@@ -1,0 +1,865 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import 'katex/dist/katex.min.css';
+
+@source './';
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  /* Naget's light palette: a warm off-white page with white cards, warm greys for text and borders,
+     golden-brown accent. Muted text stays at 4.5:1 or more on every surface. shared/themes.ts keeps
+     the same values (both palettes) for the theme editor. */
+  --bg: #f6f5f1;
+  --bg-1: #f0eee8;
+  --bg-2: #eae7df;
+  --bg-3: #e3dfd6;
+  --panel: #ffffff;
+  --sidebar: #f0eee8;
+  --elevated: #ffffff;
+  --line: #e0dbd0;
+  --line-2: #c9c2b3;
+  --fg: #1b1915;
+  --fg-2: #4a4439;
+  --fg-3: #615a4d;
+  --accent: #805a00;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(176, 124, 0, 0.12);
+  /* A session at work: blue, apart from the gold accent and from amber "needs you". */
+  --busy: #1d4ed8;
+  --claude: #c25a37;
+  --codex: #5f4fd0;
+  --ok: #156b35;
+  --err: #bd2525;
+  --warn: #9c4704;
+  --info: #1d4ed8;
+  --add: #156b35;
+  --del: #bd2525;
+  --add-bg: #e7f3e9;
+  --del-bg: #fbeceb;
+  --add-strong: #c2e5cb;
+  --del-strong: #f5cbc8;
+  --code-bg: #f2f0eb;
+  --term-bg: #faf9f6;
+  --term-fg: #2b2721;
+  --scroll: #cdc6b8;
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-grid: #ebe8e1;
+  --viz-axis: #c9c2b3;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --shadow: 0 1px 2px rgba(40, 30, 10, 0.06), 0 8px 24px rgba(40, 30, 10, 0.08);
+  --shadow-lg: 0 2px 6px rgba(40, 30, 10, 0.07), 0 18px 48px rgba(40, 30, 10, 0.14);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+.dark {
+  color-scheme: dark;
+  /* Naget's dark palette: warm near-black in small steps, warm light text, gold accent. */
+  --bg: #121110;
+  --bg-1: #171614;
+  --bg-2: #22201c;
+  --bg-3: #2c2924;
+  --panel: #1b1a17;
+  --sidebar: #151412;
+  --elevated: #1c1a17;
+  --line: #302c26;
+  --line-2: #48433a;
+  --fg: #f2eee7;
+  --fg-2: #c9c2b5;
+  --fg-3: #9b9386;
+  --accent: #d4b158;
+  --accent-fg: #1a1306;
+  --accent-soft: rgba(212, 177, 88, 0.14);
+  --busy: #82a8ff;
+  --claude: #e8916f;
+  --codex: #ada1ff;
+  --ok: #6dbb84;
+  --err: #e57373;
+  --warn: #e0a25a;
+  --info: #82a8ff;
+  --add: #6dbb84;
+  --del: #e57373;
+  --add-bg: rgba(109, 187, 132, 0.12);
+  --del-bg: rgba(229, 115, 115, 0.12);
+  --add-strong: rgba(109, 187, 132, 0.28);
+  --del-strong: rgba(229, 115, 115, 0.28);
+  --code-bg: #161513;
+  --term-bg: #0e0d0c;
+  --term-fg: #ddd7cc;
+  --scroll: #3d3932;
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-grid: #24221e;
+  --viz-axis: #3a362f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.65), 0 24px 60px rgba(0, 0, 0, 0.7);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-panel: var(--panel);
+  --color-sidebar: var(--sidebar);
+  --color-elevated: var(--elevated);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-busy: var(--busy);
+  --color-claude: var(--claude);
+  --color-codex: var(--codex);
+  --color-ok: var(--ok);
+  --color-err: var(--err);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  --color-add: var(--add);
+  --color-del: var(--del);
+  --color-code-bg: var(--code-bg);
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --shadow-pop: var(--shadow);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/* Element defaults live in the base layer so utilities (e.g. outline-none) can override them. */
+@layer base {
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01';
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scroll);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+}
+
+/* Phones must not zoom: iOS zooms into fields with text under 16px, and double taps zoom. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select,
+  [contenteditable='true'],
+  .cm-content {
+    font-size: 16px !important;
+  }
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-variant-ligatures: none;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- motion ---------------------------------------------------------------- */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes up-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.anim-pop {
+  animation: fade-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anim-overlay {
+  animation: overlay-in 140ms ease-out;
+}
+.anim-drawer {
+  animation: drawer-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anim-sheet {
+  animation: up-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.dots > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;
+  background: currentColor;
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+.dots > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dots > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Streamed words fade in as they arrive (see rehypeStreamWords). */
+@keyframes word-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sw {
+  animation: word-in 420ms ease-out both;
+}
+
+.caret::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--fg-2);
+  border-radius: 1px;
+  animation: caret 1s steps(1) infinite;
+}
+
+/* Subtle motion: content arriving rises in, opened sections ease open, panels slide in. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-in {
+  animation: rise-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes expand-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-expand {
+  animation: expand-in 220ms ease-out both;
+}
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-slide-left {
+  animation: slide-in-left 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.anim-fade {
+  animation: overlay-in 220ms ease-out both;
+}
+/* A working agent's mark turns slowly; a waiting one breathes. */
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin-gentle {
+  animation: turn 5s linear infinite;
+  transform-origin: 50% 50%;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+/* What runs right now (a step's name, "Thinking"): a soft light glides across the words, like the
+   old "slide to unlock". The words rest in a quieter colour under it. */
+@keyframes shine {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+.shine {
+  --shine-base: var(--fg-3);
+  background-image: linear-gradient(100deg, var(--shine-base) 0%, var(--shine-base) 40%, var(--fg) 50%, var(--shine-base) 60%, var(--shine-base) 100%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine 2.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ---- markdown ------------------------------------------------------------- */
+
+.md {
+  font-size: 15px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+/* HTML that documents carry (READMEs): key caps, highlights, collapsible sections. */
+.md kbd {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  padding: 0.1em 0.42em;
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--bg-1);
+  color: var(--fg);
+  white-space: nowrap;
+}
+.md mark {
+  background: color-mix(in srgb, var(--warn) 26%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 0.15em;
+}
+.md summary {
+  cursor: pointer;
+}
+.md details {
+  margin: 0.55em 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md pre,
+.md .md-table,
+.md .katex-display {
+  margin: 0.55em 0;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  font-weight: 650;
+  line-height: 1.3;
+  margin: 1.1em 0 0.45em;
+  letter-spacing: -0.01em;
+}
+.md h1 {
+  font-size: 1.35em;
+}
+.md h2 {
+  font-size: 1.2em;
+}
+.md h3 {
+  font-size: 1.07em;
+}
+.md h4 {
+  font-size: 1em;
+}
+.md ul,
+.md ol {
+  padding-left: 1.4em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin: 0.2em 0;
+}
+.md li > ul,
+.md li > ol {
+  margin: 0.15em 0;
+}
+.md li::marker {
+  color: var(--fg-3);
+}
+.md a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.md a:hover {
+  text-decoration: underline;
+}
+.md strong {
+  font-weight: 640;
+}
+.md blockquote {
+  border-left: 3px solid var(--line-2);
+  padding: 0.1em 0 0.1em 0.9em;
+  color: var(--fg-2);
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2em 0;
+}
+.md :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--bg-2);
+  border-radius: 6px;
+  padding: 0.12em 0.4em;
+  overflow-wrap: anywhere;
+}
+.md .md-table {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.md table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.93em;
+}
+.md th,
+.md td {
+  border: 1px solid var(--line);
+  padding: 0.4em 0.75em;
+  text-align: left;
+  vertical-align: top;
+  /* Whole words: a narrow column must not break "Estimate" into letters. */
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.md .md-cell {
+  min-width: 3.5em;
+  /* On a phone the next column stays in sight, which shows the table scrolls. */
+  max-width: min(24em, 62vw);
+}
+.md th {
+  background: var(--bg-1);
+  font-weight: 600;
+}
+.md input[type='checkbox'] {
+  margin-right: 0.4em;
+  accent-color: var(--accent);
+}
+.md .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2em 0;
+}
+.md img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+/* ---- code ----------------------------------------------------------------- */
+
+.code-block {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.code-block pre {
+  margin: 0;
+  padding: 10px 14px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  tab-size: 4;
+}
+.code-block pre code {
+  font-family: inherit;
+}
+.shiki,
+.shiki span {
+  background-color: transparent !important;
+}
+.dark .shiki span {
+  color: var(--shiki-dark) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+}
+
+.term-out {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--term-bg);
+  color: var(--fg-2);
+}
+
+/* ---- find in a session ------------------------------------------------------ */
+
+::highlight(wa-find) {
+  background-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  color: inherit;
+}
+.find-flash {
+  animation: find-flash 1.6s ease-out;
+  border-radius: 12px;
+}
+@keyframes find-flash {
+  0% {
+    background-color: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* ---- notebooks ------------------------------------------------------------- */
+
+:root {
+  --ansi-black: #24292f;
+  --ansi-red: #cf222e;
+  --ansi-green: #116329;
+  --ansi-yellow: #9a6700;
+  --ansi-blue: #0969da;
+  --ansi-magenta: #8250df;
+  --ansi-cyan: #1b7c83;
+  --ansi-white: #6e7781;
+  --ansi-bright-black: #57606a;
+  --ansi-bright-red: #a40e26;
+  --ansi-bright-green: #1a7f37;
+  --ansi-bright-yellow: #633c01;
+  --ansi-bright-blue: #218bff;
+  --ansi-bright-magenta: #a475f9;
+  --ansi-bright-cyan: #3192aa;
+  --ansi-bright-white: #8c959f;
+}
+.dark {
+  --ansi-black: #6e7681;
+  --ansi-red: #ff7b72;
+  --ansi-green: #3fb950;
+  --ansi-yellow: #d29922;
+  --ansi-blue: #58a6ff;
+  --ansi-magenta: #bc8cff;
+  --ansi-cyan: #39c5cf;
+  --ansi-white: #b1bac4;
+  --ansi-bright-black: #8b949e;
+  --ansi-bright-red: #ffa198;
+  --ansi-bright-green: #56d364;
+  --ansi-bright-yellow: #e3b341;
+  --ansi-bright-blue: #79c0ff;
+  --ansi-bright-magenta: #d2a8ff;
+  --ansi-bright-cyan: #56d4dd;
+  --ansi-bright-white: #f0f6fc;
+}
+
+/* Highlighted code lines up with the cell editor, so opening it does not shift the text. */
+.nb-code pre {
+  margin: 0;
+  min-height: 37px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  tab-size: 4;
+}
+.nb-code pre code {
+  font-family: inherit;
+}
+.nb-text {
+  margin: 0;
+  padding: 2px 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+.nb-stderr {
+  margin: 2px 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--err) 7%, transparent);
+}
+.nb-error {
+  margin: 2px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--err) 8%, transparent);
+  white-space: pre;
+}
+.nb-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.nb-md .md > :first-child {
+  margin-top: 0.25em;
+}
+.nb-md .md img {
+  max-width: 100%;
+}
+
+/* ---- diffs ---------------------------------------------------------------- */
+
+.diff {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+.diff table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: max-content;
+}
+.diff td {
+  padding: 0 10px 0 0;
+  white-space: pre;
+  vertical-align: top;
+}
+.diff td.ln {
+  width: 1%;
+  min-width: 3.2em;
+  padding: 0 8px;
+  text-align: right;
+  color: var(--fg-3);
+  user-select: none;
+  opacity: 0.8;
+}
+.diff td.sign {
+  width: 1%;
+  padding: 0 4px 0 6px;
+  user-select: none;
+  color: var(--fg-3);
+}
+.diff tr.add td {
+  background: var(--add-bg);
+}
+.diff tr.add td.sign {
+  color: var(--add);
+}
+.diff tr.del td {
+  background: var(--del-bg);
+}
+.diff tr.del td.sign {
+  color: var(--del);
+}
+.diff tr.hunk td {
+  background: var(--bg-2);
+  color: var(--fg-3);
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.diff mark.word-add {
+  background: var(--add-strong);
+  color: inherit;
+  border-radius: 2px;
+}
+.diff mark.word-del {
+  background: var(--del-strong);
+  color: inherit;
+  border-radius: 2px;
+}
+
+/* ---- xterm ------------------------------------------------------------------ */
+
+.xterm-host .xterm {
+  padding: 6px 0 0 8px;
+  height: 100%;
+}
+.xterm-host .xterm-viewport {
+  scrollbar-width: thin;
+}
+
+/* ---- codemirror ------------------------------------------------------------ */
+
+.cm-host .cm-editor {
+  height: 100%;
+  font-size: 13px;
+}
+.cm-host .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.55;
+}
+.cm-host .cm-editor.cm-focused {
+  outline: none;
+}
+
+/* ---- charts ---------------------------------------------------------------- */
+
+.viz-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.viz-grid {
+  stroke: var(--viz-grid);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: crispEdges;
+}
+.viz-axis {
+  stroke: var(--viz-axis);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: crispEdges;
+}
+
+/* ---- theme editor ------------------------------------------------------------ */
+
+/* A colour input drawn as a plain rounded swatch. */
+.swatch {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+}
+.swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+.swatch::-moz-color-swatch {
+  border: none;
+  border-radius: 6px;
+}

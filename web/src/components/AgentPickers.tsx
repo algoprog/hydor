@@ -1,0 +1,306 @@
+import { useEffect, useState } from 'react';
+import { create } from 'zustand';
+import { Brain, Check, ChevronRight, Gauge, ShieldCheck } from 'lucide-react';
+import type { Agent, AgentCatalog, ModelOption, SessionPrefs } from '@shared/types';
+import { api } from '../lib/api';
+import { AgentIcon, agentName } from './AgentIcon';
+import { cx, OptionRow, Picker } from './ui';
+
+type Catalog = AgentCatalog & { prefs?: SessionPrefs };
+
+// Catalogs by agent; an ACP agent's by its id ("acp:<id>"): what it offered when it last ran.
+const useCatalogs = create<{ byAgent: Record<string, Catalog>; loading: Record<string, boolean> }>(() => ({ byAgent: {}, loading: {} }));
+const catalogKey = (agent: Agent, acp?: string) => (agent === 'acp' ? `acp:${acp ?? ''}` : agent);
+
+export function loadCatalog(agent: Agent, force = false, acp?: string) {
+  const k = catalogKey(agent, acp);
+  const s = useCatalogs.getState();
+  if (!force && (s.byAgent[k] || s.loading[k])) return;
+  useCatalogs.setState((x) => ({ loading: { ...x.loading, [k]: true } }));
+  api<Catalog>(`/api/catalog/${agent}${agent === 'acp' ? `?acp=${encodeURIComponent(acp ?? '')}` : ''}`)
+    .then((c) => useCatalogs.setState((x) => ({ byAgent: { ...x.byAgent, [k]: c } })))
+    .catch(() => {})
+    .finally(() => useCatalogs.setState((x) => ({ loading: { ...x.loading, [k]: false } })));
+}
+
+export function useCatalog(agent: Agent, acp?: string): Catalog | undefined {
+  const c = useCatalogs((s) => s.byAgent[catalogKey(agent, acp)]);
+  // An ACP agent's offer is known once it has run: ask again each time.
+  useEffect(() => loadCatalog(agent, agent === 'acp', acp), [agent, acp]);
+  return c;
+}
+
+export function findModel(c: Catalog | undefined, value?: string | null): ModelOption | undefined {
+  if (!c) return undefined;
+  if (!value) return c.models.find((m) => m.isDefault) ?? c.models[0];
+  // Live sessions report resolved ids (claude-opus-5-5[1m], claude-haiku-4-5-20251001).
+  const v = value.toLowerCase().replace(/\[1m\]$/, '');
+  const named = c.models.filter((m) => m.value !== 'default');
+  return (
+    named.find((m) => m.value.toLowerCase() === v) ??
+    named.find((m) => m.resolved?.toLowerCase() === v) ??
+    named.find((m) => m.resolved && (v.startsWith(m.resolved.toLowerCase()) || m.resolved.toLowerCase().startsWith(v))) ??
+    named.find((m) => v.startsWith(m.value.toLowerCase()))
+  );
+}
+
+export function modelLabel(c: Catalog | undefined, value?: string | null): string {
+  if (!value) return findModel(c, null)?.label ?? 'Default model';
+  const m = findModel(c, value);
+  if (m && m.value !== 'default') return m.label;
+  // A resolved model id the catalog does not list: tidy it up.
+  return value.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/\[1m\]$/, ' 1M');
+}
+
+/** "Opus 5.5" → opus [5, 5]; "GPT-6-Luna" → gpt luna [6]: models of one family differ only in their version. */
+function family(label: string): { name: string; version: number[] } | null {
+  const m = /\d+(?:[.-]\d+)*/.exec(label);
+  if (!m) return null;
+  const name = (label.slice(0, m.index) + ' ' + label.slice(m.index + m[0].length)).toLowerCase().replace(/[\s_-]+/g, ' ').trim();
+  return { name, version: m[0].split(/[.-]/).map(Number) };
+}
+
+const newer = (a: number[], b: number[]) => {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  return false;
+};
+
+interface ModelRow {
+  agent: Agent;
+  opt: ModelOption;
+  /** What picking it sets: null for the agent's default. */
+  value: string | null;
+  label: string;
+  hint?: string;
+  isDefault: boolean;
+  older: boolean;
+}
+
+/** One row per model, the default marked rather than listed twice; older versions of a family are set apart. */
+function modelRows(agent: Agent, c: Catalog): ModelRow[] {
+  const def = c.models.find((m) => m.isDefault);
+  const defModel = def?.value === 'default' ? findModel(c, def.resolved) : def;
+  const named = c.models.filter((m) => m.value !== 'default');
+  const best = new Map<string, number[]>();
+  for (const m of named) {
+    const f = family(m.label);
+    if (f && (!best.has(f.name) || newer(f.version, best.get(f.name)!))) best.set(f.name, f.version);
+  }
+  return named.map((m) => {
+    const f = family(m.label);
+    const isDefault = m === defModel;
+    return {
+      agent,
+      opt: m,
+      // Claude's "default" follows its recommendation; Codex's must be named, or Codex falls back to its
+      // config.toml model, which a ChatGPT sign-in may not allow.
+      value: isDefault && def?.value === 'default' ? null : m.value,
+      label: m.label,
+      hint: m.description,
+      isDefault,
+      older: !isDefault && !!f && newer(best.get(f.name)!, f.version),
+    };
+  });
+}
+
+function ModelMenu({ agents, current, value, onPick, switchNote, acp }: { agents: Agent[]; current: Agent; value?: string | null; onPick: (v: string | null, agent: Agent) => void; switchNote?: string; acp?: string }) {
+  const all = useCatalogs((s) => s.byAgent);
+  const cats: Partial<Record<Agent, Catalog>> = Object.fromEntries(agents.map((a) => [a, all[catalogKey(a, acp)]]));
+  useEffect(() => agents.forEach((a) => loadCatalog(a, false, acp)), [agents, acp]);
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState<Partial<Record<Agent, boolean>>>({});
+  const ordered = [current, ...agents.filter((a) => a !== current)];
+  const rows = ordered.flatMap((a) => (cats[a] ? modelRows(a, cats[a]!) : []));
+  // The chosen model, with "default" read as the model it stands for.
+  const chosen = findModel(cats[current], value);
+  const chosenModel = chosen?.value === 'default' ? findModel(cats[current], chosen.resolved) : chosen;
+  const selected = (r: ModelRow) => r.agent === current && r.opt === chosenModel;
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const many = rows.length > 8;
+  return (
+    <div className="py-0.5">
+      {many && (
+        <input
+          autoFocus={!window.matchMedia('(pointer: coarse)').matches}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            const first = rows.find((r) => words.every((w) => `${r.label} ${r.value ?? ''}`.toLowerCase().includes(w)));
+            if (e.key === 'Enter' && first) onPick(first.value, first.agent);
+          }}
+          placeholder="Search models"
+          className="mx-1 mb-1 h-8 w-[calc(100%-8px)] rounded-lg bg-bg-2 px-2.5 text-[13px] outline-none placeholder:text-fg-3"
+        />
+      )}
+      {ordered.map((a) => {
+        const mine = rows.filter((r) => r.agent === a);
+        const shown = words.length ? mine.filter((r) => words.every((w) => `${r.label} ${r.value ?? ''}`.toLowerCase().includes(w))) : mine.filter((r) => !r.older || open[a] || selected(r));
+        const hidden = words.length ? 0 : mine.length - shown.length;
+        if (!cats[a]) return <div key={a} className="px-2.5 py-1.5 text-[12px] text-fg-3">Loading {agentName(a)} models…</div>;
+        if (!shown.length && words.length) return null;
+        return (
+          <div key={a}>
+            {agents.length > 1 && (
+              <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1 text-[11.5px] font-medium text-fg-3">
+                <AgentIcon agent={a} size={12} />
+                {agentName(a)}
+                {a !== current && switchNote && <span className="truncate font-normal">· {switchNote}</span>}
+              </div>
+            )}
+            {shown.map((r) => (
+              <button
+                key={`${r.agent}:${r.value}`}
+                type="button"
+                title={r.hint}
+                onClick={() => onPick(r.value, r.agent)}
+                className={cx('flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors hover:bg-bg-2', selected(r) && 'bg-bg-2')}
+              >
+                <span className="min-w-0 flex-1 truncate text-fg">{r.label}</span>
+                {r.isDefault && <span className="shrink-0 text-[11px] text-fg-3">default</span>}
+                {selected(r) && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
+              </button>
+            ))}
+            {hidden > 0 && (
+              <button type="button" onClick={() => setOpen((o) => ({ ...o, [a]: true }))} className="flex h-7.5 w-full items-center gap-1.5 rounded-lg px-2.5 text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
+                <ChevronRight size={12} />
+                {hidden} older {hidden === 1 ? 'model' : 'models'}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The model, from the session's agent or (with `agents`) any agent's list; `onChange` says which agent the
+ * picked model belongs to. Rows are one line each; older versions of a model wait behind "older models".
+ */
+export function ModelPicker({
+  agent,
+  value,
+  onChange,
+  disabled,
+  agents,
+  switchNote,
+  acp,
+}: {
+  agent: Agent;
+  value?: string | null;
+  onChange: (v: string | null, agent: Agent) => void;
+  disabled?: boolean;
+  agents?: Agent[];
+  switchNote?: string;
+  /** For an ACP agent: which one (its models are what it offered when it last ran). */
+  acp?: string;
+}) {
+  const c = useCatalog(agent, acp);
+  const list = agents ?? [agent];
+  if (agent === 'acp' && !c?.models.length) return null;
+  return (
+    <Picker
+      icon={list.length > 1 ? <AgentIcon agent={agent} size={13} className="shrink-0" /> : <Brain size={13} className="shrink-0" />}
+      value={c ? modelLabel(c, value) : 'Model'}
+      title="Model"
+      disabled={disabled}
+      width={list.length > 1 ? 300 : 260}
+    >
+      {(close) => (
+        <ModelMenu
+          agents={list}
+          current={agent}
+          value={value}
+          acp={acp}
+          switchNote={switchNote}
+          onPick={(v, a) => {
+            onChange(v, a);
+            close();
+          }}
+        />
+      )}
+    </Picker>
+  );
+}
+
+const EFFORT_HINT: Record<string, string> = {
+  low: 'Fast, light reasoning',
+  medium: 'Balanced',
+  high: 'Deeper reasoning',
+  xhigh: 'Extra-deep reasoning',
+  max: 'Maximum reasoning',
+  ultra: 'Maximum, with task delegation',
+  minimal: 'Fastest',
+  none: 'No reasoning',
+};
+
+export function EffortPicker({ agent, model, value, onChange, disabled, acp }: { agent: Agent; model?: string | null; value?: string | null; onChange: (v: string | null) => void; disabled?: boolean; acp?: string }) {
+  const c = useCatalog(agent, acp);
+  if (agent === 'acp') return null;
+  const m = findModel(c, model);
+  const levels = m?.efforts ?? [];
+  if (c && !levels.length) return null;
+  return (
+    <Picker icon={<Gauge size={13} className="shrink-0" />} value={value ? value[0].toUpperCase() + value.slice(1) : 'Effort'} title="Reasoning effort" disabled={disabled} width={230}>
+      {(close) => (
+        <>
+          <OptionRow
+            label="Default"
+            hint={m?.defaultEffort ? `Model default (${m.defaultEffort})` : 'Use the configured default'}
+            selected={!value}
+            onClick={() => {
+              onChange(null);
+              close();
+            }}
+          />
+          {levels.map((l) => (
+            <OptionRow
+              key={l}
+              label={l[0].toUpperCase() + l.slice(1)}
+              hint={EFFORT_HINT[l]}
+              selected={value === l}
+              onClick={() => {
+                onChange(l);
+                close();
+              }}
+            />
+          ))}
+        </>
+      )}
+    </Picker>
+  );
+}
+
+export function ModePicker({ agent, value, onChange, disabled, acp }: { agent: Agent; value?: string | null; onChange: (v: string) => void; disabled?: boolean; acp?: string }) {
+  const c = useCatalog(agent, acp);
+  const cur = c?.modes.find((m) => m.value === value) ?? c?.modes.find((m) => m.value === c?.defaultMode);
+  if (agent === 'acp' && !c?.modes.length) return null;
+  return (
+    <Picker icon={<ShieldCheck size={13} className="shrink-0" />} value={cur?.label ?? 'Mode'} title="Mode (Shift+Tab cycles)" disabled={disabled} width={300}>
+      {(close) => (
+        <>
+          {(c?.modes ?? []).map((m) => (
+            <OptionRow
+              key={m.value}
+              label={m.label}
+              hint={m.description}
+              selected={cur?.value === m.value}
+              onClick={() => {
+                onChange(m.value);
+                close();
+              }}
+            />
+          ))}
+          {c?.modeNote && <div className="mx-1 mt-1 border-t border-line px-2 pt-2 pb-1 text-[11.5px] leading-snug text-fg-3">{c.modeNote}</div>}
+        </>
+      )}
+    </Picker>
+  );
+}
+
+export function nextMode(c: Catalog | undefined, current?: string | null): string | null {
+  if (!c?.modes.length) return null;
+  const order = c.modes.map((m) => m.value);
+  const i = order.indexOf(current ?? c.defaultMode);
+  return order[(i + 1) % order.length];
+}

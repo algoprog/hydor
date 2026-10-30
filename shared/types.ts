@@ -1,0 +1,948 @@
+// Types shared by the server and the web client.
+import type { AppTheme } from './themes.ts';
+
+/** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
+export type Agent = 'claude' | 'codex' | 'acp';
+
+/** An ACP agent the app can start (Settings → More agents). */
+export interface AcpAgentDef {
+  id: string;
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  /** How to install it (presets). */
+  hint?: string;
+}
+
+export type ItemStatus = 'pending' | 'running' | 'ok' | 'error' | 'declined' | 'interrupted' | 'waiting';
+
+export interface FileChange {
+  path: string;
+  op: 'edit' | 'create' | 'write' | 'delete' | 'move';
+  movePath?: string;
+  added: number;
+  removed: number;
+  /** Unified-diff hunks (no file headers). */
+  diff?: string;
+  diffTruncated?: boolean;
+}
+
+export interface TodoEntry {
+  text: string;
+  status: 'pending' | 'in_progress' | 'completed' | string;
+}
+
+export interface QuestionOption {
+  label: string;
+  description?: string;
+}
+
+export interface Question {
+  id: string;
+  header?: string;
+  question: string;
+  multiSelect?: boolean;
+  options: QuestionOption[];
+  allowOther?: boolean;
+}
+
+export interface ApprovalOption {
+  id: string;
+  label: string;
+  style?: 'primary' | 'danger' | 'default';
+}
+
+export interface ApprovalRequest {
+  id: string;
+  /** What is being approved, shown as the card title. */
+  title: string;
+  detail?: string;
+  /** The tool_use / item this approval belongs to, when known. */
+  itemId?: string;
+  kind: 'tool' | 'command' | 'file' | 'permissions' | 'question' | 'plan' | 'other';
+  options: ApprovalOption[];
+  questions?: Question[];
+  createdAt: number;
+}
+
+export type ToolCategory =
+  | 'command'
+  | 'edit'
+  | 'read'
+  | 'search'
+  | 'web'
+  | 'task'
+  | 'todo'
+  | 'mcp'
+  | 'question'
+  | 'plan'
+  | 'message'
+  | 'other';
+
+export interface ToolInfo {
+  /** Raw tool name, e.g. Bash, Edit, exec_command, apply_patch, mcp__server__tool. */
+  name: string;
+  category: ToolCategory;
+  /** One-line summary: the command, the path, the query. */
+  title: string;
+  subtitle?: string;
+  /** What the step is for, in the agent's own words (Claude's command descriptions). */
+  label?: string;
+  status: ItemStatus;
+  input?: unknown;
+  output?: string;
+  /** Full output size in bytes when `output` was shortened. */
+  outputBytes?: number;
+  truncated?: boolean;
+  exitCode?: number | null;
+  durationMs?: number;
+  background?: boolean;
+  taskId?: string;
+  cwd?: string;
+  files?: FileChange[];
+  todos?: TodoEntry[];
+  questions?: Question[];
+  answers?: Record<string, string>;
+  agentId?: string;
+  error?: string;
+  /** The agent's own guard refused the command (auto-mode classifier / built-in safety check): the reason it gave. */
+  blocked?: string;
+  /** Live-only: output streamed while running. */
+  liveOutput?: string;
+}
+
+interface BaseItem {
+  id: string;
+  seq: number;
+  ts?: number;
+  turn?: string;
+}
+
+export type UserItem = BaseItem & {
+  kind: 'user';
+  text: string;
+  images?: number;
+  /** queued: typed while the agent was busy; slash: a slash command; note: injected by the harness. */
+  meta?: 'queued' | 'slash' | 'note' | 'command-output';
+  /** Set when the text is a message delivered from another Claude session (on the user's behalf). */
+  peer?: PeerFrom;
+  /** The message opened with a conversation carried over from another agent's session; `text` is the request after it. */
+  handoff?: HandoffInfo;
+  /** Byte offset of the transcript line that holds the message's images (they are read from there to show). */
+  imageAt?: number;
+};
+
+/** A conversation carried over from a session of another agent (see server/handoff.ts). */
+export interface HandoffInfo {
+  agent: Agent;
+  key?: string;
+  title?: string;
+  /** Messages carried over, and those left out to fit. */
+  messages: number;
+  omitted: number;
+  context: string;
+}
+
+/** Who an incoming cross-session message came from. */
+export interface PeerFrom {
+  name?: string;
+  mode?: string;
+  address?: string;
+}
+/** `entry`: the transcript entry it came from (Claude), so a fork can resume up to it. */
+export type AssistantItem = BaseItem & { kind: 'assistant'; text: string; phase?: string; streaming?: boolean; entry?: string };
+export type ThinkingItem = BaseItem & { kind: 'thinking'; text: string; durationMs?: number; streaming?: boolean };
+export type ToolItem = BaseItem & { kind: 'tool'; tool: ToolInfo };
+export type SystemItem = BaseItem & {
+  kind: 'system';
+  level: 'info' | 'warn' | 'error';
+  text: string;
+  detail?: string;
+  /** A cross-session notice (a peer went idle, or a message was/wasn't delivered). */
+  peer?: boolean;
+};
+export type TurnItem = BaseItem & {
+  kind: 'turn';
+  status: 'completed' | 'interrupted' | 'failed' | string;
+  durationMs?: number;
+  tokens?: TokenUsage;
+  costUsd?: number;
+  model?: string;
+};
+
+export type TimelineItem = UserItem | AssistantItem | ThinkingItem | ToolItem | SystemItem | TurnItem;
+
+export interface TokenUsage {
+  input: number;
+  output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  reasoning?: number;
+}
+
+export interface SessionStats {
+  userMessages: number;
+  assistantMessages: number;
+  toolCalls: number;
+  commands: number;
+  backgroundCommands: number;
+  filesChanged: number;
+  linesAdded: number;
+  linesRemoved: number;
+  turns: number;
+  tokensIn: number;
+  tokensOut: number;
+  tokensCached: number;
+  costUsd?: number;
+  /** Active generation time (ms): summed TTFT+decode per assistant reply, excluding tool runs and idle. Output throughput = tokensOut / genMs. */
+  genMs?: number;
+}
+
+export interface BackgroundTask {
+  id: string;
+  description: string;
+  kind?: string;
+  status: 'running' | 'completed' | 'failed' | 'stopped' | string;
+  startedAt?: number;
+  toolUseId?: string;
+}
+
+/** One step of a background agent: a tool it ran, or something it said. */
+export interface TaskLogEntry {
+  ts?: number;
+  tool?: string;
+  text: string;
+  failed?: boolean;
+}
+
+/** The latest output of a background task. */
+export interface TaskLog {
+  /** output: a command's or monitor's stdout and stderr; agent: what the agent did. */
+  kind: 'output' | 'agent';
+  text?: string;
+  entries?: TaskLogEntry[];
+  /** Size of the whole output; `text` is its end when `truncated`. */
+  size?: number;
+  truncated?: boolean;
+  updatedAt: number;
+}
+
+export type LiveStatus = 'starting' | 'idle' | 'working' | 'waiting' | 'stopping' | 'exited' | 'error';
+
+export interface LiveState {
+  status: LiveStatus;
+  startedAt: number;
+  pid?: number;
+  model?: string;
+  effort?: string;
+  mode?: string;
+  turnStartedAt?: number;
+  pendingApprovals: number;
+  error?: string;
+  contextTokens?: number;
+  contextWindow?: number;
+  backgroundTasks?: BackgroundTask[];
+  /** Output decode speed of the last reply, tokens/sec (Claude: measured from the stream; Codex: per turn). */
+  tokPerSec?: number;
+  /** Prompt cache (Claude): when the last request refreshed the cache, and its TTL, so the UI can count down to expiry. */
+  cacheAt?: number;
+  cacheTtlMs?: number;
+  /** The goal the agent is working towards, while one is set (`/goal`). */
+  goal?: GoalInfo;
+}
+
+/** A session running in another client (VS Code, a terminal), detected on this machine. */
+export interface ExternalState {
+  status: 'working' | 'waiting' | 'idle';
+  /** Where it runs: "VS Code", "terminal", … */
+  client: string;
+  pid: number;
+  detail?: string;
+  since?: number;
+  /** When its process started: tasks from an earlier run of the session died with that run. */
+  startedAt?: number;
+  /** Background commands, agents and monitors still running (from the transcript). */
+  backgroundTasks?: BackgroundTask[];
+}
+
+export interface SessionSummary {
+  key: string;
+  agent: Agent;
+  id: string;
+  title: string;
+  /** Manual position in its sidebar group (Active, Pinned), set by drag and drop; unset ones sort first. */
+  order?: number;
+  external?: ExternalState | null;
+  firstPrompt?: string;
+  lastPrompt?: string;
+  cwd?: string;
+  gitBranch?: string;
+  model?: string;
+  source?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  sizeBytes?: number;
+  stats: SessionStats;
+  live?: LiveState | null;
+  archived?: boolean;
+  pinned?: boolean;
+  createdByApp?: boolean;
+  /** Settings last used from this app for the session. */
+  prefs?: SessionPrefs;
+  /** The conversation moved here from that session, or moved on from here to it (another agent). */
+  handoffFrom?: string;
+  handoffTo?: string;
+  /** A fork of that session (Codex forks show only what came after; the rest is there). */
+  forkFrom?: string;
+  /** When a turn last finished, and when the session was last looked at: newer `doneAt` means unread. */
+  doneAt?: number;
+  seenAt?: number;
+  /** Messages waiting for the running turn to end; `queueHeld` after you stopped the agent (or a restart). */
+  queue?: QueuedMessage[];
+  queueHeld?: boolean;
+  /** Out of the list until then (it comes back by itself, or when it needs you). */
+  snoozedUntil?: number;
+  /** The session works in a worktree of its own, on its own branch. */
+  worktree?: WorktreeInfo;
+  /** The pull request made from the session's branch. */
+  pr?: PullRequestInfo;
+  /** A goal the agent keeps working towards across turns (`/goal`). */
+  goal?: GoalInfo;
+  /** When "Resume at reset" will continue it (after a usage limit). */
+  resumeAt?: number;
+  /** The added account it runs as (Settings → Accounts); missing for the CLI's own sign-in. */
+  account?: string;
+  /** For an ACP session: which agent (its id in Settings → More agents) and its name. */
+  acpAgent?: string;
+  acpName?: string;
+}
+
+export interface WorktreeInfo {
+  path: string;
+  branch: string;
+  /** The branch it was made from, and is compared and merged against. */
+  base: string;
+  /** The main checkout it belongs to. */
+  repo: string;
+}
+
+export interface PullRequestInfo {
+  provider: 'github' | 'gitea';
+  url: string;
+  number: number;
+  title: string;
+  state: 'open' | 'closed' | 'merged' | 'draft';
+  /** Combined status of its checks, when the host reports them. */
+  checks?: 'pending' | 'success' | 'failure';
+  /** The repository on the host, "owner/name". */
+  repo: string;
+  updatedAt?: number;
+}
+
+/** An account added for an agent, beside the CLI's own (Settings → Accounts). */
+export interface AgentAccount {
+  id: string;
+  agent: Agent;
+  name: string;
+}
+
+export interface GoalInfo {
+  objective: string;
+  /** active: being worked on. paused: waiting for Resume (Codex). blocked, limited: stopped by the agent, a usage limit or its token budget (Codex). */
+  status: 'active' | 'paused' | 'blocked' | 'limited';
+  /** Times it was checked and found not met yet (Claude). */
+  turns?: number;
+  /** Why the last check found it not met (Claude). */
+  reason?: string;
+  tokensUsed?: number;
+  tokenBudget?: number;
+  /** Time spent on it, in seconds (Codex). */
+  seconds?: number;
+}
+
+/** When a task runs: every few minutes, at a time of day (on some weekdays), once, or when its URL is called. */
+export type TaskSchedule =
+  | { kind: 'every'; minutes: number }
+  | { kind: 'daily'; time: string; days?: number[] }
+  | { kind: 'once'; at: number }
+  | { kind: 'webhook' };
+
+/** Agent work that starts by itself; each run starts a new session or sends a message into one. */
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  schedule: TaskSchedule;
+  /** For a webhook task, `{{body.field}}`, `{{headers.name}}`, `{{query.name}}`, `{{body}}` and `{{request}}` fill in from the call. */
+  prompt: string;
+  agent: Agent;
+  cwd: string;
+  model?: string;
+  effort?: string;
+  mode?: string;
+  /** Post into this session instead of starting a new one each run. */
+  target?: string;
+  enabled: boolean;
+  nextAt?: number;
+  lastAt?: number;
+  /** "ok", or what went wrong. */
+  lastStatus?: string;
+  /** The session the last run started or posted into. */
+  lastKey?: string;
+  /** Webhook tasks: the path to call (its secret is part of it). */
+  hookPath?: string;
+  /** Made by "Resume at reset": continues `target` once, then goes away. */
+  resume?: boolean;
+  createdAt: number;
+}
+
+export interface QueuedMessage {
+  id: string;
+  text: string;
+  at: number;
+  images?: number;
+  files?: number;
+  /** What is attached, to show and to edit. */
+  att?: QueuedAttachment[];
+}
+
+export interface QueuedAttachment {
+  /** `img:<n>` or `file:<n>`: which one, to show it and to keep it when the message is edited. */
+  ref: string;
+  name: string;
+  image: boolean;
+}
+
+/** A session finished, failed or needs you: shown on open pages and pushed to subscribed devices. */
+export interface NotifyEvent {
+  key: string;
+  kind: 'done' | 'waiting' | 'failed';
+  title: string;
+  body: string;
+  agent: Agent;
+  at: number;
+  /** Set when the session is on another machine (Settings → Machines). */
+  machine?: { id: string; name: string };
+}
+
+/** Another machine running Agent Console that this one uses (Settings → Machines); its token stays on the server. */
+export interface MachineView {
+  /** Its pages are /m/<id>/… */
+  id: string;
+  name: string;
+  via: 'url' | 'ssh';
+  url?: string;
+  /** SSH host (from ~/.ssh/config, or user@host) and the port Agent Console listens on there. */
+  ssh?: string;
+  port?: number;
+  status: MachineStatus;
+}
+
+export interface MachineStatus {
+  state: 'connecting' | 'online' | 'offline';
+  /** Its hostname and Agent Console version, once reached. */
+  host?: string;
+  version?: string;
+  error?: string;
+  /** Sessions there that need you, and that are working. */
+  waiting: number;
+  working: number;
+  since?: number;
+}
+
+export interface SessionPrefs {
+  model?: string;
+  effort?: string;
+  mode?: string;
+  /** The added account new sessions run as ('' or missing: the CLI's own sign-in). */
+  account?: string;
+}
+
+/** Live additions layered over the persisted timeline. */
+export interface LiveOverlay {
+  /** Items not yet written to the transcript (streaming text, starting tools). */
+  items: TimelineItem[];
+  /** Patches for persisted items, keyed by item id. */
+  patches: Record<string, Partial<ToolInfo>>;
+  approvals: ApprovalRequest[];
+}
+
+export interface TimelinePage {
+  items: TimelineItem[];
+  total: number;
+  start: number;
+}
+
+export interface SearchHit {
+  key: string;
+  agent: Agent;
+  title: string;
+  cwd?: string;
+  updatedAt?: number;
+  kind: string;
+  /** Snippet with \u0001 … \u0002 around matches. */
+  snippet: string;
+  ts?: number;
+}
+
+export interface ModelOption {
+  value: string;
+  label: string;
+  /** The concrete model id an alias maps to (Claude: opus -> claude-opus-5-5). */
+  resolved?: string;
+  description?: string;
+  efforts: string[];
+  defaultEffort?: string;
+  isDefault?: boolean;
+}
+
+export interface ModeOption {
+  value: string;
+  label: string;
+  description: string;
+}
+
+export interface AgentCatalog {
+  models: ModelOption[];
+  modes: ModeOption[];
+  defaultMode: string;
+  /** Slash commands and skills the agent takes as messages (Claude: from its initialize reply). */
+  commands?: { name: string; description?: string; argumentHint?: string }[];
+  /** Something to know when picking a mode here (Codex inside a container: no sandbox). */
+  modeNote?: string;
+}
+
+export interface UsageWindow {
+  id: string;
+  label: string;
+  usedPercent: number | null;
+  resetsAt?: number | null;
+  windowMinutes?: number | null;
+  severity?: string;
+  active?: boolean;
+  detail?: string;
+}
+
+export interface AgentUsage {
+  agent: Agent;
+  ok: boolean;
+  error?: string;
+  fetchedAt: number;
+  account?: { email?: string; plan?: string; org?: string };
+  windows: UsageWindow[];
+  credits?: { balance?: string; unlimited?: boolean; hasCredits?: boolean } | null;
+  /** Limit resets the account holds: Codex reset credits, Claude reset grants. */
+  resetCredits?: { available: number; items: LimitReset[]; nextAvailableAt?: number; cooldownUntil?: number } | null;
+  /** Set while the usage is used up: which limit, and when it lifts. */
+  limited?: { label: string; resetsAt?: number | null } | null;
+  extra?: {
+    enabled: boolean;
+    monthlyLimit?: number | null;
+    used?: number | null;
+    utilization?: number | null;
+    currency?: string | null;
+    note?: string;
+  } | null;
+  breakdown?: { label: string; percent: number }[];
+  daily?: { date: string; tokens: number }[];
+  lifetimeTokens?: number;
+}
+
+/** One limit reset: using it clears the plan's usage limits now instead of waiting for them to lift. */
+export interface LimitReset {
+  id: string;
+  title: string;
+  detail?: string;
+  expiresAt?: number;
+  /** Uses left on it (a Claude grant can hold several). */
+  left?: number;
+  /** Some only work once a limit is hit. */
+  usableNow: boolean;
+  note?: string;
+}
+
+export interface LimitResetResult {
+  ok: boolean;
+  /** reset, nothing_to_reset, no_credit, already_used, cooldown, unavailable, error */
+  outcome: string;
+  message: string;
+  usage: AgentUsage;
+}
+
+export interface AccountStatus {
+  agent: Agent;
+  loggedIn: boolean;
+  email?: string;
+  plan?: string;
+  method?: string;
+  detail?: string;
+  error?: string;
+}
+
+export interface LoginFlow {
+  id: string;
+  agent: Agent;
+  method: string;
+  state: 'starting' | 'waiting' | 'verifying' | 'done' | 'failed' | 'cancelled';
+  url?: string;
+  code?: string;
+  /** The flow needs the user to paste a code (Claude) or the final redirect URL (Codex browser). */
+  needsInput?: 'code' | 'url';
+  message?: string;
+  error?: string;
+}
+
+export interface DirEntry {
+  name: string;
+  path: string;
+  git?: boolean;
+}
+
+// ---- activity stats ----
+
+export type StatsGranularity = 'day' | 'week' | 'month' | 'year';
+
+export interface ActivityCounters {
+  prompts: number;
+  turns: number;
+  messages: number;
+  toolCalls: number;
+  commands: number;
+  fileEdits: number;
+  linesAdded: number;
+  linesRemoved: number;
+  /** Input tokens not served from cache (Claude: input + cache writes). */
+  tokensIn: number;
+  tokensCached: number;
+  tokensOut: number;
+  /** Active reply-generation time (ms) in the bucket. Output throughput = tokensOut / (genMs/1000). */
+  genMs: number;
+}
+
+/** Estimated API cost in dollars, for priced models (subscriptions are flat-rate). */
+export type StatsTotals = ActivityCounters & { sessions: number; cost?: number };
+
+/** A model's price in dollars per million tokens. */
+export interface ModelPrice {
+  input: number;
+  output: number;
+  /** Cached input; the input price when unset. */
+  cacheRead?: number;
+}
+
+/** Tokens and estimated cost of one model over the window shown. */
+export interface ModelUsage {
+  model: string;
+  tokensIn: number;
+  tokensCached: number;
+  tokensOut: number;
+  /** Null: no price known for this model (set one in Model prices). */
+  cost: number | null;
+  price: (ModelPrice & { source: 'custom' | 'table' }) | null;
+}
+
+export interface StatsBucket extends StatsTotals {
+  key: string;
+  label: string;
+  /** Bucket start, ms since epoch. */
+  start: number;
+}
+
+export interface StatsResponse {
+  granularity: StatsGranularity;
+  tz: string;
+  agent: 'all' | Agent;
+  buckets: StatsBucket[];
+  totals: StatsTotals;
+  /** The same number of buckets just before this window. */
+  previous: StatsTotals;
+  byAgent: Record<Agent, StatsTotals>;
+  projects: (StatsTotals & { cwd: string })[];
+  byModel: ModelUsage[];
+}
+
+// ---- system monitor ----
+
+export interface GpuSample {
+  index: number;
+  name: string;
+  util: number;
+  memUtil: number;
+  memUsed: number;
+  memTotal: number;
+  temp: number;
+  power: number;
+  powerLimit: number;
+  fan: number | null;
+  clock: number;
+  pstate: string;
+}
+
+export interface SystemSample {
+  t: number;
+  cpu: number;
+  cores: number[];
+  load: [number, number, number];
+  mem: { total: number; used: number; available: number; cached: number; buffers: number };
+  swap: { total: number; used: number };
+  gpus: GpuSample[];
+  net: { rx: number; tx: number; ifaces: Record<string, { rx: number; tx: number }> };
+  disk: { read: number; write: number };
+  temps: { label: string; value: number }[];
+}
+
+export interface ProcInfo {
+  pid: number;
+  name: string;
+  cmd: string;
+  user: string;
+  cpu: number;
+  rss: number;
+  gpuMem?: number;
+}
+
+export interface SystemInfo {
+  hostname: string;
+  os: string;
+  kernel: string;
+  uptime: number;
+  cpuModel: string;
+  cores: number;
+  mounts: { mount: string; device: string; fstype: string; size: number; used: number; avail: number }[];
+  processes: { byCpu: ProcInfo[]; byMem: ProcInfo[]; gpu: ProcInfo[] };
+}
+
+export type ServerEvent =
+  | { t: 'hello'; version: string }
+  | { t: 'sessions'; upsert: SessionSummary[]; remove?: string[] }
+  | { t: 'items'; key: string; items: TimelineItem[]; total: number; reset?: boolean }
+  | { t: 'live'; key: string; live: LiveState | null; overlay: LiveOverlay }
+  | { t: 'usage'; claude?: AgentUsage; codex?: AgentUsage; accounts?: Record<string, AgentUsage> }
+  | { t: 'accounts'; accounts: AgentAccount[] }
+  | { t: 'acpAgents'; agents: AcpAgentDef[] }
+  | { t: 'login'; flow: LoginFlow }
+  | { t: 'index'; done: number; total: number; running: boolean }
+  | { t: 'system'; sample: SystemSample }
+  | { t: 'toast'; level: 'info' | 'error'; text: string }
+  | { t: 'kernel'; id: string; e: KernelOp }
+  | { t: 'notify'; n: NotifyEvent }
+  | { t: 'machines' }
+  | { t: 'tasks' }
+  | { t: 'themes'; themes: AppTheme[] };
+
+export type ClientEvent = { t: 'sub'; key: string } | { t: 'unsub'; key: string } | { t: 'ping' };
+
+// ---- notebooks ----------------------------------------------------------------------
+
+/** One output of a code cell in nbformat shape, with multi-line strings joined. */
+export interface NbOutput {
+  output_type: 'stream' | 'display_data' | 'execute_result' | 'error';
+  name?: 'stdout' | 'stderr';
+  text?: string;
+  data?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  execution_count?: number | null;
+  ename?: string;
+  evalue?: string;
+  traceback?: string[];
+  /** Live outputs only, never saved: the id that update_display_data replaces. */
+  transient?: { display_id?: string };
+}
+
+export type RunState = 'queued' | 'running' | 'ok' | 'error' | 'aborted';
+
+/** The latest run of one cell in a kernel. `seq` grows with each run, so stale messages can be told apart. */
+export interface CellRun {
+  cellId: string;
+  seq: number;
+  state: RunState;
+  count: number | null;
+  outputs: NbOutput[];
+  startedAt?: number;
+  endedAt?: number;
+  /** The kernel is waiting for typed input (Python's input()). */
+  input?: { prompt: string; password: boolean };
+}
+
+export type KernelStatus = 'starting' | 'idle' | 'busy' | 'restarting' | 'dead';
+
+export interface KernelInfo {
+  id: string;
+  /** The notebook the kernel belongs to; it runs in that notebook's folder. */
+  notebook: string;
+  env: string;
+  envName: string;
+  language?: string;
+  status: KernelStatus;
+  pid: number;
+  startedAt: number;
+  lastActivity: number;
+  /** Resident memory of the kernel process, in bytes (listings only). */
+  rss?: number;
+  /** Why it stopped or could not start. */
+  error?: string;
+}
+
+/** A Python environment (or a registered Jupyter kernel) a notebook can run in. */
+export interface KernelEnv {
+  id: string;
+  name: string;
+  /** Where it lives, for telling similar names apart. */
+  detail: string;
+  kind: 'venv' | 'conda' | 'system' | 'spec';
+  language: string;
+  version?: string;
+  /** It can start a kernel now; a Python environment needs ipykernel installed. */
+  ready: boolean;
+}
+
+/** Live kernel changes, sent to pages subscribed to `kernel:<id>`. */
+export type KernelOp =
+  | { op: 'kernel'; kernel: KernelInfo }
+  | { op: 'gone' }
+  | { op: 'snapshot'; kernel: KernelInfo; runs: CellRun[] }
+  /** A run's state changed; a higher `seq` than the page has means a new run with no outputs yet. */
+  | { op: 'run'; run: Omit<CellRun, 'outputs'> }
+  | { op: 'out'; cellId: string; seq: number; output: NbOutput }
+  | { op: 'clear'; cellId: string; seq: number }
+  | { op: 'replace'; cellId: string; seq: number; index: number; output: NbOutput };
+
+// ---- git ----------------------------------------------------------------------------
+
+export interface GitCommit {
+  hash: string;
+  subject: string;
+  author: string;
+  ts: number;
+}
+
+export interface GitFileStatus {
+  path: string;
+  /** Porcelain XY: "M.", ".M", "A.", "D.", "R.", "??", "UU"… */
+  code: string;
+  from?: string;
+}
+
+/** A repository a session worked in, against its upstream. */
+export interface GitRepo {
+  path: string;
+  name: string;
+  /** null when HEAD is detached. */
+  branch: string | null;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  /** Changed and untracked files; -1 when status took too long. */
+  changed: number;
+  remote: string | null;
+  lastCommit?: GitCommit;
+  /** When the remote was last fetched (FETCH_HEAD), ms. */
+  fetchedAt?: number;
+  sessions: number;
+  lastUsed?: number;
+  error?: string;
+}
+
+export interface GitRepoDetail extends GitRepo {
+  remotes: { name: string; url: string }[];
+  toPush: GitCommit[];
+  toPull: GitCommit[];
+  files: GitFileStatus[];
+  recent: GitCommit[];
+}
+
+export interface GitActionResult {
+  ok: boolean;
+  output: string;
+  repo: GitRepoDetail;
+}
+
+// ---- agent setup: MCP servers, skills, plugins, instruction files ----
+
+export type McpScope = 'user' | 'project' | 'local';
+export type McpTransport = 'stdio' | 'http' | 'sse';
+
+/** A configured MCP server. Env and header values never leave the server: only their names. */
+export interface McpEntry {
+  agent: Agent;
+  name: string;
+  scope: McpScope;
+  transport: McpTransport;
+  command?: string;
+  args?: string[];
+  url?: string;
+  envKeys?: string[];
+  headerKeys?: string[];
+  bearerEnv?: string;
+  enabled?: boolean;
+}
+
+export interface McpSpec {
+  agents: Agent[];
+  name: string;
+  transport: McpTransport;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  bearerEnv?: string;
+  /** Claude only (Codex keeps one global list). */
+  scope?: McpScope;
+  cwd?: string;
+}
+
+/** A server's state as a new session sees it: `auth` needs a sign-in, `pending` was still connecting. */
+export interface McpStatus {
+  name: string;
+  state: 'connected' | 'failed' | 'auth' | 'pending' | 'off';
+  error?: string;
+  tools?: number;
+}
+
+export interface SkillEntry {
+  agent: Agent;
+  name: string;
+  description: string;
+  /** The SKILL.md file. */
+  path: string;
+  scope: 'user' | 'project' | 'repo' | 'system' | 'admin' | 'plugin';
+  enabled: boolean;
+  plugin?: string;
+  /** User and project skills can be deleted; system and plugin ones are managed elsewhere. */
+  deletable: boolean;
+}
+
+export interface PluginEntry {
+  id: string;
+  name: string;
+  description?: string;
+  marketplace?: string;
+  installCount?: number;
+  version?: string;
+  scope?: string;
+  enabled?: boolean;
+  installed: boolean;
+}
+
+export interface MarketplaceEntry {
+  name: string;
+  source?: string;
+  repo?: string;
+  url?: string;
+}
+
+/** CLAUDE.md / AGENTS.md and the like that an agent reads for a folder, in load order. */
+export interface InstructionFile {
+  path: string;
+  scope: 'user' | 'parent' | 'project' | 'local' | 'rules';
+  exists: boolean;
+  size?: number;
+  /** Shown even when missing, so it can be created. */
+  primary?: boolean;
+}
+
+export interface SetupResult {
+  ok: boolean;
+  output: string;
+}

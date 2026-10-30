@@ -1,0 +1,164 @@
+import { useState } from 'react';
+import { AlertTriangle, Clock3, RotateCcw } from 'lucide-react';
+import type { Agent, AgentUsage, LimitReset, LimitResetResult } from '@shared/types';
+import { del, enc, post } from '../../lib/api';
+import { pct, untilText } from '../../lib/format';
+import { toast, toastError, useUsage } from '../../lib/store';
+import { agentName } from '../../components/AgentIcon';
+import { Button, cx, useConfirm } from '../../components/ui';
+
+const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+
+/** Resets that work right now, soonest to expire first. */
+export function usableResets(u: AgentUsage | null | undefined): LimitReset[] {
+  return (u?.resetCredits?.items ?? []).filter((r) => r.usableNow);
+}
+
+/** Asks first, then spends one limit reset (of the agent's own sign-in, or an added account) and shows how it went. */
+export function useLimitReset(agent: Agent, account?: string) {
+  const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : agent === 'acp' ? null : s[agent]));
+  const [confirm, confirmNode] = useConfirm();
+  const [busy, setBusy] = useState(false);
+
+  const use = async (item?: LimitReset) => {
+    const pick = item ?? usableResets(u)[0];
+    if (!pick || busy) return;
+    const n = u?.resetCredits?.available ?? 1;
+    const top = (u?.windows ?? []).reduce<{ label: string; usedPercent: number | null } | null>((a, w) => ((w.usedPercent ?? 0) > (a?.usedPercent ?? -1) ? w : a), null);
+    const ok = await confirm({
+      title: `Use a ${agentName(agent)} limit reset?`,
+      body: (
+        <div className="space-y-2">
+          <div>
+            This clears the {agentName(agent)} usage limits now instead of waiting for them to reset. It uses <b className="font-medium text-fg">{pick.title}</b>
+            {pick.expiresAt ? `, which expires ${untilText(pick.expiresAt)}` : ''}; {n > 1 ? `${plural(n - 1, 'reset')} will be left.` : 'it is the last one.'}
+          </div>
+          {!u?.limited && top && (
+            <div className="rounded-lg bg-warn/10 px-3 py-2 text-[13px] text-warn">
+              You are not at a limit right now ({top.label}: {pct(top.usedPercent)} used).
+            </div>
+          )}
+        </div>
+      ),
+      confirm: 'Use reset',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const r = await post<LimitResetResult>(`/api/usage/${enc(agent)}/reset`, { id: pick.id, account });
+      useUsage.getState().set(account ? { accounts: { [account]: r.usage } } : { [agent]: r.usage });
+      toast(r.message, r.ok ? 'ok' : 'info');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { use, busy, node: confirmNode };
+}
+
+/**
+ * Shown where you work with an agent whose usage is used up: when it comes back, and a reset if there is
+ * one. In a session (`session` given) it can also continue the session by itself once the limit lifts.
+ */
+export function LimitBanner({ agent, account, className, session }: { agent: Agent; account?: string; className?: string; session?: { key: string; resumeAt?: number; busy?: boolean } }) {
+  const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : agent === 'acp' ? null : s[agent]));
+  const reset = useLimitReset(agent, account);
+  const lim = u?.limited;
+  if (session?.resumeAt)
+    return (
+      <div className={cx('anim-expand flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
+        <Clock3 size={15} className="shrink-0 text-busy" />
+        <span className="min-w-0 flex-1">
+          Continues by itself <span className="font-medium">{untilText(session.resumeAt)}</span>
+          {lim ? <span className="text-fg-3">, when the usage limit lifts.</span> : '.'}
+        </span>
+        <Button size="sm" variant="ghost" onClick={() => del(`/api/sessions/${enc(session.key)}/resume-at`).catch(toastError)}>
+          Cancel
+        </Button>
+      </div>
+    );
+  if (!lim || session?.busy) return null;
+  const usable = usableResets(u);
+  const left = u?.resetCredits?.available ?? 0;
+  return (
+    <div className={cx('anim-expand flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[13.5px]', className)} role="status">
+      <AlertTriangle size={15} className="shrink-0 text-warn" />
+      <span className="min-w-0 flex-1">
+        <span className="font-medium">You've hit the {agentName(agent)} usage limit</span>
+        <span className="text-fg-2">
+          {' '}
+          ({lim.label}).
+          {lim.resetsAt ? ` It resets ${untilText(lim.resetsAt)}.` : ''}
+        </span>
+      </span>
+      {session && lim.resetsAt && (
+        <Button
+          size="sm"
+          variant={usable.length ? 'secondary' : 'primary'}
+          icon={<Clock3 size={14} />}
+          onClick={() => post(`/api/sessions/${enc(session.key)}/resume-at`, { at: lim.resetsAt! + 60_000 }).catch(toastError)}
+          title="Sends “Continue where you left off.” a minute after the limit resets"
+        >
+          Resume at reset
+        </Button>
+      )}
+      {usable.length > 0 && (
+        <span className="flex items-center gap-2">
+          <span className="text-[12.5px] text-fg-3">{plural(left, 'reset')} available</span>
+          <Button size="sm" variant="primary" icon={<RotateCcw size={14} />} disabled={reset.busy} onClick={() => reset.use()}>
+            {reset.busy ? 'Resetting…' : 'Use a reset'}
+          </Button>
+        </span>
+      )}
+      {reset.node}
+    </div>
+  );
+}
+
+/** The resets an account holds, each usable from here. */
+export function ResetList({ u, account }: { u: AgentUsage; account?: string }) {
+  const reset = useLimitReset(u.agent, account);
+  const rc = u.resetCredits;
+  if (!rc) return null;
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 flex items-baseline gap-2">
+        <span className="text-[11.5px] font-medium tracking-wide text-fg-3 uppercase">Limit resets</span>
+        <span className="tnum text-[11.5px] text-fg-3">{rc.available}</span>
+      </div>
+      {rc.items.length ? (
+        <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+          {rc.items.map((r) => {
+            const soon = !!r.expiresAt && r.expiresAt - Date.now() < 24 * 3600_000;
+            return (
+              <div key={r.id} className="flex items-center gap-3 px-3 py-2">
+                <RotateCcw size={14} className="shrink-0 text-fg-3" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px]">
+                    {r.title}
+                    {r.left && r.left > 1 ? <span className="text-fg-3"> · {r.left} left</span> : null}
+                  </span>
+                  <span className="block truncate text-[11.5px] text-fg-3" title={r.detail}>
+                    {r.expiresAt ? <span className={cx(soon && 'text-warn')}>Expires {untilText(r.expiresAt)}</span> : 'Does not expire'}
+                    {r.note ? ` · ${r.note}` : ''}
+                  </span>
+                </span>
+                <Button size="sm" variant={u.limited ? 'primary' : 'secondary'} disabled={!r.usableNow || reset.busy} onClick={() => reset.use(r)}>
+                  Use
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-[12.5px] text-fg-3">
+          No limit resets right now
+          {rc.nextAvailableAt ? `; the next one comes ${untilText(rc.nextAvailableAt)}` : ''}
+          {rc.cooldownUntil && rc.cooldownUntil > Date.now() ? `; resets cool down until ${new Date(rc.cooldownUntil).toLocaleString()}` : ''}.
+        </div>
+      )}
+      {reset.node}
+    </div>
+  );
+}
