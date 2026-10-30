@@ -165,6 +165,7 @@ const upsert = db.prepare(`
 const delChunks = db.prepare('delete from chunk_text where key = ?');
 const addChunk = db.prepare('insert into chunk_text (key, kind, ts, text) values (?, ?, ?, ?)');
 const delActivity = db.prepare('delete from activity where key = ?');
+const unretire = db.prepare('delete from retired where key = ?');
 const ACT_COLS = ['prompts', 'turns', 'messages', 'tool_calls', 'commands', 'file_edits', 'lines_added', 'lines_removed', 'tokens_in', 'tokens_cached', 'tokens_out', 'gen_ms'];
 const addActivity = db.prepare(
   `insert into activity (key, root, agent, hour, ${ACT_COLS.join(', ')}) values (?, ?, ?, ?, ${ACT_COLS.map(() => '?').join(', ')})
@@ -232,6 +233,8 @@ async function indexFile(f: FileRef): Promise<string | null> {
     if (!incremental) {
       delChunks.run(key);
       delActivity.run(key);
+      // Back again (the whole transcript is read): no longer a session without one.
+      unretire.run(key);
     }
     for (const [hour, c] of parser.act?.hours ?? []) {
       addActivity.run(key, parentKey ?? key, f.agent, hour, c.prompts, c.turns, c.messages, c.toolCalls, c.commands, c.fileEdits, c.linesAdded, c.linesRemoved, c.tokensIn, c.tokensCached, c.tokensOut, c.genMs);
@@ -319,14 +322,16 @@ async function pass(initial: boolean) {
       });
       tx();
     }
-    // Transcripts deleted outside the app.
+    // Transcripts deleted outside the app (Claude Code prunes its own after about 30 days): the
+    // session leaves the list, but its activity stays for the stats, with its folder and model.
     const rows = db.prepare('select key, path from sessions').all() as { key: string; path: string }[];
     const gone = rows.filter((r) => !known.has(r.path));
     if (gone.length && files.length) {
+      const retire = db.prepare('insert or replace into retired (key, cwd, model) select key, cwd, model from sessions where key = ?');
       db.transaction(() => {
         for (const r of gone) {
+          retire.run(r.key);
           delChunks.run(r.key);
-          delActivity.run(r.key);
           db.prepare('delete from sessions where key = ?').run(r.key);
         }
       })();

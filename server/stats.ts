@@ -159,11 +159,16 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
     .prepare(`select * from activity where hour >= ?${agent === 'all' ? '' : ' and agent = ?'}`)
     .all(...(agent === 'all' ? [fromHour] : [fromHour, agent])) as Row[];
 
+  // Folders and models of the sessions, and of those whose transcript the agent has since deleted.
   const cwdOf = new Map<string, string>();
-  for (const r of db.prepare('select key, cwd from sessions where cwd is not null').all() as { key: string; cwd: string }[]) cwdOf.set(r.key, r.cwd);
-  // Each session's model prices its tokens (a session that changed models is priced at its latest one).
   const modelOf = new Map<string, string>();
-  for (const r of db.prepare('select key, model from sessions where model is not null').all() as { key: string; model: string }[]) modelOf.set(r.key, r.model);
+  for (const table of ['retired', 'sessions']) {
+    for (const r of db.prepare(`select key, cwd, model from ${table}`).all() as { key: string; cwd: string | null; model: string | null }[]) {
+      if (r.cwd) cwdOf.set(r.key, r.cwd);
+      // Each session's model prices its tokens (a session that changed models is priced at its latest one).
+      if (r.model) modelOf.set(r.key, r.model);
+    }
+  }
   const rates = new Map<string, ReturnType<typeof rateFor>>();
   const rate = (m: string) => {
     if (!rates.has(m)) rates.set(m, rateFor(db, m));
@@ -219,7 +224,7 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
 
   totals.sessions = totalRoots.size;
   previous.sessions = prevRoots.size;
-  for (const a of ['claude', 'codex'] as const) byAgent[a].sessions = agentRoots[a].size;
+  for (const a of ['claude', 'codex', 'acp'] as const) byAgent[a].sessions = agentRoots[a].size;
   return {
     granularity: g,
     tz,
