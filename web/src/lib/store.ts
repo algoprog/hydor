@@ -102,7 +102,7 @@ export interface Bootstrap {
   /** Themes the user made. */
   themes: AppTheme[];
   /** How far this copy is behind its git upstream (checked daily); missing when that cannot be told. */
-  update?: { behind: number; latest?: string; checkedAt: number };
+  update?: { behind: number; latest?: string; checkedAt: number; error?: string };
   /** Accounts added beside the agents' own sign-ins (Settings → Accounts). */
   accounts: AgentAccount[];
   /** Agents that speak ACP, set up in Settings → More agents. */

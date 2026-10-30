@@ -442,7 +442,13 @@ function UpdateLine() {
     </div>
   ) : (
     <div className="flex items-center gap-2">
-      <span>{update ? `Up to date · checked ${ago(update.checkedAt)}` : 'Updates are checked daily for copies installed from git.'}</span>
+      <span className={cx(update?.error && 'text-warn')}>
+        {update?.error
+          ? `Could not check for updates: ${update.error}`
+          : update
+            ? `Up to date · checked ${ago(update.checkedAt)}`
+            : 'Updates are checked daily for copies installed from git.'}
+      </span>
       <button onClick={check} disabled={busy} className="text-accent hover:underline disabled:opacity-50">
         {busy ? 'Checking…' : 'Check now'}
       </button>
