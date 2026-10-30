@@ -97,6 +97,14 @@ create table if not exists activity (
 create index if not exists activity_hour on activity(hour);
 create index if not exists activity_root on activity(root);
 
+-- Sessions whose transcript the agent deleted (Claude Code prunes them after about 30 days): their
+-- activity stays for the stats, with the folder and model it needs.
+create table if not exists retired (
+  key text primary key,
+  cwd text,
+  model text
+) without rowid;
+
 create table if not exists chunk_text (
   id integer primary key,
   key text not null,

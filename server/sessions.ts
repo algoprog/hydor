@@ -1487,6 +1487,7 @@ export class SessionManager extends EventEmitter {
     this.db.prepare('delete from queued where key = ?').run(key);
     this.db.prepare('delete from chunk_text where key = ?').run(key);
     this.db.prepare('delete from activity where key = ? or root = ?').run(key, key);
+    this.db.prepare('delete from retired where key = ?').run(key);
     this.db.prepare('delete from sessions where key = ?').run(key);
     this.db.prepare('delete from app_sessions where key = ?').run(key);
     // Sessions it continued from, or into, no longer point at it.
