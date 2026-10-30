@@ -1,0 +1,32 @@
+# Agent Console with Docker Compose.
+#
+#   docker compose up -d --build
+#   docker compose logs | grep setup     # the one-time link for choosing your password
+#
+# Then open http://localhost:8790. See the README for remote access and other options.
+services:
+  agent-console:
+    build:
+      context: .
+      args:
+        # Your own ids (put UID=… and GID=… in a .env file next to this one), so that files the
+        # agents create in ./workspace belong to you.
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: agent-console:latest
+    restart: unless-stopped
+    ports:
+      # Only this computer can reach it. For other devices, put an HTTPS proxy or tunnel in front.
+      - "127.0.0.1:${PORT:-8790}:8790"
+    environment:
+      # The address you open the app at when it is not localhost, e.g. https://agents.example.com
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Claude Code and Codex sign-ins, settings and history, and the app's own data.
+      - agent-home:/home/node
+      # The folders the agents work in.
+      - ${WORKSPACE:-./workspace}:/workspace
+
+volumes:
+  agent-home:

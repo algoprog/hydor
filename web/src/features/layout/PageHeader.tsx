@@ -1,0 +1,38 @@
+import type { ReactNode } from 'react';
+import { Menu, PanelLeftOpen } from 'lucide-react';
+import { MOD } from '../../lib/format';
+import { useUI } from '../../lib/store';
+import { cx, IconButton, useIsMobile } from '../../components/ui';
+
+/** Opens the navigation: the drawer on phones, the hidden sidebar on desktop. */
+export function NavButton() {
+  const mobile = useIsMobile();
+  const sideOpen = useUI((s) => s.sideOpen);
+  if (!mobile && sideOpen) return null;
+  return mobile ? (
+    <IconButton label="Menu" onClick={() => useUI.getState().set({ drawerOpen: true })}>
+      <Menu size={19} />
+    </IconButton>
+  ) : (
+    <IconButton label={`Show sidebar (${MOD}B)`} onClick={() => useUI.getState().set({ sideOpen: true })}>
+      <PanelLeftOpen size={18} />
+    </IconButton>
+  );
+}
+
+/** The top bar of a page: title, optional subtitle and actions, optional tabs underneath. */
+export function PageHeader({ title, sub, actions, children, className }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; children?: ReactNode; className?: string }) {
+  return (
+    <header className={cx('shrink-0 border-b border-line bg-bg pt-[var(--safe-top)]', className)}>
+      <div className="flex h-14 items-center gap-2 px-3 sm:px-6">
+        <NavButton />
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[16px] font-semibold tracking-tight">{title}</h1>
+          {sub && <div className="truncate text-[12.5px] text-fg-3">{sub}</div>}
+        </div>
+        {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
+      </div>
+      {children && <div className="-mb-px px-2 sm:px-4">{children}</div>}
+    </header>
+  );
+}
