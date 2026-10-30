@@ -12,6 +12,8 @@ export interface UpdateInfo {
   /** The newest commit's subject. */
   latest?: string;
   checkedAt: number;
+  /** Why the upstream could not be reached (the counts are then from the last time it could). */
+  error?: string;
 }
 
 let last: UpdateInfo | null = null;
@@ -22,10 +24,20 @@ export async function checkUpdates(): Promise<UpdateInfo | null> {
   if (!fs.existsSync(path.join(ROOT, '.git'))) return null;
   const up = await git(ROOT, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
   if (!up.ok) return null;
-  await git(ROOT, ['fetch', '--quiet'], 60_000);
+  const fetched = await git(ROOT, ['fetch', '--quiet'], 60_000);
   const [count, subject] = await Promise.all([git(ROOT, ['rev-list', '--count', 'HEAD..@{u}']), git(ROOT, ['log', '-1', '--format=%s', '@{u}'])]);
-  last = { behind: Number(count.out.trim()) || 0, latest: subject.out.trim() || undefined, checkedAt: Date.now() };
+  last = { behind: Number(count.out.trim()) || 0, latest: subject.out.trim() || undefined, checkedAt: Date.now(), error: fetched.ok ? undefined : fetchError(fetched.err) };
   return last;
+}
+
+/** The line of git's output that says why a fetch failed. */
+function fetchError(err: string): string {
+  const lines = err
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const line = lines.find((l) => /denied|fatal|could not|unable|timed out|not found/i.test(l)) ?? lines[0] ?? 'the fetch failed';
+  return line.replace(/^fatal:\s*/, '').slice(0, 200);
 }
 
 /** Checks a few minutes after start, then daily. */

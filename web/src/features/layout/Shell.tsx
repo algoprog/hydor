@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation, useRoute, useSearch } from 'wouter';
 import { activityOf } from '../../lib/activity';
 import { useSessions, useUI } from '../../lib/store';
-import { useIsMobile, useMediaQuery } from '../../components/ui';
+import { cx, useIsMobile, useMediaQuery } from '../../components/ui';
 import { FilesPage } from '../files/FilesPage';
 import { QuickOpen } from '../files/FileSearch';
 import { UploadsPanel } from '../files/Uploads';
@@ -142,13 +142,21 @@ export function Shell() {
         <div className="min-h-0 flex-1">
           <Routes />
         </div>
-        {drawerOpen && (
-          <div className="anim-overlay fixed inset-0 z-40 bg-black/45" onPointerDown={(e) => e.target === e.currentTarget && useUI.getState().set({ drawerOpen: false })}>
-            <div className="anim-drawer h-full w-[86vw] max-w-[340px] shadow-lg">
-              <Sidebar mobile />
-            </div>
-          </div>
-        )}
+        {/* The drawer stays built, off to the side: it opens at once and slides in and out. */}
+        <div
+          aria-hidden
+          onPointerDown={() => useUI.getState().set({ drawerOpen: false })}
+          className={cx('fixed inset-0 z-40 bg-black/45 transition-opacity duration-200 motion-reduce:transition-none', drawerOpen ? 'opacity-100' : 'pointer-events-none opacity-0')}
+        />
+        <div
+          inert={!drawerOpen}
+          className={cx(
+            'fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[340px] transition-[translate,box-shadow] duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-[translate] motion-reduce:transition-none',
+            drawerOpen ? 'translate-x-0 shadow-lg' : '-translate-x-full',
+          )}
+        >
+          <Sidebar mobile />
+        </div>
         <UploadsPanel />
         <QuickOpen />
         <CommandPalette />

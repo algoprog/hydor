@@ -10,18 +10,35 @@ import type { DB } from './db.ts';
 import { agentBaseEnv } from './env.ts';
 
 let env: Record<string, string> | null = null;
+// ssh never asks for anything (git's own prompts are off too) and gives up on a dead host.
+const BATCH = '-o BatchMode=yes -o ConnectTimeout=15';
 function gitEnv() {
   // Never wait for a password prompt, and never take locks the agents' own git commands need.
-  env ??= { ...agentBaseEnv(), GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o ConnectTimeout=15', GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' };
+  env ??= { ...agentBaseEnv(), GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: `ssh ${BATCH}`, SSH_ASKPASS_REQUIRE: 'never', GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' };
   return env;
 }
 
-export function git(cwd: string, args: string[], timeout = 15_000, extraEnv?: Record<string, string>): Promise<{ ok: boolean; out: string; err: string }> {
+function run(cwd: string, args: string[], timeout: number, e: Record<string, string>): Promise<{ ok: boolean; out: string; err: string }> {
   return new Promise((resolve) => {
-    execFile('git', args, { cwd, env: extraEnv ? { ...gitEnv(), ...extraEnv } : gitEnv(), timeout, maxBuffer: 16 << 20 }, (e, stdout, stderr) =>
-      resolve({ ok: !e, out: String(stdout ?? ''), err: String(stderr || (e as Error | null)?.message || '') }),
+    execFile('git', args, { cwd, env: e, timeout, maxBuffer: 16 << 20 }, (err, stdout, stderr) =>
+      resolve({ ok: !err, out: String(stdout ?? ''), err: String(stderr || (err as Error | null)?.message || '') }),
     );
   });
+}
+
+/** Commands that reach a remote. */
+const NETWORK = new Set(['fetch', 'pull', 'push', 'ls-remote', 'clone', 'remote', 'submodule']);
+
+export async function git(cwd: string, args: string[], timeout = 15_000, extraEnv?: Record<string, string>): Promise<{ ok: boolean; out: string; err: string }> {
+  let e = extraEnv ? { ...gitEnv(), ...extraEnv } : gitEnv();
+  const sub = args.find((a, i) => !a.startsWith('-') && args[i - 1] !== '-c');
+  if (sub && NETWORK.has(sub) && !extraEnv?.GIT_SSH_COMMAND) {
+    // GIT_SSH_COMMAND overrides a repository's own ssh command (core.sshCommand, often how it picks
+    // its key): use that one, in batch mode too.
+    const own = (await run(cwd, ['config', '--get', 'core.sshCommand'], 5000, gitEnv())).out.trim();
+    if (own) e = { ...e, GIT_SSH_COMMAND: `${own} ${BATCH}` };
+  }
+  return run(cwd, args, timeout, e);
 }
 
 // Folders the agents used only for throwaway work.
