@@ -5,8 +5,7 @@
 <h1 align="center">Agent Console</h1>
 
 <p align="center">
-  Run <b>Claude Code</b> and <b>OpenAI Codex</b> on your own computer, from any browser.<br />
-  Start coding agents, follow their work live, approve what they ask and pick up on your phone.
+  Run <b>Claude Code</b> and <b>OpenAI Codex</b> on your own computer, from any device.
 </p>
 
 <p align="center">
