@@ -5,7 +5,7 @@
 <h1 align="center">Agent Console</h1>
 
 <p align="center">
-  Run <b>Claude Code</b> and <b>OpenAI Codex</b> on your own computer, from any device.
+  Run <b>Claude Code</b> and <b>OpenAI Codex</b> on your own computer, access from any device.
 </p>
 
 <p align="center">
