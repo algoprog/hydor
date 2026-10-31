@@ -1,4 +1,5 @@
-import { createContext, memo, useContext, useEffect, useMemo, useState, type ReactNode, useRef } from 'react';
+import { createContext, memo, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type RefObject, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import {
   AlertTriangle,
   Bot,
@@ -736,9 +737,38 @@ function RunMessageRow({ item, run }: { item: Extract<TimelineItem, { kind: 'use
   );
 }
 
+/** A message of yours longer than this many lines folds to its first six (`max-h-[6lh]` below) until opened. */
+const FOLD_PAST = 9;
+/** Find in this session sends this to a message it shows, so a folded one opens on what was found. */
+export const UNFOLD = 'wa:unfold';
+
+/** Whether an element's text runs past `lines` lines, measured again whenever its width changes. */
+function useRunsPast(ref: RefObject<HTMLElement | null>, lines: number, text: string): boolean {
+  const [past, setPast] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Folded, the box is cut short, but its scrollHeight is still the whole text's.
+    const measure = () => setPast(el.scrollHeight > (lines + 0.5) * (parseFloat(getComputedStyle(el).lineHeight) || 24));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, lines, text]);
+  return past;
+}
+
+/** The box an element scrolls in. */
+function scrollBox(el: HTMLElement): HTMLElement | null {
+  for (let p = el.parentElement; p; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return p;
+  return null;
+}
+
 export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Extract<TimelineItem, { kind: 'user' }>; arrive?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   const { sessionKey } = useContext(SessionCtx);
   // Your own messages in sessions this app can drive (not ones only open elsewhere).
   const canEdit = useSessions((x) => {
@@ -751,6 +781,15 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
     const ide = splitIdeContext(text);
     return { text: ide ? ide.request : text, files, context: ide?.context, run: splitRunMessage(item.text) };
   }, [item.text]);
+  // A long message shows its first lines, the rest a click away; it folds again after.
+  const long = useRunsPast(body, FOLD_PAST, parsed.text);
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const open = () => flushSync(() => setExpanded(true));
+    el.addEventListener(UNFOLD, open);
+    return () => el.removeEventListener(UNFOLD, open);
+  }, []);
   if (item.peer) return <PeerMessage item={item} />;
   if (parsed.run) return <RunMessageRow item={item} run={parsed.run} />;
   if (item.meta === 'slash') {
@@ -769,15 +808,32 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
     );
   }
   const { text, files, context } = parsed;
-  const long = text.length > 1400 || text.split('\n').length > 24;
+  // Folding a message read on past its top brings it back into view, so it is not left above the screen.
+  const fold = () => {
+    const el = root.current;
+    const box = el && scrollBox(el);
+    if (el && box && el.getBoundingClientRect().top < box.getBoundingClientRect().top) el.scrollIntoView({ block: 'start' });
+    setExpanded(false);
+  };
   return (
     <>
       {item.handoff && <HandoffCard h={item.handoff} />}
-      <div data-seq={item.seq} className={cx('tl-item group/u flex flex-col items-end gap-1.5', arrive && 'anim-msg-in')}>
+      <div ref={root} data-seq={item.seq} className={cx('tl-item group/u flex scroll-mt-6 flex-col items-end gap-1.5', arrive && 'anim-msg-in')}>
         {item.images ? <MessageImages item={item} /> : null}
         {(text || files.length > 0 || context) && (
-          <div className="max-w-[92%] rounded-[20px] bg-bg-2 px-4 py-2.5 sm:max-w-[80%]">
-            {text && <div className={cx('text-[15px] leading-relaxed break-words whitespace-pre-wrap', long && !expanded && 'line-clamp-[16]')}>{text}</div>}
+          // Short ones keep to their words; a long one is as wide as the message box, and lines up with it.
+          <div className="max-w-full rounded-[20px] bg-bg-2 px-4 py-2.5">
+            {text && (
+              <div
+                ref={body}
+                className={cx(
+                  'text-[15px] leading-relaxed break-words whitespace-pre-wrap',
+                  long && !expanded && 'max-h-[6lh] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_2lh),transparent)]',
+                )}
+              >
+                {text}
+              </div>
+            )}
             {files.length > 0 && (
               <div className={cx('flex flex-wrap gap-1.5', text && 'mt-2')}>
                 {files.map((f) => (
@@ -792,7 +848,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
             {(long || context) && (
               <div className="mt-1 flex gap-3">
                 {long && (
-                  <button onClick={() => setExpanded((e) => !e)} className="text-[12.5px] text-fg-3 transition-colors hover:text-fg">
+                  <button onClick={() => (expanded ? fold() : setExpanded(true))} aria-expanded={expanded} className="text-[12.5px] text-fg-3 transition-colors hover:text-fg">
                     {expanded ? 'Show less' : 'Show more'}
                   </button>
                 )}
@@ -852,7 +908,7 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
     }
   };
   return (
-    <div className="anim-pop w-full max-w-[92%] space-y-2.5 rounded-2xl border border-accent/40 bg-panel p-3 sm:max-w-[80%]">
+    <div className="anim-pop w-full space-y-2.5 rounded-2xl border border-accent/40 bg-panel p-3">
       <textarea
         autoFocus
         value={text}
