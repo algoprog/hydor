@@ -142,6 +142,8 @@ interface RowProps {
   onMenu: (s: SessionSummary, el: HTMLElement) => void;
   /** Touch screens: a delete button at the row's end. */
   onDelete?: (s: SessionSummary) => void;
+  /** Near the top: always drawn, so the list is ready the moment it shows (the drawer opening). */
+  eager?: boolean;
 }
 
 /** Asking before a session is deleted: its transcript goes, for every app that shows it. */
@@ -243,7 +245,7 @@ interface DragBits {
   lifted: boolean;
 }
 
-function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, drag }: RowProps & { drag: DragBits }) {
+function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, eager, drag }: RowProps & { drag: DragBits }) {
   return (
     <div
       ref={drag.ref}
@@ -265,8 +267,10 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, drag 
         onMenu(s, e.currentTarget);
       }}
       className={cx(
-        // Rows off screen are not laid out or painted (a long list scrolls without that work).
-        'cursor-default rounded-[10px] outline-none select-none [contain-intrinsic-size:auto_56px] [content-visibility:auto] [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50',
+        // Rows further down are drawn only as they come near (a long list scrolls without that work);
+        // the first ones always are, or they would appear a moment late when the closed drawer opens.
+        'cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50',
+        !eager && '[contain-intrinsic-size:auto_56px] [content-visibility:auto]',
         drag.lifted && 'opacity-40',
       )}
     >
@@ -511,8 +515,9 @@ export function SessionList({ query }: { query: string }) {
     >
       {groups.map((g, i) => {
         const sortable = orderable(g.label);
-        const rows = g.items.map((s) => {
-          const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined };
+        const before = groups.slice(0, i).reduce((n, x) => n + x.items.length, 0);
+        const rows = g.items.map((s, k) => {
+          const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined, eager: before + k < 30 };
           return sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
         });
         return (
