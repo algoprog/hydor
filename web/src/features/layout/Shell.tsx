@@ -42,13 +42,15 @@ function useDrag(onMove: (dy: number) => void) {
   };
 }
 
-/** Pages fade in when you move between sections (not when a file or folder changes inside one).
- * Memoized: the shell re-rendering (a panel or the drawer toggled) never re-renders the page. */
+/** Pages fade in when you move between sections (not when a file or folder changes inside one); a
+ * session shows at once. Memoized: the shell re-rendering (a panel or the drawer toggled) never
+ * re-renders the page. */
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
-  const section = loc.startsWith('/s/') ? loc : loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' ? '/usage' : loc;
+  const session = loc.startsWith('/s/');
+  const section = session ? loc : loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' ? '/usage' : loc;
   return (
-    <div key={section} className="anim-fade h-full">
+    <div key={section} className={cx('h-full', !session && 'anim-fade')}>
       <Page />
     </div>
   );
