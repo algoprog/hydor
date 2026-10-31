@@ -117,6 +117,8 @@ export interface Feature {
   context?(s: { key: string; cwd: string; extra: SessionExtra }, d: Deps): string | null | undefined | Promise<string | null | undefined>;
   /** A turn ended (every session counts, also ones run outside the app). */
   turnEnd?(t: TurnInfo, d: Deps): void | Promise<void>;
+  /** Told of every event sent to the pages: a session changed, a capability's list changed… */
+  event?(e: ServerEvent, d: Deps): void;
   /** Cleans what any of the app's tools return before an agent sees it (known secret values masked). */
   scrub?(text: string): string;
   /** A message is about to go to a session's agent: throw an HttpError to refuse it. */

@@ -22,7 +22,8 @@ export type MeaningDevice = 'auto' | 'cpu';
 
 const dir = () => path.join(config.dataDir, 'memory');
 const venv = () => path.join(dir(), 'venv');
-const python = () => path.join(venv(), 'bin', 'python');
+/** The Python that runs the worker: one given (NAGET_EMBED_PYTHON, with PyTorch and Transformers), else the private one. */
+const python = () => process.env.NAGET_EMBED_PYTHON || path.join(venv(), 'bin', 'python');
 /** What the environment holds: another list means setting it up again. */
 const PACKAGES = 'torch transformers>=5.6,<6';
 const WORKER = path.join(APP_ROOT, 'server/memory/embed_worker.py');
@@ -39,7 +40,7 @@ const IDLE_CPU_MS = 5 * 60_000;
 export const meaningOn = (db: DB) => kvGet(db, 'memory.meaning') === '1';
 export const meaningDevice = (db: DB): MeaningDevice => (kvGet(db, 'memory.meaning.device') === 'cpu' ? 'cpu' : 'auto');
 const hasNvidia = () => fs.existsSync('/proc/driver/nvidia/version');
-const envReady = () => fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES;
+const envReady = () => (process.env.NAGET_EMBED_PYTHON ? fs.existsSync(python()) : fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES);
 
 function readText(f: string): string | null {
   try {

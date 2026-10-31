@@ -20,6 +20,7 @@ Everything is optional. Set these in the environment (or in `.env` for Docker Co
 | `CODEX_HOME` | `~/.codex` | Where Codex keeps its data |
 | `NAGET_EMBED_DEVICE` | the GPU with the most free memory, else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`…); Settings → Memory can also keep it on the CPU |
 | `NAGET_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
+| `NAGET_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
 
 ## What it stores
 

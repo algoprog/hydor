@@ -8,6 +8,7 @@ import { children } from '../children/index.ts';
 import { connections } from '../connections/index.ts';
 import { custom } from '../custom/index.ts';
 import { documents } from '../documents/index.ts';
+import { find } from '../find/index.ts';
 import { images } from '../images/index.ts';
 import { memory } from '../memory/index.ts';
 import { opinion } from '../opinion/index.ts';
@@ -17,4 +18,4 @@ import { skillpack } from '../skillpack/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, children, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, custom];
+export const FEATURES: Feature[] = [pages, search, browser, memory, children, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, custom, find];

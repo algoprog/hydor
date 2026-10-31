@@ -158,7 +158,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
               </IconButton>
             ) : (
               !mobile && (
-                <button type="button" onClick={openPalette} title="Sessions, actions and messages" className="rounded">
+                <button type="button" onClick={openPalette} title="Search everything: settings, sessions, apps, notes, files" className="rounded">
                   <Kbd>{MOD}K</Kbd>
                 </button>
               )
@@ -227,6 +227,17 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
               <span className={cx('h-1.5 w-1.5 rounded-full bg-accent', mobile ? 'absolute top-2.5 left-[calc(50%+7px)]' : 'ml-auto')} title="A newer version is out (Settings → General)" />
             ) : undefined
           }
+        />
+        <NavItem
+          tile={mobile}
+          path=""
+          match={false}
+          label="Search"
+          icon={<Search size={17} />}
+          onGo={() => {
+            if (mobile) close();
+            openPalette();
+          }}
         />
         {mobile && (
           <NavItem
