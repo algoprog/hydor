@@ -856,6 +856,34 @@ export interface GitRepoDetail extends GitRepo {
   toPull: GitCommit[];
   files: GitFileStatus[];
   recent: GitCommit[];
+  stashes: GitStash[];
+}
+
+export interface GitStash {
+  /** stash@{0} */
+  ref: string;
+  message: string;
+  ts: number;
+}
+
+export interface GitBranch {
+  name: string;
+  ts: number;
+  upstream?: string;
+  /** "ahead 2, behind 1", or "gone" when its upstream was deleted. */
+  track?: string;
+  subject: string;
+  /** In the current branch already: safe to delete. */
+  merged: boolean;
+}
+
+/** One commit: its message, the files it changed and their diffs. */
+export interface GitCommitDetail {
+  hash: string;
+  author: string;
+  ts: number;
+  message: string;
+  files: { path: string; added: number; removed: number; diff: string }[];
 }
 
 export interface GitActionResult {

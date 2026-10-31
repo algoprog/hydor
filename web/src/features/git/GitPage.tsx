@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, CloudDownload, FileText, GitBranch, GitCommitHorizontal, SquareTerminal, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, CloudDownload, GitBranch, GitCommitHorizontal, SquareTerminal, Upload, X } from 'lucide-react';
 import type { GitActionResult, GitCommit, GitRepo, GitRepoDetail } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { ago, tildify, timeAgo } from '../../lib/format';
@@ -9,6 +9,7 @@ import { Button, cx, Throbber, Empty, IconButton, useConfirm, useIsMobile } from
 import { PageHeader } from '../layout/PageHeader';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { RefreshIcon } from '../../components/RefreshIcon';
+import { BranchMenu, Changes, CommitList, Stashes, StashButton } from './GitWork';
 
 const repoUrl = (p: string) => `/git?path=${encodeURIComponent(p)}`;
 const plural = (n: number, one: string, many = one + 's') => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -61,41 +62,6 @@ function RepoRow({ r, active }: { r: GitRepo; active: boolean }) {
   );
 }
 
-function CommitList({ commits, empty }: { commits: GitCommit[]; empty?: string }) {
-  if (!commits.length) return empty ? <div className="px-1 py-2 text-[13px] text-fg-3">{empty}</div> : null;
-  const authors = new Set(commits.map((c) => c.author)).size > 1;
-  return (
-    <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-      {commits.map((c) => (
-        <div key={c.hash} className="flex items-baseline gap-3 px-3 py-2">
-          <code className="shrink-0 font-mono text-[12px] text-fg-3">{c.hash.slice(0, 7)}</code>
-          <span className="min-w-0 flex-1 truncate text-[13.5px]" title={c.subject}>
-            {c.subject}
-          </span>
-          {authors && <span className="hidden shrink-0 text-[12px] text-fg-3 sm:inline">{c.author}</span>}
-          <span className="shrink-0 text-[12px] text-fg-3">{timeAgo(c.ts)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const CODE_LABEL: Record<string, [string, string]> = {
-  '??': ['New', 'text-add'],
-  A: ['Added', 'text-add'],
-  M: ['Modified', 'text-warn'],
-  D: ['Deleted', 'text-del'],
-  R: ['Renamed', 'text-info'],
-  C: ['Copied', 'text-info'],
-  U: ['Conflict', 'text-err'],
-};
-
-function fileLabel(code: string): [string, string] {
-  if (code === '??') return CODE_LABEL['??'];
-  const c = code.replace(/\./g, '')[0] ?? 'M';
-  return CODE_LABEL[c] ?? CODE_LABEL.M;
-}
-
 function Section({ title, count, children, action }: { title: string; count?: number; children: ReactNode; action?: ReactNode }) {
   return (
     <section className="mt-7">
@@ -116,14 +82,22 @@ function RepoDetail({ path, onChanged, onBack }: { path: string; onChanged: (r: 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<{ action: string; output: string } | null>(null);
-  const [allFiles, setAllFiles] = useState(false);
   const [confirm, confirmNode] = useConfirm();
+  /** The repository after an action from the app: shown, and its failure explained. */
+  const apply = (r: GitActionResult, action: string, ok?: string) => {
+    setRepo(r.repo);
+    onChanged(r.repo);
+    if (!r.ok) setFailure({ action, output: r.output });
+    else {
+      setFailure(null);
+      if (ok) toast(ok, 'ok');
+    }
+  };
 
   useEffect(() => {
     setRepo(null);
     setError(null);
     setFailure(null);
-    setAllFiles(false);
     api<GitRepoDetail>(`/api/git/repo?path=${encodeURIComponent(path)}`)
       .then(setRepo)
       .catch((e) => setError(e.message));
@@ -186,7 +160,6 @@ function RepoDetail({ path, onChanged, onBack }: { path: string; onChanged: (r: 
       </div>
     );
 
-  const files = allFiles ? repo.files : repo.files.slice(0, 60);
   const canPublish = !repo.upstream && !!repo.remote && !!repo.branch;
   return (
     <div className="anim-fade mx-auto w-full max-w-[860px] px-4 py-6 sm:px-8">
@@ -208,10 +181,7 @@ function RepoDetail({ path, onChanged, onBack }: { path: string; onChanged: (r: 
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 text-[13px]">
-        <span className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-bg-2 px-2.5 font-medium">
-          <GitBranch size={14} className="text-fg-3" />
-          {repo.branch ?? 'detached HEAD'}
-        </span>
+        <BranchMenu repo={repo} apply={apply} />
         <span className="text-fg-3">{repo.upstream ? `tracks ${repo.upstream}` : repo.remote ? 'not on the remote yet' : 'no remote'}</span>
         {repo.upstream && <SyncBadges r={repo} size="md" />}
       </div>
@@ -273,44 +243,27 @@ function RepoDetail({ path, onChanged, onBack }: { path: string; onChanged: (r: 
       {repo.upstream && (
         <>
           <Section title="To push" count={repo.ahead}>
-            <CommitList commits={repo.toPush} empty={`Nothing to push: ${repo.upstream} has every commit on this branch.`} />
+            <CommitList path={repo.path} commits={repo.toPush} empty={`Nothing to push: ${repo.upstream} has every commit on this branch.`} />
             {repo.ahead > repo.toPush.length && <div className="mt-1.5 px-1 text-[12px] text-fg-3">Showing the latest {repo.toPush.length}.</div>}
           </Section>
           <Section title="To pull" count={repo.behind}>
-            <CommitList commits={repo.toPull} empty={repo.fetchedAt ? 'Nothing new on the remote since the last fetch.' : 'Fetch to see what is new on the remote.'} />
+            <CommitList path={repo.path} commits={repo.toPull} empty={repo.fetchedAt ? 'Nothing new on the remote since the last fetch.' : 'Fetch to see what is new on the remote.'} />
           </Section>
         </>
       )}
 
-      <Section title="Changed files" count={repo.changed >= 0 ? repo.changed : undefined}>
-        {repo.files.length ? (
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-            {files.map((f) => {
-              const [label, tone] = fileLabel(f.code);
-              return (
-                <button key={f.code + f.path} onClick={() => openFile(`${repo.path}/${f.path}`)} className="flex w-full items-center gap-3 px-3 py-1.5 text-left transition-colors hover:bg-bg-2">
-                  <span className={cx('w-16 shrink-0 text-[12px]', tone)}>{label}</span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]" title={f.path}>
-                    {f.from ? `${f.from} → ` : ''}
-                    {f.path}
-                  </span>
-                  <FileText size={13} className="shrink-0 text-fg-3" />
-                </button>
-              );
-            })}
-            {repo.files.length > files.length && (
-              <button onClick={() => setAllFiles(true)} className="w-full px-3 py-2 text-left text-[12.5px] text-fg-3 hover:bg-bg-2 hover:text-fg-2">
-                Show all {repo.files.length.toLocaleString()} files
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="px-1 py-2 text-[13px] text-fg-3">The working tree is clean.</div>
-        )}
+      <Section title="Changes" count={repo.changed >= 0 ? repo.changed : undefined} action={<StashButton repo={repo} apply={apply} />}>
+        <Changes key={repo.path} repo={repo} apply={apply} />
       </Section>
 
+      {repo.stashes.length > 0 && (
+        <Section title="Stashes" count={repo.stashes.length}>
+          <Stashes repo={repo} apply={apply} />
+        </Section>
+      )}
+
       <Section title="Recent commits">
-        <CommitList commits={repo.recent} empty="No commits yet." />
+        <CommitList path={repo.path} commits={repo.recent} empty="No commits yet." />
       </Section>
 
       {repo.remotes.length > 0 && (
