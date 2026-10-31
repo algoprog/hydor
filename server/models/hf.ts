@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import type { HfInspect, HfQuant, MachineInfo } from '../../shared/types.ts';
+import type { HfInspect, HfModel, HfQuant, HfSort, MachineInfo } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { HF_DIR } from './config.ts';
 import { cachePerToken, fit } from './machine.ts';
@@ -144,6 +144,98 @@ export async function inspect(input: string, o: { token?: string; machine: Machi
     if (gg?.id) out.ggufRepo = gg.id;
   }
   return out;
+}
+
+// ---- search ----------------------------------------------------------------------------------------
+
+export interface HfQuery {
+  q: string;
+  sort?: HfSort;
+  /** Only GGUF (Ollama) or only safetensors (vLLM) repositories. */
+  gguf?: boolean;
+  safetensors?: boolean;
+  vision?: boolean;
+  /** Only what runs well here (on a GPU). */
+  fits?: boolean;
+}
+
+const SORT_KEY: Record<HfSort, string> = { downloads: 'downloads', trending: 'trendingScore', likes: 'likes', new: 'createdAt' };
+const EXPAND = ['downloads', 'likes', 'lastModified', 'createdAt', 'pipeline_tag', 'tags', 'safetensors', 'gguf', 'gated', 'trendingScore'];
+/** Bytes per weight by the dtype a safetensors repository stores. */
+const DTYPE_BYTES: Record<string, number> = { F64: 8, F32: 4, BF16: 2, F16: 2, F8_E4M3: 1, F8_E5M2: 1, I8: 1, U8: 1, I4: 0.5, U4: 0.5 };
+/** Bytes per weight at Q4_K_M, the quantization most GGUF repositories are pulled at. */
+const Q4_BYTES = 0.606;
+const LLM_PIPELINES = new Set(['text-generation', 'image-text-to-text', 'text2text-generation', 'any-to-any']);
+const found = new Map<string, { at: number; list: HfModel[] }>();
+
+/**
+ * Models on Hugging Face matching the words: text models and those that also see images, in the
+ * order asked, each with a first guess of how it runs here from its size. Kept for ten minutes.
+ */
+export async function search(o: HfQuery, x: { token?: string; machine: MachineInfo }): Promise<HfModel[]> {
+  const sort = o.sort ?? 'downloads';
+  const key = JSON.stringify([o.q.trim().toLowerCase(), sort, !!o.gguf, !!o.safetensors, !!o.vision]);
+  let list = found.get(key);
+  if (!list || Date.now() - list.at > 600_000) {
+    const ask = (extra: Record<string, string>) => {
+      const p = new URLSearchParams({ search: o.q.trim(), sort: SORT_KEY[sort], direction: '-1', limit: '40', ...extra });
+      for (const e of EXPAND) p.append('expand[]', e);
+      return getJson(`${HF}/api/models?${p}`, x.token).catch(() => []) as Promise<any[]>;
+    };
+    // GGUF repositories often name no pipeline, so they are asked for by their tag.
+    const asks = o.gguf
+      ? [ask({ filter: 'gguf' })]
+      : [
+          ...(o.vision ? [] : [ask({ pipeline_tag: 'text-generation', ...(o.safetensors ? { filter: 'safetensors' } : {}) })]),
+          ask({ pipeline_tag: 'image-text-to-text', ...(o.safetensors ? { filter: 'safetensors' } : {}) }),
+          ...(o.safetensors ? [] : [ask({ filter: 'gguf' })]),
+        ];
+    const seen = new Set<string>();
+    const models: HfModel[] = [];
+    for (const m of (await Promise.all(asks)).flat()) {
+      if (!m?.id || seen.has(m.id)) continue;
+      seen.add(m.id);
+      const tags: string[] = m.tags ?? [];
+      if (m.pipeline_tag && !LLM_PIPELINES.has(m.pipeline_tag)) continue;
+      const gguf = tags.includes('gguf') || !!m.gguf;
+      const st = !gguf && (tags.includes('safetensors') || !!m.safetensors);
+      const vision = m.pipeline_tag === 'image-text-to-text' || tags.some((t) => /^(vision|multimodal|image-text-to-text)$/.test(t));
+      if (o.vision && !vision) continue;
+      models.push({
+        id: m.id,
+        downloads: m.downloads,
+        likes: m.likes,
+        updated: m.lastModified ? Date.parse(m.lastModified) : undefined,
+        created: m.createdAt ? Date.parse(m.createdAt) : undefined,
+        pipeline: m.pipeline_tag ?? undefined,
+        params: Number(m.safetensors?.total ?? m.gguf?.total ?? 0) || undefined,
+        kind: gguf ? 'gguf' : st ? 'safetensors' : 'other',
+        vision,
+        gated: !!m.gated && m.gated !== 'false',
+        contextLength: Number(m.gguf?.context_length ?? 0) || undefined,
+        // Read back below: the size of safetensors weights, and the order by trend.
+        ...({ dtypes: m.safetensors?.parameters, trending: m.trendingScore } as object),
+      });
+    }
+    const by: Record<HfSort, (m: any) => number> = { downloads: (m) => m.downloads ?? 0, trending: (m) => m.trending ?? 0, likes: (m) => m.likes ?? 0, new: (m) => m.created ?? 0 };
+    models.sort((a, b) => by[sort](b) - by[sort](a));
+    list = { at: Date.now(), list: models.slice(0, 60) };
+    found.set(key, list);
+    if (found.size > 200) found.delete(found.keys().next().value!);
+  }
+  const out: HfModel[] = list.list.map((m) => {
+    const { dtypes, trending: _t, ...rest } = m as HfModel & { dtypes?: Record<string, number>; trending?: number };
+    if (!m.params || m.kind === 'other') return rest;
+    const weightBytes =
+      m.kind === 'gguf' ? m.params * Q4_BYTES : Object.entries(dtypes ?? { BF16: m.params }).reduce((a, [t, n]) => a + Number(n) * (DTYPE_BYTES[t] ?? 2), 0);
+    const q4 = m.params * Q4_BYTES;
+    return {
+      ...rest,
+      fit: fit(x.machine, { weightBytes, cacheBytes: weightBytes * 0.1, downloadBytes: weightBytes, params: m.params, cpuOk: m.kind === 'gguf' }),
+      fitGguf: m.kind === 'safetensors' ? fit(x.machine, { weightBytes: q4, cacheBytes: q4 * 0.1, downloadBytes: q4, params: m.params, cpuOk: true }) : undefined,
+    };
+  });
+  return (o.fits ? out.filter((m) => m.fit?.verdict === 'good' || m.fitGguf?.verdict === 'good') : out).slice(0, 40);
 }
 
 // ---- downloads for vLLM -------------------------------------------------------------------------

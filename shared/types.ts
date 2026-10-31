@@ -1079,6 +1079,31 @@ export interface OpenRouterModel extends ModelEntry {
 /** How the OpenRouter search orders what it finds. */
 export type OpenRouterSort = 'match' | 'new' | 'price' | 'context';
 
+/** A model found on Hugging Face, with a first guess of how it would run here (Check tells exactly). */
+export interface HfModel {
+  /** org/name */
+  id: string;
+  downloads?: number;
+  likes?: number;
+  /** Last changed and first published (ms). */
+  updated?: number;
+  created?: number;
+  pipeline?: string;
+  params?: number;
+  /** GGUF weights run with Ollama, safetensors with vLLM. */
+  kind: 'gguf' | 'safetensors' | 'other';
+  vision?: boolean;
+  gated?: boolean;
+  contextLength?: number;
+  /** Judged by its size alone: GGUF at 4-bit, safetensors as stored (for vLLM). */
+  fit?: ModelFit;
+  /** For safetensors: the same model at 4-bit as GGUF, with Ollama (often there as its -GGUF repository). */
+  fitGguf?: ModelFit;
+}
+
+/** How the Hugging Face search orders what it finds. */
+export type HfSort = 'downloads' | 'trending' | 'likes' | 'new';
+
 export interface MachineInfo {
   gpus: { index: number; name: string; totalBytes: number; freeBytes: number }[];
   ramBytes: number;
