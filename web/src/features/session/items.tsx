@@ -1,4 +1,4 @@
-import { createContext, memo, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, memo, useContext, useEffect, useMemo, useState, type ReactNode, useRef } from 'react';
 import {
   AlertTriangle,
   Bot,
@@ -326,12 +326,11 @@ export function ToolDetail({ t, item, sessionKey }: { t: ToolInfo; item: ToolIte
   );
 }
 
-export const ToolRow = memo(function ToolRow({ item, sessionKey, forceOpen }: { item: ToolItem; sessionKey: string; forceOpen?: boolean }) {
+/** A step on one line: what it is, then how it went. A row's button, or a folded box's only line. */
+function ToolLine({ item }: { item: ToolItem }) {
   const t = item.tool;
   const home = useApp((s) => s.boot?.home);
   const { cwd } = useContext(SessionCtx);
-  const [open, setOpen] = useState(false);
-  const isOpen = open || !!forceOpen;
   const Icon = CAT_ICON[t.category] ?? Wrench;
   const running = t.status === 'running' || t.status === 'pending';
   const v = verb(t);
@@ -341,17 +340,8 @@ export const ToolRow = memo(function ToolRow({ item, sessionKey, forceOpen }: { 
   const cmd = t.category === 'command';
   const line = useMemo(() => (cmd ? commandLine(t.title) : ''), [cmd, t.title]);
   const label = useMemo(() => (cmd ? t.label || (v ? commandLabel(t.title) : undefined) : undefined), [cmd, t.label, t.title, v]);
-
-  if (isPageTool(t.name)) return <HtmlPage item={item} />;
-  if (t.category === 'todo') return <TodoCard t={t} />;
-  if (t.category === 'question') return <QuestionCard t={t} sessionKey={sessionKey} />;
-
   return (
-    <div className="tl-item">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', isOpen && 'bg-bg-2')}
-      >
+    <>
         <Icon size={14} className={cx('shrink-0', t.status === 'error' ? 'text-err' : running ? 'text-busy' : 'text-fg-3')} />
         <span className="flex min-w-0 flex-1 items-baseline gap-2 text-[13px]">
           {label ? (
@@ -380,6 +370,47 @@ export const ToolRow = memo(function ToolRow({ item, sessionKey, forceOpen }: { 
           t.durationMs != null && t.durationMs >= 1500 && <span className="tnum shrink-0 text-[11px] text-fg-3">{duration(t.durationMs)}</span>
         )}
         <StatusIcon t={t} />
+    </>
+  );
+}
+
+/** The step under way, as the one line of a folded box of steps. */
+export function StepLine({ item }: { item: TimelineItem }) {
+  if (item.kind === 'tool') return <ToolLine item={item} />;
+  if (item.kind !== 'thinking') return null;
+  const head = item.text.trim().match(/^\*\*(.+?)\*\*/)?.[1];
+  return (
+    <>
+      <Brain size={14} className="shrink-0 text-busy" />
+      <span className="shine shrink-0 text-[13px]">Thinking</span>
+      {head && <span className="min-w-0 truncate text-[12.5px] text-fg-3">· {head}</span>}
+      <span className="flex-1" />
+      {item.ts && (
+        <span className="shrink-0 text-[11px] text-fg-3">
+          <Elapsed since={item.ts} />
+        </span>
+      )}
+    </>
+  );
+}
+
+export const ToolRow = memo(function ToolRow({ item, sessionKey, forceOpen, trailing }: { item: ToolItem; sessionKey: string; forceOpen?: boolean; trailing?: ReactNode }) {
+  const t = item.tool;
+  const [open, setOpen] = useState(false);
+  const isOpen = open || !!forceOpen;
+
+  if (isPageTool(t.name)) return <HtmlPage item={item} />;
+  if (t.category === 'todo') return <TodoCard t={t} sessionKey={sessionKey} />;
+  if (t.category === 'question') return <QuestionCard t={t} sessionKey={sessionKey} />;
+
+  return (
+    <div className="tl-item">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', isOpen && 'bg-bg-2')}
+      >
+        <ToolLine item={item} />
+        {trailing}
         <ChevronRight size={14} className={cx('shrink-0 text-fg-3 opacity-0 transition group-hover:opacity-100', isOpen && 'rotate-90 opacity-100')} />
       </button>
       {isOpen && <ToolDetail t={t} item={item} sessionKey={sessionKey} />}
@@ -387,9 +418,29 @@ export const ToolRow = memo(function ToolRow({ item, sessionKey, forceOpen }: { 
   );
 });
 
-function TodoCard({ t }: { t: ToolInfo }) {
+// How far each plan item has got (by session and text), and since when: an item that gets done while
+// the page is open pops its check and draws a line through itself; one already done when shown
+// does not (a session opening renders all its plans at once, within the same moment).
+const RANK: Record<string, number> = { pending: 0, in_progress: 1, completed: 2 };
+const planSeen = new Map<string, { rank: number; at: number }>();
+function justDone(key: string, status: string, now: number): boolean {
+  const rank = RANK[status] ?? 0;
+  const prev = planSeen.get(key);
+  if (!prev || rank > prev.rank) planSeen.set(key, { rank, at: now });
+  return rank === 2 && !!prev && prev.rank < 2 && now - prev.at > 500;
+}
+
+function TodoCard({ t, sessionKey }: { t: ToolInfo; sessionKey: string }) {
   const todos = t.todos ?? [];
   const done = todos.filter((x) => x.status === 'completed').length;
+  // Kept for the length of the animation, whatever renders in between.
+  const fresh = useRef(new Map<string, number>());
+  const now = performance.now();
+  const anim = todos.map((x) => {
+    if (justDone(`${sessionKey}|${x.text}`, x.status, now)) fresh.current.set(x.text, now);
+    const at = fresh.current.get(x.text);
+    return at != null && now - at < 1000;
+  });
   return (
     <div className="tl-item my-2 rounded-2xl border border-line bg-bg-1 px-4 py-3">
       <div className="mb-2 flex items-center gap-2 text-[12.5px] text-fg-3">
@@ -405,14 +456,15 @@ function TodoCard({ t }: { t: ToolInfo }) {
           <li key={i} className="flex items-start gap-2.5 text-[13.5px]">
             <span
               className={cx(
-                'mt-[3px] flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border',
+                'mt-[3px] flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border transition-colors duration-300',
                 x.status === 'completed' ? 'border-ok bg-ok text-bg' : x.status === 'in_progress' ? 'border-busy' : 'border-line-2',
+                anim[i] && 'anim-pop-in',
               )}
             >
-              {x.status === 'completed' && <Check size={9} strokeWidth={3.5} />}
-              {x.status === 'in_progress' && <span className="h-1.5 w-1.5 rounded-full bg-busy" />}
+              {x.status === 'completed' && <Check size={9} strokeWidth={3.5} className={anim[i] ? 'anim-draw' : undefined} />}
+              {x.status === 'in_progress' && <span className="anim-pop-in h-1.5 w-1.5 rounded-full bg-busy" />}
             </span>
-            <span className={cx(x.status === 'completed' && 'text-fg-3 line-through', x.status === 'in_progress' && 'font-medium')}>{x.text}</span>
+            <span className={cx(x.status === 'completed' && (anim[i] ? 'strike-in text-fg-3' : 'text-fg-3 line-through'), x.status === 'in_progress' && 'font-medium')}>{x.text}</span>
           </li>
         ))}
       </ul>
@@ -595,7 +647,43 @@ function HandoffCard({ h }: { h: HandoffInfo }) {
   );
 }
 
-export const UserBubble = memo(function UserBubble({ item }: { item: Extract<TimelineItem, { kind: 'user' }> }) {
+/** A message another session sent this one: who sent it and how it starts, the text a click away. */
+function PeerMessage({ item }: { item: Extract<TimelineItem, { kind: 'user' }> }) {
+  const [open, setOpen] = useState(false);
+  const p = item.peer!;
+  const head = useMemo(() => {
+    const l = item.text.split('\n').find((x) => x.trim()) ?? '';
+    return l.replace(/^\s*(#+|[-*+>]|\d+[.)])\s+/, '').replace(/[*_`]/g, '').trim();
+  }, [item.text]);
+  return (
+    <div className="tl-item">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', open && 'bg-bg-2')}
+      >
+        <Inbox size={14} className="shrink-0 text-accent" />
+        <span className="max-w-[60%] shrink-0 truncate text-[13px] text-fg-2">
+          From <span className="font-medium text-fg">{p.name || 'another session'}</span>
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg-3">{!open && head && `· ${head}`}</span>
+        <span className="shrink-0 text-[11px] text-fg-3">{clockTime(item.ts)}</span>
+        <ChevronRight size={14} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-90')} />
+      </button>
+      {open && (
+        <div className="anim-expand mt-1 mb-2 ml-[15px] border-l border-accent/30 pl-4">
+          <div className="mb-1 text-[11.5px] text-fg-3">
+            {p.mode && <span className="mr-1.5 rounded bg-bg-2 px-1.5 py-px">{p.mode}</span>}
+            from another Claude session
+          </div>
+          <Markdown text={item.text} className="!text-[13.5px] !leading-relaxed !text-fg-2" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Extract<TimelineItem, { kind: 'user' }>; arrive?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const { sessionKey } = useContext(SessionCtx);
@@ -610,24 +698,7 @@ export const UserBubble = memo(function UserBubble({ item }: { item: Extract<Tim
     const ide = splitIdeContext(text);
     return { text: ide ? ide.request : text, files, context: ide?.context };
   }, [item.text]);
-  if (item.peer) {
-    const p = item.peer;
-    return (
-      <div className="tl-item">
-        <div className="max-w-[92%] rounded-2xl border border-accent/25 bg-accent/[0.04] px-4 py-3 sm:max-w-[80%]">
-          <div className="mb-1 flex items-center gap-2 text-[12.5px]">
-            <Inbox size={14} className="shrink-0 text-accent" />
-            <span className="font-medium text-fg">{p.name || 'Another session'}</span>
-            {p.mode && <span className="rounded bg-bg-2 px-1.5 py-px text-[11px] text-fg-3">{p.mode}</span>}
-            <span className="truncate text-fg-3">· from another Claude session</span>
-            <span className="flex-1" />
-            <span className="shrink-0 text-fg-3">{clockTime(item.ts)}</span>
-          </div>
-          <Markdown text={item.text} className="!text-[14px] !leading-relaxed !text-fg-2" />
-        </div>
-      </div>
-    );
-  }
+  if (item.peer) return <PeerMessage item={item} />;
   if (item.meta === 'slash') {
     return (
       <div className="tl-item flex justify-end">
@@ -648,7 +719,7 @@ export const UserBubble = memo(function UserBubble({ item }: { item: Extract<Tim
   return (
     <>
       {item.handoff && <HandoffCard h={item.handoff} />}
-      <div data-seq={item.seq} className="tl-item group/u flex flex-col items-end gap-1.5">
+      <div data-seq={item.seq} className={cx('tl-item group/u flex flex-col items-end gap-1.5', arrive && 'anim-msg-in')}>
         {item.images ? <MessageImages item={item} /> : null}
         {(text || files.length > 0 || context) && (
           <div className="max-w-[92%] rounded-[20px] bg-bg-2 px-4 py-2.5 sm:max-w-[80%]">

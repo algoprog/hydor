@@ -9,7 +9,7 @@ import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Logo } from '../../components/Logo';
 import { Markdown } from '../../components/Markdown';
-import { cx, Dots } from '../../components/ui';
+import { cx, Throbber } from '../../components/ui';
 import { HtmlPage, isPageTool } from '../session/HtmlPage';
 import { mu } from '../../lib/machine';
 
@@ -91,14 +91,14 @@ export default function GuestPage({ token }: { token: string }) {
             <div className="py-16 text-center text-[14px] text-fg-3">{err}</div>
           ) : !v ? (
             <div className="flex justify-center py-16 text-fg-3">
-              <Dots />
+              <Throbber size={28} />
             </div>
           ) : (
             v.items.map((it) => <GuestItem key={it.id} it={it} />)
           )}
           {working && (
             <div className="flex items-center gap-2 px-1 text-[12.5px] text-busy">
-              <Dots /> Working
+              <Throbber /> Working
             </div>
           )}
           <div ref={end} />

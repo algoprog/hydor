@@ -2,7 +2,7 @@
 // Ctrl+Space list (see suggest.ts).
 import { Bot, File, Folder, GitBranch, History, Play, Server, Sparkles, Target, TerminalSquare, type LucideIcon } from 'lucide-react';
 import type { SuggestKind, SuggestView } from './suggest';
-import { cx, Dots } from '../../components/ui';
+import { cx, Throbber } from '../../components/ui';
 
 const KIND: Record<SuggestKind, { icon: LucideIcon; label: string }> = {
   history: { icon: History, label: 'earlier' },
@@ -79,7 +79,7 @@ export function TermSuggest({ view, font, onPick }: { view: SuggestView; font: {
           })}
           {(menu.busy || menu.asking) && (
             <div className="flex items-center gap-2 px-2.5 py-2 text-[12.5px] text-fg-3">
-              <Dots /> {menu.asking && 'Writing a command…'}
+              <Throbber /> {menu.asking && 'Writing a command…'}
             </div>
           )}
           {menu.error && <div className="px-2.5 py-2 text-[12.5px] text-err">{menu.error}</div>}

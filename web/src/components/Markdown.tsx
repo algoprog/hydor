@@ -61,7 +61,7 @@ export function CopyButton({ text, className, label = 'Copy' }: { text: string |
       }}
       className={cx('inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg', className)}
     >
-      {done ? <Check size={13} className="anim-pop text-ok" /> : <Copy size={13} />}
+      {done ? <Check size={13} className="anim-pop-in anim-draw text-ok" /> : <Copy size={13} />}
     </button>
   );
 }

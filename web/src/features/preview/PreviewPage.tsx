@@ -1,12 +1,13 @@
 // Preview: dev servers running on this machine (Vite, Next, a Python server…), opened in a browser on
 // any device through the app's preview port (server/preview.ts).
 import { useEffect, useState } from 'react';
-import { ExternalLink, MonitorSmartphone, RefreshCw } from 'lucide-react';
+import { ExternalLink, MonitorSmartphone, } from 'lucide-react';
 import { api, post } from '../../lib/api';
 import { tildify } from '../../lib/format';
 import { toastError, useApp } from '../../lib/store';
-import { Button, cx, Dots, Empty, inputCls, Section } from '../../components/ui';
+import { Button, cx, Throbber, Empty, inputCls, Section } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
+import { RefreshIcon } from '../../components/RefreshIcon';
 
 interface DevServer {
   port: number;
@@ -65,7 +66,7 @@ export function PreviewPage() {
         title="Preview"
         sub="Open a dev server running on this machine, from any device"
         actions={
-          <Button size="sm" variant="ghost" icon={<RefreshCw size={13} />} onClick={load}>
+          <Button size="sm" variant="ghost" icon={<RefreshIcon size={13} />} onClick={load}>
             Refresh
           </Button>
         }
@@ -74,7 +75,7 @@ export function PreviewPage() {
         <div className="mx-auto max-w-[820px] space-y-4 px-3 py-5 sm:px-6">
           {!info ? (
             <div className="flex justify-center py-10 text-fg-3">
-              <Dots />
+              <Throbber size={28} />
             </div>
           ) : !info.port ? (
             <Empty icon={<MonitorSmartphone size={22} />} title="Previews are off">

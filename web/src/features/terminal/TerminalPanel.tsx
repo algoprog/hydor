@@ -6,7 +6,7 @@ import { basename, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { PageHeader } from '../layout/PageHeader';
-import { cx, Dots, IconButton, useConfirm } from '../../components/ui';
+import { cx, Throbber, IconButton, useConfirm } from '../../components/ui';
 import { Suggester, type SuggestView } from './suggest';
 import { TermSuggest } from './TermSuggest';
 import { machineBase, machineKey } from '../../lib/machine';
@@ -273,7 +273,7 @@ function TerminalView({ id, onReady }: { id: string; onReady?: (api: TermApi) =>
       <TermSuggest view={view} font={{ family: TERM_FONT.family, size: fontSize }} onPick={(i) => sug.current?.pick(i)} />
       {state === 'connecting' && (
         <div className="pointer-events-none absolute top-2 right-3 text-fg-3">
-          <Dots />
+          <Throbber />
         </div>
       )}
     </div>
@@ -431,7 +431,7 @@ export function TerminalPanel({ page }: { page?: boolean }) {
       <div className="min-h-0 flex-1">
         {!loaded ? (
           <div className="flex h-full items-center justify-center text-fg-3">
-            <Dots />
+            <Throbber size={34} />
           </div>
         ) : active && list.some((t) => t.id === active) ? (
           <TerminalView key={active} id={active} onReady={onReady} />

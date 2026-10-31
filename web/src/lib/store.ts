@@ -15,6 +15,7 @@ import type {
   SystemSample,
   TimelineItem,
   TimelinePage,
+  UpdateState,
 } from '@shared/types';
 import { api, enc } from './api';
 import { live } from './ws';
@@ -34,6 +35,8 @@ export interface Toast {
   action?: { label: string; run: () => void };
   /** A session finished, failed or needs you: shown as a small card for that session. */
   notice?: ToastNotice;
+  /** On its way out (it slips away before it is removed). */
+  leaving?: boolean;
 }
 
 export interface ToastNotice {
@@ -59,8 +62,13 @@ export const useToasts = create<{
   dismiss: (id: number) => void;
   hold: (id: number, on: boolean) => void;
 }>((set) => {
+  const leave = (id: number) => {
+    held.delete(id);
+    set((s) => ({ list: s.list.map((t) => (t.id === id ? { ...t, leaving: true } : t)) }));
+    setTimeout(() => set((s) => ({ list: s.list.filter((t) => t.id !== id) })), 180);
+  };
   const expire = (id: number, ms: number) => {
-    setTimeout(() => (held.has(id) ? expire(id, 1500) : set((s) => ({ list: s.list.filter((t) => t.id !== id) }))), ms);
+    setTimeout(() => (held.has(id) ? expire(id, 1500) : leave(id)), ms);
   };
   return {
     list: [],
@@ -77,10 +85,7 @@ export const useToasts = create<{
       expire(id, n.kind === 'done' ? 8000 : 12000);
       return id;
     },
-    dismiss: (id) => {
-      held.delete(id);
-      set((s) => ({ list: s.list.filter((t) => t.id !== id) }));
-    },
+    dismiss: (id) => leave(id),
     hold: (id, on) => void (on ? held.add(id) : held.delete(id)),
   };
 });
@@ -101,8 +106,8 @@ export interface Bootstrap {
   tourSeen: number;
   /** Themes the user made. */
   themes: AppTheme[];
-  /** How far this copy is behind its git upstream (checked daily); missing when that cannot be told. */
-  update?: { behind: number; latest?: string; checkedAt: number; error?: string };
+  /** How far this copy is behind its git upstream (checked daily), and updating; missing when that cannot be told. */
+  update?: UpdateState;
   /** Accounts added beside the agents' own sign-ins (Settings → Accounts). */
   accounts: AgentAccount[];
   /** Agents that speak ACP, set up in Settings → More agents. */
@@ -397,6 +402,25 @@ useUI.subscribe((s) => {
 
 // ---- wiring server events into the stores -----------------------------------------------
 
+/** This page's build: the file name of its entry script (none in development). */
+const pageBuild = document.querySelector<HTMLScriptElement>('script[type="module"][src*="assets/index-"]')?.getAttribute('src')?.split('/').pop();
+let offered = '';
+/** The server hands out a newer build than this page runs (after an update): reload into it, or offer to. */
+function newerBuild(build: string) {
+  if (!pageBuild || build === pageBuild || offered === build) return;
+  offered = build;
+  // "Update now" in this tab: it wanted the new version.
+  let asked = false;
+  try {
+    asked = !!sessionStorage.getItem('wa.updating');
+    sessionStorage.removeItem('wa.updating');
+  } catch {}
+  if (asked) return location.reload();
+  const offer = () => useToasts.getState().push('info', 'Agent Console was updated', { label: 'Reload', run: () => location.reload() }, 'Reload to use the new version');
+  if (document.visibilityState === 'visible') offer();
+  else document.addEventListener('visibilitychange', offer, { once: true });
+}
+
 export function handleEvent(e: ServerEvent) {
   switch (e.t) {
     case 'sessions':
@@ -429,6 +453,14 @@ export function handleEvent(e: ServerEvent) {
     }
     case 'login':
       useLogins.getState().put(e.flow);
+      break;
+    case 'update': {
+      const boot = useApp.getState().boot;
+      if (boot) useApp.getState().set({ boot: { ...boot, update: e.update ?? undefined } });
+      break;
+    }
+    case 'hello':
+      if (e.build) newerBuild(e.build);
       break;
     case 'index': {
       const was = useApp.getState().indexing?.running;

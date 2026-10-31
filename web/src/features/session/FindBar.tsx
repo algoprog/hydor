@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { api, enc } from '../../lib/api';
 import { useTimeline } from '../../lib/store';
-import { cx, Dots, IconButton } from '../../components/ui';
+import { cx, Throbber, IconButton } from '../../components/ui';
 
 type Highlights = { set: (name: string, h: unknown) => void; delete: (name: string) => void };
 const highlights = () => (CSS as unknown as { highlights?: Highlights }).highlights;
@@ -110,7 +110,7 @@ export function FindBar({ sessionKey, onClose }: { sessionKey: string; onClose: 
         className="h-7 w-44 bg-transparent text-[13.5px] outline-none placeholder:text-fg-3 sm:w-56"
       />
       <span className={cx('tnum min-w-[52px] text-right text-[12px]', found && !found.length ? 'text-err' : 'text-fg-3')}>
-        {busy ? <Dots /> : found ? (found.length ? `${cur + 1} of ${found.length}` : 'None') : ''}
+        {busy ? <Throbber /> : found ? (found.length ? `${cur + 1} of ${found.length}` : 'None') : ''}
       </span>
       <IconButton label="Older match (Enter)" size="sm" onClick={() => step(-1)} disabled={!found?.length}>
         <ChevronUp size={15} />

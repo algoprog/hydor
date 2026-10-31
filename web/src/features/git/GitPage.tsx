@@ -1,13 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, CloudDownload, FileText, GitBranch, GitCommitHorizontal, RefreshCw, SquareTerminal, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, CloudDownload, FileText, GitBranch, GitCommitHorizontal, SquareTerminal, Upload, X } from 'lucide-react';
 import type { GitActionResult, GitCommit, GitRepo, GitRepoDetail } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { ago, tildify, timeAgo } from '../../lib/format';
 import { go, openFile } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
-import { Button, cx, Dots, Empty, IconButton, useConfirm, useIsMobile } from '../../components/ui';
+import { Button, cx, Throbber, Empty, IconButton, useConfirm, useIsMobile } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { openTerminalAt } from '../terminal/TerminalPanel';
+import { RefreshIcon } from '../../components/RefreshIcon';
 
 const repoUrl = (p: string) => `/git?path=${encodeURIComponent(p)}`;
 const plural = (n: number, one: string, many = one + 's') => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -181,7 +182,7 @@ function RepoDetail({ path, onChanged, onBack }: { path: string; onChanged: (r: 
   if (!repo)
     return (
       <div className="flex h-full items-center justify-center py-20 text-fg-3">
-        <Dots />
+        <Throbber size={34} />
       </div>
     );
 
@@ -222,7 +223,7 @@ function RepoDetail({ path, onChanged, onBack }: { path: string; onChanged: (r: 
         </div>
       ) : (
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" icon={<RefreshCw size={14} />} disabled={!!busy} onClick={() => run('fetch')}>
+          <Button size="sm" variant="secondary" icon={<RefreshIcon size={14} />} disabled={!!busy} onClick={() => run('fetch')}>
             {busy === 'fetch' ? 'Fetching…' : 'Fetch'}
           </Button>
           <Button
@@ -368,14 +369,14 @@ export function GitPage({ selected }: { selected: string | null }) {
         <span className="hidden sm:inline">{busy === 'fetch' ? 'Fetching…' : 'Fetch all'}</span>
       </Button>
       <IconButton label="Refresh" onClick={() => load(true)} disabled={!!busy}>
-        <RefreshCw size={15} className={cx(busy === 'refresh' && 'animate-spin')} />
+        <RefreshIcon size={15} busy={busy === 'refresh'} />
       </IconButton>
     </>
   );
 
   const list = !repos ? (
     <div className="flex justify-center py-16 text-fg-3">
-      <Dots />
+      <Throbber size={28} />
     </div>
   ) : !repos.length ? (
     <Empty icon={<GitBranch size={20} />} title="No repositories yet">

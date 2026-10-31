@@ -1,12 +1,13 @@
 // A session's pull request: a badge for its state and checks, and a dialog that opens one (with a
 // description a model can write), links one that exists, or shows how the linked one stands.
 import { useEffect, useState } from 'react';
-import { ExternalLink, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, RefreshCw, Sparkles } from 'lucide-react';
+import { ExternalLink, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Sparkles } from 'lucide-react';
 import type { PullRequestInfo, SessionSummary } from '@shared/types';
 import { api, del, enc, post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, Dialog, Dots, inputCls } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, inputCls } from '../../components/ui';
+import { RefreshIcon } from '../../components/RefreshIcon';
 
 const STATE: Record<PullRequestInfo['state'], { icon: typeof GitPullRequest; label: string; cls: string }> = {
   open: { icon: GitPullRequest, label: 'Open', cls: 'text-ok' },
@@ -122,7 +123,7 @@ function PrStatus({ s, pr, onClose }: { s: SessionSummary; pr: PullRequestInfo; 
         <Button size="sm" variant="secondary" onClick={() => (onClose(), go(`/review/${enc(s.key)}`))}>
           Review the changes
         </Button>
-        <Button size="sm" variant="ghost" icon={<RefreshCw size={13} className={busy ? 'animate-spin' : ''} />} disabled={busy} onClick={refresh}>
+        <Button size="sm" variant="ghost" icon={<RefreshIcon size={13} busy={busy} />} disabled={busy} onClick={refresh}>
           Check now
         </Button>
         <span className="flex-1" />
@@ -209,7 +210,7 @@ function PrCreate({ s, onClose }: { s: SessionSummary; onClose: () => void }) {
   if (!d)
     return (
       <div className="flex justify-center py-6 text-fg-3">
-        <Dots />
+        <Throbber />
       </div>
     );
   const nothing = !d.commits.length && !(commitAll && d.dirty);
@@ -265,7 +266,7 @@ function PrCreate({ s, onClose }: { s: SessionSummary; onClose: () => void }) {
               <Button size="sm" variant="ghost" icon={writing ? undefined : <Sparkles size={13} />} disabled={writing || !d.commits.length} onClick={write} title={d.commits.length ? 'A model reads the commits and the diff and writes them' : 'Commit something first'}>
                 {writing ? (
                   <span className="inline-flex items-center gap-2">
-                    <Dots /> Writing…
+                    <Throbber /> Writing…
                   </span>
                 ) : (
                   'Write it for me'

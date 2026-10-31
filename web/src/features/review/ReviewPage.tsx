@@ -2,15 +2,16 @@
 // collapsible, with a "Viewed" mark that lasts until the file changes again. "Guide me" asks a model
 // for a reading order with a note per file, kept for exactly these changes.
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, ExternalLink, FileDiff, ListOrdered, RefreshCw, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ExternalLink, FileDiff, ListOrdered, Sparkles } from 'lucide-react';
 import type { PullRequestInfo } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { openSession } from '../../lib/nav';
 import { toastError, useSessions } from '../../lib/store';
 import { DiffStat, DiffView } from '../../components/DiffView';
-import { Button, cx, Dots, Empty } from '../../components/ui';
+import { Button, cx, Throbber, Empty } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { PrBadge } from '../session/PullRequest';
+import { RefreshIcon } from '../../components/RefreshIcon';
 
 interface ReviewFile {
   path: string;
@@ -137,7 +138,7 @@ export function ReviewPage({ sessionKey }: { sessionKey: string }) {
           </Empty>
         ) : !r ? (
           <div className="flex justify-center py-10 text-fg-3">
-            <Dots />
+            <Throbber size={28} />
           </div>
         ) : !r.files.length ? (
           <Empty icon={<FileDiff size={22} />} title="No changes">
@@ -185,7 +186,7 @@ export function ReviewPage({ sessionKey }: { sessionKey: string }) {
                   <Button size="sm" variant="secondary" icon={writing ? undefined : <Sparkles size={13} />} disabled={writing} onClick={guide}>
                     {writing ? (
                       <span className="inline-flex items-center gap-2">
-                        <Dots /> Reading the changes…
+                        <Throbber /> Reading the changes…
                       </span>
                     ) : (
                       'Guide me through it'
@@ -196,7 +197,7 @@ export function ReviewPage({ sessionKey }: { sessionKey: string }) {
                 <span className="text-[12px] text-fg-3 lg:hidden">
                   {done} of {r.files.length} viewed
                 </span>
-                <Button size="sm" variant="ghost" icon={<RefreshCw size={13} />} onClick={load}>
+                <Button size="sm" variant="ghost" icon={<RefreshIcon size={13} />} onClick={load}>
                   Reload
                 </Button>
               </div>

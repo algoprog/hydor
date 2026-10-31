@@ -3,7 +3,7 @@
 // wide screens; on phones a list, each section on its own page.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Bell, Blocks, Bot, Cable, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
-import type { AccountStatus, Agent, AgentAccount, LoginFlow } from '@shared/types';
+import type { AccountStatus, Agent, AgentAccount, LoginFlow, UpdateState } from '@shared/types';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -11,7 +11,7 @@ import { toast, toastError, useApp, useLogins, useUI } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { FolderChip } from '../../components/FolderPicker';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Dots, inputCls, Section, Segmented, Switch, useConfirm, useIsMobile } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, inputCls, Section, Segmented, Switch, useConfirm, useIsMobile } from '../../components/ui';
 import { chime, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
 import { PageHeader } from '../layout/PageHeader';
 import { followUpPref, type FollowUp } from '../session/Composer';
@@ -160,7 +160,7 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
         <div className="space-y-4">
           {flow.state === 'starting' && (
             <div className="flex items-center gap-2 text-[13px] text-fg-3">
-              <Dots /> Starting {agentName(agent)} sign-in…
+              <Throbber /> Starting {agentName(agent)} sign-in…
             </div>
           )}
           {flow.url && (
@@ -186,7 +186,7 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
               </div>
               {flow.state === 'waiting' && (
                 <div className="mt-3 flex items-center gap-2 text-[12.5px] text-fg-3">
-                  <Dots /> Waiting for you to finish in the browser…
+                  <Throbber /> Waiting for you to finish in the browser…
                 </div>
               )}
             </div>
@@ -211,7 +211,7 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
           )}
           {flow.state === 'verifying' && (
             <div className="flex items-center gap-2 text-[13px] text-fg-3">
-              <Dots /> Verifying…
+              <Throbber /> Verifying…
             </div>
           )}
           {flow.state === 'failed' && (
@@ -237,7 +237,7 @@ function AccountRow({ a, account, onChange, extra }: { a: AccountStatus | null; 
   if (!a || !agent) {
     return (
       <div className="flex items-center gap-3 py-3 text-fg-3">
-        <Dots />
+        <Throbber />
       </div>
     );
   }
@@ -384,6 +384,7 @@ function GeneralSettings() {
         </div>
       </Section>
       <AutoResumeSetting />
+      <AutoUpdateSetting />
       <Section>
         <div className="-my-2">
           <SettingRow label="Welcome tour" hint="Connect your subscriptions and see what each part of the app does">
@@ -407,14 +408,21 @@ function GeneralSettings() {
   );
 }
 
-/** Whether a newer version is out (for copies installed from git), and how to get it. */
+const PHASE: Record<NonNullable<UpdateState['running']>['phase'], string> = {
+  pull: 'Getting the new version',
+  install: 'Installing packages',
+  build: 'Building',
+  restart: 'Restarting, this page reconnects by itself',
+};
+
+/** Whether a newer version is out (for copies installed from git), updating to it, and how the last update went. */
 function UpdateLine() {
   const update = useApp((s) => s.boot?.update);
   const [busy, setBusy] = useState(false);
   const check = async () => {
     setBusy(true);
     try {
-      const r = await post<{ update: NonNullable<typeof update> | null }>('/api/update-check');
+      const r = await post<{ update: UpdateState | null }>('/api/update-check');
       const boot = useApp.getState().boot;
       if (boot) useApp.getState().set({ boot: { ...boot, update: r.update ?? undefined } });
       if (!r.update) toast('This copy was not installed from git with an upstream, so it cannot check', 'info');
@@ -424,35 +432,92 @@ function UpdateLine() {
       setBusy(false);
     }
   };
-  const cmd = 'node dist/server/cli.js update';
-  return update && update.behind > 0 ? (
-    <div className="space-y-1.5 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2.5 text-fg-2">
-      <div>
-        <span className="font-medium text-fg">
-          {update.behind} update{update.behind === 1 ? '' : 's'} out
-        </span>
-        {update.latest && <span> · latest: {update.latest}</span>}
-      </div>
+  const updateNow = async () => {
+    // This tab reloads into the new version once the server is back with it.
+    try {
+      sessionStorage.setItem('wa.updating', '1');
+    } catch {}
+    try {
+      await post('/api/update');
+    } catch (e) {
+      try {
+        sessionStorage.removeItem('wa.updating');
+      } catch {}
+      toastError(e);
+    }
+  };
+  const checkButton = (
+    <button onClick={check} disabled={busy} className="text-accent hover:underline disabled:opacity-50">
+      {busy ? 'Checking…' : 'Check now'}
+    </button>
+  );
+  if (!update)
+    return (
       <div className="flex items-center gap-2">
-        <span>On the server, in the app’s folder:</span>
-        <code className="rounded bg-bg-1 px-1.5 py-0.5 font-mono text-[12px]">{cmd}</code>
-        <CopyButton text={cmd} />
+        <span>Updates are checked daily for copies installed from git.</span>
+        {checkButton}
       </div>
-      <div className="text-[12px] text-fg-3">It pulls, builds and restarts; running agents carry on.</div>
+    );
+  const last = update.last && !update.running && Date.now() - update.last.at < 7 * 86_400_000 ? update.last : undefined;
+  return (
+    <div className="space-y-1.5">
+      {update.running ? (
+        <div className="anim-in flex items-center gap-2 text-fg-2">
+          <Throbber className="text-fg-3" /> {PHASE[update.running.phase]}…
+        </div>
+      ) : update.behind > 0 ? (
+        <div className="space-y-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2.5 text-fg-2">
+          <div>
+            <span className="font-medium text-fg">
+              {update.behind} update{update.behind === 1 ? '' : 's'} out
+            </span>
+            {update.latest && <span> · latest: {update.latest}</span>}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <Button size="sm" variant="primary" onClick={updateNow}>
+              Update now
+            </Button>
+            <span className="text-[12px] text-fg-3">{update.canRestart ? 'It pulls, builds and restarts; running agents carry on.' : 'It pulls and builds; restart the server afterwards to use it.'}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className={cx(update.error && 'text-warn')}>{update.error ? `Could not check for updates: ${update.error}` : `Up to date · checked ${ago(update.checkedAt)}`}</span>
+          {checkButton}
+        </div>
+      )}
+      {last && (
+        <div className={cx('text-[12px]', last.ok ? 'text-fg-3' : 'text-warn')}>
+          {!last.ok
+            ? `The ${last.auto ? 'automatic ' : ''}update ${ago(last.at)} failed: ${last.error}`
+            : last.from && last.from === last.to
+              ? `Already up to date when it last tried, ${ago(last.at)}`
+              : `Updated${last.auto ? ' by itself' : ''} ${ago(last.at)}${last.from && last.to ? ` (${last.from} → ${last.to})` : ''}${last.needsRestart ? ': restart the server to use it' : ''}`}
+        </div>
+      )}
     </div>
-  ) : (
-    <div className="flex items-center gap-2">
-      <span className={cx(update?.error && 'text-warn')}>
-        {update?.error
-          ? `Could not check for updates: ${update.error}`
-          : update
-            ? `Up to date · checked ${ago(update.checkedAt)}`
-            : 'Updates are checked daily for copies installed from git.'}
-      </span>
-      <button onClick={check} disabled={busy} className="text-accent hover:underline disabled:opacity-50">
-        {busy ? 'Checking…' : 'Check now'}
-      </button>
-    </div>
+  );
+}
+
+/** New versions install themselves while you are away, for a copy that can restart itself. */
+function AutoUpdateSetting() {
+  const update = useApp((s) => s.boot?.update);
+  if (!update) return null;
+  return (
+    <Section>
+      <div className="-my-2">
+        <SettingRow
+          label="Update automatically"
+          hint={
+            update.canRestart
+              ? 'After 5 hours without a message from you, at most once a day. Running agents carry on.'
+              : 'This server cannot restart itself. Run it as a service (install.sh) or with Docker to update automatically.'
+          }
+        >
+          <Switch on={update.auto && update.canRestart} disabled={!update.canRestart} label="Update automatically" onChange={(on) => put('/api/update/auto', { on }).catch(toastError)} />
+        </SettingRow>
+      </div>
+    </Section>
   );
 }
 
@@ -469,7 +534,7 @@ function AutoResumeSetting() {
       <div className="-my-2">
         <SettingRow label="Resume after usage limits" hint="When a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets">
           {on === null ? (
-            <Dots className="text-fg-3" />
+            <Throbber className="text-fg-3" />
           ) : (
             <Switch
               on={on}
@@ -519,7 +584,7 @@ function NotificationSettings() {
     <Section>
       <div className="-my-2 divide-y divide-line">
         <SettingRow label="Notify this device" hint={hint}>
-          {state === null || busy ? <Dots className="text-fg-3" /> : <Switch on={state === 'on'} disabled={state === 'unsupported' || state === 'denied'} onChange={toggle} label="Notify this device" />}
+          {state === null || busy ? <Throbber className="text-fg-3" /> : <Switch on={state === 'on'} disabled={state === 'unsupported' || state === 'denied'} onChange={toggle} label="Notify this device" />}
         </SettingRow>
         <SettingRow label="Sound" hint="A short chime with each notice while the app is open">
           <Switch
@@ -635,7 +700,7 @@ function AccountSettings() {
         }
       >
         {!accounts ? (
-          <Dots className="text-fg-3" />
+          <Throbber className="text-fg-3" />
         ) : !accounts.extra.length ? (
           <p className="text-[13px] leading-relaxed text-fg-3">None yet. Each added account signs in on its own and keeps its own history; your settings, instructions, skills and plugins are shared.</p>
         ) : (

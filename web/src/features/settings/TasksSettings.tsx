@@ -1,7 +1,7 @@
 // Scheduled tasks: agent work that starts by itself, every so often, at a time of day, once, or when a
 // webhook calls. Each run starts a new session (or posts into one you pick) with the task's prompt.
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, Clock, Copy, MoreHorizontal, Pencil, Play, Plus, RefreshCw, Trash2, Webhook } from 'lucide-react';
+import { CalendarClock, Clock, Copy, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
 import type { Agent, ScheduledTask, TaskSchedule } from '@shared/types';
 import { api, del, enc, post } from '../../lib/api';
 import { basename, timeAgo, untilText } from '../../lib/format';
@@ -10,7 +10,8 @@ import { toast, toastError, useApp, useSessions } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
 import { FolderChip } from '../../components/FolderPicker';
-import { Button, cx, Dialog, Dots, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Section, Segmented, Switch, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Section, Segmented, Switch, useConfirm } from '../../components/ui';
+import { RefreshIcon } from '../../components/RefreshIcon';
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -75,7 +76,7 @@ function TaskRow({ t, onEdit, onChanged }: { t: ScheduledTask; onEdit: () => voi
         }
       />
       <IconButton ref={setAnchor} label="Task menu" size="sm" onClick={() => setMenu((m) => !m)}>
-        {running ? <Dots /> : <MoreHorizontal size={16} />}
+        {running ? <Throbber /> : <MoreHorizontal size={16} />}
       </IconButton>
       <Popover anchor={{ current: anchor }} open={menu} onClose={() => setMenu(false)} align="end" width={200}>
         <MenuItem
@@ -102,7 +103,7 @@ function TaskRow({ t, onEdit, onChanged }: { t: ScheduledTask; onEdit: () => voi
         </MenuItem>
         {t.schedule.kind === 'webhook' && (
           <MenuItem
-            icon={<RefreshCw size={14} />}
+            icon={<RefreshIcon size={14} />}
             onClick={async () => {
               setMenu(false);
               if (!(await confirm({ title: 'Make a new webhook address?', body: 'The current address stops working. Update the services that call it.', confirm: 'New address' }))) return;
@@ -321,7 +322,7 @@ export function TasksSettings() {
       <Section>
         {!tasks ? (
           <div className="flex justify-center py-4 text-fg-3">
-            <Dots />
+            <Throbber />
           </div>
         ) : tasks.length ? (
           <div className="-my-2 divide-y divide-line">

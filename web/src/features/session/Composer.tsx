@@ -447,7 +447,7 @@ export function Composer({ s }: { s: SessionSummary }) {
                 onClick={interrupt}
                 title="Stop (Esc)"
                 aria-label="Stop the current turn"
-                className="anim-pop ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-fg text-bg transition duration-150 hover:opacity-85 active:scale-90"
+                className="anim-pop-in ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-fg text-bg transition duration-150 hover:opacity-85 active:scale-90"
               >
                 <Square size={12} fill="currentColor" strokeWidth={0} />
               </button>
@@ -458,9 +458,11 @@ export function Composer({ s }: { s: SessionSummary }) {
                 disabled={!canSend}
                 title={running ? 'Send (Enter)' : takeover ? `End it in ${ext!.client} and send here` : 'Resume and send'}
                 aria-label="Send"
-                className={cx('ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-200 active:scale-90', canSend ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3')}
+                className={cx('group ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-200 active:scale-90', canSend ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3')}
               >
-                <ArrowUp size={16} strokeWidth={2.4} />
+                <span className={cx('ico', canSend && 'ico-rise')}>
+                  <ArrowUp size={16} strokeWidth={2.4} />
+                </span>
               </button>
             )}
           </div>

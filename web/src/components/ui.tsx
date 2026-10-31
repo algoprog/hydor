@@ -64,13 +64,14 @@ export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTM
   },
 );
 
-export function Dots({ className }: { className?: string }) {
+/** Loading: the app's mark at work, whole from the first frame; its spark twinkles and turns.
+ * As tall as the text around it unless given a size (in px, for a page that is loading). */
+export function Throbber({ className, size }: { className?: string; size?: number }) {
   return (
-    <span className={cx('dots', className)} aria-hidden>
-      <span />
-      <span />
-      <span />
-    </span>
+    <svg viewBox="100 124 352 284" className={cx('throbber', className)} style={size ? { width: size, height: size * 0.81 } : undefined} aria-hidden>
+      <path className="throbber-prompt" d="M140 162L250 256L140 350" fill="none" stroke="currentColor" strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
+      <path className="throbber-spark" d="M356 216Q371 285 440 300Q371 315 356 384Q341 315 272 300Q341 285 356 216Z" />
+    </svg>
   );
 }
 
@@ -324,7 +325,7 @@ export function Picker({
       >
         {icon}
         <span className="truncate">{value}</span>
-        <ChevronDown size={12} className="shrink-0 opacity-60" />
+        <ChevronDown size={12} className="shrink-0 opacity-60 max-md:hidden" />
       </button>
       <Popover anchor={ref} open={open} onClose={close} width={width} prefer="above">
         {children(close)}
@@ -418,17 +419,41 @@ export function useConfirm() {
 // ---- segmented ------------------------------------------------------------------------
 
 export function Segmented<T extends string>({ value, options, onChange, size = 'md' }: { value: T; options: { value: T; label: ReactNode; icon?: ReactNode }[]; onChange: (v: T) => void; size?: 'sm' | 'md' }) {
+  // The chosen option's pill glides to the next one (placed at once the first time).
+  const box = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState<{ x: number; w: number; glide: boolean } | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const place = () => {
+      const b = [...el.querySelectorAll<HTMLElement>('[data-seg]')].find((x) => x.dataset.seg === value);
+      if (b) setPill((p) => ({ x: b.offsetLeft, w: b.offsetWidth, glide: !!p }));
+      else setPill(null);
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [value, options.length]);
   return (
-    <div className="inline-flex rounded-[10px] bg-bg-2 p-0.5">
+    <div ref={box} className="relative inline-flex rounded-[10px] bg-bg-2 p-0.5">
+      {pill && (
+        <span
+          aria-hidden
+          className={cx('absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-panel shadow-[0_1px_2px_rgba(0,0,0,0.12)] ring-1 ring-line', pill.glide && 'transition-[translate,width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]')}
+          style={{ translate: `${pill.x}px 0`, width: pill.w }}
+        />
+      )}
       {options.map((o) => (
         <button
           key={o.value}
+          data-seg={o.value}
           type="button"
           onClick={() => onChange(o.value)}
           className={cx(
-            'inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors',
+            'relative inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors duration-200',
             size === 'sm' ? 'h-7 px-2.5 text-[12.5px]' : 'h-8 px-3 text-[13px]',
-            value === o.value ? 'bg-panel text-fg shadow-[0_1px_2px_rgba(0,0,0,0.12)] ring-1 ring-line' : 'text-fg-3 hover:text-fg',
+            value === o.value ? 'text-fg' : 'text-fg-3 hover:text-fg',
           )}
         >
           {o.icon}

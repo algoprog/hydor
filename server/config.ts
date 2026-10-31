@@ -8,6 +8,14 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // dist/server/*.js -> project root is two levels up
 export const APP_ROOT = process.env.WEB_AGENT_ROOT ?? path.resolve(here, '..', '..');
 
+function packageVersion(): string {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'package.json'), 'utf8')).version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 function firstExisting(...candidates: (string | undefined)[]): string | undefined {
   for (const c of candidates) if (c && fs.existsSync(c)) return c;
   return undefined;
@@ -47,7 +55,8 @@ export const config = {
   /** Stop an idle live session after this long without activity (0 = never). */
   idleStopMs: Number(process.env.IDLE_STOP_HOURS ?? 3) * 3600_000,
   webDist: path.join(APP_ROOT, 'dist/web'),
-  version: '0.1.0',
+  /** From package.json, the one place it is kept. */
+  version: packageVersion(),
 };
 
 /**

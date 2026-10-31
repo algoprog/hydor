@@ -18,7 +18,7 @@ export function Logo({ size = 28 }: { size?: number }) {
       </defs>
       <rect x="4" y="4" width="504" height="504" rx="114" fill={`url(#${id}tile)`} stroke="rgba(0,0,0,0.10)" strokeWidth="8" />
       <path d="M140 162L250 256L140 350" fill="none" stroke={`url(#${id}ink)`} strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M356 216Q371 285 440 300Q371 315 356 384Q341 315 272 300Q341 285 356 216Z" fill="#6b6428" />
+      <path className="logo-spark" d="M356 216Q371 285 440 300Q371 315 356 384Q341 315 272 300Q341 285 356 216Z" fill="#6b6428" />
     </svg>
   );
 }

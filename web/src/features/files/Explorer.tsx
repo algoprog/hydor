@@ -20,7 +20,6 @@ import {
   MoreHorizontal,
   NotebookText,
   Pencil,
-  RefreshCw,
   SquareTerminal,
   Trash2,
   Upload,
@@ -30,10 +29,11 @@ import { basename, dirname, joinPath, tildify } from '../../lib/format';
 import { go, openFile } from '../../lib/nav';
 import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { entriesFromDrop, pickedFromInput, startUpload, walkEntries } from '../../lib/upload';
-import { cx, IconButton, MenuItem, MenuSep, Popover, useConfirm } from '../../components/ui';
+import { cx, IconButton, MenuItem, MenuSep, Popover, useConfirm, useIsMobile } from '../../components/ui';
 import { FolderPicker } from '../../components/FolderPicker';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { mu } from '../../lib/machine';
+import { RefreshIcon } from '../../components/RefreshIcon';
 
 export interface FsEntry {
   name: string;
@@ -64,8 +64,12 @@ function FileIcon({ e, open }: { e: FsEntry; open?: boolean }) {
 const GIT_CLS: Record<string, string> = { M: 'text-warn', A: 'text-ok', U: 'text-ok', D: 'text-err', R: 'text-info', C: 'text-err', '•': 'text-warn' };
 
 const expandedKey = (root: string) => `wa.tree.${root}`;
+// Fingers: rows don't drag (a long press opens the menu instead).
+const TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
 export function Explorer() {
+  const mobile = useIsMobile();
+  const isz = mobile ? 'md' : 'sm';
   const boot = useApp((s) => s.boot);
   const root = useUI((s) => s.explorerRoot) ?? boot?.defaultCwd ?? '/';
   const hidden = useUI((s) => s.showHidden);
@@ -308,18 +312,18 @@ export function Explorer() {
             >
               {tildify(root, home)}
             </button>
-            <IconButton label="Up one folder" size="sm" onClick={() => useUI.getState().set({ explorerRoot: dirname(root) })} disabled={root === '/'}>
+            <IconButton label="Up one folder" size={isz} onClick={() => useUI.getState().set({ explorerRoot: dirname(root) })} disabled={root === '/'}>
               <FolderUp size={14} />
             </IconButton>
-            <IconButton label="New file" size="sm" onClick={() => setCreating({ dir: root, kind: 'file' })}>
+            <IconButton label="New file" size={isz} onClick={() => setCreating({ dir: root, kind: 'file' })}>
               <FilePlus2 size={14} />
             </IconButton>
-            <IconButton label="New folder" size="sm" onClick={() => setCreating({ dir: root, kind: 'dir' })}>
+            <IconButton label="New folder" size={isz} onClick={() => setCreating({ dir: root, kind: 'dir' })}>
               <FolderPlus size={14} />
             </IconButton>
             <IconButton
               label="Upload files"
-              size="sm"
+              size={isz}
               onClick={() => {
                 uploadDir.current = root;
                 fileInput.current?.click();
@@ -327,11 +331,11 @@ export function Explorer() {
             >
               <Upload size={14} />
             </IconButton>
-            <IconButton label={hidden ? 'Hide dotfiles' : 'Show dotfiles'} size="sm" onClick={() => useUI.getState().set({ showHidden: !hidden })}>
+            <IconButton label={hidden ? 'Hide dotfiles' : 'Show dotfiles'} size={isz} onClick={() => useUI.getState().set({ showHidden: !hidden })}>
               {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
             </IconButton>
-            <IconButton label="Refresh" size="sm" onClick={refreshAll}>
-              <RefreshCw size={13} />
+            <IconButton label="Refresh" size={isz} onClick={refreshAll}>
+              <RefreshIcon size={13} />
             </IconButton>
           </>
         )}
@@ -346,7 +350,7 @@ export function Explorer() {
       >
         {renderDir(root, 0)}
       </div>
-      <div className="border-t border-line px-3 py-1.5 text-[11px] text-fg-3">Drop files or folders on a folder to upload</div>
+      {!mobile && <div className="border-t border-line px-3 py-1.5 text-[11px] text-fg-3">Drop files or folders on a folder to upload</div>}
       <input
         ref={fileInput}
         type="file"
@@ -482,7 +486,7 @@ const TreeRow = memo(function TreeRow({
       ref={ref}
       role="treeitem"
       aria-expanded={isDir(e) ? open : undefined}
-      draggable
+      draggable={!TOUCH}
       onDragStart={(ev) => {
         ev.dataTransfer.setData(INTERNAL, e.path);
         ev.dataTransfer.effectAllowed = 'move';
@@ -500,16 +504,19 @@ const TreeRow = memo(function TreeRow({
       onTouchEnd={() => press.current && clearTimeout(press.current)}
       onTouchMove={() => press.current && clearTimeout(press.current)}
       style={{ paddingLeft: 6 + depth * 14 }}
-      className={cx('group flex h-7 cursor-pointer items-center gap-1.5 pr-1 text-[13px] select-none hover:bg-bg-2', drop && 'bg-accent/12 outline-1 -outline-offset-1 outline-accent/60')}
+      className={cx(
+        'group flex h-7 cursor-pointer items-center gap-1.5 pr-1 text-[13px] select-none [-webkit-touch-callout:none] hover:bg-bg-2 max-md:h-10 max-md:gap-2 max-md:text-[14px] max-md:active:bg-bg-2',
+        drop && 'bg-accent/12 outline-1 -outline-offset-1 outline-accent/60',
+      )}
     >
-      <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform', !isDir(e) && 'invisible', open && 'rotate-90')} />
+      <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform max-md:size-3.5', !isDir(e) && 'invisible', open && 'rotate-90')} />
       <FileIcon e={e} open={open} />
       <span className={cx('min-w-0 flex-1 truncate', e.git && e.git !== '•' && GIT_CLS[e.git])} title={e.path}>
         {e.name}
       </span>
       {e.git && <span className={cx('w-3 shrink-0 text-center font-mono text-[10.5px]', GIT_CLS[e.git] ?? 'text-fg-3')}>{e.git}</span>}
       <button
-        className="invisible flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded text-fg-3 group-hover:visible hover:bg-bg-3 hover:text-fg max-md:visible"
+        className="invisible flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded text-fg-3 group-hover:visible hover:bg-bg-3 hover:text-fg max-md:visible max-md:h-9 max-md:w-9"
         onClick={(ev) => {
           ev.stopPropagation();
           onMenu(ref.current!);
@@ -531,7 +538,7 @@ function NameInput({ depth, kind, initial = '', onDone }: { depth: number; kind:
     onDone(val);
   };
   return (
-    <div style={{ paddingLeft: 24 + depth * 14 }} className="flex h-7 items-center gap-1.5 pr-2">
+    <div style={{ paddingLeft: 24 + depth * 14 }} className="flex h-7 items-center gap-1.5 pr-2 max-md:h-10">
       {kind === 'dir' ? <Folder size={15} className="shrink-0 text-accent/80" /> : <File size={15} className="shrink-0 text-fg-3" />}
       <input
         autoFocus
@@ -546,7 +553,7 @@ function NameInput({ depth, kind, initial = '', onDone }: { depth: number; kind:
           if (e.key === 'Escape') finish('');
         }}
         onBlur={() => finish(v)}
-        className="h-6 min-w-0 flex-1 rounded border border-accent/60 bg-bg-1 px-1.5 text-[13px] outline-none"
+        className="h-6 min-w-0 flex-1 rounded border border-accent/60 bg-bg-1 px-1.5 text-[13px] outline-none max-md:h-8"
         placeholder={kind === 'dir' ? 'folder name' : 'file name'}
       />
     </div>

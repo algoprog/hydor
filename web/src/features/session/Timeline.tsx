@@ -6,11 +6,11 @@ import { basename, compact, dirname, duration, prettyPath } from '../../lib/form
 import { openFile } from '../../lib/nav';
 import { useApp, useTimeline } from '../../lib/store';
 import { DiffStat, DiffView } from '../../components/DiffView';
-import { Button, cx, Dots } from '../../components/ui';
+import { Button, cx, Throbber } from '../../components/ui';
 import { ApprovalCard } from './Approval';
 import { AgentIcon } from '../../components/AgentIcon';
 import { QuoteSelection } from './QuoteSelection';
-import { AssistantBlock, Elapsed, hiddenThought, SessionCtx, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UserBubble } from './items';
+import { AssistantBlock, Elapsed, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UserBubble } from './items';
 import { HtmlPage, isPageTool } from './HtmlPage';
 
 type Block = { kind: 'item'; item: TimelineItem } | { kind: 'group'; id: string; items: TimelineItem[] };
@@ -175,7 +175,7 @@ const isActive = (i: TimelineItem) => (i.kind === 'tool' && (i.tool.status === '
  * A run of steps between two notes, in a quiet box apart from the prose: one line saying what was
  * done ("Ran 3 commands, read 2 files"), the step in progress under it, every step a click away.
  */
-const Group = memo(function Group({ b, sessionKey }: { b: Extract<Block, { kind: 'group' }>; sessionKey: string }) {
+const Group = memo(function Group({ b, sessionKey, agent, busy }: { b: Extract<Block, { kind: 'group' }>; sessionKey: string; agent: Agent; busy?: boolean }) {
   const [open, setOpen] = useState(false);
   const visible = b.items.filter((i) => !hiddenThought(i));
   const tools = visible.filter((i): i is ToolItem => i.kind === 'tool');
@@ -185,28 +185,43 @@ const Group = memo(function Group({ b, sessionKey }: { b: Extract<Block, { kind:
   const row = (it: TimelineItem) => <div key={it.id}>{it.kind === 'tool' ? <ToolRow item={it} sessionKey={sessionKey} /> : it.kind === 'thinking' ? <ThinkingRow item={it} /> : null}</div>;
   // Thoughts on their own stay a quiet line.
   if (!tools.length) return <div className="px-1">{visible.map(row)}</div>;
+  // The agent at work after the last step, shown in its box rather than on a line of its own.
+  const working = busy ? <AgentIcon agent={agent} size={14} spinning className="shrink-0" /> : undefined;
   // A single step is its own box.
-  if (visible.length === 1) return <div className="rounded-xl border border-line bg-bg-1 p-1">{row(visible[0])}</div>;
-  const sum = summarize(done);
-  const Icon = stepsIcon(done);
-  const head = done.length > 0;
+  if (visible.length === 1)
+    return (
+      <div className="rounded-xl border border-line bg-bg-1 p-1">
+        <ToolRow item={tools[0]} sessionKey={sessionKey} trailing={working} />
+      </div>
+    );
+  const sum = summarize(tools);
+  const Icon = stepsIcon(tools);
+  // Folded, the box keeps to one line whatever happens in it (as tall as a box of one step): the
+  // step under way while there is one, otherwise what was done.
+  const now = open ? undefined : current[current.length - 1];
   return (
     <div className="rounded-xl border border-line bg-bg-1">
-      {head && (
-        <button
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className="group flex min-h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left text-[13px] text-fg-3 transition-colors hover:text-fg-2"
-        >
-          <Icon size={14} className="shrink-0" />
-          <span className="min-w-0 flex-1 truncate">{sum.text}</span>
-          <DiffStat added={sum.added} removed={sum.removed} compact />
-          <ChevronRight size={14} className={cx('shrink-0 transition-transform duration-200', open && 'rotate-90')} />
-        </button>
-      )}
-      {(open || !head || current.length > 0) && (
-        <div className={cx('p-1', head && 'border-t border-line', open && 'anim-expand')}>{(open || !head ? visible : current).map(row)}</div>
-      )}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="group flex h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left text-[13px] text-fg-3 transition-colors hover:text-fg-2"
+      >
+        {now ? (
+          <>
+            <StepLine item={now} />
+            {done.length > 0 && <span className="shrink-0 text-[11.5px] text-fg-3">{done.length} done</span>}
+          </>
+        ) : (
+          <>
+            <Icon size={14} className="shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{sum.text}</span>
+            <DiffStat added={sum.added} removed={sum.removed} compact />
+            {working}
+          </>
+        )}
+        <ChevronRight size={14} className={cx('shrink-0 transition-transform duration-200', open && 'rotate-90')} />
+      </button>
+      {open && <div className="anim-expand border-t border-line p-1">{visible.map(row)}</div>}
     </div>
   );
 });
@@ -275,6 +290,10 @@ function WorkLog({
   if (live && !all && following()) from.current = Math.max(from.current, bl.length - LIVE_TAIL);
   const hidden = all ? 0 : Math.min(from.current, bl.length);
   const shown = hidden ? bl.slice(hidden) : bl;
+  // At work with nothing on screen saying so: a mark at the end, in the last box of steps when the log ends with one.
+  const quiet = !!live && (live.status === 'working' || live.status === 'starting') && shown.some(visibleBlock) && !replying && !tailShowsStatus(items);
+  const tail = [...shown].reverse().find(visibleBlock);
+  const inBox = quiet && !live?.note && tail?.kind === 'group' && tail.items.some((i) => i.kind === 'tool') ? tail : null;
   return (
     <div className="anim-expand mt-2 space-y-3">
       {hidden > 0 && (
@@ -285,9 +304,9 @@ function WorkLog({
       {shown.map((b) => {
         const id = b.kind === 'group' ? b.id : b.item.id;
         return (
-          <div key={id} className={cx(fresh(b.kind === 'group' ? b.items[0].id : b.item.id) && 'anim-in')}>
+          <div key={id} className={cx(fresh(b.kind === 'group' ? b.items[0].id : b.item.id) && (b.kind === 'item' && b.item.kind === 'user' && !b.item.peer ? 'anim-msg-in' : 'anim-in'))}>
             {b.kind === 'group' ? (
-              <Group b={b} sessionKey={sessionKey} />
+              <Group b={b} sessionKey={sessionKey} agent={agent} busy={b === inBox} />
             ) : b.item.kind === 'assistant' ? (
               <AssistantBlock item={b.item} note />
             ) : b.item.kind === 'user' ? (
@@ -306,7 +325,7 @@ function WorkLog({
           </div>
         );
       })}
-      {live && (live.status === 'working' || live.status === 'starting') && shown.some(visibleBlock) && !replying && !tailShowsStatus(items) && <StillWorking agent={agent} note={live.note} />}
+      {quiet && !inBox && <StillWorking agent={agent} note={live?.note} />}
     </div>
   );
 }
@@ -453,8 +472,8 @@ const SegmentView = memo(function SegmentView({
     : `${verbLine}${took >= 1000 ? `${status === 'interrupted' || status === 'failed' ? ' after' : ' for'} ${duration(took)}` : ''}`;
 
   return (
-    <section className={cx('tl-seg space-y-2', isNew && 'anim-in')}>
-      {seg.prompt && <UserBubble item={seg.prompt} />}
+    <section className={cx('tl-seg space-y-2', isNew && !seg.prompt && 'anim-in')}>
+      {seg.prompt && <UserBubble item={seg.prompt} arrive={isNew && !seg.prompt.peer} />}
       {seg.notice && (
         <div className="flex items-center gap-2 px-2 pt-2 text-[12.5px] text-fg-3">
           <Info size={13} className="shrink-0" />
@@ -462,7 +481,7 @@ const SegmentView = memo(function SegmentView({
         </div>
       )}
       {(visibleWork.length > 0 || live) && (
-        <div>
+        <div className={cx(isNew && seg.prompt && 'anim-in [animation-delay:140ms]')}>
           <button
             onClick={() => setOpen(!expanded)}
             title={tk ? `${tk.input.toLocaleString()} input · ${(tk.cacheRead ?? 0).toLocaleString()} cached · ${tk.output.toLocaleString()} output tokens` : undefined}
@@ -722,7 +741,7 @@ export function Timeline({
   if (!tl || (tl.loading && !tl.items.length)) {
     return (
       <div className="flex flex-1 items-center justify-center text-fg-3">
-        <Dots />
+        <Throbber size={34} />
       </div>
     );
   }
@@ -788,7 +807,7 @@ export function Timeline({
               // The same height loading or not, so swapping the two moves nothing below.
               <div className="flex h-7 items-center justify-center text-[12.5px] text-fg-3">
                 {tl.loadingEarlier ? (
-                  <Dots />
+                  <Throbber />
                 ) : (
                   <button
                     className="rounded-lg px-2.5 py-1 transition-colors hover:bg-bg-2 hover:text-fg"

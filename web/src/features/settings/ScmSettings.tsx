@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ExternalLink, GitPullRequest, Trash2 } from 'lucide-react';
 import { api, del, post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, Dialog, Dots, IconButton, inputCls, Section, Segmented, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, Segmented, useConfirm } from '../../components/ui';
 
 interface AccountView {
   id: string;
@@ -43,7 +43,7 @@ export function ScmSettings() {
         }
       >
         {!list ? (
-          <Dots className="text-fg-3" />
+          <Throbber className="text-fg-3" />
         ) : !list.length ? (
           <p className="text-[13px] leading-relaxed text-fg-3">
             None yet. Add your GitHub account{gh ? ' (the GitHub CLI on this machine is signed in, so that takes one click)' : ''}, or a Gitea server with an access token.

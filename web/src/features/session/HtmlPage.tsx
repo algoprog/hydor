@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, Expand, FileCode2, X } from 'lucide-react';
 import type { ToolItem } from '@shared/types';
-import { Dots, IconButton } from '../../components/ui';
+import { Throbber, IconButton } from '../../components/ui';
 
 export const isPageTool = (name: string) => /^mcp__agent-console__show_html$/.test(name);
 
@@ -68,7 +68,7 @@ export function HtmlPage({ item }: { item: ToolItem }) {
         )}
       </div>
       {!html ? (
-        <div className="flex items-center gap-2 px-3 py-3 text-[12.5px] text-fg-3">{running ? <Dots /> : 'The page was too big to keep here.'}</div>
+        <div className="flex items-center gap-2 px-3 py-3 text-[12.5px] text-fg-3">{running ? <Throbber /> : 'The page was too big to keep here.'}</div>
       ) : (
         <div style={{ height: Math.min(Math.max(height, 60), 900) }} className="relative transition-[height] duration-200">
           <PageFrame html={html} onHeight={setHeight} />

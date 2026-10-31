@@ -2,7 +2,7 @@ import { CheckCircle2, CircleSlash, Upload, X, XCircle } from 'lucide-react';
 import { bytes, tildify } from '../../lib/format';
 import { useApp } from '../../lib/store';
 import { cancelUpload, resolveConflict, useUploads, type UploadBatch } from '../../lib/upload';
-import { Button, cx, Dots } from '../../components/ui';
+import { Button, cx, Throbber } from '../../components/ui';
 
 function Batch({ b }: { b: UploadBatch }) {
   const home = useApp((s) => s.boot?.home);
@@ -58,7 +58,7 @@ function Batch({ b }: { b: UploadBatch }) {
       {current && <div className="mt-1 truncate text-[11px] text-fg-3">{current.rel}</div>}
       {b.status === 'checking' && (
         <div className="mt-1 text-fg-3">
-          <Dots />
+          <Throbber />
         </div>
       )}
       {b.status === 'conflict' && (

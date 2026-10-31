@@ -11,7 +11,7 @@ import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { modelLabel, useCatalog } from '../../components/AgentPickers';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Dots, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
 import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { openTerminalAt } from '../terminal/TerminalPanel';
@@ -335,7 +335,7 @@ function ForkDialog({ s, at, onClose }: { s: SessionSummary; at: { at?: string }
             Cancel
           </Button>
           <Button variant="primary" icon={<GitFork size={14} />} onClick={go} disabled={!text.trim() || busy}>
-            {busy ? <Dots /> : 'Fork'}
+            {busy ? <Throbber /> : 'Fork'}
           </Button>
         </>
       }
@@ -423,7 +423,7 @@ function ChangesList({ s, version }: { s: SessionSummary; version: number }) {
       .then((r) => setFiles(r.files))
       .catch(toastError);
   }, [s.key, version]);
-  if (!files) return <div className="flex justify-center py-12 text-fg-3"><Dots /></div>;
+  if (!files) return <div className="flex justify-center py-12 text-fg-3"><Throbber size={28} /></div>;
   if (!files.length) return <Empty icon={<FilePen size={20} />} title="No file changes">Files the agent edits show up here with their diffs.</Empty>;
   const total = files.reduce((a, f) => [a[0] + f.added, a[1] + f.removed], [0, 0]);
   return (
@@ -486,7 +486,7 @@ function CommandsList({ s, version }: { s: SessionSummary; version: number }) {
       .then((r) => setList(r.commands))
       .catch(toastError);
   }, [s.key, version]);
-  if (!list) return <div className="flex justify-center py-12 text-fg-3"><Dots /></div>;
+  if (!list) return <div className="flex justify-center py-12 text-fg-3"><Throbber size={28} /></div>;
   if (!list.length) return <Empty icon={<SquareTerminal size={20} />} title="No commands">Shell commands the agent runs show up here with their output.</Empty>;
   const failed = list.filter((c) => c.tool.status === 'error').length;
   const bg = list.filter((c) => c.tool.background).length;
@@ -724,7 +724,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
   }, [unread, sessionKey]);
 
   if (missing && !s) return <Empty title="Session not found">It may have been deleted.</Empty>;
-  if (!summary) return <div className="flex h-full items-center justify-center text-fg-3"><Dots /></div>;
+  if (!summary) return <div className="flex h-full items-center justify-center text-fg-3"><Throbber size={34} /></div>;
   const close = () => setDetails(false);
   const openChanges = (path?: string) => {
     useUI.getState().set({ detailsTab: 'changes', detailsFocus: path ?? null });

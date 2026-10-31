@@ -60,7 +60,8 @@ export function Toasts() {
           onPointerEnter={() => hold(t.id, true)}
           onPointerLeave={() => hold(t.id, false)}
           className={cx(
-            'anim-pop pointer-events-auto rounded-xl border bg-elevated text-fg shadow-lg',
+            'rounded-xl border bg-elevated text-fg shadow-lg',
+            t.leaving ? 'anim-out pointer-events-none' : 'anim-pop pointer-events-auto',
             t.notice ? 'w-[min(92vw,340px)] border-line' : 'flex max-w-[min(92vw,420px)] items-start gap-2.5 px-3.5 py-2.5 text-[13.5px]',
             !t.notice && (t.level === 'error' ? 'border-err/35' : 'border-line'),
           )}
