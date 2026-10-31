@@ -920,6 +920,15 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   // Wide screens always show a section; phones start at the list.
   const current = section ?? (mobile ? null : 'general');
   const def = SECTIONS.find((d) => d.id === current);
+  // Phones: a section slides in over the list (which drifts left and dims under it) and back out. Only
+  // taps here slide; the browser's back and forward switch at once, since Safari on an iPhone has already
+  // animated its swipe. `slideTo` is where a tap is sliding until the slide ends; meanwhile a section
+  // sliding away stays on its page.
+  const [slideTo, setSlideTo] = useState<SettingsSection | null>();
+  const [last, setLast] = useState(current);
+  if (current && current !== last) setLast(current);
+  const sliding = slideTo !== undefined && slideTo === current;
+  const page = def ?? (sliding ? SECTIONS.find((d) => d.id === last) : undefined);
   const url = (p: { s?: SettingsSection | null; cwd?: string | null; agent?: Agent | null }) => {
     const q = new URLSearchParams();
     const s = p.s === undefined ? section : p.s;
@@ -932,35 +941,49 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
     return `/settings${qs ? `?${qs}` : ''}`;
   };
   // On a phone, opening a section is a step the back button undoes; elsewhere it replaces.
-  const open = (id: SettingsSection) => go(url({ s: id }), !mobile);
-  const body = def && <SectionBody id={def.id} cwd={cwd} agent={agent} onAgent={(a) => go(url({ agent: a }), true)} />;
-  const folder = def?.folder ? <FolderScope cwd={cwd} onChange={(c) => go(url({ cwd: c }), true)} /> : null;
+  const open = (id: SettingsSection) => {
+    if (mobile) setSlideTo(id);
+    go(url({ s: id }), !mobile);
+  };
+  const body = page && <SectionBody id={page.id} cwd={cwd} agent={agent} onAgent={(a) => go(url({ agent: a }), true)} />;
+  const folder = page?.folder ? <FolderScope cwd={cwd} onChange={(c) => go(url({ cwd: c }), true)} /> : null;
 
   if (mobile) {
+    const motion = sliding && 'transition-[translate,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]';
     return (
       <div className="flex h-full min-h-0 flex-col">
         <PageHeader
           title={
             def ? (
-              <button onClick={() => go(url({ s: null }))} className="-ml-1 flex max-w-full items-center gap-0.5 rounded-md text-left" aria-label="All settings">
+              <button key={def.id} onClick={() => (setSlideTo(null), go(url({ s: null })))} className={cx('-ml-1 flex max-w-full items-center gap-0.5 rounded-md text-left', sliding && 'anim-fade')} aria-label="All settings">
                 <ChevronLeft size={18} className="shrink-0 text-fg-3" />
                 <span className="truncate">{def.label}</span>
               </button>
             ) : (
-              'Settings'
+              <span className={cx(sliding && 'anim-fade')}>Settings</span>
             )
           }
         />
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {def ? (
-            <div className="space-y-4 px-4 pt-4 pb-8">
-              <p className="text-[13px] leading-snug text-fg-3">{def.sub}</p>
-              {folder}
-              {body}
-            </div>
-          ) : (
+        {/* The list stays built under an open section, so it keeps its place; each section opens at its top. */}
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <div inert={!!def} className={cx('absolute inset-0 overflow-y-auto', motion, def ? '-translate-x-1/4' : 'translate-x-0')}>
             <SectionList onOpen={open} />
-          )}
+          </div>
+          <div className={cx('pointer-events-none absolute inset-0 bg-black/20', motion, def ? 'opacity-100' : 'opacity-0')} />
+          <div
+            onTransitionEnd={(e) => e.target === e.currentTarget && setSlideTo(undefined)}
+            className={cx('absolute inset-0 bg-bg', motion, def ? 'translate-x-0' : 'translate-x-full', page && 'shadow-lg')}
+          >
+            {page && (
+              <div key={page.id} className="h-full overflow-y-auto">
+                <div className="space-y-4 px-4 pt-4 pb-8">
+                  <p className="text-[13px] leading-snug text-fg-3">{page.sub}</p>
+                  {folder}
+                  {body}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
