@@ -865,8 +865,10 @@ function TourPage(p: {
       <div
         ref={foot}
         className={cx(
-          'absolute inset-x-0 bottom-0 z-[1] border-t backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color] duration-300',
-          under ? 'border-line/70 bg-bg/55' : 'border-transparent',
+          'absolute inset-x-0 bottom-0 z-[1] border-t transition-[background-color,border-color] duration-300',
+          // Glass only while something runs under it: a backdrop blur kept on all the time can draw black
+          // in Safari as the next step slides in.
+          under ? 'border-line/70 bg-bg/60 backdrop-blur-lg' : 'border-transparent',
         )}
       >
         {phone ? (
