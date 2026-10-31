@@ -2,8 +2,10 @@ import { clsx } from 'clsx';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { ARCH, GoldGradient, MARK_BOX, NUGGET } from './Logo';
 import {
+  createContext,
   forwardRef,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -165,6 +167,9 @@ function usePopoverDismiss(node: RefObject<HTMLElement | null>, anchor: RefObjec
   }, [open, onClose, node, anchor]);
 }
 
+/** Narrower than this, a `sheet` popover spans the screen. */
+const SHEET_BELOW = 640;
+
 /** A floating panel anchored to `anchor`; flips above when there is no room below. */
 export function Popover({
   anchor,
@@ -175,6 +180,7 @@ export function Popover({
   width,
   className,
   prefer = 'below',
+  sheet,
 }: {
   anchor: RefObject<HTMLElement | null>;
   open: boolean;
@@ -184,16 +190,19 @@ export function Popover({
   width?: number;
   className?: string;
   prefer?: 'below' | 'above';
+  /** On a phone, as wide as the screen with the page dimmed behind: a picker by the message box, which would otherwise sit off to one side over the conversation. */
+  sheet?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; maxH: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; maxH: number; width?: number } | null>(null);
   const place = useCallback(() => {
     const a = anchor.current?.getBoundingClientRect();
     const el = ref.current;
     if (!a || !el) return;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const w = Math.min(width ?? el.offsetWidth, vw - 16);
+    const full = sheet && vw < SHEET_BELOW;
+    const w = full ? vw - 16 : Math.min(width ?? el.offsetWidth, vw - 16);
     const h = el.scrollHeight;
     const below = vh - a.bottom - 8;
     const above = a.top - 8;
@@ -202,8 +211,8 @@ export function Popover({
     const top = goAbove ? Math.max(8, a.top - Math.min(h, maxH) - 6) : a.bottom + 6;
     let left = align === 'end' ? a.right - w : a.left;
     left = Math.max(8, Math.min(left, vw - w - 8));
-    setPos({ top, left, maxH });
-  }, [anchor, width, align, prefer]);
+    setPos({ top, left, maxH, width: full ? w : undefined });
+  }, [anchor, width, align, prefer, sheet]);
   useLayoutEffect(() => {
     if (!open) return setPos(null);
     place();
@@ -221,15 +230,20 @@ export function Popover({
   }, [open, place]);
   usePopoverDismiss(ref, anchor as RefObject<HTMLElement | null>, onClose, open);
   if (!open) return null;
+  // A tap on the dimmed page closes it, as anywhere outside does.
+  const dim = sheet && window.innerWidth < SHEET_BELOW;
   return createPortal(
-    <div
-      ref={ref}
-      role="dialog"
-      style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width, maxHeight: pos?.maxH }}
-      className={cx('anim-pop fixed z-50 overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg', className)}
-    >
-      {children}
-    </div>,
+    <>
+      {dim && <div className="anim-overlay fixed inset-0 z-50 bg-black/30" aria-hidden />}
+      <div
+        ref={ref}
+        role="dialog"
+        style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: pos?.width ?? width, maxHeight: pos?.maxH }}
+        className={cx('anim-pop fixed z-50 overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg', className)}
+      >
+        {children}
+      </div>
+    </>,
     document.body,
   );
 }
@@ -360,12 +374,18 @@ export function Picker({
         <span className="truncate">{value}</span>
         <ChevronDown size={12} className="shrink-0 opacity-60 max-md:hidden" />
       </button>
-      <Popover anchor={ref} open={open} onClose={close} width={width} prefer="above">
+      <Popover anchor={ref} open={open} onClose={close} width={width} prefer="above" sheet>
         {children(close)}
       </Popover>
     </>
   );
 }
+
+/**
+ * How the setting chips inside it show: named (the default), `bare` where the icon and value say enough
+ * (the start page's row: the name is left to screen readers), or as the `row`s of a list of settings.
+ */
+export const SettingLayout = createContext<'chip' | 'bare' | 'row'>('chip');
 
 /**
  * A setting of a new session, as the start page lists them: what it is, then what it is set to, and a
@@ -376,6 +396,29 @@ export const SettingChip = forwardRef<
   HTMLButtonElement,
   { label: string; value: ReactNode; icon?: ReactNode; title?: string; open?: boolean; on?: boolean; disabled?: boolean; onClick: () => void; className?: string }
 >(function SettingChip({ label, value, icon, title, open, on, disabled, onClick, className }, ref) {
+  const layout = useContext(SettingLayout);
+  if (layout === 'row')
+    return (
+      <button
+        ref={ref}
+        type="button"
+        title={title}
+        disabled={disabled}
+        onClick={onClick}
+        aria-expanded={open}
+        className={cx(
+          'flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50',
+          open && 'bg-bg-2',
+          className,
+        )}
+      >
+        {icon && <span className="flex shrink-0 text-fg-3">{icon}</span>}
+        <span className="shrink-0 text-fg-2">{label}</span>
+        <span className={cx('ml-auto min-w-0 truncate pl-3 font-medium', on ? 'text-accent' : 'text-fg')}>{value}</span>
+        <ChevronDown size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-180')} />
+      </button>
+    );
+  const bare = layout === 'bare';
   return (
     <button
       ref={ref}
@@ -391,8 +434,8 @@ export const SettingChip = forwardRef<
       )}
     >
       {icon && <span className="flex shrink-0 text-fg-3">{icon}</span>}
-      <span className="shrink-0 text-fg-3">{label}</span>
-      <span className={cx('truncate font-medium transition-colors', on ? 'text-accent' : 'text-fg-2 group-hover:text-fg', open && !on && 'text-fg')}>{value}</span>
+      <span className={bare ? 'sr-only' : 'shrink-0 text-fg-3'}>{label}</span>
+      <span className={cx('truncate transition-colors', !bare && 'font-medium', on ? 'text-accent' : 'text-fg-2 group-hover:text-fg', open && !on && 'text-fg')}>{value}</span>
       <ChevronDown size={12} className={cx('-ml-0.5 shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-180')} />
     </button>
   );

@@ -15,8 +15,8 @@ import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
 import { Composer } from './Composer';
-import { Elapsed, SessionCtx, ToolRow } from './items';
-import { taskKind, TaskLogDialog } from './TaskLog';
+import { SessionCtx, ToolRow } from './items';
+import { TaskLogDialog, TaskRow, useStopTask } from './TaskLog';
 import { Timeline } from './Timeline';
 import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
@@ -421,6 +421,7 @@ function InfoPanel({ s }: { s: SessionSummary }) {
   const here = !!lv && lv.status !== 'exited';
   const tasks = (here ? lv.backgroundTasks : s.external?.backgroundTasks) ?? [];
   const [logTask, setLogTask] = useState<BackgroundTask | null>(null);
+  const stopper = useStopTask(s.key);
   const ctx = lv?.contextTokens && lv?.contextWindow ? Math.round((lv.contextTokens / lv.contextWindow) * 100) : null;
   const resumeCmd = s.agent === 'claude' ? `cd ${s.cwd ?? '~'} && claude --resume ${s.id}` : `codex resume ${s.id}`;
   return (
@@ -466,27 +467,10 @@ function InfoPanel({ s }: { s: SessionSummary }) {
           <div className="mb-1.5 text-[12.5px] font-medium text-fg-3">Background tasks</div>
           <div className="space-y-1">
             {tasks.map((t) => (
-              <div key={t.id} className="flex items-center gap-2 rounded-xl bg-bg-1 pr-2 transition-colors hover:bg-bg-2">
-                <button className="min-w-0 flex-1 px-3 py-2 text-left" title="Show its output" onClick={() => setLogTask(t)}>
-                  <span className="block truncate text-[13px]">{t.description}</span>
-                  <span className="block text-[11.5px] text-fg-3">
-                    {taskKind(t.kind)}
-                    {t.startedAt ? (
-                      <>
-                        {' '}
-                        · <Elapsed since={t.startedAt} />
-                      </>
-                    ) : null}
-                  </span>
-                </button>
-                {here && (
-                  <Button size="sm" variant="ghost" className="text-err" onClick={() => post(`/api/sessions/${enc(s.key)}/tasks/${enc(t.id)}/stop`).catch(toastError)}>
-                    Stop
-                  </Button>
-                )}
-              </div>
+              <TaskRow key={t.id} t={t} className="rounded-xl bg-bg-1 py-0.5" onOpen={() => setLogTask(t)} onStop={here ? () => void stopper.stop(t) : undefined} />
             ))}
           </div>
+          {stopper.node}
           {logTask && <TaskLogDialog sessionKey={s.key} task={logTask} canStop={here} onClose={() => setLogTask(null)} />}
         </div>
       )}

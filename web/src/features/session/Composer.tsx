@@ -13,8 +13,7 @@ import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
 import { AttachmentList } from '../../components/Attachments';
 import { BlockedApproval } from './BlockedApproval';
 import { SessionMeters } from './SessionMeters';
-import { Elapsed } from './items';
-import { taskKind, TaskLogDialog } from './TaskLog';
+import { TaskLogDialog, TaskRow, useStopTask } from './TaskLog';
 import { useComposerMenu } from '../../components/ComposerMenu';
 import { QueueList } from './QueueList';
 import { GoalBar } from './GoalBar';
@@ -69,6 +68,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const tasksRef = useRef<HTMLButtonElement>(null);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [logTask, setLogTask] = useState<BackgroundTask | null>(null);
+  const stopper = useStopTask(s.key);
   const menu = useComposerMenu({ ta, setText, root: s.cwd, commands: (move ? moveCat : cat)?.commands });
   // Text from elsewhere (dictation, a choice clicked in a page) joins what is being written.
   const insertText = (t: string) => {
@@ -394,40 +394,21 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                     <ListTodo size={13} />
                     {tasks.length}
                   </button>
-                  <Popover anchor={tasksRef} open={tasksOpen} onClose={() => setTasksOpen(false)} width={320} prefer="above">
-                    <div className="px-2.5 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-fg-3 uppercase">Background tasks</div>
+                  <Popover anchor={tasksRef} open={tasksOpen} onClose={() => setTasksOpen(false)} width={340} prefer="above" sheet>
+                    <div className="px-2.5 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-fg-3 uppercase">Background tasks · {tasks.length}</div>
                     {tasks.map((t) => (
-                      <div key={t.id} className="flex items-center gap-1 rounded-lg pr-1.5 hover:bg-bg-2">
-                        <button
-                          className="min-w-0 flex-1 px-2.5 py-1.5 text-left"
-                          title="Show its output"
-                          onClick={() => {
-                            setTasksOpen(false);
-                            setLogTask(t);
-                          }}
-                        >
-                          <span className="block truncate text-[13px]">{t.description}</span>
-                          <span className="block text-[11px] text-fg-3">
-                            {taskKind(t.kind)}
-                            {t.startedAt ? (
-                              <>
-                                {' '}
-                                · <Elapsed since={t.startedAt} />
-                              </>
-                            ) : null}
-                          </span>
-                        </button>
-                        {running && (
-                          <button
-                            className="shrink-0 rounded-md px-2 py-1 text-[12px] text-err hover:bg-err/10"
-                            onClick={() => post(`/api/sessions/${enc(key)}/tasks/${enc(t.id)}/stop`).catch(toastError)}
-                          >
-                            Stop
-                          </button>
-                        )}
-                      </div>
+                      <TaskRow
+                        key={t.id}
+                        t={t}
+                        onOpen={() => {
+                          setTasksOpen(false);
+                          setLogTask(t);
+                        }}
+                        onStop={running ? () => void stopper.stop(t) : undefined}
+                      />
                     ))}
                   </Popover>
+                  {stopper.node}
                 </>
               )}
             </div>
