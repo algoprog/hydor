@@ -5,11 +5,11 @@
 // points at an element marked data-tour="…", which arrives as the step comes, with the rest of the page
 // dimmed and blurred around it; whatever no step points at arrives when the tour ends. A step without a
 // target after the pages shows in the middle of the screen.
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
-import { Bell, Blocks, Check, CircleHelp, Cloud, CornerDownLeft, Cpu, Eye, FileDiff, FolderOpen, GitFork, MessageSquareText, Plus, ShieldCheck, Smartphone, X } from 'lucide-react';
+import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, CornerDownLeft, Cpu, Eye, FileDiff, FolderOpen, GitFork, MessageSquareText, Plus, ShieldCheck, Smartphone, X } from 'lucide-react';
 import type { AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { MOD } from '../../lib/format';
@@ -19,8 +19,8 @@ import { enablePush, pushState, type PushState } from '../../lib/notify';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
-import { ARCH, NUGGET, TileGradients } from '../../components/Logo';
+import { Button, cx, Kbd, Throbber, useIsMobile, useMediaQuery } from '../../components/ui';
+import { ARCH, Logo, NUGGET, TileGradients } from '../../components/Logo';
 import { LoginDialog } from '../settings/SettingsPage';
 import { HfSearch, MachineCard, OpenRouterBody, shortGpu, size as bytes, useModels } from '../settings/ModelsSettings';
 import { machineBase, machineId } from '../../lib/machine';
@@ -44,9 +44,14 @@ function savedUses(): Use[] | null {
 
 interface Step {
   id: string;
+  /** Its name in the list of steps beside the pages. */
+  label: string;
   /** The element pointed at: [data-tour="…"]. It stays hidden until its step, so name it in styles.css
    * ("the tour builds the app up") too. None: the card sits in the middle. */
   target?: string;
+  /** What stays in the light around the target, when that is only a part of it (the whole message box
+   * for the row under it): the ring marks the target, the card keeps clear of this. */
+  focus?: string;
   title: string;
   body: ReactNode;
   /** Something to do right in the step. */
@@ -199,14 +204,16 @@ const DUST = [
   { x: '40%', y: '14%', s: 3, d: 4200 },
 ];
 
-/** The welcome page's mark, drawing itself in the light. */
+/** The welcome page's mark, drawing itself in the light, in line with the words under it. */
 function TourHero() {
   return (
-    <div className="relative mx-auto mb-6 flex h-[132px] w-[240px] items-center justify-center">
-      {DUST.map((g, n) => (
-        <span key={n} className="dust absolute rounded-full" style={{ left: g.x, top: g.y, width: g.s, height: g.s, animationDelay: `${g.d}ms` }} />
-      ))}
-      <HeroMark size={84} />
+    <div className="relative mb-8 h-[76px] w-[76px]">
+      <div className="pointer-events-none absolute -inset-x-[82px] -inset-y-[28px]" aria-hidden>
+        {DUST.map((g, n) => (
+          <span key={n} className="dust absolute rounded-full" style={{ left: g.x, top: g.y, width: g.s, height: g.s, animationDelay: `${g.d}ms` }} />
+        ))}
+      </div>
+      <HeroMark size={76} />
     </div>
   );
 }
@@ -238,6 +245,19 @@ function Burst() {
 
 // ---- things to do inside steps ----------------------------------------------------------
 
+/** One thing the app does, on the welcome page: a card, or a row on a phone. */
+function Highlight({ icon, title, children, i }: { icon: ReactNode; title: string; children: ReactNode; i: number }) {
+  return (
+    <div className="flex items-start gap-3.5 rounded-2xl border border-line bg-panel/70 p-4 sm:block" style={{ '--i': i } as CSSProperties}>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">{icon}</span>
+      <div className="min-w-0 sm:mt-3.5">
+        <div className="text-[14px] font-medium text-fg">{title}</div>
+        <div className="mt-1 text-[12.5px] leading-snug text-fg-3">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 function Feature({ icon, children, i }: { icon: ReactNode; children: ReactNode; i: number }) {
   return (
     <div className="flex items-start gap-3" style={{ '--i': i } as CSSProperties}>
@@ -254,6 +274,9 @@ function Loading() {
     </div>
   );
 }
+
+/** A plan as the CLIs name it ("max", "free"), as people read it. */
+const planName = (p?: string) => (p ? p[0].toUpperCase() + p.slice(1) : '');
 
 const Connected = ({ label = 'Connected' }: { label?: string }) => (
   <span className="anim-pop-in flex shrink-0 items-center gap-1 text-[12.5px] font-medium text-ok">
@@ -303,10 +326,11 @@ function UsesPicker() {
   const status = (u: Use): string | null => {
     if (u === 'claude' || u === 'codex') {
       const s = acc?.[u];
-      return s?.loggedIn ? `Signed in${s.plan ? ` · ${s.plan}` : ''}` : null;
+      return s?.loggedIn ? `Signed in${s.plan ? ` · ${planName(s.plan)}` : ''}` : null;
     }
     if (!models) return null;
-    if (u === 'openrouter') return models.openrouter.keyHint ? `Key added${models.openrouter.pinned.length ? ` · ${models.openrouter.pinned.length} models` : ''}` : null;
+    const pinned = models.openrouter.pinned.length;
+    if (u === 'openrouter') return models.openrouter.keyHint ? `Key added${pinned ? ` · ${pinned} model${pinned > 1 ? 's' : ''}` : ''}` : null;
     if (u === 'local') {
       if (models.local.length) return `${models.local.length} model${models.local.length > 1 ? 's' : ''} here already`;
       const g = models.machine.gpus[0];
@@ -315,7 +339,7 @@ function UsesPicker() {
     return null;
   };
   return (
-    <div className="stagger grid gap-2 sm:grid-cols-2">
+    <div className="stagger grid gap-3 sm:grid-cols-2">
       {TILES.map((t, n) => {
         const on = uses.includes(t.id);
         return (
@@ -326,15 +350,15 @@ function UsesPicker() {
             onClick={() => toggle(t.id)}
             style={{ '--i': n } as CSSProperties}
             className={cx(
-              'flex items-start gap-3 rounded-xl border p-3 text-left transition-[background-color,border-color,box-shadow,translate,scale] duration-200 active:scale-[0.985]',
-              on ? 'border-accent/70 bg-accent-soft shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-line bg-panel hover:-translate-y-px hover:border-line-2 hover:shadow-md',
+              'flex items-start gap-3.5 rounded-2xl border p-4 text-left transition-[background-color,border-color,box-shadow,translate,scale] duration-200 active:scale-[0.985]',
+              on ? 'border-accent/50 bg-accent/[0.07]' : 'border-line bg-panel/70 hover:-translate-y-px hover:border-line-2 hover:bg-panel hover:shadow-md',
               t.id === 'agents' && 'sm:col-span-2',
             )}
           >
-            <span className={cx('flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors', on ? 'bg-panel text-fg' : 'bg-bg-2 text-fg-2')}>{t.icon}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] leading-tight font-medium text-fg">{t.title}</span>
-              <span className="mt-1 block text-[12px] leading-snug text-fg-3">{status(t.id) ?? t.sub}</span>
+            <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors', on ? 'bg-accent/15 text-accent' : 'bg-bg-2 text-fg-2')}>{t.icon}</span>
+            <span className="min-w-0 flex-1 pt-px">
+              <span className="block text-[14px] leading-tight font-medium text-fg">{t.title}</span>
+              <span className="mt-1 block text-[12.5px] leading-snug text-fg-3">{status(t.id) ?? t.sub}</span>
             </span>
             <span className={cx('mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors duration-200', on ? 'border-accent bg-accent text-accent-fg' : 'border-line-2')}>
               {on && <Check size={11} strokeWidth={3.5} className="anim-draw" />}
@@ -376,7 +400,7 @@ function AccountsSetup() {
                 {!s
                   ? 'Checking…'
                   : s.loggedIn
-                    ? `${s.email ?? 'Signed in'}${s.plan ? ` · ${s.plan}` : ''}`
+                    ? `${s.email ?? 'Signed in'}${s.plan ? ` · ${planName(s.plan)}` : ''}`
                     : missing.includes(a)
                       ? 'Not on this computer yet: signing in installs it first'
                       : (s.error ?? (a === 'claude' ? 'Claude Pro, Max or Team, or an Anthropic Console account' : 'A ChatGPT plan: Plus, Pro, Business or Enterprise'))}
@@ -547,26 +571,28 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   if (!fresh)
     list.push({
       id: 'welcome',
+      label: 'Welcome',
       hero: true,
       title: 'Welcome to Naget Agent',
       body: 'Run agents on this computer from any browser, at your desk or on your phone: Claude Code, Codex, open models and more, for code, research, documents and everyday tasks. This short tour sets up the ones you want and shows you around.',
       width: 440,
       Extra: () => (
-        <div className="stagger mx-auto max-w-[25rem] space-y-3">
-          <Feature i={0} icon={<FolderOpen size={15} />}>
-            Start an agent in any folder, with the model you like.
-          </Feature>
-          <Feature i={1} icon={<Eye size={15} />}>
-            Follow its work live, approve what it asks, answer its questions.
-          </Feature>
-          <Feature i={2} icon={<Smartphone size={15} />}>
-            Pick up on your phone, and get a notification when it’s done.
-          </Feature>
+        <div className="stagger grid gap-3 sm:grid-cols-3">
+          <Highlight i={0} icon={<FolderOpen size={16} />} title="Any agent, any folder">
+            Start one in any folder on this computer, with the model you like.
+          </Highlight>
+          <Highlight i={1} icon={<Eye size={16} />} title="Follow it live">
+            Watch its work, approve what it asks and answer its questions.
+          </Highlight>
+          <Highlight i={2} icon={<Smartphone size={16} />} title="On your phone too">
+            Pick up anywhere, and get a notification when it’s done.
+          </Highlight>
         </div>
       ),
     });
   list.push({
     id: 'choose',
+    label: 'What to use',
     title: 'What would you like to use?',
     body: 'Pick one or more. The tour sets up each, and Settings adds others any time.',
     Extra: UsesPicker,
@@ -576,6 +602,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   if (cli)
     list.push({
       id: 'accounts',
+      label: claude && codex ? 'Subscriptions' : 'Sign in',
       title: claude && codex ? 'Connect your subscriptions' : `Sign in to ${cliNames}`,
       body:
         claude && codex
@@ -589,6 +616,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   if (has('openrouter'))
     list.push({
       id: 'openrouter',
+      label: 'OpenRouter',
       title: 'Models through OpenRouter',
       body: 'Hundreds of models through one key. Custom, the app’s own agent, runs them with the same tools, skills and MCP servers as the other agents.',
       Extra: OpenRouterSetup,
@@ -597,6 +625,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   if (has('local'))
     list.push({
       id: 'local',
+      label: 'On this computer',
       title: 'Models on this computer',
       body: 'Custom, the app’s own agent, runs open models on your own hardware, and nothing leaves it. Search Hugging Face: each model shows how it would run here before anything downloads.',
       Extra: LocalSetup,
@@ -605,6 +634,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   if (has('agents'))
     list.push({
       id: 'agents',
+      label: 'More agents',
       title: 'More agents',
       body: 'Agents that speak ACP run here too. Add the ones you use: the app installs those it knows, and each signs in once in its own CLI.',
       Extra: AgentsSetup,
@@ -624,6 +654,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   list.push(
     {
       id: 'composer',
+      label: 'The message box',
       target: 'composer',
       route: '/',
       title: 'Say what you want done',
@@ -631,20 +662,25 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     },
     {
       id: 'start-bar',
+      label: 'Agent and folder',
       target: 'start-bar',
+      focus: 'composer',
       route: '/',
       title: 'Pick an agent and a folder',
       body: `Under the message box: the agent${names.length ? ` (${either(names)})` : ''}, its model${modelFrom}, the folder on this computer it works in, and the assistant it starts as. What you pick stays for next time. The folder’s menu also opens the AGENTS.md or CLAUDE.md the agent reads there.`,
     },
     {
       id: 'pickers',
+      label: 'Options',
       target: 'pickers',
+      focus: 'composer',
       route: '/',
       title: cli ? 'Effort, permissions and more' : 'Permissions and more',
       body: `Options holds ${cli ? 'how hard the model thinks, ' : ''}permissions, memory and a spending cap, and names any you change. Permissions set what the agent may do without asking you first, from checking with you before every change to full access. Shift+Tab switches them.`,
     },
     {
       id: 'sessions',
+      label: 'Sessions',
       target: 'sessions',
       sidebar: true,
       title: 'Every session, live',
@@ -652,6 +688,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     },
     {
       id: 'tools',
+      label: 'Tools',
       target: 'tools',
       sidebar: true,
       title: 'Your computer, from anywhere',
@@ -659,6 +696,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     },
     {
       id: 'notify',
+      label: 'Notifications',
       target: 'nav-settings',
       sidebar: true,
       title: 'Get notified',
@@ -667,6 +705,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     },
     {
       id: 'session',
+      label: 'Inside a session',
       title: 'Inside a session',
       body: 'Once a session starts:',
       width: 440,
@@ -747,6 +786,16 @@ function placeCard(r: DOMRect | null, w: number, h: number, mobile: boolean, sid
   return { left, top: vh - EDGE - h };
 }
 
+/** A target's box with room around it. */
+const around = (r: DOMRect): Box => ({ x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 });
+
+/** A box a step of the way to where it is going, there once close. */
+function glide(cur: Box | null, goal: Box, k: number): Box {
+  if (!cur) return goal;
+  const b: Box = { x: cur.x + (goal.x - cur.x) * k, y: cur.y + (goal.y - cur.y) * k, w: cur.w + (goal.w - cur.w) * k, h: cur.h + (goal.h - cur.h) * k };
+  return Math.abs(b.x - goal.x) + Math.abs(b.y - goal.y) + Math.abs(b.w - goal.w) + Math.abs(b.h - goal.h) < 0.5 ? goal : b;
+}
+
 /** The dimmed, blurred page with a rounded hole where the target is. */
 function holePath(b: Box): string {
   const vw = window.innerWidth;
@@ -762,48 +811,191 @@ function holePath(b: Box): string {
 
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
-/** A setup step: the whole screen, over the app that is not there yet. It dissolves (out) as the app
- * comes in, or as the tour closes; a new install's first one follows the password screen without a fade. */
-function TourPage({ step, out, now, nav }: { step: Step; out: boolean; now?: boolean; nav: ReactNode }) {
-  const [still] = useState(now);
+/** Where the tour stands, down the left of its pages on a wide screen: setting up, then the app. A step
+ * already done can be gone back to. */
+function TourRail({ list, at, fresh, onGo }: { list: Step[]; at: number; fresh: boolean; onGo?: (n: number) => void }) {
+  const pages = list.findIndex((s) => !!s.target);
+  const groups = [
+    // A new install's password screen was the first step.
+    { title: 'Set up', items: [...(fresh ? [{ id: 'password', label: 'Password', n: -1 }] : []), ...list.slice(0, pages).map((s, n) => ({ id: s.id, label: s.label, n }))] },
+    { title: 'The app', items: list.slice(pages).map((s, n) => ({ id: s.id, label: s.label, n: pages + n })) },
+  ];
+  return (
+    <nav aria-label="The tour’s steps" className="relative flex w-[288px] shrink-0 flex-col overflow-y-auto border-r border-line bg-bg-1/55 px-6 pt-7 pb-6 backdrop-blur-xl">
+      <div className="flex items-center gap-2.5 px-1">
+        <Logo size={26} />
+        <span className="text-[14.5px] font-semibold tracking-tight text-fg">Naget Agent</span>
+      </div>
+      {groups.map((g) => (
+        <div key={g.title} className="mt-9">
+          <div className="mb-1.5 px-1 text-[11px] font-semibold tracking-[0.14em] text-fg-3 uppercase">{g.title}</div>
+          <ol>
+            {g.items.map((x, j) => {
+              const done = x.n < at;
+              const now = x.n === at;
+              const go = done && x.n >= 0 ? onGo : undefined;
+              return (
+                <li key={x.id} className="anim-expand relative">
+                  {j < g.items.length - 1 && <span aria-hidden className={cx('absolute top-[26px] left-[12.5px] h-4 w-px transition-colors duration-500', done ? 'bg-accent/60' : 'bg-line-2')} />}
+                  <button
+                    type="button"
+                    disabled={!go}
+                    onClick={go && (() => go(x.n))}
+                    aria-current={now ? 'step' : undefined}
+                    className={cx('flex h-[34px] w-full items-center gap-3 rounded-lg px-1 text-left text-[13.5px] transition-colors', now ? 'font-medium text-fg' : done ? 'text-fg-2' : 'text-fg-3', go && 'hover:bg-fg/[0.05] hover:text-fg')}
+                  >
+                    <span
+                      className={cx(
+                        'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,box-shadow] duration-300',
+                        done ? 'border-accent bg-accent text-accent-fg' : now ? 'border-accent shadow-[0_0_0_4px_var(--accent-soft)]' : 'border-line-2',
+                      )}
+                    >
+                      {done ? <Check size={11} strokeWidth={3} /> : now ? <span className="h-[7px] w-[7px] rounded-full bg-accent" /> : null}
+                    </span>
+                    {x.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ))}
+      <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 pt-8 text-[12px] text-fg-3">
+        <Kbd>←</Kbd>
+        <Kbd>→</Kbd> to move, <Kbd>Esc</Kbd> to close
+      </div>
+    </nav>
+  );
+}
+
+/** A setup step: the whole screen, over the app that is not there yet. On a wide screen the steps run
+ * down the left and this one sits beside them with its buttons under it; on a narrow one it fills the
+ * screen, with where the tour stands on top and the buttons at the bottom. Its words stay in one place
+ * from step to step. It dissolves (out) as the app comes in or the tour closes; a new install's first
+ * one follows the password screen without a fade. */
+function TourPage(p: {
+  list: Step[];
+  /** The step shown. */
+  k: number;
+  fresh: boolean;
+  /** The way the tour moved: forward 1, back -1. */
+  dir: number;
+  out: boolean;
+  now?: boolean;
+  ready: boolean;
+  /** None while it dissolves: its buttons are still. */
+  onBack?: () => void;
+  onNext?: () => void;
+  onSkip?: () => void;
+  onGo?: (n: number) => void;
+  nextRef?: RefObject<HTMLButtonElement | null>;
+}) {
+  const { list, k, fresh, out, ready } = p;
+  const step = list[k];
+  const wide = useMediaQuery('(min-width: 1024px)');
+  const [still] = useState(p.now);
+  const scroller = useRef<HTMLDivElement>(null);
+  const end = useRef<HTMLDivElement>(null);
+  // Under a long step (models found) the buttons keep to the bottom, on a bar of their own.
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    if (!wide || !end.current || !scroller.current) return;
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { root: scroller.current });
+    io.observe(end.current);
+    return () => io.disconnect();
+  }, [wide]);
   const Extra = step.Extra;
-  const w = Math.max(step.width ?? 0, 520) + 40;
+  const at = k + (fresh ? 1 : 0);
+  const total = list.length + (fresh ? 1 : 0);
+  const label = step.id === 'welcome' ? 'Show me around' : 'Next';
+  const close = (
+    <button onClick={() => endTour()} className="rounded-lg p-1.5 text-fg-3 transition-colors hover:bg-fg/[0.06] hover:text-fg" aria-label="Close the tour" title="Close the tour (Esc)">
+      <X size={18} />
+    </button>
+  );
+  const back = (
+    <Button variant="ghost" className="h-11 rounded-xl px-4 text-[14.5px]" onClick={k > 0 ? p.onBack : p.onSkip}>
+      {k > 0 ? 'Back' : wide ? 'Skip the tour' : 'Skip'}
+    </Button>
+  );
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby={out ? undefined : 'tour-title'}
-      className={cx('tour-page fixed inset-0 flex flex-col bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none')}
+      className={cx('tour-page fixed inset-0 flex bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none')}
     >
       <Aurora className="aurora-page" />
-      <button
-        onClick={() => endTour()}
-        className="absolute top-[calc(var(--safe-top)+10px)] right-3 z-10 rounded-md p-1.5 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
-        aria-label="Close the tour"
-        title="Close the tour (Esc)"
-      >
-        <X size={17} />
-      </button>
-      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="mx-auto flex min-h-full w-full flex-col justify-center px-5 pt-[calc(var(--safe-top)+52px)] pb-6" style={{ maxWidth: w }}>
-          <div key={step.id} className="tour-rise">
-            {step.hero && <TourHero />}
-            <h2 id={out ? undefined : 'tour-title'} className="text-center text-[25px] leading-tight font-semibold tracking-tight text-balance text-fg sm:text-[31px]" style={{ '--i': 0 } as CSSProperties}>
-              {step.title}
-            </h2>
-            <div className="mx-auto mt-3 max-w-[34rem] text-center text-[14.5px] leading-relaxed text-pretty text-fg-2 sm:text-[15.5px]" style={{ '--i': 1 } as CSSProperties}>
-              {step.body}
+      {wide && <TourRail list={list} at={k} fresh={fresh} onGo={p.onGo} />}
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        {wide ? (
+          <div className="absolute top-5 right-5 z-10">{close}</div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-4 pt-[calc(var(--safe-top)+12px)] pr-3 pl-5">
+            <div className="h-1 flex-1 overflow-hidden rounded-full bg-fg/10" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={at + 1} aria-label="Where the tour stands">
+              <div className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out" style={{ width: `${((at + 1) / total) * 100}%` }} />
             </div>
-            {Extra && (
-              <div className="mt-8" style={{ '--i': 2 } as CSSProperties}>
-                <Extra />
+            {close}
+          </div>
+        )}
+        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className={cx('mx-auto w-full max-w-[760px] px-5 sm:px-10 2xl:max-w-[840px]', wide ? 'pt-[clamp(56px,16vh,180px)]' : 'pt-7 pb-8')}>
+            <div key={step.id} className="tour-step" style={{ '--dx': `${p.dir * 22}px` } as CSSProperties}>
+              {step.hero ? (
+                <TourHero />
+              ) : (
+                <div className="text-[12px] font-semibold tracking-[0.14em] text-accent uppercase" style={{ '--i': 0 } as CSSProperties}>
+                  Step {at + 1} of {total}
+                </div>
+              )}
+              <h2
+                id={out ? undefined : 'tour-title'}
+                className={cx('text-[27px] leading-[1.15] font-semibold tracking-tight text-balance text-fg sm:text-[34px]', !step.hero && 'mt-3')}
+                style={{ '--i': 1 } as CSSProperties}
+              >
+                {step.title}
+              </h2>
+              <div className="mt-3.5 max-w-[36rem] text-[15px] leading-relaxed text-pretty text-fg-2 sm:text-[16px]" style={{ '--i': 2 } as CSSProperties}>
+                {step.body}
               </div>
+              {Extra && (
+                <div className="mt-9" style={{ '--i': 3 } as CSSProperties}>
+                  <Extra />
+                </div>
+              )}
+            </div>
+            {wide && (
+              <>
+                <div
+                  className={cx(
+                    'sticky bottom-0 z-[1] -mx-10 mt-10 flex items-center gap-2 border-t px-10 py-5 transition-[background-color,border-color] duration-200',
+                    stuck ? 'border-line bg-bg/80 backdrop-blur-md' : 'border-transparent',
+                  )}
+                >
+                  <Button ref={p.nextRef} variant="primary" className="h-11 gap-2 rounded-xl px-5 text-[14.5px]" onClick={p.onNext} disabled={!ready}>
+                    {label}
+                    <ArrowRight size={16} />
+                  </Button>
+                  {back}
+                  {!ready && <span className="ml-2 text-[13px] text-fg-3">Pick one or more to go on</span>}
+                </div>
+                <div ref={end} className="h-px" />
+              </>
             )}
           </div>
         </div>
-      </div>
-      <div className="relative mx-auto flex w-full shrink-0 items-center gap-2 px-5 pt-3 pb-[max(16px,var(--safe-bottom))]" style={{ maxWidth: w }}>
-        {nav}
+        {!wide && (
+          // A phone's thumb finds Next across the bottom; a wider screen keeps it in line with the words.
+          <div className="shrink-0 border-t border-line bg-bg/85 pt-3 pb-[max(14px,var(--safe-bottom))] backdrop-blur-md">
+            <div className="mx-auto flex w-full max-w-[760px] items-center gap-2 px-5 sm:px-10">
+              <span className="sm:order-2">{back}</span>
+              <Button ref={p.nextRef} variant="primary" className="h-11 flex-1 gap-2 rounded-xl text-[15px] sm:order-1 sm:flex-none sm:px-6" onClick={p.onNext} disabled={!ready}>
+                {ready ? label : 'Pick one or more'}
+                {ready && <ArrowRight size={16} />}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -824,6 +1016,7 @@ export function Tour() {
   const scrim = useRef<HTMLDivElement>(null);
   const ring = useRef<HTMLDivElement>(null);
   const hole = useRef<Box | null>(null);
+  const mark = useRef<Box | null>(null);
   const nextBtn = useRef<HTMLButtonElement>(null);
   const auto = useRef(false);
   // The steps before the first one in the app are pages.
@@ -839,6 +1032,9 @@ export function Tour() {
     const t = setTimeout(() => setPage(null), 380);
     return () => clearTimeout(t);
   }, [page]);
+  // Which way the tour last moved: a page comes in from that side.
+  const [move, setMove] = useState({ i, dir: 1 });
+  if (move.i !== i) setMove({ i, dir: i > move.i ? 1 : -1 });
 
   // The parts of the app shown so far: each step's own, and the sidebar around those in it.
   const shown = useMemo(() => [...new Set(list.slice(0, i + 1).flatMap((s) => (!s.target ? [] : s.sidebar ? ['sidebar', s.target] : [s.target])))].join(' '), [list, i]);
@@ -875,7 +1071,8 @@ export function Tour() {
   }, [step, mobile, closing]);
 
   // Follow the target (it may appear late, a page or the drawer opening, and move), and glide the hole
-  // and its ring after it; with no target the hole shuts in the middle.
+  // after what is in the light (the target, or the whole it is part of) and the ring after the target;
+  // with no target both shut in the middle.
   useEffect(() => {
     if (!open) return;
     setRect(null);
@@ -888,34 +1085,37 @@ export function Tour() {
     const tick = (now: number) => {
       const dt = Math.min(64, now - last);
       last = now;
-      let goal: Box = { x: innerWidth / 2, y: innerHeight / 2, w: 0, h: 0 };
+      const shut: Box = { x: innerWidth / 2, y: innerHeight / 2, w: 0, h: 0 };
+      let lit = shut;
+      let ringed = shut;
       if (step?.target && !signIn) {
         const el = document.querySelector(`[data-tour="${step.target}"]`);
         const r = el?.getBoundingClientRect();
         if (el && r && r.width > 0 && r.height > 0) {
+          const whole = step.focus ? document.querySelector(`[data-tour="${step.focus}"]`) : null;
+          const w = whole?.getBoundingClientRect();
+          const f = whole && w && w.width > 0 && w.height > 0 ? w : r;
           if (!scrolled) {
-            el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            (whole ?? el).scrollIntoView({ block: 'nearest', inline: 'nearest' });
             scrolled = true;
           }
-          goal = { x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 };
-          setRect((p) => (p && p.x === r.x && p.y === r.y && p.width === r.width && p.height === r.height ? p : r));
+          lit = around(f);
+          ringed = around(r);
+          setRect((p) => (p && p.x === f.x && p.y === f.y && p.width === f.width && p.height === f.height ? p : f));
         } else setRect(null);
       }
       const k = 1 - Math.exp(-dt / 85);
-      const cur = hole.current ?? goal;
-      const b: Box = { x: cur.x + (goal.x - cur.x) * k, y: cur.y + (goal.y - cur.y) * k, w: cur.w + (goal.w - cur.w) * k, h: cur.h + (goal.h - cur.h) * k };
-      const near = Math.abs(b.x - goal.x) + Math.abs(b.y - goal.y) + Math.abs(b.w - goal.w) + Math.abs(b.h - goal.h) < 0.5;
-      hole.current = near ? goal : b;
-      const h = hole.current;
-      const key = `${h.x.toFixed(1)},${h.y.toFixed(1)},${h.w.toFixed(1)},${h.h.toFixed(1)},${innerWidth},${innerHeight}`;
+      const h = (hole.current = glide(hole.current, lit, k));
+      const m = (mark.current = glide(mark.current, ringed, k));
+      const key = [h.x, h.y, h.w, h.h, m.x, m.y, m.w, m.h].map((v) => v.toFixed(1)).join() + `,${innerWidth},${innerHeight}`;
       if (key !== painted && scrim.current && ring.current) {
         painted = key;
         scrim.current.style.clipPath = holePath(h);
         const s = ring.current.style;
-        s.transform = `translate(${h.x}px, ${h.y}px)`;
-        s.width = `${h.w}px`;
-        s.height = `${h.h}px`;
-        s.opacity = h.w > 8 && h.h > 8 ? '1' : '0';
+        s.transform = `translate(${m.x}px, ${m.y}px)`;
+        s.width = `${m.w}px`;
+        s.height = `${m.h}px`;
+        s.opacity = m.w > 8 && m.h > 8 ? '1' : '0';
       }
       raf = requestAnimationFrame(tick);
     };
@@ -984,33 +1184,6 @@ export function Tour() {
   // A new install's password screen was step 1.
   const total = list.length + (fresh ? 1 : 0);
   const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
-  const pageStep = page ? list[page.n] : undefined;
-  // Back (Skip on the first step), where the tour stands, and on; a page dissolving keeps its own, still.
-  const nav = (k: number, live: boolean, size: 'sm' | 'md') => {
-    const ok = !live || ready;
-    return (
-      <>
-        <Button size={size} variant="ghost" onClick={live ? (k > 0 ? back : () => endTour()) : undefined}>
-          {k > 0 ? 'Back' : 'Skip the tour'}
-        </Button>
-        <span className="flex min-w-0 flex-1 justify-center">
-          {!ok ? (
-            <span className="text-[12px] text-fg-3">Pick one or more</span>
-          ) : mobile ? (
-            <span className="tnum text-[12px] text-fg-3">
-              {k + (fresh ? 2 : 1)} of {total}
-            </span>
-          ) : (
-            <TourProgress at={k + (fresh ? 1 : 0)} total={total} />
-          )}
-        </span>
-        <Button ref={live ? nextBtn : undefined} size={size} variant="primary" onClick={live ? next : undefined} disabled={!ok}>
-          {k >= list.length - 1 ? 'Get started' : list[k].id === 'welcome' ? 'Show me around' : 'Next'}
-        </Button>
-      </>
-    );
-  };
-
   return (
     <>
       {createPortal(
@@ -1046,14 +1219,17 @@ export function Tour() {
                 <div className="min-h-0 flex-1" style={{ overflowY: want > maxH ? 'auto' : 'hidden' }}>
                   <div ref={setInner} className="px-5 pt-5 pb-4">
                     <div key={step.id} className="tour-rise">
-                      <h2 id="tour-title" className="pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 0 } as CSSProperties}>
+                      <div className="text-[11px] font-semibold tracking-[0.14em] text-accent uppercase" style={{ '--i': 0 } as CSSProperties}>
+                        Step {i + (fresh ? 2 : 1)} of {total}
+                      </div>
+                      <h2 id="tour-title" className="mt-1.5 pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 1 } as CSSProperties}>
                         {step.title}
                       </h2>
-                      <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 1 } as CSSProperties}>
+                      <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 2 } as CSSProperties}>
                         {step.body}
                       </div>
                       {Extra && (
-                        <div className="mt-3.5" style={{ '--i': 2 } as CSSProperties}>
+                        <div className="mt-3.5" style={{ '--i': 3 } as CSSProperties}>
                           <Extra />
                         </div>
                       )}
@@ -1061,12 +1237,30 @@ export function Tour() {
                   </div>
                 </div>
                 <div ref={setFoot} className="flex shrink-0 items-center gap-2 border-t border-line bg-bg-1 px-4 py-2.5">
-                  {nav(i, true, 'sm')}
+                  <Button size="sm" variant="ghost" onClick={i > 0 ? back : () => endTour()}>
+                    {i > 0 ? 'Back' : 'Skip the tour'}
+                  </Button>
+                  <span className="flex-1" />
+                  <Button ref={nextBtn} size="sm" variant="primary" className="gap-1.5" onClick={next} disabled={!ready}>
+                    {i >= list.length - 1 ? 'Get started' : 'Next'}
+                    {i < list.length - 1 && <ArrowRight size={14} />}
+                  </Button>
                 </div>
               </div>
             </>
           )}
-          {page && pageStep && <TourPage step={pageStep} out={page.out} now={fresh && page.n === 0} nav={nav(page.n, !page.out, 'md')} />}
+          {page && (
+            <TourPage
+              list={list}
+              k={page.n}
+              fresh={fresh}
+              dir={move.dir}
+              out={page.out}
+              now={fresh && page.n === 0}
+              ready={page.out || ready}
+              {...(!page.out && { onBack: back, onNext: next, onSkip: () => endTour(), onGo: (n: number) => useTour.setState({ i: n }), nextRef: nextBtn })}
+            />
+          )}
         </div>,
         document.body,
       )}

@@ -639,6 +639,22 @@ html {
     scale: 1.04;
   }
 }
+/* A page's step comes in from the side the tour moved to (--dx), its words one after another and its
+   tiles after them. */
+.tour-step > * {
+  animation: tour-step-in 560ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(40ms + var(--i, 0) * 60ms);
+}
+.tour-step .stagger > * {
+  animation-delay: calc(240ms + var(--i, 0) * 45ms);
+}
+@keyframes tour-step-in {
+  from {
+    opacity: 0;
+    translate: var(--dx, 22px) 0;
+    filter: blur(4px);
+  }
+}
 /* Each step's words arrive one after another, coming into focus. */
 @keyframes tour-rise {
   from {
