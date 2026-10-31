@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { api, enc } from '../../lib/api';
 import { useTimeline } from '../../lib/store';
 import { cx, Throbber, IconButton } from '../../components/ui';
+import { UNFOLD } from './items';
 
 type Highlights = { set: (name: string, h: unknown) => void; delete: (name: string) => void };
 const highlights = () => (CSS as unknown as { highlights?: Highlights }).highlights;
@@ -36,6 +37,8 @@ async function reveal(key: string, seq: number, q: string) {
   for (let guard = 0; (useTimeline.getState().byKey[key]?.start ?? 0) > seq && guard < 200; guard++) await useTimeline.getState().loadEarlier(key);
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   let el = document.querySelector<HTMLElement>(`[data-seq="${seq}"]`);
+  // A folded message of yours opens, so what was found is in sight.
+  el?.dispatchEvent(new Event(UNFOLD));
   if (!el) {
     // Inside a folded work log: the nearest shown item before it.
     const shown = [...document.querySelectorAll<HTMLElement>('[data-seq]')].filter((e) => Number(e.dataset.seq) <= seq);

@@ -829,11 +829,13 @@ export function Timeline({
           if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') unstick();
           else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'End' || e.key === ' ') dir.current = 1;
         }}
-        className="absolute inset-x-0 top-px bottom-0 overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none]"
+        className="absolute inset-x-0 top-px bottom-0 overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]"
       >
         <QuoteSelection />
         <FollowCtx.Provider value={following}>
-          <div ref={content} className="mx-auto w-full max-w-[780px] space-y-8 px-4 pt-6 pb-10 sm:px-6">
+          {/* As wide as the message box under it (800px at most, 12px in from the sides on a phone, 24px on wider
+              screens), so the two line up. A scrollbar that takes room gets it on both sides, to keep them centred alike. */}
+          <div ref={content} className="mx-auto w-full max-w-[848px] space-y-8 px-3 pt-6 pb-10 sm:px-6">
             {tl.start > 0 && (
               // The same height loading or not, so swapping the two moves nothing below.
               <div className="flex h-7 items-center justify-center text-[12.5px] text-fg-3">

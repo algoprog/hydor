@@ -65,8 +65,9 @@ export function AppSessionPane({ s }: { s: SessionSummary }) {
   // Waiting with nothing to approve here: a question, which the conversation answers.
   const question = d.run.status === 'waiting' && !approvals.length;
   return (
-    <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className="mx-auto w-full max-w-[780px] space-y-3 px-4 pt-4 pb-8 sm:px-6">
+    <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]">
+      {/* As wide as the session's message box under it, like the conversation (Timeline). */}
+      <div className="mx-auto w-full max-w-[848px] space-y-3 px-3 pt-4 pb-8 sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5 px-0.5">
           <AppIcon icon={d.recipe.icon} color={d.recipe.color} size={22} />
           {app ? (
