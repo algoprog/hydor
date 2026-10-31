@@ -273,7 +273,10 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
   const [expanded, setExpanded] = useState(false);
   const [full, setFull] = useState(false);
   const [menu, setMenu] = useState(false);
+  // Full screen shows the header a second time: each copy of the menu's button has its own ref, as the
+  // copy that closes empties its ref (a shared one left the menu with nothing to open from).
   const menuRef = useRef<HTMLButtonElement>(null);
+  const fullMenuRef = useRef<HTMLButtonElement>(null);
   const live = useRef<LiveViewApi>(null);
   const asks = view?.asks.length ?? 0;
   // What needs the page itself (a login, a payment, a dialog) opens the live view; allowing an address does not.
@@ -360,14 +363,9 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
         )
       )}
       {view.open && (
-        <>
-          <IconButton ref={menuRef} label="Browser options" size="sm" active={menu} onClick={() => setMenu((m) => !m)}>
-            <Ellipsis size={15} />
-          </IconButton>
-          <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={270} prefer="above">
-            <BrowserMenu s={s} view={view} close={() => setMenu(false)} />
-          </Popover>
-        </>
+        <IconButton ref={inFull ? fullMenuRef : menuRef} label="Browser options" size="sm" active={menu} onClick={() => setMenu((m) => !m)}>
+          <Ellipsis size={15} />
+        </IconButton>
       )}
     </div>
   );
@@ -436,6 +434,10 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
           </div>,
           document.body,
         )}
+      {/* One menu, from the button on screen (after the full-screen one, so that one's ref is set). */}
+      <Popover anchor={full ? fullMenuRef : menuRef} open={menu && view.open} onClose={() => setMenu(false)} align="end" width={270} prefer="above">
+        <BrowserMenu s={s} view={view} close={() => setMenu(false)} />
+      </Popover>
     </div>
   );
 }
