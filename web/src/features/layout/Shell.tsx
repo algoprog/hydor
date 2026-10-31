@@ -18,6 +18,7 @@ import { UsagePage } from '../usage/UsagePage';
 import { Sidebar } from './Sidebar';
 import { undoLast } from '../../lib/flags';
 import { CommandPalette, usePalette } from '../palette/CommandPalette';
+import { ReleaseNotes, WhatsNew } from '../settings/Releases';
 import { Lightbox } from '../../components/Lightbox';
 import { HelpButton, Tour } from '../tour/Tour';
 import { ReviewPage } from '../review/ReviewPage';
@@ -188,6 +189,8 @@ export function Shell() {
         <UploadsPanel />
         <QuickOpen />
         <CommandPalette />
+        <ReleaseNotes />
+        <WhatsNew />
         <FilePeek />
         <Lightbox />
         <Tour />
@@ -218,6 +221,8 @@ export function Shell() {
       <UploadsPanel />
       <QuickOpen />
       <CommandPalette />
+      <ReleaseNotes />
+      <WhatsNew />
       <FilePeek />
       <Lightbox />
       {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}
