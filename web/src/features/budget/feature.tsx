@@ -1,5 +1,5 @@
 // Spending caps: the most a session may spend, at API prices. A small dock above the message box while
-// one is set ("$1.20 of $5.00"), the session menu's Spending cap…, a note under a turn stopped at the
+// one is set ("$1.20 of $5.00"), the session menu's Spending cap, a note under a turn stopped at the
 // cap, and a cap for a new session on the start page.
 import { useRef, useState } from 'react';
 import { OctagonAlert, Wallet } from 'lucide-react';
@@ -51,7 +51,7 @@ function CapMenuItem({ s, close }: { s: SessionSummary; close: () => void }) {
   const cap = capOf(s.extra);
   return (
     <MenuItem icon={<Wallet size={15} />} hint={cap != null ? usd(cap) : undefined} onClick={() => (close(), open(s.key))}>
-      Spending cap…
+      Spending cap
     </MenuItem>
   );
 }

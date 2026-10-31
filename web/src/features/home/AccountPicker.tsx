@@ -18,7 +18,7 @@ export function AccountPicker({ agent, accounts, value, onChange }: { agent: Age
           <OptionRow key={a.id} label={a.name} selected={a.id === value} onClick={() => (onChange(a.id), setOpen(false))} />
         ))}
         <MenuSep />
-        <MenuItem onClick={() => (setOpen(false), go('/settings?s=accounts'))}>Manage accounts…</MenuItem>
+        <MenuItem onClick={() => (setOpen(false), go('/settings?s=accounts'))}>Manage accounts</MenuItem>
       </Popover>
     </>
   );

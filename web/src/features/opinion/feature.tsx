@@ -11,7 +11,7 @@ function OpinionMenuItem({ s, close }: { s: SessionSummary; close: () => void })
   const open = useOpinionDialog((x) => x.open);
   return (
     <MenuItem icon={<ScanSearch size={15} />} onClick={() => (close(), open(s.key))}>
-      Second opinion…
+      Second opinion
     </MenuItem>
   );
 }

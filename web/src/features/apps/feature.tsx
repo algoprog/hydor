@@ -83,7 +83,7 @@ export const appsFeature: WebFeature = {
         go(`/apps/new?from=${enc(s.key)}`);
       }}
     >
-      Save as app…
+      Save as app
     </MenuItem>
   ),
   sessionMenuPart: 'more',

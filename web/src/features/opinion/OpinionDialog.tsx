@@ -1,4 +1,4 @@
-// Asking for a second opinion (the session menu → Second opinion…): who checks the work, the suggested
+// Asking for a second opinion (the session menu → Second opinion): who checks the work, the suggested
 // reviewer from another company first, and which turn, the latest finished one first.
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';

@@ -16,7 +16,7 @@ const useOpen = create<{ key: string | null; set: (k: string | null) => void }>(
 export function SessionAppsItem({ s, close }: { s: SessionSummary; close: () => void }) {
   return (
     <MenuItem icon={<PlugZap size={15} />} onClick={() => (close(), useOpen.getState().set(s.key))}>
-      Connected apps…
+      Connected apps
     </MenuItem>
   );
 }

@@ -239,7 +239,7 @@ function PageRow({ page }: { page: PageInfo }) {
             setPublish(true);
           }}
         >
-          Publish…
+          Publish
         </MenuItem>
         <MenuSep />
         <MenuItem icon={<Trash2 size={14} />} danger onClick={remove}>

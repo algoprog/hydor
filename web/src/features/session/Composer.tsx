@@ -24,10 +24,12 @@ import { putText } from '../../lib/featureEvents';
 const draftKey = (k: string) => `wa.draft.${k}`;
 
 const HANDOFF_EVENT = 'wa:handoff';
-/** The session menu's "Continue in Codex…": session `key`'s message box sets its next message to go to `agent`. */
-export function continueIn(key: string, agent: Agent) {
-  window.dispatchEvent(new CustomEvent(HANDOFF_EVENT, { detail: { key, agent } }));
+/** The session menu's "Continue in Codex": session `key`'s message box sets its next message to go to `agent` (`acp`: Custom's "console"). */
+export function continueIn(key: string, agent: Agent, acp?: string) {
+  window.dispatchEvent(new CustomEvent(HANDOFF_EVENT, { detail: { key, agent, acp } }));
 }
+/** Who a conversation moves to, by name: Custom is "Custom Agent" there. */
+export const handoffName = (agent: Agent) => (agent === 'acp' ? 'Custom Agent' : agentName(agent));
 
 /** What Enter does while the agent works: queue the message for after the turn, or steer the turn with it. */
 export type FollowUp = 'queue' | 'steer';
@@ -66,9 +68,9 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const [atts, setAtts] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [cfg, setCfg] = useState<{ model?: string | null; effort?: string | null; mode?: string | null }>({});
-  // "Continue in Codex…" (or Claude Code) was picked: the next message continues the conversation there, in a new session.
-  const [move, setMove] = useState<{ agent: Agent; model: string | null; effort?: string | null; mode?: string | null } | null>(null);
-  const moveCat = useCatalog(move?.agent ?? s.agent);
+  // "Continue in Codex" (or Claude Code, or Custom Agent) was picked: the next message continues the conversation there, in a new session.
+  const [move, setMove] = useState<{ agent: Agent; acp?: string; model: string | null; effort?: string | null; mode?: string | null } | null>(null);
+  const moveCat = useCatalog(move?.agent ?? s.agent, move ? move.acp : s.acpAgent);
   const ta = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const tasksRef = useRef<HTMLButtonElement>(null);
@@ -95,10 +97,10 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   }, [key]);
   useEffect(() => {
     const on = (e: Event) => {
-      const d = (e as CustomEvent<{ key: string; agent: Agent }>).detail;
+      const d = (e as CustomEvent<{ key: string; agent: Agent; acp?: string }>).detail;
       if (d?.key !== key || d.agent === s.agent) return;
       // Its default model to start with; the box's model menu lists its others.
-      setMove({ agent: d.agent, model: null });
+      setMove({ agent: d.agent, acp: d.acp, model: null });
       ta.current?.focus();
     };
     window.addEventListener(HANDOFF_EVENT, on);
@@ -204,7 +206,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     // Codex's default must be named: unnamed, Codex takes config.toml's model, which a ChatGPT sign-in may not allow.
     const model = move.model ?? (move.agent === 'codex' ? (moveCat?.models.find((m) => m.isDefault)?.value ?? null) : null);
     try {
-      const r = await post<{ key: string }>(`/api/sessions/${enc(key)}/handoff`, { agent: move.agent, model, effort: move.effort, mode: move.mode, text: t, ...attachmentPayload(atts) });
+      const r = await post<{ key: string }>(`/api/sessions/${enc(key)}/handoff`, { agent: move.agent, acpAgent: move.acp, model, effort: move.effort, mode: move.mode, text: t, ...attachmentPayload(atts) });
       setText('');
       releaseAttachments(atts);
       setAtts([]);
@@ -246,7 +248,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
           <div className="anim-pop mb-2 flex items-center gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2 text-[12.5px]">
             <ArrowRightLeft size={14} className="shrink-0 text-accent" />
             <span className="min-w-0 flex-1">
-              Your next message continues this conversation in <span className="font-medium">{agentName(move.agent)}</span> ({modelLabel(moveCat, move.model)}): a new session in this
+              Your next message continues this conversation in <span className="font-medium">{handoffName(move.agent)}</span> ({modelLabel(moveCat, move.model)}): a new session in this
               folder that starts with the conversation so far.
             </span>
             <button onClick={() => setMove(null)} className="shrink-0 rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg" aria-label="Stay here" title="Stay here">
@@ -357,7 +359,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             }}
             placeholder={
               move
-                ? `Message for ${agentName(move.agent)}, or just send to continue`
+                ? `Message for ${handoffName(move.agent)}, or just send to continue`
                 : locked
                 ? `Open in ${ext!.client} — continue there, or close it there to resume here`
                 : takeover
@@ -378,9 +380,9 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
               {move ? (
                 <>
-                  <ModelPicker agent={move.agent} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
-                  <EffortPicker agent={move.agent} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
-                  <ModePicker agent={move.agent} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
+                  <ModelPicker agent={move.agent} acp={move.acp} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
+                  <EffortPicker agent={move.agent} acp={move.acp} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
+                  <ModePicker agent={move.agent} acp={move.acp} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
                 </>
               ) : (
                 <>

@@ -26,7 +26,7 @@ const useDraft = create<{ key: string | null; set: (key: string | null) => void 
 function MakeAutomation({ s, close }: { s: SessionSummary; close: () => void }) {
   return (
     <MenuItem icon={<CalendarPlus size={15} />} onClick={() => (close(), useDraft.getState().set(s.key))}>
-      Make this an automation…
+      Make this an automation
     </MenuItem>
   );
 }

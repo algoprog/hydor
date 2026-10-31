@@ -91,7 +91,7 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
             go('/settings?s=assistants');
           }}
         >
-          Make or change assistants…
+          Make or change assistants
         </MenuItem>
       </Popover>
     </>

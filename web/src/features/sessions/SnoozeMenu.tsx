@@ -87,7 +87,7 @@ export function SnoozeItems({ s, onDone, heading = true }: { s: SessionSummary; 
         </MenuItem>
       ))}
       <MenuItem icon={<AlarmClock size={15} />} onClick={() => setCustom(true)}>
-        Pick a date and time…
+        Pick a date and time
       </MenuItem>
     </>
   );
