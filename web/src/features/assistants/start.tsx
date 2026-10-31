@@ -2,7 +2,7 @@
 // (a fresh folder for the task, the default unless a folder is picked or the assistant works in
 // projects, like Coder), and the agent, model and mode an assistant suggests, set when it is picked.
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, FolderPlus } from 'lucide-react';
+import { Check, Folder, FolderPlus } from 'lucide-react';
 import { agentMode, type Assistant } from '@shared/assistants';
 import type { Agent } from '@shared/types';
 import { post } from '../../lib/api';
@@ -46,6 +46,7 @@ export function WorkFolderChip({ value, task, onFolder, onTask, note, children }
       <SettingChip
         ref={ref}
         label="Folder"
+        icon={task ? <FolderPlus size={14} /> : <Folder size={14} />}
         open={open}
         onClick={() => {
           setDraft(task ? '' : tildify(value, home));

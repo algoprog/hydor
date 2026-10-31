@@ -591,21 +591,22 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       width: 480,
     });
   const names = [claude && 'Claude Code', codex && 'Codex', models && 'Custom with your models', has('agents') && 'the agents you added'].filter((x): x is string => !!x);
-  const modelLine =
+  // Where the models come from, said beside the model.
+  const modelFrom =
     cli && models
-      ? 'Choose the model, from your plans or your own, and for Claude Code and Codex how hard it thinks.'
-      : cli
-        ? `Choose the model${claude && codex ? ', from either company,' : ''} and how hard it thinks.`
+      ? ' (from your plans or your own)'
+      : cli && claude && codex
+        ? ' (from either company)'
         : models
-          ? `Choose the model: ${has('openrouter') && has('local') ? 'the OpenRouter models you added or the ones on this computer' : has('openrouter') ? 'any of the OpenRouter models you added' : 'one of those on this computer'}.`
-          : 'Choose the model the agent offers.';
+          ? ` (${has('openrouter') && has('local') ? 'the OpenRouter models you added or the ones on this computer' : has('openrouter') ? 'any of the OpenRouter models you added' : 'one of those on this computer'})`
+          : '';
   list.push(
     {
       id: 'start-bar',
       target: 'start-bar',
       route: '/',
       title: 'Pick an agent and a folder',
-      body: `Under the message box: the agent${names.length ? ` (${either(names)})` : ''}, the folder on this computer it works in, and how it works. What you pick stays for next time. The folder’s menu also opens the AGENTS.md or CLAUDE.md the agent reads there.`,
+      body: `Under the message box: the agent${names.length ? ` (${either(names)})` : ''}, its model${modelFrom}, the folder on this computer it works in, and the assistant it starts as. What you pick stays for next time. The folder’s menu also opens the AGENTS.md or CLAUDE.md the agent reads there.`,
     },
     {
       id: 'composer',
@@ -618,8 +619,8 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       id: 'pickers',
       target: 'pickers',
       route: '/',
-      title: cli ? 'Model, effort and permissions' : 'Model and permissions',
-      body: `${modelLine} Permissions set what the agent may do without asking you first, from checking with you before every change to full access. Shift+Tab switches them.`,
+      title: cli ? 'Effort, permissions and more' : 'Permissions and more',
+      body: `Options holds ${cli ? 'how hard the model thinks, ' : ''}permissions, memory and a spending cap, and names any you change. Permissions set what the agent may do without asking you first, from checking with you before every change to full access. Shift+Tab switches them.`,
     },
     {
       id: 'sessions',
