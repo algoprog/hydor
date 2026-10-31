@@ -138,50 +138,53 @@ export function ThemeSettings() {
       }
     >
       <div className="space-y-4">
-        {(['dark', 'light'] as const).map((base) => (
-          <div key={base}>
-            <div className="mb-2 flex items-baseline gap-2 text-[12px]">
-              <span className="font-medium text-fg-2">{base === 'dark' ? 'Dark' : 'Light'}</span>
-              {mode === 'system' && <span className="text-fg-3">{base === showing ? 'showing now' : `when your device is ${base}`}</span>}
-            </div>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {all
-                .filter((t) => t.base === base)
-                .map((t) => (
-                  <ThemeCard
-                    key={t.id}
-                    theme={t}
-                    picked={picked(base) === t.id}
-                    showing={picked(base) === t.id && base === showing}
-                    onPick={() => pickTheme(t)}
-                    menu={(close) => (
-                      <>
-                        {custom.some((x) => x.id === t.id) && (
-                          <MenuItem icon={<Pencil size={14} />} onClick={() => (close(), setDraft(draftFrom(t, false)))}>
-                            Edit
-                          </MenuItem>
-                        )}
-                        <MenuItem icon={<Plus size={14} />} onClick={() => (close(), setDraft(draftFrom(t, true)))}>
-                          Make a copy to edit
-                        </MenuItem>
-                        <MenuItem icon={<Copy size={14} />} onClick={() => (close(), copyTheme({ ...t, colors: themeColors(t) }))}>
-                          Copy to share
-                        </MenuItem>
-                        {custom.some((x) => x.id === t.id) && (
-                          <>
-                            <MenuSep />
-                            <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (close(), remove(t))}>
-                              Delete
+        {/* Small cards, dark and light side by side where there is room; on phones two to a row. */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:gap-x-8">
+          {(['dark', 'light'] as const).map((base) => (
+            <div key={base} className="min-w-0">
+              <div className="mb-2 flex items-baseline gap-2 text-[12px]">
+                <span className="font-medium text-fg-2">{base === 'dark' ? 'Dark' : 'Light'}</span>
+                {mode === 'system' && <span className="text-fg-3">{base === showing ? 'showing now' : `when your device is ${base}`}</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
+                {all
+                  .filter((t) => t.base === base)
+                  .map((t) => (
+                    <ThemeCard
+                      key={t.id}
+                      theme={t}
+                      picked={picked(base) === t.id}
+                      showing={picked(base) === t.id && base === showing}
+                      onPick={() => pickTheme(t)}
+                      menu={(close) => (
+                        <>
+                          {custom.some((x) => x.id === t.id) && (
+                            <MenuItem icon={<Pencil size={14} />} onClick={() => (close(), setDraft(draftFrom(t, false)))}>
+                              Edit
                             </MenuItem>
-                          </>
-                        )}
-                      </>
-                    )}
-                  />
-                ))}
+                          )}
+                          <MenuItem icon={<Plus size={14} />} onClick={() => (close(), setDraft(draftFrom(t, true)))}>
+                            Make a copy to edit
+                          </MenuItem>
+                          <MenuItem icon={<Copy size={14} />} onClick={() => (close(), copyTheme({ ...t, colors: themeColors(t) }))}>
+                            Copy to share
+                          </MenuItem>
+                          {custom.some((x) => x.id === t.id) && (
+                            <>
+                              <MenuSep />
+                              <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (close(), remove(t))}>
+                                Delete
+                              </MenuItem>
+                            </>
+                          )}
+                        </>
+                      )}
+                    />
+                  ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} disabled={custom.length >= MAX_THEMES} onClick={() => setDraft({ ...draftFrom(current, true), name: 'My theme' })}>
             New theme
@@ -202,12 +205,12 @@ function ThemeCard({ theme, picked, showing, onPick, menu }: { theme: AppTheme; 
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   return (
-    <div className={cx('group relative rounded-xl border p-1.5 transition-colors', showing ? 'border-accent ring-2 ring-accent/25' : picked ? 'border-line-2' : 'border-line hover:border-line-2')}>
+    <div className={cx('group relative rounded-[11px] border p-1 transition-colors sm:w-[144px]', showing ? 'border-accent ring-2 ring-accent/25' : picked ? 'border-line-2' : 'border-line hover:border-line-2')}>
       <button type="button" onClick={onPick} aria-pressed={picked} className="block w-full text-left">
-        <ThemeThumb theme={theme} className="block aspect-[16/10] w-full overflow-hidden rounded-lg ring-1 ring-line" />
-        <span className="flex items-center gap-1.5 px-1 pt-1.5 pb-0.5 pr-7">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-fg">{theme.name}</span>
-          {picked && <Check size={14} strokeWidth={2.5} className={showing ? 'shrink-0 text-accent' : 'shrink-0 text-fg-3'} />}
+        <ThemeThumb theme={theme} className="block aspect-[16/10] w-full overflow-hidden rounded-[7px] ring-1 ring-line" />
+        <span className="flex items-center gap-1 px-1 pt-1 pr-6">
+          <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-fg">{theme.name}</span>
+          {picked && <Check size={13} strokeWidth={2.5} className={showing ? 'shrink-0 text-accent' : 'shrink-0 text-fg-3'} />}
         </span>
       </button>
       <button
@@ -217,12 +220,12 @@ function ThemeCard({ theme, picked, showing, onPick, menu }: { theme: AppTheme; 
         title="More"
         onClick={() => setOpen((o) => !o)}
         className={cx(
-          'absolute right-1.5 bottom-1.5 flex h-6 w-6 items-center justify-center rounded-md text-fg-3 transition-opacity hover:bg-bg-2 hover:text-fg',
+          'absolute right-1 bottom-1 flex h-5.5 w-5.5 items-center justify-center rounded-md text-fg-3 transition-opacity hover:bg-bg-2 hover:text-fg',
           'opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100',
           open && 'md:opacity-100',
         )}
       >
-        <MoreHorizontal size={15} />
+        <MoreHorizontal size={14} />
       </button>
       <Popover anchor={anchor} open={open} onClose={() => setOpen(false)} align="end" width={210}>
         {menu(() => setOpen(false))}
