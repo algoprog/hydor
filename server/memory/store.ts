@@ -1,18 +1,23 @@
-// Memory's store: entries (about the user, a project, a session) and every change to them, in SQLite.
-// A deleted entry stays, marked deleted, so a change can be undone; erasing removes it and its history.
+// Memory's store: entries (about the user, a project, a session) and every change to them, in SQLite, with
+// a full-text index of their text (FTS5, kept current by triggers), their vectors for search by meaning
+// (vectors.ts) and the links from a topic or a profile to the notes it sums up. A deleted entry stays,
+// marked deleted, so a change can be undone; erasing removes it and its history.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { MemoryEntry, MemoryHistoryRow, MemoryScope, MemorySource, MemoryState } from '../../shared/memory.ts';
+import type { MemoryEntry, MemoryHistoryRow, MemoryKind, MemoryScope, MemorySource } from '../../shared/memory.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 
-/** The longest an entry may be. */
+/** The longest a note may be; topics and profiles, which sum several up, get more. */
 export const MAX_TEXT = 500;
+export const MAX_SUMMARY = 800;
+/** A note no agent has needed for this long is suggested for removal. */
+export const STALE_DAYS = 120;
 
 const ready = new WeakSet<DB>();
 
-/** Makes the tables (once per connection). */
+/** Makes the tables (once per connection), adding what older versions did not have. */
 export function memorySchema(db: DB) {
   if (ready.has(db)) return;
   db.exec(`
@@ -28,7 +33,6 @@ export function memorySchema(db: DB) {
       turn text,
       source text not null default 'auto'
     );
-    create index if not exists memory_entries_scope on memory_entries(scope, scope_key, status);
     create table if not exists memory_history (
       id integer primary key autoincrement,
       entry integer not null references memory_entries(id) on delete cascade,
@@ -46,35 +50,74 @@ export function memorySchema(db: DB) {
     -- How far each session's turns were read for memory: the last timeline item, and when.
     create table if not exists memory_cursor (key text primary key, item text, at integer not null);
   `);
+  const cols = new Set((db.prepare('pragma table_info(memory_entries)').all() as { name: string }[]).map((c) => c.name));
+  if (!cols.has('kind')) db.exec("alter table memory_entries add column kind text not null default 'note'");
+  if (!cols.has('expires_at')) db.exec('alter table memory_entries add column expires_at integer');
+  if (!cols.has('used_at')) db.exec('alter table memory_entries add column used_at integer');
+  if (!cols.has('uses')) db.exec('alter table memory_entries add column uses integer not null default 0');
+  db.exec(`
+    drop index if exists memory_entries_scope;
+    -- A place's entries, the latest changed first, without sorting all of them.
+    create index if not exists memory_entries_place on memory_entries(scope, scope_key, status, updated_at desc, id desc);
+    create index if not exists memory_entries_expiry on memory_entries(expires_at) where expires_at is not null;
+    create table if not exists memory_links (
+      parent integer not null references memory_entries(id) on delete cascade,
+      child integer not null references memory_entries(id) on delete cascade,
+      primary key (parent, child)
+    ) without rowid;
+    create index if not exists memory_links_child on memory_links(child);
+    -- A note's vector: its embedding by \`model\`, quantized (vectors.ts).
+    create table if not exists memory_vectors (
+      entry integer primary key references memory_entries(id) on delete cascade,
+      model text not null,
+      code blob not null
+    );
+  `);
+  if (!db.prepare("select 1 from sqlite_master where type = 'table' and name = 'memory_fts'").get())
+    db.exec(`
+      create virtual table memory_fts using fts5(text, content = 'memory_entries', content_rowid = 'id', tokenize = 'unicode61 remove_diacritics 2');
+      insert into memory_fts(memory_fts) values ('rebuild');
+    `);
+  db.exec(`
+    create trigger if not exists memory_fts_insert after insert on memory_entries begin
+      insert into memory_fts(rowid, text) values (new.id, new.text);
+    end;
+    create trigger if not exists memory_fts_delete after delete on memory_entries begin
+      insert into memory_fts(memory_fts, rowid, text) values ('delete', old.id, old.text);
+    end;
+    -- New words for the index, and the old vector no longer says what the text does.
+    create trigger if not exists memory_fts_update after update of text on memory_entries begin
+      insert into memory_fts(memory_fts, rowid, text) values ('delete', old.id, old.text);
+      insert into memory_fts(rowid, text) values (new.id, new.text);
+      delete from memory_vectors where entry = new.id;
+    end;
+  `);
   ready.add(db);
 }
 
 // ---- switches ---------------------------------------------------------------------------------
 
 export const memoryOn = (db: DB) => kvGet(db, 'memory.enabled') !== '0';
-export const autoOn = (db: DB) => kvGet(db, 'memory.auto') !== '0';
 
 /** Memory for one session: on for all, and not turned off for it. */
 export const sessionMemoryOn = (db: DB, key: string | undefined) => memoryOn(db) && (!key || sessionExtra(db, key).memory !== false);
 
-export function setSwitches(db: DB, p: { enabled?: boolean; auto?: boolean }) {
-  if (typeof p.enabled === 'boolean') kvSet(db, 'memory.enabled', p.enabled ? '1' : '0');
-  if (typeof p.auto === 'boolean') kvSet(db, 'memory.auto', p.auto ? '1' : '0');
+export function setEnabled(db: DB, on: boolean) {
+  kvSet(db, 'memory.enabled', on ? '1' : '0');
 }
 
-export function noteError(db: DB, message: string | null) {
-  kvSet(db, 'memory.lastError', message ? JSON.stringify({ at: Date.now(), message: message.slice(0, 300) }) : '');
+/** The nightly tidy-up (it asks the helper model; "Tidy up now" works either way). */
+export const tidyOn = (db: DB) => kvGet(db, 'memory.tidy.enabled') !== '0';
+export function setTidyOn(db: DB, on: boolean) {
+  kvSet(db, 'memory.tidy.enabled', on ? '1' : '0');
 }
 
-export function memoryState(db: DB): MemoryState {
+export function memoryCounts(db: DB, now = Date.now()): Record<MemoryScope, number> {
   memorySchema(db);
   const counts: Record<MemoryScope, number> = { global: 0, repo: 0, session: 0 };
-  for (const r of db.prepare("select scope, count(*) as n from memory_entries where status = 'active' group by scope").all() as { scope: MemoryScope; n: number }[]) counts[r.scope] = r.n;
-  let lastError: MemoryState['lastError'];
-  try {
-    lastError = JSON.parse(kvGet(db, 'memory.lastError') || 'null') ?? undefined;
-  } catch {}
-  return { enabled: memoryOn(db), auto: autoOn(db), counts, lastError };
+  const rows = db.prepare("select scope, count(*) as n from memory_entries where status = 'active' and (expires_at is null or expires_at > ?) group by scope").all(now) as { scope: MemoryScope; n: number }[];
+  for (const r of rows) counts[r.scope] = r.n;
+  return counts;
 }
 
 // ---- where an entry belongs ---------------------------------------------------------------------
@@ -120,29 +163,65 @@ export function repoRoot(cwd: string): string | null {
   return dir;
 }
 
+/** A place notes belong to: about the user (key ""), a project (its folder), a session (its key). */
+export interface Place {
+  scope: MemoryScope;
+  scopeKey: string;
+}
+
+export const placeKey = (p: Place) => `${p.scope}\u0000${p.scopeKey}`;
+
+/** The places one session sees and changes: about the user, its project's, its own (when `key` is given). */
+export function placesOf(o: { cwd?: string; key?: string }): Place[] {
+  const repo = o.cwd ? repoRoot(o.cwd) : null;
+  return [{ scope: 'global', scopeKey: '' }, ...(repo ? [{ scope: 'repo' as const, scopeKey: repo }] : []), ...(o.key ? [{ scope: 'session' as const, scopeKey: o.key }] : [])];
+}
+
+export const inPlaces = (e: Place, places: Place[]) => places.some((p) => p.scope === e.scope && p.scopeKey === e.scopeKey);
+
+/** "In one of these places" for SQL on the entries as `alias`; every place for "all". */
+export function placeSql(places: Place[] | 'all', alias = 'e'): { sql: string; args: string[] } {
+  if (places === 'all') return { sql: '1', args: [] };
+  if (!places.length) return { sql: '0', args: [] };
+  return { sql: `(${places.map(() => `(${alias}.scope = ? and ${alias}.scope_key = ?)`).join(' or ')})`, args: places.flatMap((p) => [p.scope, p.scopeKey]) };
+}
+
 // ---- entries ----------------------------------------------------------------------------------
 
 interface Row {
   id: number;
   scope: MemoryScope;
   scope_key: string;
+  kind: MemoryKind;
   text: string;
   status: 'active' | 'deleted';
   created_at: number;
   updated_at: number;
+  expires_at: number | null;
+  used_at: number | null;
+  uses: number;
+  covers: number;
   session: string | null;
   turn: string | null;
   source: MemorySource;
 }
 
+/** Entries with how many notes each sums up. */
+const SELECT = 'select e.*, (select count(*) from memory_links l where l.parent = e.id) as covers from memory_entries e';
+
 const toEntry = (r: Row): MemoryEntry => ({
   id: r.id,
   scope: r.scope,
   scopeKey: r.scope_key,
+  kind: r.kind ?? 'note',
   text: r.text,
   status: r.status,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+  expiresAt: r.expires_at ?? undefined,
+  usedAt: r.used_at ?? undefined,
+  uses: r.uses ?? 0,
+  covers: r.kind && r.kind !== 'note' ? r.covers : undefined,
   session: r.session ?? undefined,
   turn: r.turn ?? undefined,
   source: r.source,
@@ -157,11 +236,19 @@ export interface ChangeBy {
   at?: number;
 }
 
-/** Text as stored: one paragraph, at most MAX_TEXT characters. */
-export const cleanText = (t: string) => {
+/** Text as stored: one paragraph, at most `max` characters. */
+export const cleanText = (t: string, max = MAX_TEXT) => {
   const s = t.replace(/\s+/g, ' ').trim();
-  return s.length > MAX_TEXT ? s.slice(0, MAX_TEXT - 1).trimEnd() + '…' : s;
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s;
 };
+
+const maxFor = (kind: MemoryKind) => (kind === 'note' ? MAX_TEXT : MAX_SUMMARY);
+
+/** Told of every change to the entries, with the place when it is one (vectors.ts keeps a copy per place). */
+type Listener = (db: DB, place?: Place) => void;
+const listeners: Listener[] = [];
+export const onEntriesChanged = (fn: Listener) => void listeners.push(fn);
+const changed = (db: DB, place?: Place) => listeners.forEach((f) => f(db, place));
 
 function log(db: DB, entry: number, action: MemoryHistoryRow['action'], before: string | null, after: string | null, by: ChangeBy, at: number) {
   db.prepare('insert into memory_history (entry, at, action, before, after, why, session, turn, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
@@ -179,23 +266,25 @@ function log(db: DB, entry: number, action: MemoryHistoryRow['action'], before: 
 
 export function getEntry(db: DB, id: number): MemoryEntry | null {
   memorySchema(db);
-  const r = db.prepare('select * from memory_entries where id = ?').get(id) as Row | undefined;
+  const r = db.prepare(`${SELECT} where e.id = ?`).get(id) as Row | undefined;
   return r ? toEntry(r) : null;
 }
 
-export function addEntry(db: DB, e: { scope: MemoryScope; scopeKey: string; text: string }, by: ChangeBy): MemoryEntry {
+export function addEntry(db: DB, e: { scope: MemoryScope; scopeKey: string; text: string; kind?: MemoryKind; expiresAt?: number }, by: ChangeBy): MemoryEntry {
   memorySchema(db);
   const at = by.at ?? Date.now();
-  const text = cleanText(e.text);
+  const kind = e.kind ?? 'note';
+  const text = cleanText(e.text, maxFor(kind));
   const scopeKey = e.scope === 'global' ? '' : e.scopeKey;
   const id = db.transaction(() => {
     const r = db
-      .prepare('insert into memory_entries (scope, scope_key, text, status, created_at, updated_at, session, turn, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(e.scope, scopeKey, text, 'active', at, at, by.session ?? null, by.turn ?? null, by.source);
+      .prepare('insert into memory_entries (scope, scope_key, kind, text, status, created_at, updated_at, expires_at, session, turn, source) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(e.scope, scopeKey, kind, text, 'active', at, at, e.expiresAt ?? null, by.session ?? null, by.turn ?? null, by.source);
     const id = Number(r.lastInsertRowid);
     log(db, id, 'added', null, text, by, at);
     return id;
   })();
+  changed(db, { scope: e.scope, scopeKey });
   return getEntry(db, id)!;
 }
 
@@ -204,12 +293,13 @@ export function updateEntry(db: DB, id: number, text: string, by: ChangeBy): { b
   const cur = getEntry(db, id);
   if (!cur) return null;
   const at = by.at ?? Date.now();
-  const next = cleanText(text);
+  const next = cleanText(text, maxFor(cur.kind));
   if (next === cur.text) return { before: cur.text, entry: cur };
   db.transaction(() => {
     db.prepare('update memory_entries set text = ?, updated_at = ?, session = ?, turn = ?, source = ? where id = ?').run(next, at, by.session ?? null, by.turn ?? null, by.source, id);
     log(db, id, 'updated', cur.text, next, by, at);
   })();
+  changed(db, cur);
   return { before: cur.text, entry: getEntry(db, id)! };
 }
 
@@ -222,65 +312,151 @@ export function deleteEntry(db: DB, id: number, by: ChangeBy): boolean {
     db.prepare("update memory_entries set status = 'deleted', updated_at = ? where id = ?").run(at, id);
     log(db, id, 'deleted', cur.text, null, by, at);
   })();
+  changed(db, cur);
   return true;
 }
 
+/** Brings a deleted entry back (with new text, when given). One whose end date passed comes back without it. */
 export function restoreEntry(db: DB, id: number, by: ChangeBy, text?: string): boolean {
   const cur = getEntry(db, id);
   if (!cur || cur.status === 'active') return false;
   const at = by.at ?? Date.now();
-  const next = text != null ? cleanText(text) : cur.text;
+  const next = text != null ? cleanText(text, maxFor(cur.kind)) : cur.text;
   db.transaction(() => {
-    db.prepare("update memory_entries set status = 'active', text = ?, updated_at = ? where id = ?").run(next, at, id);
+    db.prepare("update memory_entries set status = 'active', text = ?, updated_at = ?, expires_at = case when expires_at <= ? then null else expires_at end where id = ?").run(next, at, at, id);
     log(db, id, 'restored', null, next, by, at);
   })();
+  changed(db, cur);
   return true;
+}
+
+/** Sets when an entry stops being true, or (null) takes that away; false when nothing changed. */
+export function setExpiry(db: DB, id: number, expiresAt: number | null, by: ChangeBy): boolean {
+  const cur = getEntry(db, id);
+  if (!cur || (cur.expiresAt ?? null) === expiresAt) return false;
+  const at = by.at ?? Date.now();
+  const iso = (t?: number | null) => (t ? new Date(t).toISOString() : null);
+  db.transaction(() => {
+    db.prepare('update memory_entries set expires_at = ? where id = ?').run(expiresAt, id);
+    log(db, id, 'expiry', iso(cur.expiresAt), iso(expiresAt), by, at);
+  })();
+  changed(db, cur);
+  return true;
+}
+
+/** Agents got these as bearing on what they were doing, or found them with recall. */
+export function markUsed(db: DB, ids: number[], at = Date.now()) {
+  if (!ids.length) return;
+  memorySchema(db);
+  db.prepare(`update memory_entries set uses = uses + 1, used_at = ? where id in (${ids.map(() => '?').join(',')})`).run(at, ...ids);
+}
+
+/** The user keeps a note suggested for removal: it counts as needed now. */
+export function keepEntry(db: DB, id: number, at = Date.now()) {
+  memorySchema(db);
+  db.prepare('update memory_entries set used_at = ? where id = ?').run(at, id);
 }
 
 /** Removes an entry and its history for good. */
 export function eraseEntry(db: DB, id: number) {
-  memorySchema(db);
+  const cur = getEntry(db, id);
   db.transaction(() => {
     db.prepare('delete from memory_history where entry = ?').run(id);
     db.prepare('delete from memory_entries where id = ?').run(id);
   })();
+  if (cur) changed(db, cur);
 }
 
 /** Removes every entry, all history and where each session was read up to. */
 export function clearAll(db: DB): number {
   memorySchema(db);
-  return db.transaction(() => {
+  const n = db.transaction(() => {
     db.prepare('delete from memory_history').run();
     db.prepare('delete from memory_cursor').run();
+    db.prepare('delete from memory_links').run();
     return db.prepare('delete from memory_entries').run().changes;
   })();
+  changed(db);
+  return n;
 }
 
-/** Entries, newest change first: of some scopes, one place, or by status. */
-export function entries(db: DB, o: { scope?: MemoryScope; scopeKey?: string; status?: 'active' | 'deleted' | 'all'; ids?: number[]; limit?: number } = {}): MemoryEntry[] {
+/**
+ * Entries, newest change first: of a scope or one place, some kinds, by status, or some by id. `live`
+ * (a time) leaves out the ones whose end date had passed by then.
+ */
+export function entries(
+  db: DB,
+  o: { scope?: MemoryScope; scopeKey?: string; status?: 'active' | 'deleted' | 'all'; ids?: number[]; kinds?: MemoryKind[]; live?: number; limit?: number } = {},
+): MemoryEntry[] {
   memorySchema(db);
   const where: string[] = [];
   const args: unknown[] = [];
-  if (o.scope) where.push('scope = ?'), args.push(o.scope);
-  if (o.scopeKey != null) where.push('scope_key = ?'), args.push(o.scopeKey);
-  if ((o.status ?? 'active') !== 'all') where.push('status = ?'), args.push(o.status ?? 'active');
+  if (o.scope) where.push('e.scope = ?'), args.push(o.scope);
+  if (o.scopeKey != null) where.push('e.scope_key = ?'), args.push(o.scopeKey);
+  if ((o.status ?? 'active') !== 'all') where.push('e.status = ?'), args.push(o.status ?? 'active');
+  if (o.kinds) where.push(`e.kind in (${o.kinds.map(() => '?').join(',')})`), args.push(...o.kinds);
+  if (o.live != null) where.push('(e.expires_at is null or e.expires_at > ?)'), args.push(o.live);
   if (o.ids) {
     if (!o.ids.length) return [];
-    where.push(`id in (${o.ids.map(() => '?').join(',')})`), args.push(...o.ids);
+    where.push(`e.id in (${o.ids.map(() => '?').join(',')})`), args.push(...o.ids);
   }
-  const sql = `select * from memory_entries ${where.length ? `where ${where.join(' and ')}` : ''} order by updated_at desc, id desc limit ?`;
+  const sql = `${SELECT} ${where.length ? `where ${where.join(' and ')}` : ''} order by e.updated_at desc, e.id desc limit ?`;
   return (db.prepare(sql).all(...args, Math.min(o.limit ?? 5000, 20000)) as Row[]).map(toEntry);
 }
 
-/** What one session may see and change: notes about the user, its project's, its own. */
-export function visibleEntries(db: DB, o: { cwd?: string; key?: string }): MemoryEntry[] {
-  const repo = o.cwd ? repoRoot(o.cwd) : null;
-  return [
-    ...entries(db, { scope: 'global' }),
-    ...(repo ? entries(db, { scope: 'repo', scopeKey: repo }) : []),
-    ...(o.key ? entries(db, { scope: 'session', scopeKey: o.key }) : []),
-  ];
+/** A note in one of the places, active and not past its end date: what a session may find or change. */
+export function visibleEntry(db: DB, id: number, places: Place[], now = Date.now()): MemoryEntry | null {
+  const e = getEntry(db, id);
+  return e && e.status === 'active' && (!e.expiresAt || e.expiresAt > now) && inPlaces(e, places) ? e : null;
 }
+
+/** An active entry of the place with this very text (in any case). */
+export function sameText(db: DB, place: Place, text: string): MemoryEntry | null {
+  memorySchema(db);
+  const r = db.prepare(`${SELECT} where e.scope = ? and e.scope_key = ? and e.status = 'active' and lower(e.text) = lower(?) limit 1`).get(place.scope, place.scopeKey, text) as Row | undefined;
+  return r ? toEntry(r) : null;
+}
+
+// ---- topics and profiles ------------------------------------------------------------------------
+
+/** What a topic or a profile sums up (replacing what it summed up before). */
+export function setLinks(db: DB, parent: number, children: number[]) {
+  memorySchema(db);
+  db.transaction(() => {
+    db.prepare('delete from memory_links where parent = ?').run(parent);
+    const add = db.prepare('insert or ignore into memory_links (parent, child) values (?, ?)');
+    for (const c of children) if (c !== parent) add.run(parent, c);
+  })();
+}
+
+export function addLinks(db: DB, parent: number, children: number[]) {
+  memorySchema(db);
+  const add = db.prepare('insert or ignore into memory_links (parent, child) values (?, ?)');
+  db.transaction(() => children.forEach((c) => c !== parent && add.run(parent, c)))();
+}
+
+export function childrenOf(db: DB, parent: number): number[] {
+  memorySchema(db);
+  return (db.prepare('select child from memory_links where parent = ?').all(parent) as { child: number }[]).map((r) => r.child);
+}
+
+/** The topics and profiles that sum a note up. */
+export function parentsOf(db: DB, child: number): number[] {
+  memorySchema(db);
+  return (db.prepare('select parent from memory_links where child = ?').all(child) as { parent: number }[]).map((r) => r.parent);
+}
+
+/** A note merged into another: what summed it up now sums up the other. */
+export function moveLinks(db: DB, from: number, to: number) {
+  memorySchema(db);
+  db.transaction(() => {
+    db.prepare('insert or ignore into memory_links (parent, child) select parent, ? from memory_links where child = ? and parent != ?').run(to, from, to);
+    db.prepare('insert or ignore into memory_links (parent, child) select ?, child from memory_links where parent = ? and child != ?').run(to, from, to);
+    db.prepare('delete from memory_links where child = ? or parent = ?').run(from, from);
+  })();
+}
+
+// ---- history ----------------------------------------------------------------------------------
 
 const toHistory = (r: any): MemoryHistoryRow => ({
   id: r.id,
@@ -320,7 +496,7 @@ export function setCursor(db: DB, key: string, item: string | undefined, at = Da
   db.prepare('insert into memory_cursor (key, item, at) values (?, ?, ?) on conflict(key) do update set item = excluded.item, at = excluded.at').run(key, item ?? null, at);
 }
 
-// ---- finding entries ----------------------------------------------------------------------------
+// ---- words ------------------------------------------------------------------------------------
 
 const STOP = new Set(
   'a an and are as at be but by can do does for from has have how i in is it its me my not of on or our so that the their them then there these they this to was we what when where which who why will with you your'.split(' '),
@@ -328,37 +504,51 @@ const STOP = new Set(
 
 /** The words of a text worth matching on. */
 export function words(text: string): string[] {
-  return [...new Set(text.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}_.-]*/gu) ?? [])].filter((w) => w.length > 1 && !STOP.has(w));
+  const all = (text.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}_.-]*/gu) ?? []).map((w) => w.replace(/[._-]+$/, ''));
+  return [...new Set(all)].filter((w) => w.length > 1 && !STOP.has(w));
 }
 
-/** How well an entry matches some words: one point per word it holds (or a word's start, 4+ letters). */
-export function matchScore(text: string, query: string[]): number {
-  if (!query.length) return 0;
-  const t = text.toLowerCase();
-  let n = 0;
-  for (const w of query) if (t.includes(w) || (w.length > 4 && t.includes(w.slice(0, Math.max(4, w.length - 2))))) n++;
-  return n;
+// ---- tidying ----------------------------------------------------------------------------------
+
+/** Deletes the entries whose end date has passed (they can be restored for a while, like any deleted one). */
+export function expireDue(db: DB, now = Date.now()): number {
+  memorySchema(db);
+  const due = db.prepare("select id from memory_entries where status = 'active' and expires_at is not null and expires_at <= ?").all(now) as { id: number }[];
+  for (const { id } of due) deleteEntry(db, id, { source: 'auto', why: 'Its end date passed', at: now });
+  return due.length;
 }
 
-/** Entries ordered by how well they match the words, then newest first. */
-export function rank(list: MemoryEntry[], query: string[] = []): MemoryEntry[] {
-  const scored = list.map((e) => ({ e, s: matchScore(e.text, query) }));
-  return scored.sort((a, b) => b.s - a.s || b.e.updatedAt - a.e.updatedAt || b.e.id - a.e.id).map((x) => x.e);
+/**
+ * Notes about the user or a project that no agent has needed for STALE_DAYS: not changed, found or given
+ * as bearing on a request since. Topics and profiles are left out (the tidy-up keeps them current), and so
+ * are notes with an end date (they go by themselves) and a session's (they go with the session).
+ */
+export function staleEntries(db: DB, o: { now?: number; limit?: number } = {}): MemoryEntry[] {
+  memorySchema(db);
+  const cut = (o.now ?? Date.now()) - STALE_DAYS * 86400_000;
+  const rows = db
+    .prepare(
+      `${SELECT} where e.status = 'active' and e.kind = 'note' and e.scope != 'session' and e.expires_at is null and e.updated_at < ? and coalesce(e.used_at, 0) < ?
+       order by max(e.updated_at, coalesce(e.used_at, 0)) limit ?`,
+    )
+    .all(cut, cut, o.limit ?? 50) as Row[];
+  return rows.map(toEntry);
 }
 
-/** Entries matching a search (every word, in any order), best first; all of them for an empty one. */
-export function search(list: MemoryEntry[], q: string): MemoryEntry[] {
-  const w = words(q);
-  if (!w.length) return list;
-  return rank(
-    list.filter((e) => matchScore(e.text, w) > 0),
-    w,
-  );
+export function staleCount(db: DB, now = Date.now()): number {
+  memorySchema(db);
+  const cut = now - STALE_DAYS * 86400_000;
+  return (
+    db.prepare("select count(*) as n from memory_entries where status = 'active' and kind = 'note' and scope != 'session' and expires_at is null and updated_at < ? and coalesce(used_at, 0) < ?").get(cut, cut) as {
+      n: number;
+    }
+  ).n;
 }
 
-/** Removes notes deleted long ago and those of sessions that are gone. */
+/** Deletes the notes past their end date, and removes notes deleted long ago and those of sessions that are gone. */
 export function sweep(db: DB, now = Date.now()) {
   memorySchema(db);
+  expireDue(db, now);
   const old = now - 30 * 86400_000;
   db.transaction(() => {
     const gone = db.prepare("select id from memory_entries where status = 'deleted' and updated_at < ?").all(old) as { id: number }[];

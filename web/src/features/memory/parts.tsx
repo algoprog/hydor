@@ -15,7 +15,7 @@ export function SessionMemoryItem({ sessionKey, on, allOff, close, label = 'Memo
 }
 
 /** Edits a note's text in place: Enter saves, Shift+Enter breaks the line, Escape cancels. */
-export function EntryEditor({ text, onSave, onCancel }: { text: string; onSave: (text: string) => Promise<unknown>; onCancel: () => void }) {
+export function EntryEditor({ text, onSave, onCancel, max = 500 }: { text: string; onSave: (text: string) => Promise<unknown>; onCancel: () => void; max?: number }) {
   const [v, setV] = useState(text);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -47,7 +47,7 @@ export function EntryEditor({ text, onSave, onCancel }: { text: string; onSave: 
         ref={ref}
         value={v}
         rows={2}
-        maxLength={500}
+        maxLength={max}
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onCancel();
@@ -70,10 +70,11 @@ export function EntryEditor({ text, onSave, onCancel }: { text: string; onSave: 
   );
 }
 
-/** "Added", "Updated", "Removed" (or "Undone"), coloured by what happened. */
+/** "Added", "Updated", "Removed", "Ends" (or "Undone"), coloured by what happened. */
 export function ChangeBadge({ c }: { c: MemoryChange }) {
   if (c.undone) return <Badge>Undone</Badge>;
   if (c.action === 'added') return <Badge tone="ok">Added</Badge>;
   if (c.action === 'updated') return <Badge tone="info">Updated</Badge>;
+  if (c.action === 'expiry') return <Badge tone="info">{c.expiresAt ? 'Ends' : 'No end date'}</Badge>;
   return <Badge tone="warn">Removed</Badge>;
 }
