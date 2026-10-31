@@ -529,10 +529,10 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       Extra: () => (
         <div className="stagger grid gap-3 sm:grid-cols-3">
           <Highlight i={0} icon={<FolderOpen size={16} />} title="Any agent, any folder">
-            Start one in any folder on this computer, with the model you like.
+            Start one in any folder on this computer, with any model.
           </Highlight>
           <Highlight i={1} icon={<Eye size={16} />} title="Follow it live">
-            Watch its work, approve what it asks and answer its questions.
+            Watch its work, approve what it asks and clarify.
           </Highlight>
           <Highlight i={2} icon={<Smartphone size={16} />} title="On your phone too">
             Pick up anywhere, and get a notification when it’s done.
@@ -762,9 +762,9 @@ function holePath(b: Box): string {
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
 /** A setup step: the whole screen, over the app that is not there yet. Its words start in the same place
- * every step, with Back, where the tour stands and Next under them: along the bottom on a phone, and kept
- * in reach at the bottom of the screen while a long step scrolls. It dissolves (out) as the app comes in
- * or the tour closes; a new install's first one follows the password screen without a fade. */
+ * every step, and Back, where the tour stands and Next stay put at the foot of the screen; a long step
+ * scrolls under them, seen through frosted glass. It dissolves (out) as the app comes in or the tour
+ * closes; a new install's first one follows the password screen without a fade. */
 function TourPage(p: {
   list: Step[];
   /** The step shown. */
@@ -787,22 +787,52 @@ function TourPage(p: {
   const [still] = useState(p.now);
   const scroller = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
-  // Under a long step (models found) the buttons keep to the bottom, on a bar across the screen.
-  const [stuck, setStuck] = useState(false);
+  const foot = useRef<HTMLDivElement>(null);
+  // Room under the words for the buttons, and whether the words run on under them (models found).
+  const [footH, setFootH] = useState(96);
+  const [under, setUnder] = useState(false);
   useEffect(() => {
-    if (!end.current || !scroller.current) return;
-    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { root: scroller.current });
-    io.observe(end.current);
-    return () => io.disconnect();
+    const s = scroller.current;
+    const f = foot.current;
+    const e = end.current;
+    if (!s || !f || !e) return;
+    const check = () => {
+      setFootH(f.offsetHeight);
+      setUnder(e.getBoundingClientRect().top > f.getBoundingClientRect().top + 1);
+    };
+    check();
+    s.addEventListener('scroll', check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(s);
+    ro.observe(f);
+    if (s.firstElementChild) ro.observe(s.firstElementChild);
+    return () => {
+      s.removeEventListener('scroll', check);
+      ro.disconnect();
+    };
   }, []);
+  // Each step starts at its top.
+  useEffect(() => scroller.current?.scrollTo({ top: 0 }), [k]);
   const Extra = step.Extra;
   const column = 'mx-auto w-full max-w-[760px] px-5 sm:px-10 2xl:max-w-[840px]';
+  const where = ready ? <TourProgress at={k + (fresh ? 1 : 0)} total={list.length + (fresh ? 1 : 0)} /> : <span className="text-[12.5px] text-fg-3">Pick one or more</span>;
+  const back = (
+    <Button variant="ghost" className="h-10 rounded-xl px-3.5 text-[14px]" onClick={k > 0 ? p.onBack : p.onSkip}>
+      {k > 0 ? 'Back' : phone ? 'Skip' : 'Skip the tour'}
+    </Button>
+  );
+  const next = (
+    <Button ref={p.nextRef} variant="primary" className={cx('gap-2 rounded-xl px-5', phone ? 'h-11 flex-1 text-[15px]' : 'h-10 text-[14px]')} onClick={p.onNext} disabled={!ready}>
+      {step.id === 'welcome' ? 'Show me around' : 'Next'}
+      <ArrowRight size={16} />
+    </Button>
+  );
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby={out ? undefined : 'tour-title'}
-      className={cx('tour-page fixed inset-0 flex flex-col bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none')}
+      className={cx('tour-page fixed inset-0 bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none')}
     >
       <Aurora className="aurora-page" />
       <button
@@ -813,45 +843,48 @@ function TourPage(p: {
       >
         <X size={18} />
       </button>
-      <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="flex min-h-full flex-col">
-          <div className={cx(column, 'pt-[calc(var(--safe-top)+64px)] sm:pt-[clamp(56px,14vh,160px)]')}>
-            <div key={step.id} className="tour-step" style={{ '--dx': `${p.dir * 22}px` } as CSSProperties}>
-              {step.hero && <TourHero />}
-              <h2 id={out ? undefined : 'tour-title'} className="text-[27px] leading-[1.15] font-semibold tracking-tight text-balance text-fg sm:text-[34px]" style={{ '--i': 0 } as CSSProperties}>
-                {step.title}
-              </h2>
-              <div className="mt-3.5 max-w-[36rem] text-[15px] leading-relaxed text-pretty text-fg-2 sm:text-[16px]" style={{ '--i': 1 } as CSSProperties}>
-                {step.body}
+      <div ref={scroller} className="absolute inset-0 overflow-y-auto overscroll-contain">
+        <div className={cx(column, 'pt-[calc(var(--safe-top)+64px)] sm:pt-[clamp(56px,14vh,160px)]')} style={{ paddingBottom: footH + 24 }}>
+          <div key={step.id} className="tour-step" style={{ '--dx': `${p.dir * 22}px` } as CSSProperties}>
+            {step.hero && <TourHero />}
+            <h2 id={out ? undefined : 'tour-title'} className="text-[27px] leading-[1.15] font-semibold tracking-tight text-balance text-fg sm:text-[34px]" style={{ '--i': 0 } as CSSProperties}>
+              {step.title}
+            </h2>
+            <div className="mt-3.5 max-w-[36rem] text-[15px] leading-relaxed text-pretty text-fg-2 sm:text-[16px]" style={{ '--i': 1 } as CSSProperties}>
+              {step.body}
+            </div>
+            {Extra && (
+              <div className="mt-9" style={{ '--i': 2 } as CSSProperties}>
+                <Extra />
               </div>
-              {Extra && (
-                <div className="mt-9" style={{ '--i': 2 } as CSSProperties}>
-                  <Extra />
-                </div>
-              )}
-            </div>
-          </div>
-          <div
-            className={cx(
-              'sticky bottom-0 z-[1] mt-auto border-t transition-[background-color,border-color] duration-200 sm:mt-10',
-              phone || stuck ? 'border-line bg-bg/85 backdrop-blur-md' : 'border-transparent',
             )}
-          >
-            <div className={cx(column, 'flex items-center gap-3 pt-3 pb-[max(12px,var(--safe-bottom))] sm:py-5')}>
-              <Button variant="ghost" className="h-10 rounded-xl px-3.5 text-[14px]" onClick={k > 0 ? p.onBack : p.onSkip}>
-                {k > 0 ? 'Back' : phone ? 'Skip' : 'Skip the tour'}
-              </Button>
-              <span className="flex min-w-0 flex-1 justify-center">
-                {ready ? <TourProgress at={k + (fresh ? 1 : 0)} total={list.length + (fresh ? 1 : 0)} /> : <span className="text-[12.5px] text-fg-3">Pick one or more</span>}
-              </span>
-              <Button ref={p.nextRef} variant="primary" className="h-10 gap-2 rounded-xl px-5 text-[14px]" onClick={p.onNext} disabled={!ready}>
-                {step.id === 'welcome' ? 'Show me around' : 'Next'}
-                <ArrowRight size={16} />
-              </Button>
+          </div>
+          <div ref={end} className="h-px" />
+        </div>
+      </div>
+      <div
+        ref={foot}
+        className={cx(
+          'absolute inset-x-0 bottom-0 z-[1] border-t backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color] duration-300',
+          under ? 'border-line/70 bg-bg/55' : 'border-transparent',
+        )}
+      >
+        {phone ? (
+          // The dots over the buttons, so neither moves with the words on them.
+          <div className={cx(column, 'pt-3 pb-[max(12px,var(--safe-bottom))]')}>
+            <div className="mb-3 flex justify-center">{where}</div>
+            <div className="flex items-center gap-2">
+              {back}
+              {next}
             </div>
           </div>
-          <div ref={end} className="h-px shrink-0" />
-        </div>
+        ) : (
+          <div className={cx(column, 'relative flex items-center justify-between py-5')}>
+            {back}
+            <span className="absolute left-1/2 -translate-x-1/2">{where}</span>
+            {next}
+          </div>
+        )}
       </div>
     </div>
   );
