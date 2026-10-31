@@ -1060,6 +1060,18 @@ export class SessionManager extends EventEmitter {
     return r?.account ?? accountOfPath(this.db, this.transcriptFor(key)) ?? undefined;
   }
 
+  /**
+   * When the plan limit a session's account is at lifts, as its usage last said: a time; null when the
+   * account is not at a limit; undefined when that is not known (not read yet, or no plan limits).
+   */
+  limitLiftsAt(key: string): number | null | undefined {
+    const agent = agentOfKey(key);
+    if (agent === 'acp') return undefined;
+    const u = this.controlFor(agent, this.accountOf(key)).lastUsage;
+    if (!u?.ok) return undefined;
+    return u.limited ? (u.limited.resetsAt ?? undefined) : null;
+  }
+
   private extraControls = new Map<string, ClaudeControl | CodexControl>();
 
   /** Sign-in, usage and models for an agent's account: the CLI's own, or an added one. */

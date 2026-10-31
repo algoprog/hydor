@@ -7,7 +7,7 @@ import compress from '@fastify/compress';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
-import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
+import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
 import { AuthManager, HttpError, SESSION_COOKIE } from './auth.ts';
 import { config, ensureDirs, paths } from './config.ts';
 import { kvGet, kvSet, openDb } from './db.ts';
@@ -502,7 +502,7 @@ app.delete('/api/tasks/:id', async (req) => {
 });
 app.post('/api/tasks/:id/run', async (req) => ({ key: await scheduler.runNow((req.params as { id: string }).id) }));
 app.post('/api/tasks/:id/rotate', async (req) => ({ task: scheduler.rotate((req.params as { id: string }).id) }));
-/** Continue a session when its usage limit resets (or at any time given). */
+/** Continue a session when its usage limit resets; the time then follows the reset as it moves (scheduler.syncResumes). */
 app.post('/api/sessions/:key/resume-at', async (req) => {
   const at = Number(((req.body ?? {}) as any).at);
   if (!Number.isFinite(at) || at < Date.now() - 60_000) throw new HttpError(400, 'Pick a time in the future');
@@ -771,17 +771,32 @@ async function addedUsage(): Promise<Record<string, AgentUsage>> {
   return { ...extraUsage };
 }
 
+/** Reads every account's usage now, tells the open pages, and keeps sessions waiting out a limit on its reset. */
+async function readUsage() {
+  usageAt = Date.now();
+  const [c, x, accounts] = await Promise.all([claude.usage(sessions.liveClaudeUsage()), codex.usage(), addedUsage()]);
+  broadcast({ t: 'usage', claude: c, codex: x, accounts });
+  scheduler.syncResumes();
+  return { claude: c, codex: x, accounts };
+}
+
 app.get('/api/usage', async (req) => {
   const refresh = (req.query as Record<string, string>).refresh === '1';
   const stale = Date.now() - usageAt > 120_000;
-  if (refresh || stale || !claude.lastUsage || !codex.lastUsage) {
-    usageAt = Date.now();
-    const [c, x, accounts] = await Promise.all([claude.usage(sessions.liveClaudeUsage()), codex.usage(), addedUsage()]);
-    broadcast({ t: 'usage', claude: c, codex: x, accounts });
-    return { claude: c, codex: x, accounts };
-  }
+  if (refresh || stale || !claude.lastUsage || !codex.lastUsage) return readUsage();
   return { claude: claude.lastUsage, codex: codex.lastUsage, accounts: { ...extraUsage } };
 });
+
+// While a session waits to continue after a usage limit, usage is read now and then, more often as the
+// reset nears and once more just before it: the provider can move the reset, and a reset used or another
+// sign-in lifts the limit early. The session continues on whatever it says then.
+setInterval(() => {
+  const next = scheduler.nextResume();
+  if (next === undefined) return;
+  const left = next - Date.now();
+  const age = Date.now() - usageAt;
+  if (age > Math.min(30 * 60_000, Math.max(2 * 60_000, left / 6)) || (left < 3 * 60_000 && age > 60_000)) readUsage().catch(() => {});
+}, 60_000).unref();
 
 const acctOf = (req: FastifyRequest) => {
   const a = (req.query as Record<string, string>).account || (req.body as any)?.account;
@@ -800,6 +815,8 @@ app.post('/api/usage/:agent/reset', async (req) => {
   const usage = agent === 'claude' ? await sessions.controlFor('claude', account).usage(sessions.liveClaudeUsage(account)) : await sessions.controlFor('codex', account).usage();
   if (account) extraUsage[account] = usage;
   broadcast(account ? { t: 'usage', accounts: { [account]: usage } } : { t: 'usage', [agent]: usage });
+  // Usage back: a session waiting for the reset continues now.
+  scheduler.syncResumes();
   return { ok: r.outcome === 'reset', ...r, usage } satisfies LimitResetResult;
 });
 
@@ -1232,7 +1249,10 @@ sessions.on('items', (key: string, items: TimelineItem[], total: number, reset: 
   toSubscribers(key, { t: 'items', key, items: items.map(previewItem), total, reset }),
 );
 sessions.on('live', (key: string, live, overlay) => toSubscribers(key, { t: 'live', key, live, overlay }));
-sessions.on('usage', (u) => broadcast({ t: 'usage', ...u }));
+sessions.on('usage', (u) => {
+  broadcast({ t: 'usage', ...u });
+  scheduler.syncResumes();
+});
 system.on('sample', (sample) => toSubscribers(SYSTEM_CHANNEL, { t: 'system', sample }));
 kernels.on('op', (id: string, e: KernelOp) => toSubscribers(`kernel:${id}`, { t: 'kernel', id, e }));
 sessions.on('toast', (t: { level: 'info' | 'error'; text: string }) => broadcast({ t: 'toast', ...t }));
@@ -1249,9 +1269,14 @@ machines.on('notify', (n: NotifyEvent) => {
   push.send({ ...n, title: t.title, body: `${n.machine!.name} · ${t.body}`, url: `/m/${n.machine!.id}/s/${encodeURIComponent(n.key)}` }).catch(() => {});
 });
 machines.on('changed', () => broadcast({ t: 'machines' }));
-claude.on('flow', (f) => broadcast({ t: 'login', flow: publicFlow(f) }));
-codex.on('flow', (f) => broadcast({ t: 'login', flow: publicFlow(f) }));
-sessions.on('flow', (f) => broadcast({ t: 'login', flow: publicFlow(f) }));
+/** A sign-in finished: with a session waiting out a limit, the new account's usage says when it continues. */
+const onFlow = (f: LoginFlow) => {
+  broadcast({ t: 'login', flow: publicFlow(f) });
+  if (f.state === 'done' && scheduler.nextResume() !== undefined) setTimeout(() => readUsage().catch(() => {}), 1500);
+};
+claude.on('flow', onFlow);
+codex.on('flow', onFlow);
+sessions.on('flow', onFlow);
 let lastProgress = 0;
 let wasRunning = true;
 indexer.on('progress', (p) => {
