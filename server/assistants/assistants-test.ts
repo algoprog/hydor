@@ -139,8 +139,11 @@ const info = (agent: SpawnInfo['agent'], extra: Record<string, unknown>, acpAgen
 test('the feature through the registry: Claude Code’s command line', async () => {
   const mine = saveAssistant(db, { ...offline, id: undefined });
   const add = await spawnAdditions(info('claude', { assistant: mine.id }));
-  assert.equal(add.instructions.length, 1);
-  assert.match(add.instructions[0], /# Assistant: Offline/);
+  // The assistant's block, beside the capabilities' own notes (Pages').
+  const own = add.instructions.filter((t) => t.startsWith('# Assistant:'));
+  assert.equal(own.length, 1);
+  assert.match(own[0], /# Assistant: Offline/);
+  assert.ok(add.instructions.some((t) => t.startsWith('Pages:')));
   assert.ok(add.disallowedTools.includes('mcp__naget-agent__web_search') && add.disallowedTools.includes('mcp__naget-agent__read_page'));
   const spec = claudeSpec({ cwd: tmp, sessionId: '00000000-0000-4000-8000-000000000001', pageServer: 'http://127.0.0.1:1/mcp/run/x', add }, {});
   const at = spec.args.indexOf('--disallowedTools');
@@ -148,9 +151,12 @@ test('the feature through the registry: Claude Code’s command line', async () 
   assert.deepEqual(spec.args[at + 1].split(','), add.disallowedTools);
   assert.ok(spec.args.includes('--strict-mcp-config'));
   assert.match(spec.args[spec.args.indexOf('--append-system-prompt') + 1], /# Assistant: Offline/);
-  // No assistant and no tone: the command line is as before.
+  // No assistant and no tone: no limits, and only the capabilities' notes in the instructions.
   const plain = claudeSpec({ cwd: tmp, sessionId: '00000000-0000-4000-8000-000000000002', add: await spawnAdditions(info('claude', {})) }, {});
-  assert.ok(!plain.args.includes('--disallowedTools') && !plain.args.includes('--strict-mcp-config') && !plain.args.includes('--append-system-prompt'));
+  assert.ok(!plain.args.includes('--disallowedTools') && !plain.args.includes('--strict-mcp-config'));
+  const prompt = plain.args[plain.args.indexOf('--append-system-prompt') + 1];
+  assert.match(prompt, /^Pages:/);
+  assert.doesNotMatch(prompt, /# Assistant:/);
 });
 
 /** Answers Codex's app-server requests like the real one would, keeping what was asked. */
@@ -185,7 +191,7 @@ test('the feature through the registry: what Codex’s thread starts with', asyn
 
 test('Custom: nothing at its start (it reads the context before each turn), the same block there', async () => {
   const add = await spawnAdditions(info('acp', { assistant: 'tutor' }, 'console'));
-  assert.equal(add.instructions.length, 0);
+  assert.ok(!add.instructions.some((t) => t.includes('# Assistant:')));
   const text = await assistants.context!({ key: 'acp:k1', cwd: tmp, extra: { assistant: 'tutor' } }, deps);
   assert.match(String(text), /^# Assistant: Tutor\n/);
 });
