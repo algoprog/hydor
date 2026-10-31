@@ -622,6 +622,23 @@ html {
 .auth-card.tour-card-out {
   animation: tour-card-out 300ms ease-in forwards;
 }
+/* The setup steps fill the screen: the first page comes in over the app (a new install's straight after
+   the password screen, which looks the same), and the last dissolves as the app comes in. */
+.tour-page {
+  animation: overlay-in 260ms ease-out backwards;
+}
+.tour-page.tour-page-now {
+  animation: none;
+}
+.tour-page.tour-page-out {
+  animation: tour-page-out 360ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes tour-page-out {
+  to {
+    opacity: 0;
+    scale: 1.04;
+  }
+}
 /* Each step's words arrive one after another, coming into focus. */
 @keyframes tour-rise {
   from {
@@ -864,6 +881,133 @@ html {
     box-shadow:
       0 8px 30px rgba(0, 0, 0, 0.1),
       0 0 0 16px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+/* The tour builds the app up. It opens on an empty app (what was on screen goes once the first page
+   covers it), and each part a step points at arrives as the step comes; the rest arrive as it ends. The
+   parts are the shell's elements marked data-tour="…", and <html data-tour-build> names those shown so
+   far, with "all" at the end (Tour.tsx). A part named in the list below is one some step shows. */
+:root[data-tour-build] [data-shell] {
+  visibility: hidden;
+  transition: visibility 0s 240ms;
+}
+:root[data-tour-build] [data-shell] [data-tour] {
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 240ms ease,
+    visibility 0s 240ms;
+}
+/* Tiles come in one after another: the chips under the message box, and the tools in a wave from the
+   corner, four to a row. */
+:root[data-tour-build~='start-bar'] [data-shell] [data-tour='start-bar'] > *,
+:root[data-tour-build~='tools'] [data-shell] [data-tour='tools'] > * {
+  animation: tour-tile-in 560ms calc(260ms + (var(--tour-c, 0) + var(--tour-r, 0)) * 55ms) cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+:root[data-tour-build] :is([data-tour='start-bar'], [data-tour='tools']) > :nth-child(4n + 2) {
+  --tour-c: 1;
+}
+:root[data-tour-build] :is([data-tour='start-bar'], [data-tour='tools']) > :nth-child(4n + 3) {
+  --tour-c: 2;
+}
+:root[data-tour-build] :is([data-tour='start-bar'], [data-tour='tools']) > :nth-child(4n + 4) {
+  --tour-c: 3;
+}
+:root[data-tour-build] :is([data-tour='start-bar'], [data-tour='tools']) > :nth-child(n + 5) {
+  --tour-r: 1;
+}
+:root[data-tour-build] [data-tour='tools'] > :nth-child(n + 9) {
+  --tour-r: 2;
+}
+:root[data-tour-build] [data-tour='tools'] > :nth-child(n + 13) {
+  --tour-r: 3;
+}
+/* The end: the rest arrives as the dimming lifts, the page's words a moment after the frame. */
+:root[data-tour-build~='all'] [data-shell] {
+  visibility: visible;
+  transition: none;
+}
+:root[data-tour-build~='all'] [data-shell] [data-tour] {
+  visibility: visible;
+  opacity: 1;
+  transition: none;
+  animation: tour-part-in 760ms 120ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+:root[data-tour-build~='all'] [data-shell] :is([data-tour='sidebar-search'], [data-tour='home-title']) {
+  animation-delay: 190ms;
+}
+:root[data-tour-build~='all'] [data-shell] :is([data-tour='home-hint'], [data-tour='today'], [data-tour='recent']) {
+  animation-delay: 260ms;
+}
+/* Each step's part, once the spotlight is on its way. These come after "all", so a part already here
+   keeps its animation (and doesn't play it again) as the tour ends. */
+:root[data-tour-build~='composer'] [data-shell] [data-tour='composer'],
+:root[data-tour-build~='start-bar'] [data-shell] [data-tour='start-bar'],
+:root[data-tour-build~='pickers'] [data-shell] [data-tour='pickers'],
+:root[data-tour-build~='sidebar'] [data-shell] [data-tour='sidebar'],
+:root[data-tour-build~='sessions'] [data-shell] [data-tour='sessions'],
+:root[data-tour-build~='tools'] [data-shell] [data-tour='tools'],
+:root[data-tour-build~='nav-settings'] [data-shell] [data-tour='nav-settings'] {
+  visibility: visible;
+  opacity: 1;
+  transition: none;
+  animation: tour-part-in 760ms 200ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+/* The sidebar slides in from its edge; the bar under the message box and the tools' grid just show as
+   their tiles come in; Options and Settings pop up, Settings' gear turning. */
+:root[data-tour-build~='sidebar'] [data-shell] [data-tour='sidebar'] {
+  animation-name: tour-panel-in;
+}
+:root[data-tour-build~='start-bar'] [data-shell] [data-tour='start-bar'],
+:root[data-tour-build~='tools'] [data-shell] [data-tour='tools'] {
+  animation: overlay-in 300ms 160ms ease-out backwards;
+}
+:root[data-tour-build~='pickers'] [data-shell] [data-tour='pickers'],
+:root[data-tour-build~='nav-settings'] [data-shell] [data-tour='nav-settings'] {
+  animation-name: tour-pop-in;
+  animation-duration: 620ms;
+}
+:root[data-tour-build~='nav-settings'] [data-shell] [data-tour='nav-settings'] .ico {
+  animation: tour-turn 1100ms 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@keyframes tour-part-in {
+  from {
+    opacity: 0;
+    translate: 0 18px;
+    scale: 0.97;
+    filter: blur(12px);
+  }
+}
+@keyframes tour-panel-in {
+  from {
+    opacity: 0;
+    translate: -32px 0;
+    filter: blur(10px);
+  }
+}
+@keyframes tour-tile-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+    scale: 0.86;
+    filter: blur(6px);
+  }
+}
+@keyframes tour-pop-in {
+  0% {
+    opacity: 0;
+    scale: 0.55;
+    filter: blur(6px);
+  }
+  55% {
+    opacity: 1;
+    scale: 1.08;
+    filter: blur(0);
+  }
+}
+@keyframes tour-turn {
+  from {
+    rotate: -150deg;
   }
 }
 /* The password and sign-in screens: the card rises in once the mark has drawn. */

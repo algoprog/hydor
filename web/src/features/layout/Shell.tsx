@@ -181,7 +181,7 @@ export function Shell() {
 
   if (mobile) {
     return (
-      <div className="flex h-dvh flex-col overflow-hidden bg-bg">
+      <div data-shell className="flex h-dvh flex-col overflow-hidden bg-bg">
         <div className="min-h-0 flex-1">
           <Routes />
         </div>
@@ -199,9 +199,9 @@ export function Shell() {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-bg">
+    <div data-shell className="flex h-dvh overflow-hidden bg-bg">
       {sideOpen && (
-        <div className="w-[280px] shrink-0 border-r border-line">
+        <div className="w-[280px] shrink-0">
           <Sidebar />
         </div>
       )}
