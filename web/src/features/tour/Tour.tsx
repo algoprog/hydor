@@ -7,7 +7,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSP
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
-import { Bell, Blocks, Check, CircleHelp, Cloud, CornerDownLeft, Cpu, Eye, FileDiff, GitFork, MessageSquareText, Plus, ShieldCheck, Smartphone, Sparkles, X } from 'lucide-react';
+import { Bell, Blocks, Check, CircleHelp, Cloud, CornerDownLeft, Cpu, Eye, FileDiff, FolderOpen, GitFork, MessageSquareText, Plus, ShieldCheck, Smartphone, X } from 'lucide-react';
 import type { AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { MOD } from '../../lib/format';
@@ -17,6 +17,7 @@ import { toastError, useApp, useUI } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
+import { ARCH, NUGGET, TileGradients } from '../../components/Logo';
 import { LoginDialog } from '../settings/SettingsPage';
 import { HfCheck, OpenRouterBody, size as bytes, useModels } from '../settings/ModelsSettings';
 import { machineBase, machineId } from '../../lib/machine';
@@ -70,7 +71,7 @@ interface TourState {
   picked: boolean;
   /** Right after choosing the password: that screen was the welcome. */
   fresh: boolean;
-  /** Sparks where the tour was finished. */
+  /** Gold dust where the tour was finished. */
   burst: { x: number; y: number; id: number } | null;
 }
 
@@ -93,7 +94,7 @@ export const setupDone = () => {
   afterSetup = true;
 };
 
-/** Closes the tour (fading); finishing it sends sparks from the button and points at the message box. */
+/** Closes the tour (fading); finishing it sends gold dust from the button and points at the message box. */
 function endTour(finishedAt?: HTMLElement | null) {
   const s = useTour.getState();
   if (!s.open || s.closing) return;
@@ -139,19 +140,10 @@ function pickAgent(uses: Use[]) {
   window.dispatchEvent(new CustomEvent('wa:agent', { detail: next }));
 }
 
-// ---- the app mark, drawing itself ----------------------------------------------------------------
+// ---- the app mark, arriving ------------------------------------------------------------------------
 
-const SPARK = 'M356 216Q371 285 440 300Q371 315 356 384Q341 315 272 300Q341 285 356 216Z';
-
-function Spark({ className, style }: { className?: string; style?: CSSProperties }) {
-  return (
-    <svg viewBox="272 216 168 168" className={className} style={style} aria-hidden>
-      <path d={SPARK} />
-    </svg>
-  );
-}
-
-/** The app mark as it arrives: the tile, then the prompt drawn, then its spark, which keeps glinting. */
+/** The app mark as Naget's film draws it: a speck of gold condenses into the nugget, the n is drawn
+ * around it, and the nugget drops into place, where it glows. */
 export function HeroMark({ size = 64 }: { size?: number }) {
   const id = useId();
   return (
@@ -159,19 +151,11 @@ export function HeroMark({ size = 64 }: { size?: number }) {
       <span className="hero-glow" aria-hidden />
       <svg width={size} height={size} viewBox="0 0 512 512" className="relative" aria-hidden>
         <defs>
-          <linearGradient id={`${id}tile`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#ffffff" />
-            <stop offset="1" stopColor="#d9d9d9" />
-          </linearGradient>
-          <linearGradient id={`${id}ink`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#2a2a28" />
-            <stop offset=".55" stopColor="#3e3a30" />
-            <stop offset="1" stopColor="#6b6428" />
-          </linearGradient>
+          <TileGradients id={id} />
         </defs>
         <rect className="hero-tile" x="4" y="4" width="504" height="504" rx="114" fill={`url(#${id}tile)`} stroke="rgba(0,0,0,0.10)" strokeWidth="8" />
-        <path className="hero-prompt" pathLength={1} d="M140 162L250 256L140 350" fill="none" stroke={`url(#${id}ink)`} strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
-        <path className="hero-spark" d={SPARK} fill="#6b6428" />
+        <path className="hero-arch" pathLength={1} d={ARCH} fill="none" stroke={`url(#${id}ink)`} strokeWidth="66" />
+        <circle className="hero-nugget" {...NUGGET} fill={`url(#${id}gold)`} />
       </svg>
     </span>
   );
@@ -188,32 +172,33 @@ export function Aurora({ className }: { className?: string }) {
   );
 }
 
-const GLINTS = [
-  { x: '27%', y: '24%', s: 10, d: 1200 },
-  { x: '70%', y: '18%', s: 7, d: 2300 },
-  { x: '76%', y: '66%', s: 11, d: 1700 },
-  { x: '22%', y: '70%', s: 7, d: 2900 },
-  { x: '60%', y: '84%', s: 6, d: 3500 },
-  { x: '40%', y: '12%', s: 5, d: 4100 },
+/** Gold dust drifting in the light: a speck catches it now and then. */
+const DUST = [
+  { x: '27%', y: '26%', s: 5, d: 1500 },
+  { x: '70%', y: '20%', s: 4, d: 2400 },
+  { x: '76%', y: '66%', s: 6, d: 1900 },
+  { x: '22%', y: '70%', s: 4, d: 3000 },
+  { x: '60%', y: '84%', s: 3, d: 3600 },
+  { x: '40%', y: '14%', s: 3, d: 4200 },
 ];
 
 function TourHero() {
   return (
     <div className="relative -mx-5 -mt-5 mb-4 flex h-[150px] items-center justify-center overflow-hidden border-b border-line bg-bg-1">
       <Aurora />
-      {GLINTS.map((g, n) => (
-        <Spark key={n} className="glint absolute" style={{ left: g.x, top: g.y, width: g.s, height: g.s, animationDelay: `${g.d}ms` }} />
+      {DUST.map((g, n) => (
+        <span key={n} className="dust absolute rounded-full" style={{ left: g.x, top: g.y, width: g.s, height: g.s, animationDelay: `${g.d}ms` }} />
       ))}
       <HeroMark size={68} />
     </div>
   );
 }
 
-/** Sparks flying out from where the tour was finished. */
-const BURST = Array.from({ length: 12 }, (_, n) => {
-  const a = (n / 12) * Math.PI * 2 + (n % 2 ? 0.26 : 0);
-  const d = [64, 46, 34][n % 3];
-  return { dx: Math.round(Math.cos(a) * d), dy: Math.round(Math.sin(a) * d), s: [13, 9, 7][n % 3], delay: (n % 4) * 30 };
+/** Gold dust flying out from where the tour was finished. */
+const BURST = Array.from({ length: 14 }, (_, n) => {
+  const a = (n / 14) * Math.PI * 2 + (n % 2 ? 0.22 : 0);
+  const d = [66, 48, 36][n % 3];
+  return { dx: Math.round(Math.cos(a) * d), dy: Math.round(Math.sin(a) * d), s: [7, 5, 4][n % 3], delay: (n % 4) * 30 };
 });
 
 function Burst() {
@@ -227,7 +212,7 @@ function Burst() {
   return createPortal(
     <div className="burst pointer-events-none fixed inset-0 z-[60]" aria-hidden>
       {BURST.map((p, n) => (
-        <Spark key={`${b.id}-${n}`} style={{ left: b.x, top: b.y, width: p.s, height: p.s, animationDelay: `${p.delay}ms`, '--dx': `${p.dx}px`, '--dy': `${p.dy}px` } as CSSProperties} />
+        <span key={`${b.id}-${n}`} style={{ left: b.x, top: b.y, width: p.s, height: p.s, animationDelay: `${p.delay}ms`, '--dx': `${p.dx}px`, '--dy': `${p.dy}px` } as CSSProperties} />
       ))}
     </div>,
     document.body,
@@ -398,12 +383,7 @@ function AccountsSetup() {
 
 function OpenRouterSetup() {
   const st = useModels();
-  if (!st) return <Loading />;
-  return (
-    <div className="rounded-xl border border-line bg-panel px-3.5 py-3">
-      <OpenRouterBody st={st} />
-    </div>
-  );
+  return st ? <OpenRouterBody st={st} /> : <Loading />;
 }
 
 /** Parameters that roughly fit in this much memory at 4-bit, with room for the context. */
@@ -581,7 +561,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       width: 440,
       Extra: () => (
         <div className="stagger space-y-2.5">
-          <Feature i={0} icon={<Sparkles size={15} />}>
+          <Feature i={0} icon={<FolderOpen size={15} />}>
             Start an agent in any folder, with the model you like.
           </Feature>
           <Feature i={1} icon={<Eye size={15} />}>

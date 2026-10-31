@@ -262,26 +262,26 @@ html {
 }
 
 /* Loading: the app's mark at work (Throbber), whole from the first frame so even a short load shows
-   it: the prompt brightens as its spark grows and turns a quarter (a four-point star, so the loop is
-   seamless), and both settle again. */
+   it: the n brightens as its nugget lifts and swells a little, and both settle again. Custom's icon
+   does the same while it works. */
 .throbber {
   display: inline-block;
-  width: 1.25em;
+  width: 1em;
   height: 1em;
   vertical-align: -0.14em;
   flex-shrink: 0;
   overflow: visible;
 }
-.throbber-prompt {
-  animation: throb-prompt 1.1s ease-in-out infinite;
+.throbber-arch {
+  animation: throb-arch 1.1s ease-in-out infinite;
 }
-.throbber-spark {
-  fill: var(--accent);
+.throbber-nugget,
+.mark-working .mark-nugget {
   transform-box: fill-box;
-  transform-origin: 50% 50%;
-  animation: throb-spark 1.1s ease-in-out infinite;
+  transform-origin: 50% 100%;
+  animation: throb-nugget 1.1s ease-in-out infinite;
 }
-@keyframes throb-prompt {
+@keyframes throb-arch {
   0%,
   100% {
     opacity: 0.6;
@@ -290,15 +290,13 @@ html {
     opacity: 1;
   }
 }
-@keyframes throb-spark {
-  0% {
-    transform: rotate(0deg) scale(0.7);
+@keyframes throb-nugget {
+  0%,
+  100% {
+    transform: translateY(0) scale(0.84);
   }
   50% {
-    transform: rotate(45deg) scale(1.12);
-  }
-  100% {
-    transform: rotate(90deg) scale(0.7);
+    transform: translateY(-34%) scale(1.04);
   }
 }
 @keyframes throb-glow {
@@ -482,14 +480,12 @@ html {
 .spin-once {
   animation: spin-once 650ms cubic-bezier(0.3, 0.7, 0.3, 1);
 }
-/* The app mark's spark turns a little under the pointer. */
-.logo-spark {
-  transform-box: fill-box;
-  transform-origin: center;
-  transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+/* The app mark's nugget lifts a little under the pointer. */
+.logo-nugget {
+  transition: translate 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.group:hover .logo-spark {
-  transform: rotate(90deg) scale(1.1);
+.group:hover .logo-nugget {
+  translate: 0 -48px;
 }
 /* Something just arrived or got done: a small pop, a check that draws itself, a line through. */
 @keyframes pop-in {
@@ -558,6 +554,15 @@ html {
 }
 .anim-out {
   animation: slip-out 180ms ease-in both;
+}
+
+/* A model maker's initial (the OpenRouter search): its own hue, readable in both themes. */
+.org-mark {
+  background: hsl(var(--h) 45% 50% / 0.16);
+  color: hsl(var(--h) 50% 34%);
+}
+.dark .org-mark {
+  color: hsl(var(--h) 55% 72%);
 }
 
 /* Behind dialogs, drawers and the tour: the page dims and softens, so what is in front stands out. */
@@ -646,15 +651,16 @@ html {
     box-shadow: 0 0 0 26px color-mix(in srgb, var(--accent) 0%, transparent);
   }
 }
-/* The app mark arriving: the tile, the prompt drawn stroke by stroke, then the spark, which glints. */
+/* The app mark arriving, as Naget's film draws it: the tile, a speck of gold condensing into the nugget,
+   the n drawn around it, then the nugget dropping into place with a glow. */
 .hero-glow {
   position: absolute;
   inset: -55%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 42%, transparent), transparent);
+  background: radial-gradient(closest-side, color-mix(in srgb, #e2b94a 40%, transparent), transparent);
   animation:
-    hero-glow 1100ms 650ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
-    hero-breathe 4s 1.8s ease-in-out infinite;
+    hero-glow 1000ms 1500ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    hero-breathe 4s 2.6s ease-in-out infinite;
 }
 @keyframes hero-glow {
   from {
@@ -679,59 +685,67 @@ html {
     transform: scale(0.6) rotate(-6deg);
   }
 }
-.hero-prompt {
+.hero-arch {
   stroke-dasharray: 1 2;
   stroke-dashoffset: 1;
-  animation: hero-draw 700ms 300ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation: hero-draw 820ms 560ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
 }
 @keyframes hero-draw {
   to {
     stroke-dashoffset: 0;
   }
 }
-.hero-spark {
+/* It forms high under the arch, where the n is drawn around it, then falls and settles. */
+.hero-nugget {
   transform-box: fill-box;
   transform-origin: center;
   animation:
-    hero-spark 760ms 820ms cubic-bezier(0.22, 1.35, 0.36, 1) backwards,
-    hero-glint 4s 2.2s ease-in-out infinite;
+    nugget-form 560ms 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    nugget-drop 560ms 1380ms backwards;
 }
-@keyframes hero-spark {
+@keyframes nugget-form {
   from {
     opacity: 0;
-    transform: scale(0) rotate(-120deg);
+    scale: 0.15;
   }
 }
-/* A quarter turn: the four-point spark looks the same after it, so the loop has no seam. */
-@keyframes hero-glint {
+@keyframes nugget-drop {
   0% {
-    transform: none;
+    translate: 0 -96px;
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
   }
-  50% {
-    transform: scale(1.14) rotate(45deg);
+  70% {
+    translate: 0 0;
+    animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+  }
+  85% {
+    translate: 0 -12px;
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
   }
   100% {
-    transform: rotate(90deg);
+    translate: 0 0;
   }
 }
-.glint {
-  fill: var(--accent);
+/* Gold dust catching the light. */
+.dust {
+  background: radial-gradient(circle at 38% 34%, #fff3c4, #e2b94a 55%, #a07a1c);
+  box-shadow: 0 0 8px 1px color-mix(in srgb, #e2b94a 55%, transparent);
   opacity: 0;
-  animation: glint 3.4s ease-in-out infinite;
+  animation: dust 3.4s ease-in-out infinite;
 }
-@keyframes glint {
+@keyframes dust {
   0%,
   100% {
     opacity: 0;
-    transform: scale(0.2) rotate(0deg);
+    transform: scale(0.3);
   }
   40% {
     opacity: 0.95;
-    transform: scale(1) rotate(45deg);
+    transform: scale(1);
   }
   70% {
     opacity: 0;
-    transform: scale(0.4) rotate(90deg);
+    transform: scale(0.5);
   }
 }
 /* Soft light drifting slowly behind the mark (and behind the sign-in screens). */
@@ -799,25 +813,27 @@ html {
     transform: translate(12%, -20%) scale(1.25);
   }
 }
-/* Finishing the tour: a few sparks fly out of the button, and the message box glows, ready. */
-.burst > svg {
+/* Finishing the tour: gold dust flies out of the button, and the message box glows, ready. */
+.burst > span {
   position: fixed;
-  fill: var(--accent);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #fff3c4, #e2b94a 55%, #a07a1c);
+  box-shadow: 0 0 6px color-mix(in srgb, #e2b94a 60%, transparent);
   translate: -50% -50%;
   opacity: 0;
-  animation: burst 820ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: burst 860ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 @keyframes burst {
   0% {
     opacity: 0;
-    transform: translate(0, 0) scale(0.2) rotate(0deg);
+    transform: translate(0, 0) scale(0.3);
   }
   18% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translate(var(--dx), var(--dy)) scale(1) rotate(100deg);
+    transform: translate(var(--dx), var(--dy)) scale(1);
   }
 }
 .tour-invite {
@@ -851,10 +867,11 @@ html {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .throbber-prompt {
+  .throbber-arch {
     animation: none !important;
   }
-  .throbber-spark {
+  .throbber-nugget,
+  .mark-working .mark-nugget {
     animation: throb-glow 1.6s ease-in-out infinite !important;
   }
 }

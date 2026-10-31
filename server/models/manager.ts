@@ -152,7 +152,7 @@ export class ModelManager {
         keyHint: keyHint(c.openrouter.apiKey),
         pinned: c.openrouter.pinned.map((id) => {
           const p = this.pinnedInfo.get(id);
-          return p ? { id: p.id, label: p.label, provider: 'openrouter' as const, contextLength: p.contextLength, vision: p.vision, tools: p.tools, detail: p.price ? `$${fmt(p.price.input)} in · $${fmt(p.price.output)} out per M` : undefined } : { id: `openrouter/${id}`, label: id, provider: 'openrouter' as const };
+          return p ?? { id: `openrouter/${id}`, label: id, provider: 'openrouter' as const, detail: id };
         }),
       },
       ollama: { url: c.ollama.url, version: this.ollamaVersion ?? undefined },
@@ -205,7 +205,7 @@ export class ModelManager {
     return this.state();
   }
 
-  search = (q: string) => openrouter.search(q);
+  search = (o: openrouter.OrQuery) => openrouter.search(o);
 
   async inspect(input: string): Promise<HfInspect> {
     const v = vllm.findVllm(this.cfg.vllm.command);
@@ -345,4 +345,3 @@ function templateTools(dir: string): boolean {
   return false;
 }
 
-const fmt = (n: number) => (n >= 10 ? n.toFixed(0) : n >= 1 ? n.toFixed(2) : n.toFixed(3));

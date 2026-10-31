@@ -656,7 +656,12 @@ const models = new ModelManager((state) => broadcast({ t: 'models', state }));
 sessions.consoleOffers = () => ({ models: models.options(), modes: CONSOLE_MODES.map((m) => ({ value: m.id, label: m.name, description: m.description })), defaultMode: 'ask' });
 app.get('/api/models', async () => models.state());
 app.put('/api/models', async (req) => models.configure((req.body ?? {}) as Parameters<ModelManager['configure']>[0]));
-app.get('/api/models/openrouter', async (req) => ({ models: await models.search(String((req.query as Record<string, string>).q ?? '')) }));
+app.get('/api/models/openrouter', async (req) => {
+  const q = req.query as Record<string, string>;
+  const f = new Set(String(q.f ?? '').split(','));
+  const sort = (['match', 'new', 'price', 'context'] as const).find((s) => s === q.sort);
+  return { models: await models.search({ q: String(q.q ?? ''), sort, tools: f.has('tools'), vision: f.has('vision'), reasoning: f.has('reasoning'), free: f.has('free') }) };
+});
 /** What a Hugging Face model is, and whether (and how) it would run here, before anything downloads. */
 app.post('/api/models/inspect', async (req) => models.inspect(String((req.body as { input?: string } | undefined)?.input ?? '')));
 app.post('/api/models/install', async (req) => {
