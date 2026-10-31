@@ -2,8 +2,8 @@
 // submenus that open in its place: Folder and code, Session settings and More. Features add their items
 // through the registry, each saying which part they go in.
 import { useState, type ReactNode, type RefObject } from 'react';
-import { AlarmClock, Archive, CheckCheck, CircleEllipsis, Copy, FileDiff, FileText, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
-import type { SessionSummary } from '@shared/types';
+import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FileText, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
+import type { Agent, SessionSummary } from '@shared/types';
 import { del, enc, post } from '../../lib/api';
 import { activityOf, isBusy } from '../../lib/activity';
 import { setFlags, settle } from '../../lib/flags';
@@ -16,6 +16,7 @@ import { deleteDialog } from '../sessions/SessionList';
 import { SnoozeItems } from '../sessions/SnoozeMenu';
 import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { openTerminalAt } from '../terminal/TerminalPanel';
+import { continueIn } from './Composer';
 import { GoalDialog } from './GoalBar';
 import { ShareDialog } from './ShareDialog';
 import { WorktreeDialog } from './WorktreeDialog';
@@ -60,6 +61,8 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
   const working = running && isBusy(activityOf(s));
   // Custom (the app's own agent) forks and keeps goals like Claude Code and Codex; other ACP agents do not.
   const custom = s.agent === 'acp' && s.acpAgent === 'console';
+  // Claude Code and Codex hand the conversation to each other (a Codex session open elsewhere is read-only here).
+  const other: Agent | null = s.agent === 'claude' ? 'codex' : s.agent === 'codex' && (running || !s.external) ? 'claude' : null;
   const resumeCmd = s.agent === 'claude' ? `cd ${s.cwd ?? '~'} && claude --resume ${s.id}` : `codex resume ${s.id}`;
 
   let items: ReactNode;
@@ -181,6 +184,11 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
         {!s.external && (s.agent !== 'acp' || custom) && (
           <MenuItem icon={<GitFork size={15} />} onClick={() => (close(), onFork())}>
             Fork…
+          </MenuItem>
+        )}
+        {other && (
+          <MenuItem icon={<ArrowRightLeft size={15} />} onClick={() => (close(), continueIn(s.key, other))}>
+            Continue in {agentName(other)}…
           </MenuItem>
         )}
         {!s.goal && !s.external && (s.agent !== 'acp' || custom) && (

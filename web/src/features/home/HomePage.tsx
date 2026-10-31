@@ -361,19 +361,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
         <SettingLayout.Provider value="bare">
           <div data-tour="start-bar" className="flex flex-wrap items-center gap-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
             <AgentPicker label="Agent" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} />
-            <ModelPicker
-              label="Model"
-              agent={agent}
-              acp={acpId ?? undefined}
-              value={model}
-              agents={agent === 'acp' ? undefined : ['claude', 'codex']}
-              onChange={(v, a) => {
-                if (a === agent) return (setModel(v), keepRun({ model: v }));
-                // Another agent's model: that agent, with it.
-                saveStart({ runs: { [a]: { model: v } } });
-                chooseAgent(a, null);
-              }}
-            />
+            <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} />
             <WorkFolderChip
               value={cwd}
               task={task}
