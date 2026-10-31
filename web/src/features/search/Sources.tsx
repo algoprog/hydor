@@ -8,6 +8,8 @@ import { useTimeline } from '../../lib/store';
 import { cx } from '../../components/ui';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** A page without a title by its address: "cnbc.com/2026/10/31/binance-hack.html". */
+const addressOf = (url: string) => url.replace(/^[a-z]+:\/\/(www\.)?/i, '').replace(/\/$/, '');
 
 export function SourcesNote({ note, sessionKey }: { note: SessionNote; sessionKey: string }) {
   const d = note.data as SourcesData | null;
@@ -47,8 +49,8 @@ export function SourcesNote({ note, sessionKey }: { note: SessionNote; sessionKe
               <div className="pb-1 text-[11.5px] font-medium text-fg-3">Pages read</div>
               {pages.map((p) => (
                 <a key={p.url} href={p.url} target="_blank" rel="noopener noreferrer" className="group/l flex min-w-0 items-baseline gap-2 py-1">
-                  <span className="min-w-0 truncate text-[13px] text-fg group-hover/l:text-accent group-hover/l:underline">{p.title || siteOf(p.url)}</span>
-                  <span className="shrink-0 text-[11.5px] text-fg-3">{siteOf(p.url)}</span>
+                  <span className="min-w-0 truncate text-[13px] text-fg group-hover/l:text-accent group-hover/l:underline">{p.title || addressOf(p.url)}</span>
+                  {p.title && <span className="shrink-0 text-[11.5px] text-fg-3">{siteOf(p.url)}</span>}
                   {p.question && <span className="hidden min-w-0 truncate text-[11.5px] text-fg-3 sm:inline">· “{p.question}”</span>}
                 </a>
               ))}
@@ -63,8 +65,11 @@ export function SourcesNote({ note, sessionKey }: { note: SessionNote; sessionKe
                     <Search size={11} className="shrink-0 translate-y-[1px] text-fg-3" />
                     <span className="min-w-0 truncate text-[13px] text-fg-2">{s.query}</span>
                     <span className="shrink-0 text-[11.5px] text-fg-3">
-                      <span className="max-sm:hidden">{s.provider} · </span>
-                      {plural(s.count, 'result')}
+                      <span className="max-sm:hidden">
+                        {s.provider}
+                        {s.count > 0 && ' · '}
+                      </span>
+                      {s.count > 0 && plural(s.count, 'result')}
                     </span>
                   </div>
                   {s.top.length > 0 && (
