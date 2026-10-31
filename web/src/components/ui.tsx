@@ -1,9 +1,11 @@
 import { clsx } from 'clsx';
 import { Check, ChevronDown, X } from 'lucide-react';
+import { ARCH, GoldGradient, MARK_BOX, NUGGET } from './Logo';
 import {
   forwardRef,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -64,13 +66,17 @@ export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTM
   },
 );
 
-/** Loading: the app's mark at work, whole from the first frame; its spark twinkles and turns.
+/** Loading: the app's mark at work, whole from the first frame; its nugget lifts and glows.
  * As tall as the text around it unless given a size (in px, for a page that is loading). */
 export function Throbber({ className, size }: { className?: string; size?: number }) {
+  const id = useId();
   return (
-    <svg viewBox="100 124 352 284" className={cx('throbber', className)} style={size ? { width: size, height: size * 0.81 } : undefined} aria-hidden>
-      <path className="throbber-prompt" d="M140 162L250 256L140 350" fill="none" stroke="currentColor" strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
-      <path className="throbber-spark" d="M356 216Q371 285 440 300Q371 315 356 384Q341 315 272 300Q341 285 356 216Z" />
+    <svg viewBox={MARK_BOX} className={cx('throbber', className)} style={size ? { width: size, height: size } : undefined} aria-hidden>
+      <defs>
+        <GoldGradient id={id} />
+      </defs>
+      <path className="throbber-arch" d={ARCH} fill="none" stroke="currentColor" strokeWidth="66" />
+      <circle className="throbber-nugget" {...NUGGET} fill={`url(#${id})`} />
     </svg>
   );
 }

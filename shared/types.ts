@@ -1060,6 +1060,25 @@ export interface ModelEntry {
   detail?: string;
 }
 
+/** A model in OpenRouter's catalog, with what the search shows about it. */
+export interface OpenRouterModel extends ModelEntry {
+  /** Dollars per million tokens, in and out. */
+  price?: { input: number; output: number };
+  /** When OpenRouter listed it (ms). */
+  created?: number;
+  /** What its maker says it is for, as plain text. */
+  description?: string;
+  /** The longest reply it gives, in tokens. */
+  maxOutput?: number;
+  /** It can think before it answers. */
+  reasoning?: boolean;
+  /** Its maker, as OpenRouter names it ("DeepSeek"). */
+  org?: string;
+}
+
+/** How the OpenRouter search orders what it finds. */
+export type OpenRouterSort = 'match' | 'new' | 'price' | 'context';
+
 export interface MachineInfo {
   gpus: { index: number; name: string; totalBytes: number; freeBytes: number }[];
   ramBytes: number;
@@ -1149,7 +1168,7 @@ export interface ModelDownload {
 }
 
 export interface ModelsState {
-  openrouter: { keyHint?: string; pinned: ModelEntry[] };
+  openrouter: { keyHint?: string; pinned: OpenRouterModel[] };
   ollama: { url: string; version?: string };
   vllm: { command?: string; path?: string; version?: string };
   endpoints: { id: string; name: string; baseUrl: string; keyHint?: string; models: string[] }[];

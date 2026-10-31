@@ -26,7 +26,8 @@ long conversation to stay within the model's context.
 
 Its models come from Settings → Models:
 
-- **OpenRouter**: add a key, then pin the models to offer.
+- **OpenRouter**: add a key, then search its catalog (each model's maker, context, longest reply, price,
+  release date, and whether it reasons, sees images or calls tools; filter and sort) and add the models to offer.
 - **Ollama**: the models of an Ollama server, with GGUF weights pulled straight from Hugging Face.
 - **vLLM**: Hugging Face models downloaded here and served on a GPU, started when a session first uses them.
 - **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, another provider).
