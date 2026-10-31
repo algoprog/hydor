@@ -119,7 +119,7 @@ function MobileDrawer() {
       <div
         inert={!rest}
         className={cx(
-          'fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[340px] transition-[translate,box-shadow] duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-[translate] motion-reduce:transition-none',
+          'fixed inset-y-0 left-0 z-40 w-full transition-[translate,box-shadow] duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-[translate] motion-reduce:transition-none',
           open ? 'translate-x-0 shadow-lg' : '-translate-x-full',
         )}
       >

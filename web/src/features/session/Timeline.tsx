@@ -552,6 +552,8 @@ export function Timeline({
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const [showLatest, setShowLatest] = useState(false);
+  // The conversation has scrolled under the header: a fade there.
+  const [under, setUnder] = useState(false);
   // Follow the end until the reader scrolls up by their own hand; follow again once they come
   // back down to it. New output, late layout and reconnects never take over the scroll.
   const stick = useRef(true);
@@ -695,6 +697,7 @@ export function Timeline({
     const el = scroller.current;
     if (!el) return;
     const top = el.scrollTop;
+    setUnder(top > 2);
     const own = ownTop.current !== null && Math.abs(top - ownTop.current) < 2;
     ownTop.current = null;
     const dist = el.scrollHeight - top - el.clientHeight;
@@ -749,6 +752,10 @@ export function Timeline({
   let prevDay = '';
   return (
     <div className="relative min-h-0 flex-1">
+      <div
+        aria-hidden
+        className={cx('pointer-events-none absolute inset-x-0 top-0 z-[2] h-8 bg-gradient-to-b from-bg via-bg/60 to-transparent transition-opacity duration-300', under ? 'opacity-100' : 'opacity-0')}
+      />
       <div
         ref={scroller}
         onScroll={onScroll}
