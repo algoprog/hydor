@@ -756,6 +756,8 @@ export function Timeline({
         aria-hidden
         className={cx('pointer-events-none absolute inset-x-0 top-0 z-[2] h-8 bg-gradient-to-b from-bg via-bg/60 to-transparent transition-opacity duration-300', under ? 'opacity-100' : 'opacity-0')}
       />
+      {/* A pixel below the fade's top: where the header ends between device pixels, the scroller's edge and the
+          fade round to different rows, and a line of the conversation would show above the fade. */}
       <div
         ref={scroller}
         onScroll={onScroll}
@@ -805,7 +807,7 @@ export function Timeline({
           if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') unstick();
           else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'End' || e.key === ' ') dir.current = 1;
         }}
-        className="absolute inset-0 overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none]"
+        className="absolute inset-x-0 top-px bottom-0 overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none]"
       >
         <QuoteSelection />
         <FollowCtx.Provider value={following}>
