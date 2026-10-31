@@ -27,6 +27,7 @@ import { ConnectSettings } from './ConnectSettings';
 import { AcpSettings } from './AcpSettings';
 import { machineId } from '../../lib/machine';
 import { pointAt } from '../../lib/pointAt';
+import { openReleaseNotes } from './Releases';
 import { MachineSettings } from './MachineSettings';
 
 /** A built-in section, or one of a capability's (registry.tsx) by its id. */
@@ -414,7 +415,12 @@ function GeneralSettings() {
       </Section>
       <Section title="About">
         <div className="space-y-1.5 text-[13px] leading-relaxed text-fg-3">
-          <div className="text-fg-2">Naget Agent {boot?.version}</div>
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            <span className="text-fg-2">Naget Agent {boot?.version}</span>
+            <button onClick={() => openReleaseNotes(boot?.version)} className="text-accent hover:underline">
+              Release notes
+            </button>
+          </div>
           <UpdateLine />
           <div>
             Sessions run as your user through the installed Claude Code and Codex. History comes from <span className="font-mono text-[12px]">~/.claude/projects</span> and{' '}

@@ -13,9 +13,10 @@ import { images } from '../images/index.ts';
 import { memory } from '../memory/index.ts';
 import { opinion } from '../opinion/index.ts';
 import { pages } from '../pages/index.ts';
+import { releaseNotes } from '../releases/index.ts';
 import { search } from '../search/index.ts';
 import { skillpack } from '../skillpack/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, children, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, custom, find];
+export const FEATURES: Feature[] = [pages, search, browser, memory, children, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, custom, find, releaseNotes];

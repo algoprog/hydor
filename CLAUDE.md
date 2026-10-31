@@ -1,5 +1,18 @@
 # Notes for agents working on Naget Agent
 
+## Releases: every version has its release notes
+
+Each version has notes in `CHANGELOG.md`, newest first, and the app shows them (Settings → General →
+Release notes, the search box, and a "What's new" note once after an update). When you make a new version:
+
+1. Set it in `package.json` and both places at the top of `package-lock.json`.
+2. Add its section at the top of `CHANGELOG.md`: a `## x.y.z · D Month YYYY` heading, one line that sums
+   the version up, then bullets in plain words on what changed for the people using it (not file names).
+   Write them from the commits since the last version (`git log --oneline <last release>..HEAD`).
+3. Commit it as `x.y.z: what it brings` (the repository's release commits look like that).
+
+`server/releases/releases-test.ts` fails while the version in `package.json` has no notes at the top.
+
 ## Search embeddings: keep the shipped vectors current
 
 The search box (Ctrl+K) and memory find things by meaning with an embedding model that runs on the user's
