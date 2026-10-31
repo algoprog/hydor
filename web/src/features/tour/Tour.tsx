@@ -185,7 +185,7 @@ const STEPS: Step[] = [
     target: 'start-bar',
     route: '/',
     title: 'Pick an agent and a folder',
-    body: 'Choose Claude Code or Codex, and the folder on this computer it should work in. The CLAUDE.md / AGENTS.md button opens the standing instructions the agent reads there.',
+    body: 'Choose the agent (Claude Code, Codex, Console with any model, or one you added) and the folder on this computer it should work in. The CLAUDE.md / AGENTS.md button opens the standing instructions the agent reads there.',
   },
   {
     id: 'composer',

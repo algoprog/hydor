@@ -13,7 +13,7 @@ import { AgentIcon } from '../../components/AgentIcon';
 import { EffortPicker, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
 import { FolderChip } from '../../components/FolderPicker';
-import { cx, IconButton, Segmented, useIsMobile } from '../../components/ui';
+import { cx, IconButton, useIsMobile } from '../../components/ui';
 import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { NavButton } from '../layout/PageHeader';
 import { ActivityText, folderName, sortActive } from '../sessions/SessionList';
@@ -21,7 +21,7 @@ import { TodayStrip } from '../stats/StatsPage';
 import { LimitBanner } from '../usage/LimitReset';
 import { useComposerMenu } from '../../components/ComposerMenu';
 import { AccountPicker } from './AccountPicker';
-import { MoreAgents } from './MoreAgents';
+import { AgentPicker } from './AgentPicker';
 import { machineId } from '../../lib/machine';
 
 function lastAgent(): Agent {
@@ -154,25 +154,14 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     <div>
       <div data-tour="start-bar" className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
-          <Segmented
-            value={agent === 'acp' ? ('' as Agent) : agent}
-            onChange={(a) => {
-              picked.current = null;
-              setAcpId(null);
-              setAgent(a);
-            }}
-            options={[
-              { value: 'claude', label: 'Claude Code', icon: <AgentIcon agent="claude" size={14} /> },
-              { value: 'codex', label: 'Codex', icon: <AgentIcon agent="codex" size={14} /> },
-            ]}
-          />
-          <MoreAgents
-            list={acpList ?? []}
-            value={agent === 'acp' ? acpId : null}
-            onPick={(id) => {
+          <AgentPicker
+            agent={agent}
+            acpId={acpId}
+            acpList={acpList ?? []}
+            onPick={(a, id) => {
               picked.current = null;
               setAcpId(id);
-              setAgent('acp');
+              setAgent(a);
             }}
           />
         </div>
@@ -260,7 +249,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
             e.preventDefault();
             attach(files);
           }}
-          placeholder={`Describe a task for ${agent === 'claude' ? 'Claude' : 'Codex'}, ask a question, or paste an error…`}
+          placeholder="Describe a task, ask a question, or paste an error…"
           className="block w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[15.5px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none"
         />
         <div className="flex items-center gap-1 px-2.5 pb-2.5">
@@ -390,7 +379,7 @@ export function HomePage() {
         <div className="mx-auto w-full max-w-[760px] px-4 pb-12 sm:px-6">
           <div className={cx('anim-in text-center', mobile ? 'pt-3' : 'pt-[11vh]')}>
             <h1 className="text-[23px] font-semibold tracking-tight sm:text-[30px]">What should we work on?</h1>
-            <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">Start a Claude Code or Codex session in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}.</p>
+            <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">Start an agent in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}: Claude Code, Codex, or any model.</p>
           </div>
           <div className="anim-in mt-6 [animation-delay:70ms] sm:mt-8">
             <StartComposer key={search} initialCwd={initialCwd} link={link} />
