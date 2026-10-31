@@ -264,14 +264,18 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, drag 
         e.preventDefault();
         onMenu(s, e.currentTarget);
       }}
-      className={cx('cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50', drag.lifted && 'opacity-40')}
+      className={cx(
+        // Rows off screen are not laid out or painted (a long list scrolls without that work).
+        'cursor-default rounded-[10px] outline-none select-none [contain-intrinsic-size:auto_56px] [content-visibility:auto] [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50',
+        drag.lifted && 'opacity-40',
+      )}
     >
       <RowBody s={s} active={active} home={home} renaming={renaming} onRename={onRename} onDelete={onDelete} />
     </div>
   );
 }
 
-function SortableRow(p: RowProps) {
+const SortableRow = memo(function SortableRow(p: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: p.s.key, disabled: p.renaming });
   return (
     <RowShell
@@ -279,13 +283,13 @@ function SortableRow(p: RowProps) {
       drag={{ ref: setNodeRef, style: { transform: CSS.Transform.toString(transform), transition }, attrs: { ...attributes, ...(listeners as HTMLAttributes<HTMLDivElement>) }, lifted: isDragging }}
     />
   );
-}
+});
 
 /** A dated row: it can be dropped on Pinned to pin it, but dated groups keep their order. */
-function DraggableRow(p: RowProps) {
+const DraggableRow = memo(function DraggableRow(p: RowProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: p.s.key, disabled: p.renaming });
   return <RowShell {...p} drag={{ ref: setNodeRef, attrs: { ...attributes, ...(listeners as HTMLAttributes<HTMLDivElement>) }, lifted: isDragging }} />;
-}
+});
 
 function PinZone({ hot }: { hot: boolean }) {
   const { setNodeRef } = useDroppable({ id: PIN_ZONE });

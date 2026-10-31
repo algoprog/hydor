@@ -2,8 +2,8 @@
 // instruction files, MCP servers, skills and plugins). A menu of sections beside the open one on
 // wide screens; on phones a list, each section on its own page.
 import { useEffect, useState, type ReactNode } from 'react';
-import { Bell, Blocks, Bot, Cable, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
-import type { AccountStatus, Agent, AgentAccount, LoginFlow, UpdateState } from '@shared/types';
+import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
+import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, UpdateState } from '@shared/types';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -18,6 +18,7 @@ import { followUpPref, type FollowUp } from '../session/Composer';
 import { InstructionsSettings, McpSettings, PluginsSettings, SkillsSettings } from './AgentSettings';
 import { startTour } from '../tour/Tour';
 import { TasksSettings } from './TasksSettings';
+import { ModelsSettings } from './ModelsSettings';
 import { ThemeSettings } from './Themes';
 import { ScmSettings } from './ScmSettings';
 import { ConnectSettings } from './ConnectSettings';
@@ -25,7 +26,7 @@ import { AcpSettings } from './AcpSettings';
 import { machineId } from '../../lib/machine';
 import { MachineSettings } from './MachineSettings';
 
-export type SettingsSection = 'general' | 'notifications' | 'security' | 'scm' | 'connect' | 'machines' | 'accounts' | 'agents' | 'instructions' | 'mcp' | 'skills' | 'plugins' | 'tasks';
+export type SettingsSection = 'general' | 'notifications' | 'security' | 'scm' | 'connect' | 'machines' | 'accounts' | 'agents' | 'models' | 'instructions' | 'mcp' | 'skills' | 'plugins' | 'tasks';
 
 interface SectionDef {
   id: SettingsSection;
@@ -53,6 +54,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
     items: [
       { id: 'accounts', label: 'Accounts', icon: UserRound, sub: 'The Claude Code and Codex sign-ins every session uses' },
       { id: 'agents', label: 'More agents', icon: Bot, sub: 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP' },
+      { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Console: OpenRouter, Ollama, and Hugging Face models run here with vLLM' },
       { id: 'instructions', label: 'Instructions', icon: FileText, sub: 'CLAUDE.md and AGENTS.md: what the agents read at the start of every session', folder: true },
       { id: 'mcp', label: 'MCP servers', icon: Plug, sub: 'Tools the agents can call', folder: true },
       { id: 'skills', label: 'Skills', icon: Sparkles, sub: 'Know-how the agents load when a task calls for it', folder: true },
@@ -726,9 +728,58 @@ function AccountSettings() {
           </div>
         )}
       </Section>
+      <AgentPrograms />
       <AddAgentAccount open={adding} onClose={() => setAdding(false)} onAdded={load} />
       {confirmNode}
     </div>
+  );
+}
+
+const SOURCE: Record<ClientInfo['source'], string> = {
+  yours: 'your own install',
+  app: 'installed by the app, kept up to date',
+  bundled: 'comes with the app, kept up to date',
+  missing: 'not here: installs by itself when you first use it',
+};
+
+/** The agents' programs on this machine: whose they are and which version. */
+function AgentPrograms() {
+  const [list, setList] = useState<ClientInfo[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => {
+    api<{ clients: ClientInfo[] }>('/api/clients').then((r) => setList(r.clients), toastError);
+  }, []);
+  const install = async (c: ClientInfo) => {
+    setBusy(c.id);
+    try {
+      setList((await post<{ clients: ClientInfo[] }>(`/api/clients/${c.id}/install`)).clients);
+      toast(`${c.name} is installed`, 'ok');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+  if (!list) return null;
+  return (
+    <Section title="Agent programs" sub="The command-line agents the sessions run. Missing ones install by themselves (with npm, in the app’s own folder); those the app installed update daily.">
+      <div className="-my-2 divide-y divide-line">
+        {list.map((c) => (
+          <div key={c.id} className="flex items-center gap-3 py-2.5 text-[13px]">
+            <span className="w-28 shrink-0 font-medium">{c.name}</span>
+            <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg-3" title={c.path}>
+              {c.version ? `${c.version} · ` : ''}
+              {SOURCE[c.source]}
+            </span>
+            {c.source === 'missing' && (
+              <Button size="sm" variant="secondary" disabled={busy === c.id || c.installing} icon={busy === c.id || c.installing ? <Throbber /> : undefined} onClick={() => install(c)}>
+                Install
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 
@@ -808,6 +859,8 @@ function SectionBody({ id, cwd, agent, onAgent }: { id: SettingsSection; cwd: st
       return <AccountSettings />;
     case 'agents':
       return <AcpSettings />;
+    case 'models':
+      return <ModelsSettings />;
     case 'instructions':
       return <InstructionsSettings cwd={cwd} agent={agent} onAgent={onAgent} />;
     case 'mcp':

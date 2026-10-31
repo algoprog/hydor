@@ -9,6 +9,7 @@ import { config, paths } from '../config.ts';
 import { agentBaseEnv } from '../env.ts';
 import { LineSplitter } from '../runner/frames.ts';
 import { claudeModels } from './claude.ts';
+import { ensureClaude } from '../clients.ts';
 import { claimClaudeReset, claudeOauthAccount, claudeResets } from './claudeResets.ts';
 import { codexEnv, codexModels } from './codex.ts';
 import { RpcPeer } from './rpc.ts';
@@ -484,6 +485,8 @@ export class ClaudeControl extends EventEmitter {
 
   /** `claude auth login` in a pseudo-terminal: show its URL, then type the code the user pastes. */
   async startLogin(method: 'claudeai' | 'console'): Promise<LoginFlow> {
+    // Signing in needs Claude Code: installed now when it is not here.
+    await ensureClaude();
     for (const f of this.flows.values()) if (f.term && (f.state === 'waiting' || f.state === 'starting')) this.cancelLogin(f.id);
     const id = crypto.randomBytes(8).toString('hex');
     const flow: LoginFlow & { term?: pty.IPty; buf?: string } = { id, agent: 'claude', method, state: 'starting', buf: '' };

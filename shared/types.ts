@@ -13,6 +13,8 @@ export interface AcpAgentDef {
   env?: Record<string, string>;
   /** How to install it (presets). */
   hint?: string;
+  /** Console, the app's own agent: always there, not removable. */
+  builtin?: boolean;
 }
 
 export type ItemStatus = 'pending' | 'running' | 'ok' | 'error' | 'declined' | 'interrupted' | 'waiting';
@@ -718,6 +720,7 @@ export interface SystemInfo {
 export type ServerEvent =
   | { t: 'hello'; version: string; build?: string }
   | { t: 'update'; update: UpdateState | null }
+  | { t: 'models'; state: ModelsState }
   | { t: 'sessions'; upsert: SessionSummary[]; remove?: string[] }
   | { t: 'items'; key: string; items: TimelineItem[]; total: number; reset?: boolean }
   | { t: 'live'; key: string; live: LiveState | null; overlay: LiveOverlay }
@@ -951,6 +954,16 @@ export interface SetupResult {
   output: string;
 }
 
+/** An agent's own program (Claude Code, Codex, Gemini CLI…): yours, installed by the app, bundled with it, or missing. */
+export interface ClientInfo {
+  id: string;
+  name: string;
+  source: 'yours' | 'app' | 'bundled' | 'missing';
+  version?: string;
+  path?: string;
+  installing?: boolean;
+}
+
 /** How the last update went. */
 export interface UpdateResult {
   ok: boolean;
@@ -980,4 +993,141 @@ export interface UpdateState {
   canRestart: boolean;
   running?: { phase: 'pull' | 'install' | 'build' | 'restart'; since: number; auto: boolean };
   last?: UpdateResult;
+}
+
+// ---- models for Console, the app's own agent ---------------------------------------------------------
+
+export type ModelProvider = 'openrouter' | 'ollama' | 'vllm' | 'endpoint';
+
+/** A model Console can run, as its agent process reads it (models/agent.json, on the server only). */
+export interface AgentModel {
+  id: string;
+  label: string;
+  provider: ModelProvider;
+  /** An OpenAI-compatible API ("…/v1"); empty for a vLLM model whose server is not up yet. */
+  baseUrl: string;
+  apiKey?: string;
+  /** The name that API takes. */
+  model: string;
+  contextLength?: number;
+  /**
+   * native: the server returns tool_calls. template: the model's chat template shows it the tools (sent
+   * with tool_choice "none") and its calls are read from the reply's text. text: tools are described in
+   * the prompt, calls read from the text.
+   */
+  tools: 'native' | 'template' | 'text';
+  vision?: boolean;
+  headers?: Record<string, string>;
+  /** A server that starts when the model is used (vLLM). */
+  start?: boolean;
+}
+
+export interface ModelEntry {
+  id: string;
+  label: string;
+  provider: ModelProvider;
+  contextLength?: number;
+  vision?: boolean;
+  tools?: 'native' | 'template' | 'text';
+  detail?: string;
+}
+
+export interface MachineInfo {
+  gpus: { index: number; name: string; totalBytes: number; freeBytes: number }[];
+  ramBytes: number;
+  ramFreeBytes: number;
+  diskFreeBytes: number;
+  cpus: number;
+}
+
+/** Whether a model runs well here: where, the memory it needs, roughly how fast. */
+export interface ModelFit {
+  verdict: 'good' | 'slow' | 'tight' | 'no';
+  where: 'gpu' | 'cpu' | 'none';
+  gpu?: number;
+  needBytes: number;
+  tokensPerSec?: number;
+  downloadBytes: number;
+  params?: number;
+  notes: string[];
+}
+
+/** One quantization of a GGUF repository, as Ollama pulls it. */
+export interface HfQuant {
+  tag: string;
+  sizeBytes: number;
+  ollamaName: string;
+  fit: ModelFit;
+}
+
+/** What a Hugging Face repository holds, and how it would install and run here. */
+export interface HfInspect {
+  repo: string;
+  gated?: string;
+  pipeline?: string;
+  arch?: string;
+  modelType?: string;
+  contextLength?: number;
+  params?: number;
+  vision?: boolean;
+  customCode?: boolean;
+  kind: 'safetensors' | 'gguf' | 'other';
+  quants: HfQuant[];
+  downloadBytes: number;
+  vllm?: { supported: boolean | null; reason?: string; fit: ModelFit };
+  /** The same model as GGUF, for Ollama. */
+  ggufRepo?: string;
+}
+
+export interface VllmServer {
+  repo: string;
+  port: number;
+  pid: number;
+  gpu: number;
+  util: number;
+  maxLen: number;
+  parser?: string;
+  startedAt: number;
+  log: string;
+  state: 'starting' | 'ready' | 'failed';
+  error?: string;
+}
+
+/** A model on this machine: downloaded for vLLM, or in Ollama. */
+export interface LocalModel {
+  id: string;
+  repo: string;
+  runtime: 'vllm' | 'ollama';
+  sizeBytes: number;
+  arch?: string;
+  detail?: string;
+  vision?: boolean;
+  supported?: boolean | null;
+  reason?: string;
+  server?: Pick<VllmServer, 'state' | 'port' | 'gpu' | 'error' | 'startedAt' | 'util' | 'maxLen'>;
+  installedAt?: number;
+}
+
+export interface ModelDownload {
+  key: string;
+  name: string;
+  target: 'vllm' | 'ollama';
+  doneBytes: number;
+  totalBytes: number;
+  status: 'running' | 'done' | 'failed' | 'cancelled';
+  error?: string;
+  detail?: string;
+  startedAt: number;
+}
+
+export interface ModelsState {
+  openrouter: { keyHint?: string; pinned: ModelEntry[] };
+  ollama: { url: string; version?: string };
+  vllm: { command?: string; path?: string; version?: string };
+  endpoints: { id: string; name: string; baseUrl: string; keyHint?: string; models: string[] }[];
+  hfTokenHint?: string;
+  local: LocalModel[];
+  downloads: ModelDownload[];
+  machine: MachineInfo;
+  storage: { usedBytes: number; freeBytes: number };
 }

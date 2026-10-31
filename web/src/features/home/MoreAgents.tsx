@@ -29,7 +29,7 @@ export function MoreAgents({ list, value, onPick }: { list: AcpAgentDef[]; value
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={250}>
         {list.length ? (
-          list.map((a) => <OptionRow key={a.id} icon={<AgentIcon agent="acp" name={a.name} size={14} />} label={a.name} hint={[a.command, ...a.args].join(' ')} selected={a.id === value} onClick={() => (onPick(a.id), setOpen(false))} />)
+          list.map((a) => <OptionRow key={a.id} icon={<AgentIcon agent="acp" name={a.name} size={14} />} label={a.name} hint={a.builtin ? 'Any model: OpenRouter, Ollama, or vLLM here' : [a.command, ...a.args].join(' ')} selected={a.id === value} onClick={() => (onPick(a.id), setOpen(false))} />)
         ) : (
           <div className="px-2.5 py-2 text-[12.5px] leading-relaxed text-fg-3">Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP can run here too.</div>
         )}

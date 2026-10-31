@@ -11,7 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AcpAgentDef, ApprovalOption, ModelOption } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
-import { config } from '../config.ts';
+import { APP_ROOT, config } from '../config.ts';
+import { AGENT_FILE, MODELS_DIR } from '../models/config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
@@ -34,13 +35,27 @@ export const ACP_PRESETS: AcpAgentDef[] = [
 
 // ---- the list of agents ---------------------------------------------------------------------------
 
+/** Console, the app's own agent (server/agent): any model from Settings → Models. */
+export const CONSOLE_ID = 'console';
+const consoleDef = (): AcpAgentDef => ({
+  id: CONSOLE_ID,
+  name: 'Console',
+  command: process.execPath,
+  args: [path.join(APP_ROOT, 'dist/server/agent.js')],
+  env: { AGENT_CONSOLE_MODELS: AGENT_FILE, AGENT_CONSOLE_STATE: path.join(MODELS_DIR, 'sessions') },
+  hint: 'Built in: models from OpenRouter, Ollama and vLLM, in Settings → Models',
+  builtin: true,
+});
+
 export function acpAgents(db: DB): AcpAgentDef[] {
+  let mine: AcpAgentDef[] = [];
   try {
-    return JSON.parse(kvGet(db, 'acp_agents') ?? '[]');
-  } catch {
-    return [];
-  }
+    mine = JSON.parse(kvGet(db, 'acp_agents') ?? '[]');
+  } catch {}
+  return [consoleDef(), ...mine.filter((a) => a.id !== CONSOLE_ID)];
 }
+
+const ownAgents = (db: DB) => acpAgents(db).filter((a) => !a.builtin);
 
 export function acpAgent(db: DB, id: string | undefined): AcpAgentDef {
   const a = acpAgents(db).find((x) => x.id === id);
@@ -56,13 +71,15 @@ export function saveAcpAgent(db: DB, d: Partial<AcpAgentDef>): AcpAgentDef {
   const args = Array.isArray(d.args) ? d.args.map(String).filter((a) => a.length) : [];
   const env = d.env && typeof d.env === 'object' ? Object.fromEntries(Object.entries(d.env).filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k)).map(([k, v]) => [k, String(v)])) : undefined;
   const id = d.id && /^[a-z0-9-]{1,40}$/.test(d.id) ? d.id : `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'agent'}-${crypto.randomBytes(2).toString('hex')}`;
+  if (id === CONSOLE_ID) throw new HttpError(400, 'Console is built in');
   const def: AcpAgentDef = { id, name, command, args, env };
-  kvSet(db, 'acp_agents', JSON.stringify([...acpAgents(db).filter((a) => a.id !== id), def]));
+  kvSet(db, 'acp_agents', JSON.stringify([...ownAgents(db).filter((a) => a.id !== id), def]));
   return def;
 }
 
 export function removeAcpAgent(db: DB, id: string) {
-  kvSet(db, 'acp_agents', JSON.stringify(acpAgents(db).filter((a) => a.id !== id)));
+  if (id === CONSOLE_ID) throw new HttpError(400, 'Console is built in');
+  kvSet(db, 'acp_agents', JSON.stringify(ownAgents(db).filter((a) => a.id !== id)));
 }
 
 /** The command's full path when it is installed (on PATH or given as a path). */

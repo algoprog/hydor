@@ -6,6 +6,7 @@ const entries = {
   runner: 'server/runner/runner.ts',
   'index-worker': 'server/indexer/worker.ts',
   cli: 'server/cli.ts',
+  agent: 'server/agent/main.ts',
 };
 const only = process.argv.slice(2);
 

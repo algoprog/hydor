@@ -66,6 +66,8 @@ export function agentBaseEnv(): Record<string, string> {
   }
   const local = path.join(user.homedir, '.local/bin');
   if (!(env.PATH ?? '').split(':').includes(local)) env.PATH = `${local}:${env.PATH ?? '/usr/bin:/bin'}`;
+  // Agents' programs the app installed itself (server/clients.ts), after the user's own.
+  env.PATH = `${env.PATH}:${path.join(process.env.DATA_DIR ?? path.join(user.homedir, '.web-agent'), 'clients/node_modules/.bin')}`;
   const runtime = `/run/user/${user.uid}`;
   if (!env.XDG_RUNTIME_DIR && fs.existsSync(runtime)) env.XDG_RUNTIME_DIR = runtime;
   if (!env.DBUS_SESSION_BUS_ADDRESS && fs.existsSync(`${runtime}/bus`)) env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${runtime}/bus`;
