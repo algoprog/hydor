@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema.json",
+  "id": "stripe",
+  "name": "Stripe",
+  "description": "Look up and manage customers, payments, invoices, products and subscriptions in Stripe.",
+  "category": "finance",
+  "icon": "stripe",
+  "color": "#635BFF",
+  "homepage": "https://stripe.com",
+  "docs": "https://docs.stripe.com/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.stripe.com"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "payments",
+    "billing",
+    "invoices",
+    "subscriptions",
+    "customers"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

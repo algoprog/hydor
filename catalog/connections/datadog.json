@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema.json",
+  "id": "datadog",
+  "name": "Datadog",
+  "description": "Search Datadog logs, metrics, traces, monitors and incidents.",
+  "category": "analytics",
+  "icon": "datadog",
+  "color": "#632CA6",
+  "homepage": "https://www.datadoghq.com",
+  "docs": "https://docs.datadoghq.com/bits_ai/mcp_server/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "monitoring",
+    "logs",
+    "metrics",
+    "apm",
+    "incidents"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "For Datadog’s US1 site."
+}

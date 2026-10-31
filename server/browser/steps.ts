@@ -1,0 +1,62 @@
+// Small pictures of the page after each browser step, for the step's row in the conversation. A
+// step's answer starts with "Browser step N", which the row uses to find its picture.
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { BROWSER_DIR } from './chrome.ts';
+
+const DIR = path.join(BROWSER_DIR, 'steps');
+const KEEP = 400;
+const next = new Map<string, number>();
+
+const dirOf = (key: string) => path.join(DIR, crypto.createHash('sha1').update(key).digest('hex').slice(0, 24));
+
+function numbers(dir: string): number[] {
+  try {
+    return fs
+      .readdirSync(dir)
+      .map((f) => Number(/^(\d+)\.jpg$/.exec(f)?.[1]))
+      .filter((n) => n > 0);
+  } catch {
+    return [];
+  }
+}
+
+/** The next step's number for a session (counting on from what is saved). */
+export function nextStep(key: string): number {
+  let n = next.get(key);
+  if (n === undefined) n = Math.max(0, ...numbers(dirOf(key)));
+  next.set(key, ++n);
+  return n;
+}
+
+export function saveStep(key: string, n: number, jpeg: string) {
+  const dir = dirOf(key);
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    fs.writeFileSync(path.join(dir, `${n}.jpg`), Buffer.from(jpeg, 'base64'), { mode: 0o600 });
+    if (n % 50 === 0) for (const old of numbers(dir).filter((x) => x <= n - KEEP)) fs.rmSync(path.join(dir, `${old}.jpg`), { force: true });
+  } catch {}
+}
+
+export function stepFile(key: string, n: number): string | null {
+  if (!Number.isInteger(n) || n <= 0) return null;
+  const f = path.join(dirOf(key), `${n}.jpg`);
+  return fs.existsSync(f) ? f : null;
+}
+
+export function dropSteps(key: string) {
+  next.delete(key);
+  fs.rmSync(dirOf(key), { recursive: true, force: true });
+}
+
+/** Pictures of sessions untouched for a month go. */
+export function pruneSteps() {
+  const old = Date.now() - 30 * 86400_000;
+  try {
+    for (const d of fs.readdirSync(DIR)) {
+      const p = path.join(DIR, d);
+      if (fs.statSync(p).mtimeMs < old) fs.rmSync(p, { recursive: true, force: true });
+    }
+  } catch {}
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "../schema.json",
+  "id": "git",
+  "name": "Git",
+  "description": "Read the history, diffs and branches of git repositories on this computer, and commit.",
+  "category": "local",
+  "icon": "git",
+  "color": "#F05032",
+  "homepage": "https://github.com/modelcontextprotocol/servers",
+  "docs": "https://github.com/modelcontextprotocol/servers/tree/main/src/git",
+  "server": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": [
+      "mcp-server-git"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "version control",
+    "commits",
+    "branches",
+    "diffs"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "Needs uv (uvx) on this computer."
+}

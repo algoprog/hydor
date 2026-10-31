@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "cloudflare-bindings",
+  "name": "Cloudflare Workers bindings",
+  "description": "Build on Cloudflare Workers with the KV, R2, D1 and other storage in your account.",
+  "category": "cloud",
+  "icon": "cloudflare-bindings",
+  "color": "#F38020",
+  "homepage": "https://developers.cloudflare.com/workers/",
+  "docs": "https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/",
+  "server": {
+    "transport": "http",
+    "url": "https://bindings.mcp.cloudflare.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "workers",
+    "kv",
+    "r2",
+    "d1",
+    "serverless"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

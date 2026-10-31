@@ -12,7 +12,6 @@ import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { EffortPicker, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
-import { FolderChip } from '../../components/FolderPicker';
 import { cx, IconButton, useIsMobile } from '../../components/ui';
 import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { NavButton } from '../layout/PageHeader';
@@ -23,6 +22,9 @@ import { useComposerMenu } from '../../components/ComposerMenu';
 import { AccountPicker } from './AccountPicker';
 import { AgentPicker } from './AgentPicker';
 import { machineId } from '../../lib/machine';
+import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
+import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
+import type { SessionExtra } from '@shared/features';
 
 function lastAgent(): Agent {
   try {
@@ -73,6 +75,11 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   }, []);
   const cat = useCatalog(agent, acpId ?? undefined);
   const [cwd, setCwd] = useState('');
+  // Settings for the new session from the capabilities' start options (an assistant, memory off…).
+  const [extra, setExtra] = useState<SessionExtra>({});
+  // A new task folder (Settings → Assistants) unless a folder is picked here or linked, or the assistant works in projects (Coder).
+  const [taskPick, setTaskPick] = useState<boolean | null>(initialCwd ? false : null);
+  const task = useTaskFolder(typeof extra.assistant === 'string' ? extra.assistant : undefined, taskPick);
   const [instructions, setInstructions] = useState(false);
   const [text, setText] = useState(link?.prompt ?? '');
   const [model, setModel] = useState<string | null>(null);
@@ -101,6 +108,12 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   const ta = useRef<HTMLTextAreaElement>(null);
   const menu = useComposerMenu({ ta, setText, root: cwd || undefined, commands: cat?.commands });
   const fileRef = useRef<HTMLInputElement>(null);
+  // Text from the capabilities' buttons (dictation) joins what is being written.
+  const insertText = (t: string) => {
+    if (!t) return;
+    setText((cur) => (cur.trim() ? `${cur.replace(/\s*$/, '')} ${t}` : t));
+    ta.current?.focus();
+  };
 
   useEffect(() => {
     if (initialCwd) setCwd(initialCwd);
@@ -117,6 +130,8 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     setMode(p.mode ?? cat?.defaultMode ?? null);
     setAccount(p.account ?? '');
   }, [agent, cat]);
+  // Picking an assistant sets the agent, model and mode it suggests (after the above, which it overrides).
+  useAssistantDefaults(typeof extra.assistant === 'string' ? extra.assistant : undefined, { agent, acpId, cat, setAgent, setAcpId, setModel, setMode });
 
   useLayoutEffect(() => {
     const el = ta.current;
@@ -141,13 +156,14 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
       const r = await post<{ key: string }>('/api/sessions', {
         agent,
         acpAgent: agent === 'acp' ? acpId : undefined,
-        cwd,
+        cwd: task ? await taskFolderFor(text) : cwd,
         prompt: text.trim(),
         model,
         effort: agent === 'acp' ? undefined : effort,
         mode,
         account: acct,
-        worktree: !!repo && worktree,
+        worktree: !task && !!repo && worktree,
+        ...(Object.keys(extra).length ? { extra } : {}),
         ...attachmentPayload(atts),
       });
       releaseAttachments(atts);
@@ -180,7 +196,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
         {cwd && (
           <div className="flex min-w-0 items-center gap-0.5">
             {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={accounts.some((a) => a.id === account) ? account : ''} onChange={setAccount} />}
-            {agent !== 'acp' && (
+            {agent !== 'acp' && !task && (
             <button
               type="button"
               onClick={() => setInstructions(true)}
@@ -191,7 +207,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
               {instructionName(agent)}
             </button>
             )}
-            {repo && (
+            {repo && !task && (
               <button
                 type="button"
                 onClick={() => setWorktree((w) => !w)}
@@ -206,7 +222,8 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
                 {worktree ? 'New worktree' : 'Worktree'}
               </button>
             )}
-            <FolderChip value={cwd} onChange={setCwd} />
+            <FeatureStartOptions value={extra} onChange={(p) => setExtra((x) => ({ ...x, ...p }))} cwd={cwd} />
+            <WorkFolderChip value={cwd} task={task} onFolder={(p) => (setCwd(p), setTaskPick(false))} onTask={() => setTaskPick(true)} />
           </div>
         )}
       </div>
@@ -296,6 +313,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
           <button className="shrink-0 rounded-lg p-2 text-fg-3 hover:bg-bg-2 hover:text-fg" onClick={() => fileRef.current?.click()} title="Attach files" aria-label="Attach files">
             <Paperclip size={17} />
           </button>
+          <FeatureComposerButtons insert={insertText} />
           <input
             ref={fileRef}
             type="file"

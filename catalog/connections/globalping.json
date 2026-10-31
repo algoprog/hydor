@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "globalping",
+  "name": "Globalping",
+  "description": "Run ping, traceroute, DNS and HTTP checks from probes around the world.",
+  "category": "dev",
+  "icon": "globalping",
+  "color": "#17A589",
+  "homepage": "https://globalping.io",
+  "docs": "https://github.com/jsdelivr/globalping-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.globalping.dev/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "network",
+    "ping",
+    "dns",
+    "latency"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

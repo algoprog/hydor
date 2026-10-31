@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "dropbox",
+  "name": "Dropbox",
+  "description": "Find, read and organize the files and folders in your Dropbox.",
+  "category": "files",
+  "icon": "dropbox",
+  "color": "#0061FF",
+  "homepage": "https://www.dropbox.com",
+  "docs": "https://help.dropbox.com/integrations/connect-dropbox-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.dropbox.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "files",
+    "cloud storage",
+    "documents",
+    "sharing"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

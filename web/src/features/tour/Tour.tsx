@@ -532,7 +532,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       id: 'welcome',
       hero: true,
       title: 'Welcome to Naget Agent',
-      body: 'Run coding agents on this computer from any browser, at your desk or on your phone: Claude Code, Codex, open models and more. This short tour sets up the ones you want and shows you around.',
+      body: 'Run agents on this computer from any browser, at your desk or on your phone: Claude Code, Codex, open models and more, for code, research, documents and everyday tasks. This short tour sets up the ones you want and shows you around.',
       width: 440,
       Extra: () => (
         <div className="stagger space-y-2.5">

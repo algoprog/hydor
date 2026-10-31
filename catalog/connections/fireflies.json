@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "fireflies",
+  "name": "Fireflies",
+  "description": "Search your meeting transcripts, summaries and action items in Fireflies.",
+  "category": "communication",
+  "icon": "fireflies",
+  "color": "#E5306F",
+  "homepage": "https://fireflies.ai",
+  "docs": "https://docs.fireflies.ai/getting-started/mcp-configuration",
+  "server": {
+    "transport": "http",
+    "url": "https://api.fireflies.ai/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "meetings",
+    "transcripts",
+    "notes",
+    "calls"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

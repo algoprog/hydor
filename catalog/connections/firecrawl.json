@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "firecrawl",
+  "name": "Firecrawl",
+  "description": "Scrape, crawl, map and search the web into clean Markdown with Firecrawl.",
+  "category": "search",
+  "icon": "firecrawl",
+  "color": "#FF4C00",
+  "homepage": "https://www.firecrawl.dev",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.firecrawl.dev/v2/mcp"
+  },
+  "auth": {
+    "type": "api_key",
+    "url": "https://www.firecrawl.dev/app/api-keys"
+  },
+  "keywords": [
+    "scraping",
+    "crawling",
+    "web search",
+    "markdown"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

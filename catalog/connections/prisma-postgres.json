@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "prisma-postgres",
+  "name": "Prisma Postgres",
+  "description": "Create and manage Prisma Postgres databases, backups and connection strings.",
+  "category": "data",
+  "icon": "prisma-postgres",
+  "color": "#2D3748",
+  "homepage": "https://www.prisma.io",
+  "docs": "https://www.prisma.io/docs/postgres/integrations/mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.prisma.io/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "postgres",
+    "database",
+    "orm",
+    "sql"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

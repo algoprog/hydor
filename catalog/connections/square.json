@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "square",
+  "name": "Square",
+  "description": "Work with the payments, orders, catalog, customers and bookings of your Square business.",
+  "category": "commerce",
+  "icon": "square",
+  "color": "#1A1A1A",
+  "homepage": "https://squareup.com",
+  "docs": "https://developer.squareup.com/docs/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.squareup.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "payments",
+    "point of sale",
+    "orders",
+    "catalog",
+    "retail"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

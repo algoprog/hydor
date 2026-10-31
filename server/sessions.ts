@@ -22,9 +22,15 @@ import { claudeTranscriptPath, findClaudeTranscript, Timeline } from './timeline
 import { removeSessionScratch } from './tasklog.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
 import { pageServerUrl, runToken } from './mcp.ts';
+import { beforeSend, spawnAdditions, turnEnded } from './features/registry.ts';
+import { dropNotes } from './notes.ts';
+import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
+import type { SessionExtra } from '../shared/features.ts';
 import { accountEnv, accountOfPath } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { ensureClaude, ensureCommand } from './clients.ts';
+import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
+import { customGoal } from './custom/goal.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -106,6 +112,7 @@ interface Row {
   pr: string | null;
   account: string | null;
   acp_agent: string | null;
+  extra: string | null;
   app_created: number | null;
   app_updated: number | null;
 }
@@ -116,7 +123,7 @@ const SELECT = `
     s.lines_added, s.lines_removed, s.turns, s.tokens_in, s.tokens_out, s.tokens_cached, s.cost_usd, s.gen_ms, s.bg_tasks, s.parent_key,
     a.title as app_title, a.cwd as app_cwd, a.agent as app_agent, a.first_prompt as app_first_prompt, a.archived, a.pinned,
     a.created_by_app, a.model as pref_model, a.effort as pref_effort, a.mode as pref_mode, a.created_at as app_created,
-    a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent
+    a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent, a.extra
   from sessions s left join app_sessions a on a.key = s.key`;
 
 const SELECT_APP_ONLY = `
@@ -126,7 +133,7 @@ const SELECT_APP_ONLY = `
     0 as lines_added, 0 as lines_removed, 0 as turns, 0 as tokens_in, 0 as tokens_out, 0 as tokens_cached, null as cost_usd,
     0 as gen_ms, null as bg_tasks, null as parent_key, a.title as app_title, a.cwd as app_cwd, a.agent as app_agent, a.first_prompt as app_first_prompt, a.archived, a.pinned,
     a.created_by_app, a.model as pref_model, a.effort as pref_effort, a.mode as pref_mode, a.created_at as app_created,
-    a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent
+    a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent, a.extra
   from app_sessions a where not exists (select 1 from sessions s where s.key = a.key)`;
 
 /** A non-image attachment: saved under uploads/ and listed by path in the message. */
@@ -164,6 +171,8 @@ export interface CreateOpts {
   account?: string;
   /** For agent 'acp': which agent of Settings → More agents. */
   acpAgent?: string;
+  /** Settings beyond the agent's own (memory, assistant, spending cap…). */
+  extra?: SessionExtra;
 }
 
 interface Live {
@@ -174,6 +183,8 @@ interface Live {
   runner: Runner;
   /** An added account the agent runs as (Settings → Accounts); none for the CLI's own. */
   account?: string;
+  /** For an ACP agent: which one (Custom's id is "console"). */
+  acpAgent?: string;
 }
 
 /** Lists saved attachments at the end of a message; the agent opens them by path. */
@@ -343,6 +354,7 @@ export class SessionManager extends EventEmitter {
       pr: parseJson<PullRequestInfo>(r.pr),
       account: r.account ?? accountOfPath(this.db, r.path) ?? undefined,
       acpAgent: r.acp_agent ?? undefined,
+      extra: r.extra ? parseExtra(r.extra) : undefined,
       acpName: r.acp_agent ? (acpAgents(this.db).find((a) => a.id === r.acp_agent)?.name ?? r.acp_agent) : undefined,
       // A live Codex session knows its goal first-hand; otherwise the transcript tells.
       goal: (live && r.key.startsWith('codex:') ? live.adapter.state.goal : this.timelines.get(r.key)?.goal()) ?? undefined,
@@ -439,6 +451,8 @@ export class SessionManager extends EventEmitter {
   // ---- finished / needs you -------------------------------------------------------
 
   private statuses = new Map<string, { status: Phase; turnStart: number }>();
+  /** Turns of sessions run here that ended since their status was last looked at, by when each began. */
+  private endedTurns = new Map<string, number>();
 
   /**
    * Turns that end (after running a while), sessions that start waiting for an answer or approval, and
@@ -451,7 +465,16 @@ export class SessionManager extends EventEmitter {
       const prev = this.statuses.get(s.key);
       const busy = (p?: Phase) => p === 'working' || p === 'waiting';
       this.statuses.set(s.key, { status: st, turnStart: busy(st) ? (busy(prev?.status) ? prev!.turnStart : now) : 0 });
-      if (!prev || prev.status === st) continue; // the first sighting is only a baseline
+      const ended = this.endedTurns.get(s.key);
+      this.endedTurns.delete(s.key);
+      if (!prev || prev.status === st) {
+        // A turn that began and ended between two looks (a quick one, or the first): the capabilities hear of it too.
+        if (ended !== undefined && (st === 'idle' || st === 'error')) {
+          const t = { key: s.key, agent: s.agent, cwd: s.cwd, status: st, startedAt: ended, endedAt: now, external: false };
+          setTimeout(() => turnEnded(t), 1500);
+        }
+        continue; // the first sighting is only a baseline
+      }
       const base = { key: s.key, title: s.title, agent: s.agent, at: now };
       if (st === 'waiting') {
         // A snoozed session that needs you comes back now.
@@ -459,31 +482,44 @@ export class SessionManager extends EventEmitter {
         const ext = s.external;
         const n: NotifyEvent = { ...base, kind: 'waiting', body: ext ? `Waiting for you in ${ext.client}` : (s.live?.pendingApprovals ?? 0) > 0 ? 'Needs your approval' : 'Has a question for you' };
         // In VS Code or a terminal you are likely right there: speak up only if it is still waiting a minute later.
-        if (!ext) this.emit('notify', n);
+        if (!ext) this.notify(n);
         else {
           const since = this.statuses.get(s.key)!.turnStart;
           setTimeout(() => {
             const now2 = this.statuses.get(s.key);
-            if (now2?.status === 'waiting' && now2.turnStart === since) this.emit('notify', { ...n, at: Date.now() });
+            if (now2?.status === 'waiting' && now2.turnStart === since) this.notify({ ...n, at: Date.now() });
           }, 60_000);
         }
       } else if (st === 'error') {
-        this.emit('notify', { ...base, kind: 'failed', body: s.live?.error ? s.live.error.slice(0, 200) : 'Stopped with an error' } satisfies NotifyEvent);
+        this.notify({ ...base, kind: 'failed', body: s.live?.error ? s.live.error.slice(0, 200) : 'Stopped with an error' } satisfies NotifyEvent);
       }
       // A turn that ended because the plan's usage ran out continues by itself after the reset, if you asked for that.
       if ((st === 'idle' || st === 'error') && busy(prev.status) && kvGet(this.db, 'auto_resume') === '1' && this.onLimited) {
         const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
         if (lim?.resetsAt && lim.resetsAt > now && !this.resumeLookup?.(s.key)) this.onLimited(s.key, lim.resetsAt + 60_000);
       }
+      // The capabilities hear of every ended turn (memory notes, spending, automations), once its last lines are in.
+      if ((st === 'idle' || st === 'error') && busy(prev.status)) {
+        const t = { key: s.key, agent: s.agent, cwd: s.cwd, status: st, startedAt: prev.turnStart, endedAt: now, external: !!s.external };
+        setTimeout(() => turnEnded(t), 1500);
+      }
       if (st === 'idle' && busy(prev.status) && now - prev.turnStart >= 10_000) {
         this.db
           .prepare('insert into app_sessions (key, agent, done_at, created_at, updated_at) values (?, ?, ?, ?, ?) on conflict(key) do update set done_at = excluded.done_at')
           .run(s.key, s.agent, now, now, now);
         this.queueSummary(s.key);
-        // The last lines of the transcript land a moment after the turn ends.
-        setTimeout(() => this.emit('notify', { ...base, kind: 'done', body: this.lastReply(s.key) ?? 'Finished' } satisfies NotifyEvent), 1500);
+        // The last lines of the transcript land a moment after the turn ends. A Custom goal still going says when it is met.
+        if (!(s.acpAgent === CONSOLE_ID && s.goal?.status === 'active')) setTimeout(() => this.notify({ ...base, kind: 'done', body: this.lastReply(s.key) ?? 'Finished' } satisfies NotifyEvent), 1500);
       }
     }
+  }
+
+  /** Set by the scheduler: a scheduled run's notice may read differently, or not go out (nothing to report). */
+  noticeGate?: (n: NotifyEvent) => NotifyEvent | null;
+
+  private notify(n: NotifyEvent) {
+    const out = this.noticeGate ? this.noticeGate(n) : n;
+    if (out) this.emit('notify', out);
   }
 
   /** The start of the latest reply, when its timeline is in memory (never loads a transcript for it). */
@@ -612,6 +648,7 @@ export class SessionManager extends EventEmitter {
     // The list shows the status and whether background tasks still run.
     let lastStatus = adapter.state.status;
     let lastTasks = 0;
+    let turnBegan = 0;
     let lastGoal = JSON.stringify(adapter.state.goal ?? null);
     adapter.on('change', () => {
       emitLive();
@@ -626,6 +663,10 @@ export class SessionManager extends EventEmitter {
         lastStatus = adapter.state.status;
         lastTasks = tasks;
         this.queueSummary(key);
+        // Noted for watchStatus, which looks only now and then and could miss a quick turn.
+        const busy = (x: string) => x === 'working' || x === 'waiting';
+        if (busy(lastStatus) && !busy(was)) turnBegan = Date.now();
+        if ((lastStatus === 'idle' || lastStatus === 'error') && busy(was)) this.endedTurns.set(key, turnBegan || Date.now());
         // A turn ended: the next queued message goes out.
         if (adapter.state.status === 'idle' && (was === 'working' || was === 'waiting')) setTimeout(() => this.dispatchQueued(key), 300);
       }
@@ -713,7 +754,7 @@ export class SessionManager extends EventEmitter {
   private async spawn(
     agent: Agent,
     cwd: string,
-    opts: { sessionId?: string; threadId?: string; resume?: boolean; forkFrom?: string; forkAt?: string; model?: string; effort?: string; mode?: string; account?: string; acpAgent?: string },
+    opts: { sessionId?: string; threadId?: string; resume?: boolean; forkFrom?: string; forkAt?: string; model?: string; effort?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra },
   ): Promise<Live> {
     if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) throw new HttpError(400, `Folder not found: ${cwd}`);
     if (agent === 'acp') return this.spawnAcp(cwd, opts);
@@ -725,7 +766,10 @@ export class SessionManager extends EventEmitter {
     const runId = crypto.randomBytes(6).toString('hex');
     if (agent === 'claude') {
       const sessionId = opts.sessionId ?? crypto.randomUUID();
-      const o = { cwd, sessionId, resume: !!opts.resume, forkFrom: opts.forkFrom, forkAt: opts.forkAt, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId) };
+      // What the app's capabilities add: instructions (memory, the assistant), MCP servers, environment.
+      const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`) });
+      Object.assign(env, add.env);
+      const o = { cwd, sessionId, resume: !!opts.resume, forkFrom: opts.forkFrom, forkAt: opts.forkAt, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add };
       const meta: RunMeta = { runId, agent, key: `claude:${sessionId}`, createdAt: Date.now(), cwd, opts: { ...o, account } };
       const runner = await Runner.start(meta, claudeSpec(o, env));
       const adapter = new ClaudeLive(runner, o);
@@ -742,7 +786,10 @@ export class SessionManager extends EventEmitter {
       adapter.emit('identity');
       return l;
     }
-    const o = { cwd, threadId: opts.threadId, forkFrom: opts.forkFrom, forkLastTurn: opts.forkFrom ? opts.forkAt : undefined, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId) };
+    const known = opts.threadId ? `codex:${opts.threadId}` : undefined;
+    const add = await spawnAdditions({ agent, key: known, cwd, runId, resume: !!opts.threadId, extra: opts.extra ?? (known ? sessionExtra(this.db, known) : {}) });
+    Object.assign(env, add.env);
+    const o = { cwd, threadId: opts.threadId, forkFrom: opts.forkFrom, forkLastTurn: opts.forkFrom ? opts.forkAt : undefined, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent, createdAt: Date.now(), cwd, opts: { ...o, account } };
     const runner = await Runner.start(meta, codexSpec(o, env));
     const adapter = new CodexLive(runner, o);
@@ -764,7 +811,7 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An ACP agent (Gemini CLI, OpenCode…): its own command, driven over the Agent Client Protocol. */
-  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; acpAgent?: string }): Promise<Live> {
+  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; acpAgent?: string; extra?: SessionExtra }): Promise<Live> {
     const def = acpAgent(this.db, opts.acpAgent);
     const env = { ...agentBaseEnv(), ...(def.env ?? {}) };
     // Missing: installed now when the app knows its package (Gemini CLI, OpenCode…).
@@ -777,12 +824,14 @@ export class SessionManager extends EventEmitter {
     const runId = crypto.randomBytes(6).toString('hex');
     // Console asks the app to get its model ready (start a vLLM server) at this run's own address.
     if (def.id === CONSOLE_ID) env.NAGET_AGENT_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
-    const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, pageServer: pageServerUrl(runId) };
+    const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`) });
+    Object.assign(env, add.env);
+    const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };
     const runner = await Runner.start(meta, { cmd, args: def.args, cwd, env });
     const adapter = new AcpLive(runner, o);
     await runner.connect();
-    const l: Live = { key: meta.key!, agent: 'acp', cwd, adapter, runner };
+    const l: Live = { key: meta.key!, agent: 'acp', cwd, adapter, runner, acpAgent: def.id };
     this.attach(l);
     try {
       await adapter.boot(!!opts.resume);
@@ -806,7 +855,7 @@ export class SessionManager extends EventEmitter {
       cwd = made.cwd;
     }
     const mode = o.mode || (o.agent === 'claude' ? 'default' : o.agent === 'codex' ? 'auto' : undefined);
-    const l = await this.spawn(o.agent, cwd, { model: o.model || undefined, effort: o.effort || undefined, mode, account: o.account || undefined, acpAgent: o.acpAgent });
+    const l = await this.spawn(o.agent, cwd, { model: o.model || undefined, effort: o.effort || undefined, mode, account: o.account || undefined, acpAgent: o.acpAgent, extra: o.extra });
     const now = Date.now();
     this.db
       .prepare(
@@ -818,10 +867,12 @@ export class SessionManager extends EventEmitter {
     if (wt) this.db.prepare('update app_sessions set worktree = ? where key = ?').run(JSON.stringify(wt), l.key);
     if (o.account) this.db.prepare('update app_sessions set account = ? where key = ?').run(o.account, l.key);
     if (o.acpAgent) this.db.prepare('update app_sessions set acp_agent = ? where key = ?').run(o.acpAgent, l.key);
+    if (o.extra && Object.keys(o.extra).length) setSessionExtra(this.db, l.key, o.extra);
     if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: o.model, effort: o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
     const prompt = withFiles(o.prompt?.trim() ?? '', this.saveFiles(o.files ?? []));
     if (prompt || o.images?.length) {
+      await beforeSend(l.key);
       await this.snapshot(l.key);
       await l.adapter.sendMessage(prompt, this.saveImages(o.images ?? []));
     }
@@ -873,7 +924,8 @@ export class SessionManager extends EventEmitter {
    * back to how they were then: a worktree's snapshot, or Claude Code's own checkpoints.
    */
   async rewind(key: string, o: { itemId: string; text: string; restoreFiles?: boolean }): Promise<string> {
-    if (key.startsWith('acp:')) throw new HttpError(400, 'Not available for this agent');
+    const custom = this.isCustom(key);
+    if (key.startsWith('acp:') && !custom) throw new HttpError(400, 'Not available for this agent');
     const s = this.summary(key);
     if (!s) throw new HttpError(404, 'Unknown session');
     if (!o.text.trim()) throw new HttpError(400, 'Write the new message');
@@ -886,6 +938,7 @@ export class SessionManager extends EventEmitter {
     if (o.restoreFiles) await this.restoreFilesBefore(key, s.agent, msg);
     let at: string | undefined;
     if (s.agent === 'claude') at = this.claudeParent(key, msg.id);
+    else if (custom) at = customTurnBefore(key, msg.id);
     else {
       const before = items.slice(0, idx).filter((i): i is Extract<TimelineItem, { kind: 'user' }> => i.kind === 'user' && !!i.turn && i.turn !== msg.turn && !i.turn.startsWith('p:'));
       at = before[before.length - 1]?.turn;
@@ -895,7 +948,7 @@ export class SessionManager extends EventEmitter {
     const prefs = s.prefs ?? {};
     const next = at
       ? await this.fork(key, { prompt: o.text, at })
-      : await this.create({ agent: s.agent, cwd, prompt: o.text, model: prefs.model ?? s.model, effort: prefs.effort ?? undefined, mode: prefs.mode ?? undefined, title: s.title, remember: false, account: this.accountOf(key) });
+      : await this.create({ agent: s.agent, cwd, prompt: o.text, model: prefs.model ?? s.model, effort: prefs.effort ?? undefined, mode: prefs.mode ?? undefined, title: s.title, remember: false, account: this.accountOf(key), acpAgent: s.acpAgent });
     this.db.prepare('update app_sessions set title = ?, worktree = ? where key = ?').run(s.title, s.worktree ? JSON.stringify(s.worktree) : null, next);
     this.setFlags(key, { archived: true });
     this.queueSummary(next);
@@ -910,6 +963,8 @@ export class SessionManager extends EventEmitter {
       await restoreCheckpoint(w, c.commit_id);
       return;
     }
+    // Custom kept what its own edits changed, per turn.
+    if (this.isCustom(key)) return restoreCustomFiles(key, msg.id);
     if (agent !== 'claude') throw new HttpError(400, 'Putting the files back needs a worktree for Codex sessions');
     if (!this.lives.has(key)) await this.start(key);
     const adapter = this.live(key).adapter as ClaudeLive;
@@ -962,7 +1017,7 @@ export class SessionManager extends EventEmitter {
    * arrives; Codex copies the thread right away.
    */
   async fork(key: string, o: { prompt: string; images?: ImageInput[]; files?: FileInput[]; at?: string }): Promise<string> {
-    if (key.startsWith('acp:')) throw new HttpError(400, 'Not available for this agent');
+    if (key.startsWith('acp:') && !this.isCustom(key)) throw new HttpError(400, 'Not available for this agent');
     const from = this.summary(key);
     const cwd = this.sessionCwd(key);
     if (!from || !cwd) throw new HttpError(404, 'Unknown session');
@@ -974,6 +1029,10 @@ export class SessionManager extends EventEmitter {
     if (from.agent === 'claude') {
       if (o.at && !/^[0-9a-f-]{36}$/i.test(o.at)) throw new HttpError(400, 'Bad message id');
       l = await this.spawn('claude', cwd, { sessionId: crypto.randomUUID(), forkFrom: from.id, forkAt: o.at, ...cfg });
+    } else if (from.agent === 'acp') {
+      // Custom: a copy of its transcript and state up to the end of the turn `at` (a prompt's id), then loaded.
+      const id = await prepareCustomFork(key, o.at);
+      l = await this.spawn('acp', cwd, { sessionId: id, resume: true, acpAgent: CONSOLE_ID, model: cfg.model, mode: cfg.mode });
     } else {
       // The new session's own app-server copies the thread, so it is the one writing to the copy.
       // `at` is the last turn to keep (none: the whole thread).
@@ -987,6 +1046,7 @@ export class SessionManager extends EventEmitter {
       )
       .run(l.key, from.agent, cwd, `${from.title} · fork`, cfg.model ?? null, cfg.effort ?? null, cfg.mode ?? null, key, now, now);
     if (cfg.account) this.db.prepare('update app_sessions set account = ? where key = ?').run(cfg.account, l.key);
+    if (from.agent === 'acp') this.db.prepare('update app_sessions set acp_agent = ? where key = ?').run(CONSOLE_ID, l.key);
     await l.adapter.sendMessage(withFiles(o.prompt.trim(), this.saveFiles(o.files ?? [])), this.saveImages(o.images ?? []));
     this.queueSummary(l.key);
     return l.key;
@@ -1072,6 +1132,13 @@ export class SessionManager extends EventEmitter {
     if (keys.length) this.emit('sessions', [], keys);
   }
 
+  /** A session of Custom, the app's own agent (ACP agent "console"). */
+  private isCustom(key: string): boolean {
+    if (!key.startsWith('acp:')) return false;
+    const r = this.db.prepare('select acp_agent from app_sessions where key = ?').get(key) as { acp_agent: string | null } | undefined;
+    return (this.lives.get(key)?.acpAgent ?? r?.acp_agent) === CONSOLE_ID;
+  }
+
   private live(key: string): Live {
     const l = this.lives.get(key);
     if (!l) throw new HttpError(409, 'The session is not running');
@@ -1097,10 +1164,11 @@ export class SessionManager extends EventEmitter {
     else await l.adapter.sendMessage('/compact', []);
   }
 
-  /** Sets, pauses, resumes or clears a session's goal: Codex through its thread goal, Claude Code with /goal. */
+  /** Sets, pauses, resumes or clears a session's goal: Codex through its thread goal, Claude Code with /goal, Custom by the app's own loop. */
   async goal(key: string, action: 'set' | 'pause' | 'resume' | 'clear', objective?: string) {
-    if (key.startsWith('acp:')) throw new HttpError(400, 'Not available for this agent');
+    if (key.startsWith('acp:') && !this.isCustom(key)) throw new HttpError(400, 'Not available for this agent');
     const text = (objective ?? '').trim();
+    if (key.startsWith('acp:')) return customGoal(key, action, text);
     if (action === 'set' && !text) throw new HttpError(400, 'Say what the goal is');
     if (key.startsWith('codex:')) {
       if (!this.lives.has(key)) await this.start(key);
@@ -1221,8 +1289,17 @@ export class SessionManager extends EventEmitter {
 
   private dispatchQueued(key: string) {
     if (this.held.has(key) || this.lives.get(key)?.adapter.state.status !== 'idle') return;
-    const m = this.take(key);
-    if (m) this.deliver(key, m).catch((e) => this.emit('toast', { level: 'error', text: `A queued message was not sent: ${(e as Error).message}` }));
+    // A capability may refuse it (a spending cap reached): the queue then waits for you.
+    beforeSend(key).then(
+      () => {
+        const m = this.take(key);
+        if (m) this.deliver(key, m).catch((e) => this.emit('toast', { level: 'error', text: `A queued message was not sent: ${(e as Error).message}` }));
+      },
+      (e) => {
+        this.holdQueue(key);
+        this.emit('toast', { level: 'error', text: `The queue is on hold: ${(e as Error).message}` });
+      },
+    );
   }
 
   /** Sends one queued message right away: into the running turn if there is one. */
@@ -1325,6 +1402,7 @@ export class SessionManager extends EventEmitter {
 
   async send(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = []) {
     if (!text.trim() && !images.length && !files.length) throw new HttpError(400, 'Empty message');
+    await beforeSend(key);
     if (!this.lives.has(key)) await this.start(key);
     const l = this.live(key);
     // ACP agents take one message at a time: one sent mid-turn waits in the queue.
@@ -1410,8 +1488,8 @@ export class SessionManager extends EventEmitter {
   }
 
   /** The live session an agent process belongs to, by the run id it was started with. */
-  liveByRun(runId: string): { key: string; agent: Agent } | null {
-    for (const l of this.lives.values()) if (l.runner.meta.runId === runId) return { key: l.key, agent: l.agent };
+  liveByRun(runId: string): { key: string; agent: Agent; cwd: string; acpAgent?: string } | null {
+    for (const l of this.lives.values()) if (l.runner.meta.runId === runId) return { key: l.key, agent: l.agent, cwd: l.cwd, acpAgent: l.acpAgent };
     return null;
   }
 
@@ -1453,6 +1531,7 @@ export class SessionManager extends EventEmitter {
 
   /** Stops the session and deletes its transcript (and Codex thread state). */
   async remove(key: string) {
+    dropNotes(this.db, key);
     const l = this.lives.get(key);
     if (l) {
       const exited = new Promise<void>((resolve) => {

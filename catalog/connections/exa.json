@@ -1,0 +1,26 @@
+{
+  "$schema": "../schema.json",
+  "id": "exa",
+  "name": "Exa",
+  "description": "Search the web and get the clean contents of pages, with Exa.",
+  "category": "search",
+  "icon": "exa",
+  "color": "#1F40ED",
+  "homepage": "https://exa.ai",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.exa.ai/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "web search",
+    "research",
+    "crawling"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

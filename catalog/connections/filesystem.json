@@ -1,0 +1,41 @@
+{
+  "$schema": "../schema.json",
+  "id": "filesystem",
+  "name": "Files on this computer",
+  "description": "Read, write, search and move files in the folders you choose.",
+  "category": "local",
+  "icon": "folder",
+  "color": "#64748B",
+  "homepage": "https://github.com/modelcontextprotocol/servers",
+  "docs": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "{{FOLDERS}}"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "fields": [
+    {
+      "name": "FOLDERS",
+      "label": "Folders it may use",
+      "placeholder": "/home/you/Documents",
+      "help": "Full paths, one per line. It can read and change files only inside these."
+    }
+  ],
+  "keywords": [
+    "files",
+    "folders",
+    "documents",
+    "local"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

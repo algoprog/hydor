@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "id": "gamma",
+  "name": "Gamma",
+  "description": "Make presentations, documents and web pages with Gamma.",
+  "category": "design",
+  "icon": "gamma",
+  "color": "#6D28D9",
+  "homepage": "https://gamma.app",
+  "docs": "https://developers.gamma.app/docs/gamma-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.gamma.app/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "presentations",
+    "slides",
+    "documents"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

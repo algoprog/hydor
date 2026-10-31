@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "motherduck",
+  "name": "MotherDuck",
+  "description": "Query your MotherDuck and DuckDB data with SQL.",
+  "category": "data",
+  "icon": "motherduck",
+  "color": "#FFDE00",
+  "homepage": "https://motherduck.com",
+  "docs": "https://motherduck.com/docs/key-tasks/ai-and-motherduck/mcp-setup/",
+  "server": {
+    "transport": "http",
+    "url": "https://api.motherduck.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "duckdb",
+    "sql",
+    "analytics",
+    "data warehouse"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

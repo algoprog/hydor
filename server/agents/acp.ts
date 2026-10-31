@@ -14,6 +14,7 @@ import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
 import { AGENT_FILE, MODELS_DIR } from '../models/config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
+import type { SpawnAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
 import { acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
@@ -128,6 +129,8 @@ export interface AcpOpts {
   model?: string;
   /** This app's MCP address for the session (show_html), for agents that take HTTP MCP servers. */
   pageServer?: string;
+  /** What the app's capabilities add: instructions, MCP servers (server/features). */
+  add?: Required<SpawnAdditions>;
 }
 
 export class AcpLive extends LiveAdapter {
@@ -174,7 +177,13 @@ export class AcpLive extends LiveAdapter {
       60_000,
     );
     this.caps = init?.agentCapabilities ?? {};
-    const mcpServers = this.o.pageServer && this.caps.mcpCapabilities?.http ? [{ type: 'http', name: PAGE_SERVER, url: this.o.pageServer, headers: [] }] : [];
+    // The app's own server and the capabilities' servers: by address for agents that take HTTP, else commands.
+    const http = !!this.caps.mcpCapabilities?.http;
+    const pairs = (o?: Record<string, string>) => Object.entries(o ?? {}).map(([name, value]) => ({ name, value }));
+    const mcpServers: unknown[] = Object.entries(this.o.add?.mcpServers ?? {}).flatMap(([name, d]): unknown[] =>
+      d.type === 'http' ? (http ? [{ type: 'http', name, url: d.url, headers: pairs(d.headers) }] : []) : [{ name, command: d.command, args: d.args ?? [], env: pairs(d.env) }],
+    );
+    if (this.o.pageServer && http) mcpServers.push({ type: 'http', name: PAGE_SERVER, url: this.o.pageServer, headers: [] });
     const auth = (e: unknown) => {
       const m = (e as Error).message;
       // Signing in happens in the agent's own CLI (in a terminal), once.
@@ -369,7 +378,8 @@ export class AcpLive extends LiveAdapter {
     this.changed();
     // The call returns when the turn ends, however long that takes.
     this.rpc
-      .call('session/prompt', { sessionId: this.acpSession, prompt }, 7 * 24 * 3600_000)
+      // Custom keeps the prompt's id with the turn: forks and "Edit from here" cut its conversation by it.
+      .call('session/prompt', { sessionId: this.acpSession, prompt, ...(this.o.def.id === CONSOLE_ID ? { _meta: { promptId: id } } : {}) }, 7 * 24 * 3600_000)
       .then((r) => this.turnEnded({ stopReason: r?.stopReason ?? 'end_turn' }))
       .catch((e) => this.turnEnded({ error: (e as Error).message }));
   }

@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "slack",
+  "name": "Slack",
+  "description": "Search and read channels and threads, and send messages in Slack.",
+  "category": "communication",
+  "icon": "slack",
+  "color": "#4A154B",
+  "homepage": "https://slack.com",
+  "docs": "https://docs.slack.dev/ai/slack-mcp-server/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.slack.com/mcp"
+  },
+  "auth": {
+    "type": "oauth",
+    "help": "Slack signs in only through a Slack app you make for your workspace (api.slack.com/apps): add this page’s callback address as its redirect URL, then enter its client ID and secret here."
+  },
+  "keywords": [
+    "chat",
+    "messages",
+    "channels",
+    "team"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

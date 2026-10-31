@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "sentry",
+  "name": "Sentry",
+  "description": "Look into errors, issues, traces and releases in your Sentry projects.",
+  "category": "dev",
+  "icon": "sentry",
+  "color": "#362D59",
+  "homepage": "https://sentry.io",
+  "docs": "https://docs.sentry.io/product/sentry-mcp/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.sentry.dev/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "errors",
+    "monitoring",
+    "crashes",
+    "performance",
+    "debugging"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

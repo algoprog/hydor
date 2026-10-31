@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "zapier",
+  "name": "Zapier",
+  "description": "Run the actions you set up in Zapier across thousands of apps: send email, add rows, post messages.",
+  "category": "ai",
+  "icon": "zapier",
+  "color": "#FF4F00",
+  "homepage": "https://zapier.com",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.zapier.com/api/mcp/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "automation",
+    "workflows",
+    "integrations",
+    "actions"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

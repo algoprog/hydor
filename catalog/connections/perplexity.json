@@ -1,0 +1,44 @@
+{
+  "$schema": "../schema.json",
+  "id": "perplexity",
+  "name": "Perplexity",
+  "description": "Search the web and get answers with sources from Perplexity’s Sonar models.",
+  "category": "search",
+  "icon": "perplexity",
+  "color": "#20808D",
+  "homepage": "https://www.perplexity.ai",
+  "docs": "https://github.com/perplexityai/modelcontextprotocol",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@perplexity-ai/mcp-server"
+    ],
+    "env": {
+      "PERPLEXITY_API_KEY": "{{PERPLEXITY_API_KEY}}"
+    }
+  },
+  "auth": {
+    "type": "api_key",
+    "url": "https://www.perplexity.ai/account/api"
+  },
+  "fields": [
+    {
+      "name": "PERPLEXITY_API_KEY",
+      "label": "API key",
+      "secret": true,
+      "url": "https://www.perplexity.ai/account/api"
+    }
+  ],
+  "keywords": [
+    "web search",
+    "research",
+    "answers",
+    "citations"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

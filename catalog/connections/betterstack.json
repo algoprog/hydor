@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "betterstack",
+  "name": "Better Stack",
+  "description": "Check uptime monitors, incidents, on-call and logs in Better Stack.",
+  "category": "analytics",
+  "icon": "betterstack",
+  "color": "#1A1A2E",
+  "homepage": "https://betterstack.com",
+  "docs": "https://betterstack.com/docs/getting-started/integrations/mcp/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.betterstack.com"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "uptime",
+    "incidents",
+    "logs",
+    "monitoring"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

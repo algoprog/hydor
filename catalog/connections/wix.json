@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "id": "wix",
+  "name": "Wix",
+  "description": "Manage your Wix sites: their content, store, bookings and settings.",
+  "category": "commerce",
+  "icon": "wix",
+  "color": "#0C6EFC",
+  "homepage": "https://www.wix.com",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.wix.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "website",
+    "store",
+    "bookings",
+    "cms"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

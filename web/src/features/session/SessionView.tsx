@@ -29,6 +29,7 @@ import { PrBadge, PullRequestDialog } from './PullRequest';
 import { ShareDialog } from './ShareDialog';
 import { noteOpened } from '../palette/CommandPalette';
 import { FindBar } from './FindBar';
+import { FeatureDock, FeatureMenuItems } from '../registry';
 
 function StatusPill({ s }: { s: SessionSummary }) {
   const a = activityOf(s);
@@ -72,6 +73,8 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
   const running = !!s.live && s.live.status !== 'exited';
   const working = running && isBusy(a);
   const elsewhere = a?.kind === 'external';
+  // Custom (the app's own agent) forks and keeps goals like Claude Code and Codex; other ACP agents do not.
+  const custom = s.agent === 'acp' && s.acpAgent === 'console';
   const st = s.stats;
 
   const rename = async () => {
@@ -201,7 +204,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
               Worktree: {s.worktree.branch}
             </MenuItem>
           )}
-          {!s.goal && !s.external && s.agent !== 'acp' && (
+          {!s.goal && !s.external && (s.agent !== 'acp' || custom) && (
             <MenuItem icon={<Target size={15} />} onClick={() => (setMenu(false), setGoalOpen(true))}>
               Set a goal…
             </MenuItem>
@@ -219,6 +222,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
           <MenuItem icon={<Link2 size={15} />} onClick={() => (setMenu(false), setShareOpen(true))}>
             Share a read-only link…
           </MenuItem>
+          <FeatureMenuItems s={s} close={() => setMenu(false)} />
           {running && !working && (
             <MenuItem icon={<Square size={13} />} onClick={() => (setMenu(false), post(`/api/sessions/${enc(s.key)}/stop`).catch(toastError))}>
               Stop the agent process
@@ -240,7 +244,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
               Edit {instructionName(s.agent)}
             </MenuItem>
           )}
-          {!s.external && s.agent !== 'acp' && (
+          {!s.external && (s.agent !== 'acp' || custom) && (
             <MenuItem icon={<GitFork size={15} />} onClick={() => (setMenu(false), onFork())}>
               Fork…
             </MenuItem>
@@ -336,7 +340,7 @@ function ForkDialog({ s, at, onClose }: { s: SessionSummary; at: { at?: string }
       }
     >
       <p className="mb-3 text-[13px] leading-relaxed text-fg-3">
-        A new {agentName(s.agent)} session starts with this conversation{at?.at ? ' up to that reply' : ''}, then the message below. This session stays as it is.
+        A new {agentName(s.agent, s.acpName)} session starts with this conversation{at?.at ? ' up to that reply' : ''}, then the message below. This session stays as it is.
       </p>
       <textarea
         autoFocus
@@ -739,6 +743,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
           </div>
           <LimitBanner agent={summary.agent} account={summary.account} className="mx-3 mb-2 sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]" />
           <MovedOn s={summary} />
+          <FeatureDock s={summary} />
           <Composer s={summary} />
           <ForkDialog s={summary} at={forking} onClose={() => setForking(null)} />
         </div>

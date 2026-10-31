@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "kiwi",
+  "name": "Kiwi.com",
+  "description": "Search flights and fares between any cities with Kiwi.com.",
+  "category": "life",
+  "icon": "kiwi",
+  "color": "#00A991",
+  "homepage": "https://www.kiwi.com",
+  "docs": "https://www.kiwi.com/stories/kiwi-mcp-connector/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.kiwi.com"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "flights",
+    "travel",
+    "airfare",
+    "trips"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

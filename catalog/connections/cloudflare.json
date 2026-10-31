@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "cloudflare",
+  "name": "Cloudflare",
+  "description": "Manage your Cloudflare account through its API: Workers, DNS, storage, security settings and more.",
+  "category": "cloud",
+  "icon": "cloudflare",
+  "color": "#F38020",
+  "homepage": "https://www.cloudflare.com",
+  "docs": "https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.cloudflare.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "workers",
+    "dns",
+    "cdn",
+    "r2",
+    "hosting"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -7,6 +7,7 @@ const entries = {
   'index-worker': 'server/indexer/worker.ts',
   cli: 'server/cli.ts',
   agent: 'server/agent/main.ts',
+  connbridge: 'server/connections/bridge.ts',
 };
 const only = process.argv.slice(2);
 

@@ -13,6 +13,7 @@ import { openPalette } from '../palette/CommandPalette';
 import { startTour } from '../tour/Tour';
 import { machineId } from '../../lib/machine';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
+import { features } from '../registry';
 
 /** The most-used plan window, as a tiny meter next to "Usage" (under it on a phone's tile). */
 function UsageHint({ tile }: { tile?: boolean }) {
@@ -207,6 +208,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         <NavItem tile={mobile} path="/files" match={loc === '/files' || loc === '/file' || loc === '/search'} label="Files" icon={<FolderTree size={17} />} onGo={nav} />
         <NavItem tile={mobile} path="/git" match={loc === '/git'} label="Git" icon={<GitBranch size={17} />} onGo={nav} />
         <NavItem tile={mobile} path="/terminal" match={loc === '/terminal'} label="Terminal" icon={<SquareTerminal size={17} />} onGo={nav} anim="ico-nudge" />
+        {features().flatMap((f) => (f.nav ?? []).map((n) => <NavItem key={n.path} tile={mobile} path={n.path} match={n.match ? n.match(loc) : loc === n.path} label={n.label} icon={n.icon} onGo={nav} />))}
         {/* Dev-server previews open on this server's own preview port: its own machine only. */}
         {!machineId && <NavItem tile={mobile} path="/preview" match={loc === '/preview'} label="Preview" icon={<MonitorSmartphone size={17} />} onGo={nav} />}
         <NavItem tile={mobile} path="/usage" match={loc === '/usage' || loc === '/stats'} label="Usage" icon={<Gauge size={17} />} extra={<UsageHint tile={mobile} />} onGo={nav} anim="ico-grow" />

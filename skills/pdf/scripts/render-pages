@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Renders a document's pages as PNG images, to look at how it came out: open the images with your
+# tool for viewing images. PDFs need pdftoppm (poppler-utils); Word, Excel, PowerPoint and
+# OpenDocument files need LibreOffice too, to lay them out as pages first.
+#
+#   render-pages report.docx                 pages 1–8, into report-pages/ beside it
+#   render-pages slides.pptx /tmp/look 3 5   pages 3 to 5, into /tmp/look
+#   DPI=120 render-pages form.pdf            sharper (the default, 80, is enough to judge a layout)
+set -euo pipefail
+in="${1:?Usage: render-pages FILE [OUT_DIR] [FIRST_PAGE] [LAST_PAGE]}"
+[ -f "$in" ] || { echo "No such file: $in" >&2; exit 2; }
+stem="$(basename "${in%.*}")"
+out="${2:-$(dirname "$in")/$stem-pages}"
+first="${3:-1}"
+last="${4:-$((first + 7))}"
+ext="$(printf '%s' "${in##*.}" | tr '[:upper:]' '[:lower:]')"
+
+if ! command -v pdftoppm >/dev/null 2>&1; then
+  echo "Rendering pages needs pdftoppm, which is not installed here (Debian/Ubuntu: sudo apt install poppler-utils; macOS: brew install poppler)." >&2
+  echo "Meanwhile, check the content by reading the file back (read_document, or pdftotext)." >&2
+  exit 3
+fi
+
+pdf="$in"
+if [ "$ext" != "pdf" ]; then
+  office="$(command -v soffice || command -v libreoffice || true)"
+  [ -z "$office" ] && [ -x /Applications/LibreOffice.app/Contents/MacOS/soffice ] && office=/Applications/LibreOffice.app/Contents/MacOS/soffice
+  if [ -z "$office" ]; then
+    echo "Laying out a .$ext file as pages needs LibreOffice, which is not installed here (Debian/Ubuntu: sudo apt install libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui; macOS: brew install --cask libreoffice)." >&2
+    echo "Meanwhile, check the content by reading the file back with read_document, and keep the layout simple." >&2
+    exit 3
+  fi
+  data="${NAGET_DATA_DIR:-${DATA_DIR:-}}"
+  if [ -z "$data" ]; then
+    if [ ! -d "$HOME/.naget-agent" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.naget-agent"; fi
+  fi
+  profile="$data/office/lo-profile-cli"
+  if [ ! -f "$profile/user/registrymodifications.xcu" ]; then
+    # Macros never run here.
+    mkdir -p "$profile/user"
+    cat > "$profile/user/registrymodifications.xcu" <<'XCU'
+<?xml version="1.0" encoding="UTF-8"?>
+<oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="MacroSecurityLevel" oor:op="fuse"><value>3</value></prop></item>
+<item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="DisableMacrosExecution" oor:op="fuse"><value>true</value></prop></item>
+</oor:items>
+XCU
+  fi
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  cp "$in" "$tmp/document.$ext"
+  SAL_USE_VCLPLUGIN=svp "$office" "-env:UserInstallation=file://$profile" --headless --norestore --nolockcheck --nologo \
+    --convert-to pdf --outdir "$tmp" "$tmp/document.$ext" >"$tmp/log" 2>&1 || true
+  pdf="$tmp/document.pdf"
+  if [ ! -f "$pdf" ]; then
+    echo "LibreOffice could not lay out $in as pages:" >&2
+    tail -3 "$tmp/log" >&2
+    exit 4
+  fi
+fi
+
+mkdir -p "$out"
+rm -f "$out"/page-*.png
+pdftoppm -png -r "${DPI:-80}" -f "$first" -l "$last" "$pdf" "$out/page"
+total="$(pdfinfo "$pdf" 2>/dev/null | awk '/^Pages:/ {print $2}')"
+ls -1 "$out"/page-*.png
+echo "${total:-?} pages in all; these are pages $first to $(( last < ${total:-$last} ? last : ${total:-$last} )). Look at each image before you hand the file over."

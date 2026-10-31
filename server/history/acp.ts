@@ -8,13 +8,26 @@
 //   {"t":"update","ts":…,"u":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"…"}}}
 //   {"t":"end","ts":…,"stopReason":"end_turn"}
 //   {"t":"title","title":"…"}
-import type { FileChange, SessionStats, TimelineItem, TodoEntry, ToolCategory, ToolInfo, ToolItem } from '../../shared/types.ts';
+//   {"t":"goal","ts":…,"goal":{…}|null,"note":{"text":"…"},"step":"…"}   Custom's /goal (server/custom/goal.ts)
+//
+// Custom adds a usage_update after each model call: its running totals for the ACP session (tokens in
+// `_meta.naget`, the cost when it knows it). Another ACP agent may send the cost alone.
+import type { FileChange, GoalInfo, SessionStats, TimelineItem, TodoEntry, ToolCategory, ToolInfo, ToolItem } from '../../shared/types.ts';
 import { ActivityLog, clip, emptyStats, firstLine, snippetDiff, wholeFileDiff, type Chunk } from './common.ts';
 import type { ParserOptions, SummaryData } from './claude.ts';
 
 type Json = Record<string, any>;
 
 const MAX_OUTPUT = 64 * 1024;
+
+/** An ACP session's running totals: tokens (fresh, out, read from cache) and dollars, when any were priced. */
+interface Spend {
+  in: number;
+  out: number;
+  cached: number;
+  usd: number;
+  priced: boolean;
+}
 
 export interface AcpSummary extends SummaryData {
   /** Which ACP agent (its id in the app's list) and its name. */
@@ -86,8 +99,14 @@ export class AcpParser {
   /** The item agent text and thoughts go on appending to, while nothing else came between. */
   private open: { kind: 'assistant' | 'thinking'; id: string } | null = null;
   private turn: { id: string; start: number; tools: number } | null = null;
-  /** ACP has no goals. */
-  goal: null = null;
+  /** Custom's goal (/goal), as its latest "goal" line says; other ACP agents have none. */
+  goal: GoalInfo | null = null;
+  /** The message the goal loop sends next: its note says it, so it does not show as yours. */
+  private goalStep: string | null = null;
+  /** Running totals per ACP session (a session that could not be reopened starts its own), and the turn's start. */
+  private spend = new Map<string, Spend>();
+  private acpSession = '';
+  private turnBase: Spend | null = null;
 
   constructor(private opts: ParserOptions) {
     this.act = opts.collectActivity ? new ActivityLog() : null;
@@ -164,11 +183,11 @@ export class AcpParser {
         this.summary.acpName = m.name;
         this.summary.cwd = m.cwd ?? this.summary.cwd;
         this.summary.source = 'acp';
-        if (m.acpSession) this.summary.acpSession = m.acpSession;
+        if (m.acpSession) this.summary.acpSession = this.acpSession = String(m.acpSession);
         if (m.model) this.summary.model = m.model;
         break;
       case 'session':
-        if (m.acpSession) this.summary.acpSession = m.acpSession;
+        if (m.acpSession) this.summary.acpSession = this.acpSession = String(m.acpSession);
         break;
       case 'title':
         if (m.title) this.summary.customTitle = String(m.title);
@@ -180,11 +199,24 @@ export class AcpParser {
         this.open = null;
         if (m.text) this.upsert({ kind: 'system', id: `note${this.seq++}`, seq: 0, ts, level: 'info', text: String(m.text) });
         break;
+      case 'goal':
+        this.open = null;
+        this.goal = m.goal && typeof m.goal.objective === 'string' ? (m.goal as GoalInfo) : null;
+        this.goalStep = typeof m.step === 'string' ? m.step : null;
+        if (m.note?.text)
+          this.upsert({ kind: 'system', id: `goal${this.seq++}`, seq: 0, ts, level: m.note.level === 'warn' ? 'warn' : 'info', text: String(m.note.text), detail: m.note.detail ? String(m.note.detail) : undefined });
+        break;
       case 'prompt': {
         const text = String(m.text ?? '');
         const id = String(m.id ?? `u${this.seq++}`);
         this.open = null;
         this.turn = { id, start: ts ?? Date.now(), tools: 0 };
+        this.turnBase = this.spent();
+        if (this.goalStep !== null && text === this.goalStep) {
+          // The goal loop's next step: the note before it shows it; the turn is the agent's.
+          this.goalStep = null;
+          break;
+        }
         this.stats.userMessages++;
         this.act?.bump(ts, 'prompts');
         if (!this.summary.firstPrompt && text) this.summary.firstPrompt = firstLine(text, 300);
@@ -206,7 +238,14 @@ export class AcpParser {
         if (m.error) this.upsert({ kind: 'system', id: `err:${t?.id ?? this.seq++}`, seq: 0, ts, level: 'error', text: firstLine(String(m.error), 300), detail: String(m.error) });
         else if (m.stopReason && !['end_turn', 'cancelled'].includes(m.stopReason))
           this.upsert({ kind: 'system', id: `stop:${t?.id ?? this.seq++}`, seq: 0, ts, level: 'warn', text: STOP_TEXT[m.stopReason] ?? `Stopped (${m.stopReason})` });
-        this.upsert({ kind: 'turn', id: `turn:${t?.id ?? this.seq++}`, seq: 0, ts, status, durationMs: t && ts ? ts - t.start : undefined, turn: t?.id });
+        // What the turn's model calls used and cost, when the agent said.
+        const now = this.spent();
+        const base = this.turnBase;
+        this.turnBase = null;
+        const used = base && now.in + now.out + now.cached > base.in + base.out + base.cached;
+        const tokens = used ? { input: now.in - base.in, output: now.out - base.out, cacheRead: now.cached - base.cached } : undefined;
+        const costUsd = used && now.priced ? Math.max(0, now.usd - base.usd) || undefined : undefined;
+        this.upsert({ kind: 'turn', id: `turn:${t?.id ?? this.seq++}`, seq: 0, ts, status, durationMs: t && ts ? ts - t.start : undefined, turn: t?.id, tokens, costUsd });
         break;
       }
     }
@@ -234,7 +273,8 @@ export class AcpParser {
           this.stats.assistantMessages++;
           this.act?.bump(ts, 'messages');
           this.chunk('assistant', text, ts);
-          this.upsert({ kind: 'assistant', id, seq: 0, ts, text, turn });
+          // A Custom reply can be forked from: up to the end of its turn.
+          this.upsert({ kind: 'assistant', id, seq: 0, ts, text, turn, entry: this.summary.acpAgent === 'console' ? turn : undefined });
         } else this.upsert({ kind: 'thinking', id, seq: 0, ts, text, turn });
         return;
       }
@@ -251,8 +291,10 @@ export class AcpParser {
         const category = KIND[u.kind] ?? 'other';
         const files = acpDiffs(u.content);
         const out = clip(acpText(u.content), MAX_OUTPUT);
+        // Custom calls the app's own tools "naget-agent: web_search": their full name lets their views show.
+        const own = /^naget-agent: (\w+)$/.exec(String(u.title ?? ''));
         const tool: ToolInfo = {
-          name: String(u.kind ?? 'tool'),
+          name: own ? `mcp__naget-agent__${own[1]}` : String(u.kind ?? 'tool'),
           category,
           title: String(u.title ?? u.kind ?? 'Tool'),
           status: STATUS[u.status] ?? 'running',
@@ -261,6 +303,7 @@ export class AcpParser {
           truncated: out.truncated || undefined,
           files: files.length ? files : undefined,
           subtitle: Array.isArray(u.locations) && u.locations[0]?.path ? String(u.locations[0].path) : undefined,
+          auto: typeof u._meta?.auto === 'string' ? u._meta.auto : undefined,
         };
         this.stats.toolCalls++;
         this.act?.bump(ts, 'toolCalls');
@@ -289,6 +332,7 @@ export class AcpParser {
           files: files.length ? files : prev.tool.files,
           input: u.rawInput ?? prev.tool.input,
           category: u.kind ? (KIND[u.kind] ?? prev.tool.category) : prev.tool.category,
+          auto: typeof u._meta?.auto === 'string' ? u._meta.auto : prev.tool.auto,
         };
         if (files.length && !prev.tool.files) this.countFiles(files, prev.ts);
         this.upsert({ ...prev, tool });
@@ -302,10 +346,41 @@ export class AcpParser {
         this.upsert({ kind: 'tool', id, seq: 0, ts, tool: { name: 'plan', category: 'todo', title: 'Plan', status: 'ok', todos }, turn });
         return;
       }
+      case 'usage_update': {
+        const n = u._meta?.naget ?? {};
+        const prev = this.spend.get(this.acpSession) ?? { in: 0, out: 0, cached: 0, usd: 0, priced: false };
+        const count = (v: unknown, was: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : was);
+        const cost = typeof u.cost?.amount === 'number' && Number.isFinite(u.cost.amount) && (u.cost.currency ?? 'USD') === 'USD' ? u.cost.amount : undefined;
+        const cur: Spend = { in: count(n.tokensIn, prev.in), out: count(n.tokensOut, prev.out), cached: count(n.tokensCached, prev.cached), usd: cost ?? prev.usd, priced: cost !== undefined || prev.priced };
+        this.act?.bump(ts, 'tokensIn', Math.max(0, cur.in - prev.in));
+        this.act?.bump(ts, 'tokensOut', Math.max(0, cur.out - prev.out));
+        this.act?.bump(ts, 'tokensCached', Math.max(0, cur.cached - prev.cached));
+        this.spend.set(this.acpSession, cur);
+        const all = this.spent();
+        this.stats.tokensIn = all.in;
+        this.stats.tokensOut = all.out;
+        this.stats.tokensCached = all.cached;
+        this.stats.costUsd = all.priced ? all.usd : undefined;
+        if (typeof n.model === 'string' && n.model) this.summary.model = n.model;
+        return;
+      }
       case 'current_mode_update':
         if (u.currentModeId) this.upsert({ kind: 'system', id: `mode${this.seq++}`, seq: 0, ts, level: 'info', text: `Mode: ${u.currentModeId}` });
         return;
     }
+  }
+
+  /** The totals of every ACP session in this transcript. */
+  private spent(): Spend {
+    const t: Spend = { in: 0, out: 0, cached: 0, usd: 0, priced: false };
+    for (const v of this.spend.values()) {
+      t.in += v.in;
+      t.out += v.out;
+      t.cached += v.cached;
+      t.usd += v.usd;
+      t.priced ||= v.priced;
+    }
+    return t;
   }
 
   private countFiles(files: FileChange[], ts?: number) {

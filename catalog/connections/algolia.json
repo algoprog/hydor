@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "id": "algolia",
+  "name": "Algolia",
+  "description": "Search and manage your Algolia indices, rules and search analytics.",
+  "category": "search",
+  "icon": "algolia",
+  "color": "#003DFF",
+  "homepage": "https://www.algolia.com",
+  "docs": "https://www.algolia.com/doc/guides/model-context-protocol/productivity-mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.algolia.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "search",
+    "indices",
+    "analytics"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "plaid",
+  "name": "Plaid",
+  "description": "Look into your Plaid integration from its dashboard: items, Link sessions and usage.",
+  "category": "finance",
+  "icon": "plaid",
+  "color": "#111111",
+  "homepage": "https://plaid.com",
+  "docs": "https://plaid.com/docs/resources/mcp/",
+  "server": {
+    "transport": "http",
+    "url": "https://api.dashboard.plaid.com/mcp/"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "banking",
+    "fintech",
+    "api",
+    "developers"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

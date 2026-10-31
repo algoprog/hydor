@@ -1,0 +1,9 @@
+{
+  "query": "storage projects of at least 1 GWh",
+  "url": "https://en.wikipedia.org/wiki/Grid_energy_storage",
+  "title": "Grid energy storage - Wikipedia",
+  "filtered_snippet": "## Batteries\nThe largest battery storage project, Moss Landing, holds 3 GWh.",
+  "input_words": 9480,
+  "kept_words": 14,
+  "usage": { "duration_ms": 1890 }
+}

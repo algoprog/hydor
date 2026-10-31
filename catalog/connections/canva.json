@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "canva",
+  "name": "Canva",
+  "description": "Search, create and edit designs in your Canva account, and export them.",
+  "category": "design",
+  "icon": "canva",
+  "color": "#00C4CC",
+  "homepage": "https://www.canva.com",
+  "docs": "https://www.canva.dev/docs/mcp/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.canva.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "design",
+    "graphics",
+    "presentations",
+    "social media"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema.json",
+  "id": "sequential-thinking",
+  "name": "Sequential thinking",
+  "description": "A step-by-step thinking tool for working through hard problems and revising as it goes.",
+  "category": "ai",
+  "icon": "list",
+  "color": "#4F46E5",
+  "homepage": "https://github.com/modelcontextprotocol/servers",
+  "docs": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-sequential-thinking"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "reasoning",
+    "planning",
+    "problem solving"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

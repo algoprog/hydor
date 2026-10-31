@@ -1,0 +1,25 @@
+{
+  "tiers": [
+    { "id": "tier1", "label": "Institutional facts", "description": "Factual records from an institution with direct authority.", "primary_flagged": true },
+    { "id": "low_authority", "label": "Low authority", "description": "No accountable source.", "primary_flagged": false }
+  ],
+  "categories": [
+    { "id": "academic", "label": "Academic", "group": "page_type", "description": "Scholarly papers from every scholarly collection.", "tiers": ["tier2"], "file_types": ["html", "pdf"] },
+    { "id": "news", "label": "News", "group": "page_type", "description": "News articles.", "tiers": ["tier1", "tier4"] },
+    { "id": "docs", "label": "Documentation", "group": "page_type", "description": "Technical documentation.", "tiers": ["tier2"] },
+    { "id": "arxiv", "label": "arXiv", "group": "collection", "description": "arXiv preprints.", "tiers": ["tier2"] },
+    { "id": "pubmed", "label": "PubMed", "group": "collection", "description": "Biomedical literature.", "tiers": ["tier2"] },
+    { "id": "uspto", "label": "US patents", "group": "collection", "description": "Patents granted by the USPTO.", "tiers": ["tier1"] },
+    { "id": "data", "label": "Data", "group": "page_type", "description": "Datasets and statistics.", "tiers": ["tier1"] },
+    { "label": "no id: left out" }
+  ],
+  "primary_sources": { "description": "The publisher originated the claim." },
+  "file_types": [
+    { "id": "html", "label": "Web pages", "description": "Web pages and records.", "available": true },
+    { "id": "pdf", "label": "PDF documents", "description": "PDFs crawled from the web.", "available": true }
+  ],
+  "languages": [
+    { "id": "en", "label": "English" },
+    { "id": "de", "label": "German" }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "../schema.json",
+  "id": "gmail",
+  "name": "Gmail",
+  "description": "Search and read your email in Gmail, and write drafts.",
+  "category": "communication",
+  "icon": "gmail",
+  "color": "#EA4335",
+  "homepage": "https://mail.google.com",
+  "docs": "https://developers.google.com/workspace/guides/configure-mcp-servers",
+  "server": {
+    "transport": "http",
+    "url": "https://gmailmcp.googleapis.com/mcp/v1"
+  },
+  "auth": {
+    "type": "oauth",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.compose"
+    ],
+    "params": {
+      "access_type": "offline",
+      "prompt": "consent"
+    },
+    "help": "Google’s MCP servers are a developer preview: make an OAuth client (a web application) in Google Cloud with this page’s callback address, turn on the Gmail API, and enter its client ID and secret here."
+  },
+  "keywords": [
+    "email",
+    "mail",
+    "inbox",
+    "google"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "Google’s preview: it needs your own OAuth client from Google Cloud."
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, Download, Eye, FileDiff, RotateCcw, Save, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle } from '../../lib/codemirror';
@@ -9,6 +9,10 @@ import { DiffView } from '../../components/DiffView';
 import { Button, cx, Throbber, Empty, IconButton, useIsMobile } from '../../components/ui';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { mu } from '../../lib/machine';
+import { isPreviewable } from '@shared/documents';
+
+// Word, Excel, PowerPoint and other documents open as a preview (features/documents).
+const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) => ({ default: m.OfficePreview })));
 
 interface FileData {
   path: string;
@@ -83,6 +87,7 @@ export function FileEditor({
   const media = MEDIA[ext];
   const isMd = ext === 'md' || ext === 'markdown' || ext === 'mdx';
   const isHtml = ext === 'html' || ext === 'htm';
+  const office = isPreviewable(path);
   // An HTML file shows as a page: sandboxed, with a short-lived link that lets it load its own files.
   const [pageUrl, setPageUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -282,6 +287,10 @@ export function FileEditor({
           <div className="flex h-full items-center justify-center text-fg-3">
             <Throbber size={34} />
           </div>
+        ) : office && (file.binary || file.tooLarge || ext === 'rtf') ? (
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-fg-3"><Throbber size={34} /></div>}>
+            <OfficePreview path={path} mtime={file.mtime} />
+          </Suspense>
         ) : media && (file.binary || ext === 'svg') ? (
           <div className="flex h-full items-center justify-center overflow-auto bg-bg-1 p-4">
             {media === 'image' && <img src={raw} alt={basename(path)} className="max-h-full max-w-full rounded-lg border border-line bg-[repeating-conic-gradient(var(--bg-2)_0%_25%,var(--bg)_0%_50%)] [background-size:16px_16px] object-contain" />}

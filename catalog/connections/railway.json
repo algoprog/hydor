@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "railway",
+  "name": "Railway",
+  "description": "Deploy and manage services, environments, variables and logs on Railway.",
+  "category": "cloud",
+  "icon": "railway",
+  "color": "#0B0D0E",
+  "homepage": "https://railway.com",
+  "docs": "https://docs.railway.com/guides/mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.railway.com"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "hosting",
+    "deployments",
+    "databases",
+    "infrastructure"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -22,6 +22,8 @@ import { live } from './ws';
 import { machineId, machineKey } from './machine';
 import { useMachines } from './machines';
 import { handleNotify } from './notify';
+import { useNotes } from './notes';
+import { emitFeatureEvent } from './featureEvents';
 
 // ---- toasts --------------------------------------------------------------------
 
@@ -490,6 +492,12 @@ export function handleEvent(e: ServerEvent) {
     case 'themes':
       // Another machine's pages keep this server's themes (they come on its own socket).
       if (!machineId) window.dispatchEvent(new CustomEvent('wa:themes', { detail: e.themes }));
+      break;
+    case 'note':
+      useNotes.getState().apply(e.key, e.note, e.removed);
+      break;
+    case 'feature':
+      emitFeatureEvent(e.id, { key: e.key, data: e.data });
       break;
   }
 }

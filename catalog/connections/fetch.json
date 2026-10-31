@@ -1,0 +1,32 @@
+{
+  "$schema": "../schema.json",
+  "id": "fetch",
+  "name": "Fetch",
+  "description": "Fetch web pages and turn them into Markdown for the agent to read.",
+  "category": "search",
+  "icon": "globe",
+  "color": "#0EA5E9",
+  "homepage": "https://github.com/modelcontextprotocol/servers",
+  "docs": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch",
+  "server": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": [
+      "mcp-server-fetch"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "web",
+    "pages",
+    "markdown",
+    "http"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "Needs uv (uvx) on this computer."
+}

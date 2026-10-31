@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "buildkite",
+  "name": "Buildkite",
+  "description": "Look at Buildkite pipelines, builds, jobs and their logs.",
+  "category": "dev",
+  "icon": "buildkite",
+  "color": "#14CC80",
+  "homepage": "https://buildkite.com",
+  "docs": "https://buildkite.com/docs/apis/mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.buildkite.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "ci",
+    "builds",
+    "pipelines",
+    "tests"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

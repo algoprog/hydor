@@ -1,0 +1,41 @@
+{
+  "$schema": "../schema.json",
+  "id": "sqlite",
+  "name": "SQLite",
+  "description": "Query and change a SQLite database file, and keep notes on what it finds.",
+  "category": "data",
+  "icon": "database",
+  "color": "#003B57",
+  "homepage": "https://github.com/modelcontextprotocol/servers-archived",
+  "docs": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite",
+  "server": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": [
+      "mcp-server-sqlite",
+      "--db-path",
+      "{{DB_PATH}}"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "fields": [
+    {
+      "name": "DB_PATH",
+      "label": "Database file",
+      "placeholder": "/home/you/data.db",
+      "help": "A full path; the file is made if it is not there."
+    }
+  ],
+  "keywords": [
+    "sql",
+    "database",
+    "local"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "Needs uv (uvx) on this computer."
+}

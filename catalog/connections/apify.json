@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "id": "apify",
+  "name": "Apify",
+  "description": "Run Apify’s ready-made web scrapers and automation tools (Actors) and get their data.",
+  "category": "search",
+  "icon": "apify",
+  "color": "#246DFF",
+  "homepage": "https://apify.com",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.apify.com"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "scraping",
+    "crawling",
+    "automation",
+    "data extraction"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

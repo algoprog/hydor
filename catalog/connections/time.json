@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema.json",
+  "id": "time",
+  "name": "Time",
+  "description": "The current time in any time zone, and conversions between zones.",
+  "category": "local",
+  "icon": "clock",
+  "color": "#0F766E",
+  "homepage": "https://github.com/modelcontextprotocol/servers",
+  "docs": "https://github.com/modelcontextprotocol/servers/tree/main/src/time",
+  "server": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": [
+      "mcp-server-time"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "time zones",
+    "clock",
+    "dates"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "Needs uv (uvx) on this computer."
+}

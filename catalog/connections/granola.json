@@ -1,0 +1,26 @@
+{
+  "$schema": "../schema.json",
+  "id": "granola",
+  "name": "Granola",
+  "description": "Search your Granola meeting notes and transcripts.",
+  "category": "communication",
+  "icon": "granola",
+  "color": "#5B7B3A",
+  "homepage": "https://www.granola.ai",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.granola.ai/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "meetings",
+    "notes",
+    "transcripts"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

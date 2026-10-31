@@ -1,0 +1,31 @@
+// What the app's capabilities (search, browser, memory, assistants…) share between server and pages:
+// the settings a session keeps beyond its agent's own, and the notes the app adds to a conversation.
+
+/** Settings a session keeps beyond its agent's own. Each capability reads and writes its own fields. */
+export interface SessionExtra {
+  /** Memory: false turns it off for this session. */
+  memory?: boolean;
+  /** The assistant it started as (Researcher, Writer…). */
+  assistant?: string;
+  /** Most this session may spend, in US dollars (API prices); none when unset. */
+  capUsd?: number;
+  /** The session that started this one, for a child session. */
+  parent?: string;
+  /** Any other capability's settings, under its own name. */
+  [field: string]: unknown;
+}
+
+/**
+ * Something the app adds to a conversation beside what the agent wrote: a memory update, a second
+ * opinion, a spending cap reached. It shows with the turn of its anchor, or at the end without one.
+ */
+export interface SessionNote {
+  id: string;
+  key: string;
+  /** Which capability shows it: "memory", "opinion", "budget"… */
+  kind: string;
+  at: number;
+  /** The timeline item it follows (usually the reply it is about). */
+  anchor?: string;
+  data: unknown;
+}

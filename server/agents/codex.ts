@@ -8,6 +8,7 @@ import type { Runner, RunSpec } from '../runner/client.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig } from './live.ts';
 import { RpcPeer } from './rpc.ts';
 import { splitHandoff } from '../handoff.ts';
+import type { SpawnAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
 
 type Json = Record<string, any>;
@@ -24,6 +25,20 @@ export interface CodexOpts {
   model?: string;
   effort?: string;
   mode?: string;
+  /** What the app's capabilities add: instructions, MCP servers (server/features). */
+  add?: Required<SpawnAdditions>;
+}
+
+/** MCP servers in Codex's own config format; the app's tools need no approval. */
+function codexServers(o: CodexOpts): Record<string, unknown> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [name, d] of Object.entries(o.add?.mcpServers ?? {}))
+    out[name] = d.type === 'http' ? { url: d.url, ...(d.headers ? { http_headers: d.headers } : {}) } : { command: d.command, args: d.args ?? [], env: d.env ?? {} };
+  // Its tools may take minutes (an image model at work): Codex would give up after 60 seconds.
+  if (o.pageServer) out[PAGE_SERVER] = { url: o.pageServer, default_tools_approval_mode: 'approve', tool_timeout_sec: 600 };
+  // Tools an assistant leaves out ("mcp__naget-agent__web_search"), off on their server.
+  for (const m of (o.add?.disallowedTools ?? []).map((t) => /^mcp__(.+?)__(.+)$/.exec(t))) if (m && out[m[1]]) ((out[m[1]].disabled_tools ??= []) as string[]).push(m[2]);
+  return out;
 }
 
 interface ModeDef {
@@ -179,14 +194,20 @@ export class CodexLive extends LiveAdapter {
       capabilities: { experimentalApi: true, requestAttestation: false },
     });
     this.rpc.notify('initialized');
+    // Skill folders from the capabilities (the app's skill library), for this process's threads.
+    if (this.opts.add?.skillRoots?.length) await this.rpc.call('skills/extraRoots/set', { extraRoots: this.opts.add.skillRoots }).catch(() => {});
     const mode = codexMode(this.opts.mode);
     const common = {
       model: this.opts.model || null,
       config: {
         // Also the thread's default effort, so turns Codex starts by itself (a goal's) use it too.
         ...(this.opts.effort ? { model_reasoning_effort: this.opts.effort } : {}),
-        // The app's page server, next to the user's own MCP servers.
-        ...(this.opts.pageServer ? { mcp_servers: { [PAGE_SERVER]: { url: this.opts.pageServer, default_tools_approval_mode: 'approve' } } } : {}),
+        // The app's own server (and the capabilities' servers), next to the user's own MCP servers.
+        ...(this.opts.pageServer || Object.keys(this.opts.add?.mcpServers ?? {}).length ? { mcp_servers: codexServers(this.opts) } : {}),
+        // What the capabilities add to its instructions (memory, the assistant…).
+        ...(this.opts.add?.instructions.length ? { developer_instructions: this.opts.add.instructions.join('\n\n') } : {}),
+        // And to its settings (an assistant without the web: web_search "disabled").
+        ...this.opts.add?.codexConfig,
       },
       cwd: this.opts.cwd,
       approvalPolicy: mode.approval,

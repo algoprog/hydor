@@ -1,0 +1,15 @@
+{
+  "query": "solid state battery",
+  "number_of_results": 0,
+  "results": [
+    { "url": "https://en.wikipedia.org/wiki/Solid-state_battery", "title": "Solid-state battery - Wikipedia", "content": "A solid-state battery is an electrical battery that uses a solid electrolyte.", "engine": "duckduckgo", "engines": ["duckduckgo", "brave"], "positions": [1, 2], "score": 4.0, "category": "general", "publishedDate": null, "template": "default.html" },
+    { "url": "https://www.nature.com/articles/s41560-023-01234-5", "title": "Solid-state batteries enter &quot;production&quot;", "content": "Pilot lines in 2023 <em>show</em> …", "engine": "google scholar", "engines": ["google scholar"], "score": 2.0, "category": "science", "publishedDate": "2023-05-02T00:00:00", "pubdate": "2023-05-02" },
+    { "url": "https://en.wikipedia.org/wiki/Solid-state_battery", "title": "Duplicate", "content": "Same page again.", "engine": "bing", "category": "general" },
+    { "url": "magnet:?xt=urn:btih:0000", "title": "A torrent", "content": "", "engine": "piratebay", "category": "files" }
+  ],
+  "answers": [],
+  "corrections": [],
+  "infoboxes": [],
+  "suggestions": ["solid state battery toyota"],
+  "unresponsive_engines": [["qwant", "timeout"]]
+}

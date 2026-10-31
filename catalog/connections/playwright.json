@@ -1,0 +1,33 @@
+{
+  "$schema": "../schema.json",
+  "id": "playwright",
+  "name": "Playwright browser",
+  "description": "Drive a real browser: open pages, click, type, fill forms and take snapshots.",
+  "category": "search",
+  "icon": "browser",
+  "color": "#2EAD33",
+  "homepage": "https://playwright.dev",
+  "docs": "https://github.com/microsoft/playwright-mcp",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@playwright/mcp@latest"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "browser",
+    "automation",
+    "web",
+    "testing",
+    "forms"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

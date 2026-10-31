@@ -1,0 +1,26 @@
+{
+  "$schema": "../schema.json",
+  "id": "grep",
+  "name": "Grep by Vercel",
+  "description": "Search code across a million public GitHub repositories.",
+  "category": "dev",
+  "icon": "grep",
+  "color": "#000000",
+  "homepage": "https://grep.app",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.grep.app"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "code search",
+    "github",
+    "examples"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

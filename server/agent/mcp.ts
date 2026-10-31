@@ -26,6 +26,8 @@ export interface McpTool {
   fullName: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  /** The server says it only reads (MCP's readOnlyHint). */
+  readOnly?: boolean;
 }
 
 const readJson = (f: string): any => {
@@ -254,16 +256,41 @@ export class McpClient {
       fullName: `mcp__${clean(this.def.name)}__${clean(t.name)}`.slice(0, 64),
       description: String(t.description ?? '').slice(0, 1000),
       inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
+      readOnly: t.annotations?.readOnlyHint === true,
     }));
   }
 
-  /** A tool's result as text (images and other content noted, not shown). */
-  async call(tool: string, args: unknown, signal: AbortSignal): Promise<{ text: string; isError: boolean }> {
+  /**
+   * A tool's result: its text, its images (a screenshot) for the models that see them, and its
+   * structured content when the text does not already carry it.
+   */
+  async call(tool: string, args: unknown, signal: AbortSignal): Promise<{ text: string; images: { data: string; mimeType: string }[]; isError: boolean }> {
     const r = await this.request('tools/call', { name: tool, arguments: args ?? {} }, 600_000, signal);
-    const text = (r.content ?? [])
-      .map((c: any) => (c.type === 'text' ? c.text : c.type === 'resource' ? (c.resource?.text ?? `[resource ${c.resource?.uri}]`) : `[${c.type}]`))
-      .join('\n');
-    return { text: text || JSON.stringify(r.structuredContent ?? r), isError: !!r.isError };
+    const images: { data: string; mimeType: string }[] = [];
+    const parts: string[] = [];
+    for (const c of r.content ?? []) {
+      if (c?.type === 'text') parts.push(String(c.text ?? ''));
+      else if (c?.type === 'image' && typeof c.data === 'string') {
+        images.push({ data: c.data, mimeType: String(c.mimeType ?? 'image/png') });
+        parts.push(`[image ${images.length}]`);
+      } else if (c?.type === 'resource') {
+        const res = c.resource ?? {};
+        if (typeof res.text === 'string') parts.push(res.text);
+        else if (typeof res.blob === 'string' && /^image\//.test(res.mimeType ?? '')) {
+          images.push({ data: res.blob, mimeType: res.mimeType });
+          parts.push(`[image ${images.length}: ${res.uri ?? ''}]`);
+        } else parts.push(`[resource ${res.uri ?? ''}${res.mimeType ? ` (${res.mimeType})` : ''}]`);
+      } else if (c?.type === 'resource_link') parts.push(`[link: ${c.name ?? ''} ${c.uri ?? ''}]`.replace(/\s+\]/, ']'));
+      else if (c?.type) parts.push(`[${c.type}]`);
+    }
+    let text = parts.join('\n');
+    // Structured content usually comes as text too; when it does not, it is added.
+    if (r.structuredContent !== undefined) {
+      const json = JSON.stringify(r.structuredContent);
+      const compact = (s: string) => s.replace(/\s+/g, '');
+      if (!compact(text).includes(compact(json).slice(0, 200))) text = text ? `${text}\n\nStructured result:\n${JSON.stringify(r.structuredContent, null, 1)}` : JSON.stringify(r.structuredContent, null, 1);
+    }
+    return { text: text || (images.length ? '' : '(no output)'), images, isError: !!r.isError };
   }
 
   close() {

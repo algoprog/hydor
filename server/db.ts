@@ -173,12 +173,18 @@ export function openDb(file = paths.db): DB {
     ['pr', 'text'],
     ['account', 'text'],
     ['acp_agent', 'text'],
+    ['extra', 'text'],
   ]) {
     if (appCols.has(col)) continue;
     try {
       db.exec(`alter table app_sessions add column ${col} ${type}`);
     } catch {}
   }
+  // Notes the app adds to conversations (server/notes.ts).
+  db.exec(`create table if not exists session_notes (
+    id text primary key, key text not null, kind text not null, at integer not null, anchor text, data text not null
+  )`);
+  db.exec('create index if not exists session_notes_key on session_notes(key, at)');
   const actCols = new Set((db.prepare('pragma table_info(activity)').all() as { name: string }[]).map((c) => c.name));
   if (!actCols.has('gen_ms')) {
     try {

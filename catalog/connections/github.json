@@ -1,0 +1,34 @@
+{
+  "$schema": "../schema.json",
+  "id": "github",
+  "name": "GitHub",
+  "description": "Work with repositories, issues, pull requests, Actions runs and code search on GitHub.",
+  "category": "dev",
+  "icon": "github",
+  "color": "#24292F",
+  "homepage": "https://github.com",
+  "docs": "https://github.com/github/github-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://api.githubcopilot.com/mcp/"
+  },
+  "auth": {
+    "type": "api_key",
+    "url": "https://github.com/settings/personal-access-tokens/new",
+    "help": "A fine-grained personal access token, limited to the repositories and permissions you want agents to have."
+  },
+  "keywords": [
+    "git",
+    "repositories",
+    "pull requests",
+    "issues",
+    "code",
+    "actions"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "GitHub’s sign-in server does not let apps register by themselves, so this uses a personal access token."
+}

@@ -5,6 +5,7 @@ import { api, post, put } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { Button, cx, inputCls, Section, Throbber, useConfirm } from '../../components/ui';
+import { HelperModel } from './HelperModel';
 
 const GiB = 1024 ** 3;
 export const size = (b: number) => (b >= 10 * GiB ? `${Math.round(b / GiB)} GB` : b >= 0.1 * GiB ? `${(b / GiB).toFixed(1)} GB` : `${Math.round(b / 1024 ** 2)} MB`);
@@ -34,6 +35,7 @@ export function ModelsSettings() {
       <p className="text-[13px] leading-relaxed text-fg-3">
         Custom, the app’s own agent, runs any of these models with the same tools, skills and MCP servers as the other agents. Pick Custom on the start page, then the model.
       </p>
+      <HelperModel />
       <LocalModels st={st} />
       <AddFromHf st={st} />
       <OpenRouter st={st} />

@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema.json",
+  "id": "supabase",
+  "name": "Supabase",
+  "description": "Manage Supabase projects: query and change databases, apply migrations, read logs.",
+  "category": "data",
+  "icon": "supabase",
+  "color": "#3ECF8E",
+  "homepage": "https://supabase.com",
+  "docs": "https://supabase.com/docs/guides/ai-tools/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.supabase.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "postgres",
+    "database",
+    "backend",
+    "auth",
+    "storage"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

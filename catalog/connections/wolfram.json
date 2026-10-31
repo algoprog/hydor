@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "wolfram",
+  "name": "Wolfram",
+  "description": "Exact answers for math, science, units, dates and data from Wolfram.",
+  "category": "search",
+  "icon": "wolfram",
+  "color": "#DD1100",
+  "homepage": "https://www.wolfram.com",
+  "docs": "https://www.wolfram.com/agent-tools/",
+  "server": {
+    "transport": "http",
+    "url": "https://agenttools.wolfram.com/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "math",
+    "science",
+    "calculations",
+    "facts"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

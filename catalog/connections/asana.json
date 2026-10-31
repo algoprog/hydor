@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "asana",
+  "name": "Asana",
+  "description": "Find, create and update tasks, projects and goals in Asana.",
+  "category": "tasks",
+  "icon": "asana",
+  "color": "#F06A6A",
+  "homepage": "https://asana.com",
+  "docs": "https://developers.asana.com/docs/using-asanas-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.asana.com/v2/mcp"
+  },
+  "auth": {
+    "type": "oauth",
+    "help": "Asana signs in through an app you make in its developer console: give it this page’s callback address as a redirect URL, then enter its client ID and secret here."
+  },
+  "keywords": [
+    "tasks",
+    "projects",
+    "goals",
+    "work management"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

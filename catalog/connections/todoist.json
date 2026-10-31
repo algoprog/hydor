@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "todoist",
+  "name": "Todoist",
+  "description": "Add, find, reschedule and complete tasks and projects in Todoist.",
+  "category": "tasks",
+  "icon": "todoist",
+  "color": "#E44332",
+  "homepage": "https://www.todoist.com",
+  "docs": "https://www.todoist.com/help/articles/todoist-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://ai.todoist.net/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "to-do",
+    "tasks",
+    "reminders",
+    "personal"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

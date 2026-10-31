@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "postman",
+  "name": "Postman",
+  "description": "Work with Postman workspaces, collections, environments and APIs.",
+  "category": "dev",
+  "icon": "postman",
+  "color": "#FF6C37",
+  "homepage": "https://www.postman.com",
+  "docs": "https://learning.postman.com/docs/reference/postman-api/postman-mcp-server/postman-mcp-remote-server/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.postman.com/minimal"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "api",
+    "testing",
+    "collections",
+    "http"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "../schema.json",
+  "id": "slack-bot",
+  "name": "Slack (bot token)",
+  "description": "Read channels and threads, and post messages and reactions in Slack as a bot you add.",
+  "category": "communication",
+  "icon": "slack-bot",
+  "color": "#4A154B",
+  "homepage": "https://slack.com",
+  "docs": "https://github.com/zencoderai/slack-mcp-server",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@zencoderai/slack-mcp-server"
+    ],
+    "env": {
+      "SLACK_BOT_TOKEN": "{{SLACK_BOT_TOKEN}}",
+      "SLACK_TEAM_ID": "{{SLACK_TEAM_ID}}"
+    }
+  },
+  "auth": {
+    "type": "api_key",
+    "url": "https://api.slack.com/apps"
+  },
+  "fields": [
+    {
+      "name": "SLACK_BOT_TOKEN",
+      "label": "Bot token",
+      "secret": true,
+      "placeholder": "xoxb-…",
+      "url": "https://api.slack.com/apps"
+    },
+    {
+      "name": "SLACK_TEAM_ID",
+      "label": "Workspace ID",
+      "placeholder": "T01234567"
+    }
+  ],
+  "keywords": [
+    "chat",
+    "messages",
+    "channels",
+    "bot"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

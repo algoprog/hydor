@@ -1,0 +1,44 @@
+{
+  "$schema": "../schema.json",
+  "id": "brave-search",
+  "name": "Brave Search",
+  "description": "Web, news, image, video and local search through the Brave Search API.",
+  "category": "search",
+  "icon": "search",
+  "color": "#FB542B",
+  "homepage": "https://brave.com/search/api/",
+  "docs": "https://github.com/brave/brave-search-mcp-server",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@brave/brave-search-mcp-server"
+    ],
+    "env": {
+      "BRAVE_API_KEY": "{{BRAVE_API_KEY}}"
+    }
+  },
+  "auth": {
+    "type": "api_key",
+    "url": "https://brave.com/search/api/"
+  },
+  "fields": [
+    {
+      "name": "BRAVE_API_KEY",
+      "label": "API key",
+      "secret": true,
+      "url": "https://brave.com/search/api/"
+    }
+  ],
+  "keywords": [
+    "web search",
+    "news",
+    "images",
+    "local"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

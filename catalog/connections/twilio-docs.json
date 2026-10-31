@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "twilio-docs",
+  "name": "Twilio docs",
+  "description": "Search Twilio’s documentation and API reference.",
+  "category": "dev",
+  "icon": "twilio-docs",
+  "color": "#F22F46",
+  "homepage": "https://www.twilio.com",
+  "docs": "https://www.twilio.com/docs/ai/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.twilio.com/docs"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "sms",
+    "voice",
+    "documentation",
+    "api"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}
