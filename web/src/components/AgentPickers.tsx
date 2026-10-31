@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { Brain, Check, ChevronRight, Gauge, ShieldCheck } from 'lucide-react';
 import type { Agent, AgentCatalog, ModelOption, SessionPrefs } from '@shared/types';
 import { api } from '../lib/api';
-import { AgentIcon, agentName } from './AgentIcon';
+import { agentName } from './AgentIcon';
 import { cx, OptionRow, Picker } from './ui';
 
 type Catalog = AgentCatalog & { prefs?: SessionPrefs };
@@ -66,7 +66,6 @@ const newer = (a: number[], b: number[]) => {
 };
 
 interface ModelRow {
-  agent: Agent;
   opt: ModelOption;
   /** What picking it sets: null for the agent's default. */
   value: string | null;
@@ -77,7 +76,7 @@ interface ModelRow {
 }
 
 /** One row per model, the default marked rather than listed twice; older versions of a family are set apart. */
-function modelRows(agent: Agent, c: Catalog): ModelRow[] {
+function modelRows(c: Catalog): ModelRow[] {
   const def = c.models.find((m) => m.isDefault);
   const defModel = def?.value === 'default' ? findModel(c, def.resolved) : def;
   const named = c.models.filter((m) => m.value !== 'default');
@@ -90,7 +89,6 @@ function modelRows(agent: Agent, c: Catalog): ModelRow[] {
     const f = family(m.label);
     const isDefault = m === defModel;
     return {
-      agent,
       opt: m,
       // Claude's "default" follows its recommendation; Codex's must be named, or Codex falls back to its
       // config.toml model, which a ChatGPT sign-in may not allow.
@@ -103,123 +101,96 @@ function modelRows(agent: Agent, c: Catalog): ModelRow[] {
   });
 }
 
-function ModelMenu({ agents, current, value, onPick, switchNote, acp }: { agents: Agent[]; current: Agent; value?: string | null; onPick: (v: string | null, agent: Agent) => void; switchNote?: string; acp?: string }) {
-  const all = useCatalogs((s) => s.byAgent);
-  const cats: Partial<Record<Agent, Catalog>> = Object.fromEntries(agents.map((a) => [a, all[catalogKey(a, acp)]]));
-  useEffect(() => agents.forEach((a) => loadCatalog(a, false, acp)), [agents, acp]);
+function ModelMenu({ agent, c, value, onPick }: { agent: Agent; c: Catalog | undefined; value?: string | null; onPick: (v: string | null) => void }) {
   const [q, setQ] = useState('');
-  const [open, setOpen] = useState<Partial<Record<Agent, boolean>>>({});
-  const ordered = [current, ...agents.filter((a) => a !== current)];
-  const rows = ordered.flatMap((a) => (cats[a] ? modelRows(a, cats[a]!) : []));
+  const [open, setOpen] = useState(false);
+  if (!c) return <div className="px-2.5 py-1.5 text-[12px] text-fg-3">Loading {agentName(agent)} models…</div>;
+  const rows = modelRows(c);
   // The chosen model, with "default" read as the model it stands for.
-  const chosen = findModel(cats[current], value);
-  const chosenModel = chosen?.value === 'default' ? findModel(cats[current], chosen.resolved) : chosen;
-  const selected = (r: ModelRow) => r.agent === current && r.opt === chosenModel;
+  const chosen = findModel(c, value);
+  const chosenModel = chosen?.value === 'default' ? findModel(c, chosen.resolved) : chosen;
+  const selected = (r: ModelRow) => r.opt === chosenModel;
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const many = rows.length > 8;
+  const found = (r: ModelRow) => words.every((w) => `${r.label} ${r.value ?? ''}`.toLowerCase().includes(w));
+  const shown = words.length ? rows.filter(found) : rows.filter((r) => !r.older || open || selected(r));
+  const hidden = words.length ? 0 : rows.length - shown.length;
   return (
     <div className="py-0.5">
-      {many && (
+      {rows.length > 8 && (
         <input
           autoFocus={!window.matchMedia('(pointer: coarse)').matches}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            const first = rows.find((r) => words.every((w) => `${r.label} ${r.value ?? ''}`.toLowerCase().includes(w)));
-            if (e.key === 'Enter' && first) onPick(first.value, first.agent);
+            if (e.key === 'Enter' && shown[0]) onPick(shown[0].value);
           }}
           placeholder="Search models"
           className="mx-1 mb-1 h-8 w-[calc(100%-8px)] rounded-lg bg-bg-2 px-2.5 text-[13px] outline-none placeholder:text-fg-3"
         />
       )}
-      {ordered.map((a) => {
-        const mine = rows.filter((r) => r.agent === a);
-        const shown = words.length ? mine.filter((r) => words.every((w) => `${r.label} ${r.value ?? ''}`.toLowerCase().includes(w))) : mine.filter((r) => !r.older || open[a] || selected(r));
-        const hidden = words.length ? 0 : mine.length - shown.length;
-        if (!cats[a]) return <div key={a} className="px-2.5 py-1.5 text-[12px] text-fg-3">Loading {agentName(a)} models…</div>;
-        if (!shown.length && words.length) return null;
-        return (
-          <div key={a}>
-            {agents.length > 1 && (
-              <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1 text-[11.5px] font-medium text-fg-3">
-                <AgentIcon agent={a} size={12} />
-                {agentName(a)}
-                {a !== current && switchNote && <span className="truncate font-normal">· {switchNote}</span>}
-              </div>
-            )}
-            {shown.map((r) => (
-              <button
-                key={`${r.agent}:${r.value}`}
-                type="button"
-                title={r.hint}
-                onClick={() => onPick(r.value, r.agent)}
-                className={cx('flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors hover:bg-bg-2', selected(r) && 'bg-bg-2')}
-              >
-                <span className="min-w-0 flex-1 truncate text-fg">{r.label}</span>
-                {r.isDefault && <span className="shrink-0 text-[11px] text-fg-3">default</span>}
-                {selected(r) && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
-              </button>
-            ))}
-            {hidden > 0 && (
-              <button type="button" onClick={() => setOpen((o) => ({ ...o, [a]: true }))} className="flex h-7.5 w-full items-center gap-1.5 rounded-lg px-2.5 text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
-                <ChevronRight size={12} />
-                {hidden} older {hidden === 1 ? 'model' : 'models'}
-              </button>
-            )}
-          </div>
-        );
-      })}
+      {shown.map((r) => (
+        <button
+          key={r.opt.value}
+          type="button"
+          title={r.hint}
+          onClick={() => onPick(r.value)}
+          className={cx('flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors hover:bg-bg-2', selected(r) && 'bg-bg-2')}
+        >
+          <span className="min-w-0 flex-1 truncate text-fg">{r.label}</span>
+          {r.isDefault && <span className="shrink-0 text-[11px] text-fg-3">default</span>}
+          {selected(r) && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
+        </button>
+      ))}
+      {hidden > 0 && (
+        <button type="button" onClick={() => setOpen(true)} className="flex h-7.5 w-full items-center gap-1.5 rounded-lg px-2.5 text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
+          <ChevronRight size={12} />
+          {hidden} older {hidden === 1 ? 'model' : 'models'}
+        </button>
+      )}
     </div>
   );
 }
 
 /**
- * The model, from the session's agent or (with `agents`) any agent's list; `onChange` says which agent the
- * picked model belongs to. Rows are one line each; older versions of a model wait behind "older models".
+ * The model, from the agent's own list only: Claude Code's models for Claude Code, Codex's for Codex, the
+ * Custom models for Custom. Rows are one line each; older versions of a model wait behind "older models".
  */
 export function ModelPicker({
   agent,
   value,
   onChange,
   disabled,
-  agents,
-  switchNote,
   acp,
   label,
 }: {
   agent: Agent;
   value?: string | null;
-  onChange: (v: string | null, agent: Agent) => void;
+  onChange: (v: string | null) => void;
   disabled?: boolean;
-  agents?: Agent[];
-  switchNote?: string;
   /** For an ACP agent: which one (its models are what it offered when it last ran). */
   acp?: string;
   /** Named, without an icon (the start page): "Model  Opus 5.5", the default read as the model it stands for. */
   label?: string;
 }) {
   const c = useCatalog(agent, acp);
-  const list = agents ?? [agent];
   if (agent === 'acp' && !c?.models.length) return null;
   const def = !value && label ? c?.models.find((m) => m.isDefault) : undefined;
   return (
     <Picker
-      icon={label ? undefined : list.length > 1 ? <AgentIcon agent={agent} size={13} className="shrink-0" /> : <Brain size={13} className="shrink-0" />}
+      icon={label ? undefined : <Brain size={13} className="shrink-0" />}
       label={label}
       value={c ? (def?.resolved ? modelLabel(c, def.resolved) : modelLabel(c, value)) : '…'}
       title={def ? `Model: ${agentName(agent)}'s default` : 'Model'}
       disabled={disabled}
-      width={list.length > 1 ? 300 : 260}
+      width={260}
     >
       {(close) => (
         <ModelMenu
-          agents={list}
-          current={agent}
+          agent={agent}
+          c={c}
           value={value}
-          acp={acp}
-          switchNote={switchNote}
-          onPick={(v, a) => {
-            onChange(v, a);
+          onPick={(v) => {
+            onChange(v);
             close();
           }}
         />

@@ -23,6 +23,12 @@ import { putText } from '../../lib/featureEvents';
 
 const draftKey = (k: string) => `wa.draft.${k}`;
 
+const HANDOFF_EVENT = 'wa:handoff';
+/** The session menu's "Continue in Codex…": session `key`'s message box sets its next message to go to `agent`. */
+export function continueIn(key: string, agent: Agent) {
+  window.dispatchEvent(new CustomEvent(HANDOFF_EVENT, { detail: { key, agent } }));
+}
+
 /** What Enter does while the agent works: queue the message for after the turn, or steer the turn with it. */
 export type FollowUp = 'queue' | 'steer';
 export function followUpPref(): FollowUp {
@@ -60,7 +66,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const [atts, setAtts] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [cfg, setCfg] = useState<{ model?: string | null; effort?: string | null; mode?: string | null }>({});
-  // A model of the other agent was picked: the next message continues the conversation there, in a new session.
+  // "Continue in Codex…" (or Claude Code) was picked: the next message continues the conversation there, in a new session.
   const [move, setMove] = useState<{ agent: Agent; model: string | null; effort?: string | null; mode?: string | null } | null>(null);
   const moveCat = useCatalog(move?.agent ?? s.agent);
   const ta = useRef<HTMLTextAreaElement>(null);
@@ -87,6 +93,17 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     window.addEventListener('naget:compose', on);
     return () => window.removeEventListener('naget:compose', on);
   }, [key]);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ key: string; agent: Agent }>).detail;
+      if (d?.key !== key || d.agent === s.agent) return;
+      // Its default model to start with; the box's model menu lists its others.
+      setMove({ agent: d.agent, model: null });
+      ta.current?.focus();
+    };
+    window.addEventListener(HANDOFF_EVENT, on);
+    return () => window.removeEventListener(HANDOFF_EVENT, on);
+  }, [key, s.agent]);
   // Up in an empty box walks back through this session's prompts; -1 is the draft.
   const [recall, setRecall] = useState(-1);
   const prompts = useTimeline((x) => x.byKey[key]?.items)
@@ -184,8 +201,10 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const handOff = async (t: string) => {
     if (!move || busy) return;
     setBusy(true);
+    // Codex's default must be named: unnamed, Codex takes config.toml's model, which a ChatGPT sign-in may not allow.
+    const model = move.model ?? (move.agent === 'codex' ? (moveCat?.models.find((m) => m.isDefault)?.value ?? null) : null);
     try {
-      const r = await post<{ key: string }>(`/api/sessions/${enc(key)}/handoff`, { agent: move.agent, model: move.model, effort: move.effort, mode: move.mode, text: t, ...attachmentPayload(atts) });
+      const r = await post<{ key: string }>(`/api/sessions/${enc(key)}/handoff`, { agent: move.agent, model, effort: move.effort, mode: move.mode, text: t, ...attachmentPayload(atts) });
       setText('');
       releaseAttachments(atts);
       setAtts([]);
@@ -359,26 +378,13 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
               {move ? (
                 <>
-                  <ModelPicker
-                    agent={move.agent}
-                    value={move.model}
-                    agents={['claude', 'codex']}
-                    switchNote="stay in this session"
-                    onChange={(v, a) => (a === s.agent ? (setMove(null), configure({ model: v })) : setMove({ ...move, agent: a, model: v }))}
-                  />
+                  <ModelPicker agent={move.agent} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
                   <EffortPicker agent={move.agent} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
                   <ModePicker agent={move.agent} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
                 </>
               ) : (
                 <>
-                  <ModelPicker
-                    agent={s.agent}
-                    acp={s.acpAgent}
-                    value={model}
-                    agents={locked || s.agent === 'acp' ? undefined : ['claude', 'codex']}
-                    switchNote="continue in a new session"
-                    onChange={(v, a) => (a === s.agent ? configure({ model: v }) : setMove({ agent: a, model: v }))}
-                  />
+                  <ModelPicker agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
                   <EffortPicker agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
                   <ModePicker agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
                 </>
