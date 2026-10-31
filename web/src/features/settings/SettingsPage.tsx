@@ -249,55 +249,60 @@ function AccountRow({ a, account, onChange, extra }: { a: AccountStatus | null; 
       </div>
     );
   }
+  // The name and sign-in keep their width; on a phone the buttons go under them.
   return (
-    <div className="flex flex-wrap items-center gap-3 py-3">
+    <div className="flex items-start gap-3 py-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-bg-2">
         <AgentIcon agent={agent} size={18} />
       </span>
-      <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-medium">
-          {agentName(agent)}
-          {account && <span className="font-normal text-fg-3"> · {account.name}</span>}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="min-w-[min(100%,14rem)] flex-1">
+          <div className="text-[14px] font-medium">
+            {agentName(agent)}
+            {account && <span className="font-normal text-fg-3"> · {account.name}</span>}
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-fg-3">
+            {a.loggedIn ? <CheckCircle2 size={12} className="shrink-0 text-ok" /> : <XCircle size={12} className="shrink-0 text-err" />}
+            {a.loggedIn ? (
+              <span className="truncate" title={[a.email, a.plan, a.method].filter(Boolean).join(' · ')}>
+                {a.email ?? 'Signed in'}
+                {a.plan ? ` · ${a.plan}` : ''}
+                {a.method ? ` · ${a.method}` : ''}
+              </span>
+            ) : (
+              <span className="min-w-0 break-words">{a.error ?? a.detail ?? 'Not signed in'}</span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 truncate text-[12px] text-fg-3">
-          {a.loggedIn ? <CheckCircle2 size={12} className="text-ok" /> : <XCircle size={12} className="text-err" />}
-          {a.loggedIn ? (
-            <span className="truncate">
-              {a.email ?? 'Signed in'}
-              {a.plan ? ` · ${a.plan}` : ''}
-              {a.method ? ` · ${a.method}` : ''}
-            </span>
-          ) : (
-            <span>{a.error ?? a.detail ?? 'Not signed in'}</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {a.loggedIn && (
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<LogOut size={13} />}
+              onClick={async () => {
+                if (
+                  !(await confirm({
+                    title: `Sign out of ${agentName(agent)}${account ? ` (${account.name})` : ''}?`,
+                    body: account ? 'Sessions that run as this account stop working until it signs in again.' : 'This signs the CLI out on the server, for every terminal and editor that uses it.',
+                    confirm: 'Sign out',
+                    danger: true,
+                  }))
+                )
+                  return;
+                await post(`/api/accounts/${agent}/logout${q}`).catch(toastError);
+                onChange();
+              }}
+            >
+              Sign out
+            </Button>
           )}
+          <Button size="sm" variant={a.loggedIn ? 'secondary' : 'primary'} icon={<LogIn size={13} />} onClick={() => setLogin(true)}>
+            {a.loggedIn ? 'Switch account' : 'Sign in'}
+          </Button>
+          {extra}
         </div>
       </div>
-      {a.loggedIn && (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon={<LogOut size={13} />}
-          onClick={async () => {
-            if (
-              !(await confirm({
-                title: `Sign out of ${agentName(agent)}${account ? ` (${account.name})` : ''}?`,
-                body: account ? 'Sessions that run as this account stop working until it signs in again.' : 'This signs the CLI out on the server, for every terminal and editor that uses it.',
-                confirm: 'Sign out',
-                danger: true,
-              }))
-            )
-              return;
-            await post(`/api/accounts/${agent}/logout${q}`).catch(toastError);
-            onChange();
-          }}
-        >
-          Sign out
-        </Button>
-      )}
-      <Button size="sm" variant={a.loggedIn ? 'secondary' : 'primary'} icon={<LogIn size={13} />} onClick={() => setLogin(true)}>
-        {a.loggedIn ? 'Switch account' : 'Sign in'}
-      </Button>
-      {extra}
       <LoginDialog agent={agent} account={account} open={login} onClose={() => setLogin(false)} onDone={onChange} />
       {node}
     </div>
