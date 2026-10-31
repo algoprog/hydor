@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/media/naget-agent-intro.mp4"><img src="docs/media/naget-agent-intro.webp" width="720" alt="A one-minute tour of Naget Agent: pick any agent and any model, even one on your own GPU, start it in a folder, follow its steps, approve a command, see the diff, continue on a phone, switch between agents and machines, and the Git, models and other tools around them" /></a>
+  <a href="docs/media/naget-agent-intro.mp4"><img src="docs/media/naget-agent-intro.webp" width="720" alt="A 90-second tour of Naget Agent: pick any agent and any model, even one on your own GPU, start it in a folder, follow its steps, approve a command and see the diff; start a Researcher that searches and reads the web, take over its browser to sign in, and get a spreadsheet with its sources and a memory note; carry on from a phone and turn a follow-up into a scheduled task, see child sessions and other machines, search everything at once, and the Git, models, apps, pages, connections and skills around them" /></a>
 </p>
 
 Naget Agent is a self-hosted agent harness. It works on top of the coding agents you already use,
