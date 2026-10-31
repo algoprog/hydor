@@ -2,6 +2,7 @@
 // removed from it in that turn (its remember and forget calls), each with undo. Memory is not written by
 // itself after a reply: notes come from agents (when the user asks, or they learn something lasting) and
 // from the user in Settings, and the nightly tidy-up (tidy.ts) keeps them short and current.
+import { splitRunMessage } from '../../shared/automations.ts';
 import type { MemoryChange, MemoryHistoryRow, MemoryNoteData } from '../../shared/memory.ts';
 import type { TimelineItem, ToolInfo } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
@@ -14,6 +15,8 @@ export interface Turn {
   steps: string[];
   reply: string;
   anchor?: string;
+  /** A scheduled run started it: its message is the task's, not words the user wrote now. */
+  run?: boolean;
 }
 
 /** Most turns read at once (when several ended close together). */
@@ -58,7 +61,8 @@ export function turnsAfter(items: TimelineItem[], after?: string): { turns: Turn
         cur = next();
         afterStep = false;
       }
-      cur.user.push(it.text);
+      if (splitRunMessage(it.text)) cur.run = true;
+      else cur.user.push(it.text);
     } else if (it.kind === 'tool') {
       cur ??= next();
       const line = stepLine(it.tool);
@@ -76,7 +80,8 @@ export function turnsAfter(items: TimelineItem[], after?: string): { turns: Turn
       afterStep = false;
     }
   }
-  return { turns: turns.filter((t) => t.user.length || t.reply).slice(-MAX_TURNS), last: items[items.length - 1]?.id };
+  // A run's own turn is left out (each run would teach the task's prompt again), unless the user wrote in it too.
+  return { turns: turns.filter((t) => t.user.length || (t.reply && !t.run)).slice(-MAX_TURNS), last: items[items.length - 1]?.id };
 }
 
 /** An agent's own remember and forget calls, as changes for the note. */
