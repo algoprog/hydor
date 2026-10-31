@@ -3,7 +3,7 @@
 // wide screens; on phones a list, each section on its own page.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
-import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, UpdateState } from '@shared/types';
+import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, StartupState, UpdateState } from '@shared/types';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -386,6 +386,7 @@ function GeneralSettings() {
         </div>
       </Section>
       <AutoResumeSetting />
+      <StartupSetting />
       <AutoUpdateSetting />
       <Section>
         <div className="-my-2">
@@ -517,6 +518,60 @@ function AutoUpdateSetting() {
           }
         >
           <Switch on={update.auto && update.canRestart} disabled={!update.canRestart} label="Update automatically" onChange={(on) => put('/api/update/auto', { on }).catch(toastError)} />
+        </SettingRow>
+      </div>
+    </Section>
+  );
+}
+
+/** The app comes back after this computer restarts (on by default): a service of your user, a system
+ * service, or Docker's restart policy; whichever runs it says what can change. */
+function StartupSetting() {
+  const [st, setSt] = useState<StartupState | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api<StartupState>('/api/startup')
+      .then(setSt)
+      .catch(() => setSt(null));
+  }, []);
+  if (!st) return null;
+  const hint =
+    st.how === 'docker'
+      ? 'In Docker its restart policy brings it back: restart: unless-stopped in compose.yaml.'
+      : st.how === 'system-service'
+        ? `The system service ${st.unit} ${st.on ? 'starts it at boot' : 'is off: it does not start at boot'}. Changing it needs root on this computer.`
+        : st.how === 'user-service'
+          ? st.on
+            ? st.linger
+              ? `As ${st.unit}, a service of your user, even before anyone logs in. It also comes back if it stops.`
+              : `As ${st.unit}, a service of your user, once you log in. To start it before anyone logs in: sudo loginctl enable-linger ${'$'}USER`
+            : `${st.unit} is set up but does not start at boot.`
+          : st.can
+            ? 'Sets it up as a service of your user that starts at boot and comes back if it stops.'
+            : 'Not available here (no systemd for your user): start it with your system’s own tools, or run it in Docker.';
+  return (
+    <Section>
+      <div className="-my-2">
+        <SettingRow label="Start when this computer starts" hint={hint}>
+          {busy ? (
+            <Throbber className="text-fg-3" />
+          ) : (
+            <Switch
+              on={st.on}
+              disabled={!st.can}
+              label="Start when this computer starts"
+              onChange={async (on) => {
+                setBusy(true);
+                try {
+                  setSt(await put<StartupState>('/api/startup', { on }));
+                } catch (e) {
+                  toastError(e);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          )}
         </SettingRow>
       </div>
     </Section>

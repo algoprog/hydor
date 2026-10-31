@@ -1104,6 +1104,17 @@ export interface HfModel {
 /** How the Hugging Face search orders what it finds. */
 export type HfSort = 'downloads' | 'trending' | 'likes' | 'new';
 
+/** Whether the app starts again when this computer starts, and what does it. */
+export interface StartupState {
+  on: boolean;
+  how: 'user-service' | 'system-service' | 'docker' | 'none';
+  unit?: string;
+  /** A user service starts at boot only while the user lingers; otherwise once they log in. */
+  linger?: boolean;
+  /** Whether it can be changed from here. */
+  can: boolean;
+}
+
 export interface MachineInfo {
   gpus: { index: number; name: string; totalBytes: number; freeBytes: number }[];
   ramBytes: number;

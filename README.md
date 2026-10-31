@@ -32,13 +32,21 @@ See [all features](docs/features.md).
 
 ## Quick start
 
-With Docker:
+With Docker, on Linux, macOS or Windows (the image runs on Intel/AMD and ARM):
+
+```bash
+docker run -d --name naget-agent --restart unless-stopped -p 127.0.0.1:8790:8790 \
+  -v naget-agent-home:/home/node -v "$PWD/workspace:/workspace" nagetai/naget-agent
+docker logs naget-agent | grep setup   # your one-time setup link
+```
+
+Or build the image yourself, with your own user ids for the files the agents create:
 
 ```bash
 git clone https://github.com/Naget-Inc/naget-agent && cd naget-agent
 printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env && mkdir -p workspace
 docker compose up -d --build
-docker compose logs | grep setup   # your one-time setup link
+docker compose logs | grep setup
 ```
 
 Or on Linux, as a service of your user (needs Node.js 22.12+, git and tmux):
