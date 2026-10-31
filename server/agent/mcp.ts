@@ -1,6 +1,6 @@
 // MCP servers for Console: the user's (Claude Code's user and project settings, the project's
-// .mcp.json) and those the app hands over (its show_html page server). Over stdio (newline-delimited
-// JSON-RPC) or Streamable HTTP; their tools join Console's as mcp__<server>__<tool>.
+// .mcp.json, Codex's config.toml) and those the app hands over (its show_html page server). Over stdio
+// (newline-delimited JSON-RPC) or Streamable HTTP; their tools join Console's as mcp__<server>__<tool>.
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -14,6 +14,9 @@ export interface McpDef {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  /** Codex's enabled_tools and disabled_tools. */
+  only?: string[];
+  skip?: string[];
 }
 
 export interface McpTool {
@@ -47,8 +50,157 @@ export function mcpServers(cwd: string, fromClient: any[]): McpDef[] {
   for (const [n, d] of Object.entries(claude?.mcpServers ?? {})) add(n, d);
   for (const [n, d] of Object.entries(claude?.projects?.[cwd]?.mcpServers ?? {})) add(n, d);
   for (const [n, d] of Object.entries(readJson(path.join(cwd, '.mcp.json'))?.mcpServers ?? {})) add(n, d);
+  // Codex's, where Claude Code has none of the same name.
+  for (const [n, d] of Object.entries(codexServers())) if (!out.has(n)) out.set(n, d);
   for (const d of fromClient ?? []) if (d?.name) add(d.name, d);
   return [...out.values()];
+}
+
+/** Codex's MCP servers ([mcp_servers.<name>] in config.toml): their commands, or addresses and headers. */
+function codexServers(): Record<string, McpDef> {
+  let cfg: Record<string, any>;
+  try {
+    cfg = parseToml(fs.readFileSync(path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml'), 'utf8'));
+  } catch {
+    return {};
+  }
+  const out: Record<string, McpDef> = {};
+  for (const [name, d] of Object.entries<any>(cfg.mcp_servers ?? {})) {
+    if (!d || typeof d !== 'object' || d.enabled === false) continue;
+    const lists = { only: Array.isArray(d.enabled_tools) ? d.enabled_tools.map(String) : undefined, skip: Array.isArray(d.disabled_tools) ? d.disabled_tools.map(String) : undefined };
+    if (d.command) out[name] = { name, type: 'stdio', command: String(d.command), args: (d.args ?? []).map(String), env: d.env, ...lists };
+    else if (d.url) {
+      const headers: Record<string, string> = { ...(d.http_headers ?? {}) };
+      for (const [h, v] of Object.entries<string>(d.env_http_headers ?? {})) if (process.env[v]) headers[h] = process.env[v]!;
+      if (d.bearer_token_env_var && process.env[d.bearer_token_env_var]) headers.Authorization = `Bearer ${process.env[d.bearer_token_env_var]}`;
+      out[name] = { name, type: 'http', url: String(d.url), headers, ...lists };
+    }
+  }
+  return out;
+}
+
+/**
+ * Enough TOML for Codex's settings: tables (dotted, quoted names), keys, strings (basic, literal,
+ * multi-line), numbers, booleans, arrays across lines, inline tables. Arrays of tables are skipped.
+ */
+export function parseToml(src: string): Record<string, any> {
+  const root: Record<string, any> = {};
+  let table: Record<string, any> | null = root;
+  let i = 0;
+  const ws = (lines = true) => {
+    for (;;) {
+      while (i < src.length && (src[i] === ' ' || src[i] === '\t' || (lines && (src[i] === '\n' || src[i] === '\r')))) i++;
+      if (src[i] === '#') while (i < src.length && src[i] !== '\n') i++;
+      else return;
+    }
+  };
+  const str = (): string => {
+    const q = src[i];
+    const triple = src.startsWith(q.repeat(3), i);
+    i += triple ? 3 : 1;
+    if (triple && src[i] === '\n') i++;
+    let out = '';
+    while (i < src.length && !(triple ? src.startsWith(q.repeat(3), i) : src[i] === q)) {
+      if (q === '"' && src[i] === '\\') {
+        const c = src[++i];
+        if (c === 'u' || c === 'U') {
+          const n = c === 'u' ? 4 : 8;
+          out += String.fromCodePoint(parseInt(src.slice(i + 1, i + 1 + n), 16));
+          i += n;
+        } else out += ({ n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' } as Record<string, string>)[c] ?? c;
+        i++;
+      } else out += src[i++];
+    }
+    i += triple ? 3 : 1;
+    return out;
+  };
+  const key = (): string[] => {
+    const parts: string[] = [];
+    for (;;) {
+      ws(false);
+      if (src[i] === '"' || src[i] === "'") parts.push(str());
+      else {
+        const m = /^[A-Za-z0-9_-]+/.exec(src.slice(i));
+        if (!m) break;
+        parts.push(m[0]);
+        i += m[0].length;
+      }
+      ws(false);
+      if (src[i] !== '.') break;
+      i++;
+    }
+    return parts;
+  };
+  const value = (): any => {
+    ws();
+    const c = src[i];
+    if (c === '"' || c === "'") return str();
+    if (c === '[') {
+      i++;
+      const arr: any[] = [];
+      for (ws(); src[i] !== ']' && i < src.length; ws()) {
+        arr.push(value());
+        ws();
+        if (src[i] === ',') i++;
+      }
+      i++;
+      return arr;
+    }
+    if (c === '{') {
+      i++;
+      const obj: Record<string, any> = {};
+      for (ws(); src[i] !== '}' && i < src.length; ws()) {
+        const k = key();
+        ws();
+        i++; // =
+        set(obj, k, value());
+        ws();
+        if (src[i] === ',') i++;
+      }
+      i++;
+      return obj;
+    }
+    const m = /^[^\s,\]}#]+/.exec(src.slice(i));
+    const w = m?.[0] ?? '';
+    i += w.length;
+    if (w === 'true' || w === 'false') return w === 'true';
+    const n = Number(w.replace(/_/g, ''));
+    return Number.isNaN(n) ? w : n;
+  };
+  const set = (obj: Record<string, any>, k: string[], v: any) => {
+    let o = obj;
+    for (const p of k.slice(0, -1)) o = o[p] = o[p] && typeof o[p] === 'object' ? o[p] : {};
+    o[k[k.length - 1]] = v;
+  };
+  while (i < src.length) {
+    ws();
+    if (i >= src.length) break;
+    if (src.startsWith('[[', i)) {
+      // An array of tables: not needed here, so its keys are read and dropped.
+      i += 2;
+      key();
+      i += 2;
+      table = null;
+    } else if (src[i] === '[') {
+      i++;
+      const k = key();
+      i++;
+      let t: Record<string, any> = root;
+      for (const p of k) t = t[p] = t[p] && typeof t[p] === 'object' ? t[p] : {};
+      table = t;
+    } else {
+      const k = key();
+      ws(false);
+      if (src[i] !== '=' || !k.length) {
+        while (i < src.length && src[i] !== '\n') i++;
+        continue;
+      }
+      i++;
+      const v = value();
+      if (table) set(table, k, v);
+    }
+  }
+  return root;
 }
 
 const clean = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '_');
@@ -94,7 +246,9 @@ export class McpClient {
       cursor = r.nextCursor;
       if (!cursor) break;
     }
-    this.tools = tools.map((t) => ({
+    this.tools = tools
+      .filter((t) => (!this.def.only || this.def.only.includes(t.name)) && !this.def.skip?.includes(t.name))
+      .map((t) => ({
       server: this.def.name,
       name: t.name,
       fullName: `mcp__${clean(this.def.name)}__${clean(t.name)}`.slice(0, 64),
