@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "deepwiki",
+  "name": "DeepWiki",
+  "description": "Ask about any public GitHub repository and get answers from its generated wiki.",
+  "category": "dev",
+  "icon": "deepwiki",
+  "color": "#2563EB",
+  "homepage": "https://deepwiki.com",
+  "docs": "https://docs.devin.ai/work-with-devin/deepwiki-mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.deepwiki.com/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "github",
+    "documentation",
+    "repositories",
+    "code"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

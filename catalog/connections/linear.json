@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema.json",
+  "id": "linear",
+  "name": "Linear",
+  "description": "Find, create and update issues, projects, cycles and comments in Linear.",
+  "category": "tasks",
+  "icon": "linear",
+  "color": "#5E6AD2",
+  "homepage": "https://linear.app",
+  "docs": "https://linear.app/docs/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.linear.app/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "issues",
+    "bugs",
+    "projects",
+    "roadmap",
+    "tickets"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

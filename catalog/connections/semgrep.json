@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "semgrep",
+  "name": "Semgrep",
+  "description": "Scan code for security issues and look at findings with Semgrep.",
+  "category": "dev",
+  "icon": "semgrep",
+  "color": "#2EAE83",
+  "homepage": "https://semgrep.dev",
+  "docs": "https://semgrep.dev/docs/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.semgrep.ai/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "security",
+    "static analysis",
+    "vulnerabilities",
+    "code review"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "hubspot",
+  "name": "HubSpot",
+  "description": "Read and update contacts, companies, deals and tickets in your HubSpot CRM.",
+  "category": "sales",
+  "icon": "hubspot",
+  "color": "#FF7A59",
+  "homepage": "https://www.hubspot.com",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.hubspot.com"
+  },
+  "auth": {
+    "type": "oauth",
+    "help": "HubSpot does not let apps register by themselves: make an MCP auth app in your HubSpot developer settings, give it this page’s callback address, and enter its client ID and secret here."
+  },
+  "keywords": [
+    "crm",
+    "contacts",
+    "deals",
+    "marketing",
+    "sales"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

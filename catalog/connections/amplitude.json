@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "amplitude",
+  "name": "Amplitude",
+  "description": "Ask questions of your Amplitude product analytics: charts, cohorts and experiments.",
+  "category": "analytics",
+  "icon": "amplitude",
+  "color": "#1E61F0",
+  "homepage": "https://amplitude.com",
+  "docs": "https://amplitude.com/docs/amplitude-ai/amplitude-mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.amplitude.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "product analytics",
+    "events",
+    "experiments",
+    "funnels"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

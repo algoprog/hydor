@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Naget-Inc/naget-agent/blob/main/catalog/schema.json",
+  "title": "A connected app in Naget Agent's catalog",
+  "description": "One file per app: catalog/connections/<id>.json. See catalog/CONTRIBUTING.md; node scripts/check-catalog.mjs checks every file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "description", "category", "icon", "homepage", "server", "auth", "verified"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,39}$", "description": "Lowercase letters, digits and dashes; the file's name and the MCP server's name agents see." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "description": { "type": "string", "minLength": 10, "maxLength": 240, "description": "One plain sentence: what an agent can do with it." },
+    "category": {
+      "enum": ["docs", "tasks", "communication", "calendar", "files", "design", "dev", "cloud", "data", "analytics", "sales", "finance", "commerce", "search", "ai", "life", "local"]
+    },
+    "icon": {
+      "description": "A slug (the app's id, or one of the generic glyphs: folder, git, globe, brain, clock, database, browser, search, terminal, mail, calendar, chat, key, cloud, list), or a small inline SVG without scripts, links or images.",
+      "oneOf": [
+        { "type": "string", "pattern": "^[a-z0-9-]{1,40}$" },
+        { "type": "object", "additionalProperties": false, "required": ["svg"], "properties": { "svg": { "type": "string", "pattern": "^<svg[\\s>]", "maxLength": 8192 } } }
+      ]
+    },
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "The tile's colour behind a slug icon." },
+    "homepage": { "type": "string", "pattern": "^https://" },
+    "docs": { "type": "string", "pattern": "^https://", "description": "Where its MCP server is described." },
+    "server": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["transport", "url"],
+          "properties": {
+            "transport": { "enum": ["http", "sse"], "description": "http: Streamable HTTP. sse: the older HTTP with server-sent events." },
+            "url": { "type": "string", "pattern": "^https://", "description": "May hold {{FIELD}} placeholders for fields that are not secret." }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["transport", "command"],
+          "properties": {
+            "transport": { "const": "stdio" },
+            "command": { "type": "string", "pattern": "^[^\\s;&|`$<>]+$", "description": "One program: npx, uvx, docker…" },
+            "args": { "type": "array", "items": { "type": "string" } },
+            "env": { "type": "object", "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }, "additionalProperties": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "auth": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "none" } } },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "oauth" },
+            "scopes": { "type": "array", "items": { "type": "string" } },
+            "clientId": { "type": "string", "description": "A public client id, for a sign-in server that does not let apps register by themselves." },
+            "params": { "type": "object", "propertyNames": { "pattern": "^[a-z_]{1,40}$" }, "additionalProperties": { "type": "string", "maxLength": 100 }, "description": "Extra parameters for the sign-in address, such as Google's access_type=offline (so the sign-in can renew)." },
+            "help": { "type": "string", "maxLength": 400 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "api_key" },
+            "header": { "type": "string", "pattern": "^[A-Za-z0-9-]{1,64}$", "description": "A remote server's header for the key (Authorization by default)." },
+            "prefix": { "type": "string", "maxLength": 40, "description": "Before the key in that header (\"Bearer \" by default for Authorization)." },
+            "url": { "type": "string", "pattern": "^https://", "description": "Where to get the key." },
+            "help": { "type": "string", "maxLength": 400 }
+          }
+        }
+      ]
+    },
+    "fields": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "label"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "secret": { "type": "boolean", "description": "Kept in the vault; only a local server's environment may use it." },
+          "optional": { "type": "boolean" },
+          "placeholder": { "type": "string", "maxLength": 200 },
+          "default": { "type": "string", "maxLength": 400 },
+          "help": { "type": "string", "maxLength": 300 },
+          "url": { "type": "string", "pattern": "^https://" }
+        }
+      }
+    },
+    "defaultTools": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "The tools on by default (remote servers); every tool when left out." },
+    "keywords": { "type": "array", "maxItems": 16, "items": { "type": "string", "maxLength": 40 }, "uniqueItems": true },
+    "featured": { "type": "boolean" },
+    "verified": {
+      "description": "Who checked the server answers as described, and when; null for an address not checked yet.",
+      "oneOf": [
+        { "type": "null" },
+        { "type": "object", "additionalProperties": false, "required": ["by", "date"], "properties": { "by": { "type": "string", "minLength": 1, "maxLength": 80 }, "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" } } }
+      ]
+    },
+    "notes": { "type": "string", "maxLength": 400 }
+  }
+}

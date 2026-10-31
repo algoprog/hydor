@@ -44,6 +44,9 @@ export function App() {
 
   useEffect(() => {
     if (auth !== 'ok') return;
+    // The browser's time zone, so agents and schedules speak in local time.
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz) api('/api/me/timezone', { method: 'PUT', body: { tz } }).catch(() => {});
     api<Bootstrap>('/api/bootstrap')
       .then((b) => {
         useApp.getState().set({ boot: b, indexing: b.indexing });

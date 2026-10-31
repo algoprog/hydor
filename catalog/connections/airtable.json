@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "airtable",
+  "name": "Airtable",
+  "description": "Read, add and update records in your Airtable bases.",
+  "category": "data",
+  "icon": "airtable",
+  "color": "#18BFFF",
+  "homepage": "https://www.airtable.com",
+  "docs": "https://support.airtable.com/articles/9897799762-using-the-airtable-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.airtable.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "spreadsheet",
+    "database",
+    "tables",
+    "records"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

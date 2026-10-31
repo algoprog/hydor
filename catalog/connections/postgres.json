@@ -1,0 +1,44 @@
+{
+  "$schema": "../schema.json",
+  "id": "postgres",
+  "name": "PostgreSQL",
+  "description": "Query a PostgreSQL database (read-only here), with help on indexes and the database’s health.",
+  "category": "data",
+  "icon": "database",
+  "color": "#336791",
+  "homepage": "https://github.com/crystaldba/postgres-mcp",
+  "docs": "https://github.com/crystaldba/postgres-mcp",
+  "server": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": [
+      "postgres-mcp",
+      "--access-mode=restricted"
+    ],
+    "env": {
+      "DATABASE_URI": "{{DATABASE_URI}}"
+    }
+  },
+  "auth": {
+    "type": "api_key",
+    "help": "The connection string, password included; it stays in the vault."
+  },
+  "fields": [
+    {
+      "name": "DATABASE_URI",
+      "label": "Connection string",
+      "secret": true,
+      "placeholder": "postgresql://user:password@host:5432/dbname"
+    }
+  ],
+  "keywords": [
+    "postgres",
+    "sql",
+    "database"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "Read-only (restricted mode). Needs uv (uvx) on this computer."
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "figma",
+  "name": "Figma",
+  "description": "Read designs, components and variables from your Figma files, to build from them.",
+  "category": "design",
+  "icon": "figma",
+  "color": "#F24E1E",
+  "homepage": "https://www.figma.com",
+  "docs": "https://developers.figma.com/docs/figma-mcp-server/remote-server-installation/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.figma.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "design",
+    "ui",
+    "prototypes",
+    "components"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

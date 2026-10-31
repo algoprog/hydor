@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "id": "posthog",
+  "name": "PostHog",
+  "description": "Ask questions of your PostHog analytics, and manage feature flags, experiments and errors.",
+  "category": "analytics",
+  "icon": "posthog",
+  "color": "#F54E00",
+  "homepage": "https://posthog.com",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.posthog.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "product analytics",
+    "feature flags",
+    "experiments",
+    "session replay"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

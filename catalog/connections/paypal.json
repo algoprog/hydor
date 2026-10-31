@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "paypal",
+  "name": "PayPal",
+  "description": "Create and look up invoices, orders, payments, subscriptions and disputes in PayPal.",
+  "category": "finance",
+  "icon": "paypal",
+  "color": "#003087",
+  "homepage": "https://www.paypal.com",
+  "docs": "https://developer.paypal.com/tools/mcp-server/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.paypal.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "payments",
+    "invoices",
+    "checkout",
+    "disputes"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

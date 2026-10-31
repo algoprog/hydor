@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "twelve-data",
+  "name": "Twelve Data",
+  "description": "Stock, forex, crypto and ETF prices, history and indicators from Twelve Data.",
+  "category": "finance",
+  "icon": "twelve-data",
+  "color": "#1B4DFF",
+  "homepage": "https://twelvedata.com",
+  "docs": "https://twelvedata.com/docs",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.twelvedata.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "stocks",
+    "market data",
+    "crypto",
+    "forex"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

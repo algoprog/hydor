@@ -1,5 +1,5 @@
 // A goal the agent keeps working towards across turns (/goal): what it is and how it stands, above
-// the composer, with Pause, Resume (Codex) and Clear. "Set a goal" asks for one.
+// the composer, with Pause, Resume (Codex and Custom) and Clear. "Set a goal" asks for one.
 import { useState } from 'react';
 import { Target } from 'lucide-react';
 import type { GoalInfo, SessionSummary } from '@shared/types';
@@ -41,7 +41,8 @@ export function GoalBar({ s, className }: { s: SessionSummary; className?: strin
     }
   };
   const meta = spent(g);
-  const codex = s.agent === 'codex';
+  // Codex and Custom (the app's own loop) can pause a goal and pick it up again.
+  const codex = s.agent === 'codex' || (s.agent === 'acp' && s.acpAgent === 'console');
   return (
     <div className={cx('anim-expand flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
       <Target size={15} className={cx('mt-0.5 shrink-0', g.status === 'active' ? 'text-accent' : 'text-warn')} />
@@ -56,9 +57,9 @@ export function GoalBar({ s, className }: { s: SessionSummary; className?: strin
           </span>
         </div>
         <div className="mt-0.5 line-clamp-3 text-fg-2">{g.objective}</div>
-        {g.reason && g.status === 'active' && (
-          <div className="mt-1 line-clamp-2 text-[12.5px] text-fg-3" title={g.reason}>
-            Last check: {g.reason}
+        {g.reason && (
+          <div className={cx('mt-1 line-clamp-2 text-[12.5px]', g.status === 'active' ? 'text-fg-3' : 'text-warn')} title={g.reason}>
+            {g.status === 'active' ? `Last check: ${g.reason}` : g.reason}
           </div>
         )}
       </div>
@@ -117,7 +118,9 @@ export function GoalDialog({ s, open, onClose }: { s: SessionSummary; open: bool
       <p className="mb-3 text-[13px] leading-relaxed text-fg-3">
         {s.agent === 'codex'
           ? 'Codex keeps working, turn after turn, until it judges the goal done. You can pause or clear it any time.'
-          : 'Claude keeps working, turn after turn; after each one a quick check decides whether the goal holds yet. You can clear it any time.'}{' '}
+          : s.agent === 'acp'
+            ? 'The agent keeps working, turn after turn; after each one the helper model checks the evidence and gives it the next step, until the goal holds. It pauses when it stops making progress. You can pause or clear it any time.'
+            : 'Claude keeps working, turn after turn; after each one a quick check decides whether the goal holds yet. You can clear it any time.'}{' '}
         Say what “done” looks like, for example “npm test passes and the upload page handles 2 GB files”.
       </p>
       <textarea

@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "vercel",
+  "name": "Vercel",
+  "description": "Look at your Vercel projects, deployments, domains and build logs.",
+  "category": "cloud",
+  "icon": "vercel",
+  "color": "#000000",
+  "homepage": "https://vercel.com",
+  "docs": "https://vercel.com/docs/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.vercel.com"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "deployments",
+    "hosting",
+    "next.js",
+    "serverless"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

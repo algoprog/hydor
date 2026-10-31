@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "circleci",
+  "name": "CircleCI",
+  "description": "Find failing CircleCI builds, read their logs, and rerun workflows.",
+  "category": "dev",
+  "icon": "circleci",
+  "color": "#343434",
+  "homepage": "https://circleci.com",
+  "docs": "https://circleci.com/docs/guides/toolkit/circleci-mcp-overview/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.circleci.com/v1/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "ci",
+    "builds",
+    "tests",
+    "pipelines"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

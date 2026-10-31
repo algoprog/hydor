@@ -1,0 +1,34 @@
+{
+  "type": "search",
+  "query": { "original": "solid state battery", "more_results_available": true },
+  "mixed": { "type": "mixed", "main": [{ "type": "web", "index": 0, "all": false }] },
+  "web": {
+    "type": "search",
+    "family_friendly": true,
+    "results": [
+      {
+        "title": "Solid-state battery - Wikipedia",
+        "url": "https://en.wikipedia.org/wiki/Solid-state_battery",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "A <strong>solid</strong>-<strong>state</strong> <strong>battery</strong> is an electrical battery that uses a solid electrolyte.",
+        "page_age": "2025-09-12T08:01:00",
+        "profile": { "name": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Solid-state_battery", "long_name": "en.wikipedia.org" },
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "generic",
+        "meta_url": { "scheme": "https", "netloc": "en.wikipedia.org", "hostname": "en.wikipedia.org", "path": "› wiki › Solid-state_battery" },
+        "extra_snippets": ["Solid-state batteries can use ceramics or solid polymers.", "Toyota plans production in 2027.", "A third snippet that is left out."]
+      },
+      {
+        "title": "Toyota&#x27;s solid-state plans",
+        "url": "https://www.example.com/toyota",
+        "description": "Toyota said its first solid-state cars come in 2027.",
+        "age": "2 days ago",
+        "language": "en"
+      },
+      { "title": "No address", "description": "left out" }
+    ]
+  }
+}

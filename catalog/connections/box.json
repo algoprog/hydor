@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "box",
+  "name": "Box",
+  "description": "Search, read and organize the files and folders in your Box account.",
+  "category": "files",
+  "icon": "box",
+  "color": "#0061D5",
+  "homepage": "https://www.box.com",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.box.com"
+  },
+  "auth": {
+    "type": "oauth",
+    "help": "Box does not let apps register by themselves: make an app in the Box developer console with this page’s callback address as its redirect URI, and enter its client ID and secret here."
+  },
+  "keywords": [
+    "files",
+    "documents",
+    "cloud storage",
+    "enterprise"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

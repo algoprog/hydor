@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "neon",
+  "name": "Neon",
+  "description": "Create, branch and query Neon Postgres databases.",
+  "category": "data",
+  "icon": "neon",
+  "color": "#00E599",
+  "homepage": "https://neon.com",
+  "docs": "https://neon.com/docs/ai/neon-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.neon.tech/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "postgres",
+    "database",
+    "serverless",
+    "sql"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

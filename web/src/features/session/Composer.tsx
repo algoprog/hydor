@@ -19,6 +19,8 @@ import { useComposerMenu } from '../../components/ComposerMenu';
 import { QueueList } from './QueueList';
 import { GoalBar } from './GoalBar';
 import { LimitBanner } from '../usage/LimitReset';
+import { FeatureComposerButtons } from '../registry';
+import { putText } from '../../lib/featureEvents';
 
 const draftKey = (k: string) => `wa.draft.${k}`;
 
@@ -65,6 +67,23 @@ export function Composer({ s }: { s: SessionSummary }) {
   const [tasksOpen, setTasksOpen] = useState(false);
   const [logTask, setLogTask] = useState<BackgroundTask | null>(null);
   const menu = useComposerMenu({ ta, setText, root: s.cwd, commands: (move ? moveCat : cat)?.commands });
+  // Text from elsewhere (dictation, a choice clicked in a page) joins what is being written.
+  const insertText = (t: string) => {
+    if (!t) return;
+    setText((cur) => (cur.trim() ? `${cur.replace(/\s*$/, '')} ${t}` : t));
+    ta.current?.focus();
+  };
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ text: string; key?: string; replace?: string }>).detail;
+      if (!d || (d.key && d.key !== key) || (!d.text && !d.replace)) return;
+      // A choice changed in a page: the new one takes the old one's place, if that is still there.
+      setText((cur) => putText(cur, d.text, d.replace));
+      ta.current?.focus();
+    };
+    window.addEventListener('naget:compose', on);
+    return () => window.removeEventListener('naget:compose', on);
+  }, [key]);
   // Up in an empty box walks back through this session's prompts; -1 is the draft.
   const [recall, setRecall] = useState(-1);
   const prompts = useTimeline((x) => x.byKey[key]?.items)
@@ -439,6 +458,7 @@ export function Composer({ s }: { s: SessionSummary }) {
             <button className="rounded-lg p-2 text-fg-3 hover:bg-bg-2 hover:text-fg disabled:opacity-50" onClick={() => fileRef.current?.click()} disabled={locked} title="Attach files" aria-label="Attach files">
               <Paperclip size={17} />
             </button>
+            <FeatureComposerButtons s={s} insert={insertText} disabled={locked} />
             <input
               ref={fileRef}
               type="file"

@@ -21,6 +21,7 @@ export class ModelManager {
   private ollamaModels: (ModelEntry & { sizeBytes: number })[] = [];
   private ollamaVersion: string | null = null;
   private endpointModels = new Map<string, string[]>();
+  private endpointContext = new Map<string, number>();
   private pinnedInfo = new Map<string, openrouter.OrModel>();
   private emitTimer: NodeJS.Timeout | null = null;
 
@@ -42,6 +43,11 @@ export class ModelManager {
         const r = await fetch(`${e.baseUrl.replace(/\/+$/, '')}/models`, { headers: e.apiKey ? { authorization: `Bearer ${e.apiKey}` } : {}, signal: AbortSignal.timeout(5000) });
         const d: any = await r.json();
         this.endpointModels.set(e.id, (d.data ?? []).map((m: any) => String(m.id)));
+        // Their context, where the server says (vLLM's max_model_len, others' context_length).
+        for (const m of d.data ?? []) {
+          const n = Number(m.max_model_len ?? m.context_length ?? m.context_window ?? m.max_context_length);
+          if (n > 0) this.endpointContext.set(`${e.id}/${m.id}`, n);
+        }
       } catch {
         this.endpointModels.set(e.id, []);
       }
@@ -77,6 +83,8 @@ export class ModelManager {
           contextLength: m?.contextLength,
           tools: m?.tools ?? 'native',
           vision: m?.vision,
+          reasoning: m?.reasoning,
+          maxOutput: m?.maxOutput,
           headers: { 'HTTP-Referer': 'https://github.com/Naget-Inc/naget-agent', 'X-Title': 'Naget Agent' },
         });
       }
@@ -100,7 +108,7 @@ export class ModelManager {
     }
     for (const e of c.endpoints)
       for (const m of this.endpointModels.get(e.id) ?? [])
-        out.push({ id: `endpoint/${e.id}/${m}`, label: `${m} (${e.name})`, provider: 'endpoint', baseUrl: e.baseUrl.replace(/\/+$/, ''), apiKey: e.apiKey, model: m, tools: 'native' });
+        out.push({ id: `endpoint/${e.id}/${m}`, label: `${m} (${e.name})`, provider: 'endpoint', baseUrl: e.baseUrl.replace(/\/+$/, ''), apiKey: e.apiKey, model: m, tools: 'native', contextLength: this.endpointContext.get(`${e.id}/${m}`) });
     return out;
   }
 

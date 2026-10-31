@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "intercom",
+  "name": "Intercom",
+  "description": "Search conversations, tickets, contacts and help articles in Intercom.",
+  "category": "sales",
+  "icon": "intercom",
+  "color": "#286EFA",
+  "homepage": "https://www.intercom.com",
+  "docs": "https://developers.intercom.com/docs/guides/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.intercom.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "support",
+    "customer service",
+    "tickets",
+    "chat"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

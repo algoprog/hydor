@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Python with the libraries for making office files: python-docx (Word), openpyxl (Excel), python-pptx
+# (PowerPoint), reportlab and pypdf (PDF). They are installed once, on first use, into a private
+# environment in Naget Agent's data folder; nothing is installed system-wide.
+#
+#   office-python make_report.py [args…]     run a script
+#   office-python -c 'import docx'           or anything python takes
+set -euo pipefail
+
+PKGS="python-docx>=1.1,<2 openpyxl>=3.1,<4 python-pptx>=1.0,<2 reportlab>=4,<6 pypdf>=4,<8"
+
+data="${NAGET_DATA_DIR:-${DATA_DIR:-}}"
+if [ -z "$data" ]; then
+  if [ ! -d "$HOME/.naget-agent" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.naget-agent"; fi
+fi
+venv="$data/office/venv"
+py="$venv/bin/python"
+
+if [ ! -x "$py" ] || [ "$(cat "$venv/.packages" 2>/dev/null)" != "$PKGS" ]; then
+  mkdir -p "$data/office"
+  # One setup at a time (several agents may start at once).
+  lock="$data/office/.setup-lock"
+  for _ in $(seq 1 300); do mkdir "$lock" 2>/dev/null && break; sleep 1; done
+  trap 'rmdir "$lock" 2>/dev/null || true' EXIT
+  if [ ! -x "$py" ] || [ "$(cat "$venv/.packages" 2>/dev/null)" != "$PKGS" ]; then
+    sys="$(command -v python3 || true)"
+    if [ -z "$sys" ]; then
+      echo "Python 3 is not installed on this computer, and making office files needs it." >&2
+      echo "Install it (Debian/Ubuntu: sudo apt install python3 python3-venv; macOS: brew install python), then run this again." >&2
+      exit 3
+    fi
+    if [ ! -x "$py" ] && ! "$sys" -m venv "$venv" >/dev/null 2>&1; then
+      rm -rf "$venv"
+      echo "Python is here, but it cannot make a private environment: its venv module is missing." >&2
+      echo "Install it (Debian/Ubuntu: sudo apt install python3-venv), then run this again." >&2
+      exit 3
+    fi
+    echo "Setting up python-docx, openpyxl, python-pptx, reportlab and pypdf (once, about 30 MB)…" >&2
+    # shellcheck disable=SC2086
+    if ! "$py" -m pip install --quiet --disable-pip-version-check $PKGS >&2; then
+      echo "Could not download the Python libraries. Is the internet reachable from here?" >&2
+      exit 4
+    fi
+    printf '%s' "$PKGS" > "$venv/.packages"
+  fi
+fi
+# No __pycache__ beside the scripts (they may live in the app's own folder).
+export PYTHONDONTWRITEBYTECODE=1
+exec "$py" "$@"

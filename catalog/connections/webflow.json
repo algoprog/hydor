@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "webflow",
+  "name": "Webflow",
+  "description": "Manage Webflow sites, pages and CMS collections.",
+  "category": "commerce",
+  "icon": "webflow",
+  "color": "#146EF5",
+  "homepage": "https://webflow.com",
+  "docs": "https://developers.webflow.com/mcp/reference/getting-started",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.webflow.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "website",
+    "cms",
+    "no-code",
+    "pages"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

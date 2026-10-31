@@ -1,0 +1,25 @@
+{
+  "$schema": "../schema.json",
+  "id": "parallel",
+  "name": "Parallel Search",
+  "description": "Web search made for agents, from Parallel: fresh results with the passages that matter.",
+  "category": "search",
+  "icon": "parallel",
+  "color": "#1D1D1F",
+  "homepage": "https://parallel.ai",
+  "server": {
+    "transport": "http",
+    "url": "https://search.parallel.ai/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "web search",
+    "research"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

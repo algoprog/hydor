@@ -1,0 +1,44 @@
+{
+  "$schema": "../schema.json",
+  "id": "memory",
+  "name": "Memory graph",
+  "description": "A knowledge graph of people, projects and facts that agents keep across sessions.",
+  "category": "local",
+  "icon": "brain",
+  "color": "#8B5CF6",
+  "homepage": "https://github.com/modelcontextprotocol/servers",
+  "docs": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-memory"
+    ],
+    "env": {
+      "MEMORY_FILE_PATH": "{{MEMORY_FILE}}"
+    }
+  },
+  "auth": {
+    "type": "none"
+  },
+  "fields": [
+    {
+      "name": "MEMORY_FILE",
+      "label": "Where to keep it",
+      "optional": true,
+      "placeholder": "/home/you/agent-memory.jsonl",
+      "help": "A .jsonl file; left empty, it is kept beside the server’s own files."
+    }
+  ],
+  "keywords": [
+    "memory",
+    "knowledge graph",
+    "notes",
+    "facts"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

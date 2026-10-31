@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "cloudinary",
+  "name": "Cloudinary",
+  "description": "Upload, find, tag and transform images and videos in Cloudinary.",
+  "category": "design",
+  "icon": "cloudinary",
+  "color": "#3448C5",
+  "homepage": "https://cloudinary.com",
+  "docs": "https://cloudinary.com/documentation/cloudinary_llm_mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://asset-management.mcp.cloudinary.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "images",
+    "video",
+    "media",
+    "assets"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -10,17 +10,22 @@ import type { Agent, SessionSummary, TimelineItem } from '../shared/types.ts';
 import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { signWithKey } from './links.ts';
+import { featureDeps, runTools } from './features/registry.ts';
+import { appMcpTools } from './apps/mcp.ts';
+import { frameHtml } from './pages/kit.ts';
+import type { RunCtx, ToolOutput } from './features/types.ts';
 import type { SessionManager } from './sessions.ts';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 export const PAGE_SERVER = 'naget-agent';
-export const MAX_PAGE = 2 * 1024 * 1024;
+export { MAX_PAGE } from './pages/index.ts';
 
 interface Tool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  run: (args: Record<string, any>) => Promise<string>;
+  annotations?: Record<string, unknown>;
+  run: (args: Record<string, any>) => Promise<string | ToolOutput>;
 }
 
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: any };
@@ -43,12 +48,14 @@ async function answer(m: Rpc, tools: Tool[], info: { instructions?: string }): P
     case 'ping':
       return ok({});
     case 'tools/list':
-      return ok({ tools: tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) });
+      return ok({ tools: tools.map(({ name, description, inputSchema, annotations }) => ({ name, description, inputSchema, ...(annotations ? { annotations } : {}) })) });
     case 'tools/call': {
       const tool = tools.find((t) => t.name === m.params?.name);
       if (!tool) return fail(-32602, `Unknown tool: ${m.params?.name}`);
       try {
-        return ok({ content: [{ type: 'text', text: await tool.run(m.params?.arguments ?? {}) }] });
+        const r = await tool.run(m.params?.arguments ?? {});
+        if (typeof r === 'string') return ok({ content: [{ type: 'text', text: r }] });
+        return ok({ content: [{ type: 'text', text: r.text }, ...(r.images ?? []).map((i) => ({ type: 'image', data: i.data, mimeType: i.mimeType }))], ...(r.isError ? { isError: true } : {}) });
       } catch (e) {
         return ok({ content: [{ type: 'text', text: (e as Error).message }], isError: true });
       }
@@ -67,7 +74,7 @@ async function serve(req: FastifyRequest, reply: FastifyReply, tools: Tool[], in
   return reply.type('application/json').send(Array.isArray(body) ? out : out[0]);
 }
 
-// ---- the sessions' own server: show_html ----------------------------------------------------------
+// ---- the sessions' own server: the capabilities' tools (show_html, web_search…) --------------------
 
 /** The signed address segment for a run, so only that agent process can show pages in its session. */
 export function runToken(runId: string): string {
@@ -82,29 +89,13 @@ export function runOf(token: string): string | null {
   return want.length === token.length && crypto.timingSafeEqual(Buffer.from(want), Buffer.from(token)) ? runId : null;
 }
 
+/** Most a call to a session's own server may carry (a page, a file's content). */
+const MAX_RUN_BODY = 8 * 1024 * 1024;
+
 /** The page server's entry for an agent's MCP configuration. */
 export function pageServerUrl(runId: string) {
   return `http://127.0.0.1:${config.port}/mcp/run/${runToken(runId)}`;
 }
-
-const SHOW_HTML: Omit<Tool, 'run'> = {
-  name: 'show_html',
-  description: [
-    'Show the user an HTML page inside the conversation: a report, a chart, a table, a diagram, a mock-up of a UI.',
-    'Use it when a visual is clearer than text, or when asked for one. The page renders in a sandboxed frame on a white background,',
-    'as wide as the chat column (about 760px on a computer, 360px on a phone: make it fit both), and grows to its content height. Write a complete, self-contained page: inline CSS and',
-    'JavaScript; scripts may load from CDNs (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com). It cannot reach this app or the',
-    'user’s files, so embed the data. The user sees the page itself; do not repeat its contents in your reply.',
-  ].join(' '),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      title: { type: 'string', description: 'A short name for the page, shown above it.' },
-      html: { type: 'string', description: 'The whole page, <!doctype html> included.' },
-    },
-    required: ['html'],
-  },
-};
 
 // ---- other agents: sessions --------------------------------------------------------------------
 
@@ -153,12 +144,14 @@ function checkBearer(db: DB, req: FastifyRequest): boolean {
   return true;
 }
 
-function line(s: SessionSummary): string {
+/** A session as one line: key, agent, status, title, folder, last change. */
+export function line(s: SessionSummary): string {
   const st = s.live?.status ?? s.external?.status ?? 'idle';
   return `- ${s.key} · ${s.agent} · ${st}${s.goal ? ' · goal set' : ''} · ${s.title}${s.cwd ? ` · ${s.cwd}` : ''} · updated ${new Date(s.updatedAt ?? s.createdAt ?? 0).toISOString()}`;
 }
 
-function itemText(it: TimelineItem): string | null {
+/** A timeline item as a line of text: messages in full, steps by their titles only. */
+export function itemText(it: TimelineItem): string | null {
   switch (it.kind) {
     case 'user':
       return it.meta ? null : `USER: ${it.text}`;
@@ -270,22 +263,16 @@ export function mcpRoutes(app: FastifyInstance, db: DB, sessions: SessionManager
   const info = { instructions: 'Naget Agent runs Claude Code and Codex sessions on this machine. Use list_sessions for keys, read_session to catch up, send_message to steer.' };
   app.post('/mcp', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
     if (!checkBearer(db, req)) return reply.code(401).header('WWW-Authenticate', 'Bearer').send({ error: 'A token from Settings → Connect other agents is needed' });
-    return serve(req, reply, tools, info);
+    // The user's apps (server/apps) come as tools too, as they are now.
+    return serve(req, reply, [...tools, ...appMcpTools()], info);
   });
-  app.post('/mcp/run/:token', { bodyLimit: MAX_PAGE + 64 * 1024 }, async (req, reply) => {
+  app.post('/mcp/run/:token', { bodyLimit: MAX_RUN_BODY }, async (req, reply) => {
     const runId = runOf((req.params as { token: string }).token);
     const live = runId ? sessions.liveByRun(runId) : null;
-    if (!live) return reply.code(404).send({ error: 'No session runs with that address' });
-    const show: Tool = {
-      ...SHOW_HTML,
-      run: async (a) => {
-        const html = String(a.html ?? '');
-        if (!html.trim()) throw new Error('html is empty');
-        if (Buffer.byteLength(html) > MAX_PAGE) throw new Error('The page is over 2 MB; keep it smaller (embed less data).');
-        return 'The page is showing in the conversation.';
-      },
-    };
-    return serve(req, reply, [show], {});
+    if (!runId || !live) return reply.code(404).send({ error: 'No session runs with that address' });
+    const ctx: RunCtx = { runId, key: live.key, agent: live.agent, acpAgent: live.acpAgent, cwd: live.cwd, deps: featureDeps() };
+    const tools: Tool[] = runTools(ctx).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, annotations: t.annotations, run: (a) => t.run(a, ctx) }));
+    return serve(req, reply, tools, {});
   });
   // No event stream: clients fall back to plain request and reply.
   for (const p of ['/mcp', '/mcp/run/:token']) {
@@ -299,19 +286,9 @@ export function mcpRoutes(app: FastifyInstance, db: DB, sessions: SessionManager
 export const PAGE_CSP = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'";
 
 /**
- * The frame a page from show_html renders in (sandboxed, its own opaque origin, permissive inside):
- * the parent posts the page, which replaces this document; a small script added at its end reports
- * the page's height so the frame can fit it.
+ * The frame every page renders in (show_html, saved pages, a page's own address): sandboxed, its own
+ * opaque origin, permissive inside. The parent posts the page, which replaces this document, with the
+ * page kit first (server/pages/kit.ts): ready-made classes, and the bridge that reports the page's
+ * height, sends the user's choices and keeps a saved page's storage, all by postMessage.
  */
-export const PAGE_FRAME_HTML = `<!doctype html>
-<html><head><meta charset="utf-8"></head><body><script>
-addEventListener('message', function (e) {
-  if (e.source !== parent || !e.data || e.data.type !== 'wa-html-page') return;
-  var fit = '<script>(function(){function s(){var d=document.documentElement,b=document.body;parent.postMessage({type:"wa-html-size",h:Math.max(d.scrollHeight,b?b.scrollHeight:0)},"*")}' +
-    'new ResizeObserver(s).observe(document.documentElement);addEventListener("load",s);setTimeout(s,300);s()})()<\\/script>';
-  document.open();
-  document.write(String(e.data.html) + fit);
-  document.close();
-});
-parent.postMessage({ type: 'wa-html-ready' }, '*');
-</script></body></html>`;
+export const PAGE_FRAME_HTML = frameHtml();

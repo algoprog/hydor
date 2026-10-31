@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "monday",
+  "name": "monday.com",
+  "description": "Read and update boards, items and updates in monday.com.",
+  "category": "tasks",
+  "icon": "monday",
+  "color": "#6161FF",
+  "homepage": "https://monday.com",
+  "docs": "https://developer.monday.com/apps/docs/mondaycom-mcp-integration",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.monday.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "boards",
+    "projects",
+    "work management",
+    "crm"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -11,7 +11,9 @@ import { ApprovalCard } from './Approval';
 import { AgentIcon } from '../../components/AgentIcon';
 import { QuoteSelection } from './QuoteSelection';
 import { AssistantBlock, Elapsed, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UserBubble } from './items';
-import { HtmlPage, isPageTool } from './HtmlPage';
+import { toolView } from '../registry';
+import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
+import type { SessionNote } from '@shared/features';
 
 type Block = { kind: 'item'; item: TimelineItem } | { kind: 'group'; id: string; items: TimelineItem[] };
 
@@ -43,8 +45,9 @@ function blocks(items: TimelineItem[]): Block[] {
     cur = [];
   };
   for (const it of items) {
-    // A page an agent showed is part of its answer, not a step to fold away.
-    if ((it.kind === 'tool' && !STANDALONE.has(it.tool.category) && !isPageTool(it.tool.name)) || it.kind === 'thinking') cur.push(it);
+    // A page an agent showed (or another of the app's tools shown with the reply) is not a step to fold away.
+    const place = placeOf(it);
+    if ((it.kind === 'tool' && !STANDALONE.has(it.tool.category) && (!place || place === 'work')) || it.kind === 'thinking') cur.push(it);
     else {
       flush();
       out.push({ kind: 'item', item: it });
@@ -78,6 +81,9 @@ interface Segment {
 const isOpenQuestion = (it: TimelineItem) =>
   it.kind === 'tool' && it.tool.category === 'question' && (it.tool.status === 'running' || it.tool.status === 'pending' || it.tool.status === 'waiting') && !Object.keys(it.tool.answers ?? {}).length;
 
+/** Where one of the app's own tools shows (registry.tsx): with the reply, outside the fold, or in the work. */
+const placeOf = (it: TimelineItem) => (it.kind === 'tool' ? toolView(it.tool.name, it.tool)?.place : undefined);
+
 function segment(items: TimelineItem[]): Segment[] {
   const out: Segment[] = [];
   let cur: Segment | null = null;
@@ -106,10 +112,10 @@ function segment(items: TimelineItem[]): Segment[] {
     cur!.work.push(it);
   }
   for (const s of out) {
-    s.attention = s.work.filter(isOpenQuestion);
-    if (s.attention.length) s.work = s.work.filter((i) => !isOpenQuestion(i));
-    // Pages the agent showed belong with its reply, outside the folded work.
-    const pages = s.work.filter((it) => it.kind === 'tool' && isPageTool(it.tool.name));
+    s.attention = s.work.filter((i) => isOpenQuestion(i) || placeOf(i) === 'attention');
+    if (s.attention.length) s.work = s.work.filter((i) => !s.attention.includes(i));
+    // Pages the agent showed (and what else the app's tools put with a reply) belong with it, outside the folded work.
+    const pages = s.work.filter((it) => placeOf(it) === 'answer');
     if (pages.length) s.work = s.work.filter((it) => !pages.includes(it));
     // The reply is what the agent wrote after its last step.
     let last = -1;
@@ -430,6 +436,13 @@ function TurnChanges({ files, sessionKey }: { files: FileEntry[]; sessionKey: st
   );
 }
 
+/** The ids of a turn's items: notes anchored to any of them show with it. */
+function segIds(seg: Segment): Set<string> {
+  const ids = new Set<string>([seg.id]);
+  for (const it of [seg.prompt, seg.notice, ...seg.work, ...seg.attention, ...seg.answer, seg.end]) if (it) ids.add(it.id);
+  return ids;
+}
+
 const SegmentView = memo(function SegmentView({
   seg,
   sessionKey,
@@ -437,6 +450,7 @@ const SegmentView = memo(function SegmentView({
   live,
   isNew,
   fresh,
+  notes,
 }: {
   seg: Segment;
   sessionKey: string;
@@ -444,6 +458,8 @@ const SegmentView = memo(function SegmentView({
   live: LiveInfo | null;
   isNew: boolean;
   fresh: (id: string) => boolean;
+  /** The session's notes (each shows with the turn of its anchor). */
+  notes: SessionNote[];
 }) {
   const [open, setOpen] = useState<boolean | null>(null);
   const expanded = open ?? !!live;
@@ -525,9 +541,10 @@ const SegmentView = memo(function SegmentView({
       {seg.answer.map((a) => (
         <div key={a.id} className={cx(fresh(a.id) && 'anim-in')}>
           {a.kind === 'assistant' && <AssistantBlock item={a} />}
-          {a.kind === 'tool' && <HtmlPage item={a} />}
+          {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} />}
         </div>
       ))}
+      {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}
       {!live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}
     </section>
   );
@@ -626,6 +643,8 @@ export function Timeline({
   const following = () => stick.current;
   const merged = useMemo(() => mergeOverlay(tl?.items ?? [], overlay), [tl?.items, overlay]);
   const segs = useMemo(() => segment(merged), [merged]);
+  const notes = useSessionNotes(sessionKey);
+  const noteIds = useMemo(() => new Set(segs.flatMap((s) => [...segIds(s)])), [segs]);
   const approvals: ApprovalRequest[] = overlay?.approvals ?? [];
   const here = !!live && live.status !== 'exited' && live.status !== 'error';
   const ext = here ? null : (external ?? null);
@@ -854,11 +873,12 @@ export function Timeline({
                     </div>
                   )}
                   <div data-seg={seg.id} data-partial={i === 0 && tl.start > 0 && !seg.prompt ? '1' : undefined}>
-                    <SegmentView seg={seg} sessionKey={sessionKey} agent={agent} live={isLast ? liveInfo : null} isNew={fresh(seg.prompt?.id ?? seg.notice?.id ?? seg.work[0]?.id ?? seg.id)} fresh={fresh} />
+                    <SegmentView seg={seg} sessionKey={sessionKey} agent={agent} live={isLast ? liveInfo : null} isNew={fresh(seg.prompt?.id ?? seg.notice?.id ?? seg.work[0]?.id ?? seg.id)} fresh={fresh} notes={notes} />
                   </div>
                 </Fragment>
               );
             })}
+            {notes.length > 0 && <LooseNotes notes={notes} known={noteIds} sessionKey={sessionKey} complete={tl.start === 0} />}
             {working && !segs.length && (
               <div className="flex items-center gap-2.5 px-2 text-[13.5px] text-busy">
                 <AgentIcon agent={agent} size={15} className="spin-gentle" /> Starting…

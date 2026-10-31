@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "alltrails",
+  "name": "AllTrails",
+  "description": "Find hiking, running and biking trails, with their reviews and conditions.",
+  "category": "life",
+  "icon": "alltrails",
+  "color": "#2D6A2E",
+  "homepage": "https://www.alltrails.com",
+  "docs": "https://www.alltrails.com/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://www.alltrails.com/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "hiking",
+    "trails",
+    "outdoors",
+    "running"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

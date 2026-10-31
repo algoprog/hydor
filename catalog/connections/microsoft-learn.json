@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "microsoft-learn",
+  "name": "Microsoft Learn",
+  "description": "Search Microsoft’s official documentation and code samples (Azure, .NET, Microsoft 365…).",
+  "category": "dev",
+  "icon": "microsoft-learn",
+  "color": "#0078D4",
+  "homepage": "https://learn.microsoft.com",
+  "docs": "https://learn.microsoft.com/en-us/training/support/mcp-get-started",
+  "server": {
+    "transport": "http",
+    "url": "https://learn.microsoft.com/api/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "documentation",
+    "azure",
+    ".net",
+    "microsoft 365"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

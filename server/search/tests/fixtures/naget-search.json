@@ -1,0 +1,70 @@
+{
+  "query": "solid state battery",
+  "mode": "hybrid",
+  "rerank": true,
+  "pagerank": true,
+  "scope": { "categories": ["uspto", "data"] },
+  "scope_description": "US patents and data",
+  "parsed": null,
+  "revision": 412,
+  "data": [
+    {
+      "rank": 1,
+      "url": "https://patents.google.com/patent/US8481204B2/en",
+      "title": "Solid-state battery",
+      "snippet": "A solid-state battery has a power generation element having a cathode layer, a sulfide-based solid electrolyte membrane and an anode layer stacked in this order.",
+      "category": "tier1/uspto",
+      "file_type": "html",
+      "authority_tier": "tier1",
+      "primary_source": true,
+      "date": "2013-07-09",
+      "date_source": "published",
+      "language": "en",
+      "score": 23.1,
+      "rerank_score": 0.92,
+      "retrieval_rank": 2,
+      "filtered_snippet": "The battery case holds a flowable sealant that does not react with the electrolyte.\n\n| Layer | Material |\n| --- | --- |\n| Cathode | LiCoO2 |"
+    },
+    {
+      "rank": 2,
+      "url": "https://www.example.org/reports/battery-outlook.pdf",
+      "title": "Battery &amp; storage outlook 2026",
+      "snippet": "Global battery storage additions reached 180 GWh in 2025.",
+      "category": "pdf/tier1/data",
+      "file_type": "pdf",
+      "authority_tier": "tier1",
+      "primary_source": false,
+      "date": "2026-03-01T00:00:00Z",
+      "date_source": "crawled",
+      "language": "en",
+      "score": 18.4,
+      "rerank_score": 0.81,
+      "retrieval_rank": 1,
+      "filtered_snippet": ""
+    },
+    {
+      "rank": 3,
+      "url": "https://news.example.com/solid-state",
+      "title": "Solid-state batteries <b>arrive</b>",
+      "snippet": "Carmakers plan the first cars with solid-state cells.",
+      "category": null,
+      "file_type": null,
+      "authority_tier": null,
+      "primary_source": null,
+      "date": null,
+      "date_source": null,
+      "language": null,
+      "score": null,
+      "rerank_score": 0.5,
+      "retrieval_rank": 7
+    },
+    { "rank": 4, "title": "A result without an address", "snippet": "left out" }
+  ],
+  "usage": { "searches": 1, "duration_ms": 412 },
+  "credits": {
+    "mode": "search",
+    "charged_credits": "2",
+    "free_usage": { "daily_credits": "2000", "available_credits": "1840.5" },
+    "reset_at": "2026-11-01T00:00:00Z"
+  }
+}

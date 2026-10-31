@@ -1,6 +1,8 @@
 // Live Claude Code session over the stream-json protocol:
 //   claude --input-format stream-json --output-format stream-json --permission-prompt-tool stdio ...
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { ApprovalRequest, ModelOption, TimelineItem, ToolItem } from '../../shared/types.ts';
 import { config } from '../config.ts';
 import { describeClaudeTool, questionsFrom } from '../history/claude.ts';
@@ -8,6 +10,7 @@ import { firstLine, snippetDiff, wholeFileDiff } from '../history/common.ts';
 import type { Runner, RunSpec } from '../runner/client.ts';
 import { approvalTitleFor, LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig } from './live.ts';
 import { splitHandoff } from '../handoff.ts';
+import type { SpawnAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
 
 type Json = Record<string, any>;
@@ -23,8 +26,10 @@ export interface ClaudeOpts {
   model?: string;
   effort?: string;
   mode?: string;
-  /** This app's MCP address for the session (show_html). */
+  /** This app's MCP address for the session (show_html, web_search…). */
   pageServer?: string;
+  /** What the app's capabilities add: instructions, MCP servers (server/features). */
+  add?: Required<SpawnAdditions>;
 }
 
 export const CLAUDE_MODES = [
@@ -34,6 +39,15 @@ export const CLAUDE_MODES = [
   { value: 'plan', label: 'Plan', description: 'Read and plan only; propose a plan for approval' },
   { value: 'bypassPermissions', label: 'Bypass', description: 'Never ask (full access)' },
 ];
+
+/** The MCP servers for a session's run, written where only this user can read them; returns the path. */
+function mcpConfigFile(sessionId: string, cfg: object): string {
+  const dir = path.join(config.dataDir, 'mcp');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const file = path.join(dir, `${sessionId.replace(/[^\w-]/g, '')}.json`);
+  fs.writeFileSync(file, JSON.stringify(cfg), { mode: 0o600 });
+  return file;
+}
 
 export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec {
   const args = [
@@ -54,8 +68,19 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
   if (o.model) args.push('--model', o.model);
   if (o.effort) args.push('--effort', o.effort);
   if (o.mode) args.push('--permission-mode', o.mode);
-  // The app's page server joins the user's own MCP servers; showing a page needs no approval.
-  if (o.pageServer) args.push('--mcp-config', JSON.stringify({ mcpServers: { [PAGE_SERVER]: { type: 'http', url: o.pageServer } } }), '--allowedTools', `mcp__${PAGE_SERVER}__show_html`);
+  // The app's own server (and the capabilities' servers) join the user's MCP servers. The app's tools
+  // need no approval here: those that need the user's say ask in the conversation themselves.
+  const servers: Record<string, unknown> = {};
+  for (const [name, d] of Object.entries(o.add?.mcpServers ?? {})) servers[name] = d.type === 'http' ? { type: 'http', url: d.url, ...(d.headers ? { headers: d.headers } : {}) } : { type: 'stdio', command: d.command, args: d.args ?? [], env: d.env ?? {} };
+  if (o.pageServer) servers[PAGE_SERVER] = { type: 'http', url: o.pageServer };
+  // In a file only this user can read, not on the command line: its addresses carry the run's token.
+  if (Object.keys(servers).length) args.push('--mcp-config', mcpConfigFile(o.sessionId, { mcpServers: servers }));
+  if (o.pageServer) args.push('--allowedTools', `mcp__${PAGE_SERVER}`);
+  if (o.add?.instructions.length) args.push('--append-system-prompt', o.add.instructions.join('\n\n'));
+  if (o.add?.args?.length) args.push(...o.add.args);
+  // An assistant's limits: tools switched off, and none of the user's own MCP servers.
+  if (o.add?.disallowedTools?.length) args.push('--disallowedTools', o.add.disallowedTools.join(','));
+  if (o.add?.strictMcp) args.push('--strict-mcp-config');
   return { cmd: config.claudeBin, args, cwd: o.cwd, env };
 }
 

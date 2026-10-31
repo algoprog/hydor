@@ -7,12 +7,19 @@ import { App } from './App';
 // shared session alone, without signing in.
 const GuestPage = lazy(() => import('./features/guest/GuestPage'));
 const guest = /^(?:\/m\/[a-z0-9-]+)?\/g\/([^/]+)\/?$/.exec(location.pathname);
+// An app's public page (/a/<slug>): its form, for anyone with the link.
+const PublicAppPage = lazy(() => import('./features/apps/PublicPage'));
+const publicApp = /^\/a\/([^/]+)\/?$/.exec(location.pathname);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {guest ? (
       <Suspense fallback={null}>
         <GuestPage token={decodeURIComponent(guest[1])} />
+      </Suspense>
+    ) : publicApp ? (
+      <Suspense fallback={null}>
+        <PublicAppPage slug={decodeURIComponent(publicApp[1])} />
       </Suspense>
     ) : (
       <App />

@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "netlify",
+  "name": "Netlify",
+  "description": "Create, deploy and manage sites, forms and environment settings on Netlify.",
+  "category": "cloud",
+  "icon": "netlify",
+  "color": "#00C7B7",
+  "homepage": "https://www.netlify.com",
+  "docs": "https://docs.netlify.com/build/build-with-ai/agent-setup-guides/agent-setup-overview/",
+  "server": {
+    "transport": "http",
+    "url": "https://netlify-mcp.netlify.app/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "hosting",
+    "deployments",
+    "websites",
+    "serverless"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "calendly",
+  "name": "Calendly",
+  "description": "See your Calendly event types and bookings, and share scheduling links.",
+  "category": "calendar",
+  "icon": "calendly",
+  "color": "#006BFF",
+  "homepage": "https://calendly.com",
+  "docs": "https://developer.calendly.com/calendly-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.calendly.com"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "scheduling",
+    "meetings",
+    "bookings",
+    "calendar"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

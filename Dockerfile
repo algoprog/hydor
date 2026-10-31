@@ -23,11 +23,29 @@ LABEL org.opencontainers.image.title="Naget Agent" \
 ARG UID=1000
 ARG GID=1000
 
-# git, python3, make and g++ build the app (and its native modules) when it updates.
+# git, python3, make and g++ build the app (and its native modules) when it updates. poppler-utils
+# reads PDFs (pdftotext) and shows their pages to agents (pdftoppm); python3-venv lets the office
+# skills install python-docx, openpyxl, python-pptx and reportlab into the data folder on first use.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      tini git tmux ripgrep ca-certificates curl openssh-client procps less python3 make g++ \
+      tini git tmux ripgrep ca-certificates curl openssh-client procps less python3 python3-venv make g++ poppler-utils \
  && rm -rf /var/lib/apt/lists/*
+
+# LibreOffice (a few hundred MB more) shows Word, Excel and PowerPoint files as laid-out pages, and lets
+# agents look at the documents they make: build with --build-arg OFFICE=true to add it, with fonts
+# that stand in for Calibri, Cambria, Arial and Times.
+ARG OFFICE=false
+RUN if [ "$OFFICE" = true ]; then apt-get update \
+ && apt-get install -y --no-install-recommends libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui \
+      fonts-liberation2 fonts-dejavu-core fonts-crosextra-carlito fonts-crosextra-caladea \
+ && rm -rf /var/lib/apt/lists/*; fi
+
+# Chromium for the agents' browser (Settings → Browser), with fonts for most pages and emoji. Build
+# with --build-arg BROWSER=false to leave it out (on x86-64 the app can then download Chrome itself).
+ARG BROWSER=true
+RUN if [ "$BROWSER" = true ]; then apt-get update \
+ && apt-get install -y --no-install-recommends chromium fonts-liberation fonts-noto-color-emoji \
+ && rm -rf /var/lib/apt/lists/*; fi
 
 # Claude Code; Codex comes with the app's own npm dependencies.
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \

@@ -1,0 +1,32 @@
+{
+  "$schema": "../schema.json",
+  "id": "chrome-devtools",
+  "name": "Chrome DevTools",
+  "description": "Control and inspect Chrome: performance traces, network requests, console and screenshots.",
+  "category": "dev",
+  "icon": "browser",
+  "color": "#4285F4",
+  "homepage": "https://developer.chrome.com/docs/devtools",
+  "docs": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "chrome-devtools-mcp@latest"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "browser",
+    "debugging",
+    "performance",
+    "web"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

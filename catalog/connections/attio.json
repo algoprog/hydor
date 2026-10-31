@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "attio",
+  "name": "Attio",
+  "description": "Search and update people, companies, deals, lists and notes in your Attio CRM.",
+  "category": "sales",
+  "icon": "attio",
+  "color": "#1C1D1F",
+  "homepage": "https://attio.com",
+  "docs": "https://attio.com/help/apps/other-apps/using-the-attio-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.attio.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "crm",
+    "contacts",
+    "deals",
+    "sales"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

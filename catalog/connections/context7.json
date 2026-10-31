@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "context7",
+  "name": "Context7",
+  "description": "Current documentation and code examples for thousands of libraries, straight to the agent.",
+  "category": "dev",
+  "icon": "context7",
+  "color": "#0E9F6E",
+  "homepage": "https://context7.com",
+  "docs": "https://context7.com/docs/resources/all-clients",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.context7.com/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "documentation",
+    "libraries",
+    "api reference",
+    "code examples"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

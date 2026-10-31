@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "aws-knowledge",
+  "name": "AWS Knowledge",
+  "description": "Search AWS documentation, architecture guidance and which services are in which regions.",
+  "category": "cloud",
+  "icon": "aws-knowledge",
+  "color": "#FF9900",
+  "homepage": "https://aws.amazon.com",
+  "docs": "https://awslabs.github.io/mcp/servers/aws-knowledge-mcp-server/",
+  "server": {
+    "transport": "http",
+    "url": "https://knowledge-mcp.global.api.aws"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "aws",
+    "amazon",
+    "documentation",
+    "cloud"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

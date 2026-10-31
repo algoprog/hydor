@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "close",
+  "name": "Close",
+  "description": "Work with leads, contacts, opportunities and activities in Close CRM.",
+  "category": "sales",
+  "icon": "close",
+  "color": "#1463FF",
+  "homepage": "https://www.close.com",
+  "docs": "https://help.close.com/docs/mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.close.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "crm",
+    "leads",
+    "sales",
+    "calls"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

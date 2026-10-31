@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema.json",
+  "id": "hugging-face",
+  "name": "Hugging Face",
+  "description": "Search models, datasets, Spaces and papers on Hugging Face, and use Spaces as tools.",
+  "category": "ai",
+  "icon": "hugging-face",
+  "color": "#FFD21E",
+  "homepage": "https://huggingface.co",
+  "docs": "https://huggingface.co/docs/hub/agents-mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://huggingface.co/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "models",
+    "datasets",
+    "machine learning",
+    "spaces",
+    "papers"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

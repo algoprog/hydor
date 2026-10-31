@@ -31,6 +31,7 @@ import { Elapsed } from '../session/items';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
+import { ChildNest, nestChildren } from '../children/Nest';
 
 /**
  * Active sessions keep their places: newest to become active on top, then fixed. Working,
@@ -387,6 +388,9 @@ export function SessionList({ query }: { query: string }) {
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   );
 
+  // Child sessions sit under their parent (folded), when it is listed too.
+  const nest = useMemo(() => nestChildren(byKey, (s) => !s.archived && (filter === 'all' || s.agent === filter)), [byKey, filter]);
+
   const groups = useMemo(() => {
     const out: { label: string; items: SessionSummary[] }[] = [];
     const now = new Date();
@@ -394,6 +398,7 @@ export function SessionList({ query }: { query: string }) {
       const s = byKey[key];
       if (!s || s.archived) continue;
       if (filter !== 'all' && s.agent !== filter) continue;
+      if (nest.under.has(key)) continue;
       // Snoozed ones wait at the bottom until their time (or until they need you).
       const label = s.snoozedUntil && s.snoozedUntil > now.getTime() ? 'Snoozed' : activityOf(s) ? 'Active' : s.pinned ? 'Pinned' : dayGroup(s.updatedAt, now);
       let g = out.find((x) => x.label === label);
@@ -409,7 +414,7 @@ export function SessionList({ query }: { query: string }) {
     const pin = out.find((g) => g.label === 'Pinned');
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
     return out.sort((a, b) => rank(a.label) - rank(b.label));
-  }, [byKey, order, filter]);
+  }, [byKey, order, filter, nest]);
 
   const groupOf = useMemo(() => {
     const m = new Map<string, string>();
@@ -518,7 +523,15 @@ export function SessionList({ query }: { query: string }) {
         const before = groups.slice(0, i).reduce((n, x) => n + x.items.length, 0);
         const rows = g.items.map((s, k) => {
           const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined, eager: before + k < 30 };
-          return sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
+          const row = sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
+          const kids = nest.byParent.get(s.key);
+          if (!kids) return row;
+          return (
+            <Fragment key={s.key}>
+              {row}
+              <ChildNest parent={s.key} kids={kids} activeKey={activeKey} row={(c, active) => <RowBody s={c} active={active} home={home} />} />
+            </Fragment>
+          );
         });
         return (
           <Fragment key={g.label}>

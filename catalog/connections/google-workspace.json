@@ -1,0 +1,53 @@
+{
+  "$schema": "../schema.json",
+  "id": "google-workspace",
+  "name": "Google Workspace (on this computer)",
+  "description": "Gmail, Drive, Calendar, Docs, Sheets and more in one server that runs on this computer.",
+  "category": "communication",
+  "icon": "google-workspace",
+  "color": "#4285F4",
+  "homepage": "https://workspace.google.com",
+  "docs": "https://github.com/taylorwilsdon/google_workspace_mcp",
+  "server": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": [
+      "workspace-mcp",
+      "--single-user"
+    ],
+    "env": {
+      "GOOGLE_OAUTH_CLIENT_ID": "{{GOOGLE_OAUTH_CLIENT_ID}}",
+      "GOOGLE_OAUTH_CLIENT_SECRET": "{{GOOGLE_OAUTH_CLIENT_SECRET}}"
+    }
+  },
+  "auth": {
+    "type": "api_key",
+    "url": "https://console.cloud.google.com/apis/credentials",
+    "help": "An OAuth client from Google Cloud. The first time a tool runs it gives a Google sign-in link whose answer comes back to this computer, so open it in a browser here."
+  },
+  "fields": [
+    {
+      "name": "GOOGLE_OAUTH_CLIENT_ID",
+      "label": "OAuth client ID",
+      "placeholder": "….apps.googleusercontent.com"
+    },
+    {
+      "name": "GOOGLE_OAUTH_CLIENT_SECRET",
+      "label": "OAuth client secret",
+      "secret": true
+    }
+  ],
+  "keywords": [
+    "gmail",
+    "drive",
+    "calendar",
+    "docs",
+    "sheets",
+    "google"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "Its Google sign-in comes back to this computer (localhost), so finish it in a browser here. Needs uv (uvx)."
+}

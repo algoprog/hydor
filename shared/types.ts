@@ -1,4 +1,5 @@
 // Types shared by the server and the web client.
+import type { SessionExtra, SessionNote } from './features.ts';
 import type { AppTheme } from './themes.ts';
 
 /** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
@@ -110,6 +111,8 @@ export interface ToolInfo {
   error?: string;
   /** The agent's own guard refused the command (auto-mode classifier / built-in safety check): the reason it gave. */
   blocked?: string;
+  /** Custom's Auto mode decided this step without asking: "Auto: routine command", or why it stopped it. */
+  auto?: string;
   /** Live-only: output streamed while running. */
   liveOutput?: string;
 }
@@ -273,6 +276,8 @@ export interface SessionSummary {
   agent: Agent;
   id: string;
   title: string;
+  /** Settings beyond the agent's own: memory on or off, its assistant, a spending cap… */
+  extra?: SessionExtra;
   /** Manual position in its sidebar group (Active, Pinned), set by drag and drop; unset ones sort first. */
   order?: number;
   external?: ExternalState | null;
@@ -363,40 +368,8 @@ export interface GoalInfo {
   seconds?: number;
 }
 
-/** When a task runs: every few minutes, at a time of day (on some weekdays), once, or when its URL is called. */
-export type TaskSchedule =
-  | { kind: 'every'; minutes: number }
-  | { kind: 'daily'; time: string; days?: number[] }
-  | { kind: 'once'; at: number }
-  | { kind: 'webhook' };
-
-/** Agent work that starts by itself; each run starts a new session or sends a message into one. */
-export interface ScheduledTask {
-  id: string;
-  name: string;
-  schedule: TaskSchedule;
-  /** For a webhook task, `{{body.field}}`, `{{headers.name}}`, `{{query.name}}`, `{{body}}` and `{{request}}` fill in from the call. */
-  prompt: string;
-  agent: Agent;
-  cwd: string;
-  model?: string;
-  effort?: string;
-  mode?: string;
-  /** Post into this session instead of starting a new one each run. */
-  target?: string;
-  enabled: boolean;
-  nextAt?: number;
-  lastAt?: number;
-  /** "ok", or what went wrong. */
-  lastStatus?: string;
-  /** The session the last run started or posted into. */
-  lastKey?: string;
-  /** Webhook tasks: the path to call (its secret is part of it). */
-  hookPath?: string;
-  /** Made by "Resume at reset": continues `target` once, then goes away. */
-  resume?: boolean;
-  createdAt: number;
-}
+/** Scheduled tasks and their schedules live with the rest of the automations (shared/automations.ts). */
+export type { ScheduledTask, TaskSchedule } from './automations.ts';
 
 export interface QueuedMessage {
   id: string;
@@ -719,6 +692,10 @@ export interface SystemInfo {
 
 export type ServerEvent =
   | { t: 'hello'; version: string; build?: string }
+  /** A note the app added to a session's conversation, changed, or removed. */
+  | { t: 'note'; key: string; note: SessionNote; removed?: boolean }
+  /** A capability's own news (a browser's frame, a memory update…): for one session's pages when `key` is set. */
+  | { t: 'feature'; id: string; key?: string; data: unknown }
   | { t: 'update'; update: UpdateState | null }
   | { t: 'models'; state: ModelsState }
   | { t: 'sessions'; upsert: SessionSummary[]; remove?: string[] }
@@ -1048,6 +1025,10 @@ export interface AgentModel {
   headers?: Record<string, string>;
   /** A server that starts when the model is used (vLLM). */
   start?: boolean;
+  /** It can think before it answers (OpenRouter's catalog says so): Custom asks for a reasoning effort. */
+  reasoning?: boolean;
+  /** The longest reply it gives, in tokens, when known. */
+  maxOutput?: number;
 }
 
 export interface ModelEntry {

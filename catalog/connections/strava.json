@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "strava",
+  "name": "Strava",
+  "description": "Look at your Strava activities, routes, segments and training trends.",
+  "category": "life",
+  "icon": "strava",
+  "color": "#FC4C02",
+  "homepage": "https://www.strava.com",
+  "docs": "https://support.strava.com/en-us/articles/15401531-strava-mcp-connector",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.strava.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "running",
+    "cycling",
+    "fitness",
+    "training"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

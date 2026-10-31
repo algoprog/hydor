@@ -1,0 +1,49 @@
+{
+  "$schema": "../schema.json",
+  "id": "astra-db",
+  "name": "Astra DB",
+  "description": "Manage and query collections and records in a DataStax Astra DB database.",
+  "category": "data",
+  "icon": "database",
+  "color": "#6E40C9",
+  "homepage": "https://www.datastax.com/products/datastax-astra",
+  "docs": "https://github.com/datastax/astra-db-mcp",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@datastax/astra-db-mcp"
+    ],
+    "env": {
+      "ASTRA_DB_APPLICATION_TOKEN": "{{ASTRA_DB_APPLICATION_TOKEN}}",
+      "ASTRA_DB_API_ENDPOINT": "{{ASTRA_DB_API_ENDPOINT}}"
+    }
+  },
+  "auth": {
+    "type": "api_key",
+    "url": "https://astra.datastax.com"
+  },
+  "fields": [
+    {
+      "name": "ASTRA_DB_APPLICATION_TOKEN",
+      "label": "Application token",
+      "secret": true,
+      "placeholder": "AstraCS:…"
+    },
+    {
+      "name": "ASTRA_DB_API_ENDPOINT",
+      "label": "API endpoint",
+      "placeholder": "https://<id>-<region>.apps.astra.datastax.com"
+    }
+  ],
+  "keywords": [
+    "vector database",
+    "nosql",
+    "cassandra"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

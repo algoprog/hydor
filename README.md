@@ -27,6 +27,10 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - Use a terminal, files, git, notebooks, scheduled tasks and your plans' limits in the same app
 - Switch between several accounts and machines from the sidebar
 - Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
+- Get help with anything, not just code: assistants for research, writing and planning, web search (Naget Search by
+  default) and a browser you can watch and take over, documents in and out, pages and small apps you keep
+- Give every agent memory of you and your projects, your apps and services (connected once), skills, child
+  sessions, and tasks that run on a schedule or when something changes
 
 See [all features](docs/features.md).
 

@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "clickup",
+  "name": "ClickUp",
+  "description": "Find, create and update tasks, docs and comments in ClickUp.",
+  "category": "tasks",
+  "icon": "clickup",
+  "color": "#7B68EE",
+  "homepage": "https://clickup.com",
+  "docs": "https://developer.clickup.com/docs/connect-an-ai-assistant-to-clickups-mcp-server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.clickup.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "tasks",
+    "projects",
+    "docs",
+    "work management"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -3,6 +3,7 @@
 // wide screens; on phones a list, each section on its own page.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
+import { featureSections } from '../registry';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, StartupState, UpdateState } from '@shared/types';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
@@ -26,7 +27,8 @@ import { AcpSettings } from './AcpSettings';
 import { machineId } from '../../lib/machine';
 import { MachineSettings } from './MachineSettings';
 
-export type SettingsSection = 'general' | 'notifications' | 'security' | 'scm' | 'connect' | 'machines' | 'accounts' | 'agents' | 'models' | 'instructions' | 'mcp' | 'skills' | 'plugins' | 'tasks';
+/** A built-in section, or one of a capability's (registry.tsx) by its id. */
+export type SettingsSection = string;
 
 interface SectionDef {
   id: SettingsSection;
@@ -66,8 +68,12 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
 
 // Another machine's MCP server is reached at its own address, not through this one.
 if (machineId) for (const g of GROUPS) g.items = g.items.filter((d) => d.id !== 'connect');
-const SECTIONS = GROUPS.flatMap((g) => g.items);
-export const isSettingsSection = (s: string | null): s is SettingsSection => SECTIONS.some((d) => d.id === s);
+
+/** The built-in groups, then the capabilities' sections (search, browser, memory…), read when first needed. */
+let all: { label: string; items: SectionDef[] }[] | null = null;
+const groups = () => (all ??= [...GROUPS, { label: 'Capabilities', items: featureSections().map(({ id, label, icon, sub }): SectionDef => ({ id, label, icon, sub })) }].filter((g) => g.items.length));
+const sections = () => groups().flatMap((g) => g.items);
+export const isSettingsSection = (s: string | null): s is SettingsSection => sections().some((d) => d.id === s);
 
 export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: Agent; account?: AgentAccount; open: boolean; onClose: () => void; onDone: () => void }) {
   // An added account signs in into its own folder.
@@ -926,6 +932,10 @@ function SectionBody({ id, cwd, agent, onAgent }: { id: SettingsSection; cwd: st
       return <PluginsSettings />;
     case 'tasks':
       return <TasksSettings />;
+    default: {
+      const f = featureSections().find((d) => d.id === id);
+      return f ? <f.Body /> : null;
+    }
   }
 }
 
@@ -943,7 +953,7 @@ function FolderScope({ cwd, onChange }: { cwd: string; onChange: (c: string) => 
 function SectionList({ onOpen }: { onOpen: (id: SettingsSection) => void }) {
   return (
     <div className="space-y-5 px-4 pt-4 pb-8">
-      {GROUPS.map((g) => (
+      {groups().map((g) => (
         <div key={g.label}>
           <div className="px-1 pb-1.5 text-[12px] font-medium text-fg-3">{g.label}</div>
           <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
@@ -974,7 +984,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   const agent = agentParam ?? 'claude';
   // Wide screens always show a section; phones start at the list.
   const current = section ?? (mobile ? null : 'general');
-  const def = SECTIONS.find((d) => d.id === current);
+  const def = sections().find((d) => d.id === current);
   // Phones: a section slides in over the list (which drifts left and dims under it) and back out. Only
   // taps here slide; the browser's back and forward switch at once, since Safari on an iPhone has already
   // animated its swipe. `slideTo` is where a tap is sliding until the slide ends; meanwhile a section
@@ -983,7 +993,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   const [last, setLast] = useState(current);
   if (current && current !== last) setLast(current);
   const sliding = slideTo !== undefined && slideTo === current;
-  const page = def ?? (sliding ? SECTIONS.find((d) => d.id === last) : undefined);
+  const page = def ?? (sliding ? sections().find((d) => d.id === last) : undefined);
   const url = (p: { s?: SettingsSection | null; cwd?: string | null; agent?: Agent | null }) => {
     const q = new URLSearchParams();
     const s = p.s === undefined ? section : p.s;
@@ -1050,7 +1060,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-[1180px] items-start gap-8 px-6 pt-6 pb-10">
           <nav className="sticky top-6 w-[200px] shrink-0" aria-label="Settings sections">
-            {GROUPS.map((g, i) => (
+            {groups().map((g, i) => (
               <div key={g.label} className={cx(i > 0 && 'mt-5')}>
                 <div className="px-2.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
                 {g.items.map((d) => {

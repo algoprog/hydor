@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "id": "cloudflare-docs",
+  "name": "Cloudflare docs",
+  "description": "Search Cloudflare’s developer documentation.",
+  "category": "dev",
+  "icon": "cloudflare-docs",
+  "color": "#F38020",
+  "homepage": "https://developers.cloudflare.com",
+  "docs": "https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/",
+  "server": {
+    "transport": "http",
+    "url": "https://docs.mcp.cloudflare.com/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "documentation",
+    "workers",
+    "reference"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "wordpress-com",
+  "name": "WordPress.com",
+  "description": "Read and manage posts, pages, comments and settings on your WordPress.com sites.",
+  "category": "commerce",
+  "icon": "wordpress-com",
+  "color": "#21759B",
+  "homepage": "https://wordpress.com",
+  "docs": "https://developer.wordpress.com/docs/mcp/",
+  "server": {
+    "transport": "http",
+    "url": "https://public-api.wordpress.com/wpcom/v2/mcp/v1"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "blog",
+    "website",
+    "cms",
+    "posts"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

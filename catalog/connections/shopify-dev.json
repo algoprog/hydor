@@ -1,0 +1,32 @@
+{
+  "$schema": "../schema.json",
+  "id": "shopify-dev",
+  "name": "Shopify developer docs",
+  "description": "Search Shopify’s developer documentation and API schemas, and check GraphQL against them.",
+  "category": "commerce",
+  "icon": "shopify-dev",
+  "color": "#95BF47",
+  "homepage": "https://shopify.dev",
+  "docs": "https://shopify.dev/docs/apps/build/devmcp",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@shopify/dev-mcp@latest"
+    ]
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "shopify",
+    "ecommerce",
+    "graphql",
+    "documentation"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

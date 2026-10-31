@@ -1,0 +1,43 @@
+{
+  "$schema": "../schema.json",
+  "id": "tavily",
+  "name": "Tavily",
+  "description": "Web search, page extraction and site crawling tuned for agents, from Tavily.",
+  "category": "search",
+  "icon": "search",
+  "color": "#5E4BD9",
+  "homepage": "https://tavily.com",
+  "docs": "https://github.com/tavily-ai/tavily-mcp",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "tavily-mcp"
+    ],
+    "env": {
+      "TAVILY_API_KEY": "{{TAVILY_API_KEY}}"
+    }
+  },
+  "auth": {
+    "type": "api_key",
+    "url": "https://app.tavily.com"
+  },
+  "fields": [
+    {
+      "name": "TAVILY_API_KEY",
+      "label": "API key",
+      "secret": true,
+      "url": "https://app.tavily.com"
+    }
+  ],
+  "keywords": [
+    "web search",
+    "research",
+    "extraction"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

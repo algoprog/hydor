@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "id": "trivago",
+  "name": "trivago",
+  "description": "Compare hotel prices and availability with trivago.",
+  "category": "life",
+  "icon": "trivago",
+  "color": "#007FAD",
+  "homepage": "https://www.trivago.com",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.trivago.com/mcp"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "hotels",
+    "travel",
+    "accommodation",
+    "prices"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

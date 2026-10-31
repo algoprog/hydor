@@ -42,8 +42,9 @@ import { Button, cx, useConfirm } from '../../components/ui';
 import { allAnswered, answerOf, QuestionForm, type Picks } from './QuestionForm';
 import { openLightbox } from '../../components/Lightbox';
 import { commandLabel, commandLine } from '../../lib/commands';
-import { HtmlPage, isPageTool } from './HtmlPage';
+import { toolView } from '../registry';
 import { mu } from '../../lib/machine';
+import { ReadAloudButton } from '../voice/ReadAloud';
 
 /** The session's folder (paths inside it are shown relative to it) and a way to show its changes. */
 /** `fork(at)`: start a new session from this one, up to the transcript entry `at` (Claude) or all of it. */
@@ -186,10 +187,20 @@ const CAT_ICON: Record<string, typeof Wrench> = {
   other: Wrench,
 };
 
+/** A step as its capability presents it (registry.tsx): the kind it counts as, its verb and title. */
+function shown(t: ToolInfo): ToolInfo & { verb?: string } {
+  const s = toolView(t.name, t)?.step?.(t);
+  return s ? { ...t, category: s.category ?? t.category, title: s.title ?? t.title, verb: s.verb } : t;
+}
+
 /** The icon for a run of steps: its most common kind. */
 export function stepsIcon(items: TimelineItem[]): typeof Wrench {
   const n = new Map<string, number>();
-  for (const it of items) if (it.kind === 'tool') n.set(it.tool.category, (n.get(it.tool.category) ?? 0) + 1);
+  for (const it of items) {
+    if (it.kind !== 'tool') continue;
+    const c = shown(it.tool).category;
+    n.set(c, (n.get(c) ?? 0) + 1);
+  }
   let best = 'other';
   for (const [c, k] of n) if (k > (n.get(best) ?? 0)) best = c;
   return CAT_ICON[best] ?? Wrench;
@@ -249,6 +260,7 @@ export function ToolDetail({ t, item, sessionKey }: { t: ToolInfo; item: ToolIte
   const input = tool.input as Record<string, any> | undefined;
   return (
     <div className="space-y-2 pt-1.5 pb-2 pl-7">
+      {tool.auto && <div className="text-[12px] text-fg-3">{tool.auto}</div>}
       {tool.category === 'command' && (
         <>
           <div className="code-block">
@@ -328,12 +340,12 @@ export function ToolDetail({ t, item, sessionKey }: { t: ToolInfo; item: ToolIte
 
 /** A step on one line: what it is, then how it went. A row's button, or a folded box's only line. */
 function ToolLine({ item }: { item: ToolItem }) {
-  const t = item.tool;
+  const t = shown(item.tool);
   const home = useApp((s) => s.boot?.home);
   const { cwd } = useContext(SessionCtx);
   const Icon = CAT_ICON[t.category] ?? Wrench;
   const running = t.status === 'running' || t.status === 'pending';
-  const v = verb(t);
+  const v = t.verb ?? verb(t);
   const added = t.files?.reduce((a, f) => a + f.added, 0) ?? 0;
   const removed = t.files?.reduce((a, f) => a + f.removed, 0) ?? 0;
   // A command reads by what it is for ("Run the tests"); the command itself follows, quieter.
@@ -360,6 +372,11 @@ function ToolLine({ item }: { item: ToolItem }) {
           )}
         </span>
         {t.background && <span className="shrink-0 rounded-md bg-bg-2 px-1.5 text-[11px] text-fg-3">background</span>}
+        {t.auto && (
+          <span title={t.auto} className={cx('shrink-0 rounded-md px-1.5 text-[11px]', t.status === 'error' ? 'bg-err/10 text-err' : 'bg-accent/10 text-accent')}>
+            Auto
+          </span>
+        )}
         <DiffStat added={added} removed={removed} />
         {t.exitCode != null && t.exitCode !== 0 && <span className="shrink-0 font-mono text-[11px] text-err">exit {t.exitCode}</span>}
         {running ? (
@@ -399,7 +416,9 @@ export const ToolRow = memo(function ToolRow({ item, sessionKey, forceOpen, trai
   const [open, setOpen] = useState(false);
   const isOpen = open || !!forceOpen;
 
-  if (isPageTool(t.name)) return <HtmlPage item={item} />;
+  // The app's own tools (show_html, web_search…) show as their capability draws them (registry.tsx).
+  const view = toolView(t.name, t);
+  if (view) return <view.Row item={item} sessionKey={sessionKey} />;
   if (t.category === 'todo') return <TodoCard t={t} sessionKey={sessionKey} />;
   if (t.category === 'question') return <QuestionCard t={t} sessionKey={sessionKey} />;
 
@@ -690,7 +709,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
   // Your own messages in sessions this app can drive (not ones only open elsewhere).
   const canEdit = useSessions((x) => {
     const s = sessionKey ? x.byKey[sessionKey] : undefined;
-    return !!s && !s.external && s.agent !== 'acp' && !item.meta && !item.peer;
+    return !!s && !s.external && (s.agent !== 'acp' || s.acpAgent === 'console') && !item.meta && !item.peer;
   });
   const [showContext, setShowContext] = useState(false);
   const parsed = useMemo(() => {
@@ -783,7 +802,8 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
   const [text, setText] = useState(initial);
   const [restore, setRestore] = useState(false);
   const [busy, setBusy] = useState(false);
-  const canRestore = s?.agent === 'claude' || !!s?.worktree;
+  const custom = s?.agent === 'acp' && s.acpAgent === 'console';
+  const canRestore = s?.agent === 'claude' || custom || !!s?.worktree;
   const send = async () => {
     if (!sessionKey || !text.trim()) return;
     setBusy(true);
@@ -817,6 +837,7 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
         <span>
           Put the files back as they were before this message
           {!canRestore && <span className="block text-[11.5px]">Only for Codex sessions in a worktree.</span>}
+          {custom && !s?.worktree && <span className="block text-[11.5px] text-fg-3">The files Custom’s own edits changed; what commands changed stays.</span>}
         </span>
       </label>
       <div className="flex items-center gap-2">
@@ -852,6 +873,7 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note }: { ite
               <GitFork size={13} />
             </button>
           )}
+          <ReadAloudButton id={item.id} text={item.text} />
           <CopyButton text={item.text} label="Copy message" />
         </div>
       )}
@@ -921,7 +943,7 @@ export function summarize(items: TimelineItem[]): { text: string; added: number;
   let removed = 0;
   for (const it of items) {
     if (it.kind !== 'tool') continue;
-    const c = it.tool.category;
+    const c = shown(it.tool).category;
     if (c === 'command') commands++;
     else if (c === 'edit') edits++;
     else if (c === 'read') reads++;

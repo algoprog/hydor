@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "comfy-cloud",
+  "name": "Comfy Cloud",
+  "description": "Run ComfyUI image and video workflows in Comfy Cloud.",
+  "category": "ai",
+  "icon": "comfy-cloud",
+  "color": "#172DD7",
+  "homepage": "https://www.comfy.org",
+  "docs": "https://docs.comfy.org/agent-tools/cloud",
+  "server": {
+    "transport": "http",
+    "url": "https://cloud.comfy.org/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "image generation",
+    "video",
+    "comfyui",
+    "stable diffusion"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

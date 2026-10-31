@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema.json",
+  "id": "notion",
+  "name": "Notion",
+  "description": "Search, read and write the pages and databases in your Notion workspace.",
+  "category": "docs",
+  "icon": "notion",
+  "color": "#191919",
+  "homepage": "https://www.notion.com",
+  "docs": "https://developers.notion.com/docs/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.notion.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "notes",
+    "wiki",
+    "docs",
+    "pages",
+    "databases",
+    "knowledge base"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

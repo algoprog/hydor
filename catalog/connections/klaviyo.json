@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "klaviyo",
+  "name": "Klaviyo",
+  "description": "Look at Klaviyo campaigns, flows, segments and how they perform.",
+  "category": "sales",
+  "icon": "klaviyo",
+  "color": "#232426",
+  "homepage": "https://www.klaviyo.com",
+  "docs": "https://developers.klaviyo.com/en/docs/klaviyo_mcp_server",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.klaviyo.com/mcp?core-tools-only=true&disable-tools-with-user-generated-content=true"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "email marketing",
+    "sms",
+    "campaigns",
+    "segments"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  },
+  "notes": "Uses Klaviyo’s core tools, without the ones that read customer-written content. Needs an Owner, Admin or Manager role."
+}

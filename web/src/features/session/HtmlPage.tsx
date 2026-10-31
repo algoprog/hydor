@@ -1,49 +1,61 @@
 // A page an agent showed with show_html (the app's own MCP tool): rendered in the conversation in a
-// sandboxed frame of its own origin, fitted to its height, with a full-screen view.
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Download, Expand, FileCode2, X } from 'lucide-react';
+// sandboxed frame of its own origin, fitted to its height, with a full-screen view. Its choices go to
+// the message box (never sent by themselves); Keep puts it in Pages, with what it stored meanwhile.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { BookmarkCheck, BookmarkPlus, Download, Expand, FileCode2 } from 'lucide-react';
+import type { PageInfo } from '@shared/pages';
 import type { ToolItem } from '@shared/types';
-import { Throbber, IconButton } from '../../components/ui';
+import { post } from '../../lib/api';
+import { composeInsert } from '../../lib/featureEvents';
+import { go } from '../../lib/nav';
+import { toast, toastError } from '../../lib/store';
+import { Throbber, IconButton, cx } from '../../components/ui';
+import { memoryStore, pageStore, PageFrame, type Pick } from '../pages/frame';
+import { PageOverlay } from '../pages/overlay';
+import { usePagesStore } from '../pages/state';
 
 // The server was called agent-console in older sessions.
 export const isPageTool = (name: string) => /^mcp__(naget-agent|agent-console)__show_html$/.test(name);
 
-function PageFrame({ html, onHeight }: { html: string; onHeight?: (h: number) => void }) {
-  const ref = useRef<HTMLIFrameElement>(null);
+/**
+ * Choices go to the message box; a later pick in the same group takes the earlier one's place. While
+ * the page is full screen they wait, and go in when it closes (the box is under it).
+ */
+export function usePicks(sessionKey: string | undefined, holding: boolean) {
+  const last = useRef(new Map<string, string>());
+  const held = useRef(new Map<string, string>());
+  const put = (group: string, text: string) => {
+    const prev = last.current.get(group);
+    if (!text && !prev) return;
+    composeInsert(text, sessionKey, prev);
+    last.current.set(group, text);
+  };
   useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (e.source !== ref.current?.contentWindow) return;
-      if (e.data?.type === 'wa-html-ready') ref.current?.contentWindow?.postMessage({ type: 'wa-html-page', html }, '*');
-      else if (e.data?.type === 'wa-html-size' && typeof e.data.h === 'number') onHeight?.(e.data.h);
-    };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [html, onHeight]);
-  return (
-    <iframe
-      ref={ref}
-      src="/htmlframe"
-      title="Page"
-      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
-      className="block h-full w-full border-0 bg-white"
-    />
-  );
+    if (holding) return;
+    for (const [g, t] of held.current) put(g, t);
+    held.current.clear();
+  }, [holding]);
+  if (!sessionKey) return undefined;
+  return (p: Pick) => (holding ? held.current.set(p.group, p.text) : put(p.group, p.text));
 }
 
-export function HtmlPage({ item }: { item: ToolItem }) {
+export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: string }) {
   const input = (item.tool.input ?? {}) as { html?: string; title?: string };
   const html = typeof input.html === 'string' ? input.html : '';
   const title = input.title?.trim() || 'Page';
   const [height, setHeight] = useState(0);
   const [full, setFull] = useState(false);
   const running = item.tool.status === 'running' || item.tool.status === 'pending';
+  // Kept in Pages: the page then keeps its data there; until then, while it is on screen.
+  const keptMap = usePagesStore((s) => (sessionKey ? s.kept[sessionKey] : undefined));
+  const kept = keptMap?.[item.id];
+  const memory = useMemo(() => memoryStore(), []);
+  const store = useMemo(() => (kept ? pageStore(kept) : memory), [kept, memory]);
+  const [keeping, setKeeping] = useState(false);
+  const onPick = usePicks(sessionKey, full);
   useEffect(() => {
-    if (!full) return;
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && setFull(false);
-    document.addEventListener('keydown', k);
-    return () => document.removeEventListener('keydown', k);
-  }, [full]);
+    if (sessionKey && !keptMap) usePagesStore.getState().loadKept(sessionKey).catch(() => {});
+  }, [sessionKey, !keptMap]);
   const download = () => {
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     const a = document.createElement('a');
@@ -52,6 +64,22 @@ export function HtmlPage({ item }: { item: ToolItem }) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+  const keep = async () => {
+    if (!sessionKey) return;
+    if (kept) return go(`/pages/${kept}`);
+    setKeeping(true);
+    try {
+      const r = await post<{ page: PageInfo }>('/api/pages', { title, html, sessionKey, item: item.id, data: memory.dump() });
+      usePagesStore.getState().setKept(sessionKey, item.id, r.page.id);
+      toast('Kept in Pages', 'ok');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setKeeping(false);
+    }
+  };
+  // The frame starts over when the page's storage moves to Pages.
+  const frameKey = kept ?? 'memory';
   return (
     <div className="tl-item my-1 overflow-hidden rounded-xl border border-line bg-panel">
       <div className="flex items-center gap-2 border-b border-line px-3 py-1.5">
@@ -59,6 +87,21 @@ export function HtmlPage({ item }: { item: ToolItem }) {
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-fg-2">{title}</span>
         {html && (
           <>
+            {sessionKey && (
+              <button
+                type="button"
+                onClick={keep}
+                disabled={keeping}
+                title={kept ? 'Open it in Pages' : 'Keep this page in Pages, with its own address and storage'}
+                className={cx(
+                  'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium transition-colors disabled:opacity-50',
+                  kept ? 'text-accent hover:bg-accent-soft' : 'text-fg-3 hover:bg-bg-2 hover:text-fg',
+                )}
+              >
+                {kept ? <BookmarkCheck size={14} /> : <BookmarkPlus size={14} />}
+                {kept ? 'Kept' : 'Keep'}
+              </button>
+            )}
             <IconButton label="Save as a file" size="sm" onClick={download}>
               <Download size={14} />
             </IconButton>
@@ -72,31 +115,19 @@ export function HtmlPage({ item }: { item: ToolItem }) {
         <div className="flex items-center gap-2 px-3 py-3 text-[12.5px] text-fg-3">{running ? <Throbber /> : 'The page was too big to keep here.'}</div>
       ) : (
         <div style={{ height: Math.min(Math.max(height, 60), 900) }} className="relative transition-[height] duration-200">
-          <PageFrame html={html} onHeight={setHeight} />
-          {height > 900 && (
+          {!full && <PageFrame key={frameKey} html={html} title={title} store={store} onHeight={setHeight} onPick={onPick} />}
+          {height > 900 && !full && (
             <button onClick={() => setFull(true)} className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent pt-8 pb-2 text-[12.5px] font-medium text-white">
               See the whole page
             </button>
           )}
         </div>
       )}
-      {full &&
-        createPortal(
-          <div className="anim-overlay scrim fixed inset-0 z-50 flex flex-col p-0 sm:p-6 [--scrim:0.6]" onPointerDown={(e) => e.target === e.currentTarget && setFull(false)}>
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-panel sm:rounded-2xl">
-              <div className="flex items-center gap-2 border-b border-line px-4 py-2 pt-[max(8px,var(--safe-top))]">
-                <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{title}</span>
-                <IconButton label="Close" size="sm" onClick={() => setFull(false)}>
-                  <X size={16} />
-                </IconButton>
-              </div>
-              <div className="min-h-0 flex-1">
-                <PageFrame html={html} />
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {full && (
+        <PageOverlay title={title} onClose={() => setFull(false)}>
+          <PageFrame key={frameKey} html={html} title={title} store={store} onPick={onPick} />
+        </PageOverlay>
+      )}
     </div>
   );
 }

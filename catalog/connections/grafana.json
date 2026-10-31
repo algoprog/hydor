@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema.json",
+  "id": "grafana",
+  "name": "Grafana Cloud",
+  "description": "Query dashboards, metrics, logs and alerts in Grafana Cloud.",
+  "category": "analytics",
+  "icon": "grafana",
+  "color": "#F46800",
+  "homepage": "https://grafana.com",
+  "docs": "https://grafana.com/docs/grafana-cloud/ai-tools/mcp-servers/cloud-mcp/",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.grafana.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "dashboards",
+    "metrics",
+    "logs",
+    "alerts",
+    "observability"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

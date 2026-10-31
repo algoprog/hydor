@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "miro",
+  "name": "Miro",
+  "description": "Read and add to Miro boards: sticky notes, diagrams, documents and tables.",
+  "category": "design",
+  "icon": "miro",
+  "color": "#FFD02F",
+  "homepage": "https://miro.com",
+  "docs": "https://developers.miro.com/docs/connecting-to-miro-mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.miro.com/"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "whiteboard",
+    "diagrams",
+    "brainstorming",
+    "collaboration"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

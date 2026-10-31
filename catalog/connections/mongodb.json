@@ -1,0 +1,45 @@
+{
+  "$schema": "../schema.json",
+  "id": "mongodb",
+  "name": "MongoDB",
+  "description": "Query MongoDB databases and collections and look at their schemas (read-only here).",
+  "category": "data",
+  "icon": "database",
+  "color": "#47A248",
+  "homepage": "https://www.mongodb.com",
+  "docs": "https://github.com/mongodb-js/mongodb-mcp-server",
+  "server": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "mongodb-mcp-server",
+      "--readOnly"
+    ],
+    "env": {
+      "MDB_MCP_CONNECTION_STRING": "{{CONNECTION_STRING}}"
+    }
+  },
+  "auth": {
+    "type": "api_key",
+    "help": "The connection string, password included; it stays in the vault."
+  },
+  "fields": [
+    {
+      "name": "CONNECTION_STRING",
+      "label": "Connection string",
+      "secret": true,
+      "placeholder": "mongodb+srv://user:password@cluster.example.net/"
+    }
+  ],
+  "keywords": [
+    "mongodb",
+    "nosql",
+    "database",
+    "atlas"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "../schema.json",
+  "id": "gitlab",
+  "name": "GitLab",
+  "description": "Work with GitLab projects, issues, merge requests and pipelines.",
+  "category": "dev",
+  "icon": "gitlab",
+  "color": "#FC6D26",
+  "homepage": "https://about.gitlab.com",
+  "docs": "https://docs.gitlab.com/user/model_context_protocol/mcp_server/",
+  "server": {
+    "transport": "http",
+    "url": "https://{{GITLAB_HOST}}/api/v4/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "fields": [
+    {
+      "name": "GITLAB_HOST",
+      "label": "GitLab address",
+      "default": "gitlab.com",
+      "placeholder": "gitlab.com",
+      "help": "Change it for a self-managed GitLab."
+    }
+  ],
+  "keywords": [
+    "git",
+    "merge requests",
+    "issues",
+    "ci",
+    "repositories"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

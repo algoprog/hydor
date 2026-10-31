@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema.json",
+  "id": "mixpanel",
+  "name": "Mixpanel",
+  "description": "Ask questions of your Mixpanel product analytics: events, funnels and retention.",
+  "category": "analytics",
+  "icon": "mixpanel",
+  "color": "#7856FF",
+  "homepage": "https://mixpanel.com",
+  "docs": "https://docs.mixpanel.com/docs/mcp",
+  "server": {
+    "transport": "http",
+    "url": "https://mcp.mixpanel.com/mcp"
+  },
+  "auth": {
+    "type": "oauth"
+  },
+  "keywords": [
+    "product analytics",
+    "events",
+    "funnels",
+    "retention"
+  ],
+  "verified": {
+    "by": "scripts/check-catalog.mjs --probe",
+    "date": "2026-10-31"
+  }
+}

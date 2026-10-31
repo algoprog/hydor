@@ -21,6 +21,7 @@ import { Lightbox } from '../../components/Lightbox';
 import { HelpButton, Tour } from '../tour/Tour';
 import { ReviewPage } from '../review/ReviewPage';
 import { PreviewPage } from '../preview/PreviewPage';
+import { features } from '../registry';
 
 function useDrag(onMove: (dy: number) => void) {
   return (e: React.PointerEvent) => {
@@ -75,6 +76,8 @@ function Page() {
     const agent = q.get('agent');
     return <SettingsPage section={isSettingsSection(s) ? s : null} cwd={q.get('cwd')} agent={agent === 'claude' || agent === 'codex' ? agent : null} />;
   }
+  // The capabilities' own pages (registry.tsx).
+  for (const f of features()) for (const r of f.routes ?? []) if (r.match(loc)) return <r.Page />;
   // Customize moved into Settings; old links still land in the right place.
   if (loc === '/customize') {
     const q = new URLSearchParams(search);
