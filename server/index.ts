@@ -43,6 +43,7 @@ import { listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPrevie
 import { Kernels } from './notebook/kernels.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
+import { startSettings, updateStartSettings } from './startSettings.ts';
 import { claudeRetention, setClaudeRetention } from './claudeHistory.ts';
 import { computeStats } from './stats.ts';
 import { SystemMonitor } from './system.ts';
@@ -221,6 +222,7 @@ app.get('/api/bootstrap', async () => ({
   dataDir: config.dataDir.startsWith(config.home + '/') ? `~${config.dataDir.slice(config.home.length)}` : config.dataDir,
   defaultCwd: config.defaultCwd,
   prefs: { claude: sessions.defaults('claude'), codex: sessions.defaults('codex') },
+  start: startSettings(db),
   indexing: indexer.progress,
   host: os.hostname(),
   tourSeen: Number(kvGet(db, 'tour.seen') ?? 0),
@@ -236,6 +238,12 @@ app.post('/api/update-check', async () => ({ update: await checkUpdates() }));
 app.post('/api/update', async () => ({ update: startUpdate(false) }));
 app.put('/api/update/auto', async (req) => ({ update: setAutoUpdate(!!(req.body as { on?: boolean } | undefined)?.on) }));
 app.get('/api/startup', async () => startupState());
+/** The start page's picks as they change (the agent, model, folder, assistant…), so it opens that way next time, on any device. */
+app.put('/api/start', async (req) => {
+  const start = updateStartSettings(db, req.body);
+  broadcast({ t: 'feature', id: 'start', data: start });
+  return start;
+});
 app.put('/api/startup', async (req) => setStartup(!!(req.body as { on?: boolean } | undefined)?.on));
 watchUpdates(db, (update) => broadcast({ t: 'update', update }));
 

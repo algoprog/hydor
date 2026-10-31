@@ -185,6 +185,7 @@ export function ModelPicker({
   agents,
   switchNote,
   acp,
+  label,
 }: {
   agent: Agent;
   value?: string | null;
@@ -194,15 +195,19 @@ export function ModelPicker({
   switchNote?: string;
   /** For an ACP agent: which one (its models are what it offered when it last ran). */
   acp?: string;
+  /** Named, without an icon (the start page): "Model  Opus 5.5", the default read as the model it stands for. */
+  label?: string;
 }) {
   const c = useCatalog(agent, acp);
   const list = agents ?? [agent];
   if (agent === 'acp' && !c?.models.length) return null;
+  const def = !value && label ? c?.models.find((m) => m.isDefault) : undefined;
   return (
     <Picker
-      icon={list.length > 1 ? <AgentIcon agent={agent} size={13} className="shrink-0" /> : <Brain size={13} className="shrink-0" />}
-      value={c ? modelLabel(c, value) : 'Model'}
-      title="Model"
+      icon={label ? undefined : list.length > 1 ? <AgentIcon agent={agent} size={13} className="shrink-0" /> : <Brain size={13} className="shrink-0" />}
+      label={label}
+      value={c ? (def?.resolved ? modelLabel(c, def.resolved) : modelLabel(c, value)) : '…'}
+      title={def ? `Model: ${agentName(agent)}'s default` : 'Model'}
       disabled={disabled}
       width={list.length > 1 ? 300 : 260}
     >
@@ -234,14 +239,34 @@ const EFFORT_HINT: Record<string, string> = {
   none: 'No reasoning',
 };
 
-export function EffortPicker({ agent, model, value, onChange, disabled, acp }: { agent: Agent; model?: string | null; value?: string | null; onChange: (v: string | null) => void; disabled?: boolean; acp?: string }) {
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+export function EffortPicker({
+  agent,
+  model,
+  value,
+  onChange,
+  disabled,
+  acp,
+  label,
+}: {
+  agent: Agent;
+  model?: string | null;
+  value?: string | null;
+  onChange: (v: string | null) => void;
+  disabled?: boolean;
+  acp?: string;
+  /** Named, without an icon (the start page): "Effort  Medium". */
+  label?: string;
+}) {
   const c = useCatalog(agent, acp);
   if (agent === 'acp') return null;
   const m = findModel(c, model);
   const levels = m?.efforts ?? [];
   if (c && !levels.length) return null;
+  const shown = value ? cap(value) : label ? (m?.defaultEffort ? cap(m.defaultEffort) : 'Default') : 'Effort';
   return (
-    <Picker icon={<Gauge size={13} className="shrink-0" />} value={value ? value[0].toUpperCase() + value.slice(1) : 'Effort'} title="Reasoning effort" disabled={disabled} width={230}>
+    <Picker icon={label ? undefined : <Gauge size={13} className="shrink-0" />} label={label} value={shown} title="Reasoning effort: how hard the model thinks" disabled={disabled} width={230}>
       {(close) => (
         <>
           <OptionRow
@@ -256,7 +281,7 @@ export function EffortPicker({ agent, model, value, onChange, disabled, acp }: {
           {levels.map((l) => (
             <OptionRow
               key={l}
-              label={l[0].toUpperCase() + l.slice(1)}
+              label={cap(l)}
               hint={EFFORT_HINT[l]}
               selected={value === l}
               onClick={() => {
@@ -271,12 +296,34 @@ export function EffortPicker({ agent, model, value, onChange, disabled, acp }: {
   );
 }
 
-export function ModePicker({ agent, value, onChange, disabled, acp }: { agent: Agent; value?: string | null; onChange: (v: string) => void; disabled?: boolean; acp?: string }) {
+export function ModePicker({
+  agent,
+  value,
+  onChange,
+  disabled,
+  acp,
+  label,
+}: {
+  agent: Agent;
+  value?: string | null;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  acp?: string;
+  /** Named, without an icon (the start page): "Permissions  Ask". */
+  label?: string;
+}) {
   const c = useCatalog(agent, acp);
   const cur = c?.modes.find((m) => m.value === value) ?? c?.modes.find((m) => m.value === c?.defaultMode);
   if (agent === 'acp' && !c?.modes.length) return null;
   return (
-    <Picker icon={<ShieldCheck size={13} className="shrink-0" />} value={cur?.label ?? 'Mode'} title="Mode (Shift+Tab cycles)" disabled={disabled} width={300}>
+    <Picker
+      icon={label ? undefined : <ShieldCheck size={13} className="shrink-0" />}
+      label={label}
+      value={cur?.label ?? (label ? (c ? 'Default' : '…') : 'Mode')}
+      title={`${label ? 'What the agent may do without asking you' : 'Mode'} (Shift+Tab cycles)${cur?.description ? `\n${cur.label}: ${cur.description}` : ''}`}
+      disabled={disabled}
+      width={300}
+    >
       {(close) => (
         <>
           {(c?.modes ?? []).map((m) => (

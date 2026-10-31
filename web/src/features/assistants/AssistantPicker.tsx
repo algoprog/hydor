@@ -1,14 +1,14 @@
 // On the start page: which assistant the new session starts as. One row each (icon, name, one line);
-// General the first time, then the last one picked. Picking one turns its connections on for the session.
+// General the first time, then the one the start page used last. Picking one turns its connections on.
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Settings2 } from 'lucide-react';
+import { Check, Settings2 } from 'lucide-react';
 import { assistantExtra, type Assistant } from '@shared/assistants';
 import type { SessionExtra } from '@shared/features';
 import { go } from '../../lib/nav';
 import { useApp } from '../../lib/store';
-import { cx, MenuItem, MenuLabel, MenuSep, Popover } from '../../components/ui';
+import { cx, MenuItem, MenuLabel, MenuSep, Popover, SettingChip } from '../../components/ui';
 import { AssistantIcon } from './icons';
-import { assistantIn, lastAssistant, rememberAssistant, useAssistantsState } from './state';
+import { assistantIn, lastAssistant, useAssistantsState } from './state';
 
 const AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
 
@@ -34,7 +34,6 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
   const cur = assistantIn(st, typeof value.assistant === 'string' ? value.assistant : undefined);
   const acpName = (id: string) => acp?.find((x) => x.id === id)?.name;
   const pick = (a: Assistant) => {
-    rememberAssistant(a.id);
     set(a);
     setOpen(false);
   };
@@ -61,17 +60,19 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
   const mine = st.assistants.filter((a) => !a.builtin);
   return (
     <>
-      <button
+      <SettingChip
         ref={ref}
-        type="button"
+        label="Assistant"
+        open={open}
         onClick={() => setOpen((o) => !o)}
         title={cur ? `${cur.name}: ${cur.description}` : 'Which assistant this session starts as'}
-        className={cx('inline-flex h-8 max-w-[11rem] min-w-0 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg', open && 'bg-bg-2 text-fg')}
-      >
-        <AssistantIcon icon={cur?.icon ?? 'sparkles'} size={14} plain className="text-fg-3" />
-        <span className="truncate font-medium">{cur?.name ?? 'Assistant'}</span>
-        <ChevronDown size={13} className="shrink-0 opacity-60 max-md:hidden" />
-      </button>
+        value={
+          <span className="inline-flex items-center gap-1.5">
+            <AssistantIcon icon={cur?.icon ?? 'sparkles'} size={13} plain className="shrink-0 text-fg-3" />
+            {cur?.name ?? '…'}
+          </span>
+        }
+      />
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(340, window.innerWidth - 16)}>
         <MenuLabel>Start as</MenuLabel>
         {st.assistants.filter((a) => a.builtin).map(row)}

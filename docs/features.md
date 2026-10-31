@@ -5,7 +5,8 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
 ## Sessions
 - Start a Claude Code or Codex session in any folder, optionally in a worktree of its own (a new branch in a
   separate folder, so several agents can change one repository at once). Pick the model, how hard it
-  thinks, and what it may do without asking you.
+  thinks, and what it may do without asking you. The start page opens with what you picked there last,
+  on any device: the agent and its model, the folder, the assistant, memory and a spending cap.
 - Switch models mid-session, even to the other company's agent: the conversation is handed over.
 - Fork a session from any reply, or edit an earlier message and go on from there, with the files put back as
   they were. Compact a long session, stop a turn, resume an old one.

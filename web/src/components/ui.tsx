@@ -310,9 +310,10 @@ export function OptionRow({ label, hint, selected, onClick, icon }: { label: Rea
   );
 }
 
-/** A chip that opens a picker popover. */
+/** A chip that opens a picker popover; with `label`, a setting that names itself ("Model  Opus 5.5"). */
 export function Picker({
   icon,
+  label,
   value,
   title,
   children,
@@ -321,6 +322,7 @@ export function Picker({
   className,
 }: {
   icon?: ReactNode;
+  label?: string;
   value: ReactNode;
   title: string;
   children: (close: () => void) => ReactNode;
@@ -331,6 +333,15 @@ export function Picker({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
+  if (label)
+    return (
+      <>
+        <SettingChip ref={ref} label={label} icon={icon} value={value} title={title} open={open} disabled={disabled} onClick={() => setOpen((o) => !o)} className={className} />
+        <Popover anchor={ref} open={open} onClose={close} width={width}>
+          {children(close)}
+        </Popover>
+      </>
+    );
   return (
     <>
       <button
@@ -355,6 +366,37 @@ export function Picker({
     </>
   );
 }
+
+/**
+ * A setting of a new session, as the start page lists them: what it is, then what it is set to, and a
+ * menu on click ("Folder  New task folder ⌄"). The name is quieter, so the values read first; `on` marks a
+ * value that is not the usual one (no memory, a spending cap).
+ */
+export const SettingChip = forwardRef<
+  HTMLButtonElement,
+  { label: string; value: ReactNode; icon?: ReactNode; title?: string; open?: boolean; on?: boolean; disabled?: boolean; onClick: () => void; className?: string }
+>(function SettingChip({ label, value, icon, title, open, on, disabled, onClick, className }, ref) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      aria-expanded={open}
+      className={cx(
+        'group inline-flex h-8 max-w-[min(100%,18rem)] min-w-0 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] transition-colors hover:bg-bg-2 disabled:opacity-50',
+        open && 'bg-bg-2',
+        className,
+      )}
+    >
+      {icon && <span className="flex shrink-0 text-fg-3">{icon}</span>}
+      <span className="shrink-0 text-fg-3">{label}</span>
+      <span className={cx('truncate font-medium transition-colors', on ? 'text-accent' : 'text-fg-2 group-hover:text-fg', open && !on && 'text-fg')}>{value}</span>
+      <ChevronDown size={12} className={cx('-ml-0.5 shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-180')} />
+    </button>
+  );
+});
 
 // ---- dialog --------------------------------------------------------------------------
 

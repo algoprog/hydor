@@ -12,6 +12,7 @@ import type { AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from 
 import { api, post } from '../../lib/api';
 import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
+import { saveStart, startSettings } from '../../lib/start';
 import { enablePush, pushState, type PushState } from '../../lib/notify';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { live } from '../../lib/ws';
@@ -124,19 +125,15 @@ function invite() {
 
 /** The start page's agent, when the one it has is not among those chosen. */
 function pickAgent(uses: Use[]) {
-  let cur = '';
-  try {
-    cur = localStorage.getItem('wa.lastAgent') ?? '';
-  } catch {}
+  const cur = startSettings().agent ?? '';
   const own = useApp.getState().boot?.acpAgents.filter((a) => !a.builtin) ?? [];
   const fits = (v: string) =>
     v === 'claude' ? uses.includes('claude') : v === 'codex' ? uses.includes('codex') : v === 'acp:console' ? uses.includes('openrouter') || uses.includes('local') : v.startsWith('acp:') && uses.includes('agents');
   if (cur && fits(cur)) return;
   const next = ['claude', 'codex', 'acp:console', ...own.map((a) => `acp:${a.id}`)].find(fits);
   if (!next || next === (cur || 'claude')) return;
-  try {
-    localStorage.setItem('wa.lastAgent', next);
-  } catch {}
+  // Kept for the start page, which may open after this; an open one takes it at once.
+  saveStart({ agent: next });
   window.dispatchEvent(new CustomEvent('wa:agent', { detail: next }));
 }
 
@@ -608,7 +605,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       target: 'start-bar',
       route: '/',
       title: 'Pick an agent and a folder',
-      body: `Choose the agent${names.length ? ` (${either(names)})` : ''} and the folder on this computer it works in. The instructions button opens the AGENTS.md or CLAUDE.md the agent reads there.`,
+      body: `Under the message box: the agent${names.length ? ` (${either(names)})` : ''}, the folder on this computer it works in, and how it works. What you pick stays for next time. The folder’s menu also opens the AGENTS.md or CLAUDE.md the agent reads there.`,
     },
     {
       id: 'composer',
@@ -622,7 +619,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       target: 'pickers',
       route: '/',
       title: cli ? 'Model, effort and permissions' : 'Model and permissions',
-      body: `${modelLine} The shield sets what the agent may do without asking you first, from checking with you before every change to full access. Shift+Tab switches it.`,
+      body: `${modelLine} Permissions set what the agent may do without asking you first, from checking with you before every change to full access. Shift+Tab switches them.`,
     },
     {
       id: 'sessions',

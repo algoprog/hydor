@@ -159,10 +159,15 @@ export function FeatureComposerButtons(p: { s?: SessionSummary; insert: (text: s
   );
 }
 
+/** The assistant leads the start options: picking one can set the others. */
+const startRank = (f: WebFeature) => (f.id === 'assistants' ? 0 : 1);
+
 export function FeatureStartOptions(p: { value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void; cwd: string }) {
   return (
     <>
-      {features().map((f) => (f.StartOptions ? <f.StartOptions key={f.id} {...p} /> : null))}
+      {[...features()]
+        .sort((a, b) => startRank(a) - startRank(b))
+        .map((f) => (f.StartOptions ? <f.StartOptions key={f.id} {...p} /> : null))}
     </>
   );
 }
