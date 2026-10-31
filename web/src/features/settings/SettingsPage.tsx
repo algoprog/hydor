@@ -1,7 +1,7 @@
 // Settings, in one place: the app (theme, notifications, password) and the agents (their accounts,
-// instruction files, MCP servers, skills and plugins). A menu of sections beside the open one on
-// wide screens; on phones a list, each section on its own page.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+// instruction files, MCP servers, skills and plugins). On wide screens a tab per group, with its
+// sections in a menu beside the open one; on phones a list, each section on its own page.
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
 import { featureSections } from '../registry';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, StartupState, UpdateState } from '@shared/types';
@@ -12,7 +12,7 @@ import { toast, toastError, useApp, useLogins, useUI } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { FolderChip } from '../../components/FolderPicker';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Throbber, inputCls, Section, Segmented, Switch, useConfirm, useIsMobile } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, inputCls, Section, Segmented, Switch, Tabs, useConfirm, useIsMobile } from '../../components/ui';
 import { chime, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
 import { PageHeader } from '../layout/PageHeader';
 import { followUpPref, type FollowUp } from '../session/Composer';
@@ -389,13 +389,13 @@ function GeneralSettings() {
           <SettingRow label="Terminal suggestions" hint="Grey text after the cursor with the likeliest rest of the command; → takes it. Ctrl+Space lists more either way.">
             <Switch on={termSuggest} label="Terminal suggestions" onChange={(v) => useUI.getState().set({ termSuggest: v })} />
           </SettingRow>
+          <AutoResumeSetting />
         </div>
       </Section>
-      <AutoResumeSetting />
-      <StartupSetting />
-      <AutoUpdateSetting />
       <Section>
-        <div className="-my-2">
+        <div className="-my-2 divide-y divide-line">
+          <StartupSetting />
+          <AutoUpdateSetting />
           <SettingRow label="Welcome tour" hint="Connect your subscriptions and see what each part of the app does">
             <Button size="sm" variant="secondary" icon={<CircleHelp size={14} />} onClick={() => startTour()}>
               Take the tour
@@ -513,20 +513,16 @@ function AutoUpdateSetting() {
   const update = useApp((s) => s.boot?.update);
   if (!update) return null;
   return (
-    <Section>
-      <div className="-my-2">
-        <SettingRow
-          label="Update automatically"
-          hint={
-            update.canRestart
-              ? 'After 5 hours without a message from you, at most once a day. Running agents carry on.'
-              : 'This server cannot restart itself. Run it as a service (install.sh) or with Docker to update automatically.'
-          }
-        >
-          <Switch on={update.auto && update.canRestart} disabled={!update.canRestart} label="Update automatically" onChange={(on) => put('/api/update/auto', { on }).catch(toastError)} />
-        </SettingRow>
-      </div>
-    </Section>
+    <SettingRow
+      label="Update automatically"
+      hint={
+        update.canRestart
+          ? 'After 5 hours without a message from you, at most once a day. Running agents carry on.'
+          : 'This server cannot restart itself. Run it as a service (install.sh) or with Docker to update automatically.'
+      }
+    >
+      <Switch on={update.auto && update.canRestart} disabled={!update.canRestart} label="Update automatically" onChange={(on) => put('/api/update/auto', { on }).catch(toastError)} />
+    </SettingRow>
   );
 }
 
@@ -556,31 +552,27 @@ function StartupSetting() {
             ? 'Sets it up as a service of your user that starts at boot and comes back if it stops.'
             : 'Not available here (no systemd for your user): start it with your system’s own tools, or run it in Docker.';
   return (
-    <Section>
-      <div className="-my-2">
-        <SettingRow label="Start when this computer starts" hint={hint}>
-          {busy ? (
-            <Throbber className="text-fg-3" />
-          ) : (
-            <Switch
-              on={st.on}
-              disabled={!st.can}
-              label="Start when this computer starts"
-              onChange={async (on) => {
-                setBusy(true);
-                try {
-                  setSt(await put<StartupState>('/api/startup', { on }));
-                } catch (e) {
-                  toastError(e);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            />
-          )}
-        </SettingRow>
-      </div>
-    </Section>
+    <SettingRow label="Start when this computer starts" hint={hint}>
+      {busy ? (
+        <Throbber className="text-fg-3" />
+      ) : (
+        <Switch
+          on={st.on}
+          disabled={!st.can}
+          label="Start when this computer starts"
+          onChange={async (on) => {
+            setBusy(true);
+            try {
+              setSt(await put<StartupState>('/api/startup', { on }));
+            } catch (e) {
+              toastError(e);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      )}
+    </SettingRow>
   );
 }
 
@@ -593,24 +585,20 @@ function AutoResumeSetting() {
       .catch(() => setOn(false));
   }, []);
   return (
-    <Section>
-      <div className="-my-2">
-        <SettingRow label="Resume after usage limits" hint="When a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets">
-          {on === null ? (
-            <Throbber className="text-fg-3" />
-          ) : (
-            <Switch
-              on={on}
-              label="Resume after usage limits"
-              onChange={(v) => {
-                setOn(v);
-                put('/api/app-settings', { autoResume: v }).catch((e) => (setOn(!v), toastError(e)));
-              }}
-            />
-          )}
-        </SettingRow>
-      </div>
-    </Section>
+    <SettingRow label="Resume after usage limits" hint="When a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets">
+      {on === null ? (
+        <Throbber className="text-fg-3" />
+      ) : (
+        <Switch
+          on={on}
+          label="Resume after usage limits"
+          onChange={(v) => {
+            setOn(v);
+            put('/api/app-settings', { autoResume: v }).catch((e) => (setOn(!v), toastError(e)));
+          }}
+        />
+      )}
+    </SettingRow>
   );
 }
 
@@ -976,61 +964,36 @@ function SectionList({ onOpen }: { onOpen: (id: SettingsSection) => void }) {
   );
 }
 
-/** Wide screens: the sections beside the open one. The menu scrolls on its own, so however long the open
- * section is, the rest stay in reach; a fade at either end shows there are more that way. */
-function SectionMenu({ current, onOpen }: { current: SettingsSection | null; onOpen: (id: SettingsSection) => void }) {
-  const scroller = useRef<HTMLDivElement>(null);
-  const [more, setMore] = useState({ above: false, below: false });
-  const measure = () => {
-    const el = scroller.current;
-    if (!el) return;
-    const above = el.scrollTop > 1;
-    const below = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-    setMore((m) => (m.above === above && m.below === below ? m : { above, below }));
-  };
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  // The open section's row stays in view, opened from a link or the command palette too.
-  useEffect(() => {
-    scroller.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
-  }, [current]);
-  const fade = 'pointer-events-none absolute inset-x-0 z-[1] h-10 from-bg via-bg/60 to-transparent transition-opacity duration-300';
+/** The group a section is in: on wide screens, its tab. */
+const groupOf = (id: SettingsSection | null) => groups().find((g) => g.items.some((d) => d.id === id)) ?? groups()[0];
+
+/** The section last open under each tab, so going back to a tab opens it again. */
+const lastOpen: Record<string, SettingsSection> = {};
+
+/** Wide screens: the open tab's sections, beside the open one. Short enough to need no scrolling of its
+ * own, it stays in place while the section scrolls. */
+function SectionMenu({ items, current, onOpen }: { items: SectionDef[]; current: SettingsSection | null; onOpen: (id: SettingsSection) => void }) {
   return (
-    <div className="relative flex shrink-0 grow flex-col">
-      <div aria-hidden className={cx(fade, 'top-0 bg-gradient-to-b', more.above ? 'opacity-100' : 'opacity-0')} />
-      <div ref={scroller} onScroll={measure} className="min-h-0 flex-1 overflow-y-auto pl-[18px]">
-        <nav className="ml-auto w-[212px] px-1.5 py-6" aria-label="Settings sections">
-          {groups().map((g, i) => (
-            <div key={g.label} className={cx(i > 0 && 'mt-4')}>
-              <div className="px-2.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
-              {g.items.map((d) => {
-                const on = d.id === current;
-                return (
-                  <button
-                    key={d.id}
-                    onClick={() => onOpen(d.id)}
-                    aria-current={on ? 'page' : undefined}
-                    className={cx(
-                      'flex h-8 w-full scroll-my-10 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors',
-                      on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg',
-                    )}
-                  >
-                    <d.icon size={16} className={cx('shrink-0', on ? 'text-fg' : 'text-fg-3')} />
-                    <span className="truncate">{d.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-      </div>
-      <div aria-hidden className={cx(fade, 'bottom-0 bg-gradient-to-t', more.below ? 'opacity-100' : 'opacity-0')} />
-    </div>
+    // Only a window too short for all of a tab's sections scrolls them on their own.
+    <nav className="sticky top-0 max-h-[calc(100dvh-94px)] w-[200px] shrink-0 overflow-y-auto py-6" aria-label="Settings sections">
+      {items.map((d) => {
+        const on = d.id === current;
+        return (
+          <button
+            key={d.id}
+            onClick={() => onOpen(d.id)}
+            aria-current={on ? 'page' : undefined}
+            className={cx(
+              'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors',
+              on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg',
+            )}
+          >
+            <d.icon size={16} className={cx('shrink-0', on ? 'text-fg' : 'text-fg-3')} />
+            <span className="truncate">{d.label}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -1070,6 +1033,13 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   };
   const body = page && <SectionBody id={page.id} cwd={cwd} agent={agent} onAgent={(a) => go(url({ agent: a }), true)} />;
   const folder = page?.folder ? <FolderScope cwd={cwd} onChange={(c) => go(url({ cwd: c }), true)} /> : null;
+  // Wide screens: the tab is the open section's group, and each section opens at its top.
+  const tab = groupOf(current);
+  const scroller = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (current) lastOpen[groupOf(current).label] = current;
+    if (scroller.current) scroller.current.scrollTop = 0;
+  }, [current]);
 
   if (mobile) {
     const motion = sliding && 'transition-[translate,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]';
@@ -1112,18 +1082,21 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
     );
   }
 
+  // A tab per group (App, Agents, Capabilities), its sections in a menu beside the open one, and one
+  // scroll for the page. The tabs line up with the menu: under the title, and on a screen wider than
+  // 1280px together with it in the middle.
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Settings" />
-      {/* The menu and the open section scroll each on their own. On a wide screen each side takes half the room
-          to spare, the menu at the right of its side and the section at the left of its, so the two stay
-          together in the middle, 1180px across at most. */}
-      <div className="flex min-h-0 flex-1">
-        <SectionMenu current={current} onOpen={open} />
-        {/* Keyed, so each section opens at its top. */}
-        <div key={def?.id} className="min-w-0 grow basis-[950px] overflow-y-auto">
+      <PageHeader title="Settings">
+        <div className="mx-auto max-w-[1248px]">
+          <Tabs value={tab.label} onChange={(t) => open(lastOpen[t] ?? groups().find((g) => g.label === t)!.items[0].id)} options={groups().map((g) => ({ value: g.label, label: g.label }))} />
+        </div>
+      </PageHeader>
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-[1280px] items-start gap-9 px-4">
+          <SectionMenu items={tab.items} current={current} onOpen={open} />
           {def && (
-            <div className="anim-fade max-w-[950px] pt-6 pr-6 pb-10 pl-[26px]">
+            <div key={def.id} className="max-w-[920px] min-w-0 flex-1 pt-6 pb-10">
               <header className="mb-5 flex flex-wrap items-start gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-[19px] font-semibold tracking-tight">{def.label}</h2>
