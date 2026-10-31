@@ -662,6 +662,12 @@ app.get('/api/models/openrouter', async (req) => {
   const sort = (['match', 'new', 'price', 'context'] as const).find((s) => s === q.sort);
   return { models: await models.search({ q: String(q.q ?? ''), sort, tools: f.has('tools'), vision: f.has('vision'), reasoning: f.has('reasoning'), free: f.has('free') }) };
 });
+app.get('/api/models/hf', async (req) => {
+  const q = req.query as Record<string, string>;
+  const f = new Set(String(q.f ?? '').split(','));
+  const sort = (['downloads', 'trending', 'likes', 'new'] as const).find((s) => s === q.sort);
+  return { models: await models.searchHf({ q: String(q.q ?? ''), sort, gguf: f.has('gguf'), safetensors: f.has('safetensors'), vision: f.has('vision'), fits: f.has('fits') }) };
+});
 /** What a Hugging Face model is, and whether (and how) it would run here, before anything downloads. */
 app.post('/api/models/inspect', async (req) => models.inspect(String((req.body as { input?: string } | undefined)?.input ?? '')));
 app.post('/api/models/install', async (req) => {

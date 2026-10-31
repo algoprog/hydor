@@ -207,6 +207,11 @@ export class ModelManager {
 
   search = (o: openrouter.OrQuery) => openrouter.search(o);
 
+  /** Models on Hugging Face, each with a first guess of how it runs on this machine. */
+  async searchHf(o: hf.HfQuery) {
+    return hf.search(o, { token: this.cfg.hfToken, machine: await machine(MODELS_DIR) });
+  }
+
   async inspect(input: string): Promise<HfInspect> {
     const v = vllm.findVllm(this.cfg.vllm.command);
     return hf.inspect(input, { token: this.cfg.hfToken, machine: await machine(MODELS_DIR), vllmArchs: v?.archs ?? null });

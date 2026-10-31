@@ -1,6 +1,6 @@
 {
   "name": "naget-agent",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "Self-hosted agent harness for Claude Code, Codex, other coding agents and any model, open-weight ones included: run them on your own machine, follow their work live, approve what they ask and pick up on your phone.",
   "keywords": [

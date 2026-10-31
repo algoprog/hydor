@@ -32,7 +32,11 @@ Its models come from Settings → Models:
 - **vLLM**: Hugging Face models downloaded here and served on a GPU, started when a session first uses them.
 - **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, another provider).
 
-Before anything downloads, the app checks how a model would run on this machine: where (a GPU, or the CPU),
+Hugging Face is searched by name, like OpenRouter's catalog: each model shows its maker, size, format (GGUF
+for Ollama, safetensors for vLLM), downloads, likes and date, and a first verdict from its size on how it
+would run here (a model too big for vLLM as stored may still run at 4-bit with Ollama). Filter to what runs
+well here, a format, or models that see images; order by downloads, trend, likes or date. Before anything
+downloads, Check tells exactly how it would run on this machine: where (a GPU, or the CPU),
 the memory it needs, about how fast, and the disk it takes. Installed models show their size and remove
 with one click. Models without native tool calls are told about the tools in their own format, or in the
 prompt, and their calls are read from what they write.

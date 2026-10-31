@@ -19,7 +19,7 @@ import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
 import { ARCH, NUGGET, TileGradients } from '../../components/Logo';
 import { LoginDialog } from '../settings/SettingsPage';
-import { HfCheck, OpenRouterBody, size as bytes, useModels } from '../settings/ModelsSettings';
+import { HfSearch, MachineCard, OpenRouterBody, shortGpu, size as bytes, useModels } from '../settings/ModelsSettings';
 import { machineBase, machineId } from '../../lib/machine';
 
 /** Raise it when the tour changes enough to be worth showing again to everyone. */
@@ -244,7 +244,6 @@ const Connected = ({ label = 'Connected' }: { label?: string }) => (
   </span>
 );
 
-const shortGpu = (name: string) => name.replace(/^NVIDIA\s+/i, '').replace(/^GeForce\s+/i, '');
 
 const TILES: { id: Use; title: string; sub: string; icon: ReactNode }[] = [
   { id: 'claude', title: 'Claude Code', sub: 'With your Claude plan or an API key', icon: <AgentIcon agent="claude" size={18} /> },
@@ -386,23 +385,36 @@ function OpenRouterSetup() {
   return st ? <OpenRouterBody st={st} /> : <Loading />;
 }
 
-/** Parameters that roughly fit in this much memory at 4-bit, with room for the context. */
-function aboutParams(free: number): number {
-  const b = free / (0.61 * 1.5 * 1e9);
-  return b >= 20 ? Math.floor(b / 10) * 10 : b >= 10 ? Math.floor(b / 5) * 5 : Math.max(1, Math.floor(b));
-}
-
-function Runtime({ name, ok, detail, href }: { name: string; ok: boolean; detail: string; href?: string }) {
+/** Models on this computer and those downloading, in the tour. */
+function LocalList({ st }: { st: ModelsState }) {
+  const running = st.downloads.filter((d) => d.status === 'running');
+  if (!running.length && !st.local.length) return null;
   return (
-    <div className="flex items-center gap-2 text-[12.5px]">
-      <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', ok ? 'bg-ok' : 'bg-line-2')} />
-      <span className="font-medium text-fg">{name}</span>
-      <span className="min-w-0 truncate text-fg-3">{detail}</span>
-      {href && (
-        <a href={href} target="_blank" rel="noreferrer" className="ml-auto shrink-0 text-accent hover:underline">
-          Install
-        </a>
-      )}
+    <div>
+      <div className="mb-1.5 text-[12px] font-medium text-fg-2">
+        On this computer <span className="font-normal text-fg-3">· {st.local.length + running.length}</span>
+      </div>
+      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+        {running.map((d) => (
+          <div key={d.key} className="px-3 py-2.5">
+            <div className="flex items-center gap-2 text-[12.5px]">
+              <span className="min-w-0 flex-1 truncate text-fg">{d.name.replace(/^hf\.co\//, '')}</span>
+              <span className="tnum shrink-0 text-fg-3">{d.totalBytes ? `${Math.floor((d.doneBytes / d.totalBytes) * 100)}%` : bytes(d.doneBytes)}</span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/10">
+              <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${d.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 5}%` }} />
+            </div>
+          </div>
+        ))}
+        {st.local.map((x) => (
+          <div key={x.id} className="flex items-center gap-2.5 px-3 py-2 text-[12.5px]">
+            <Check size={14} className="anim-pop-in shrink-0 text-ok" />
+            <span className="min-w-0 flex-1 truncate text-fg">{x.repo}</span>
+            <span className="shrink-0 rounded-md bg-bg-2 px-1.5 py-px text-[11px] font-medium text-fg-2 ring-1 ring-line">{x.runtime === 'ollama' ? 'Ollama' : 'vLLM'}</span>
+            <span className="tnum shrink-0 text-fg-3">{bytes(x.sizeBytes)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -410,48 +422,11 @@ function Runtime({ name, ok, detail, href }: { name: string; ok: boolean; detail
 function LocalSetup() {
   const st = useModels();
   if (!st) return <Loading />;
-  const m = st.machine;
-  const gpu = [...m.gpus].sort((a, b) => b.freeBytes - a.freeBytes)[0];
-  const running = st.downloads.filter((d) => d.status === 'running');
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-line bg-panel px-3.5 py-3">
-        <div className="flex items-center gap-2 text-[13px] font-medium text-fg">
-          <Cpu size={14} className="text-fg-3" /> This computer
-        </div>
-        <div className="mt-0.5 text-[12px] leading-snug text-fg-3">
-          {m.gpus.length ? m.gpus.map((g) => `${shortGpu(g.name)} (${bytes(g.totalBytes)})`).join(', ') : 'No GPU found: small models run on the processor'} · {bytes(m.ramBytes)} memory · {bytes(st.storage.freeBytes)} disk free
-        </div>
-        <div className="mt-2.5 space-y-1.5">
-          <Runtime name="Ollama" ok={!!st.ollama.version} detail={st.ollama.version ? `running, ${st.ollama.version}` : 'not running: GGUF models on GPU or processor'} href={st.ollama.version ? undefined : 'https://ollama.com/download'} />
-          <Runtime name="vLLM" ok={!!st.vllm.path} detail={st.vllm.path ? `${st.vllm.version ?? 'found'}, starts models on a GPU` : 'not found: pip install vllm, for NVIDIA GPUs'} />
-        </div>
-      </div>
-      <div>
-        <HfCheck st={st} placeholder="A Hugging Face model, e.g. Qwen/Qwen3-8B-GGUF" />
-        {gpu && <p className="mt-1 text-[12px] text-fg-3">Up to about {aboutParams(gpu.freeBytes)}B parameters at 4-bit should fit on its GPU now.</p>}
-      </div>
-      {(running.length > 0 || st.local.length > 0) && (
-        <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
-          {running.map((d) => (
-            <div key={d.key} className="px-3.5 py-2.5">
-              <div className="truncate text-[12.5px] text-fg">{d.name.replace(/^hf\.co\//, '')}</div>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/10">
-                <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${d.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 5}%` }} />
-              </div>
-            </div>
-          ))}
-          {st.local.map((x) => (
-            <div key={x.id} className="flex items-center gap-2 px-3.5 py-2 text-[12.5px]">
-              <Check size={13} className="anim-pop-in shrink-0 text-ok" />
-              <span className="min-w-0 truncate text-fg">{x.repo}</span>
-              <span className="ml-auto shrink-0 text-fg-3">
-                {x.runtime === 'ollama' ? 'Ollama' : 'vLLM'} · {bytes(x.sizeBytes)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      <MachineCard st={st} />
+      <HfSearch st={st} />
+      <LocalList st={st} />
     </div>
   );
 }
@@ -598,17 +573,17 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     list.push({
       id: 'openrouter',
       title: 'Models through OpenRouter',
-      body: 'Custom, the app’s own agent, runs them with the same tools, skills and MCP servers as the other agents. Add your key, then the models you want in the pickers.',
+      body: 'Hundreds of models through one key. Custom, the app’s own agent, runs them with the same tools, skills and MCP servers as the other agents.',
       Extra: OpenRouterSetup,
-      width: 480,
+      width: 560,
     });
   if (has('local'))
     list.push({
       id: 'local',
       title: 'Models on this computer',
-      body: 'Custom, the app’s own agent, runs open models on your own hardware, and nothing leaves the machine. Check one from Hugging Face: you see how it would run here before anything downloads.',
+      body: 'Custom, the app’s own agent, runs open models on your own hardware, and nothing leaves it. Search Hugging Face: each model shows how it would run here before anything downloads.',
       Extra: LocalSetup,
-      width: 500,
+      width: 560,
     });
   if (has('agents'))
     list.push({
