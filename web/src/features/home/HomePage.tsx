@@ -408,7 +408,11 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
           </div>
         </SettingLayout.Provider>
       </div>
-      {!mobile && <div className="mt-2.5 text-center text-[12px] text-fg-3">Enter to start · Shift+Enter for a new line</div>}
+      {!mobile && (
+        <div data-tour="home-hint" className="mt-2.5 text-center text-[12px] text-fg-3">
+          Enter to start · Shift+Enter for a new line
+        </div>
+      )}
     </div>
   );
 }
@@ -421,7 +425,7 @@ function RecentSessions() {
   const list = [...sortActive(all.filter((s) => activityOf(s))), ...all.filter((s) => !activityOf(s))].slice(0, 6);
   if (!list.length) return null;
   return (
-    <div className="mt-10">
+    <div data-tour="recent" className="mt-10">
       <div className="mb-2 flex items-center justify-between px-1">
         <h2 className="text-[13px] font-medium text-fg-3">Recent</h2>
         <button className="flex items-center gap-0.5 text-[13px] text-fg-3 hover:text-fg" onClick={() => useUI.getState().set({ drawerOpen: true })}>
@@ -458,7 +462,7 @@ export function HomePage() {
   }, [link]);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-14 shrink-0 items-center px-3 pt-[var(--safe-top)] sm:px-6">
+      <div data-tour="home-top" className="flex h-14 shrink-0 items-center px-3 pt-[var(--safe-top)] sm:px-6">
         <NavButton />
         <span className="flex-1" />
         {/* Desktop has the ? in the bottom-right corner. */}
@@ -470,16 +474,21 @@ export function HomePage() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[760px] px-4 pb-12 sm:px-6">
+          {/* The tour's parts (data-tour) sit inside these, which have an entrance of their own. */}
           <div className={cx('anim-in text-center', mobile ? 'pt-3' : 'pt-[11vh]')}>
-            <h1 className="text-[23px] font-semibold tracking-tight sm:text-[30px]">What should we work on?</h1>
-            <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">Start an agent in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}: Claude Code, Codex, or any model.</p>
+            <div data-tour="home-title">
+              <h1 className="text-[23px] font-semibold tracking-tight sm:text-[30px]">What should we work on?</h1>
+              <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">Start an agent in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}: Claude Code, Codex, or any model.</p>
+            </div>
           </div>
           <div className="anim-in mt-6 [animation-delay:70ms] sm:mt-8">
             {/* It opens with the last picks, which come with the bootstrap. */}
             {booted ? <StartComposer key={search} initialCwd={initialCwd} link={link} /> : <div className="h-[200px]" />}
           </div>
           <div className="anim-in mt-5 flex justify-center [animation-delay:140ms] sm:mt-8">
-            <TodayStrip />
+            <div data-tour="today">
+              <TodayStrip />
+            </div>
           </div>
           {mobile && <RecentSessions />}
         </div>

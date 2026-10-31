@@ -1,8 +1,10 @@
 // The welcome tour. The first time someone opens the app (right after choosing a password on a new
 // install), and whenever they press the ? button, it asks what they want to use (Claude Code, Codex,
-// models through OpenRouter or on this computer, other agents), sets each of those up right in its
-// cards, then walks over the real screens. A step points at an element marked data-tour="…": the rest
-// of the page dims and blurs around it. A step without one shows in the middle of the screen.
+// models through OpenRouter or on this computer, other agents) and sets each of those up, on pages that
+// fill the screen while the app behind is empty. Then it builds the app up as it shows it around: a step
+// points at an element marked data-tour="…", which arrives as the step comes, with the rest of the page
+// dimmed and blurred around it; whatever no step points at arrives when the tour ends. A step without a
+// target after the pages shows in the middle of the screen.
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
@@ -50,11 +52,11 @@ interface Step {
   Extra?: () => ReactNode;
   /** The page the target is on. */
   route?: string;
-  /** The target is in the sidebar: shown first (the drawer, on phones). */
+  /** The target is in the sidebar: shown first (the drawer, on phones), and arriving with it. */
   sidebar?: boolean;
-  /** The card's width on wider screens. */
+  /** The card's width on wider screens (a page's column is at least 520px). */
   width?: number;
-  /** The welcome card's picture on top. */
+  /** The welcome page's mark on top. */
   hero?: boolean;
   /** Next waits for this. */
   ready?: (uses: Use[]) => boolean;
@@ -79,23 +81,35 @@ interface TourState {
 const useTour = create<TourState>(() => ({ open: false, closing: false, i: 0, signIn: null, accountsRev: 0, uses: [], picked: false, fresh: false, burst: null }));
 
 let closeTimer = 0;
+let builtTimer = 0;
+
+/** The app builds up as the tour shows it: <html data-tour-build> names the parts shown so far, with
+ * "all" as the tour ends, and the app is empty but for them (styles.css, "the tour builds the app up").
+ * Null: the app is whole again. */
+function build(parts: string | null) {
+  if (parts === null) delete document.documentElement.dataset.tourBuild;
+  else document.documentElement.dataset.tourBuild = parts;
+}
 
 /** Opens the tour, at its start or at one step. */
 export function startTour(from?: string, fresh = false) {
   window.clearTimeout(closeTimer);
+  window.clearTimeout(builtTimer);
   const saved = savedUses();
   const uses = saved ?? [];
   const i = from ? steps(uses, fresh).findIndex((s) => s.id === from) : 0;
   useTour.setState({ open: true, closing: false, i: Math.max(0, i), signIn: null, uses, picked: !!saved, fresh });
 }
 
-/** A new install chose its password: the tour goes on from what to use. */
+/** A new install chose its password: the tour goes on from what to use, and the app comes in empty. */
 let afterSetup = false;
 export const setupDone = () => {
   afterSetup = true;
+  build('');
 };
 
-/** Closes the tour (fading); finishing it sends gold dust from the button and points at the message box. */
+/** Closes the tour (fading) as the rest of the app arrives; finishing it sends gold dust from the
+ * button and points at the message box. */
 function endTour(finishedAt?: HTMLElement | null) {
   const s = useTour.getState();
   if (!s.open || s.closing) return;
@@ -105,8 +119,13 @@ function endTour(finishedAt?: HTMLElement | null) {
   closeTimer = window.setTimeout(() => {
     useTour.setState({ open: false, closing: false });
     if (useUI.getState().drawerOpen) useUI.getState().set({ drawerOpen: false });
-    if (r) invite();
   }, 380);
+  // Once the rest has arrived the app is itself again, and the message box glows, ready.
+  window.clearTimeout(builtTimer);
+  builtTimer = window.setTimeout(() => {
+    build(null);
+    if (r) invite();
+  }, 1150);
   const boot = useApp.getState().boot;
   if (boot && boot.tourSeen < TOUR_VERSION) useApp.getState().set({ boot: { ...boot, tourSeen: TOUR_VERSION } });
   post('/api/tour', { version: TOUR_VERSION }).catch(() => {});
@@ -179,14 +198,14 @@ const DUST = [
   { x: '40%', y: '14%', s: 3, d: 4200 },
 ];
 
+/** The welcome page's mark, drawing itself in the light. */
 function TourHero() {
   return (
-    <div className="relative -mx-5 -mt-5 mb-4 flex h-[150px] items-center justify-center overflow-hidden border-b border-line bg-bg-1">
-      <Aurora />
+    <div className="relative mx-auto mb-6 flex h-[132px] w-[240px] items-center justify-center">
       {DUST.map((g, n) => (
         <span key={n} className="dust absolute rounded-full" style={{ left: g.x, top: g.y, width: g.s, height: g.s, animationDelay: `${g.d}ms` }} />
       ))}
-      <HeroMark size={68} />
+      <HeroMark size={84} />
     </div>
   );
 }
@@ -532,7 +551,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       body: 'Run agents on this computer from any browser, at your desk or on your phone: Claude Code, Codex, open models and more, for code, research, documents and everyday tasks. This short tour sets up the ones you want and shows you around.',
       width: 440,
       Extra: () => (
-        <div className="stagger space-y-2.5">
+        <div className="stagger mx-auto max-w-[25rem] space-y-3">
           <Feature i={0} icon={<FolderOpen size={15} />}>
             Start an agent in any folder, with the model you like.
           </Feature>
@@ -600,20 +619,21 @@ function steps(uses: Use[], fresh: boolean): Step[] {
         : models
           ? ` (${has('openrouter') && has('local') ? 'the OpenRouter models you added or the ones on this computer' : has('openrouter') ? 'any of the OpenRouter models you added' : 'one of those on this computer'})`
           : '';
+  // The app arrives in this order, the message box before the row under it.
   list.push(
-    {
-      id: 'start-bar',
-      target: 'start-bar',
-      route: '/',
-      title: 'Pick an agent and a folder',
-      body: `Under the message box: the agent${names.length ? ` (${either(names)})` : ''}, its model${modelFrom}, the folder on this computer it works in, and the assistant it starts as. What you pick stays for next time. The folder’s menu also opens the AGENTS.md or CLAUDE.md the agent reads there.`,
-    },
     {
       id: 'composer',
       target: 'composer',
       route: '/',
       title: 'Say what you want done',
       body: 'Describe a task, ask a question or paste an error. Drop in screenshots and files, type @ to point at a file, or / for the agent’s commands. Enter starts the session.',
+    },
+    {
+      id: 'start-bar',
+      target: 'start-bar',
+      route: '/',
+      title: 'Pick an agent and a folder',
+      body: `Under the message box: the agent${names.length ? ` (${either(names)})` : ''}, its model${modelFrom}, the folder on this computer it works in, and the assistant it starts as. What you pick stays for next time. The folder’s menu also opens the AGENTS.md or CLAUDE.md the agent reads there.`,
     },
     {
       id: 'pickers',
@@ -741,6 +761,53 @@ function holePath(b: Box): string {
 
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
+/** A setup step: the whole screen, over the app that is not there yet. It dissolves (out) as the app
+ * comes in, or as the tour closes; a new install's first one follows the password screen without a fade. */
+function TourPage({ step, out, now, nav }: { step: Step; out: boolean; now?: boolean; nav: ReactNode }) {
+  const [still] = useState(now);
+  const Extra = step.Extra;
+  const w = Math.max(step.width ?? 0, 520) + 40;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={out ? undefined : 'tour-title'}
+      className={cx('tour-page fixed inset-0 flex flex-col bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none')}
+    >
+      <Aurora className="aurora-page" />
+      <button
+        onClick={() => endTour()}
+        className="absolute top-[calc(var(--safe-top)+10px)] right-3 z-10 rounded-md p-1.5 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
+        aria-label="Close the tour"
+        title="Close the tour (Esc)"
+      >
+        <X size={17} />
+      </button>
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto flex min-h-full w-full flex-col justify-center px-5 pt-[calc(var(--safe-top)+52px)] pb-6" style={{ maxWidth: w }}>
+          <div key={step.id} className="tour-rise">
+            {step.hero && <TourHero />}
+            <h2 id={out ? undefined : 'tour-title'} className="text-center text-[25px] leading-tight font-semibold tracking-tight text-balance text-fg sm:text-[31px]" style={{ '--i': 0 } as CSSProperties}>
+              {step.title}
+            </h2>
+            <div className="mx-auto mt-3 max-w-[34rem] text-center text-[14.5px] leading-relaxed text-pretty text-fg-2 sm:text-[15.5px]" style={{ '--i': 1 } as CSSProperties}>
+              {step.body}
+            </div>
+            {Extra && (
+              <div className="mt-8" style={{ '--i': 2 } as CSSProperties}>
+                <Extra />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="relative mx-auto flex w-full shrink-0 items-center gap-2 px-5 pt-3 pb-[max(16px,var(--safe-bottom))]" style={{ maxWidth: w }}>
+        {nav}
+      </div>
+    </div>
+  );
+}
+
 export function Tour() {
   const { open, closing, i, signIn, uses, fresh } = useTour();
   const boot = useApp((s) => s.boot);
@@ -758,16 +825,40 @@ export function Tour() {
   const hole = useRef<Box | null>(null);
   const nextBtn = useRef<HTMLButtonElement>(null);
   const auto = useRef(false);
-
-  // The first visit (or the first after the tour changed) opens it on the home page.
+  // The steps before the first one in the app are pages.
+  const pages = list.findIndex((s) => !!s.target);
+  const onPage = i < pages;
+  // A page stays a moment once the tour moves into the app (or closes), dissolving as the app comes in.
+  const [page, setPage] = useState<{ n: number; out: boolean } | null>(null);
+  const pageNow = step && onPage && !closing ? i : null;
+  if (pageNow !== null && (page?.n !== pageNow || page.out)) setPage({ n: pageNow, out: false });
+  else if (pageNow === null && page && !page.out) setPage({ n: page.n, out: true });
   useEffect(() => {
-    // Another machine's pages never open it: the tour is about this app, seen on the main one.
-    if (auto.current || !boot || boot.tourSeen >= TOUR_VERSION || open || loc !== '/' || machineId) return;
-    auto.current = true;
-    const after = afterSetup;
-    afterSetup = false;
-    const t = setTimeout(() => startTour(undefined, after), after ? 450 : 700);
+    if (!page?.out) return;
+    const t = setTimeout(() => setPage(null), 380);
     return () => clearTimeout(t);
+  }, [page]);
+
+  // The parts of the app shown so far: each step's own, and the sidebar around those in it.
+  const shown = useMemo(() => [...new Set(list.slice(0, i + 1).flatMap((s) => (!s.target ? [] : s.sidebar ? ['sidebar', s.target] : [s.target])))].join(' '), [list, i]);
+  useLayoutEffect(() => {
+    if (open) build(closing ? `${shown} all` : shown);
+  }, [open, closing, shown]);
+
+  // The first visit (or the first after the tour changed) opens it on the home page; a new install goes
+  // on from its password at once.
+  useEffect(() => {
+    if (auto.current || open) return;
+    if (afterSetup) {
+      auto.current = true;
+      afterSetup = false;
+      startTour(undefined, true);
+      return;
+    }
+    // Another machine's pages never open it: the tour is about this app, seen on the main one.
+    if (!boot || boot.tourSeen >= TOUR_VERSION || loc !== '/' || machineId) return;
+    auto.current = true;
+    startTour();
   }, [boot, loc, open]);
 
   // Put the page where the step's target is.
@@ -775,11 +866,11 @@ export function Tour() {
     if (!step || closing) return;
     if (step.route && location.pathname !== machineBase + step.route) go(step.route);
     const ui = useUI.getState();
-    if (step.sidebar) {
-      if (mobile) ui.set({ drawerOpen: true });
-      else if (!ui.sideOpen) ui.set({ sideOpen: true });
-    } else if (mobile && ui.drawerOpen) ui.set({ drawerOpen: false });
-    if (step.id === 'start-bar') pickAgent(useTour.getState().uses);
+    if (mobile) {
+      if (!!step.sidebar !== ui.drawerOpen) ui.set({ drawerOpen: !!step.sidebar });
+    } else if (step.target && !ui.sideOpen) ui.set({ sideOpen: true }); // there from the first part on, so the page keeps its place
+    // The message box arrives with an agent picked from those chosen.
+    if (step.route === '/') pickAgent(useTour.getState().uses);
   }, [step, mobile, closing]);
 
   // Follow the target (it may appear late, a page or the drawer opening, and move), and glide the hole
@@ -846,7 +937,6 @@ export function Tour() {
   }, [inner, foot]);
 
   const ready = !step?.ready || step.ready(uses);
-  const last = i >= list.length - 1;
   const next = () => {
     if (!ready) return;
     if (step?.id === 'choose') {
@@ -855,7 +945,7 @@ export function Tour() {
       } catch {}
       useTour.setState({ picked: true });
     }
-    if (last) endTour(nextBtn.current);
+    if (i >= list.length - 1) endTour(nextBtn.current);
     else useTour.setState({ i: i + 1 });
   };
   const back = () => i > 0 && useTour.setState({ i: i - 1 });
@@ -891,86 +981,91 @@ export function Tour() {
   const pos = placeCard(target, w, h || 280, mobile, step.sidebar);
   const Extra = step.Extra;
   // A new install's password screen was step 1.
-  const at = i + (fresh ? 1 : 0);
   const total = list.length + (fresh ? 1 : 0);
   const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  const pageStep = page ? list[page.n] : undefined;
+  // Back (Skip on the first step), where the tour stands, and on; a page dissolving keeps its own, still.
+  const nav = (k: number, live: boolean, size: 'sm' | 'md') => {
+    const ok = !live || ready;
+    return (
+      <>
+        <Button size={size} variant="ghost" onClick={live ? (k > 0 ? back : () => endTour()) : undefined}>
+          {k > 0 ? 'Back' : 'Skip the tour'}
+        </Button>
+        <span className="flex min-w-0 flex-1 justify-center">
+          {!ok ? (
+            <span className="text-[12px] text-fg-3">Pick one or more</span>
+          ) : mobile ? (
+            <span className="tnum text-[12px] text-fg-3">
+              {k + (fresh ? 2 : 1)} of {total}
+            </span>
+          ) : (
+            <TourProgress at={k + (fresh ? 1 : 0)} total={total} />
+          )}
+        </span>
+        <Button ref={live ? nextBtn : undefined} size={size} variant="primary" onClick={live ? next : undefined} disabled={!ok}>
+          {k >= list.length - 1 ? 'Get started' : list[k].id === 'welcome' ? 'Show me around' : 'Next'}
+        </Button>
+      </>
+    );
+  };
 
   return (
     <>
       {createPortal(
-        <div
-          className={cx('fixed inset-0 z-[55] transition-opacity duration-200', (signIn || closing) && 'pointer-events-none', signIn && 'opacity-0')}
-          onPointerDown={(e) => e.target === e.currentTarget && e.preventDefault()}
-        >
-          <div ref={scrim} className={cx('scrim tour-scrim pointer-events-none fixed inset-0', closing && 'opacity-0')} />
-          <div ref={ring} className={cx('tour-ring pointer-events-none fixed top-0 left-0 rounded-[14px]', closing && 'invisible')}>
-            {target && <span key={step.id} className="tour-ping" />}
-          </div>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="tour-title"
-            className={cx('tour-card fixed flex flex-col overflow-hidden rounded-2xl border border-line-2 bg-elevated shadow-lg', closing && 'tour-card-out', pending && 'pointer-events-none opacity-0')}
-            style={{
-              left: pos.left,
-              top: pos.top,
-              width: w,
-              height: h || undefined,
-              transition: `left 520ms ${ease}, top 520ms ${ease}, width 420ms ${ease}, height 420ms ${ease}, opacity 200ms ease`,
-            }}
-          >
-            <button
-              onClick={() => endTour()}
-              className="absolute top-3 right-3 z-10 rounded-md p-1 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
-              aria-label="Close the tour"
-              title="Close the tour (Esc)"
-            >
-              <X size={15} />
-            </button>
-            <div className="min-h-0 flex-1" style={{ overflowY: want > maxH ? 'auto' : 'hidden' }}>
-              <div ref={setInner} className="px-5 pt-5 pb-4">
-                <div key={step.id} className="tour-rise">
-                  {step.hero && <TourHero />}
-                  <h2 id="tour-title" className="pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 0 } as CSSProperties}>
-                    {step.title}
-                  </h2>
-                  <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 1 } as CSSProperties}>
-                    {step.body}
-                  </div>
-                  {Extra && (
-                    <div className="mt-3.5" style={{ '--i': 2 } as CSSProperties}>
-                      <Extra />
+        // Under a sign-in's dialog while it is open.
+        <div className={cx('fixed inset-0', signIn ? 'z-[45]' : 'z-[55]', closing && 'pointer-events-none')} onPointerDown={(e) => e.target === e.currentTarget && e.preventDefault()}>
+          {!onPage && (
+            <>
+              <div ref={scrim} className={cx('scrim tour-scrim pointer-events-none fixed inset-0', closing && 'opacity-0')} />
+              <div ref={ring} className={cx('tour-ring pointer-events-none fixed top-0 left-0 rounded-[14px]', closing && 'invisible')}>
+                {target && <span key={step.id} className="tour-ping" />}
+              </div>
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="tour-title"
+                className={cx('tour-card fixed flex flex-col overflow-hidden rounded-2xl border border-line-2 bg-elevated shadow-lg', closing && 'tour-card-out', pending && 'pointer-events-none opacity-0')}
+                style={{
+                  left: pos.left,
+                  top: pos.top,
+                  width: w,
+                  height: h || undefined,
+                  transition: `left 520ms ${ease}, top 520ms ${ease}, width 420ms ${ease}, height 420ms ${ease}, opacity 200ms ease`,
+                }}
+              >
+                <button
+                  onClick={() => endTour()}
+                  className="absolute top-3 right-3 z-10 rounded-md p-1 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
+                  aria-label="Close the tour"
+                  title="Close the tour (Esc)"
+                >
+                  <X size={15} />
+                </button>
+                <div className="min-h-0 flex-1" style={{ overflowY: want > maxH ? 'auto' : 'hidden' }}>
+                  <div ref={setInner} className="px-5 pt-5 pb-4">
+                    <div key={step.id} className="tour-rise">
+                      <h2 id="tour-title" className="pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 0 } as CSSProperties}>
+                        {step.title}
+                      </h2>
+                      <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 1 } as CSSProperties}>
+                        {step.body}
+                      </div>
+                      {Extra && (
+                        <div className="mt-3.5" style={{ '--i': 2 } as CSSProperties}>
+                          <Extra />
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                </div>
+                <div ref={setFoot} className="flex shrink-0 items-center gap-2 border-t border-line bg-bg-1 px-4 py-2.5">
+                  {nav(i, true, 'sm')}
                 </div>
               </div>
-            </div>
-            <div ref={setFoot} className="flex shrink-0 items-center gap-2 border-t border-line bg-bg-1 px-4 py-2.5">
-              {i > 0 ? (
-                <Button size="sm" variant="ghost" onClick={back}>
-                  Back
-                </Button>
-              ) : (
-                <Button size="sm" variant="ghost" onClick={() => endTour()}>
-                  Skip the tour
-                </Button>
-              )}
-              <span className="flex min-w-0 flex-1 justify-center">
-                {!ready ? (
-                  <span className="text-[12px] text-fg-3">Pick one or more</span>
-                ) : mobile ? (
-                  <span className="tnum text-[12px] text-fg-3">
-                    {at + 1} of {total}
-                  </span>
-                ) : (
-                  <TourProgress at={at} total={total} />
-                )}
-              </span>
-              <Button ref={nextBtn} size="sm" variant="primary" onClick={next} disabled={!ready}>
-                {last ? 'Get started' : step.id === 'welcome' ? 'Show me around' : 'Next'}
-              </Button>
-            </div>
-          </div>
+            </>
+          )}
+          {page && pageStep && <TourPage step={pageStep} out={page.out} now={fresh && page.n === 0} nav={nav(page.n, !page.out, 'md')} />}
         </div>,
         document.body,
       )}

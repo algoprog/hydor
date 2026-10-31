@@ -160,7 +160,9 @@ with npm into the app's folder), and the copies the app installed are kept up to
   Memory) things also match what they mean, in nine languages; what ships with the app has its vectors made
   ahead of time, and what you make gets them as you make it. `Ctrl+F` finds within a conversation.
 - A short welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter or on this
-  computer, other agents), sets those up in place, then shows you around; the ? button shows it again.
+  computer, other agents) and sets those up, on pages that fill the screen. Then it shows you around as the
+  app builds itself up: each part arrives as it is explained, the rest as the tour ends. The ? button shows
+  it again.
 - Starts when the computer starts (on by default; Settings → General), as a service of your user.
 - Several machines: add other machines running Naget Agent, over SSH or by address, and switch between
   them from the sidebar. Notices from all of them reach you wherever you are.
