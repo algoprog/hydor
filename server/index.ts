@@ -900,6 +900,29 @@ app.post('/api/git/fetch', async (req) => gitRepos.fetch(repoPath(req)));
 app.post('/api/git/pull', async (req) => gitRepos.pull(repoPath(req)));
 app.post('/api/git/push', async (req) => gitRepos.push(repoPath(req), !!(req.body as Record<string, unknown>)?.publish));
 app.post('/api/git/fetch-all', async () => ({ repos: await gitRepos.fetchAll() }));
+app.get('/api/git/diff', async (req) => gitRepos.fileDiff(repoPath(req), String((req.query as Record<string, string>).file ?? '')));
+app.get('/api/git/show', async (req) => gitRepos.commitDetail(repoPath(req), String((req.query as Record<string, string>).hash ?? '')));
+app.post('/api/git/commit', async (req) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  return gitRepos.commit(repoPath(req), Array.isArray(b.files) ? b.files.map(String) : [], String(b.message ?? ''), !!b.push);
+});
+app.post('/api/git/message', async (req) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  return gitRepos.suggestMessage(repoPath(req), Array.isArray(b.files) ? b.files.map(String) : []);
+});
+app.post('/api/git/discard', async (req) => gitRepos.discard(repoPath(req), String(((req.body ?? {}) as Record<string, unknown>).file ?? '')));
+app.get('/api/git/branches', async (req) => gitRepos.branches(repoPath(req)));
+app.post('/api/git/switch', async (req) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  return gitRepos.switchBranch(repoPath(req), String(b.branch ?? '').trim(), !!b.create);
+});
+app.post('/api/git/branch-delete', async (req) => gitRepos.deleteBranch(repoPath(req), String(((req.body ?? {}) as Record<string, unknown>).branch ?? '')));
+app.post('/api/git/stash', async (req) => gitRepos.stash(repoPath(req), String(((req.body ?? {}) as Record<string, unknown>).message ?? '')));
+app.post('/api/git/stash/:action', async (req) => {
+  const action = (req.params as { action: string }).action;
+  if (action !== 'apply' && action !== 'pop' && action !== 'drop') throw new HttpError(404, 'No such action');
+  return gitRepos.stashAction(repoPath(req), String(((req.body ?? {}) as Record<string, unknown>).ref ?? ''), action);
+});
 
 // ---- agent setup: MCP servers, skills, plugins, instruction files ------------------------
 

@@ -4,7 +4,8 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { GitActionResult, GitCommit, GitFileStatus, GitRepo, GitRepoDetail } from '../shared/types.ts';
+import type { GitActionResult, GitBranch, GitCommit, GitCommitDetail, GitFileStatus, GitRepo, GitRepoDetail, GitStash } from '../shared/types.ts';
+import { oneShot } from './oneshot.ts';
 import { HttpError } from './auth.ts';
 import type { DB } from './db.ts';
 import { agentBaseEnv } from './env.ts';
@@ -188,7 +189,12 @@ export class GitRepos {
 
   async detail(repoPath: string): Promise<GitRepoDetail> {
     const base = await this.known(repoPath);
-    const [st, remotes, recent] = await Promise.all([status(repoPath, true), git(repoPath, ['remote', '-v']), git(repoPath, ['log', '-15', `--format=${LOG_FORMAT}`])]);
+    const [st, remotes, recent, stashes] = await Promise.all([
+      status(repoPath, true),
+      git(repoPath, ['remote', '-v']),
+      git(repoPath, ['log', '-15', `--format=${LOG_FORMAT}`]),
+      git(repoPath, ['stash', 'list', `--format=%gd${SEP}%s${SEP}%ct`]),
+    ]);
     const summary = await this.summarize(repoPath, base.sessions, base.lastUsed ?? 0);
     const up = summary.upstream;
     const [push, pull] = up
@@ -207,6 +213,13 @@ export class GitRepos {
       toPull: parseLog(pull.out),
       files: st.files,
       recent: parseLog(recent.out),
+      stashes: stashes.out
+        .split('\n')
+        .filter(Boolean)
+        .map((l): GitStash => {
+          const [ref, message, ct] = l.split(SEP);
+          return { ref, message, ts: Number(ct) * 1000 };
+        }),
     };
   }
 
@@ -238,6 +251,159 @@ export class GitRepos {
       return this.act(repoPath, ['push', '--set-upstream', r.remote, r.branch], 180_000);
     }
     return this.act(repoPath, ['push'], 180_000);
+  }
+
+  // ---- working on the repository from the app ------------------------------------------------------
+
+  /** A path in the repository, relative to its top (refusing one outside it). */
+  private rel(repoPath: string, file: string): string {
+    const abs = path.resolve(repoPath, file);
+    if (abs !== repoPath && !abs.startsWith(repoPath + path.sep)) throw new HttpError(400, 'Not a file in this repository');
+    return path.relative(repoPath, abs) || '.';
+  }
+
+  private async result(repoPath: string, r: { ok: boolean; out: string; err: string }): Promise<GitActionResult> {
+    return { ok: r.ok, output: (r.out + (r.err ? (r.out ? '\n' : '') + r.err : '')).trim(), repo: await this.detail(repoPath) };
+  }
+
+  private tracked = async (repoPath: string, rel: string) => (await git(repoPath, ['ls-files', '--error-unmatch', '--', rel])).ok;
+
+  /** A file's changes since the last commit; a new file counts as added whole. */
+  async fileDiff(repoPath: string, file: string): Promise<{ diff: string }> {
+    await this.known(repoPath);
+    const rel = this.rel(repoPath, file);
+    let r = (await this.tracked(repoPath, rel))
+      ? await git(repoPath, ['diff', '--no-color', '--no-ext-diff', 'HEAD', '--', rel], 20_000)
+      : await git(repoPath, ['diff', '--no-color', '--no-ext-diff', '--no-index', '--', '/dev/null', rel], 20_000);
+    // A repository without commits yet has no HEAD to compare with.
+    if (!r.out && !r.ok) r = await git(repoPath, ['diff', '--no-color', '--cached', '--', rel], 20_000);
+    return { diff: r.out.slice(0, 600_000) };
+  }
+
+  /** A commit's message, and each file it changed with its diff. */
+  async commitDetail(repoPath: string, hash: string): Promise<GitCommitDetail> {
+    await this.known(repoPath);
+    if (!/^[0-9a-f]{4,40}$/i.test(hash)) throw new HttpError(400, 'Not a commit');
+    const [meta, stat, patch] = await Promise.all([
+      git(repoPath, ['show', '-s', `--format=%H${SEP}%an${SEP}%ct${SEP}%B`, hash]),
+      git(repoPath, ['show', '--numstat', '--format=', hash]),
+      git(repoPath, ['show', '--no-color', '--no-ext-diff', '--format=', '--patch', hash], 20_000),
+    ]);
+    if (!meta.ok) throw new HttpError(404, 'No such commit');
+    const [full, author, ct, message] = meta.out.split(SEP);
+    // The patch, cut into one diff per file.
+    const diffs = new Map<string, string>();
+    for (const part of patch.out.slice(0, 2_000_000).split(/^(?=diff --git )/m)) {
+      const m = /^diff --git a\/(.+?) b\/(.+)$/m.exec(part);
+      if (m) diffs.set(m[2], part);
+    }
+    const files = stat.out
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => {
+        const [a, d, ...p] = l.split('\t');
+        const name = p.join('\t').replace(/^(.*)\{(.*) => (.*)\}(.*)$/, '$1$3$4').replace(/^.* => /, '');
+        return { path: name, added: Number(a) || 0, removed: Number(d) || 0, diff: (diffs.get(name) ?? '').slice(0, 300_000) };
+      });
+    return { hash: full, author, ts: Number(ct) * 1000, message: message.trim(), files };
+  }
+
+  /** Commits just these files (others staged stay out), then pushes when asked. */
+  async commit(repoPath: string, files: string[], message: string, push: boolean): Promise<GitActionResult> {
+    await this.known(repoPath);
+    if (!message.trim()) throw new HttpError(400, 'Write a commit message');
+    if (!files.length) throw new HttpError(400, 'Pick the files to commit');
+    const rels = files.map((f) => this.rel(repoPath, f));
+    const add = await git(repoPath, ['add', '-A', '--', ...rels], 60_000);
+    if (!add.ok) return this.result(repoPath, add);
+    const c = await git(repoPath, ['commit', '--only', '-m', message.trim(), '--', ...rels], 120_000);
+    if (!c.ok || !push) return this.result(repoPath, c);
+    const branch = (await git(repoPath, ['branch', '--show-current'])).out.trim();
+    const up = (await git(repoPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])).ok;
+    const remote = (await git(repoPath, ['remote'])).out.split('\n').filter(Boolean)[0];
+    const p = await git(repoPath, up ? ['push'] : ['push', '--set-upstream', remote ?? 'origin', branch], 180_000);
+    return this.result(repoPath, { ok: p.ok, out: `${c.out}\n${p.out}`.trim(), err: p.err });
+  }
+
+  /** A commit message for these files' changes, in the style of the repository's recent ones. */
+  async suggestMessage(repoPath: string, files: string[]): Promise<{ message: string }> {
+    await this.known(repoPath);
+    const rels = files.map((f) => this.rel(repoPath, f));
+    const parts: string[] = [];
+    let size = 0;
+    for (const rel of rels) {
+      if (size > 60_000) break;
+      const d = (await this.fileDiff(repoPath, rel)).diff.slice(0, 20_000);
+      size += d.length;
+      parts.push(d);
+    }
+    const recent = (await git(repoPath, ['log', '-12', '--format=%s'])).out.trim();
+    const out = await oneShot({
+      system: [
+        'You write git commit messages. Given a change, write one that says what it does and why it was needed.',
+        'A summary line under 72 characters, then (when the change is not obvious from it) a blank line and a short body wrapped at about 72 columns.',
+        'Match the style of the repository’s recent messages. Reply with the message only: no quotes, no code fences, no preamble.',
+      ].join('\n'),
+      prompt: `Recent commit messages in this repository:\n${recent || '(none yet)'}\n\nThe change:\n${parts.join('\n')}`,
+      timeoutMs: 90_000,
+    });
+    return { message: out.trim().replace(/^```\w*\n?|```$/g, '').trim() };
+  }
+
+  /** Puts a file back as it was in the last commit; a new file is deleted. */
+  async discard(repoPath: string, file: string): Promise<GitActionResult> {
+    await this.known(repoPath);
+    const rel = this.rel(repoPath, file);
+    if (await this.tracked(repoPath, rel)) return this.result(repoPath, await git(repoPath, ['restore', '--source=HEAD', '--staged', '--worktree', '--', rel], 30_000));
+    if (rel === '.') throw new HttpError(400, 'Not a file');
+    fs.rmSync(path.join(repoPath, rel), { recursive: true, force: true });
+    return this.result(repoPath, { ok: true, out: '', err: '' });
+  }
+
+  async branches(repoPath: string): Promise<{ current: string | null; branches: GitBranch[] }> {
+    await this.known(repoPath);
+    const [list, cur, merged] = await Promise.all([
+      git(repoPath, ['for-each-ref', '--sort=-committerdate', `--format=%(refname:short)${SEP}%(committerdate:unix)${SEP}%(upstream:short)${SEP}%(upstream:track,nobracket)${SEP}%(subject)`, 'refs/heads'], 15_000),
+      git(repoPath, ['branch', '--show-current']),
+      git(repoPath, ['branch', '--merged', 'HEAD', '--format=%(refname:short)']),
+    ]);
+    const current = cur.out.trim() || null;
+    const done = new Set(merged.out.split('\n').map((x) => x.trim()));
+    return {
+      current,
+      branches: list.out
+        .split('\n')
+        .filter(Boolean)
+        .map((l): GitBranch => {
+          const [name, ct, upstream, track, subject] = l.split(SEP);
+          return { name, ts: Number(ct) * 1000, upstream: upstream || undefined, track: track || undefined, subject, merged: done.has(name) && name !== current };
+        }),
+    };
+  }
+
+  /** Switches branch (git refuses when that would overwrite changes here), or makes a new one first. */
+  async switchBranch(repoPath: string, branch: string, create: boolean): Promise<GitActionResult> {
+    await this.known(repoPath);
+    if (!(await git(repoPath, ['check-ref-format', '--branch', branch])).ok || branch.startsWith('-')) throw new HttpError(400, 'Not a valid branch name');
+    return this.result(repoPath, await git(repoPath, create ? ['switch', '-c', branch] : ['switch', branch], 60_000));
+  }
+
+  /** Deletes a branch already merged into this one (git keeps one that is not). */
+  async deleteBranch(repoPath: string, branch: string): Promise<GitActionResult> {
+    await this.known(repoPath);
+    if (branch.startsWith('-')) throw new HttpError(400, 'Not a branch');
+    return this.result(repoPath, await git(repoPath, ['branch', '-d', '--', branch], 30_000));
+  }
+
+  async stash(repoPath: string, message: string): Promise<GitActionResult> {
+    await this.known(repoPath);
+    return this.result(repoPath, await git(repoPath, ['stash', 'push', '--include-untracked', ...(message.trim() ? ['-m', message.trim()] : [])], 60_000));
+  }
+
+  async stashAction(repoPath: string, ref: string, action: 'apply' | 'pop' | 'drop'): Promise<GitActionResult> {
+    await this.known(repoPath);
+    if (!/^stash@\{\d+\}$/.test(ref)) throw new HttpError(400, 'Not a stash');
+    return this.result(repoPath, await git(repoPath, ['stash', action, ref], 60_000));
   }
 
   async fetchAll(): Promise<GitRepo[]> {
