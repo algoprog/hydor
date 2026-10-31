@@ -1,4 +1,5 @@
 import { navigate } from 'wouter/use-browser-location';
+import { create } from 'zustand';
 import { machineBase, machineId, splitMachinePath } from './machine';
 import { useUI } from './store';
 
@@ -26,7 +27,17 @@ export function filePath(path: string, line?: number) {
   return `/file?path=${encodeURIComponent(path)}${line ? `&line=${line}` : ''}`;
 }
 
+/** The file shown in a dialog over the page (features/files/FilePeek), if any. */
+export const useFilePeek = create<{ file: { path: string; line?: number } | null }>(() => ({ file: null }));
+
+/** Opens a file. From a session it shows in a dialog over the conversation, which stays where it was; elsewhere on the Files page. */
 export function openFile(path: string, line?: number) {
+  if (location.pathname.slice(machineBase.length).startsWith('/s/')) useFilePeek.setState({ file: { path, line } });
+  else showInFiles(path, line);
+}
+
+/** Opens a file on the Files page, among its tabs. */
+export function showInFiles(path: string, line?: number) {
   useUI.getState().openTab({ id: `f:${path}`, kind: 'file', ref: path });
   go(filePath(path, line));
 }

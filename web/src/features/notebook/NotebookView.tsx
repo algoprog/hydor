@@ -504,7 +504,8 @@ function KernelPicker({
   );
 }
 
-export default function NotebookView({ path, onSource }: { path: string; onSource: () => void }) {
+/** `embedded`: in a dialog over another page, so there is no Back button (the dialog closes instead); `onDirty` tells it of unsaved changes. */
+export default function NotebookView({ path, onSource, embedded, onDirty }: { path: string; onSource: () => void; embedded?: boolean; onDirty?: (dirty: boolean) => void }) {
   const home = useApp((s) => s.boot?.home);
   const mobile = useIsMobile();
   const dark = useDark();
@@ -530,6 +531,7 @@ export default function NotebookView({ path, onSource }: { path: string; onSourc
   const [confirm, confirmNode] = useConfirm();
   const { kernel, setKernel } = useKernel(path, dispatch, () => mtime.current);
   const dirty = isDirty(doc);
+  useEffect(() => onDirty?.(dirty), [dirty, onDirty]);
   const dir = dirname(path);
   const nb = doc.nb;
   const lang = String(nb?.metadata.language_info?.name ?? nb?.metadata.kernelspec?.language ?? kernel?.language ?? 'python');
@@ -887,7 +889,7 @@ export default function NotebookView({ path, onSource }: { path: string; onSourc
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line px-2 sm:px-3">
-        {mobile && (
+        {mobile && !embedded && (
           <IconButton label="Back" onClick={() => history.back()}>
             <ArrowLeft size={17} />
           </IconButton>

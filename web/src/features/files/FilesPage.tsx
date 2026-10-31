@@ -11,8 +11,11 @@ import { FileSearchPanel } from './FileSearch';
 
 const NotebookView = lazy(() => import('../notebook/NotebookView'));
 
-/** A file: notebooks open as notebooks (with their JSON a click away), everything else in the editor. */
-function FileView({ path, line }: { path: string; line?: number }) {
+/**
+ * A file: notebooks open as notebooks (with their JSON a click away), everything else in the editor.
+ * `embedded`: in a dialog over another page (FilePeek), showing documents as they look first.
+ */
+export function FileView({ path, line, embedded, onDirty }: { path: string; line?: number; embedded?: boolean; onDirty?: (dirty: boolean) => void }) {
   const notebook = path.endsWith('.ipynb');
   const [source, setSource] = useState(false);
   if (notebook && !source) {
@@ -24,7 +27,7 @@ function FileView({ path, line }: { path: string; line?: number }) {
           </div>
         }
       >
-        <NotebookView path={path} onSource={() => setSource(true)} />
+        <NotebookView path={path} onSource={() => setSource(true)} embedded={embedded} onDirty={onDirty} />
       </Suspense>
     );
   }
@@ -32,6 +35,9 @@ function FileView({ path, line }: { path: string; line?: number }) {
     <FileEditor
       path={path}
       line={line}
+      embedded={embedded}
+      preview={embedded}
+      onDirty={onDirty}
       actions={
         notebook && (
           <IconButton label="Open as a notebook" size="sm" onClick={() => setSource(false)}>

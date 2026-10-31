@@ -15,8 +15,8 @@ import { machineId } from '../../lib/machine';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
 import { features } from '../registry';
 
-/** The most-used plan window, as a tiny meter next to "Usage" (under it on a phone's tile). */
-function UsageHint({ tile }: { tile?: boolean }) {
+/** The most-used plan window, as a tiny meter under "Usage". */
+function UsageHint() {
   const { claude, codex } = useUsage();
   const all = [...(claude?.windows ?? []), ...(codex?.windows ?? [])].filter((w) => w.usedPercent != null);
   if (!all.length) return null;
@@ -25,22 +25,14 @@ function UsageHint({ tile }: { tile?: boolean }) {
   const title = [claude, codex]
     .flatMap((u) => (u?.windows ?? []).filter((w) => w.usedPercent != null).map((w) => `${u!.agent === 'claude' ? 'Claude' : 'Codex'} ${w.label}: ${pct(w.usedPercent)} used`))
     .join('\n');
-  if (tile)
-    return (
-      <span className="absolute bottom-[7px] left-1/2 h-[3px] w-8 -translate-x-1/2 overflow-hidden rounded-full bg-fg/10" title={title}>
-        <span className="block h-full rounded-full" style={{ width: `${Math.min(100, top.usedPercent ?? 0)}%`, background: limited ? 'var(--err)' : severityColor(top.usedPercent) }} />
-      </span>
-    );
   return (
-    <span className="ml-auto flex items-center gap-2" title={title}>
-      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-fg/10">
-        <span className="anim-grow-x block h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${Math.min(100, top.usedPercent ?? 0)}%`, background: severityColor(top.usedPercent) }} />
-      </span>
-      <span className={cx('tnum w-8 text-right text-[11.5px]', limited ? 'text-err' : 'text-fg-3')}>{limited ? 'Limit' : pct(top.usedPercent)}</span>
+    <span className="absolute bottom-[7px] left-1/2 h-[3px] w-8 -translate-x-1/2 overflow-hidden rounded-full bg-fg/10" title={title}>
+      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, top.usedPercent ?? 0)}%`, background: limited ? 'var(--err)' : severityColor(top.usedPercent) }} />
     </span>
   );
 }
 
+/** A tool: icon over label, four to a row, so the sessions keep the room (on phones and computers alike). */
 function NavItem({
   path,
   match,
@@ -50,7 +42,6 @@ function NavItem({
   onGo,
   tour,
   anim = 'ico-lift',
-  tile,
 }: {
   path: string;
   match: boolean;
@@ -61,29 +52,18 @@ function NavItem({
   tour?: string;
   /** How its icon answers the pointer (styles.css, "small motion"). */
   anim?: string;
-  /** A phone's drawer: icon over label, four to a row, so the sessions keep the room. */
-  tile?: boolean;
 }) {
-  if (tile)
-    return (
-      <button
-        data-tour={tour}
-        onClick={() => onGo(path)}
-        className={cx('group relative flex h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-[10px] text-[11.5px] transition-colors', match ? 'bg-bg-3 font-medium text-fg' : 'text-fg-2 active:bg-bg-2')}
-      >
-        <span className={cx('ico shrink-0', anim, match ? 'text-fg' : 'text-fg-3')}>{icon}</span>
-        <span className="max-w-full truncate px-1 leading-none">{label}</span>
-        {extra}
-      </button>
-    );
   return (
     <button
       data-tour={tour}
       onClick={() => onGo(path)}
-      className={cx('group flex h-9 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] transition-colors', match ? 'bg-bg-3 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg')}
+      className={cx(
+        'group relative flex h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-[10px] text-[11.5px] transition-colors',
+        match ? 'bg-bg-3 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg active:bg-bg-2',
+      )}
     >
       <span className={cx('ico shrink-0', anim, match ? 'text-fg' : 'text-fg-3')}>{icon}</span>
-      {label}
+      <span className="max-w-full truncate px-1 leading-none">{label}</span>
       {extra}
     </button>
   );
@@ -201,20 +181,16 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         <SessionList query={q} />
       </div>
 
-      <nav
-        data-tour="tools"
-        className={cx('shrink-0 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]', mobile ? 'grid grid-cols-4 gap-1' : 'space-y-0.5')}
-      >
-        <NavItem tile={mobile} path="/files" match={loc === '/files' || loc === '/file' || loc === '/search'} label="Files" icon={<FolderTree size={17} />} onGo={nav} />
-        <NavItem tile={mobile} path="/git" match={loc === '/git'} label="Git" icon={<GitBranch size={17} />} onGo={nav} />
-        <NavItem tile={mobile} path="/terminal" match={loc === '/terminal'} label="Terminal" icon={<SquareTerminal size={17} />} onGo={nav} anim="ico-nudge" />
-        {features().flatMap((f) => (f.nav ?? []).map((n) => <NavItem key={n.path} tile={mobile} path={n.path} match={n.match ? n.match(loc) : loc === n.path} label={n.label} icon={n.icon} onGo={nav} />))}
+      <nav data-tour="tools" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
+        <NavItem path="/files" match={loc === '/files' || loc === '/file' || loc === '/search'} label="Files" icon={<FolderTree size={17} />} onGo={nav} />
+        <NavItem path="/git" match={loc === '/git'} label="Git" icon={<GitBranch size={17} />} onGo={nav} />
+        <NavItem path="/terminal" match={loc === '/terminal'} label="Terminal" icon={<SquareTerminal size={17} />} onGo={nav} anim="ico-nudge" />
+        {features().flatMap((f) => (f.nav ?? []).map((n) => <NavItem key={n.path} path={n.path} match={n.match ? n.match(loc) : loc === n.path} label={n.label} icon={n.icon} onGo={nav} />))}
         {/* Dev-server previews open on this server's own preview port: its own machine only. */}
-        {!machineId && <NavItem tile={mobile} path="/preview" match={loc === '/preview'} label="Preview" icon={<MonitorSmartphone size={17} />} onGo={nav} />}
-        <NavItem tile={mobile} path="/usage" match={loc === '/usage' || loc === '/stats'} label="Usage" icon={<Gauge size={17} />} extra={<UsageHint tile={mobile} />} onGo={nav} anim="ico-grow" />
-        <NavItem tile={mobile} path="/system" match={loc === '/system'} label="System" icon={<Activity size={17} />} onGo={nav} anim="ico-beat" />
+        {!machineId && <NavItem path="/preview" match={loc === '/preview'} label="Preview" icon={<MonitorSmartphone size={17} />} onGo={nav} />}
+        <NavItem path="/usage" match={loc === '/usage' || loc === '/stats'} label="Usage" icon={<Gauge size={17} />} extra={<UsageHint />} onGo={nav} anim="ico-grow" />
+        <NavItem path="/system" match={loc === '/system'} label="System" icon={<Activity size={17} />} onGo={nav} anim="ico-beat" />
         <NavItem
-          tile={mobile}
           path="/settings"
           match={loc === '/settings'}
           label="Settings"
@@ -222,14 +198,9 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
           onGo={nav}
           anim="ico-turn"
           tour="nav-settings"
-          extra={
-            updates ? (
-              <span className={cx('h-1.5 w-1.5 rounded-full bg-accent', mobile ? 'absolute top-2.5 left-[calc(50%+7px)]' : 'ml-auto')} title="A newer version is out (Settings → General)" />
-            ) : undefined
-          }
+          extra={updates ? <span className="absolute top-2.5 left-[calc(50%+7px)] h-1.5 w-1.5 rounded-full bg-accent" title="A newer version is out (Settings → General)" /> : undefined}
         />
         <NavItem
-          tile={mobile}
           path=""
           match={false}
           label="Search"
@@ -239,19 +210,16 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
             openPalette();
           }}
         />
-        {mobile && (
-          <NavItem
-            tile
-            path=""
-            match={false}
-            label="Tour"
-            icon={<CircleHelp size={17} />}
-            onGo={() => {
-              close();
-              startTour();
-            }}
-          />
-        )}
+        <NavItem
+          path=""
+          match={false}
+          label="Tour"
+          icon={<CircleHelp size={17} />}
+          onGo={() => {
+            if (mobile) close();
+            startTour();
+          }}
+        />
       </nav>
     </aside>
   );
