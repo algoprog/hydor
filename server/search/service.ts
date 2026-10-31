@@ -2,6 +2,7 @@
 // can read), which of them are resting after a failure, Naget's categories and allowance, and the
 // sources each turn used, which become a note under the turn's reply.
 import type { NagetCredits, SearchEvent, SearchProviderView, SearchSettingsView, SearchTestResult, SourcesData } from '../../shared/search.ts';
+import type { TimelineItem } from '../../shared/types.ts';
 import type { Deps, TurnInfo } from '../features/types.ts';
 import { addNote } from '../notes.ts';
 import { FALLBACK_TAXONOMY, fetchTaxonomy, nagetBase, type Taxonomy } from './naget.ts';
@@ -32,6 +33,33 @@ type Source = { at: number; search?: SourcesData['searches'][number]; page?: Sou
 const DAY = 86_400_000;
 /** The app's own tools as each agent's transcript names them. */
 const OWN_TOOL = /^mcp__(?:naget-agent|agent-console)__(?:web_search|read_page)$/;
+/** The agents' own web tools: Claude Code's, and Codex's search. */
+const AGENT_WEB: Record<string, string> = { WebSearch: 'Claude Code', WebFetch: 'Claude Code', web_search: 'Codex' };
+
+/** What a turn searched and read with the agent's own web tools (the app's record themselves as they run). */
+export function agentSources(items: TimelineItem[]): Source[] {
+  const out: Source[] = [];
+  for (const it of items) {
+    if (it.kind !== 'tool' || it.tool.category !== 'web' || !AGENT_WEB[it.tool.name] || it.tool.status === 'error') continue;
+    const t = it.tool;
+    if (t.name === 'WebFetch') {
+      // What it asked of the page (its subtitle turns into the answer's status once one comes).
+      const prompt = (t.input as { prompt?: unknown } | undefined)?.prompt;
+      const ask = typeof prompt === 'string' ? prompt.trim().split('\n')[0].slice(0, 200) : '';
+      if (/^https?:\/\//.test(t.title)) out.push({ at: it.ts ?? 0, page: { url: t.title, ...(ask && { question: ask }) } });
+      continue;
+    }
+    // Each result is a title, then its address on the next line, indented.
+    const lines = (t.output ?? '').split('\n');
+    const top: { title: string; url: string }[] = [];
+    lines.forEach((l, i) => {
+      const url = l.trim();
+      if (/^\s+https?:\/\/\S+$/.test(l) && !top.some((r) => r.url === url)) top.push({ title: lines[i - 1]?.trim() || url, url });
+    });
+    out.push({ at: it.ts ?? 0, search: { query: t.title, provider: AGENT_WEB[t.name], count: top.length, top: top.slice(0, 5) } });
+  }
+  return out;
+}
 
 /** An address as typed ("searx.example.org/") made whole ("https://searx.example.org"); throws for one that is not. */
 function address(p: SearchProvider, raw: string | null | undefined): string {
@@ -261,11 +289,11 @@ export class SearchService {
     this.sources.set(key, list.slice(-60));
   }
 
-  /** The sources gathered for a session up to `until`, taken out. */
-  take(key: string, until: number): SourcesData | null {
-    const list = this.sources.get(key);
-    if (!list?.length) return null;
-    const mine = list.filter((s) => s.at <= until);
+  /** The sources gathered for a session up to `until`, taken out, with `more` the turn's others. */
+  take(key: string, until: number, more: Source[] = []): SourcesData | null {
+    const list = this.sources.get(key) ?? [];
+    if (!list.length && !more.length) return null;
+    const mine = [...list.filter((s) => s.at <= until), ...more].sort((a, b) => a.at - b.at);
     const rest = list.filter((s) => s.at > until);
     if (rest.length) this.sources.set(key, rest);
     else this.sources.delete(key);
@@ -277,19 +305,19 @@ export class SearchService {
 
   /** A turn ended: what it searched and read becomes a note under its reply. */
   async turnEnded(t: TurnInfo, d: Deps): Promise<void> {
-    const data = this.take(t.key, t.endedAt + 1000);
-    if (!data) return;
-    let anchor: string | undefined;
+    // A session running elsewhere (VS Code, a terminal) is read only when the app's tools ran in it.
+    if (t.external && !this.sources.get(t.key)?.length) return;
+    let items: TimelineItem[] = [];
     try {
-      const items = (await d.sessions.timeline(t.key)).page(undefined, 400).items;
-      // The turn's last search or read; else its last item.
-      for (let i = items.length - 1; i >= 0 && !anchor; i--) {
-        const it = items[i];
-        if (it.kind === 'tool' && OWN_TOOL.test(it.tool.name)) anchor = it.id;
-        else if (it.kind === 'user' && !it.meta) break;
-      }
-      anchor ??= items[items.length - 1]?.id;
+      items = (await d.sessions.timeline(t.key)).page(undefined, 400).items;
     } catch {}
-    addNote(d.db, { key: t.key, kind: 'sources', anchor, data });
+    // The turn: what came after its prompt.
+    const prompt = items.findLastIndex((it) => it.kind === 'user' && !it.meta);
+    const turn = items.slice(prompt + 1);
+    const data = this.take(t.key, t.endedAt + 1000, agentSources(turn));
+    if (!data) return;
+    // The turn's last search or read; else its last item.
+    const last = turn.findLast((it) => it.kind === 'tool' && (OWN_TOOL.test(it.tool.name) || !!AGENT_WEB[it.tool.name]));
+    addNote(d.db, { key: t.key, kind: 'sources', anchor: (last ?? items[items.length - 1])?.id, data });
   }
 }

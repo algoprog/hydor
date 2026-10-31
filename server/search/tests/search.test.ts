@@ -654,4 +654,37 @@ describe('the search service and its tools', () => {
     await svc.turnEnded({ key: 'claude:s1', agent: 'claude', status: 'idle', startedAt: 0, endedAt: Date.now(), external: false }, d);
     assert.equal(notesOf(db, 'claude:s1').length, 1);
   });
+
+  it('counts what the agent searched and read with its own web tools, in order', async () => {
+    const db = new Database(':memory:');
+    db.exec('create table session_notes (id text primary key, key text not null, kind text not null, at integer not null, anchor text, data text not null)');
+    const web = (id: string, ts: number, tool: Record<string, unknown>) => ({ id, ts, kind: 'tool', tool: { category: 'web', status: 'ok', ...tool } });
+    const items = [
+      web('old', 1, { name: 'WebFetch', title: 'https://earlier.example/' }),
+      { id: 'u1', kind: 'user', text: 'tech news' },
+      web('t1', 10, { name: 'WebSearch', title: 'intel stock', output: 'Intel shares slump\n  https://news.example/intel\nSecond\n  https://b.example/x' }),
+      web('t3', 30, { name: 'WebFetch', title: 'https://www.cnbc.com/2026/10/31/binance.html', subtitle: '200 OK', input: { url: 'https://www.cnbc.com/2026/10/31/binance.html', prompt: 'Key facts\nand more' } }),
+      web('t4', 40, { name: 'WebFetch', title: 'https://down.example/', status: 'error' }),
+      { id: 'q1', kind: 'user', text: 'and chips', meta: 'queued' },
+      web('t5', 50, { name: 'web_search', title: 'nvidia' }),
+      { id: 'a1', kind: 'assistant', text: 'Here they are.' },
+    ];
+    const d = { db, sessions: { timeline: async () => ({ page: () => ({ items }) }) } } as unknown as Deps;
+    const svc = new SearchService({ kv: memory(), fetch: fake(() => json(500, {})).f });
+    svc.record('claude:s1', { page: { url: 'https://techcrunch.com/', title: 'TechCrunch' } });
+    await svc.turnEnded({ key: 'claude:s1', agent: 'claude', status: 'idle', startedAt: 0, endedAt: Date.now(), external: false }, d);
+    const [note] = notesOf(db, 'claude:s1');
+    assert.equal(note.anchor, 't5');
+    const data = note.data as SourcesData;
+    assert.deepEqual(data.searches, [
+      { query: 'intel stock', provider: 'Claude Code', count: 2, top: [{ title: 'Intel shares slump', url: 'https://news.example/intel' }, { title: 'Second', url: 'https://b.example/x' }] },
+      { query: 'nvidia', provider: 'Codex', count: 0, top: [] },
+    ]);
+    // In the order they were read (the app's read_page came last here), without the failed one or one from the turn before.
+    assert.deepEqual(data.pages, [{ url: 'https://www.cnbc.com/2026/10/31/binance.html', question: 'Key facts' }, { url: 'https://techcrunch.com/', title: 'TechCrunch' }]);
+    // A session running elsewhere is not read for them alone.
+    const d2 = { db, sessions: { timeline: async () => assert.fail('not read') } } as unknown as Deps;
+    await svc.turnEnded({ key: 'claude:s2', agent: 'claude', status: 'idle', startedAt: 0, endedAt: Date.now(), external: true }, d2);
+    assert.equal(notesOf(db, 'claude:s2').length, 0);
+  });
 });
