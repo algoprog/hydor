@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { ArrowUp, ChevronRight, CircleHelp, FileText, GitBranch, MonitorUp, Paperclip } from 'lucide-react';
+import { ArrowUp, ChevronRight, CircleHelp, FileText, GitBranch, MonitorUp, Paperclip, SlidersHorizontal } from 'lucide-react';
 import { startTour } from '../tour/Tour';
 import type { Agent, StartRun } from '@shared/types';
 import type { SessionExtra } from '@shared/features';
+import { usd } from '@shared/budget';
 import { api, post } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
@@ -12,9 +13,9 @@ import { openSession } from '../../lib/nav';
 import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
 import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { EffortPicker, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
+import { EffortPicker, findModel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
-import { cx, IconButton, MenuItem, Switch, useIsMobile } from '../../components/ui';
+import { cx, IconButton, MenuItem, Popover, SettingChip, SettingLayout, Switch, useIsMobile } from '../../components/ui';
 import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { NavButton } from '../layout/PageHeader';
 import { ActivityText, folderName, sortActive } from '../sessions/SessionList';
@@ -38,11 +39,35 @@ function fromLink(search: string): { prompt?: string; agent?: Agent; model?: str
   return { prompt, agent: agent === 'claude' || agent === 'codex' ? agent : undefined, model: q.get('model') ?? undefined, stripped: !!raw && raw !== prompt };
 }
 
+/** The start page's quieter settings, behind one chip that names those changed ("Max effort · Plan"), else "Options". */
+function MoreOptions({ changed, title, children }: { changed: string[]; title: string; children: ReactNode }) {
+  const mobile = useIsMobile();
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <SettingChip
+        ref={ref}
+        label="Options"
+        icon={<SlidersHorizontal size={14} />}
+        value={changed.length ? changed.join(' · ') : 'Options'}
+        title={title}
+        open={open}
+        onClick={() => setOpen((o) => !o)}
+      />
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={290} align="end">
+        <SettingLayout.Provider value="row">{children}</SettingLayout.Provider>
+        {!mobile && <div className="mx-1.5 mt-1 border-t border-line px-1 pt-2 pb-1 text-[11.5px] text-fg-3">Shift+Tab in the message box switches permissions</div>}
+      </Popover>
+    </>
+  );
+}
+
 /**
  * The start page's message box. It opens with what was picked here last time (kept on the server, so on
  * any device): the agent with its model, effort and permissions, the folder, the assistant, memory and a
- * spending cap. Every setting sits in the tray under the box, named, one line for who does the work and
- * one for where and how.
+ * spending cap. One row under the box shows who does the work, where and as which assistant; the rest
+ * wait under Options, whose chip names any of them set away from the usual.
  */
 function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: ReturnType<typeof fromLink> }) {
   const mobile = useIsMobile();
@@ -197,6 +222,37 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     }
   };
 
+  // A capability's start option changed (the assistant, memory, a spending cap): kept for next time.
+  const onExtra = (p: Partial<SessionExtra>) => {
+    const before = extra.assistant;
+    setExtra((x) => ({ ...x, ...p }));
+    if ('memory' in p) saveStart({ memory: p.memory === false ? false : null });
+    if ('capUsd' in p) saveStart({ capUsd: typeof p.capUsd === 'number' ? p.capUsd : null });
+    // The assistant picked (not the one the page opened with): its kind of folder too, unless one was picked here.
+    if (typeof p.assistant === 'string' && before !== undefined && p.assistant !== before) {
+      saveStart({ assistant: p.assistant });
+      if (!folderPicked.current) (setTaskPick(null), saveStart({ task: null }));
+    }
+  };
+
+  // What the Options chip names: the settings under it that are not as usual.
+  const levels = findModel(cat, model)?.efforts ?? [];
+  const effortOn = agent !== 'acp' && !!effort && (!cat || levels.length > 0) ? effort[0].toUpperCase() + effort.slice(1) : null;
+  const modeOn = cat && mode && mode !== cat.defaultMode ? (cat.modes.find((m) => m.value === mode)?.label ?? null) : null;
+  const acctOn = acct ? (accounts.find((a) => a.id === acct)?.name ?? null) : null;
+  const capOn = typeof extra.capUsd === 'number' ? usd(extra.capUsd) : null;
+  const changed = [effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
+  const modeNow = cat?.modes.find((m) => m.value === (mode ?? cat.defaultMode))?.label;
+  const optionsTitle = [
+    agent !== 'acp' && `Effort: ${effortOn ?? 'default'}`,
+    modeNow && `Permissions: ${modeNow}`,
+    acctOn && `Account: ${acctOn}`,
+    `Memory: ${extra.memory === false ? 'off' : 'on'}`,
+    `Spending cap: ${capOn ?? 'none'}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
   const ready = !!cwd && !busy;
   const iconBtn = 'shrink-0 rounded-lg p-2 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg';
   return (
@@ -301,8 +357,9 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
             </span>
           </button>
         </div>
-        <div data-tour="start-bar" className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
-          <div data-tour="pickers" className="flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5">
+        {/* Who does the work, where and as which assistant; the rest under Options. */}
+        <SettingLayout.Provider value="bare">
+          <div data-tour="start-bar" className="flex flex-wrap items-center gap-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
             <AgentPicker label="Agent" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} />
             <ModelPicker
               label="Model"
@@ -317,11 +374,6 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
                 chooseAgent(a, null);
               }}
             />
-            <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={model} value={effort} onChange={(v) => (setEffort(v), keepRun({ effort: v }))} />
-            <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (setMode(v), keepRun({ mode: v }))} />
-            {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5">
             <WorkFolderChip
               value={cwd}
               task={task}
@@ -356,25 +408,19 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
                 </div>
               )}
             </WorkFolderChip>
-            <FeatureStartOptions
-              value={extra}
-              cwd={cwd}
-              onChange={(p) => {
-                const before = extra.assistant;
-                setExtra((x) => ({ ...x, ...p }));
-                if ('memory' in p) saveStart({ memory: p.memory === false ? false : null });
-                if ('capUsd' in p) saveStart({ capUsd: typeof p.capUsd === 'number' ? p.capUsd : null });
-                // The assistant picked (not the one the page opened with): its kind of folder too, unless one was picked here.
-                if (typeof p.assistant === 'string' && before !== undefined && p.assistant !== before) {
-                  saveStart({ assistant: p.assistant });
-                  if (!folderPicked.current) (setTaskPick(null), saveStart({ task: null }));
-                }
-              }}
-            />
+            <FeatureStartOptions part="lead" value={extra} cwd={cwd} onChange={onExtra} />
+            <span data-tour="pickers" className="ml-auto flex min-w-0">
+              <MoreOptions changed={changed} title={optionsTitle}>
+                <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={model} value={effort} onChange={(v) => (setEffort(v), keepRun({ effort: v }))} />
+                <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (setMode(v), keepRun({ mode: v }))} />
+                {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
+                <FeatureStartOptions part="rest" value={extra} cwd={cwd} onChange={onExtra} />
+              </MoreOptions>
+            </span>
           </div>
-        </div>
+        </SettingLayout.Provider>
       </div>
-      {!mobile && <div className="mt-2.5 text-center text-[12px] text-fg-3">Enter to start · Shift+Enter for a new line · Shift+Tab changes permissions</div>}
+      {!mobile && <div className="mt-2.5 text-center text-[12px] text-fg-3">Enter to start · Shift+Enter for a new line</div>}
     </div>
   );
 }
