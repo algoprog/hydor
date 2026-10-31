@@ -18,7 +18,6 @@ import { Composer } from './Composer';
 import { Elapsed, SessionCtx, ToolRow } from './items';
 import { taskKind, TaskLogDialog } from './TaskLog';
 import { Timeline } from './Timeline';
-import { LimitBanner } from '../usage/LimitReset';
 import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
 import { noteOpened } from '../palette/CommandPalette';
@@ -632,7 +631,6 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
               <Timeline sessionKey={sessionKey} agent={summary.agent} live={summary.live ?? null} overlay={lv?.overlay} external={summary.external} />
             )}
           </div>
-          <LimitBanner agent={summary.agent} account={summary.account} className="mx-3 mb-2 sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]" />
           <MovedOn s={summary} />
           <FeatureDock s={summary} />
           <Composer s={summary} hint={pane && show === 'pane' ? pane.placeholder : undefined} />

@@ -488,6 +488,43 @@ export class Scheduler extends EventEmitter {
     this.sessions.queueSummary(key);
   }
 
+  /** When the next session continues after a usage limit, if one is waiting to. */
+  nextResume(): number | undefined {
+    const r = this.db.prepare('select min(next_at) as t from tasks where resume = 1').get() as { t: number | null } | undefined;
+    return r?.t ?? undefined;
+  }
+
+  /** Sessions continued early because their limit lifted, and when: one that hits it again waits for the reset. */
+  private earlyResumes = new Map<string, number>();
+
+  /**
+   * Keeps each session waiting out a usage limit on the time that limit lifts, a minute after it, as its
+   * account's usage last said. That time moves: the provider reports another, a reset clears the limit,
+   * the account signs in as another one. Usage back already continues the session now.
+   */
+  syncResumes() {
+    const now = Date.now();
+    for (const r of this.db.prepare('select * from tasks where resume = 1').all() as Row[]) {
+      const key = r.target!;
+      const lifts = this.sessions.limitLiftsAt(key);
+      if (lifts === undefined) continue;
+      let at: number;
+      if (lifts === null) {
+        // Not at a limit (anymore): now, unless it was continued early lately and stopped at the limit again.
+        if ((this.earlyResumes.get(key) ?? 0) > now - 15 * 60_000) continue;
+        at = now + 5_000;
+        if ((r.next_at ?? 0) <= at) continue;
+        this.earlyResumes.set(key, now);
+      } else {
+        at = Math.max(lifts + 60_000, now + 5_000);
+        if (Math.abs(at - (r.next_at ?? 0)) < 30_000) continue;
+      }
+      this.db.prepare('update tasks set schedule = ?, next_at = ? where id = ?').run(JSON.stringify({ kind: 'once', at }), at, r.id);
+      this.sessions.queueSummary(key);
+    }
+    for (const [k, t] of this.earlyResumes) if (t < now - 15 * 60_000) this.earlyResumes.delete(k);
+  }
+
   // ---- webhooks ----------------------------------------------------------------------------
 
   async webhook(secret: string, call: HookCall): Promise<HookResult> {
@@ -550,6 +587,7 @@ export class Scheduler extends EventEmitter {
       this.zone = tz;
       this.reschedule();
     }
+    this.syncResumes();
     const due = this.db.prepare('select * from tasks where enabled = 1 and next_at is not null and next_at <= ?').all(Date.now()) as Row[];
     for (const r of due) {
       if ((JSON.parse(r.schedule) as TaskSchedule).kind === 'watch') this.check(r).catch(() => {});

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Clock3, RotateCcw } from 'lucide-react';
 import type { Agent, AgentUsage, LimitReset, LimitResetResult } from '@shared/types';
 import { del, enc, post } from '../../lib/api';
@@ -57,60 +57,95 @@ export function useLimitReset(agent: Agent, account?: string) {
   return { use, busy, node: confirmNode };
 }
 
+/** Renders again every `ms` while `on`, so "in 1 h 31 min" keeps counting down. */
+function useTicking(on: boolean, ms = 30_000) {
+  const [, set] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    const t = setInterval(() => set((x) => x + 1), ms);
+    return () => clearInterval(t);
+  }, [on, ms]);
+}
+
 /**
  * Shown where you work with an agent whose usage is used up: when it comes back, and a reset if there is
- * one. In a session (`session` given) it can also continue the session by itself once the limit lifts.
+ * one. In a session (`session` given) it also says when the session continues by itself (the server keeps
+ * that on the limit's reset time as it moves), or offers to. One banner: the text has the width, and its
+ * buttons go under it when there is no room beside it.
  */
 export function LimitBanner({ agent, account, className, session }: { agent: Agent; account?: string; className?: string; session?: { key: string; resumeAt?: number; busy?: boolean } }) {
   const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : agent === 'acp' ? null : s[agent]));
   const reset = useLimitReset(agent, account);
-  const lim = u?.limited;
-  if (session?.resumeAt)
+  const lim = session?.busy ? null : u?.limited;
+  const resumeAt = session?.resumeAt;
+  useTicking(!!lim || !!resumeAt);
+  if (!lim && !resumeAt) return null;
+  const cancel = () => del(`/api/sessions/${enc(session!.key)}/resume-at`).catch(toastError);
+  // Usage is back (or the session is going again): only the continue still to come.
+  if (!lim)
     return (
-      <div className={cx('anim-expand flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
+      <div className={cx('anim-expand flex items-center gap-3 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
         <Clock3 size={15} className="shrink-0 text-busy" />
         <span className="min-w-0 flex-1">
-          Continues by itself <span className="font-medium">{untilText(session.resumeAt)}</span>
-          {lim ? <span className="text-fg-3">, when the usage limit lifts.</span> : '.'}
+          Continues by itself <span className="font-medium">{untilText(resumeAt)}</span>.
         </span>
-        <Button size="sm" variant="ghost" onClick={() => del(`/api/sessions/${enc(session.key)}/resume-at`).catch(toastError)}>
+        <Button size="sm" variant="ghost" onClick={cancel}>
           Cancel
         </Button>
       </div>
     );
-  if (!lim || session?.busy) return null;
   const usable = usableResets(u);
   const left = u?.resetCredits?.available ?? 0;
+  // The server continues a minute after the reset; told apart only when the two disagree.
+  const withReset = !!resumeAt && !!lim.resetsAt && Math.abs(resumeAt - lim.resetsAt - 60_000) < 3 * 60_000;
   return (
-    <div className={cx('anim-expand flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[13.5px]', className)} role="status">
-      <AlertTriangle size={15} className="shrink-0 text-warn" />
-      <span className="min-w-0 flex-1">
-        <span className="font-medium">You've hit the {agentName(agent)} usage limit</span>
-        <span className="text-fg-2">
-          {' '}
-          ({lim.label}).
-          {lim.resetsAt ? ` It resets ${untilText(lim.resetsAt)}.` : ''}
-        </span>
-      </span>
-      {session && lim.resetsAt && (
-        <Button
-          size="sm"
-          variant={usable.length ? 'secondary' : 'primary'}
-          icon={<Clock3 size={14} />}
-          onClick={() => post(`/api/sessions/${enc(session.key)}/resume-at`, { at: lim.resetsAt! + 60_000 }).catch(toastError)}
-          title="Sends “Continue where you left off.” a minute after the limit resets"
-        >
-          Resume at reset
-        </Button>
-      )}
-      {usable.length > 0 && (
-        <span className="flex items-center gap-2">
-          <span className="text-[12.5px] text-fg-3">{plural(left, 'reset')} available</span>
-          <Button size="sm" variant="primary" icon={<RotateCcw size={14} />} disabled={reset.busy} onClick={() => reset.use()}>
-            {reset.busy ? 'Resetting…' : 'Use a reset'}
-          </Button>
-        </span>
-      )}
+    <div className={cx('anim-expand flex gap-3 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[13.5px]', className)} role="status">
+      <AlertTriangle size={15} className="mt-[3px] shrink-0 text-warn" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="min-w-[min(100%,15rem)] flex-1 leading-snug">
+            <div className="font-medium">You've hit the {agentName(agent)} usage limit</div>
+            <div className="text-[12.5px] text-fg-2">
+              {lim.label}
+              {lim.resetsAt ? ` · resets ${untilText(lim.resetsAt)}` : ''}
+            </div>
+          </div>
+          {((session && !resumeAt && lim.resetsAt) || usable.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {session && !resumeAt && lim.resetsAt && (
+                <Button
+                  size="sm"
+                  variant={usable.length ? 'secondary' : 'primary'}
+                  icon={<Clock3 size={14} />}
+                  onClick={() => post(`/api/sessions/${enc(session.key)}/resume-at`, { at: lim.resetsAt! + 60_000 }).catch(toastError)}
+                  title="Sends “Continue where you left off.” a minute after the limit resets"
+                >
+                  Resume at reset
+                </Button>
+              )}
+              {usable.length > 0 && (
+                <span className="flex items-center gap-2">
+                  <span className="text-[12.5px] whitespace-nowrap text-fg-3">{plural(left, 'reset')} available</span>
+                  <Button size="sm" variant="primary" icon={<RotateCcw size={14} />} disabled={reset.busy} onClick={() => reset.use()}>
+                    {reset.busy ? 'Resetting…' : 'Use a reset'}
+                  </Button>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        {resumeAt && (
+          <div className="mt-2 flex items-center gap-1.5 border-t border-warn/20 pt-2 text-[12.5px] text-fg-2">
+            <Clock3 size={13} className="shrink-0 text-busy" />
+            <span className="min-w-0 flex-1">
+              This session continues by itself <span className="font-medium text-fg">{withReset ? 'when it resets' : untilText(resumeAt)}</span>.
+            </span>
+            <button onClick={cancel} className="-my-1 shrink-0 rounded-md px-2 py-1 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
       {reset.node}
     </div>
   );
