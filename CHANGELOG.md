@@ -3,6 +3,26 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.6.2 · 31 October 2026
+
+A welcome tour that builds the app up as it shows you around, model menus that keep to their agent, and
+conversations as wide as the message box.
+
+- **The welcome tour** starts on an empty screen. Setting up what you want to use happens on pages that fill
+  the screen; then the app builds itself up as the tour shows it around, each part arriving as it is
+  explained: the message box, the row under it, Options, your sessions, the tools and Settings. The rest
+  arrives as the tour ends. A new install goes from choosing its password straight into the tour.
+- **Model menus** list only the models of the agent a message box is set to: Claude Code's, Codex's or
+  Custom's. Picking another agent is the agent menu's job.
+- **Continue in another agent**: a Claude Code or Codex session's menu offers Continue in Codex (or Claude
+  Code) and, once Custom has a model in Settings → Models, Continue in Custom Agent, beside Fork. The
+  message box then says where the next message goes, and the new session opens with the conversation so
+  far.
+- **Conversations** line up with the message box under them, in sessions and in an app's results. A message
+  of yours longer than nine lines folds to its first six, with Show more; Find opens a folded message to
+  show what it found.
+- Menu items no longer end in "…"; buttons in dialogs keep it.
+
 ## 0.6.1 · 31 October 2026
 
 Memory that finds by meaning and keeps itself tidy, one search for everything, and these release notes.
