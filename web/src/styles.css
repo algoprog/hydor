@@ -884,7 +884,7 @@ html {
   }
 }
 .tour-invite {
-  animation: tour-invite 1300ms 150ms cubic-bezier(0.22, 1, 0.36, 1) 2;
+  animation: tour-invite 1300ms 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 /* The message box's own soft shadow stays under the glow. */
 @keyframes tour-invite {

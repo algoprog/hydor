@@ -167,13 +167,13 @@ function LocalModels({ st }: { st: ModelsState }) {
 // ---- shared: search box, filters, order, rows ----------------------------------------------------
 
 /** 1M, 164K… tokens */
-const tokens = (n: number) => (n >= 1_000_000 ? `${+(n / 1_048_576).toFixed(1)}M` : `${Math.round(n / 1000)}K`);
+export const tokens = (n: number) => (n >= 1_000_000 ? `${+(n / 1_048_576).toFixed(1)}M` : `${Math.round(n / 1000)}K`);
 /** $0.15, $3, $0.021… per million tokens. */
-const dollars = (n: number) => `$${n >= 10 ? Math.round(n) : n >= 1 ? n.toFixed(2).replace(/\.00$/, '') : n >= 0.1 ? n.toFixed(2) : +n.toPrecision(2)}`;
+export const dollars = (n: number) => `$${n >= 10 ? Math.round(n) : n >= 1 ? n.toFixed(2).replace(/\.00$/, '') : n >= 0.1 ? n.toFixed(2) : +n.toPrecision(2)}`;
 /** 12.8M, 3.4K, 512 */
-const count = (n: number) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${+(n / 1e3).toFixed(1)}K` : String(n));
+export const count = (n: number) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${+(n / 1e3).toFixed(1)}K` : String(n));
 /** 14.8B, 600M */
-const paramsShort = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B` : `${Math.round(n / 1e6)}M`);
+export const paramsShort = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B` : `${Math.round(n / 1e6)}M`);
 const month = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 const DAY = 86_400_000;
 
@@ -544,7 +544,7 @@ const HF_ORDER: { id: HfSort; label: string }[] = [
 const HF_STARTERS = ['qwen3', 'gemma', 'llama', 'gpt-oss', 'mistral', 'phi'];
 
 /** "org/name" from that, a huggingface.co address or hf.co/… (as the server reads it). */
-function repoOf(input: string): string | null {
+export function repoOf(input: string): string | null {
   const s = input
     .trim()
     .replace(/^https?:\/\/(www\.)?(huggingface\.co|hf\.co)\//, '')

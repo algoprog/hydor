@@ -19,10 +19,11 @@ import { enablePush, pushState, type PushState } from '../../lib/notify';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { Button, cx, Kbd, Throbber, useIsMobile, useMediaQuery } from '../../components/ui';
-import { ARCH, Logo, NUGGET, TileGradients } from '../../components/Logo';
+import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
+import { ARCH, NUGGET, TileGradients } from '../../components/Logo';
 import { LoginDialog } from '../settings/SettingsPage';
-import { HfSearch, MachineCard, OpenRouterBody, shortGpu, size as bytes, useModels } from '../settings/ModelsSettings';
+import { shortGpu } from '../settings/ModelsSettings';
+import { TourLocal, TourOpenRouter } from './TourModels';
 import { machineBase, machineId } from '../../lib/machine';
 
 /** Raise it when the tour changes enough to be worth showing again to everyone. */
@@ -144,7 +145,7 @@ function invite() {
   box.classList.remove('tour-invite');
   void box.offsetWidth;
   box.classList.add('tour-invite');
-  setTimeout(() => box.classList.remove('tour-invite'), 2600);
+  setTimeout(() => box.classList.remove('tour-invite'), 1500);
   if (!window.matchMedia('(pointer: coarse)').matches) box.querySelector('textarea')?.focus({ preventScroll: true });
 }
 
@@ -421,57 +422,6 @@ function AccountsSetup() {
   );
 }
 
-function OpenRouterSetup() {
-  const st = useModels();
-  return st ? <OpenRouterBody st={st} /> : <Loading />;
-}
-
-/** Models on this computer and those downloading, in the tour. */
-function LocalList({ st }: { st: ModelsState }) {
-  const running = st.downloads.filter((d) => d.status === 'running');
-  if (!running.length && !st.local.length) return null;
-  return (
-    <div>
-      <div className="mb-1.5 text-[12px] font-medium text-fg-2">
-        On this computer <span className="font-normal text-fg-3">· {st.local.length + running.length}</span>
-      </div>
-      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-        {running.map((d) => (
-          <div key={d.key} className="px-3 py-2.5">
-            <div className="flex items-center gap-2 text-[12.5px]">
-              <span className="min-w-0 flex-1 truncate text-fg">{d.name.replace(/^hf\.co\//, '')}</span>
-              <span className="tnum shrink-0 text-fg-3">{d.totalBytes ? `${Math.floor((d.doneBytes / d.totalBytes) * 100)}%` : bytes(d.doneBytes)}</span>
-            </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/10">
-              <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${d.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 5}%` }} />
-            </div>
-          </div>
-        ))}
-        {st.local.map((x) => (
-          <div key={x.id} className="flex items-center gap-2.5 px-3 py-2 text-[12.5px]">
-            <Check size={14} className="anim-pop-in shrink-0 text-ok" />
-            <span className="min-w-0 flex-1 truncate text-fg">{x.repo}</span>
-            <span className="shrink-0 rounded-md bg-bg-2 px-1.5 py-px text-[11px] font-medium text-fg-2 ring-1 ring-line">{x.runtime === 'ollama' ? 'Ollama' : 'vLLM'}</span>
-            <span className="tnum shrink-0 text-fg-3">{bytes(x.sizeBytes)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LocalSetup() {
-  const st = useModels();
-  if (!st) return <Loading />;
-  return (
-    <div className="space-y-3">
-      <MachineCard st={st} />
-      <HfSearch st={st} />
-      <LocalList st={st} />
-    </div>
-  );
-}
-
 type AgentDef = AcpAgentDef & { installed: boolean };
 
 function AgentsSetup() {
@@ -619,7 +569,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       label: 'OpenRouter',
       title: 'Models through OpenRouter',
       body: 'Hundreds of models through one key. Custom, the app’s own agent, runs them with the same tools, skills and MCP servers as the other agents.',
-      Extra: OpenRouterSetup,
+      Extra: TourOpenRouter,
       width: 560,
     });
   if (has('local'))
@@ -628,7 +578,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       label: 'On this computer',
       title: 'Models on this computer',
       body: 'Custom, the app’s own agent, runs open models on your own hardware, and nothing leaves it. Search Hugging Face: each model shows how it would run here before anything downloads.',
-      Extra: LocalSetup,
+      Extra: TourLocal,
       width: 560,
     });
   if (has('agents'))
@@ -811,68 +761,10 @@ function holePath(b: Box): string {
 
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
-/** Where the tour stands, down the left of its pages on a wide screen: setting up, then the app. A step
- * already done can be gone back to. */
-function TourRail({ list, at, fresh, onGo }: { list: Step[]; at: number; fresh: boolean; onGo?: (n: number) => void }) {
-  const pages = list.findIndex((s) => !!s.target);
-  const groups = [
-    // A new install's password screen was the first step.
-    { title: 'Set up', items: [...(fresh ? [{ id: 'password', label: 'Password', n: -1 }] : []), ...list.slice(0, pages).map((s, n) => ({ id: s.id, label: s.label, n }))] },
-    { title: 'The app', items: list.slice(pages).map((s, n) => ({ id: s.id, label: s.label, n: pages + n })) },
-  ];
-  return (
-    <nav aria-label="The tour’s steps" className="relative flex w-[288px] shrink-0 flex-col overflow-y-auto border-r border-line bg-bg-1/55 px-6 pt-7 pb-6 backdrop-blur-xl">
-      <div className="flex items-center gap-2.5 px-1">
-        <Logo size={26} />
-        <span className="text-[14.5px] font-semibold tracking-tight text-fg">Naget Agent</span>
-      </div>
-      {groups.map((g) => (
-        <div key={g.title} className="mt-9">
-          <div className="mb-1.5 px-1 text-[11px] font-semibold tracking-[0.14em] text-fg-3 uppercase">{g.title}</div>
-          <ol>
-            {g.items.map((x, j) => {
-              const done = x.n < at;
-              const now = x.n === at;
-              const go = done && x.n >= 0 ? onGo : undefined;
-              return (
-                <li key={x.id} className="anim-expand relative">
-                  {j < g.items.length - 1 && <span aria-hidden className={cx('absolute top-[26px] left-[12.5px] h-4 w-px transition-colors duration-500', done ? 'bg-accent/60' : 'bg-line-2')} />}
-                  <button
-                    type="button"
-                    disabled={!go}
-                    onClick={go && (() => go(x.n))}
-                    aria-current={now ? 'step' : undefined}
-                    className={cx('flex h-[34px] w-full items-center gap-3 rounded-lg px-1 text-left text-[13.5px] transition-colors', now ? 'font-medium text-fg' : done ? 'text-fg-2' : 'text-fg-3', go && 'hover:bg-fg/[0.05] hover:text-fg')}
-                  >
-                    <span
-                      className={cx(
-                        'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,box-shadow] duration-300',
-                        done ? 'border-accent bg-accent text-accent-fg' : now ? 'border-accent shadow-[0_0_0_4px_var(--accent-soft)]' : 'border-line-2',
-                      )}
-                    >
-                      {done ? <Check size={11} strokeWidth={3} /> : now ? <span className="h-[7px] w-[7px] rounded-full bg-accent" /> : null}
-                    </span>
-                    {x.label}
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      ))}
-      <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 pt-8 text-[12px] text-fg-3">
-        <Kbd>←</Kbd>
-        <Kbd>→</Kbd> to move, <Kbd>Esc</Kbd> to close
-      </div>
-    </nav>
-  );
-}
-
-/** A setup step: the whole screen, over the app that is not there yet. On a wide screen the steps run
- * down the left and this one sits beside them with its buttons under it; on a narrow one it fills the
- * screen, with where the tour stands on top and the buttons at the bottom. Its words stay in one place
- * from step to step. It dissolves (out) as the app comes in or the tour closes; a new install's first
- * one follows the password screen without a fade. */
+/** A setup step: the whole screen, over the app that is not there yet. Its words start in the same place
+ * every step, with Back, where the tour stands and Next under them: along the bottom on a phone, and kept
+ * in reach at the bottom of the screen while a long step scrolls. It dissolves (out) as the app comes in
+ * or the tour closes; a new install's first one follows the password screen without a fade. */
 function TourPage(p: {
   list: Step[];
   /** The step shown. */
@@ -887,115 +779,79 @@ function TourPage(p: {
   onBack?: () => void;
   onNext?: () => void;
   onSkip?: () => void;
-  onGo?: (n: number) => void;
   nextRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const { list, k, fresh, out, ready } = p;
   const step = list[k];
-  const wide = useMediaQuery('(min-width: 1024px)');
+  const phone = useIsMobile();
   const [still] = useState(p.now);
   const scroller = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
-  // Under a long step (models found) the buttons keep to the bottom, on a bar of their own.
+  // Under a long step (models found) the buttons keep to the bottom, on a bar across the screen.
   const [stuck, setStuck] = useState(false);
   useEffect(() => {
-    if (!wide || !end.current || !scroller.current) return;
+    if (!end.current || !scroller.current) return;
     const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { root: scroller.current });
     io.observe(end.current);
     return () => io.disconnect();
-  }, [wide]);
+  }, []);
   const Extra = step.Extra;
-  const at = k + (fresh ? 1 : 0);
-  const total = list.length + (fresh ? 1 : 0);
-  const label = step.id === 'welcome' ? 'Show me around' : 'Next';
-  const close = (
-    <button onClick={() => endTour()} className="rounded-lg p-1.5 text-fg-3 transition-colors hover:bg-fg/[0.06] hover:text-fg" aria-label="Close the tour" title="Close the tour (Esc)">
-      <X size={18} />
-    </button>
-  );
-  const back = (
-    <Button variant="ghost" className="h-11 rounded-xl px-4 text-[14.5px]" onClick={k > 0 ? p.onBack : p.onSkip}>
-      {k > 0 ? 'Back' : wide ? 'Skip the tour' : 'Skip'}
-    </Button>
-  );
+  const column = 'mx-auto w-full max-w-[760px] px-5 sm:px-10 2xl:max-w-[840px]';
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby={out ? undefined : 'tour-title'}
-      className={cx('tour-page fixed inset-0 flex bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none')}
+      className={cx('tour-page fixed inset-0 flex flex-col bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none')}
     >
       <Aurora className="aurora-page" />
-      {wide && <TourRail list={list} at={k} fresh={fresh} onGo={p.onGo} />}
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        {wide ? (
-          <div className="absolute top-5 right-5 z-10">{close}</div>
-        ) : (
-          <div className="flex shrink-0 items-center gap-4 pt-[calc(var(--safe-top)+12px)] pr-3 pl-5">
-            <div className="h-1 flex-1 overflow-hidden rounded-full bg-fg/10" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={at + 1} aria-label="Where the tour stands">
-              <div className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out" style={{ width: `${((at + 1) / total) * 100}%` }} />
-            </div>
-            {close}
-          </div>
-        )}
-        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className={cx('mx-auto w-full max-w-[760px] px-5 sm:px-10 2xl:max-w-[840px]', wide ? 'pt-[clamp(56px,16vh,180px)]' : 'pt-7 pb-8')}>
+      <button
+        onClick={() => endTour()}
+        className="absolute top-[calc(var(--safe-top)+12px)] right-3 z-10 rounded-lg p-1.5 text-fg-3 transition-colors hover:bg-fg/[0.06] hover:text-fg sm:top-5 sm:right-5"
+        aria-label="Close the tour"
+        title="Close the tour (Esc)"
+      >
+        <X size={18} />
+      </button>
+      <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="flex min-h-full flex-col">
+          <div className={cx(column, 'pt-[calc(var(--safe-top)+64px)] sm:pt-[clamp(56px,14vh,160px)]')}>
             <div key={step.id} className="tour-step" style={{ '--dx': `${p.dir * 22}px` } as CSSProperties}>
-              {step.hero ? (
-                <TourHero />
-              ) : (
-                <div className="text-[12px] font-semibold tracking-[0.14em] text-accent uppercase" style={{ '--i': 0 } as CSSProperties}>
-                  Step {at + 1} of {total}
-                </div>
-              )}
-              <h2
-                id={out ? undefined : 'tour-title'}
-                className={cx('text-[27px] leading-[1.15] font-semibold tracking-tight text-balance text-fg sm:text-[34px]', !step.hero && 'mt-3')}
-                style={{ '--i': 1 } as CSSProperties}
-              >
+              {step.hero && <TourHero />}
+              <h2 id={out ? undefined : 'tour-title'} className="text-[27px] leading-[1.15] font-semibold tracking-tight text-balance text-fg sm:text-[34px]" style={{ '--i': 0 } as CSSProperties}>
                 {step.title}
               </h2>
-              <div className="mt-3.5 max-w-[36rem] text-[15px] leading-relaxed text-pretty text-fg-2 sm:text-[16px]" style={{ '--i': 2 } as CSSProperties}>
+              <div className="mt-3.5 max-w-[36rem] text-[15px] leading-relaxed text-pretty text-fg-2 sm:text-[16px]" style={{ '--i': 1 } as CSSProperties}>
                 {step.body}
               </div>
               {Extra && (
-                <div className="mt-9" style={{ '--i': 3 } as CSSProperties}>
+                <div className="mt-9" style={{ '--i': 2 } as CSSProperties}>
                   <Extra />
                 </div>
               )}
             </div>
-            {wide && (
-              <>
-                <div
-                  className={cx(
-                    'sticky bottom-0 z-[1] -mx-10 mt-10 flex items-center gap-2 border-t px-10 py-5 transition-[background-color,border-color] duration-200',
-                    stuck ? 'border-line bg-bg/80 backdrop-blur-md' : 'border-transparent',
-                  )}
-                >
-                  <Button ref={p.nextRef} variant="primary" className="h-11 gap-2 rounded-xl px-5 text-[14.5px]" onClick={p.onNext} disabled={!ready}>
-                    {label}
-                    <ArrowRight size={16} />
-                  </Button>
-                  {back}
-                  {!ready && <span className="ml-2 text-[13px] text-fg-3">Pick one or more to go on</span>}
-                </div>
-                <div ref={end} className="h-px" />
-              </>
-            )}
           </div>
-        </div>
-        {!wide && (
-          // A phone's thumb finds Next across the bottom; a wider screen keeps it in line with the words.
-          <div className="shrink-0 border-t border-line bg-bg/85 pt-3 pb-[max(14px,var(--safe-bottom))] backdrop-blur-md">
-            <div className="mx-auto flex w-full max-w-[760px] items-center gap-2 px-5 sm:px-10">
-              <span className="sm:order-2">{back}</span>
-              <Button ref={p.nextRef} variant="primary" className="h-11 flex-1 gap-2 rounded-xl text-[15px] sm:order-1 sm:flex-none sm:px-6" onClick={p.onNext} disabled={!ready}>
-                {ready ? label : 'Pick one or more'}
-                {ready && <ArrowRight size={16} />}
+          <div
+            className={cx(
+              'sticky bottom-0 z-[1] mt-auto border-t transition-[background-color,border-color] duration-200 sm:mt-10',
+              phone || stuck ? 'border-line bg-bg/85 backdrop-blur-md' : 'border-transparent',
+            )}
+          >
+            <div className={cx(column, 'flex items-center gap-3 pt-3 pb-[max(12px,var(--safe-bottom))] sm:py-5')}>
+              <Button variant="ghost" className="h-10 rounded-xl px-3.5 text-[14px]" onClick={k > 0 ? p.onBack : p.onSkip}>
+                {k > 0 ? 'Back' : phone ? 'Skip' : 'Skip the tour'}
+              </Button>
+              <span className="flex min-w-0 flex-1 justify-center">
+                {ready ? <TourProgress at={k + (fresh ? 1 : 0)} total={list.length + (fresh ? 1 : 0)} /> : <span className="text-[12.5px] text-fg-3">Pick one or more</span>}
+              </span>
+              <Button ref={p.nextRef} variant="primary" className="h-10 gap-2 rounded-xl px-5 text-[14px]" onClick={p.onNext} disabled={!ready}>
+                {step.id === 'welcome' ? 'Show me around' : 'Next'}
+                <ArrowRight size={16} />
               </Button>
             </div>
           </div>
-        )}
+          <div ref={end} className="h-px shrink-0" />
+        </div>
       </div>
     </div>
   );
@@ -1219,17 +1075,14 @@ export function Tour() {
                 <div className="min-h-0 flex-1" style={{ overflowY: want > maxH ? 'auto' : 'hidden' }}>
                   <div ref={setInner} className="px-5 pt-5 pb-4">
                     <div key={step.id} className="tour-rise">
-                      <div className="text-[11px] font-semibold tracking-[0.14em] text-accent uppercase" style={{ '--i': 0 } as CSSProperties}>
-                        Step {i + (fresh ? 2 : 1)} of {total}
-                      </div>
-                      <h2 id="tour-title" className="mt-1.5 pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 1 } as CSSProperties}>
+                      <h2 id="tour-title" className="pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 0 } as CSSProperties}>
                         {step.title}
                       </h2>
-                      <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 2 } as CSSProperties}>
+                      <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 1 } as CSSProperties}>
                         {step.body}
                       </div>
                       {Extra && (
-                        <div className="mt-3.5" style={{ '--i': 3 } as CSSProperties}>
+                        <div className="mt-3.5" style={{ '--i': 2 } as CSSProperties}>
                           <Extra />
                         </div>
                       )}
@@ -1240,7 +1093,9 @@ export function Tour() {
                   <Button size="sm" variant="ghost" onClick={i > 0 ? back : () => endTour()}>
                     {i > 0 ? 'Back' : 'Skip the tour'}
                   </Button>
-                  <span className="flex-1" />
+                  <span className="flex min-w-0 flex-1 justify-center">
+                    <TourProgress at={i + (fresh ? 1 : 0)} total={total} />
+                  </span>
                   <Button ref={nextBtn} size="sm" variant="primary" className="gap-1.5" onClick={next} disabled={!ready}>
                     {i >= list.length - 1 ? 'Get started' : 'Next'}
                     {i < list.length - 1 && <ArrowRight size={14} />}
@@ -1258,7 +1113,7 @@ export function Tour() {
               out={page.out}
               now={fresh && page.n === 0}
               ready={page.out || ready}
-              {...(!page.out && { onBack: back, onNext: next, onSkip: () => endTour(), onGo: (n: number) => useTour.setState({ i: n }), nextRef: nextBtn })}
+              {...(!page.out && { onBack: back, onNext: next, onSkip: () => endTour(), nextRef: nextBtn })}
             />
           )}
         </div>,
