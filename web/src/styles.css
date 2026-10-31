@@ -1282,6 +1282,13 @@ html {
 .cm-host .cm-editor.cm-focused {
   outline: none;
 }
+/* Code keeps its size on phones: the 16px that keeps iOS from zooming into fields (above) would leave
+   a phone some 35 columns, and the viewport's maximum-scale=1 already stops that zoom. */
+@media (pointer: coarse) {
+  .cm-host .cm-content {
+    font-size: inherit !important;
+  }
+}
 
 /* ---- charts ---------------------------------------------------------------- */
 

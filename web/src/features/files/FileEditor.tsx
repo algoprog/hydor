@@ -1,12 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, Download, Eye, FileDiff, RotateCcw, Save, SquareTerminal, WrapText } from 'lucide-react';
+import { ArrowLeft, Download, Ellipsis, Eye, FileDiff, RotateCcw, Save, Search, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle } from '../../lib/codemirror';
 import { basename, bytes, dirname, tildify } from '../../lib/format';
 import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
-import { Button, cx, Throbber, Empty, IconButton, useIsMobile } from '../../components/ui';
+import { Button, cx, Throbber, Empty, IconButton, MenuItem, MenuSep, Popover, useIsMobile } from '../../components/ui';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { mu } from '../../lib/machine';
 import { isPreviewable } from '@shared/documents';
@@ -78,7 +78,11 @@ export function FileEditor({
   }, [mode, mdHtml]);
   const docImages = useMemo(() => mdHtml?.localImages(dirname(path)), [mdHtml, path]);
   const [diff, setDiff] = useState('');
-  const [wrap, setWrap] = useState(() => localStorage.getItem('wa.wrap') === '1');
+  // Phones wrap long lines unless told not to, a setting of their own: a narrow screen cuts most code off.
+  const [wrapKey] = useState(() => (mobile ? 'wa.wrap.phone' : 'wa.wrap'));
+  const [wrap, setWrap] = useState(() => (localStorage.getItem(wrapKey) ?? (mobile ? '1' : '0')) === '1');
+  const [menu, setMenu] = useState(false);
+  const moreRef = useRef<HTMLButtonElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<EditorHandle | null>(null);
   const doc = useRef('');
@@ -138,6 +142,7 @@ export function FileEditor({
         path,
         dark: isDark(),
         wrap,
+        phone: mobile,
         onChange: (d) => {
           doc.current = d;
           setDirty(d !== (file.content ?? ''));
@@ -161,8 +166,8 @@ export function FileEditor({
 
   useEffect(() => {
     editor.current?.setWrap(wrap);
-    localStorage.setItem('wa.wrap', wrap ? '1' : '0');
-  }, [wrap]);
+    localStorage.setItem(wrapKey, wrap ? '1' : '0');
+  }, [wrap, wrapKey]);
 
   const save = async (force = false) => {
     if (!file || saving) return;
@@ -220,52 +225,125 @@ export function FileEditor({
 
   const raw = mu(`/api/fs/raw?path=${encodeURIComponent(path)}`);
   const crumbs = tildify(path, home).split('/');
+  const text = !!file && !file.binary && !file.tooLarge;
+  const togglePreview = () => setMode((m) => (m === 'preview' ? 'edit' : 'preview'));
+  const toggleDiff = () => setMode((m) => (m === 'diff' ? 'edit' : 'diff'));
+  const download = () => (location.href = `${raw}&download=1`);
+  const fromMenu = (f: () => void) => () => {
+    setMenu(false);
+    f();
+  };
+  const unsaved = dirty && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line px-2 sm:px-3">
-        {mobile && !embedded && (
-          <IconButton label="Back" onClick={() => history.back()}>
-            <ArrowLeft size={17} />
-          </IconButton>
-        )}
-        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-[12px] text-fg-3" title={path}>
-          {crumbs.map((c, i) => (
-            <span key={i} className={cx('truncate', i === crumbs.length - 1 ? 'shrink-0 text-fg' : 'min-w-0 shrink')}>
-              {i > 0 && <span className="px-0.5 opacity-50">/</span>}
-              {c}
-            </span>
-          ))}
-          {dirty && <span className="ml-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />}
-        </div>
-        {file && !file.binary && !file.tooLarge && (
-          <>
-            {(isMd || isHtml) && (
-              <IconButton label={isHtml ? 'Show as a page' : 'Preview'} size="sm" active={mode === 'preview'} onClick={() => setMode((m) => (m === 'preview' ? 'edit' : 'preview'))}>
-                <Eye size={14} />
+      {mobile ? (
+        // Phones: the file's name over its folder, and only what is used most beside them; the rest is under More.
+        <div className={cx('shrink-0 border-b border-line', !embedded && 'pt-[var(--safe-top)]')}>
+          <div className={cx('flex items-center gap-1 px-2', embedded ? 'h-12' : 'h-14')}>
+            {!embedded && (
+              <IconButton label="Back" onClick={() => history.back()}>
+                <ArrowLeft size={18} />
               </IconButton>
             )}
-            <IconButton label="Changes since the last commit" size="sm" active={mode === 'diff'} onClick={() => setMode((m) => (m === 'diff' ? 'edit' : 'diff'))}>
-              <FileDiff size={14} />
+            <div className="ml-1 min-w-0 flex-1" title={path}>
+              {/* A dialog has the name in its title already. */}
+              {!embedded && (
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[15px] font-semibold tracking-tight">{basename(path)}</span>
+                  {unsaved}
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                {/* Cut at its start: the folders nearest the file say the most. */}
+                <span dir="rtl" className="min-w-0 truncate text-left font-mono text-[11.5px] text-fg-3">
+                  <span dir="ltr">{tildify(dirname(path), home)}</span>
+                </span>
+                {embedded && unsaved}
+              </div>
+            </div>
+            {text && (isMd || isHtml) && (
+              <IconButton label={isHtml ? 'Show as a page' : 'Preview'} active={mode === 'preview'} onClick={togglePreview}>
+                <Eye size={17} />
+              </IconButton>
+            )}
+            {actions}
+            {text && (dirty || saving) && (
+              <Button size="sm" variant="primary" icon={<Save size={13} />} disabled={saving} onClick={() => save()} className="mx-0.5">
+                {saving ? 'Saving' : 'Save'}
+              </Button>
+            )}
+            <IconButton ref={moreRef} label="More" active={menu} onClick={() => setMenu((m) => !m)}>
+              <Ellipsis size={17} />
             </IconButton>
-            <IconButton label="Word wrap" size="sm" active={wrap} onClick={() => setWrap((w) => !w)}>
-              <WrapText size={14} />
-            </IconButton>
-          </>
-        )}
-        {actions}
-        <IconButton label="Terminal in this folder" size="sm" onClick={() => openTerminalAt(dirname(path))}>
-          <SquareTerminal size={14} />
-        </IconButton>
-        <IconButton label="Download" size="sm" onClick={() => (location.href = `${raw}&download=1`)}>
-          <Download size={14} />
-        </IconButton>
-        {file && !file.binary && !file.tooLarge && (
-          <Button size="sm" variant={dirty ? 'primary' : 'ghost'} icon={<Save size={13} />} disabled={!dirty || saving} onClick={() => save()} className="ml-1">
-            <span className="hidden sm:inline">{saving ? 'Saving' : 'Save'}</span>
-          </Button>
-        )}
-      </div>
+            <Popover anchor={moreRef} open={menu} onClose={() => setMenu(false)} align="end" width={272}>
+              {text && mode === 'edit' && (
+                <MenuItem icon={<Search size={14} />} onClick={fromMenu(() => editor.current?.find())}>
+                  Find
+                </MenuItem>
+              )}
+              {text && (
+                <>
+                  <MenuItem icon={<WrapText size={14} />} checked={wrap} onClick={fromMenu(() => setWrap((w) => !w))}>
+                    Word wrap
+                  </MenuItem>
+                  <MenuItem icon={<FileDiff size={14} />} checked={mode === 'diff'} onClick={fromMenu(toggleDiff)}>
+                    Changes since the last commit
+                  </MenuItem>
+                  <MenuSep />
+                </>
+              )}
+              {!embedded && (
+                <MenuItem icon={<SquareTerminal size={14} />} onClick={fromMenu(() => openTerminalAt(dirname(path)))}>
+                  Terminal in this folder
+                </MenuItem>
+              )}
+              <MenuItem icon={<Download size={14} />} onClick={fromMenu(download)}>
+                Download
+              </MenuItem>
+            </Popover>
+          </div>
+        </div>
+      ) : (
+        <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line px-3">
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-[12px] text-fg-3" title={path}>
+            {crumbs.map((c, i) => (
+              <span key={i} className={cx('truncate', i === crumbs.length - 1 ? 'shrink-0 text-fg' : 'min-w-0 shrink')}>
+                {i > 0 && <span className="px-0.5 opacity-50">/</span>}
+                {c}
+              </span>
+            ))}
+            {dirty && <span className="ml-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />}
+          </div>
+          {text && (
+            <>
+              {(isMd || isHtml) && (
+                <IconButton label={isHtml ? 'Show as a page' : 'Preview'} size="sm" active={mode === 'preview'} onClick={togglePreview}>
+                  <Eye size={14} />
+                </IconButton>
+              )}
+              <IconButton label="Changes since the last commit" size="sm" active={mode === 'diff'} onClick={toggleDiff}>
+                <FileDiff size={14} />
+              </IconButton>
+              <IconButton label="Word wrap" size="sm" active={wrap} onClick={() => setWrap((w) => !w)}>
+                <WrapText size={14} />
+              </IconButton>
+            </>
+          )}
+          {actions}
+          <IconButton label="Terminal in this folder" size="sm" onClick={() => openTerminalAt(dirname(path))}>
+            <SquareTerminal size={14} />
+          </IconButton>
+          <IconButton label="Download" size="sm" onClick={download}>
+            <Download size={14} />
+          </IconButton>
+          {text && (
+            <Button size="sm" variant={dirty ? 'primary' : 'ghost'} icon={<Save size={13} />} disabled={!dirty || saving} onClick={() => save()} className="ml-1">
+              {saving ? 'Saving' : 'Save'}
+            </Button>
+          )}
+        </div>
+      )}
       {changedOnDisk && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warn/40 bg-warn/10 px-3 py-1.5 text-[12.5px]">
           <span className="flex-1">The file changed on disk since you opened it.</span>
