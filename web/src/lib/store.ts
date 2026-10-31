@@ -97,6 +97,8 @@ export const toastError = (e: unknown) => toast(e instanceof Error ? e.message :
 export interface Bootstrap {
   version: string;
   home: string;
+  /** The app's own data folder (~/.naget-agent, or ~/.web-agent on older installs). */
+  dataDir?: string;
   defaultCwd: string;
   prefs: Record<string, SessionPrefs>;
   indexing: { done: number; total: number; running: boolean };
@@ -416,7 +418,7 @@ function newerBuild(build: string) {
     sessionStorage.removeItem('wa.updating');
   } catch {}
   if (asked) return location.reload();
-  const offer = () => useToasts.getState().push('info', 'Agent Console was updated', { label: 'Reload', run: () => location.reload() }, 'Reload to use the new version');
+  const offer = () => useToasts.getState().push('info', 'Naget Agent was updated', { label: 'Reload', run: () => location.reload() }, 'Reload to use the new version');
   if (document.visibilityState === 'visible') offer();
   else document.addEventListener('visibilitychange', offer, { once: true });
 }

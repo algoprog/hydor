@@ -100,7 +100,7 @@ export class KernelWire {
 
   /** Sends a request; returns its msg_id, which replies and outputs carry as their parent. */
   send(channel: Exclude<Channel, 'iopub'>, msgType: string, content: Json, parent: Json = {}): string {
-    const header = { msg_id: crypto.randomUUID(), username: 'web-agent', session: this.session, date: new Date().toISOString(), msg_type: msgType, version: '5.3' };
+    const header = { msg_id: crypto.randomUUID(), username: 'naget-agent', session: this.session, date: new Date().toISOString(), msg_type: msgType, version: '5.3' };
     const parts = [header, parent, {}, content].map((o) => Buffer.from(JSON.stringify(o)));
     const frames = [DELIM, Buffer.from(this.sign(parts)), ...parts];
     const sock = this.socks[channel];

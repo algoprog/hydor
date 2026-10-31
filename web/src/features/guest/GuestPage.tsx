@@ -64,7 +64,7 @@ export default function GuestPage({ token }: { token: string }) {
   }, [token]);
 
   useEffect(() => {
-    if (v) document.title = `${v.title} · Agent Console`;
+    if (v) document.title = `${v.title} · Naget Agent`;
   }, [v?.title]);
 
   const working = v && ['working', 'waiting', 'starting'].includes(v.status);
@@ -79,7 +79,7 @@ export default function GuestPage({ token }: { token: string }) {
               <h1 className="truncate text-[15px] font-semibold tracking-tight">{v?.title ?? 'Shared session'}</h1>
             </div>
             <div className="text-[12px] text-fg-3">
-              {v ? `${agentName(v.agent, v.acpName)} · read-only, shared from Agent Console` : 'Agent Console'}
+              {v ? `${agentName(v.agent, v.acpName)} · read-only, shared from Naget Agent` : 'Naget Agent'}
               {working && <span className="text-busy"> · working now</span>}
             </div>
           </div>

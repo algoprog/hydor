@@ -258,7 +258,7 @@ export async function renamePath(fromIn: string, toIn: string) {
   return { path: to };
 }
 
-/** Moves to ~/.web-agent/trash; returns where it went. */
+/** Moves to the trash folder in the app's data; returns where it went. */
 export async function deletePath(pIn: string) {
   const p = resolvePath(pIn);
   if (p === '/' || p === os.homedir()) throw new HttpError(400, 'Refusing to delete that');

@@ -14,6 +14,7 @@ import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
 import { AGENT_FILE, MODELS_DIR } from '../models/config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
+import { PAGE_SERVER } from '../mcp.ts';
 import { acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig } from './live.ts';
@@ -35,14 +36,14 @@ export const ACP_PRESETS: AcpAgentDef[] = [
 
 // ---- the list of agents ---------------------------------------------------------------------------
 
-/** Console, the app's own agent (server/agent): any model from Settings → Models. */
+/** Custom, the app's own agent (server/agent; its id stays 'console'): any model from Settings → Models. */
 export const CONSOLE_ID = 'console';
 const consoleDef = (): AcpAgentDef => ({
   id: CONSOLE_ID,
-  name: 'Console',
+  name: 'Custom',
   command: process.execPath,
   args: [path.join(APP_ROOT, 'dist/server/agent.js')],
-  env: { AGENT_CONSOLE_MODELS: AGENT_FILE, AGENT_CONSOLE_STATE: path.join(MODELS_DIR, 'sessions') },
+  env: { NAGET_AGENT_MODELS: AGENT_FILE, NAGET_AGENT_STATE: path.join(MODELS_DIR, 'sessions') },
   hint: 'Built in: models from OpenRouter, Ollama and vLLM, in Settings → Models',
   builtin: true,
 });
@@ -71,14 +72,14 @@ export function saveAcpAgent(db: DB, d: Partial<AcpAgentDef>): AcpAgentDef {
   const args = Array.isArray(d.args) ? d.args.map(String).filter((a) => a.length) : [];
   const env = d.env && typeof d.env === 'object' ? Object.fromEntries(Object.entries(d.env).filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k)).map(([k, v]) => [k, String(v)])) : undefined;
   const id = d.id && /^[a-z0-9-]{1,40}$/.test(d.id) ? d.id : `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'agent'}-${crypto.randomBytes(2).toString('hex')}`;
-  if (id === CONSOLE_ID) throw new HttpError(400, 'Console is built in');
+  if (id === CONSOLE_ID) throw new HttpError(400, 'Custom is built in');
   const def: AcpAgentDef = { id, name, command, args, env };
   kvSet(db, 'acp_agents', JSON.stringify([...ownAgents(db).filter((a) => a.id !== id), def]));
   return def;
 }
 
 export function removeAcpAgent(db: DB, id: string) {
-  if (id === CONSOLE_ID) throw new HttpError(400, 'Console is built in');
+  if (id === CONSOLE_ID) throw new HttpError(400, 'Custom is built in');
   kvSet(db, 'acp_agents', JSON.stringify(ownAgents(db).filter((a) => a.id !== id)));
 }
 
@@ -169,11 +170,11 @@ export class AcpLive extends LiveAdapter {
     this.record({ t: 'run', run: this.runner.meta.runId });
     const init = await this.rpc.call(
       'initialize',
-      { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true }, terminal: false }, clientInfo: { name: 'agent-console', title: 'Agent Console', version: config.version } },
+      { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true }, terminal: false }, clientInfo: { name: 'naget-agent', title: 'Naget Agent', version: config.version } },
       60_000,
     );
     this.caps = init?.agentCapabilities ?? {};
-    const mcpServers = this.o.pageServer && this.caps.mcpCapabilities?.http ? [{ type: 'http', name: 'agent-console', url: this.o.pageServer, headers: [] }] : [];
+    const mcpServers = this.o.pageServer && this.caps.mcpCapabilities?.http ? [{ type: 'http', name: PAGE_SERVER, url: this.o.pageServer, headers: [] }] : [];
     const auth = (e: unknown) => {
       const m = (e as Error).message;
       // Signing in happens in the agent's own CLI (in a terminal), once.

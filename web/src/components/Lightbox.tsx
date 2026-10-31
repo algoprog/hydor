@@ -43,7 +43,7 @@ export function Lightbox() {
 
   if (!open || !img) return null;
   return createPortal(
-    <div className="anim-overlay fixed inset-0 z-[70] flex flex-col bg-black/85" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+    <div className="anim-overlay scrim fixed inset-0 z-[70] flex flex-col [--scrim-blur:14px] [--scrim:0.78]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div className="flex shrink-0 items-center gap-2 px-3 pt-[max(8px,var(--safe-top))] pb-2 text-[13px] text-white/80">
         <span className="min-w-0 flex-1 truncate">{img.name ?? ''}</span>
         {images.length > 1 && (

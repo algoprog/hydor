@@ -1,7 +1,7 @@
 // Maintenance commands, run on the host:
 //   node dist/server/cli.js set-password        prompts; resets the web password, signs everyone out
 //   node dist/server/cli.js setup-token         prints the one-time token for first setup
-//   node dist/server/cli.js access-token [name] prints a new token for another Agent Console to use this machine
+//   node dist/server/cli.js access-token [name] prints a new token for another Naget Agent to use this machine
 //   node dist/server/cli.js service install     runs the app as a systemd user service (no root needed)
 //   node dist/server/cli.js service uninstall | status | logs
 //   node dist/server/cli.js update              pulls the latest code, builds it and restarts the service
@@ -13,9 +13,12 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const UNIT = 'agent-console.service';
-const UNIT_PATH = path.join(os.homedir(), '.config/systemd/user', UNIT);
-const ENV_FILE = path.join(os.homedir(), '.config/agent-console.env');
+// Installs from before the rename keep their agent-console service and settings file.
+const UNIT_DIR = path.join(os.homedir(), '.config/systemd/user');
+const OLD_UNIT = 'agent-console.service';
+const UNIT = !fs.existsSync(path.join(UNIT_DIR, 'naget-agent.service')) && fs.existsSync(path.join(UNIT_DIR, OLD_UNIT)) ? OLD_UNIT : 'naget-agent.service';
+const UNIT_PATH = path.join(UNIT_DIR, UNIT);
+const ENV_FILE = [path.join(os.homedir(), '.config/naget-agent.env'), path.join(os.homedir(), '.config/agent-console.env')].find((f) => fs.existsSync(f)) ?? path.join(os.homedir(), '.config/naget-agent.env');
 
 const [cmd, sub] = process.argv.slice(2);
 
@@ -64,7 +67,7 @@ async function auth() {
 
 function unitText(): string {
   return `[Unit]
-Description=Agent Console
+Description=Naget Agent
 After=network-online.target
 
 [Service]
@@ -103,7 +106,7 @@ if (cmd === 'set-password') {
   const t = a.setupToken();
   console.log(t ?? 'A password is already set (use set-password to reset it).');
 } else if (cmd === 'access-token') {
-  // For another machine's Agent Console (its Settings → Machines): it can then do all you can here.
+  // For another machine's Naget Agent (its Settings → Machines): it can then do all you can here.
   const { db } = await auth();
   const { createAccessToken } = await import('./machines.ts');
   console.log(createAccessToken(db, process.argv.slice(3).join(' ') || 'Another machine').token);
@@ -118,7 +121,7 @@ if (cmd === 'set-password') {
   if (systemctl('daemon-reload') !== 0 || systemctl('enable', '--now', UNIT) !== 0) process.exit(1);
   // Without lingering, user services stop when you log out.
   const linger = spawnSync('loginctl', ['enable-linger', os.userInfo().username], { stdio: 'ignore' }).status === 0;
-  console.log(`\nAgent Console runs as a service of your user${linger ? ', also while you are logged out' : ''}.`);
+  console.log(`\nNaget Agent runs as a service of your user${linger ? ', also while you are logged out' : ''}.`);
   if (!linger) console.log(`To keep it running after you log out: sudo loginctl enable-linger ${os.userInfo().username}`);
   const { auth: a } = await auth();
   const t = a.setupToken();
@@ -129,7 +132,8 @@ if (cmd === 'set-password') {
   systemctl('disable', '--now', UNIT);
   fs.rmSync(UNIT_PATH, { force: true });
   systemctl('daemon-reload');
-  console.log(`Removed the service. Your data (${process.env.DATA_DIR ?? '~/.web-agent'}) and running agents stay.`);
+  const { config } = await import('./config.ts');
+  console.log(`Removed the service. Your data (${config.dataDir}) and running agents stay.`);
 } else if (cmd === 'service' && sub === 'status') {
   process.exit(systemctl('status', '--no-pager', UNIT));
 } else if (cmd === 'service' && sub === 'logs') {

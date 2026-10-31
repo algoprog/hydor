@@ -82,7 +82,7 @@ async function saveThemes(list: AppTheme[]) {
 async function copyTheme(t: { name: string; base: ThemeBase; colors: Partial<ThemeColors> }) {
   try {
     await navigator.clipboard.writeText(JSON.stringify({ name: t.name, base: t.base, colors: t.colors }, null, 2));
-    toast('Copied. Paste it into Import in another Agent Console to add it there.', 'ok');
+    toast('Copied. Paste it into Import in another Naget Agent to add it there.', 'ok');
   } catch {
     toast('Could not reach the clipboard here', 'error');
   }

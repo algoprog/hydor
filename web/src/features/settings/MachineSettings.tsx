@@ -1,4 +1,4 @@
-// Settings → Machines: other machines running Agent Console that this app shows (each under /m/<id>/,
+// Settings → Machines: other machines running Naget Agent that this app shows (each under /m/<id>/,
 // reached over SSH or by URL), and the access tokens other machines use to reach the machine shown.
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, KeyRound, Plus, Trash2 } from 'lucide-react';
@@ -94,7 +94,7 @@ export function MachineSettings() {
         )}
         {loaded && !list.length && (
           <p className="mt-3 text-[13px] leading-relaxed text-fg-3">
-            None yet. Install Agent Console on the other machine, make an access token there, then add it here: the sidebar then switches between machines, and notices from all of
+            None yet. Install Naget Agent on the other machine, make an access token there, then add it here: the sidebar then switches between machines, and notices from all of
             them reach you.
           </p>
         )}
@@ -187,14 +187,14 @@ function EditMachine({ value, onClose, onSaved }: { value: Partial<MachineView> 
               <input value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={cx(inputCls, 'font-mono text-[12.5px]')} />
             </label>
             <p className="col-span-2 -mt-1 leading-relaxed text-fg-3">
-              With this server’s SSH keys and ~/.ssh/config (a key without a passphrase). Agent Console there keeps listening on 127.0.0.1 only: nothing else to open.
+              With this server’s SSH keys and ~/.ssh/config (a key without a passphrase). Naget Agent there keeps listening on 127.0.0.1 only: nothing else to open.
             </p>
           </div>
         ) : (
           <label className="block">
             <span className="mb-1 block text-fg-2">Address</span>
             <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://100.64.0.5:8790" spellCheck={false} className={cx(inputCls, 'font-mono text-[12.5px]')} />
-            <span className="mt-1 block leading-relaxed text-fg-3">On a VPN such as Tailscale or WireGuard, or behind HTTPS. Agent Console there must listen where this server reaches it (its HOST setting).</span>
+            <span className="mt-1 block leading-relaxed text-fg-3">On a VPN such as Tailscale or WireGuard, or behind HTTPS. Naget Agent there must listen where this server reaches it (its HOST setting).</span>
           </label>
         )}
         <label className="block">
@@ -208,7 +208,7 @@ function EditMachine({ value, onClose, onSaved }: { value: Partial<MachineView> 
             className={cx(inputCls, 'font-mono text-[12.5px]')}
           />
           <span className="mt-1 block leading-relaxed text-fg-3">
-            Make it on that machine: in its Settings → Machines, or run <code className="rounded bg-bg-2 px-1 font-mono text-[11.5px]">{CLI}</code> in its Agent Console folder.
+            Make it on that machine: in its Settings → Machines, or run <code className="rounded bg-bg-2 px-1 font-mono text-[11.5px]">{CLI}</code> in its Naget Agent folder.
           </span>
         </label>
         {error && <p className="rounded-lg bg-err/10 px-3 py-2 leading-relaxed text-err">{error}</p>}
@@ -245,7 +245,7 @@ function AccessTokens() {
   return (
     <Section
       title={machineId && host ? `Access to ${host}` : 'Access from other machines'}
-      sub="Another Agent Console with one of these tokens can do all you can here, running commands included. Make one for each machine that connects."
+      sub="Another Naget Agent with one of these tokens can do all you can here, running commands included. Make one for each machine that connects."
       actions={
         <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking(true)}>
           New token

@@ -359,7 +359,7 @@ export function Dialog({
   }, [open, onClose]);
   if (!open) return null;
   return createPortal(
-    <div className="anim-overlay fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="anim-overlay scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         role="dialog"
         aria-modal

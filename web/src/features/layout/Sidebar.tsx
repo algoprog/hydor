@@ -112,7 +112,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         <span className="group inline-flex">
           <Logo />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold tracking-tight">Agent Console</span>
+        <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold tracking-tight">Naget Agent</span>
         {!connected && (
           <span title="Reconnecting…" className="text-warn">
             <WifiOff size={15} />

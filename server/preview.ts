@@ -67,7 +67,7 @@ export function startPreviewServer(): http.Server | null {
     if (url.pathname === '/__ac/open') {
       const raw = url.searchParams.get('t') ?? '';
       const t = readLink<{ k: string; port: number; e: number }>(raw);
-      if (t?.k !== 'preview-open' || used.has(raw)) return page(res, 403, 'This preview link has expired. Open the preview again from Agent Console.');
+      if (t?.k !== 'preview-open' || used.has(raw)) return page(res, 403, 'This preview link has expired. Open the preview again from Naget Agent.');
       used.set(raw, t.e);
       const https = req.headers['x-forwarded-proto'] === 'https' || String(req.headers['cf-visitor'] ?? '').includes('https');
       const session = signLink({ k: 'preview', port: t.port }, SESSION_MS);
@@ -79,7 +79,7 @@ export function startPreviewServer(): http.Server | null {
       return res.end();
     }
     const port = portOf(req);
-    if (!port) return page(res, 403, 'Open this preview from Agent Console (Preview in the menu).');
+    if (!port) return page(res, 403, 'Open this preview from Naget Agent (Preview in the menu).');
     // localhost, trying both address families: dev servers listen on 127.0.0.1, ::1 or both.
     const opts = { host: 'localhost', port, autoSelectFamily: true, method: req.method, path: req.url, headers: forwarded(req, port) } as http.RequestOptions;
     const up = http.request(opts, (r) => {

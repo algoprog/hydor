@@ -560,6 +560,287 @@ html {
   animation: slip-out 180ms ease-in both;
 }
 
+/* Behind dialogs, drawers and the tour: the page dims and softens, so what is in front stands out. */
+.scrim {
+  background-color: rgb(0 0 0 / var(--scrim, 0.34));
+  -webkit-backdrop-filter: blur(var(--scrim-blur, 7px)) saturate(1.15);
+  backdrop-filter: blur(var(--scrim-blur, 7px)) saturate(1.15);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: rgb(0 0 0 / 0.55);
+  }
+}
+
+/* ---- the welcome tour -------------------------------------------------------------------------- */
+
+.tour-scrim {
+  --scrim: 0.46;
+  --scrim-blur: 5px;
+  animation: overlay-in 480ms ease-out;
+  transition: opacity 360ms ease;
+}
+@keyframes tour-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.965);
+    filter: blur(8px);
+  }
+}
+@keyframes tour-card-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+    filter: blur(6px);
+  }
+}
+.tour-card {
+  animation: tour-card-in 620ms 90ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.tour-card.tour-card-out,
+.auth-card.tour-card-out {
+  animation: tour-card-out 300ms ease-in forwards;
+}
+/* Each step's words arrive one after another, coming into focus. */
+@keyframes tour-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(4px);
+  }
+}
+.tour-rise > * {
+  animation: tour-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(80ms + var(--i, 0) * 70ms);
+}
+/* The spotlight: an accent ring that breathes, and a ripple when it lands on something new. */
+.tour-ring {
+  transition: opacity 240ms ease;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 6px var(--accent-soft),
+    0 0 30px 6px color-mix(in srgb, var(--accent) 22%, transparent);
+  animation: tour-breathe 3s ease-in-out infinite;
+}
+@keyframes tour-breathe {
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 0 8px var(--accent-soft),
+      0 0 42px 10px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+.tour-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: tour-ping 1100ms 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes tour-ping {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 26px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+/* The app mark arriving: the tile, the prompt drawn stroke by stroke, then the spark, which glints. */
+.hero-glow {
+  position: absolute;
+  inset: -55%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 42%, transparent), transparent);
+  animation:
+    hero-glow 1100ms 650ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    hero-breathe 4s 1.8s ease-in-out infinite;
+}
+@keyframes hero-glow {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+@keyframes hero-breathe {
+  50% {
+    opacity: 0.65;
+    transform: scale(1.08);
+  }
+}
+.hero-tile {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hero-tile 620ms cubic-bezier(0.22, 1.2, 0.36, 1) backwards;
+}
+@keyframes hero-tile {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-6deg);
+  }
+}
+.hero-prompt {
+  stroke-dasharray: 1 2;
+  stroke-dashoffset: 1;
+  animation: hero-draw 700ms 300ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+@keyframes hero-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.hero-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation:
+    hero-spark 760ms 820ms cubic-bezier(0.22, 1.35, 0.36, 1) backwards,
+    hero-glint 4s 2.2s ease-in-out infinite;
+}
+@keyframes hero-spark {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-120deg);
+  }
+}
+/* A quarter turn: the four-point spark looks the same after it, so the loop has no seam. */
+@keyframes hero-glint {
+  0% {
+    transform: none;
+  }
+  50% {
+    transform: scale(1.14) rotate(45deg);
+  }
+  100% {
+    transform: rotate(90deg);
+  }
+}
+.glint {
+  fill: var(--accent);
+  opacity: 0;
+  animation: glint 3.4s ease-in-out infinite;
+}
+@keyframes glint {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  40% {
+    opacity: 0.95;
+    transform: scale(1) rotate(45deg);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(0.4) rotate(90deg);
+  }
+}
+/* Soft light drifting slowly behind the mark (and behind the sign-in screens). */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.38;
+}
+.dark .aurora {
+  opacity: 0.5;
+}
+.aurora.aurora-page {
+  position: fixed;
+  opacity: 0.2;
+}
+/* Round glows whatever the screen's shape (a phone's tall one would stretch them into streaks). */
+.aurora.aurora-page > span {
+  width: 80vmax;
+  height: 80vmax;
+}
+.dark .aurora.aurora-page {
+  opacity: 0.3;
+}
+.aurora > span {
+  position: absolute;
+  width: 70%;
+  height: 120%;
+  border-radius: 50%;
+  will-change: transform;
+}
+.aurora > span:nth-child(1) {
+  left: -10%;
+  top: -30%;
+  background: radial-gradient(closest-side, var(--accent), transparent);
+  animation: aurora-1 17s ease-in-out infinite alternate;
+}
+.aurora > span:nth-child(2) {
+  right: -15%;
+  top: -40%;
+  background: radial-gradient(closest-side, var(--claude), transparent);
+  opacity: 0.75;
+  animation: aurora-2 21s ease-in-out infinite alternate;
+}
+.aurora > span:nth-child(3) {
+  left: 25%;
+  bottom: -60%;
+  background: radial-gradient(closest-side, var(--busy), transparent);
+  opacity: 0.55;
+  animation: aurora-3 25s ease-in-out infinite alternate;
+}
+@keyframes aurora-1 {
+  to {
+    transform: translate(22%, 18%) scale(1.2);
+  }
+}
+@keyframes aurora-2 {
+  to {
+    transform: translate(-18%, 22%) scale(0.9);
+  }
+}
+@keyframes aurora-3 {
+  to {
+    transform: translate(12%, -20%) scale(1.25);
+  }
+}
+/* Finishing the tour: a few sparks fly out of the button, and the message box glows, ready. */
+.burst > svg {
+  position: fixed;
+  fill: var(--accent);
+  translate: -50% -50%;
+  opacity: 0;
+  animation: burst 820ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@keyframes burst {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.2) rotate(0deg);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(1) rotate(100deg);
+  }
+}
+.tour-invite {
+  animation: tour-invite 1300ms 150ms cubic-bezier(0.22, 1, 0.36, 1) 2;
+}
+/* The message box's own soft shadow stays under the glow. */
+@keyframes tour-invite {
+  from {
+    box-shadow:
+      0 8px 30px rgba(0, 0, 0, 0.1),
+      0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  to {
+    box-shadow:
+      0 8px 30px rgba(0, 0, 0, 0.1),
+      0 0 0 16px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+/* The password and sign-in screens: the card rises in once the mark has drawn. */
+.auth-card {
+  animation: tour-card-in 700ms 380ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -142,7 +142,7 @@ app.addHook('onRequest', async (req, reply) => {
   const other = /^\/m\/[a-z0-9-]+(\/.*)$/.exec(url);
   if (other) url = other[1];
   if (!url.startsWith('/api/') && !url.startsWith('/ws')) return;
-  // Another Agent Console using this machine, with an access token: not a browser, so no origin to check.
+  // Another Naget Agent using this machine, with an access token: not a browser, so no origin to check.
   const token = other ? null : bearerOf(req.headers.authorization);
   if (token) return accessOk(db, token) ? undefined : reply.code(401).send({ error: 'That access token is not valid here' });
   if (req.method !== 'GET' && req.method !== 'HEAD' && !originOk(req)) {
@@ -208,6 +208,7 @@ app.post('/api/auth/password', async (req) => {
 app.get('/api/bootstrap', async () => ({
   version: config.version,
   home: config.home,
+  dataDir: config.dataDir.startsWith(config.home + '/') ? `~${config.dataDir.slice(config.home.length)}` : config.dataDir,
   defaultCwd: config.defaultCwd,
   prefs: { claude: sessions.defaults('claude'), codex: sessions.defaults('codex') },
   indexing: indexer.progress,
@@ -985,7 +986,7 @@ app.post('/api/push/unsubscribe', async (req) => {
   push.unsubscribe(String(body(req).endpoint ?? ''));
   return { ok: true };
 });
-app.post('/api/push/test', async () => ({ sent: await push.send({ key: '', kind: 'done', title: 'Agent Console', body: 'Notifications work on this device.', url: '/', at: Date.now() }) }));
+app.post('/api/push/test', async () => ({ sent: await push.send({ key: '', kind: 'done', title: 'Naget Agent', body: 'Notifications work on this device.', url: '/', at: Date.now() }) }));
 
 // ---- notebooks: Jupyter kernels ------------------------------------------------------------
 
@@ -1366,7 +1367,7 @@ mcpRoutes(app, db, sessions, (key) => `${publicBase()}/s/${encodeURIComponent(ke
 
 // ---- machines -----------------------------------------------------------------------------------
 
-/** This machine, as another Agent Console sees it. */
+/** This machine, as another Naget Agent sees it. */
 app.get('/api/machine', async () => machineInfo());
 
 /** The other machines this one uses (Settings → Machines); their pages are /m/<id>/… */
@@ -1450,7 +1451,7 @@ const token = auth.setupToken();
 if (token) {
   // A wildcard listen address is not one a browser can open; localhost is (Docker publishes the port there).
   const host = config.host === '0.0.0.0' || config.host === '::' ? 'localhost' : config.host;
-  console.log(`[web-agent] No password set yet. Open http://${host}:${config.port}/setup?token=${token} to choose one (token also in ${config.dataDir}/setup-token).`);
+  console.log(`[naget-agent] No password set yet. Open http://${host}:${config.port}/setup?token=${token} to choose one (token also in ${config.dataDir}/setup-token).`);
 }
 
 await sessions.restore();
@@ -1469,7 +1470,7 @@ sweep();
 setInterval(sweep, 6 * 3600_000).unref();
 
 await app.listen({ host: config.host, port: config.port });
-console.log(`[web-agent] listening on http://${config.host}:${config.port}`);
+console.log(`[naget-agent] listening on http://${config.host}:${config.port}`);
 machines.start();
 // SSH tunnels end with the server (the service stops only its main process).
 process.on('exit', () => machines.shutdown());

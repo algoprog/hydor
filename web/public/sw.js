@@ -1,4 +1,4 @@
-// Agent Console service worker: shows a pushed notification (a session finished, failed or needs
+// Naget Agent service worker: shows a pushed notification (a session finished, failed or needs
 // you) when no page of the app is in view, and opens that session when the notification is tapped.
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
@@ -13,9 +13,9 @@ self.addEventListener('push', (e) => {
       const pages = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       // A page in view shows its own toast.
       if (pages.some((p) => p.visibilityState === 'visible')) return;
-      await self.registration.showNotification(n.title || 'Agent Console', {
+      await self.registration.showNotification(n.title || 'Naget Agent', {
         body: n.body || '',
-        tag: n.key || 'agent-console',
+        tag: n.key || 'naget-agent',
         renotify: true,
         icon: '/icon-192.png?v=3',
         data: { url: n.url || '/' },

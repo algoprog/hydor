@@ -6,7 +6,8 @@ import { Download, Expand, FileCode2, X } from 'lucide-react';
 import type { ToolItem } from '@shared/types';
 import { Throbber, IconButton } from '../../components/ui';
 
-export const isPageTool = (name: string) => /^mcp__agent-console__show_html$/.test(name);
+// The server was called agent-console in older sessions.
+export const isPageTool = (name: string) => /^mcp__(naget-agent|agent-console)__show_html$/.test(name);
 
 function PageFrame({ html, onHeight }: { html: string; onHeight?: (h: number) => void }) {
   const ref = useRef<HTMLIFrameElement>(null);
@@ -81,7 +82,7 @@ export function HtmlPage({ item }: { item: ToolItem }) {
       )}
       {full &&
         createPortal(
-          <div className="anim-overlay fixed inset-0 z-50 flex flex-col bg-black/70 p-0 sm:p-6" onPointerDown={(e) => e.target === e.currentTarget && setFull(false)}>
+          <div className="anim-overlay scrim fixed inset-0 z-50 flex flex-col p-0 sm:p-6 [--scrim:0.6]" onPointerDown={(e) => e.target === e.currentTarget && setFull(false)}>
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-panel sm:rounded-2xl">
               <div className="flex items-center gap-2 border-b border-line px-4 py-2 pt-[max(8px,var(--safe-top))]">
                 <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{title}</span>

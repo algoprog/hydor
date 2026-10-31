@@ -77,7 +77,7 @@ export class ModelManager {
           contextLength: m?.contextLength,
           tools: m?.tools ?? 'native',
           vision: m?.vision,
-          headers: { 'HTTP-Referer': 'https://github.com/Naget-Inc/agent-console', 'X-Title': 'Agent Console' },
+          headers: { 'HTTP-Referer': 'https://github.com/Naget-Inc/naget-agent', 'X-Title': 'Naget Agent' },
         });
       }
     for (const m of this.ollamaModels)

@@ -748,7 +748,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
               <Details s={summary} version={version} onClose={close} />
             </aside>
           ) : (
-            <div className="anim-overlay fixed inset-0 z-40 flex justify-end bg-black/35" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+            <div className="anim-overlay scrim fixed inset-0 z-40 flex justify-end [--scrim:0.26]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
               <div className="anim-slide-left h-full w-full max-w-[440px] border-l border-line shadow-lg">
                 <Details s={summary} version={version} onClose={close} />
               </div>

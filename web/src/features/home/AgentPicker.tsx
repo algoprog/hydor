@@ -1,4 +1,4 @@
-// Which agent a new session runs: Claude Code, Codex, Console (any model) or another agent that speaks
+// Which agent a new session runs: Claude Code, Codex, Custom (any model) or another agent that speaks
 // ACP, all in one list, none ahead of the others. The last one used is picked next time.
 import { useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -48,7 +48,7 @@ export function AgentPicker({ agent, acpId, acpList, onPick }: { agent: Agent; a
           />
         ))}
         <MenuSep />
-        <MenuItem onClick={() => (setOpen(false), go('/settings?s=models'))}>Models for Console…</MenuItem>
+        <MenuItem onClick={() => (setOpen(false), go('/settings?s=models'))}>Models for Custom…</MenuItem>
         <MenuItem onClick={() => (setOpen(false), go('/settings?s=agents'))}>Add or manage agents…</MenuItem>
       </Popover>
     </>

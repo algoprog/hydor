@@ -7,16 +7,22 @@ import { live } from '../../lib/ws';
 import { Button, cx, inputCls, Section, Throbber, useConfirm } from '../../components/ui';
 
 const GiB = 1024 ** 3;
-const size = (b: number) => (b >= 10 * GiB ? `${Math.round(b / GiB)} GB` : b >= 0.1 * GiB ? `${(b / GiB).toFixed(1)} GB` : `${Math.round(b / 1024 ** 2)} MB`);
+export const size = (b: number) => (b >= 10 * GiB ? `${Math.round(b / GiB)} GB` : b >= 0.1 * GiB ? `${(b / GiB).toFixed(1)} GB` : `${Math.round(b / 1024 ** 2)} MB`);
 const params = (n?: number) => (n ? (n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B parameters` : `${Math.round(n / 1e6)}M parameters`) : '');
 
-/** Console's models: providers and keys, models on this machine, and adding more from Hugging Face. */
-export function ModelsSettings() {
+/** The Custom agent's models, kept current: providers, what is on this machine, downloads. */
+export function useModels(): ModelsState | null {
   const [st, setSt] = useState<ModelsState | null>(null);
   useEffect(() => {
     api<ModelsState>('/api/models').then(setSt, toastError);
     return live.on((e) => e.t === 'models' && setSt(e.state));
   }, []);
+  return st;
+}
+
+/** The Custom agent's models: providers and keys, models on this machine, and adding more from Hugging Face. */
+export function ModelsSettings() {
+  const st = useModels();
   if (!st)
     return (
       <div className="flex justify-center py-10 text-fg-3">
@@ -26,7 +32,7 @@ export function ModelsSettings() {
   return (
     <div className="space-y-4">
       <p className="text-[13px] leading-relaxed text-fg-3">
-        Console, the app’s own agent, runs any of these models with the same tools, skills and MCP servers as the other agents. Pick it on the start page, then the model.
+        Custom, the app’s own agent, runs any of these models with the same tools, skills and MCP servers as the other agents. Pick Custom on the start page, then the model.
       </p>
       <LocalModels st={st} />
       <AddFromHf st={st} />
@@ -136,6 +142,15 @@ function LocalModels({ st }: { st: ModelsState }) {
 // ---- from Hugging Face -----------------------------------------------------------------------------
 
 function AddFromHf({ st }: { st: ModelsState }) {
+  return (
+    <Section title="Add a model from Hugging Face">
+      <HfCheck st={st} />
+    </Section>
+  );
+}
+
+/** A Hugging Face model by name: how it would run here, then installing it (with Ollama or for vLLM). */
+export function HfCheck({ st, placeholder = 'org/model, or its huggingface.co address' }: { st: ModelsState; placeholder?: string }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<HfInspect | null>(null);
@@ -158,7 +173,7 @@ function AddFromHf({ st }: { st: ModelsState }) {
       setQ('');
     }, toastError);
   return (
-    <Section title="Add a model from Hugging Face">
+    <>
       <form
         className="flex gap-2"
         onSubmit={(e) => {
@@ -166,7 +181,7 @@ function AddFromHf({ st }: { st: ModelsState }) {
           void check();
         }}
       >
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="org/model, or its huggingface.co address" className={cx(inputCls, 'min-w-0 flex-1')} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className={cx(inputCls, 'min-w-0 flex-1')} />
         <Button type="submit" size="sm" variant="secondary" disabled={busy || !q.trim()} icon={busy ? <Throbber /> : <Search size={13} />}>
           Check
         </Button>
@@ -231,13 +246,25 @@ function AddFromHf({ st }: { st: ModelsState }) {
           {info.kind === 'other' && <div className="mt-2 text-[12.5px] text-fg-3">No weights this app can run (safetensors for vLLM, GGUF for Ollama).</div>}
         </div>
       )}
-    </Section>
+    </>
   );
 }
 
 // ---- OpenRouter ------------------------------------------------------------------------------------
 
 function OpenRouter({ st }: { st: ModelsState }) {
+  return (
+    <Section title="OpenRouter">
+      <OpenRouterBody st={st} />
+    </Section>
+  );
+}
+
+/** Words to search the catalog by, for a first model. */
+const STARTERS = ['deepseek', 'qwen', 'glm', 'kimi', 'gpt-oss', 'mistral'];
+
+/** The OpenRouter key, and the models it brings into the pickers. */
+export function OpenRouterBody({ st }: { st: ModelsState }) {
   const [key, setKey] = useState('');
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<(ModelEntry & { price?: { input: number; output: number } })[]>([]);
@@ -249,7 +276,7 @@ function OpenRouter({ st }: { st: ModelsState }) {
   const pinned = new Set(st.openrouter.pinned.map((p) => p.id));
   const save = (body: Record<string, unknown>) => put('/api/models', body).catch(toastError);
   return (
-    <Section title="OpenRouter">
+    <>
       <p className="mb-2 text-[12.5px] text-fg-3">
         Hundreds of models through one key, paid per token at{' '}
         <a className="text-accent hover:underline" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
@@ -295,6 +322,16 @@ function OpenRouter({ st }: { st: ModelsState }) {
             <Search size={14} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-3" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Add a model: search by name (deepseek, qwen, claude…)" className={cx(inputCls, 'w-full pl-8')} />
           </div>
+          {!st.openrouter.pinned.length && !q && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-fg-3">
+              Pick at least one to use it. Try
+              {STARTERS.map((w) => (
+                <button key={w} type="button" onClick={() => setQ(w)} className="rounded-md bg-bg-2 px-1.5 py-0.5 font-mono text-[11.5px] text-fg-2 ring-1 ring-line transition-colors hover:bg-bg-3 hover:text-fg">
+                  {w}
+                </button>
+              ))}
+            </div>
+          )}
           {hits.length > 0 && (
             <div className="mt-1 max-h-72 overflow-y-auto rounded-xl border border-line">
               {hits.map((m) => (
@@ -318,7 +355,7 @@ function OpenRouter({ st }: { st: ModelsState }) {
           )}
         </>
       )}
-    </Section>
+    </>
   );
 }
 

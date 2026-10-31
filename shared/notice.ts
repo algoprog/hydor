@@ -23,5 +23,5 @@ export function noticeLine(n: { kind: NotifyEvent['kind']; body?: string }): { s
 /** A notice as a system notification: the session's name as the title, the status first in the body. */
 export function noticeText(n: NotifyEvent): { title: string; body: string } {
   const { status, detail } = noticeLine(n);
-  return { title: shortTitle(n.title || 'Agent Console'), body: detail ? `${status} · ${detail}` : status };
+  return { title: shortTitle(n.title || 'Naget Agent'), body: detail ? `${status} · ${detail}` : status };
 }

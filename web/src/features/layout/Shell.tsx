@@ -90,11 +90,11 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
-/** "(2) Agent Console" while sessions wait for an approval or an answer. */
+/** "(2) Naget Agent" while sessions wait for an approval or an answer. */
 function useTitleBadge() {
   const waiting = useSessions((s) => Object.values(s.byKey).filter((x) => activityOf(x)?.status === 'waiting').length);
   useEffect(() => {
-    document.title = waiting ? `(${waiting}) Agent Console` : 'Agent Console';
+    document.title = waiting ? `(${waiting}) Naget Agent` : 'Naget Agent';
   }, [waiting]);
 }
 
@@ -114,7 +114,8 @@ function MobileDrawer() {
       <div
         aria-hidden
         onPointerDown={() => useUI.getState().set({ drawerOpen: false })}
-        className={cx('fixed inset-0 z-40 bg-black/45 transition-opacity duration-200 motion-reduce:transition-none', open ? 'opacity-100' : 'pointer-events-none opacity-0')}
+        // Hidden once faded, so the blur costs nothing while the drawer is shut.
+        className={cx('scrim fixed inset-0 z-40 transition-[opacity,visibility] duration-200 motion-reduce:transition-none', open ? 'opacity-100' : 'pointer-events-none invisible opacity-0')}
       />
       <div
         inert={!rest}

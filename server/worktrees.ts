@@ -75,7 +75,7 @@ export async function removeWorktree(w: WorktreeInfo, o: { force?: boolean; dele
     const rm = await git(w.repo, ['worktree', 'remove', ...(o.force ? ['--force'] : []), w.path], 120_000);
     if (!rm.ok) throw new HttpError(500, `Could not remove the worktree: ${rm.err.trim().split('\n').pop()}`);
   } else await git(w.repo, ['worktree', 'prune']);
-  const refs = await git(w.repo, ['for-each-ref', '--format=%(refname)', `refs/agent-console/checkpoints/${path.basename(w.path)}/`]);
+  const refs = await git(w.repo, ['for-each-ref', '--format=%(refname)', ...['naget-agent', 'agent-console'].map((ns) => `refs/${ns}/checkpoints/${path.basename(w.path)}/`)]);
   for (const ref of refs.out.split('\n').filter(Boolean)) await git(w.repo, ['update-ref', '-d', ref]);
   const drop = o.deleteBranch || st.ahead === 0;
   if (drop) {
@@ -89,7 +89,7 @@ export async function removeWorktree(w: WorktreeInfo, o: { force?: boolean; dele
 
 /**
  * A snapshot of the worktree as it is now (committed or not, untracked files too, ignored ones not),
- * kept as a commit under refs/agent-console so git does not collect it. Returns its id.
+ * kept as a commit under refs/naget-agent so git does not collect it. Returns its id.
  */
 export async function checkpoint(w: WorktreeInfo): Promise<string | null> {
   if (!fs.existsSync(w.path)) return null;
@@ -102,9 +102,9 @@ export async function checkpoint(w: WorktreeInfo): Promise<string | null> {
     await gitWith(w.path, ['add', '-A', '.'], envIdx);
     const tree = (await gitWith(w.path, ['write-tree'], envIdx)).out.trim();
     if (!tree) return null;
-    const commit = (await git(w.path, ['commit-tree', tree, '-p', head, '-m', 'agent-console checkpoint'])).out.trim();
+    const commit = (await git(w.path, ['commit-tree', tree, '-p', head, '-m', 'naget-agent checkpoint'])).out.trim();
     if (!commit) return null;
-    await git(w.path, ['update-ref', `refs/agent-console/checkpoints/${path.basename(w.path)}/${Date.now()}`, commit]);
+    await git(w.path, ['update-ref', `refs/naget-agent/checkpoints/${path.basename(w.path)}/${Date.now()}`, commit]);
     return commit;
   } finally {
     fs.rmSync(index, { force: true });

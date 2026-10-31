@@ -43,10 +43,10 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
     items: [
       { id: 'general', label: 'General', icon: SlidersHorizontal, sub: 'Theme, and what Enter does while an agent works' },
       { id: 'notifications', label: 'Notifications', icon: Bell, sub: 'When a session finishes, fails or needs your answer' },
-      { id: 'security', label: 'Password', icon: KeyRound, sub: 'The password for this console, and signing out' },
+      { id: 'security', label: 'Password', icon: KeyRound, sub: 'The password for this app, and signing out' },
       { id: 'scm', label: 'Source control', icon: GitPullRequest, sub: 'GitHub and Gitea accounts for opening pull requests' },
       { id: 'connect', label: 'Connect other agents', icon: Cable, sub: 'Let agents elsewhere start and steer sessions here, through this app’s MCP server' },
-      { id: 'machines', label: 'Machines', icon: Server, sub: 'Other machines running Agent Console, to use from here, and access to this one' },
+      { id: 'machines', label: 'Machines', icon: Server, sub: 'Other machines running Naget Agent, to use from here, and access to this one' },
     ],
   },
   {
@@ -54,7 +54,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
     items: [
       { id: 'accounts', label: 'Accounts', icon: UserRound, sub: 'The Claude Code and Codex sign-ins every session uses' },
       { id: 'agents', label: 'More agents', icon: Bot, sub: 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP' },
-      { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Console: OpenRouter, Ollama, and Hugging Face models run here with vLLM' },
+      { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM' },
       { id: 'instructions', label: 'Instructions', icon: FileText, sub: 'CLAUDE.md and AGENTS.md: what the agents read at the start of every session', folder: true },
       { id: 'mcp', label: 'MCP servers', icon: Plug, sub: 'Tools the agents can call', folder: true },
       { id: 'skills', label: 'Skills', icon: Sparkles, sub: 'Know-how the agents load when a task calls for it', folder: true },
@@ -398,7 +398,7 @@ function GeneralSettings() {
       </Section>
       <Section title="About">
         <div className="space-y-1.5 text-[13px] leading-relaxed text-fg-3">
-          <div className="text-fg-2">Agent Console {boot?.version}</div>
+          <div className="text-fg-2">Naget Agent {boot?.version}</div>
           <UpdateLine />
           <div>
             Sessions run as your user through the installed Claude Code and Codex. History comes from <span className="font-mono text-[12px]">~/.claude/projects</span> and{' '}
@@ -577,7 +577,7 @@ function NotificationSettings() {
   const hint =
     state === 'unsupported'
       ? appleNotInstalled
-        ? 'On iPhone or iPad: Share → Add to Home Screen, open Agent Console from there, then turn this on.'
+        ? 'On iPhone or iPad: Share → Add to Home Screen, open Naget Agent from there, then turn this on.'
         : 'This browser cannot receive notifications here.'
       : state === 'denied'
         ? 'Blocked for this site in the browser settings; allow notifications there first.'

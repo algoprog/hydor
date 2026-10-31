@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Installs Agent Console for your user and runs it as a service that starts at boot (a systemd user
+# Installs Naget Agent for your user and runs it as a service that starts at boot (a systemd user
 # unit: no root needed).
 #
 #   In a copy of the repository:  ./install.sh
-#   From anywhere:                curl -fsSL https://raw.githubusercontent.com/Naget-Inc/agent-console/main/install.sh | bash
+#   From anywhere:                curl -fsSL https://raw.githubusercontent.com/Naget-Inc/naget-agent/main/install.sh | bash
 #
-# Settings (environment): AGENT_CONSOLE_DIR  where to clone (default ~/agent-console)
-#                         AGENT_CONSOLE_REPO the git URL to clone from (default: this project on GitHub)
-#                         PORT               the port (default 8790)
-#                         NO_SERVICE=1       build only; start it yourself with npm start
+# Settings (environment): NAGET_AGENT_DIR   where to clone (default ~/naget-agent)
+#                         NAGET_AGENT_REPO  the git URL to clone from (default: this project on GitHub)
+#                         PORT              the port (default 8790)
+#                         NO_SERVICE=1      build only; start it yourself with npm start
 set -euo pipefail
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
@@ -33,16 +33,18 @@ fi
 dir=""
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
   here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  grep -q '"name": "agent-console"' "$here/package.json" 2>/dev/null && dir="$here"
+  grep -Eq '"name": "(naget-agent|agent-console)"' "$here/package.json" 2>/dev/null && dir="$here"
 fi
 if [ -z "$dir" ]; then
-  dir="${AGENT_CONSOLE_DIR:-$HOME/agent-console}"
+  # A copy installed before the rename (in ~/agent-console) is updated where it is.
+  dir="${NAGET_AGENT_DIR:-${AGENT_CONSOLE_DIR:-}}"
+  [ -z "$dir" ] && { [ -d "$HOME/agent-console/.git" ] && [ ! -d "$HOME/naget-agent" ] && dir="$HOME/agent-console" || dir="$HOME/naget-agent"; }
   if [ -d "$dir/.git" ]; then
     say "Updating $dir"
     git -C "$dir" pull --ff-only
   else
     say "Cloning into $dir"
-    git clone --depth 1 "${AGENT_CONSOLE_REPO:-https://github.com/Naget-Inc/agent-console.git}" "$dir"
+    git clone --depth 1 "${NAGET_AGENT_REPO:-${AGENT_CONSOLE_REPO:-https://github.com/Naget-Inc/naget-agent.git}}" "$dir"
   fi
 fi
 cd "$dir"
@@ -60,7 +62,8 @@ if [ "${NO_SERVICE:-}" = 1 ]; then
 fi
 command -v systemctl >/dev/null || die "No systemd here. Start it with 'npm start' in $dir, or use Docker."
 if [ -n "${PORT:-}" ]; then
-  env_file="$HOME/.config/agent-console.env"
+  env_file="$HOME/.config/naget-agent.env"
+  [ ! -f "$env_file" ] && [ -f "$HOME/.config/agent-console.env" ] && env_file="$HOME/.config/agent-console.env"
   mkdir -p "$(dirname "$env_file")"
   touch "$env_file"
   grep -q '^PORT=' "$env_file" && sed -i "s/^PORT=.*/PORT=$PORT/" "$env_file" || echo "PORT=$PORT" >> "$env_file"

@@ -8,7 +8,7 @@ Everything is optional. Set these in the environment (or in `.env` for Docker Co
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` (`0.0.0.0` in Docker) | Address to listen on |
 | `PORT` | `8790` | Port to listen on |
-| `DATA_DIR` | `~/.web-agent` | The app's own data (see below) |
+| `DATA_DIR` | `~/.naget-agent` (`~/.web-agent` where an older install made it) | The app's own data (see below) |
 | `DEFAULT_CWD` | your home folder (`/workspace` in Docker) | Folder new sessions start in |
 | `ALLOWED_ORIGINS` | none | Extra addresses the app is opened at, comma-separated, when a proxy changes the `Host` header |
 | `IDLE_STOP_HOURS` | `3` | Stop an agent process after this long without activity (`0`: never). History is kept, and it resumes on the next message |
@@ -21,7 +21,7 @@ Everything is optional. Set these in the environment (or in `.env` for Docker Co
 
 ## What it stores
 
-In `DATA_DIR`: the password hash (`auth.json`), the session index and search database (`web-agent.db`),
+In `DATA_DIR`: the password hash (`auth.json`), the session index and search database (`naget-agent.db`, `web-agent.db` in older installs),
 logs of running agents (`runs/`), attachments waiting to be sent (`uploads/`), files deleted in the file
 browser (`trash/`), notebook kernels and the terminal server. Conversations themselves stay where the agents
 write them (`~/.claude/projects`, `~/.codex/sessions`); the app only reads them.
@@ -32,7 +32,7 @@ Change it in Settings → Password. If you forget it:
 
 ```bash
 node dist/server/cli.js set-password                                        # without Docker
-docker compose exec -it agent-console node dist/server/cli.js set-password  # with Docker
+docker compose exec -it naget-agent node dist/server/cli.js set-password  # with Docker
 ```
 
 Either way, every browser is signed out.

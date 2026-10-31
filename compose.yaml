@@ -1,11 +1,11 @@
-# Agent Console with Docker Compose.
+# Naget Agent with Docker Compose.
 #
 #   docker compose up -d --build
 #   docker compose logs | grep setup     # the one-time link for choosing your password
 #
 # Then open http://localhost:8790. See the README for remote access and other options.
 services:
-  agent-console:
+  naget-agent:
     build:
       context: .
       args:
@@ -13,7 +13,7 @@ services:
         # agents create in ./workspace belong to you.
         UID: ${UID:-1000}
         GID: ${GID:-1000}
-    image: agent-console:latest
+    image: naget-agent:latest
     restart: unless-stopped
     ports:
       # Only this computer can reach it. For other devices, put an HTTPS proxy or tunnel in front.

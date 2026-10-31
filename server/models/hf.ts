@@ -13,7 +13,8 @@ import { cachePerToken, fit } from './machine.ts';
 const HF = 'https://huggingface.co';
 /** The context a local model is given by default (and what the fit assumes). */
 export const LOCAL_CONTEXT = 32768;
-const MARKER = '.agent-console.json';
+const MARKER = '.naget-agent.json';
+const OLD_MARKER = '.agent-console.json';
 
 /** "LiquidAI/LFM3-VL-2B" from that, a huggingface.co URL, or hf.co/… */
 export function parseRepo(input: string): string | null {
@@ -179,7 +180,9 @@ export function localRepos(): LocalRepo[] {
       for (const name of fs.readdirSync(path.join(HF_DIR, org))) {
         const dir = path.join(HF_DIR, org, name);
         try {
-          const m = JSON.parse(fs.readFileSync(path.join(dir, MARKER), 'utf8'));
+          const marker = [MARKER, OLD_MARKER].map((f) => path.join(dir, f)).find((f) => fs.existsSync(f));
+          if (!marker) continue;
+          const m = JSON.parse(fs.readFileSync(marker, 'utf8'));
           out.push({ ...m, dir, sizeBytes: dirSize(dir) });
         } catch {}
       }

@@ -96,7 +96,7 @@ async function call(acc: Account, method: string, p: string, body?: unknown): Pr
       ? { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
       : { Authorization: `token ${token}`, Accept: 'application/json' };
   if (body) headers['Content-Type'] = 'application/json';
-  headers['User-Agent'] = 'agent-console';
+  headers['User-Agent'] = 'naget-agent';
   let r: Response;
   try {
     r = await fetch(base + p, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(20_000) });
