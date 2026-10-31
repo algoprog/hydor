@@ -2,6 +2,7 @@
 // instruction files, MCP servers, skills and plugins). On wide screens a tab per group, with its
 // sections in a menu beside the open one; on phones a list, each section on its own page.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useSearch } from 'wouter';
 import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
 import { featureSections } from '../registry';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, StartupState, UpdateState } from '@shared/types';
@@ -25,6 +26,7 @@ import { ScmSettings } from './ScmSettings';
 import { ConnectSettings } from './ConnectSettings';
 import { AcpSettings } from './AcpSettings';
 import { machineId } from '../../lib/machine';
+import { pointAt } from '../../lib/pointAt';
 import { MachineSettings } from './MachineSettings';
 
 /** A built-in section, or one of a capability's (registry.tsx) by its id. */
@@ -74,6 +76,8 @@ let all: { label: string; items: SectionDef[] }[] | null = null;
 const groups = () => (all ??= [...GROUPS, { label: 'Capabilities', items: featureSections().map(({ id, label, icon, sub }): SectionDef => ({ id, label, icon, sub })) }].filter((g) => g.items.length));
 const sections = () => groups().flatMap((g) => g.items);
 export const isSettingsSection = (s: string | null): s is SettingsSection => sections().some((d) => d.id === s);
+/** Every section with its tab, for the search box. */
+export const settingsSections = () => groups().flatMap((g) => g.items.map((d) => ({ id: d.id, label: d.label, sub: d.sub, icon: d.icon, group: g.label })));
 
 export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: Agent; account?: AgentAccount; open: boolean; onClose: () => void; onDone: () => void }) {
   // An added account signs in into its own folder.
@@ -1036,7 +1040,11 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
     if (mobile) setSlideTo(id);
     go(url({ s: id }), !mobile);
   };
-  const body = page && <SectionBody id={page.id} cwd={cwd} agent={agent} onAgent={(a) => go(url({ agent: a }), true)} />;
+  const body = page && (
+    <div data-settings-body>
+      <SectionBody id={page.id} cwd={cwd} agent={agent} onAgent={(a) => go(url({ agent: a }), true)} />
+    </div>
+  );
   const folder = page?.folder ? <FolderScope cwd={cwd} onChange={(c) => go(url({ cwd: c }), true)} /> : null;
   // Wide screens: the tab is the open section's group, and each section opens at its top.
   const tab = groupOf(current);
@@ -1045,6 +1053,16 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
     if (current) lastOpen[groupOf(current).label] = current;
     if (scroller.current) scroller.current.scrollTop = 0;
   }, [current]);
+  // From the search box (`find=`): the option that says those words, scrolled to and lit up.
+  const findWords = new URLSearchParams(useSearch()).get('find');
+  useEffect(() => {
+    if (!findWords || !current) return;
+    let live = true;
+    void pointAt(() => document.querySelector('[data-settings-body]'), findWords).then(() => live && go(url({}), true));
+    return () => {
+      live = false;
+    };
+  }, [findWords, current]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (mobile) {
     const motion = sliding && 'transition-[translate,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]';

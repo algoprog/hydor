@@ -1108,6 +1108,26 @@ html {
     background-color: transparent;
   }
 }
+/* What the search box opened a page at (a setting, a note): outlined long enough to catch the eye. */
+.find-point {
+  animation: find-point 2.4s ease-out;
+  border-radius: 12px;
+}
+@keyframes find-point {
+  0%,
+  60% {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow:
+      0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent),
+      0 0 0 8px color-mix(in srgb, var(--accent) 65%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow:
+      0 0 0 6px transparent,
+      0 0 0 8px transparent;
+  }
+}
 
 /* ---- notebooks ------------------------------------------------------------- */
 

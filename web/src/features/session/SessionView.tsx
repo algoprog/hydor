@@ -5,6 +5,7 @@ import type { BackgroundTask, FileChange, SessionSummary, ToolItem } from '@shar
 import { api, enc, post } from '../../lib/api';
 import { activityLabel, activityOf, canTakeOver, confirmResume, inBackground, isBusy, isWorking, takeoverDialog } from '../../lib/activity';
 import { ago, basename, compact, dirname, money, prettyPath, tildify } from '../../lib/format';
+import { useSearch } from 'wouter';
 import { go, openFile, openSession, sessionPath } from '../../lib/nav';
 import { toastError, useApp, useLive, useSessions, useTimeline, useUI, type DetailsTab } from '../../lib/store';
 import { live as socket } from '../../lib/ws';
@@ -561,8 +562,11 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
   useEffect(() => noteOpened(sessionKey), [sessionKey]);
   const [forking, setForking] = useState<{ at?: string } | null>(null);
 
-  // Ctrl+F finds in this session's messages (editors and terminals keep their own).
+  // Ctrl+F finds in this session's messages (editors and terminals keep their own); the search box opens a
+  // session with `find=<words>` to show where they are.
   const [finding, setFinding] = useState(false);
+  const [findFirst, setFindFirst] = useState<string>();
+  const findWords = new URLSearchParams(useSearch()).get('find');
   useEffect(() => {
     setFinding(false);
     const k = (e: KeyboardEvent) => {
@@ -574,6 +578,13 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [sessionKey]);
+  // After the reset above, so a session opened from the search box keeps its find bar.
+  useEffect(() => {
+    if (!findWords) return;
+    setFindFirst(findWords);
+    setFinding(true);
+    go(sessionPath(sessionKey), true);
+  }, [findWords, sessionKey]);
   // Finding looks through the conversation, so that is what shows.
   useEffect(() => {
     if (finding) useSessionShow.getState().show(sessionKey, 'conversation');
@@ -608,7 +619,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
           <ForkedFrom s={summary} />
           {pane && <PaneSwitch pane={pane} show={show} onChange={(v) => useSessionShow.getState().show(sessionKey, v)} />}
           <div className="relative flex min-h-0 flex-1 flex-col">
-            {finding && <FindBar sessionKey={sessionKey} onClose={() => setFinding(false)} />}
+            {finding && <FindBar sessionKey={sessionKey} first={findFirst} onClose={() => (setFinding(false), setFindFirst(undefined))} />}
             {pane && show === 'pane' ? (
               <pane.Body s={summary} />
             ) : (

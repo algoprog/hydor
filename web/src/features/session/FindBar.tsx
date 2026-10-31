@@ -49,8 +49,9 @@ async function reveal(key: string, seq: number, q: string) {
   mark(el, q);
 }
 
-export function FindBar({ sessionKey, onClose }: { sessionKey: string; onClose: () => void }) {
-  const [q, setQ] = useState('');
+/** `first`: words to look for at once (from the search box). */
+export function FindBar({ sessionKey, first, onClose }: { sessionKey: string; first?: string; onClose: () => void }) {
+  const [q, setQ] = useState(first ?? '');
   const [found, setFound] = useState<number[] | null>(null);
   const [cur, setCur] = useState(-1);
   const [busy, setBusy] = useState(false);

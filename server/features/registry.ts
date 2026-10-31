@@ -1,6 +1,7 @@
 // Calls into the app's capabilities. Kept apart from the list of them (index.ts) so sessions.ts and
 // mcp.ts can call in without importing every capability's code.
 import type { SessionExtra } from '../../shared/features.ts';
+import type { ServerEvent } from '../../shared/types.ts';
 import type { Deps, Feature, RunCtx, RunTool, SpawnAdditions, SpawnInfo, TurnInfo } from './types.ts';
 
 let list: Feature[] = [];
@@ -114,6 +115,18 @@ export async function featureContext(s: { key: string; cwd: string; extra: Sessi
 export function turnEnded(t: TurnInfo) {
   if (!deps) return;
   for (const f of list) if (f.turnEnd) Promise.resolve().then(() => f.turnEnd!(t, deps!)).catch((e) => warn(f, 'turnEnd', e));
+}
+
+/** An event went to the pages: the capabilities that listen hear it too. */
+export function eventSent(e: ServerEvent) {
+  if (!deps) return;
+  for (const f of list)
+    if (f.event)
+      try {
+        f.event(e, deps);
+      } catch (err) {
+        warn(f, 'event', err);
+      }
 }
 
 /** Throws (an HttpError) when a capability refuses the message, e.g. a spending cap was reached. */

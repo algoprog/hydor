@@ -50,7 +50,7 @@ import { SystemMonitor } from './system.ts';
 import { readTaskLog, taskOutputPath } from './tasklog.ts';
 import * as terms from './terminals.ts';
 import { FEATURES } from './features/index.ts';
-import { featureContext, registerFeatures, startFeatures } from './features/registry.ts';
+import { eventSent, featureContext, registerFeatures, startFeatures } from './features/registry.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
@@ -1238,6 +1238,7 @@ function send(c: Client, e: ServerEvent) {
 function broadcast(e: ServerEvent) {
   const s = JSON.stringify(e);
   for (const c of clients) if (c.ws.readyState === c.ws.OPEN) c.ws.send(s);
+  eventSent(e);
 }
 function toSubscribers(key: string, e: ServerEvent) {
   const s = JSON.stringify(e);
