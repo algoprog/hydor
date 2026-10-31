@@ -33,12 +33,13 @@ import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
 import { createMcpToken, mcpRoutes, mcpTokens, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken } from './mcp.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
-import { checkUpdates, updateInfo, watchUpdates } from './updates.ts';
+import { checkUpdates, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { addAccount, addedAccounts, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
 import { ACP_PRESETS, acpAgents, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import * as setup from './setup.ts';
+import { claudeRetention, setClaudeRetention } from './claudeHistory.ts';
 import { computeStats } from './stats.ts';
 import { SystemMonitor } from './system.ts';
 import { readTaskLog, taskOutputPath } from './tasklog.ts';
@@ -210,14 +211,30 @@ app.get('/api/bootstrap', async () => ({
   host: os.hostname(),
   tourSeen: Number(kvGet(db, 'tour.seen') ?? 0),
   themes: customThemes(),
-  update: updateInfo() ?? undefined,
+  update: updateState() ?? undefined,
   accounts: addedAccounts(db),
   acpAgents: acpAgents(db),
 }));
 
 /** Checks for a newer version now (Settings → About). */
 app.post('/api/update-check', async () => ({ update: await checkUpdates() }));
-watchUpdates(() => {});
+/** Pulls, builds and restarts now; progress arrives as update events. */
+app.post('/api/update', async () => ({ update: startUpdate(false) }));
+app.put('/api/update/auto', async (req) => ({ update: setAutoUpdate(!!(req.body as { on?: boolean } | undefined)?.on) }));
+watchUpdates(db, (update) => broadcast({ t: 'update', update }));
+
+/** The web build the server hands out (its entry script), so open pages notice a newer one. */
+let webBuild: { mtime: number; id?: string } | null = null;
+function currentBuild(): string | undefined {
+  try {
+    const f = path.join(config.webDist, 'index.html');
+    const mtime = fs.statSync(f).mtimeMs;
+    if (webBuild?.mtime !== mtime) webBuild = { mtime, id: /assets\/(index-[\w-]+\.js)/.exec(fs.readFileSync(f, 'utf8'))?.[1] };
+    return webBuild.id;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Themes the user made (the built-in ones ship with the app), shared by every device. */
 function customThemes(): AppTheme[] {
@@ -267,6 +284,7 @@ app.get('/api/search', async (req) => {
 
 app.post('/api/sessions', async (req) => {
   const b = req.body as any;
+  noteUserMessage();
   if (b?.agent !== 'claude' && b?.agent !== 'codex' && b?.agent !== 'acp') throw new HttpError(400, 'Pick an agent');
   if (b.agent === 'acp' && typeof b.acpAgent !== 'string') throw new HttpError(400, 'Pick which agent');
   const key = await sessions.create({
@@ -295,6 +313,7 @@ app.post('/api/sessions/:key/worktree/remove', async (req) => {
 /** "Edit from here": continue from just before one of your messages, with new text (and the files as they were). */
 app.post('/api/sessions/:key/rewind', async (req) => {
   const b = (req.body ?? {}) as any;
+  noteUserMessage();
   return { key: await sessions.rewind(K(req), { itemId: String(b.itemId ?? ''), text: String(b.text ?? ''), restoreFiles: !!b.restoreFiles }) };
 });
 
@@ -327,6 +346,7 @@ app.post('/api/sessions/:key/seen', async (req) => {
 /** Carries the conversation to a new session on the other agent (see server/handoff.ts). */
 app.post('/api/sessions/:key/handoff', async (req) => {
   const b = req.body as any;
+  noteUserMessage();
   if (b?.agent !== 'claude' && b?.agent !== 'codex') throw new HttpError(400, 'Pick Claude Code or Codex');
   const key = await sessions.handoff(K(req), {
     agent: b.agent,
@@ -443,6 +463,7 @@ app.post('/api/sessions/:key/interrupt', async (req) => {
 });
 app.post('/api/sessions/:key/message', async (req) => {
   const b = (req.body ?? {}) as any;
+  noteUserMessage();
   await sessions.send(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []);
   return { ok: true };
 });
@@ -498,6 +519,7 @@ app.post('/api/uploads', async (req) => {
 });
 app.post('/api/sessions/:key/queue', async (req) => {
   const b = (req.body ?? {}) as any;
+  noteUserMessage();
   sessions.enqueue(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []);
   return { ok: true };
 });
@@ -542,6 +564,7 @@ app.post('/api/sessions/:key/queue/:id/delete', async (req) => {
 });
 app.post('/api/sessions/:key/takeover', async (req) => {
   const b = (req.body ?? {}) as any;
+  noteUserMessage();
   await sessions.takeover(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []);
   return { ok: true };
 });
@@ -935,6 +958,12 @@ app.delete('/api/fs/upload', async (req) => {
 
 app.get('/api/system', async () => system.snapshot());
 
+/** Whether Claude Code keeps its conversations (it deletes them after 30 days by default). */
+app.get('/api/claude-retention', async () => claudeRetention());
+app.put('/api/claude-retention', async (req) => {
+  setClaudeRetention(!!(req.body as { keep?: boolean })?.keep);
+  return claudeRetention();
+});
 app.get('/api/stats', async (req) => {
   const q = req.query as Record<string, string>;
   const g = (['day', 'week', 'month', 'year'] as const).find((x) => x === q.granularity) ?? 'day';
@@ -1110,7 +1139,7 @@ app.register(async (scope) => {
   scope.get('/ws', { websocket: true }, (ws: WebSocket) => {
     const c: Client = { ws, subs: new Set() };
     clients.add(c);
-    send(c, { t: 'hello', version: config.version });
+    send(c, { t: 'hello', version: config.version, build: currentBuild() });
     ws.on('message', async (raw) => {
       let m: ClientEvent;
       try {

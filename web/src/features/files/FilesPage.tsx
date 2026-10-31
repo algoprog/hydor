@@ -3,7 +3,7 @@ import { FileText, FolderTree, NotebookText, Search, X } from 'lucide-react';
 import { basename, MOD } from '../../lib/format';
 import { filePath, go } from '../../lib/nav';
 import { useUI } from '../../lib/store';
-import { cx, Dots, Empty, IconButton, Kbd, Segmented, useIsMobile } from '../../components/ui';
+import { cx, Throbber, Empty, IconButton, Kbd, Segmented, useIsMobile } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { Explorer } from './Explorer';
 import { FileEditor } from './FileEditor';
@@ -20,7 +20,7 @@ function FileView({ path, line }: { path: string; line?: number }) {
       <Suspense
         fallback={
           <div className="flex h-full items-center justify-center text-fg-3">
-            <Dots />
+            <Throbber size={34} />
           </div>
         }
       >

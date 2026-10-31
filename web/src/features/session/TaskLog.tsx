@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { BackgroundTask, TaskLog } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { toastError } from '../../lib/store';
-import { Button, Dialog, Dots } from '../../components/ui';
+import { Button, Dialog, Throbber } from '../../components/ui';
 import { Elapsed } from './items';
 
 /** "Command", "Agent", "Monitor" for the CLI's task types (local_bash, local_agent, …). */
@@ -89,7 +89,7 @@ export function TaskLogDialog({ sessionKey, task, canStop, onClose }: { sessionK
             <span className="text-fg-3">{error}</span>
           ) : (
             <span className="text-fg-3">
-              <Dots />
+              <Throbber />
             </span>
           )
         ) : empty ? (

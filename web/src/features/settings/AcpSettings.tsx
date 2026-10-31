@@ -7,7 +7,7 @@ import type { AcpAgentDef } from '@shared/types';
 import { api, del, post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Button, cx, Dialog, Dots, IconButton, inputCls, Section, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, useConfirm } from '../../components/ui';
 
 type Def = AcpAgentDef & { installed: boolean };
 
@@ -44,7 +44,7 @@ export function AcpSettings() {
         }
       >
         {!data ? (
-          <Dots className="text-fg-3" />
+          <Throbber className="text-fg-3" />
         ) : !data.agents.length ? (
           <p className="text-[13px] leading-relaxed text-fg-3">None yet. Pick one below, or add any agent that speaks ACP by the command that starts it.</p>
         ) : (

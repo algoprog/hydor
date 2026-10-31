@@ -9,7 +9,7 @@ import { applyTheme, setCustomThemes, useThemes } from './lib/theme';
 import { handleNotify, initNotifications } from './lib/notify';
 import { live, ownLive } from './lib/ws';
 import { MachineDown } from './features/machines/MachineSwitcher';
-import { Dots } from './components/ui';
+import { Throbber } from './components/ui';
 import { Toasts } from './components/Toasts';
 import { Login, Setup } from './features/auth/AuthScreens';
 import { Shell } from './features/layout/Shell';
@@ -89,7 +89,7 @@ export function App() {
   if (auth === 'unknown') {
     return (
       <div className="flex h-full items-center justify-center text-fg-3">
-        <Dots />
+        <Throbber size={34} />
       </div>
     );
   }

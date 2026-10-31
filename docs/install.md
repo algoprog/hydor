@@ -74,9 +74,18 @@ If you missed the setup link, `node dist/server/cli.js setup-token` prints the t
 
 ## Updates
 
-A copy installed from git checks its upstream once a day; Settings → General shows when a newer version is
-out. To update:
+Agent Console checks for a newer version once a day and installs it by itself after 5 hours without a
+message from you, at most once a day. Agents can be at work meanwhile: they carry on through the
+restart. Settings → General shows what is out, has **Update now** for updating at once, and a switch to
+turn the automatic updates off.
+
+This works for the installer's service and for Docker, which both start the server again after it
+exits. A server started by hand (`npm start`) only checks; update it with `git pull && npm ci && npm run
+build` and start it again. With the service, the same from a terminal:
 
 ```bash
 node dist/server/cli.js update   # pull, build, restart the service; running agents carry on
 ```
+
+The Docker container updates the copy of the app inside it. Rebuilding the image (`docker compose up -d
+--build`) starts again from your clone of the repository, so `git pull` before you do.

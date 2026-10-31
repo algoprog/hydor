@@ -7,7 +7,7 @@ import { api, del, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { toastError } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Dots, IconButton, inputCls, Section, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, useConfirm } from '../../components/ui';
 
 interface TokenView {
   id: string;
@@ -44,7 +44,7 @@ export function ConnectSettings() {
         }
       >
         {!list ? (
-          <Dots className="text-fg-3" />
+          <Throbber className="text-fg-3" />
         ) : !list.length ? (
           <p className="text-[13px] leading-relaxed text-fg-3">None yet. Make one for each agent or machine, so you can revoke them one at a time.</p>
         ) : (

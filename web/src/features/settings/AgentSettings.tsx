@@ -7,7 +7,7 @@ import { api, enc, post } from '../../lib/api';
 import { compact, tildify } from '../../lib/format';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { Badge, Button, cx, Dialog, Dots, IconButton, inputCls, Section, Segmented, Switch, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, Dialog, Throbber, IconButton, inputCls, Section, Segmented, Switch, useConfirm } from '../../components/ui';
 import { showTerminal, type TerminalInfo } from '../terminal/TerminalPanel';
 import { EditorDialog, InstructionsEditor } from './Instructions';
 
@@ -38,7 +38,7 @@ function Field({ label, hint, children }: { label: string; hint?: ReactNode; chi
 function Loading() {
   return (
     <div className="flex justify-center py-6 text-fg-3">
-      <Dots />
+      <Throbber />
     </div>
   );
 }
@@ -208,7 +208,7 @@ function AddMcpDialog({ open, cwd, onClose, onAdded }: { open: boolean; cwd: str
             Cancel
           </Button>
           <Button variant="primary" onClick={submit} disabled={!ready || busy}>
-            {busy ? <Dots /> : 'Add server'}
+            {busy ? <Throbber /> : 'Add server'}
           </Button>
         </>
       }
@@ -432,7 +432,7 @@ export function McpSettings({ cwd }: { cwd: string }) {
                 <Button size="sm" variant="ghost" onClick={() => check(a)} disabled={st === 'busy'} title="Start every server the way a new session would and see which connect">
                   {st === 'busy' ? (
                     <>
-                      <Dots /> Connecting
+                      <Throbber /> Connecting
                     </>
                   ) : (
                     'Check connections'
@@ -507,7 +507,7 @@ function NewSkillDialog({ open, cwd, onClose, onCreated }: { open: boolean; cwd:
             Cancel
           </Button>
           <Button variant="primary" onClick={submit} disabled={!name.trim() || busy}>
-            {busy ? <Dots /> : 'Create and edit'}
+            {busy ? <Throbber /> : 'Create and edit'}
           </Button>
         </>
       }
@@ -707,7 +707,7 @@ function PluginRow({ p, busy, actions }: { p: PluginEntry; busy: boolean; action
         </div>
         {p.description && <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">{p.description}</div>}
       </div>
-      <div className="flex shrink-0 items-center gap-0.5">{busy ? <Dots className="px-3 text-fg-3" /> : actions}</div>
+      <div className="flex shrink-0 items-center gap-0.5">{busy ? <Throbber className="px-3 text-fg-3" /> : actions}</div>
     </div>
   );
 }
@@ -850,7 +850,7 @@ export function PluginsSettings() {
             {data.available.length < data.total && (
               <div className="mt-3 flex justify-center">
                 <Button size="sm" variant="ghost" onClick={() => setLimit((l) => l + PAGE)} disabled={loading}>
-                  {loading ? <Dots /> : `Show more (${(data.total - data.available.length).toLocaleString()} left)`}
+                  {loading ? <Throbber /> : `Show more (${(data.total - data.available.length).toLocaleString()} left)`}
                 </Button>
               </div>
             )}
@@ -873,7 +873,7 @@ export function PluginsSettings() {
                     <div className="truncate font-mono text-[12px] text-fg-3">{m.repo ?? m.url ?? m.source}</div>
                   </div>
                   {busy === `market:${m.name}` ? (
-                    <Dots className="px-3 text-fg-3" />
+                    <Throbber className="px-3 text-fg-3" />
                   ) : (
                     <IconButton label="Remove" size="sm" onClick={() => marketAct('remove', m.name)} disabled={!!busy}>
                       <Trash2 size={14} />
@@ -891,7 +891,7 @@ export function PluginsSettings() {
             >
               <input className={cx(inputCls, 'h-8.5 font-mono text-[13px]')} value={market} onChange={(e) => setMarket(e.target.value)} placeholder="owner/repo, a git URL or a folder" spellCheck={false} />
               <Button size="sm" type="submit" disabled={!market.trim() || !!busy}>
-                {busy === `market:${market.trim()}` ? <Dots /> : 'Add'}
+                {busy === `market:${market.trim()}` ? <Throbber /> : 'Add'}
               </Button>
             </form>
           </>

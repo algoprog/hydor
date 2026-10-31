@@ -146,10 +146,19 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
 
   const first = db.prepare('select min(hour) as h from activity').get() as { h: number | null };
   const firstYear = first.h != null ? localDate(fmt, first.h * 3_600_000)[0] : today[0];
+  // When each agent's history starts (Claude Code deletes its conversations after 30 days).
+  const firstByAgent: Partial<Record<Agent, number>> = {};
+  for (const r of db.prepare('select agent, min(hour) as h from activity group by agent').all() as { agent: Agent; h: number }[]) firstByAgent[r.agent] = r.h * 3_600_000;
 
   // Current window plus the same number of buckets before it, for the comparison.
   const all = bucketKeys(g, n * 2, today, g === 'year' ? firstYear - n : firstYear);
-  const keys = g === 'year' ? bucketKeys(g, n, today, firstYear) : all.slice(-n);
+  let keys = g === 'year' ? bucketKeys(g, n, today, firstYear) : all.slice(-n);
+  // Months start where the history does, rather than with a run of empty ones.
+  if (g === 'month' && first.h != null && !q.count) {
+    const [fy, fm] = localDate(fmt, first.h * 3_600_000);
+    const firstKey = keyFor(g, fy, fm, 1);
+    if (firstKey > keys[0]) keys = keys.filter((k) => k >= firstKey);
+  }
   const prevKeys = new Set(g === 'year' ? [] : all.slice(0, all.length - keys.length));
   const startKey = g === 'year' ? keys[0] : all[0];
   // Two days of slack either side of the local-midnight boundary.
@@ -229,6 +238,8 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
     granularity: g,
     tz,
     agent,
+    firstAt: first.h != null ? first.h * 3_600_000 : undefined,
+    firstByAgent,
     buckets: [...buckets.values()].map(({ roots, ...b }) => ({ ...b, sessions: roots.size })),
     totals,
     previous,

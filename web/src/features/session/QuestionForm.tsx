@@ -4,7 +4,7 @@ import type { Question } from '@shared/types';
 import { post } from '../../lib/api';
 import { attachmentPayload, readAttachments } from '../../lib/attachments';
 import { toastError } from '../../lib/store';
-import { cx, Dots } from '../../components/ui';
+import { cx, Throbber } from '../../components/ui';
 
 /** A file attached to an answer: saved on this machine, and named in the answer so the agent can open it. */
 export interface AnswerFile {
@@ -168,7 +168,7 @@ function AnswerFiles({ value, onChange, disabled, add, busy }: { value: Pick; on
       ))}
       {!disabled && (
         <button type="button" onClick={() => input.current?.click()} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
-          {busy ? <Dots /> : <Paperclip size={12} />} Attach files
+          {busy ? <Throbber /> : <Paperclip size={12} />} Attach files
         </button>
       )}
       <input

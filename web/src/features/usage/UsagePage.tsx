@@ -1,15 +1,16 @@
 import { useEffect } from 'react';
-import { AlertTriangle, Coins, RefreshCw, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Coins, TrendingUp } from 'lucide-react';
 import type { AgentAccount, AgentUsage, UsageWindow } from '@shared/types';
 import { ago, compact, pct, untilText } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { useApp, useUsage } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Columns, Meter, severityColor } from '../../components/charts';
-import { Button, cx, Dots, Tabs } from '../../components/ui';
+import { Button, cx, Throbber, Tabs } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { StatsBody } from '../stats/StatsPage';
 import { LimitBanner, ResetList } from './LimitReset';
+import { RefreshIcon } from '../../components/RefreshIcon';
 
 function WindowRow({ w }: { w: UsageWindow }) {
   const left = w.usedPercent == null ? null : Math.max(0, 100 - w.usedPercent);
@@ -50,7 +51,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
       </header>
       {!u ? (
         <div className="flex justify-center py-6 text-fg-3">
-          <Dots />
+          <Throbber />
         </div>
       ) : !u.ok && !u.windows.length ? (
         <div className="rounded-lg border border-err/30 bg-err/5 px-3 py-2.5 text-[12.5px]">
@@ -151,7 +152,7 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' }) {
         sub={tab === 'limits' ? 'How much of each plan is left, and when it resets' : 'Lines changed, tokens and sessions over time'}
         actions={
           tab === 'limits' && (
-            <Button size="sm" variant="ghost" icon={<RefreshCw size={14} className={cx(loading && 'animate-spin')} />} onClick={() => refresh(true)} disabled={loading}>
+            <Button size="sm" variant="ghost" icon={<RefreshIcon size={14} busy={loading} />} onClick={() => refresh(true)} disabled={loading}>
               <span className="hidden sm:inline">Refresh</span>
             </Button>
           )

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, BarChart3, CircleDollarSign, FileDiff, FolderGit2, Gauge, MessageSquare, Minus, Plus, SquareTerminal, Table2, TextCursorInput, Users } from 'lucide-react';
 import type { StatsGranularity, StatsResponse, StatsTotals } from '@shared/types';
-import { api } from '../../lib/api';
+import { api, put } from '../../lib/api';
+import { useCountUp } from '../../lib/motion';
 import { compact, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toastError, useApp } from '../../lib/store';
+import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Columns, DivergingColumns, Legend, StackedColumns } from '../../components/charts';
-import { cx, Dots, Segmented } from '../../components/ui';
+import { Button, cx, Throbber, Segmented, useIsMobile } from '../../components/ui';
 import { ModelPricesDialog } from './ModelPrices';
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -28,18 +29,77 @@ function Delta({ cur, prev }: { cur: number; prev: number }) {
   );
 }
 
-function Tile({ icon, label, value, sub, cur, prev }: { icon: React.ReactNode; label: string; value: string; sub?: string; cur: number; prev?: number }) {
+// Integers as the tiles show them, while they count.
+const whole = (n: number) => compact(Math.round(n));
+
+function Tile({
+  icon,
+  label,
+  sub,
+  cur,
+  prev,
+  format,
+  i = 0,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  sub?: string;
+  cur: number;
+  prev?: number;
+  /** How the number reads; it counts up to `cur` when it arrives or changes. */
+  format: (n: number) => string;
+  /** Its place, so the tiles come in one after another. */
+  i?: number;
+}) {
+  const shown = useCountUp(cur);
   return (
-    <div className="rounded-2xl border border-line bg-panel px-4 py-3">
+    <div className="rounded-2xl border border-line bg-panel px-4 py-3" style={{ '--i': i } as React.CSSProperties}>
       <div className="flex items-center gap-1.5 text-[12px] text-fg-3">
         {icon}
         {label}
       </div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className="text-[22px] leading-tight font-semibold tracking-tight">{value}</span>
+        <span className="tnum text-[22px] leading-tight font-semibold tracking-tight">{format(shown)}</span>
         {prev != null && <Delta cur={cur} prev={prev} />}
       </div>
       {sub && <div className="truncate text-[11.5px] text-fg-3">{sub}</div>}
+    </div>
+  );
+}
+
+/** Where the history starts, and why Claude Code's can start late: it deletes conversations after 30
+ * days unless told to keep them (the stats keep whatever the app has already counted). */
+function HistoryNote({ data, g }: { data: StatsResponse | null; g: StatsGranularity }) {
+  const from = data?.firstByAgent?.claude;
+  const show = (g === 'month' || g === 'year') && from != null && Date.now() - from < 45 * 86_400_000;
+  const [keep, setKeep] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (show && keep == null)
+      api<{ keep: boolean }>('/api/claude-retention')
+        .then((r) => setKeep(r.keep))
+        .catch(() => {});
+  }, [show, keep]);
+  if (!show) return null;
+  const since = new Date(from).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const turnOn = async () => {
+    try {
+      setKeep((await put<{ keep: boolean }>('/api/claude-retention', { keep: true })).keep);
+      toast('Claude Code now keeps its conversations', 'ok');
+    } catch (e) {
+      toastError(e);
+    }
+  };
+  return (
+    <div className="anim-in mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-panel px-3.5 py-2.5 text-[12.5px] leading-relaxed text-fg-2">
+      <span className="min-w-[220px] flex-1">
+        Claude Code's activity starts on {since}:{' '}
+        {keep ? 'older conversations were deleted before it was set to keep them.' : 'Claude Code deleted older conversations, as it does after 30 days.'}
+      </span>
+      {keep === false && (
+        <Button size="sm" variant="secondary" onClick={turnOn}>
+          Keep Claude Code's history
+        </Button>
+      )}
     </div>
   );
 }
@@ -95,6 +155,7 @@ export function StatsBody() {
       .finally(() => setLoading(false));
   }, [g, agent, rev]);
 
+  const sz = useIsMobile() ? 'sm' : 'md';
   const t = data?.totals;
   const p = data?.previous;
   const hasPrev = g !== 'year' && !!p && (p.prompts > 0 || p.tokensOut > 0);
@@ -106,6 +167,7 @@ export function StatsBody() {
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <Segmented<StatsGranularity>
+            size={sz}
             value={g}
             onChange={setG}
             options={[
@@ -116,6 +178,7 @@ export function StatsBody() {
             ]}
           />
           <Segmented
+            size={sz}
             value={agent}
             onChange={setAgent}
             options={[
@@ -125,6 +188,7 @@ export function StatsBody() {
             ]}
           />
           <Segmented
+            size={sz}
             value={view}
             onChange={setView}
             options={[
@@ -132,36 +196,46 @@ export function StatsBody() {
               { value: 'table', label: 'Table', icon: <Table2 size={13} /> },
             ]}
           />
-          <span className="ml-auto text-[12px] text-fg-3">
-            {WINDOW[g]}
+          <span className="text-[12px] text-fg-3 sm:ml-auto">
+            {g === 'month' && b.length > 0 && b.length < 12 ? `Since ${b[0].label}` : WINDOW[g]}
             {hasPrev && ` · arrows compare with the ${PREV[g]}`} · {TZ}
           </span>
         </div>
+        <HistoryNote data={data} g={g} />
 
         {!data ? (
           <div className="flex justify-center py-20 text-fg-3">
-            <Dots />
+            <Throbber size={28} />
           </div>
         ) : (
           <div className={cx('space-y-4 transition-opacity', loading && 'opacity-60')}>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Tile icon={<Plus size={13} />} label="Lines added" value={compact(t!.linesAdded)} cur={t!.linesAdded} prev={hasPrev ? p!.linesAdded : undefined} />
-              <Tile icon={<Minus size={13} />} label="Lines removed" value={compact(t!.linesRemoved)} cur={t!.linesRemoved} prev={hasPrev ? p!.linesRemoved : undefined} />
+            <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Tile i={0} icon={<Plus size={13} />} label="Lines added" format={whole} cur={t!.linesAdded} prev={hasPrev ? p!.linesAdded : undefined} />
+              <Tile i={1} icon={<Minus size={13} />} label="Lines removed" format={whole} cur={t!.linesRemoved} prev={hasPrev ? p!.linesRemoved : undefined} />
               <Tile
+                i={2}
                 icon={<TextCursorInput size={13} />}
                 label="Input tokens"
-                value={compact(t!.tokensIn + t!.tokensCached)}
+                format={whole}
                 sub={`${compact(t!.tokensIn)} fresh · ${compact(t!.tokensCached)} cached`}
                 cur={t!.tokensIn + t!.tokensCached}
                 prev={hasPrev ? p!.tokensIn + p!.tokensCached : undefined}
               />
-              <Tile icon={<MessageSquare size={13} />} label="Output tokens" value={compact(t!.tokensOut)} cur={t!.tokensOut} prev={hasPrev ? p!.tokensOut : undefined} />
-              <Tile icon={<Gauge size={13} />} label="Output speed" value={`${num(tps(t!))} tok/s`} sub="avg over reply generation" cur={tps(t!)} prev={hasPrev ? tps(p!) : undefined} />
-              <Tile icon={<CircleDollarSign size={13} />} label="API cost (est.)" value={dollars(t!.cost ?? 0)} sub="the same tokens at API prices" cur={t!.cost ?? 0} prev={hasPrev ? (p!.cost ?? 0) : undefined} />
-              <Tile icon={<TextCursorInput size={13} />} label="Prompts" value={compact(t!.prompts)} sub={`${compact(t!.turns)} turns`} cur={t!.prompts} prev={hasPrev ? p!.prompts : undefined} />
-              <Tile icon={<Users size={13} />} label="Sessions" value={compact(t!.sessions)} cur={t!.sessions} prev={hasPrev ? p!.sessions : undefined} />
-              <Tile icon={<SquareTerminal size={13} />} label="Commands" value={compact(t!.commands)} sub={`${compact(t!.toolCalls)} tool calls`} cur={t!.commands} prev={hasPrev ? p!.commands : undefined} />
-              <Tile icon={<FileDiff size={13} />} label="File edits" value={compact(t!.fileEdits)} cur={t!.fileEdits} prev={hasPrev ? p!.fileEdits : undefined} />
+              <Tile i={3} icon={<MessageSquare size={13} />} label="Output tokens" format={whole} cur={t!.tokensOut} prev={hasPrev ? p!.tokensOut : undefined} />
+              <Tile
+                i={4}
+                icon={<Gauge size={13} />}
+                label="Output speed"
+                format={(n) => `${num(Math.round(n))} tok/s`}
+                sub="avg over reply generation"
+                cur={tps(t!)}
+                prev={hasPrev ? tps(p!) : undefined}
+              />
+              <Tile i={5} icon={<CircleDollarSign size={13} />} label="API cost (est.)" format={dollars} sub="the same tokens at API prices" cur={t!.cost ?? 0} prev={hasPrev ? (p!.cost ?? 0) : undefined} />
+              <Tile i={6} icon={<TextCursorInput size={13} />} label="Prompts" format={whole} sub={`${compact(t!.turns)} turns`} cur={t!.prompts} prev={hasPrev ? p!.prompts : undefined} />
+              <Tile i={7} icon={<Users size={13} />} label="Sessions" format={whole} cur={t!.sessions} prev={hasPrev ? p!.sessions : undefined} />
+              <Tile i={8} icon={<SquareTerminal size={13} />} label="Commands" format={whole} sub={`${compact(t!.toolCalls)} tool calls`} cur={t!.commands} prev={hasPrev ? p!.commands : undefined} />
+              <Tile i={9} icon={<FileDiff size={13} />} label="File edits" format={whole} cur={t!.fileEdits} prev={hasPrev ? p!.fileEdits : undefined} />
             </div>
 
             {view === 'table' ? (
@@ -270,54 +344,58 @@ export function StatsBody() {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card title="By agent">
+                <div className="overflow-x-auto">
                 <table className="tnum w-full text-[12.5px]">
                   <thead>
                     <tr className="text-left text-[11px] text-fg-3">
                       <th className="py-1.5 pr-3 font-medium">Agent</th>
                       <th className="py-1.5 pr-3 text-right font-medium">Sessions</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">Prompts</th>
+                      <th className="hidden py-1.5 pr-3 text-right font-medium sm:table-cell">Prompts</th>
                       <th className="py-1.5 pr-3 text-right font-medium">Lines</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">Input</th>
+                      <th className="hidden py-1.5 pr-3 text-right font-medium sm:table-cell">Input</th>
                       <th className="py-1.5 text-right font-medium">Output</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(['claude', 'codex'] as const).map((a) => {
+                    {(['claude', 'codex', 'acp'] as const).map((a) => {
                       const v = data.byAgent[a];
+                      if (!v || (a === 'acp' && !v.sessions)) return null;
                       return (
                         <tr key={a} className="border-t border-line">
                           <td className="py-1.5 pr-3">
-                            <span className="flex items-center gap-1.5">
-                              <AgentIcon agent={a} size={13} /> {a === 'claude' ? 'Claude Code' : 'Codex'}
+                            <span className="flex items-center gap-1.5 whitespace-nowrap">
+                              <AgentIcon agent={a} size={13} /> {a === 'claude' ? 'Claude Code' : a === 'codex' ? 'Codex' : 'Other agents'}
                             </span>
                           </td>
                           <td className="py-1.5 pr-3 text-right">{num(v.sessions)}</td>
-                          <td className="py-1.5 pr-3 text-right">{num(v.prompts)}</td>
+                          <td className="hidden py-1.5 pr-3 text-right sm:table-cell">{num(v.prompts)}</td>
                           <td className="py-1.5 pr-3 text-right whitespace-nowrap">
                             <span className="text-add">+{compact(v.linesAdded)}</span> <span className="text-del">−{compact(v.linesRemoved)}</span>
                           </td>
-                          <td className="py-1.5 pr-3 text-right">{compact(v.tokensIn + v.tokensCached)}</td>
+                          <td className="hidden py-1.5 pr-3 text-right sm:table-cell">{compact(v.tokensIn + v.tokensCached)}</td>
                           <td className="py-1.5 text-right">{compact(v.tokensOut)}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+                </div>
               </Card>
               <Card title="Top projects" sub="by lines changed">
-                <table className="tnum w-full text-[12.5px]">
+                <div className="overflow-x-auto">
+                <table className="tnum w-full table-fixed text-[12.5px] sm:table-auto">
                   <thead>
                     <tr className="text-left text-[11px] text-fg-3">
                       <th className="py-1.5 pr-3 font-medium">Folder</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">Sessions</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">Lines</th>
-                      <th className="py-1.5 text-right font-medium">Output</th>
+                      <th className="w-[68px] py-1.5 pr-3 text-right font-medium sm:w-auto">Sessions</th>
+                      <th className="w-[104px] py-1.5 pr-3 text-right font-medium sm:w-auto">Lines</th>
+                      <th className="hidden py-1.5 text-right font-medium sm:table-cell">Output</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.projects.slice(0, 8).map((pr) => (
                       <tr key={pr.cwd} className="border-t border-line">
-                        <td className="max-w-[260px] truncate py-1.5 pr-3 font-mono text-[12px]" title={pr.cwd}>
+                        <td className="truncate py-1.5 pr-3 font-mono text-[12px] sm:max-w-[260px]" title={pr.cwd}>
                           <FolderGit2 size={12} className="mr-1.5 inline text-fg-3" />
                           {tildify(pr.cwd, home)}
                         </td>
@@ -325,11 +403,12 @@ export function StatsBody() {
                         <td className="py-1.5 pr-3 text-right whitespace-nowrap">
                           <span className="text-add">+{compact(pr.linesAdded)}</span> <span className="text-del">−{compact(pr.linesRemoved)}</span>
                         </td>
-                        <td className="py-1.5 text-right">{compact(pr.tokensOut)}</td>
+                        <td className="hidden py-1.5 text-right sm:table-cell">{compact(pr.tokensOut)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                </div>
               </Card>
               <Card
                 title="By model"
@@ -339,24 +418,25 @@ export function StatsBody() {
                   </button>
                 }
               >
-                <table className="tnum w-full text-[12.5px]">
+                <div className="overflow-x-auto">
+                <table className="tnum w-full table-fixed text-[12.5px] sm:table-auto">
                   <thead>
                     <tr className="text-left text-[11px] text-fg-3">
                       <th className="py-1.5 pr-3 font-medium">Model</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">Input</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">Cached</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">Output</th>
-                      <th className="py-1.5 text-right font-medium">API cost</th>
+                      <th className="hidden py-1.5 pr-3 text-right font-medium sm:table-cell">Input</th>
+                      <th className="hidden py-1.5 pr-3 text-right font-medium sm:table-cell">Cached</th>
+                      <th className="w-[64px] py-1.5 pr-3 text-right font-medium sm:w-auto">Output</th>
+                      <th className="w-[84px] py-1.5 text-right font-medium sm:w-auto">API cost</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.byModel.slice(0, 12).map((m) => (
                       <tr key={m.model} className="border-t border-line">
-                        <td className="max-w-[220px] truncate py-1.5 pr-3 font-mono text-[12px]" title={m.price ? `$${m.price.input}/M in · $${m.price.output}/M out (${m.price.source === 'custom' ? 'your price' : 'public price table'})` : 'No price known'}>
+                        <td className="truncate py-1.5 pr-3 font-mono text-[12px] sm:max-w-[220px]" title={m.price ? `$${m.price.input}/M in · $${m.price.output}/M out (${m.price.source === 'custom' ? 'your price' : 'public price table'})` : 'No price known'}>
                           {m.model}
                         </td>
-                        <td className="py-1.5 pr-3 text-right">{compact(m.tokensIn)}</td>
-                        <td className="py-1.5 pr-3 text-right">{compact(m.tokensCached)}</td>
+                        <td className="hidden py-1.5 pr-3 text-right sm:table-cell">{compact(m.tokensIn)}</td>
+                        <td className="hidden py-1.5 pr-3 text-right sm:table-cell">{compact(m.tokensCached)}</td>
                         <td className="py-1.5 pr-3 text-right">{compact(m.tokensOut)}</td>
                         <td className="py-1.5 text-right">
                           {m.cost != null ? (
@@ -371,6 +451,7 @@ export function StatsBody() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </Card>
             </div>
           </div>
@@ -400,10 +481,10 @@ export function TodayStrip() {
       <span>
         <span className="text-add">+{compact(t.linesAdded)}</span> <span className="text-del">−{compact(t.linesRemoved)}</span> lines
       </span>
-      <span>{compact(t.tokensIn + t.tokensCached)} in</span>
+      <span className="max-md:hidden">{compact(t.tokensIn + t.tokensCached)} in</span>
       <span>{compact(t.tokensOut)} out</span>
       <span>{t.prompts} prompts</span>
-      <span>{t.sessions} sessions</span>
+      <span className="max-md:hidden">{t.sessions} sessions</span>
     </button>
   );
 }

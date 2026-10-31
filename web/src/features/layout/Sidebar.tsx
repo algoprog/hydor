@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { Activity, CircleHelp, FolderTree, Gauge, GitBranch, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
 import { MOD, pct } from '../../lib/format';
@@ -14,8 +14,8 @@ import { startTour } from '../tour/Tour';
 import { machineId } from '../../lib/machine';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
 
-/** The most-used plan window, as a tiny meter next to "Usage". */
-function UsageHint() {
+/** The most-used plan window, as a tiny meter next to "Usage" (under it on a phone's tile). */
+function UsageHint({ tile }: { tile?: boolean }) {
   const { claude, codex } = useUsage();
   const all = [...(claude?.windows ?? []), ...(codex?.windows ?? [])].filter((w) => w.usedPercent != null);
   if (!all.length) return null;
@@ -24,24 +24,64 @@ function UsageHint() {
   const title = [claude, codex]
     .flatMap((u) => (u?.windows ?? []).filter((w) => w.usedPercent != null).map((w) => `${u!.agent === 'claude' ? 'Claude' : 'Codex'} ${w.label}: ${pct(w.usedPercent)} used`))
     .join('\n');
+  if (tile)
+    return (
+      <span className="absolute bottom-[7px] left-1/2 h-[3px] w-8 -translate-x-1/2 overflow-hidden rounded-full bg-fg/10" title={title}>
+        <span className="block h-full rounded-full" style={{ width: `${Math.min(100, top.usedPercent ?? 0)}%`, background: limited ? 'var(--err)' : severityColor(top.usedPercent) }} />
+      </span>
+    );
   return (
     <span className="ml-auto flex items-center gap-2" title={title}>
       <span className="h-1.5 w-12 overflow-hidden rounded-full bg-fg/10">
-        <span className="block h-full rounded-full" style={{ width: `${Math.min(100, top.usedPercent ?? 0)}%`, background: severityColor(top.usedPercent) }} />
+        <span className="anim-grow-x block h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${Math.min(100, top.usedPercent ?? 0)}%`, background: severityColor(top.usedPercent) }} />
       </span>
       <span className={cx('tnum w-8 text-right text-[11.5px]', limited ? 'text-err' : 'text-fg-3')}>{limited ? 'Limit' : pct(top.usedPercent)}</span>
     </span>
   );
 }
 
-function NavItem({ path, match, label, icon, extra, onGo, tour }: { path: string; match: boolean; label: string; icon: ReactNode; extra?: ReactNode; onGo: (p: string) => void; tour?: string }) {
+function NavItem({
+  path,
+  match,
+  label,
+  icon,
+  extra,
+  onGo,
+  tour,
+  anim = 'ico-lift',
+  tile,
+}: {
+  path: string;
+  match: boolean;
+  label: string;
+  icon: ReactNode;
+  extra?: ReactNode;
+  onGo: (p: string) => void;
+  tour?: string;
+  /** How its icon answers the pointer (styles.css, "small motion"). */
+  anim?: string;
+  /** A phone's drawer: icon over label, four to a row, so the sessions keep the room. */
+  tile?: boolean;
+}) {
+  if (tile)
+    return (
+      <button
+        data-tour={tour}
+        onClick={() => onGo(path)}
+        className={cx('group relative flex h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-[10px] text-[11.5px] transition-colors', match ? 'bg-bg-3 font-medium text-fg' : 'text-fg-2 active:bg-bg-2')}
+      >
+        <span className={cx('ico shrink-0', anim, match ? 'text-fg' : 'text-fg-3')}>{icon}</span>
+        <span className="max-w-full truncate px-1 leading-none">{label}</span>
+        {extra}
+      </button>
+    );
   return (
     <button
       data-tour={tour}
       onClick={() => onGo(path)}
-      className={cx('flex h-9 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] transition-colors', match ? 'bg-bg-3 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg')}
+      className={cx('group flex h-9 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] transition-colors', match ? 'bg-bg-3 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg')}
     >
-      <span className={cx('shrink-0', match ? 'text-fg' : 'text-fg-3')}>{icon}</span>
+      <span className={cx('ico shrink-0', anim, match ? 'text-fg' : 'text-fg-3')}>{icon}</span>
       {label}
       {extra}
     </button>
@@ -49,7 +89,7 @@ function NavItem({ path, match, label, icon, extra, onGo, tour }: { path: string
 }
 
 /** Navigation: new session, search, every session, then the tools. A drawer on phones. */
-export function Sidebar({ mobile }: { mobile?: boolean }) {
+export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const [loc] = useLocation();
   const [q, setQ] = useState('');
   const filter = useUI((s) => s.agentFilter);
@@ -69,7 +109,9 @@ export function Sidebar({ mobile }: { mobile?: boolean }) {
   return (
     <aside className="flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)]">
       <div className="flex h-14 shrink-0 items-center gap-2.5 px-4">
-        <Logo />
+        <span className="group inline-flex">
+          <Logo />
+        </span>
         <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold tracking-tight">Agent Console</span>
         {!connected && (
           <span title="Reconnecting…" className="text-warn">
@@ -91,9 +133,11 @@ export function Sidebar({ mobile }: { mobile?: boolean }) {
         <MachineSwitcher onGo={mobile ? close : undefined} />
         <button
           onClick={() => nav('/')}
-          className="flex h-9.5 w-full items-center gap-2.5 rounded-[10px] bg-bg-2 px-3 text-[13.5px] font-medium text-fg ring-1 ring-line-2 transition-colors ring-inset hover:bg-bg-3"
+          className="group flex h-9.5 w-full items-center gap-2.5 rounded-[10px] bg-bg-2 px-3 text-[13.5px] font-medium text-fg ring-1 ring-line-2 transition-colors ring-inset hover:bg-bg-3"
         >
-          <SquarePen size={16} />
+          <span className="ico ico-tilt">
+            <SquarePen size={16} />
+          </span>
           New session
         </button>
         <div className="relative">
@@ -156,36 +200,46 @@ export function Sidebar({ mobile }: { mobile?: boolean }) {
         <SessionList query={q} />
       </div>
 
-      <nav data-tour="tools" className="shrink-0 space-y-0.5 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
-        <NavItem path="/files" match={loc === '/files' || loc === '/file' || loc === '/search'} label="Files" icon={<FolderTree size={17} />} onGo={nav} />
-        <NavItem path="/git" match={loc === '/git'} label="Git" icon={<GitBranch size={17} />} onGo={nav} />
-        <NavItem path="/terminal" match={loc === '/terminal'} label="Terminal" icon={<SquareTerminal size={17} />} onGo={nav} />
+      <nav
+        data-tour="tools"
+        className={cx('shrink-0 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]', mobile ? 'grid grid-cols-4 gap-1' : 'space-y-0.5')}
+      >
+        <NavItem tile={mobile} path="/files" match={loc === '/files' || loc === '/file' || loc === '/search'} label="Files" icon={<FolderTree size={17} />} onGo={nav} />
+        <NavItem tile={mobile} path="/git" match={loc === '/git'} label="Git" icon={<GitBranch size={17} />} onGo={nav} />
+        <NavItem tile={mobile} path="/terminal" match={loc === '/terminal'} label="Terminal" icon={<SquareTerminal size={17} />} onGo={nav} anim="ico-nudge" />
         {/* Dev-server previews open on this server's own preview port: its own machine only. */}
-        {!machineId && <NavItem path="/preview" match={loc === '/preview'} label="Preview" icon={<MonitorSmartphone size={17} />} onGo={nav} />}
-        <NavItem path="/usage" match={loc === '/usage' || loc === '/stats'} label="Usage" icon={<Gauge size={17} />} extra={<UsageHint />} onGo={nav} />
-        <NavItem path="/system" match={loc === '/system'} label="System" icon={<Activity size={17} />} onGo={nav} />
+        {!machineId && <NavItem tile={mobile} path="/preview" match={loc === '/preview'} label="Preview" icon={<MonitorSmartphone size={17} />} onGo={nav} />}
+        <NavItem tile={mobile} path="/usage" match={loc === '/usage' || loc === '/stats'} label="Usage" icon={<Gauge size={17} />} extra={<UsageHint tile={mobile} />} onGo={nav} anim="ico-grow" />
+        <NavItem tile={mobile} path="/system" match={loc === '/system'} label="System" icon={<Activity size={17} />} onGo={nav} anim="ico-beat" />
         <NavItem
+          tile={mobile}
           path="/settings"
           match={loc === '/settings'}
           label="Settings"
           icon={<Settings size={17} />}
           onGo={nav}
+          anim="ico-turn"
           tour="nav-settings"
-          extra={updates ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" title="A newer version is out (Settings → General)" /> : undefined}
+          extra={
+            updates ? (
+              <span className={cx('h-1.5 w-1.5 rounded-full bg-accent', mobile ? 'absolute top-2.5 left-[calc(50%+7px)]' : 'ml-auto')} title="A newer version is out (Settings → General)" />
+            ) : undefined
+          }
         />
         {mobile && (
-          <button
-            onClick={() => {
+          <NavItem
+            tile
+            path=""
+            match={false}
+            label="Tour"
+            icon={<CircleHelp size={17} />}
+            onGo={() => {
               close();
               startTour();
             }}
-            className="flex h-9 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
-          >
-            <CircleHelp size={17} className="shrink-0 text-fg-3" />
-            Take the tour
-          </button>
+          />
         )}
       </nav>
     </aside>
   );
-}
+});

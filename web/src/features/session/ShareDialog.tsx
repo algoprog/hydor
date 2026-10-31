@@ -7,7 +7,7 @@ import { api, del, enc, post } from '../../lib/api';
 import { ago, untilText } from '../../lib/format';
 import { toastError } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
-import { Button, Dialog, Dots, IconButton, Segmented } from '../../components/ui';
+import { Button, Dialog, Throbber, IconButton, Segmented } from '../../components/ui';
 import { machineBase } from '../../lib/machine';
 
 interface LinkView {
@@ -81,7 +81,7 @@ export function ShareDialog({ s, open, onClose }: { s: SessionSummary; open: boo
           </div>
         )}
         {links === null ? (
-          <Dots className="text-fg-3" />
+          <Throbber className="text-fg-3" />
         ) : links.length ? (
           <div className="space-y-1 border-t border-line pt-3">
             <div className="text-[12px] font-medium text-fg-3">Links that work now</div>

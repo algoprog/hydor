@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useLocation, useRoute, useSearch } from 'wouter';
 import { activityOf } from '../../lib/activity';
 import { useSessions, useUI } from '../../lib/store';
@@ -41,8 +41,9 @@ function useDrag(onMove: (dy: number) => void) {
   };
 }
 
-/** Pages fade in when you move between sections (not when a file or folder changes inside one). */
-function Routes() {
+/** Pages fade in when you move between sections (not when a file or folder changes inside one).
+ * Memoized: the shell re-rendering (a panel or the drawer toggled) never re-renders the page. */
+const Routes = memo(function Routes() {
   const [loc] = useLocation();
   const section = loc.startsWith('/s/') ? loc : loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' ? '/usage' : loc;
   return (
@@ -50,7 +51,7 @@ function Routes() {
       <Page />
     </div>
   );
-}
+});
 
 function Page() {
   const [loc] = useLocation();
@@ -97,9 +98,43 @@ function useTitleBadge() {
   }, [waiting]);
 }
 
+/** The phone's drawer. It stays built, off to the side, so it opens at once and slides in and out;
+ * toggling it re-renders only this (the sidebar inside is memoized). */
+function MobileDrawer() {
+  const open = useUI((s) => s.drawerOpen);
+  // `inert` restyles every row of the drawer (a long session list), which held the slide back by a
+  // few frames on phones: it follows once the drawer has come to rest, so the slide starts at once.
+  const [rest, setRest] = useState(open);
+  useEffect(() => {
+    const t = setTimeout(() => setRest(open), 300);
+    return () => clearTimeout(t);
+  }, [open]);
+  return (
+    <>
+      <div
+        aria-hidden
+        onPointerDown={() => useUI.getState().set({ drawerOpen: false })}
+        className={cx('fixed inset-0 z-40 bg-black/45 transition-opacity duration-200 motion-reduce:transition-none', open ? 'opacity-100' : 'pointer-events-none opacity-0')}
+      />
+      <div
+        inert={!rest}
+        className={cx(
+          'fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[340px] transition-[translate,box-shadow] duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-[translate] motion-reduce:transition-none',
+          open ? 'translate-x-0 shadow-lg' : '-translate-x-full',
+        )}
+      >
+        <Sidebar mobile />
+      </div>
+    </>
+  );
+}
+
 export function Shell() {
   const mobile = useIsMobile();
-  const { sideOpen, drawerOpen, panelOpen, panelHeight } = useUI();
+  // Only what the shell lays out: the drawer listens for itself (MobileDrawer).
+  const sideOpen = useUI((s) => s.sideOpen);
+  const panelOpen = useUI((s) => s.panelOpen);
+  const panelHeight = useUI((s) => s.panelHeight);
   const [loc] = useLocation();
   // The ? sits in the corner only where it clears a centred composer, the terminal and the panel.
   const roomy = useMediaQuery(sideOpen ? '(min-width: 1180px)' : '(min-width: 900px)');
@@ -142,21 +177,7 @@ export function Shell() {
         <div className="min-h-0 flex-1">
           <Routes />
         </div>
-        {/* The drawer stays built, off to the side: it opens at once and slides in and out. */}
-        <div
-          aria-hidden
-          onPointerDown={() => useUI.getState().set({ drawerOpen: false })}
-          className={cx('fixed inset-0 z-40 bg-black/45 transition-opacity duration-200 motion-reduce:transition-none', drawerOpen ? 'opacity-100' : 'pointer-events-none opacity-0')}
-        />
-        <div
-          inert={!drawerOpen}
-          className={cx(
-            'fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[340px] transition-[translate,box-shadow] duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-[translate] motion-reduce:transition-none',
-            drawerOpen ? 'translate-x-0 shadow-lg' : '-translate-x-full',
-          )}
-        >
-          <Sidebar mobile />
-        </div>
+        <MobileDrawer />
         <UploadsPanel />
         <QuickOpen />
         <CommandPalette />

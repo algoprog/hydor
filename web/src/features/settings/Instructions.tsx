@@ -5,7 +5,7 @@ import { api, enc, post } from '../../lib/api';
 import { basename, bytes, dirname, joinPath, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError, useApp, useUI } from '../../lib/store';
-import { Button, cx, Dialog, Dots, Empty, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, Empty, useConfirm } from '../../components/ui';
 import { FileEditor } from '../files/FileEditor';
 
 /** The instruction file each agent reads: Claude Code's CLAUDE.md, Codex's AGENTS.md. */
@@ -106,7 +106,7 @@ export function InstructionsEditor({ agent, cwd, className, guard }: { agent: Ag
         <div className="px-2 pt-1 pb-1.5 text-[11.5px] font-medium text-fg-3">Read in this order</div>
         {!files ? (
           <div className="flex justify-center py-6 text-fg-3">
-            <Dots />
+            <Throbber />
           </div>
         ) : (
           files.map((f) => (

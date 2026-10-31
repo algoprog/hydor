@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 import { basename, dirname, tildify } from '../../lib/format';
 import { openFile } from '../../lib/nav';
 import { useApp, useUI } from '../../lib/store';
-import { cx, Dialog, Dots, IconButton } from '../../components/ui';
+import { cx, Dialog, Throbber, IconButton } from '../../components/ui';
 
 interface Match {
   path: string;
@@ -106,7 +106,7 @@ export function FileSearchPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto pb-4">
         {busy && !res && (
           <div className="flex justify-center py-6 text-fg-3">
-            <Dots />
+            <Throbber />
           </div>
         )}
         {res && !res.matches.length && <div className="px-4 py-6 text-center text-[12.5px] text-fg-3">No results</div>}

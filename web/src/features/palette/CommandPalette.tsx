@@ -12,7 +12,7 @@ import { go, openSession } from '../../lib/nav';
 import { useApp, useSessions, useUI } from '../../lib/store';
 import { allThemes, applyTheme, pickTheme } from '../../lib/theme';
 import { AgentIcon } from '../../components/AgentIcon';
-import { cx, Dots } from '../../components/ui';
+import { cx, Throbber } from '../../components/ui';
 import { folderName } from '../sessions/SessionList';
 
 export const usePalette = create<{ open: boolean }>(() => ({ open: false }));
@@ -217,7 +217,7 @@ export function CommandPalette() {
             placeholder="Sessions, actions and messages… (> for actions only)"
             className="h-12 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-fg-3"
           />
-          {hits === null && q.trim().length >= 3 && !onlyActions && <Dots className="text-fg-3" />}
+          {hits === null && q.trim().length >= 3 && !onlyActions && <Throbber className="text-fg-3" />}
         </div>
         <div ref={listRef} className="min-h-0 overflow-y-auto p-1.5">
           {!items.length && <div className="px-3 py-6 text-center text-[13px] text-fg-3">Nothing matches.</div>}

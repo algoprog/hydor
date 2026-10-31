@@ -169,6 +169,9 @@ export function severityColor(p: number | null | undefined): string {
   return 'var(--viz-1)';
 }
 
+/** Columns grow from their baseline (y) when a chart first shows, one after another. */
+const grow = (y: number, i: number) => ({ transformOrigin: `0 ${y}px`, animationDelay: `${Math.min(i * 18, 420)}ms` });
+
 export function Meter({ percent, color, height = 6, className }: { percent: number | null | undefined; color?: string; height?: number; className?: string }) {
   const p = Math.max(0, Math.min(100, percent ?? 0));
   const c = color ?? severityColor(percent);
@@ -180,7 +183,7 @@ export function Meter({ percent, color, height = 6, className }: { percent: numb
   }, [p]);
   return (
     <div className={cx('w-full overflow-hidden rounded-full', className)} style={{ height, background: `color-mix(in srgb, ${c} 16%, transparent)` }}>
-      <div className="h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${w}%`, background: c, minWidth: w > 0 ? 3 : 0 }} />
+      <div className="anim-grow-x h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${w}%`, background: c, minWidth: w > 0 ? 3 : 0 }} />
     </div>
   );
 }
@@ -239,7 +242,7 @@ export function Columns({ data, height = 120, format, axisFormat, color = 'var(-
             return (
               <g key={d.key} onPointerEnter={() => setHover(i)}>
                 <rect x={axisW + i * slot} y={0} width={slot} height={padTop + plotH} fill="transparent" />
-                {path && <path d={path} fill={color} opacity={hover == null || hover === i ? 1 : 0.55} />}
+                {path && <path d={path} fill={color} opacity={hover == null || hover === i ? 1 : 0.55} className="bar-in" style={grow(padTop + plotH, i)} />}
               </g>
             );
           })}
@@ -352,8 +355,10 @@ export function DivergingColumns({
             return (
               <g key={d.key} onPointerEnter={() => setHover(i)}>
                 <rect x={axisW + i * slot} y={0} width={slot} height={padTop + plotH} fill="transparent" />
-                <path d={roundedTop(bx, zero - hu - 1, bw, hu, 4)} fill={up.color} opacity={dim} />
-                <path d={roundedBottom(bx, zero + 1, bw, hd, 4)} fill={down.color} opacity={dim} />
+                <g className="bar-in" style={grow(zero, i)}>
+                  <path d={roundedTop(bx, zero - hu - 1, bw, hu, 4)} fill={up.color} opacity={dim} />
+                  <path d={roundedBottom(bx, zero + 1, bw, hd, 4)} fill={down.color} opacity={dim} />
+                </g>
               </g>
             );
           })}
@@ -425,6 +430,7 @@ export function StackedColumns({
             return (
               <g key={d.key} onPointerEnter={() => setHover(i)} opacity={hover != null && hover !== i ? 0.55 : 1}>
                 <rect x={axisW + i * slot} y={0} width={slot} height={padTop + plotH} fill="transparent" />
+                <g className="bar-in" style={grow(padTop + plotH, i)}>
                 {d.values.map((v, j) => {
                   const h = (v / max) * plotH;
                   if (h <= 0) return null;
@@ -435,6 +441,7 @@ export function StackedColumns({
                   base = top;
                   return <path key={j} d={path} fill={series[j].color} />;
                 })}
+                </g>
               </g>
             );
           })}

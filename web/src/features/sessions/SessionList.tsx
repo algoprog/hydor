@@ -26,7 +26,7 @@ import { activityOf, inBackground, isBusy, isWorking } from '../../lib/activity'
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { DiffStat } from '../../components/DiffView';
-import { cx, Dots, MenuItem, Popover, useMediaQuery } from '../../components/ui';
+import { cx, Throbber, MenuItem, Popover, useMediaQuery } from '../../components/ui';
 import { Elapsed } from '../session/items';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
@@ -291,7 +291,7 @@ function SearchResults({ q }: { q: string }) {
       ctl.abort();
     };
   }, [q]);
-  if (!hits) return <div className="flex justify-center py-8 text-fg-3">{busy && <Dots />}</div>;
+  if (!hits) return <div className="flex justify-center py-8 text-fg-3">{busy && <Throbber />}</div>;
   if (!hits.length) return <div className="px-3 py-8 text-center text-[13px] text-fg-3">No sessions match “{q}”.</div>;
   return (
     <div className="space-y-0.5 px-2 pb-3">
@@ -436,7 +436,7 @@ export function SessionList({ query }: { query: string }) {
   if (!loaded) {
     return (
       <div className="flex justify-center py-10 text-fg-3">
-        <Dots />
+        <Throbber size={28} />
       </div>
     );
   }

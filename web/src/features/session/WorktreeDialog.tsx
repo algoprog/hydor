@@ -7,7 +7,7 @@ import { api, enc, post } from '../../lib/api';
 import { tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
-import { Button, Dialog, Dots } from '../../components/ui';
+import { Button, Dialog, Throbber } from '../../components/ui';
 
 type State = WorktreeInfo & { exists: boolean; dirty: number; ahead: number; behind: number };
 
@@ -42,7 +42,7 @@ export function WorktreeDialog({ s, open, onClose }: { s: SessionSummary; open: 
     <Dialog open={open} onClose={onClose} title="Worktree" width={480}>
       {!st ? (
         <div className="flex justify-center py-6 text-fg-3">
-          <Dots />
+          <Throbber />
         </div>
       ) : (
         <div className="space-y-4 text-[13.5px]">

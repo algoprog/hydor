@@ -6,7 +6,7 @@ import { basename, bytes, dirname, tildify } from '../../lib/format';
 import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
-import { Button, cx, Dots, Empty, IconButton, useIsMobile } from '../../components/ui';
+import { Button, cx, Throbber, Empty, IconButton, useIsMobile } from '../../components/ui';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { mu } from '../../lib/machine';
 
@@ -280,7 +280,7 @@ export function FileEditor({
           <Empty title="Could not open the file">{error}</Empty>
         ) : !file ? (
           <div className="flex h-full items-center justify-center text-fg-3">
-            <Dots />
+            <Throbber size={34} />
           </div>
         ) : media && (file.binary || ext === 'svg') ? (
           <div className="flex h-full items-center justify-center overflow-auto bg-bg-1 p-4">
@@ -308,13 +308,13 @@ export function FileEditor({
             />
           ) : (
             <div className="flex h-full items-center justify-center text-fg-3">
-              <Dots />
+              <Throbber size={34} />
             </div>
           )
         ) : mode === 'preview' ? (
           <div className="h-full overflow-auto">
             <div className="mx-auto max-w-[860px] px-5 py-6">
-              {mdHtml ? <Markdown text={doc.current} rehypeExtra={mdHtml.MD_HTML} resolveImage={docImages} baseDir={dirname(path)} /> : <Dots className="text-fg-3" />}
+              {mdHtml ? <Markdown text={doc.current} rehypeExtra={mdHtml.MD_HTML} resolveImage={docImages} baseDir={dirname(path)} /> : <Throbber className="text-fg-3" />}
             </div>
           </div>
         ) : mode === 'diff' ? (

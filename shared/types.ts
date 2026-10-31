@@ -649,6 +649,9 @@ export interface StatsBucket extends StatsTotals {
 }
 
 export interface StatsResponse {
+  /** When the history starts, overall and per agent (ms). */
+  firstAt?: number;
+  firstByAgent?: Partial<Record<Agent, number>>;
   granularity: StatsGranularity;
   tz: string;
   agent: 'all' | Agent;
@@ -713,7 +716,8 @@ export interface SystemInfo {
 }
 
 export type ServerEvent =
-  | { t: 'hello'; version: string }
+  | { t: 'hello'; version: string; build?: string }
+  | { t: 'update'; update: UpdateState | null }
   | { t: 'sessions'; upsert: SessionSummary[]; remove?: string[] }
   | { t: 'items'; key: string; items: TimelineItem[]; total: number; reset?: boolean }
   | { t: 'live'; key: string; live: LiveState | null; overlay: LiveOverlay }
@@ -945,4 +949,35 @@ export interface InstructionFile {
 export interface SetupResult {
   ok: boolean;
   output: string;
+}
+
+/** How the last update went. */
+export interface UpdateResult {
+  ok: boolean;
+  at: number;
+  /** Installed by itself, not from "Update now". */
+  auto: boolean;
+  /** Short commits before and after. */
+  from?: string;
+  to?: string;
+  /** Built, but this server cannot restart itself: it runs the new version after a restart. */
+  needsRestart?: boolean;
+  error?: string;
+}
+
+/** A newer version, and updating to it, for a copy installed from git with an upstream. */
+export interface UpdateState {
+  /** Commits behind the upstream at the last check. */
+  behind: number;
+  /** The newest upstream commit's subject. */
+  latest?: string;
+  checkedAt: number;
+  /** Why the upstream could not be reached (the counts are then from the last time it could). */
+  error?: string;
+  /** Updates install themselves after 5 hours without a message from you, at most once a day. */
+  auto: boolean;
+  /** The server comes back by itself after it exits, its agents left running (the installer's service, the Docker image). */
+  canRestart: boolean;
+  running?: { phase: 'pull' | 'install' | 'build' | 'restart'; since: number; auto: boolean };
+  last?: UpdateResult;
 }

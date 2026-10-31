@@ -1,7 +1,7 @@
 // Settings → Machines: other machines running Agent Console that this app shows (each under /m/<id>/,
 // reached over SSH or by URL), and the access tokens other machines use to reach the machine shown.
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowUpRight, KeyRound, Plus, Trash2 } from 'lucide-react';
 import type { MachineView } from '@shared/types';
 import { api, del, patch, post } from '../../lib/api';
 import { ago } from '../../lib/format';
@@ -9,8 +9,9 @@ import { machineId, machinePath } from '../../lib/machine';
 import { useMachines } from '../../lib/machines';
 import { toastError, useApp } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Dots, IconButton, inputCls, Section, Segmented, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, Segmented, useConfirm } from '../../components/ui';
 import { MACHINE_DOT, machineLine } from '../machines/MachineSwitcher';
+import { RefreshIcon } from '../../components/RefreshIcon';
 
 const CLI = 'node dist/server/cli.js access-token';
 
@@ -41,7 +42,7 @@ export function MachineSettings() {
         }
       >
         {!loaded ? (
-          <Dots className="text-fg-3" />
+          <Throbber className="text-fg-3" />
         ) : (
           <div className="-my-1 divide-y divide-line">
             <div className="flex items-center gap-3 py-2.5">
@@ -72,7 +73,7 @@ export function MachineSettings() {
                 <div className="flex items-center gap-1">
                   {m.status.state === 'offline' && (
                     <IconButton label="Try again now" size="sm" onClick={() => post(`/api/machines/${m.id}/reconnect`).catch(toastError)}>
-                      <RefreshCw size={14} />
+                      <RefreshIcon size={14} />
                     </IconButton>
                   )}
                   {m.id !== machineId && (
@@ -252,7 +253,7 @@ function AccessTokens() {
       }
     >
       {!list ? (
-        <Dots className="text-fg-3" />
+        <Throbber className="text-fg-3" />
       ) : !list.length ? (
         <p className="text-[13px] leading-relaxed text-fg-3">None yet.</p>
       ) : (

@@ -309,13 +309,17 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
             onClick={start}
             disabled={!ready}
             title={`Start (Enter)`}
+            aria-label="Start"
             className={cx(
-              'ml-0.5 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full pr-3 pl-3.5 text-[13.5px] font-medium transition duration-150 active:scale-95',
+              // A round arrow on phones, so the pickers beside it keep their labels.
+              'group ml-0.5 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full pr-3 pl-3.5 text-[13.5px] font-medium transition duration-150 active:scale-95 max-md:w-9 max-md:px-0',
               ready ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3',
             )}
           >
-            {busy ? 'Starting…' : 'Start'}
-            <ArrowUp size={16} strokeWidth={2.4} />
+            <span className="max-md:hidden">{busy ? 'Starting…' : 'Start'}</span>
+            <span className={cx('ico', ready && 'ico-rise')}>
+              <ArrowUp size={16} strokeWidth={2.4} />
+            </span>
           </button>
         </div>
       </div>
@@ -384,14 +388,14 @@ export function HomePage() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[760px] px-4 pb-12 sm:px-6">
-          <div className={cx('anim-in text-center', mobile ? 'pt-6' : 'pt-[11vh]')}>
-            <h1 className="text-[26px] font-semibold tracking-tight sm:text-[30px]">What should we work on?</h1>
-            <p className="mt-2 text-[14.5px] text-fg-3">Start a Claude Code or Codex session in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}.</p>
+          <div className={cx('anim-in text-center', mobile ? 'pt-3' : 'pt-[11vh]')}>
+            <h1 className="text-[23px] font-semibold tracking-tight sm:text-[30px]">What should we work on?</h1>
+            <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">Start a Claude Code or Codex session in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}.</p>
           </div>
-          <div className="anim-in mt-8 [animation-delay:70ms]">
+          <div className="anim-in mt-6 [animation-delay:70ms] sm:mt-8">
             <StartComposer key={search} initialCwd={initialCwd} link={link} />
           </div>
-          <div className="anim-in mt-8 flex justify-center [animation-delay:140ms]">
+          <div className="anim-in mt-5 flex justify-center [animation-delay:140ms] sm:mt-8">
             <TodayStrip />
           </div>
           {mobile && <RecentSessions />}

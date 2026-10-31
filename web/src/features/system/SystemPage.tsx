@@ -8,11 +8,11 @@ import { toastError, useApp, useSystemLive } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { CoreGrid, Legend, Meter, severityColor, Sparkline, TimeSeries, useInterval } from '../../components/charts';
 import { PageHeader } from '../layout/PageHeader';
-import { Button, cx, Dots, Segmented, useConfirm } from '../../components/ui';
+import { Button, cx, Throbber, Segmented, useConfirm } from '../../components/ui';
 
 function Card({ icon, title, right, children, className }: { icon: React.ReactNode; title: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className={cx('rounded-2xl border border-line bg-panel p-4', className)}>
+    <section className={cx('min-w-0 rounded-2xl border border-line bg-panel p-4', className)}>
       <header className="mb-3 flex items-center gap-2">
         <span className="text-fg-3">{icon}</span>
         <h2 className="flex-1 text-[13px] font-semibold">{title}</h2>
@@ -25,7 +25,7 @@ function Card({ icon, title, right, children, className }: { icon: React.ReactNo
 
 function Tile({ icon, label, value, sub, spark, sparkMax }: { icon: React.ReactNode; label: string; value: string; sub?: string; spark?: number[]; sparkMax?: number }) {
   return (
-    <div className="rounded-2xl border border-line bg-panel px-4 pt-3 pb-2">
+    <div className="min-w-0 rounded-2xl border border-line bg-panel px-4 pt-3 pb-2">
       <div className="flex items-center gap-1.5 text-[12px] text-fg-3">
         {icon}
         {label}
@@ -74,8 +74,8 @@ function ProcTable({ info }: { info: SystemInfo }) {
           <thead>
             <tr className="text-left text-[11px] text-fg-3">
               <th className="py-1 pr-3 font-medium">Process</th>
-              <th className="py-1 pr-3 font-medium">PID</th>
-              <th className="py-1 pr-3 font-medium">User</th>
+              <th className="hidden py-1 pr-3 font-medium sm:table-cell">PID</th>
+              <th className="hidden py-1 pr-3 font-medium sm:table-cell">User</th>
               <th className="py-1 pr-3 text-right font-medium">CPU</th>
               <th className="py-1 pr-3 text-right font-medium">Memory</th>
               {by === 'gpu' && <th className="py-1 text-right font-medium">VRAM</th>}
@@ -84,12 +84,12 @@ function ProcTable({ info }: { info: SystemInfo }) {
           <tbody>
             {list.map((p) => (
               <tr key={p.pid} className="border-t border-line" title={p.cmd}>
-                <td className="max-w-[340px] truncate py-1.5 pr-3">
+                <td className="max-w-[46vw] truncate py-1.5 pr-3 sm:max-w-[340px]">
                   <span className="font-medium">{p.name}</span>
-                  <span className="ml-2 font-mono text-[11px] text-fg-3">{p.cmd.replace(/^\S*\//, '').slice(0, 80)}</span>
+                  <span className="ml-2 hidden font-mono text-[11px] text-fg-3 sm:inline">{p.cmd.replace(/^\S*\//, '').slice(0, 80)}</span>
                 </td>
-                <td className="py-1.5 pr-3 text-fg-3">{p.pid}</td>
-                <td className="py-1.5 pr-3 text-fg-3">{p.user}</td>
+                <td className="hidden py-1.5 pr-3 text-fg-3 sm:table-cell">{p.pid}</td>
+                <td className="hidden py-1.5 pr-3 text-fg-3 sm:table-cell">{p.user}</td>
                 <td className="py-1.5 pr-3 text-right">{p.cpu.toFixed(1)}%</td>
                 <td className="py-1.5 pr-3 text-right">{bytes(p.rss)}</td>
                 {by === 'gpu' && <td className="py-1.5 text-right">{bytes(p.gpuMem)}</td>}
@@ -180,7 +180,7 @@ export function SystemPage() {
   if (!s || !info) {
     return (
       <div className="flex h-full items-center justify-center text-fg-3">
-        <Dots />
+        <Throbber size={34} />
       </div>
     );
   }
@@ -208,7 +208,7 @@ export function SystemPage() {
         <div className="mb-4 text-[12.5px] text-fg-3">
           {info.os} · {info.kernel}
         </div>
-        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5 [&>:last-child:nth-child(odd)]:col-span-2 lg:[&>:last-child:nth-child(odd)]:col-span-1">
           <Tile icon={<Cpu size={13} />} label="CPU" value={pct(s.cpu)} sub={`load ${s.load.map((l) => l.toFixed(2)).join(' · ')}`} spark={series.cpu.slice(-60)} sparkMax={100} />
           <Tile icon={<MemoryStick size={13} />} label="Memory" value={pct(memPct)} sub={`${bytes(s.mem.used)} of ${bytes(s.mem.total)}`} spark={series.mem.slice(-60)} sparkMax={s.mem.total} />
           {s.gpus.length > 0 && <Tile icon={<Microchip size={13} />} label={`GPU × ${s.gpus.length}`} value={pct(gpuAvg)} sub={`${bytes(vramUsed)} of ${bytes(vramTotal)} VRAM`} spark={series.gpu.slice(-60)} sparkMax={100} />}
@@ -216,7 +216,7 @@ export function SystemPage() {
           <Tile icon={<HardDrive size={13} />} label="Disk I/O" value={rate(s.disk.read + s.disk.write)} sub={`read ${rate(s.disk.read)} · write ${rate(s.disk.write)}`} spark={series.wr.slice(-60).map((v, i) => v + (series.rd.slice(-60)[i] ?? 0))} />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card icon={<Cpu size={15} />} title="CPU" right={cpuTemp ? `${cpuTemp.value.toFixed(0)} °C` : undefined}>
             <TimeSeries series={[{ label: 'CPU', color: 'var(--viz-1)', values: series.cpu }]} times={times} max={100} format={(v) => `${Math.round(v)}%`} height={130} />
             <div className="mt-3 mb-1 text-[11.5px] text-fg-3">Per core</div>

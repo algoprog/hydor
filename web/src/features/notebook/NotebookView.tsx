@@ -11,7 +11,7 @@ import { highlight } from '../../lib/highlight';
 import { toast, toastError, useApp } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
 import { localImages, MD_HTML } from '../../components/markdownHtml';
-import { Button, cx, Dots, Empty, IconButton, MenuItem, MenuLabel, MenuSep, Popover, useConfirm, useIsMobile } from '../../components/ui';
+import { Button, cx, Throbber, Empty, IconButton, MenuItem, MenuLabel, MenuSep, Popover, useConfirm, useIsMobile } from '../../components/ui';
 import { fromCodePoints, kernelApi, toCodePoints, useKernel } from './kernel';
 import { initialDoc, isDirty, newCell, parseNotebook, reduce, serializeNotebook, type Cell, type CellRunView, type CellType } from './model';
 import { Outputs } from './Outputs';
@@ -447,7 +447,7 @@ function KernelPicker({
         <MenuLabel>Run this notebook with</MenuLabel>
         {!data ? (
           <div className="flex justify-center py-4 text-fg-3">
-            <Dots />
+            <Throbber />
           </div>
         ) : !data.envs.length ? (
           <div className="px-2.5 py-2 text-[12.5px] text-fg-3">No Python environments were found.</div>
@@ -478,7 +478,7 @@ function KernelPicker({
                   !e.ready &&
                   e.kind !== 'spec' &&
                   (installing === e.id ? (
-                    <Dots className="px-2 text-fg-3" />
+                    <Throbber className="px-2 text-fg-3" />
                   ) : (
                     <Button
                       size="sm"
@@ -993,7 +993,7 @@ export default function NotebookView({ path, onSource }: { path: string; onSourc
           </Empty>
         ) : !nb ? (
           <div className="flex h-full items-center justify-center text-fg-3">
-            <Dots />
+            <Throbber size={34} />
           </div>
         ) : (
           <div className="mx-auto max-w-[1000px] px-1 pt-4 pb-24 sm:px-4">
