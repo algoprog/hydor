@@ -1,6 +1,7 @@
 // Above a session's message box while its browser is open: what the agent is doing there, a live
 // view to watch (full screen on a phone), taking over to log in or pass a check, and handing back.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, ChevronDown, ChevronUp, CreditCard, Ellipsis, FileDown, Globe, Hand, Keyboard, Maximize2, Minimize2, RotateCw, Server, X } from 'lucide-react';
 import type { BrowserAsk, BrowserView } from '@shared/browser';
 import type { SessionSummary } from '@shared/types';
@@ -396,40 +397,45 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
           )}
         </div>
       </div>
-      {full && view.open && (
-        <div className="anim-overlay fixed inset-0 z-50 flex flex-col bg-bg pt-[var(--safe-top,0px)]">
-          <div className="border-b border-line">
-            {header(true)}
-            {askList}
-            {driving && (
-              <div className="px-3 pb-2">
-                <AddressBar k={key} view={view} driving={driving} />
+      {/* Over the whole app, like the other full-screen layers: inside the page, the sidebar's group
+          headings showed through it. */}
+      {full &&
+        view.open &&
+        createPortal(
+          <div className="anim-overlay fixed inset-0 z-50 flex flex-col bg-bg pt-[var(--safe-top,0px)]">
+            <div className="border-b border-line">
+              {header(true)}
+              {askList}
+              {driving && (
+                <div className="px-3 pb-2">
+                  <AddressBar k={key} view={view} driving={driving} />
+                </div>
+              )}
+            </div>
+            <FitBox>
+              {(w, h) => (
+                <>
+                  <FitPage k={key} view={view} on={driving && mobile} area={{ w, h }} />
+                  <LiveView ref={live} k={key} view={view} driving={driving} maxH={`${Math.max(120, h - 16)}px`} className="rounded-lg border border-line" />
+                  {view.dialog && <DialogCard k={key} view={view} />}
+                </>
+              )}
+            </FitBox>
+            {driving && mobile && (
+              <div className="flex shrink-0 gap-1 overflow-x-auto border-t border-line bg-bg-1 px-1.5 py-1.5 pb-[max(6px,var(--safe-bottom))] [&::-webkit-scrollbar]:hidden">
+                <button onClick={() => live.current?.keyboard()} aria-label="Keyboard" className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 text-[12.5px] font-medium text-accent-fg">
+                  <Keyboard size={15} /> Type
+                </button>
+                {KEYS.map((x) => (
+                  <button key={x.key} onClick={() => live.current?.press(x.key)} className="h-9 min-w-9 shrink-0 rounded-md bg-bg-3 px-2.5 font-mono text-[12.5px] text-fg">
+                    {x.label}
+                  </button>
+                ))}
               </div>
             )}
-          </div>
-          <FitBox>
-            {(w, h) => (
-              <>
-                <FitPage k={key} view={view} on={driving && mobile} area={{ w, h }} />
-                <LiveView ref={live} k={key} view={view} driving={driving} maxH={`${Math.max(120, h - 16)}px`} className="rounded-lg border border-line" />
-                {view.dialog && <DialogCard k={key} view={view} />}
-              </>
-            )}
-          </FitBox>
-          {driving && mobile && (
-            <div className="flex shrink-0 gap-1 overflow-x-auto border-t border-line bg-bg-1 px-1.5 py-1.5 pb-[max(6px,var(--safe-bottom))] [&::-webkit-scrollbar]:hidden">
-              <button onClick={() => live.current?.keyboard()} aria-label="Keyboard" className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 text-[12.5px] font-medium text-accent-fg">
-                <Keyboard size={15} /> Type
-              </button>
-              {KEYS.map((x) => (
-                <button key={x.key} onClick={() => live.current?.press(x.key)} className="h-9 min-w-9 shrink-0 rounded-md bg-bg-3 px-2.5 font-mono text-[12.5px] text-fg">
-                  {x.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

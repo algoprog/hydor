@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { AlarmClock, Archive, CheckCheck, ChevronLeft, ChevronRight, Copy, FileDiff, FilePen, FilePlus2, FileText, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, MoreHorizontal, PanelRight, Pencil, Pin, Play, Shrink, Square, SquareTerminal, Target, Trash2, UserRound, X } from 'lucide-react';
 import type { BackgroundTask, FileChange, SessionSummary, ToolItem } from '@shared/types';
 import { api, del, enc, post } from '../../lib/api';
@@ -753,11 +754,15 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
               <Details s={summary} version={version} onClose={close} />
             </aside>
           ) : (
-            <div className="anim-overlay scrim fixed inset-0 z-40 flex justify-end [--scrim:0.26]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-              <div className="anim-slide-left h-full w-full max-w-[440px] border-l border-line shadow-lg">
-                <Details s={summary} version={version} onClose={close} />
-              </div>
-            </div>
+            // Over the whole app, so the sidebar dims with the rest and its group headings stay behind.
+            createPortal(
+              <div className="anim-overlay scrim fixed inset-0 z-40 flex justify-end [--scrim:0.26]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+                <div className="anim-slide-left h-full w-full max-w-[440px] border-l border-line shadow-lg">
+                  <Details s={summary} version={version} onClose={close} />
+                </div>
+              </div>,
+              document.body,
+            )
           ))}
       </div>
     </SessionCtx.Provider>
