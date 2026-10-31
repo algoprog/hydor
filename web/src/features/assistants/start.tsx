@@ -1,15 +1,15 @@
 // What the start page takes from assistants beyond the picker: the folder chip with "New task folder"
 // (a fresh folder for the task, the default unless a folder is picked or the assistant works in
 // projects, like Coder), and the agent, model and mode an assistant suggests, set when it is picked.
-import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, FolderOpen, FolderPlus } from 'lucide-react';
+import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Check, FolderPlus } from 'lucide-react';
 import { agentMode, type Assistant } from '@shared/assistants';
 import type { Agent } from '@shared/types';
 import { post } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
 import { useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
-import { cx, Popover } from '../../components/ui';
+import { cx, Popover, SettingChip } from '../../components/ui';
 import { assistantIn, lastAssistant, useAssistantsState } from './state';
 
 /** Makes the new task's folder (Settings → Assistants says where) and returns its path. */
@@ -24,41 +24,36 @@ export function useTaskFolder(assistant: string | undefined, pick: boolean | nul
   return pick ?? (a ? a.folder !== 'project' : false);
 }
 
-/** "📁 New task folder ▾", or the folder a new session works in; picking a folder turns the new one off. */
-export function WorkFolderChip({ value, task, onFolder, onTask }: { value: string; task: boolean; onFolder: (path: string) => void; onTask: () => void }) {
+/**
+ * "Folder  New task folder", or the folder a new session works in; picking a folder turns the new one
+ * off. `children` go at the end of its menu: what goes with a folder of your own (a worktree, the
+ * instructions the agent reads there); `note` follows the folder's name ("· new worktree").
+ */
+export function WorkFolderChip({ value, task, onFolder, onTask, note, children }: { value: string; task: boolean; onFolder: (path: string) => void; onTask: () => void; note?: string; children?: ReactNode }) {
   const home = useApp((s) => s.boot?.home) ?? '';
   const st = useAssistantsState();
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const root = tildify(st?.taskRoot ?? `${home}/Naget`, home);
+  const extras = Children.toArray(children);
   const use = (p: string) => {
     onFolder(p);
     setOpen(false);
   };
   return (
     <>
-      <button
+      <SettingChip
         ref={ref}
-        type="button"
+        label="Folder"
+        open={open}
         onClick={() => {
           setDraft(task ? '' : tildify(value, home));
           setOpen((o) => !o);
         }}
         title={task ? `A new folder for this task, in ${root}` : tildify(value, home)}
-        className={cx('inline-flex h-8 max-w-[16rem] min-w-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg', open && 'bg-bg-2 text-fg')}
-      >
-        {task ? <FolderPlus size={15} className="shrink-0 text-fg-3" /> : <FolderOpen size={15} className="shrink-0 text-fg-3" />}
-        {task ? (
-          <span className="truncate font-medium">
-            <span className="max-md:hidden">New task folder</span>
-            <span className="md:hidden">New folder</span>
-          </span>
-        ) : (
-          <span className="truncate font-medium">{value === home ? '~' : basename(value) || '/'}</span>
-        )}
-        <ChevronDown size={13} className="shrink-0 opacity-60 max-md:hidden" />
-      </button>
+        value={task ? 'New task folder' : `${value === home ? '~' : basename(value) || '/'}${note ? ` · ${note}` : ''}`}
+      />
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(420, window.innerWidth - 16)}>
         <div className="p-2">
           <button
@@ -91,6 +86,12 @@ export function WorkFolderChip({ value, task, onFolder, onTask }: { value: strin
               Use this folder
             </button>
           </div>
+          {extras.length > 0 && (
+            <>
+              <div className="mx-0.5 my-2 h-px bg-line" />
+              <div onClick={(e) => (e.target as HTMLElement).closest('[data-closes]') && setOpen(false)}>{extras}</div>
+            </>
+          )}
         </div>
       </Popover>
     </>

@@ -6,7 +6,7 @@ import { OctagonAlert, Wallet } from 'lucide-react';
 import { parseCap, usd, type BudgetNote } from '@shared/budget';
 import type { SessionExtra, SessionNote } from '@shared/features';
 import type { SessionSummary } from '@shared/types';
-import { Button, cx, inputCls, MenuItem, Popover } from '../../components/ui';
+import { Button, cx, inputCls, MenuItem, Popover, SettingChip } from '../../components/ui';
 import { openSession } from '../../lib/nav';
 import type { WebFeature } from '../registry';
 import { CapDialog } from './CapDialog';
@@ -100,21 +100,19 @@ function StartCap({ value, onChange }: { value: SessionExtra; onChange: (patch: 
   };
   return (
     <>
-      <button
+      <SettingChip
         ref={ref}
-        type="button"
+        label="Spending cap"
+        value={cap != null ? usd(cap) : 'None'}
+        on={cap != null}
+        open={open}
         onClick={() => {
           setV(cap != null ? String(cap) : '');
           setOpen((o) => !o);
         }}
-        aria-pressed={cap != null}
-        title={cap != null ? `This session stops once it has spent ${usd(cap)} (API prices)` : 'Set the most this session may spend'}
-        className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] transition-colors', cap != null ? 'bg-accent-soft text-accent' : 'text-fg-2 hover:bg-bg-2 hover:text-fg')}
-      >
-        <Wallet size={14} className={cap != null ? undefined : 'text-fg-3'} />
-        {cap != null ? usd(cap) : <span className="max-sm:hidden">Cap</span>}
-      </button>
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={264} prefer="above">
+        title={cap != null ? `This session stops once it has spent ${usd(cap)} (API prices)` : 'No limit on what this session spends. Click to set the most it may spend'}
+      />
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={264}>
         <div className="p-2">
           <div className="mb-2 text-[12.5px] leading-snug text-fg-3">The most this session may spend, at API prices. It stops there until you raise the cap.</div>
           <div className="flex gap-1.5">

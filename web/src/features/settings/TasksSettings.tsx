@@ -342,9 +342,9 @@ export function TaskEditor({
           <FolderChip value={d.cwd} onChange={(c) => set({ cwd: c })} />
         </div>
         <div className="flex flex-wrap items-center gap-0.5 rounded-xl border border-line-2 px-1.5 py-1">
-          <ModelPicker agent={d.agent} acp={d.acpAgent} value={d.model ?? null} onChange={(v) => set({ model: v ?? undefined })} />
-          <EffortPicker agent={d.agent} acp={d.acpAgent} model={d.model ?? null} value={d.effort ?? null} onChange={(v) => set({ effort: v ?? undefined })} />
-          <ModePicker agent={d.agent} acp={d.acpAgent} value={d.mode ?? null} onChange={(v) => set({ mode: v })} />
+          <ModelPicker label="Model" agent={d.agent} acp={d.acpAgent} value={d.model ?? null} onChange={(v) => set({ model: v ?? undefined })} />
+          <EffortPicker label="Effort" agent={d.agent} acp={d.acpAgent} model={d.model ?? null} value={d.effort ?? null} onChange={(v) => set({ effort: v ?? undefined })} />
+          <ModePicker label="Permissions" agent={d.agent} acp={d.acpAgent} value={d.mode ?? null} onChange={(v) => set({ mode: v })} />
           <FeatureStartOptions value={extra} onChange={(p) => set({ extra: tidyExtra({ ...extra, ...p }) })} cwd={d.cwd} />
         </div>
         <div>

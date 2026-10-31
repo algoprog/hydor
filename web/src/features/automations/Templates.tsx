@@ -5,6 +5,7 @@ import type { TaskDraft } from '@shared/automations';
 import type { Agent } from '@shared/types';
 import { DAY_NAMES } from '@shared/automations';
 import { post } from '../../lib/api';
+import { lastAgent } from '../../lib/start';
 import { toast, toastError, useApp } from '../../lib/store';
 import { FolderChip } from '../../components/FolderPicker';
 import { Button, cx, Dialog, inputCls, Section } from '../../components/ui';
@@ -15,14 +16,7 @@ import { TEMPLATES, type Template, type TemplateField } from './templates';
 const small = cx(boxCls, 'h-9 text-[13.5px]');
 
 /** The agent picked last on the start page, else Claude Code. */
-export function lastAgent(): { agent: Agent; acp: string | null } {
-  try {
-    const a = localStorage.getItem('wa.lastAgent');
-    if (a?.startsWith('acp:')) return { agent: 'acp', acp: a.slice(4) };
-    if (a === 'codex') return { agent: 'codex', acp: null };
-  } catch {}
-  return { agent: 'claude', acp: null };
-}
+export { lastAgent };
 
 /** A new task's mode: Custom's Auto suits runs nobody watches (routine steps go ahead, risky ones ask); others keep their own default. */
 export const defaultMode = (agent: Agent, acp?: string | null) => (agent === 'acp' && acp === 'console' ? 'auto' : undefined);

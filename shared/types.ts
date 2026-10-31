@@ -433,6 +433,38 @@ export interface SessionPrefs {
   account?: string;
 }
 
+/** An agent's model, effort and mode on the start page; null is the agent's own default. */
+export interface StartRun {
+  model?: string | null;
+  effort?: string | null;
+  mode?: string | null;
+  /** An added account ('' for the CLI's own sign-in). */
+  account?: string;
+}
+
+/**
+ * What the start page had picked last, so it opens that way again: kept on the server, the same on
+ * every device. Anything missing falls back to the start page's own defaults.
+ */
+export interface StartSettings {
+  /** 'claude', 'codex' or 'acp:<id>'. */
+  agent?: string;
+  /** Each agent's last model, effort, mode and account, by the same names as `agent`. */
+  runs?: Record<string, StartRun>;
+  /** The assistant (General, Researcher…). */
+  assistant?: string;
+  /** A new task folder, or the folder in `cwd`. */
+  task?: boolean;
+  /** The folder picked last (also kept while a new task folder is the pick). */
+  cwd?: string;
+  /** A worktree of its own, when the folder is a git repository. */
+  worktree?: boolean;
+  /** false: without memory. */
+  memory?: boolean;
+  /** A spending cap in US dollars. */
+  capUsd?: number;
+}
+
 /** Live additions layered over the persisted timeline. */
 export interface LiveOverlay {
   /** Items not yet written to the transcript (streaming text, starting tools). */

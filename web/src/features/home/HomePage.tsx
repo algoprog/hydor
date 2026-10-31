@@ -2,17 +2,19 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearch } from 'wouter';
 import { ArrowUp, ChevronRight, CircleHelp, FileText, GitBranch, MonitorUp, Paperclip } from 'lucide-react';
 import { startTour } from '../tour/Tour';
-import type { Agent } from '@shared/types';
+import type { Agent, StartRun } from '@shared/types';
+import type { SessionExtra } from '@shared/features';
 import { api, post } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
-import { MOD, timeAgo } from '../../lib/format';
+import { timeAgo } from '../../lib/format';
 import { openSession } from '../../lib/nav';
+import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
 import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
-import { AgentIcon } from '../../components/AgentIcon';
+import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { EffortPicker, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
-import { cx, IconButton, useIsMobile } from '../../components/ui';
+import { cx, IconButton, MenuItem, Switch, useIsMobile } from '../../components/ui';
 import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { NavButton } from '../layout/PageHeader';
 import { ActivityText, folderName, sortActive } from '../sessions/SessionList';
@@ -24,16 +26,6 @@ import { AgentPicker } from './AgentPicker';
 import { machineId } from '../../lib/machine';
 import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
 import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
-import type { SessionExtra } from '@shared/features';
-
-function lastAgent(): Agent {
-  try {
-    const a = localStorage.getItem('wa.lastAgent');
-    return a === 'codex' ? 'codex' : a?.startsWith('acp:') ? 'acp' : 'claude';
-  } catch {
-    return 'claude';
-  }
-}
 
 /** Starts a session: pick the agent and folder, type the task, press Enter. */
 /** A prompt link (/?prompt=…&agent=…&model=…&cwd=…) fills the box; it never starts anything by itself. */
@@ -46,39 +38,27 @@ function fromLink(search: string): { prompt?: string; agent?: Agent; model?: str
   return { prompt, agent: agent === 'claude' || agent === 'codex' ? agent : undefined, model: q.get('model') ?? undefined, stripped: !!raw && raw !== prompt };
 }
 
+/**
+ * The start page's message box. It opens with what was picked here last time (kept on the server, so on
+ * any device): the agent with its model, effort and permissions, the folder, the assistant, memory and a
+ * spending cap. Every setting sits in the tray under the box, named, one line for who does the work and
+ * one for where and how.
+ */
 function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: ReturnType<typeof fromLink> }) {
-  const boot = useApp((s) => s.boot);
-  const explorerRoot = useUI((s) => s.explorerRoot);
   const mobile = useIsMobile();
-  const [agent, setAgent] = useState<Agent>(() => link?.agent ?? lastAgent());
+  const [saved] = useState(() => startSettings());
+  const [first] = useState(() => (link?.agent ? { agent: link.agent, acp: null } : lastAgent()));
+  const [agent, setAgent] = useState<Agent>(first.agent);
   // An ACP agent (Settings → More agents) when agent is 'acp'.
-  const [acpId, setAcpId] = useState<string | null>(() => {
-    try {
-      const a = localStorage.getItem('wa.lastAgent');
-      return a?.startsWith('acp:') ? a.slice(4) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [acpId, setAcpId] = useState<string | null>(first.acp);
   const acpList = useApp((s) => s.boot?.acpAgents);
-  // The tour sets the agent to one of those picked there.
-  useEffect(() => {
-    const pick = (e: Event) => {
-      const v = String((e as CustomEvent<string>).detail ?? '');
-      if (v.startsWith('acp:')) {
-        setAcpId(v.slice(4));
-        setAgent('acp');
-      } else if (v === 'claude' || v === 'codex') setAgent(v);
-    };
-    window.addEventListener('wa:agent', pick);
-    return () => window.removeEventListener('wa:agent', pick);
-  }, []);
   const cat = useCatalog(agent, acpId ?? undefined);
-  const [cwd, setCwd] = useState('');
+  const [cwd, setCwd] = useState(() => initialCwd ?? saved.cwd ?? useUI.getState().explorerRoot ?? useApp.getState().boot?.defaultCwd ?? '');
   // Settings for the new session from the capabilities' start options (an assistant, memory off…).
-  const [extra, setExtra] = useState<SessionExtra>({});
-  // A new task folder (Settings → Assistants) unless a folder is picked here or linked, or the assistant works in projects (Coder).
-  const [taskPick, setTaskPick] = useState<boolean | null>(initialCwd ? false : null);
+  const [extra, setExtra] = useState<SessionExtra>(() => ({ ...(saved.memory === false ? { memory: false } : {}), ...(saved.capUsd ? { capUsd: saved.capUsd } : {}) }));
+  // A new task folder (Settings → Assistants) or the folder shown: as picked here, else as the assistant prefers (Coder works in projects).
+  const [taskPick, setTaskPick] = useState<boolean | null>(() => (initialCwd ? false : (saved.task ?? null)));
+  const folderPicked = useRef(!!initialCwd);
   const task = useTaskFolder(typeof extra.assistant === 'string' ? extra.assistant : undefined, taskPick);
   const [instructions, setInstructions] = useState(false);
   const [text, setText] = useState(link?.prompt ?? '');
@@ -89,11 +69,31 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   const [busy, setBusy] = useState(false);
   // In a git repository the session can get a worktree of its own: a branch and folder for this task.
   const [repo, setRepo] = useState<{ repo: string; branch: string } | null>(null);
-  const [worktree, setWorktree] = useState(false);
+  const [worktree, setWorktree] = useState(!!saved.worktree);
   // Accounts added for this agent (Settings → Accounts); '' is the CLI's own sign-in.
   const allAccounts = useApp((s) => s.boot?.accounts);
   const accounts = useMemo(() => (allAccounts ?? []).filter((a) => a.agent === agent), [allAccounts, agent]);
   const [account, setAccount] = useState('');
+  const key = agentKey(agent, acpId);
+  // Picks that land after the agent changes (an assistant's model and mode) belong to the new one.
+  const keyNow = useRef(key);
+  keyNow.current = key;
+  const keepRun = (r: StartRun) => saveStart({ runs: { [keyNow.current]: r } });
+
+  const chooseAgent = (a: Agent, id: string | null) => {
+    setAcpId(id);
+    setAgent(a);
+    saveStart({ agent: agentKey(a, id) });
+  };
+  // The tour sets the agent to one of those picked there.
+  useEffect(() => {
+    const pick = (e: Event) => {
+      const v = parseAgentKey(String((e as CustomEvent<string>).detail ?? ''));
+      if (v) chooseAgent(v.agent, v.acp);
+    };
+    window.addEventListener('wa:agent', pick);
+    return () => window.removeEventListener('wa:agent', pick);
+  }, []);
   useEffect(() => {
     setRepo(null);
     if (!cwd) return;
@@ -115,23 +115,32 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     ta.current?.focus();
   };
 
+  // Each agent starts from what it last ran with here (else from its last session's), or from a link's model.
+  const linked = useRef<{ agent: Agent; model: string } | null>(link?.model ? { agent: first.agent, model: link.model } : null);
   useEffect(() => {
-    if (initialCwd) setCwd(initialCwd);
-    else if (!cwd && boot) setCwd(explorerRoot ?? boot.defaultCwd);
-  }, [initialCwd, boot, explorerRoot]);
-
-  // A new agent starts from what it was last used with, or from the model just picked for it.
-  const picked = useRef<{ agent: Agent; model: string | null } | null>(link?.model ? { agent: link.agent ?? lastAgent(), model: link.model } : null);
-  useEffect(() => {
+    const r = startSettings().runs?.[key] ?? {};
     const p = cat?.prefs ?? {};
-    const pick = picked.current?.agent === agent ? picked.current : null;
-    setModel(pick ? pick.model : (p.model ?? (agent === 'codex' ? (cat?.models.find((m) => m.isDefault)?.value ?? null) : null)));
-    setEffort(p.effort ?? null);
-    setMode(p.mode ?? cat?.defaultMode ?? null);
-    setAccount(p.account ?? '');
-  }, [agent, cat]);
+    const pick = linked.current?.agent === agent ? linked.current : null;
+    if (pick && cat) linked.current = null;
+    const m = pick ? pick.model : r.model !== undefined ? r.model : p.model;
+    // Codex's default must be named: unnamed, Codex takes config.toml's model, which a ChatGPT sign-in may not allow.
+    setModel(m ?? (agent === 'codex' ? (cat?.models.find((x) => x.isDefault)?.value ?? null) : null));
+    setEffort((r.effort !== undefined ? r.effort : p.effort) ?? null);
+    const md = (r.mode !== undefined ? r.mode : p.mode) ?? null;
+    setMode(md && (!cat || cat.modes.some((x) => x.value === md)) ? md : cat?.defaultMode || null);
+    setAccount((r.account !== undefined ? r.account : p.account) ?? '');
+  }, [agent, acpId, cat]);
   // Picking an assistant sets the agent, model and mode it suggests (after the above, which it overrides).
-  useAssistantDefaults(typeof extra.assistant === 'string' ? extra.assistant : undefined, { agent, acpId, cat, setAgent, setAcpId, setModel, setMode });
+  const pendingAcp = useRef<string | null>(null);
+  useAssistantDefaults(typeof extra.assistant === 'string' ? extra.assistant : undefined, {
+    agent,
+    acpId,
+    cat,
+    setAgent: (a) => chooseAgent(a, a === 'acp' ? pendingAcp.current : null),
+    setAcpId: (id) => void (pendingAcp.current = id),
+    setModel: (m) => (setModel(m), keepRun({ model: m })),
+    setMode: (m) => (setMode(m), keepRun({ mode: m })),
+  });
 
   useLayoutEffect(() => {
     const el = ta.current;
@@ -145,14 +154,25 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     if (list.length) setAtts((l) => [...l, ...list]);
   };
 
+  const acct = accounts.some((a) => a.id === account) ? account : undefined;
   const start = async () => {
     if (busy || !cwd) return;
     setBusy(true);
+    // Kept as it was used, the whole of it, for the next start.
+    saveStart(
+      {
+        agent: key,
+        runs: { [key]: { model, effort: agent === 'acp' ? undefined : effort, mode, account: acct ?? '' } },
+        assistant: typeof extra.assistant === 'string' ? extra.assistant : undefined,
+        task,
+        cwd,
+        worktree,
+        memory: extra.memory === false ? false : null,
+        capUsd: typeof extra.capUsd === 'number' ? extra.capUsd : null,
+      },
+      true,
+    );
     try {
-      try {
-        localStorage.setItem('wa.lastAgent', agent === 'acp' ? `acp:${acpId}` : agent);
-      } catch {}
-      const acct = accounts.some((a) => a.id === account) ? account : undefined;
       const r = await post<{ key: string }>('/api/sessions', {
         agent,
         acpAgent: agent === 'acp' ? acpId : undefined,
@@ -178,57 +198,11 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   };
 
   const ready = !!cwd && !busy;
+  const iconBtn = 'shrink-0 rounded-lg p-2 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg';
   return (
     <div>
-      <div data-tour="start-bar" className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
-          <AgentPicker
-            agent={agent}
-            acpId={acpId}
-            acpList={acpList ?? []}
-            onPick={(a, id) => {
-              picked.current = null;
-              setAcpId(id);
-              setAgent(a);
-            }}
-          />
-        </div>
-        {cwd && (
-          <div className="flex min-w-0 items-center gap-0.5">
-            {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={accounts.some((a) => a.id === account) ? account : ''} onChange={setAccount} />}
-            {agent !== 'acp' && !task && (
-            <button
-              type="button"
-              onClick={() => setInstructions(true)}
-              title={`Edit the ${instructionName(agent)} ${agent === 'claude' ? 'Claude Code' : 'Codex'} reads in this folder`}
-              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
-            >
-              <FileText size={14} className="text-fg-3" />
-              {instructionName(agent)}
-            </button>
-            )}
-            {repo && !task && (
-              <button
-                type="button"
-                onClick={() => setWorktree((w) => !w)}
-                aria-pressed={worktree}
-                title={worktree ? `A new branch and folder from ${repo.branch}, just for this session` : `Work in a new worktree: a branch and folder of its own, from ${repo.branch}`}
-                className={cx(
-                  'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] transition-colors',
-                  worktree ? 'bg-accent-soft text-accent' : 'text-fg-2 hover:bg-bg-2 hover:text-fg',
-                )}
-              >
-                <GitBranch size={14} className={worktree ? undefined : 'text-fg-3'} />
-                {worktree ? 'New worktree' : 'Worktree'}
-              </button>
-            )}
-            <FeatureStartOptions value={extra} onChange={(p) => setExtra((x) => ({ ...x, ...p }))} cwd={cwd} />
-            <WorkFolderChip value={cwd} task={task} onFolder={(p) => (setCwd(p), setTaskPick(false))} onTask={() => setTaskPick(true)} />
-          </div>
-        )}
-      </div>
       {cwd && <InstructionsDialog agent={agent} cwd={cwd} open={instructions} onClose={() => setInstructions(false)} />}
-      <LimitBanner agent={agent} account={accounts.some((a) => a.id === account) ? account : undefined} className="mb-3" />
+      <LimitBanner agent={agent} account={acct} className="mb-3" />
       <div
         data-tour="composer"
         className="relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50"
@@ -269,7 +243,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
             } else if (e.key === 'Tab' && e.shiftKey) {
               e.preventDefault();
               const m = nextMode(cat, mode);
-              if (m) setMode(m);
+              if (m) (setMode(m), keepRun({ mode: m }));
             }
           }}
           onPaste={(e) => {
@@ -281,25 +255,13 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
           placeholder="Describe a task, ask a question, or paste an error…"
           className="block w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[15.5px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none"
         />
-        <div className="flex items-center gap-1 px-2.5 pb-2.5">
-          <div data-tour="pickers" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-            <ModelPicker
-              agent={agent}
-              acp={acpId ?? undefined}
-              value={model}
-              agents={agent === 'acp' ? undefined : ['claude', 'codex']}
-              onChange={(v, a) => {
-                if (a === agent) return setModel(v);
-                picked.current = { agent: a, model: v };
-                setAgent(a);
-              }}
-            />
-            <EffortPicker agent={agent} acp={acpId ?? undefined} model={model} value={effort} onChange={setEffort} />
-            <ModePicker agent={agent} acp={acpId ?? undefined} value={mode} onChange={setMode} />
-          </div>
+        <div className="flex items-center gap-0.5 px-2.5 pb-2.5">
+          <button className={iconBtn} onClick={() => fileRef.current?.click()} title="Attach files" aria-label="Attach files">
+            <Paperclip size={17} />
+          </button>
           {canCaptureScreen() && (
             <button
-              className="shrink-0 rounded-lg p-2 text-fg-3 hover:bg-bg-2 hover:text-fg"
+              className={iconBtn}
               onClick={async () => {
                 const f = await captureScreen();
                 if (f) attach([f]);
@@ -310,9 +272,6 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
               <MonitorUp size={17} />
             </button>
           )}
-          <button className="shrink-0 rounded-lg p-2 text-fg-3 hover:bg-bg-2 hover:text-fg" onClick={() => fileRef.current?.click()} title="Attach files" aria-label="Attach files">
-            <Paperclip size={17} />
-          </button>
           <FeatureComposerButtons insert={insertText} />
           <input
             ref={fileRef}
@@ -324,14 +283,15 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
               e.target.value = '';
             }}
           />
+          <span className="flex-1" />
           <button
             onClick={start}
             disabled={!ready}
-            title={`Start (Enter)`}
+            title="Start (Enter)"
             aria-label="Start"
             className={cx(
-              // A round arrow on phones, so the pickers beside it keep their labels.
-              'group ml-0.5 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full pr-3 pl-3.5 text-[13.5px] font-medium transition duration-150 active:scale-95 max-md:w-9 max-md:px-0',
+              // A round arrow on phones.
+              'group inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full pr-3 pl-3.5 text-[13.5px] font-medium transition duration-150 active:scale-95 max-md:w-9 max-md:px-0',
               ready ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3',
             )}
           >
@@ -341,12 +301,80 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
             </span>
           </button>
         </div>
-      </div>
-      {!mobile && (
-        <div className="mt-2.5 text-center text-[12px] text-fg-3">
-          Enter to start · Shift+Enter for a new line · Shift+Tab switches mode · {MOD}K finds a session
+        <div data-tour="start-bar" className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
+          <div data-tour="pickers" className="flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5">
+            <AgentPicker label="Agent" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} />
+            <ModelPicker
+              label="Model"
+              agent={agent}
+              acp={acpId ?? undefined}
+              value={model}
+              agents={agent === 'acp' ? undefined : ['claude', 'codex']}
+              onChange={(v, a) => {
+                if (a === agent) return (setModel(v), keepRun({ model: v }));
+                // Another agent's model: that agent, with it.
+                saveStart({ runs: { [a]: { model: v } } });
+                chooseAgent(a, null);
+              }}
+            />
+            <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={model} value={effort} onChange={(v) => (setEffort(v), keepRun({ effort: v }))} />
+            <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (setMode(v), keepRun({ mode: v }))} />
+            {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5">
+            <WorkFolderChip
+              value={cwd}
+              task={task}
+              note={!task && repo && worktree ? 'new worktree' : undefined}
+              onFolder={(p) => {
+                folderPicked.current = true;
+                setCwd(p);
+                setTaskPick(false);
+                saveStart({ cwd: p, task: false });
+              }}
+              onTask={() => {
+                folderPicked.current = true;
+                setTaskPick(true);
+                saveStart({ task: true });
+              }}
+            >
+              {!task && repo && (
+                <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-bg-2">
+                  <GitBranch size={16} className="shrink-0 text-fg-3" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13.5px] font-medium text-fg">New worktree</span>
+                    <span className="block truncate text-[12px] text-fg-3">A branch and folder of its own, from {repo.branch}</span>
+                  </span>
+                  <Switch on={worktree} label="Work in a new worktree" onChange={(v) => (setWorktree(v), saveStart({ worktree: v }))} />
+                </label>
+              )}
+              {!task && agent !== 'acp' && (
+                <div data-closes>
+                  <MenuItem icon={<FileText size={15} />} onClick={() => setInstructions(true)}>
+                    Edit the {instructionName(agent)} {agentName(agent)} reads here…
+                  </MenuItem>
+                </div>
+              )}
+            </WorkFolderChip>
+            <FeatureStartOptions
+              value={extra}
+              cwd={cwd}
+              onChange={(p) => {
+                const before = extra.assistant;
+                setExtra((x) => ({ ...x, ...p }));
+                if ('memory' in p) saveStart({ memory: p.memory === false ? false : null });
+                if ('capUsd' in p) saveStart({ capUsd: typeof p.capUsd === 'number' ? p.capUsd : null });
+                // The assistant picked (not the one the page opened with): its kind of folder too, unless one was picked here.
+                if (typeof p.assistant === 'string' && before !== undefined && p.assistant !== before) {
+                  saveStart({ assistant: p.assistant });
+                  if (!folderPicked.current) (setTaskPick(null), saveStart({ task: null }));
+                }
+              }}
+            />
+          </div>
         </div>
-      )}
+      </div>
+      {!mobile && <div className="mt-2.5 text-center text-[12px] text-fg-3">Enter to start · Shift+Enter for a new line · Shift+Tab changes permissions</div>}
     </div>
   );
 }
@@ -386,6 +414,7 @@ function RecentSessions() {
 
 export function HomePage() {
   const mobile = useIsMobile();
+  const booted = useApp((s) => !!s.boot);
   const host = useApp((s) => s.boot?.host);
   const search = useSearch();
   const initialCwd = new URLSearchParams(search).get('cwd') ?? undefined;
@@ -412,7 +441,8 @@ export function HomePage() {
             <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">Start an agent in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}: Claude Code, Codex, or any model.</p>
           </div>
           <div className="anim-in mt-6 [animation-delay:70ms] sm:mt-8">
-            <StartComposer key={search} initialCwd={initialCwd} link={link} />
+            {/* It opens with the last picks, which come with the bootstrap. */}
+            {booted ? <StartComposer key={search} initialCwd={initialCwd} link={link} /> : <div className="h-[200px]" />}
           </div>
           <div className="anim-in mt-5 flex justify-center [animation-delay:140ms] sm:mt-8">
             <TodayStrip />

@@ -12,6 +12,7 @@ import type {
   NotifyEvent,
   ServerEvent,
   SessionSummary,
+  StartSettings,
   SystemSample,
   TimelineItem,
   TimelinePage,
@@ -103,6 +104,8 @@ export interface Bootstrap {
   dataDir?: string;
   defaultCwd: string;
   prefs: Record<string, SessionPrefs>;
+  /** What the start page had picked last; missing on servers before it was kept. */
+  start?: StartSettings;
   indexing: { done: number; total: number; running: boolean };
   /** The welcome tour version this user finished or skipped (0: never). */
   /** The machine's hostname. */
