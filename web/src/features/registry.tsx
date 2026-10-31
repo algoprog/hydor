@@ -24,6 +24,9 @@ import { searchFeature } from './search/feature';
 import { skillpackFeature } from './skillpack/feature';
 import { voiceFeature } from './voice/feature';
 
+/** A view of a note in the conversation. One that shows several (`many`) gets the later notes of its kind in that turn as `more`, shown as one note with the first. */
+export type NoteView = ComponentType<{ note: SessionNote; sessionKey: string; more?: SessionNote[] }> & { many?: boolean };
+
 /** How one of the app's own MCP tools shows in the conversation. */
 export interface ToolView {
   /** In the folded work (the default), with the reply (a page, files made), or outside the fold because it needs the user. */
@@ -63,7 +66,7 @@ export interface WebFeature {
   /** A view for another tool call it recognises (an agent loading a skill), or nothing. */
   matchTool?: (t: ToolInfo) => ToolView | undefined;
   /** Views for the notes it adds to conversations, by kind. */
-  noteViews?: Record<string, ComponentType<{ note: SessionNote; sessionKey: string }>>;
+  noteViews?: Record<string, NoteView>;
   /** Sections of Settings (in its Capabilities group). */
   settings?: FeatureSection[];
   /** Pages of its own. */
@@ -121,7 +124,7 @@ export function toolView(name: string, t?: ToolInfo): ToolView | undefined {
   return undefined;
 }
 
-export function noteView(kind: string): ComponentType<{ note: SessionNote; sessionKey: string }> | undefined {
+export function noteView(kind: string): NoteView | undefined {
   for (const f of features()) if (f.noteViews?.[kind]) return f.noteViews[kind];
   return undefined;
 }
@@ -162,11 +165,16 @@ export function FeatureComposerButtons(p: { s?: SessionSummary; insert: (text: s
 /** The assistant leads the start options: picking one can set the others. */
 const startRank = (f: WebFeature) => (f.id === 'assistants' ? 0 : 1);
 
-export function FeatureStartOptions(p: { value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void; cwd: string }) {
+/**
+ * The capabilities' options for a new session; with `part`, only the one that leads (on the start page's
+ * row, always there) or the rest (in its Options menu, there only while it is open).
+ */
+export function FeatureStartOptions({ part, ...p }: { value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void; cwd: string; part?: 'lead' | 'rest' }) {
   return (
     <>
       {[...features()]
         .sort((a, b) => startRank(a) - startRank(b))
+        .filter((f) => !part || (startRank(f) === 0) === (part === 'lead'))
         .map((f) => (f.StartOptions ? <f.StartOptions key={f.id} {...p} /> : null))}
     </>
   );

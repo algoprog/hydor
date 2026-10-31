@@ -1,5 +1,6 @@
 // Notes the app added to a conversation (a memory update, a second opinion…): shown with the turn of
-// the item each is anchored to, or at the end of the conversation when that item is not in it.
+// the item each is anchored to, or at the end of the conversation when that item is not in it. Several
+// of a kind in one turn can show as one (memory's: one chip, not one per update).
 import { useEffect } from 'react';
 import type { SessionNote } from '@shared/features';
 import { useNotes } from '../../lib/notes';
@@ -18,9 +19,26 @@ export function useSessionNotes(key: string): SessionNote[] {
   return useNotes((s) => s.byKey[key] ?? EMPTY);
 }
 
-function NoteRow({ note, sessionKey }: { note: SessionNote; sessionKey: string }) {
+/** The notes in the order they show; a kind whose view shows several (`many`) shows once, where its first note is, with the rest. */
+function grouped(notes: SessionNote[]): { note: SessionNote; more: SessionNote[] }[] {
+  const out: { note: SessionNote; more: SessionNote[] }[] = [];
+  const firsts = new Map<string, { note: SessionNote; more: SessionNote[] }>();
+  for (const n of notes) {
+    const many = !!noteView(n.kind)?.many;
+    const first = many ? firsts.get(n.kind) : undefined;
+    if (first) first.more.push(n);
+    else {
+      const g = { note: n, more: [] };
+      out.push(g);
+      if (many) firsts.set(n.kind, g);
+    }
+  }
+  return out;
+}
+
+function NoteRow({ note, more, sessionKey }: { note: SessionNote; more: SessionNote[]; sessionKey: string }) {
   const View = noteView(note.kind);
-  return View ? <View note={note} sessionKey={sessionKey} /> : null;
+  return View ? <View note={note} more={more.length ? more : undefined} sessionKey={sessionKey} /> : null;
 }
 
 /** The notes anchored to any of `ids` (one turn's items). */
@@ -29,8 +47,8 @@ export function TurnNotes({ notes, ids, sessionKey }: { notes: SessionNote[]; id
   if (!mine.length) return null;
   return (
     <div className="space-y-1.5">
-      {mine.map((n) => (
-        <NoteRow key={n.id} note={n} sessionKey={sessionKey} />
+      {grouped(mine).map((g) => (
+        <NoteRow key={g.note.id} note={g.note} more={g.more} sessionKey={sessionKey} />
       ))}
     </div>
   );
@@ -45,8 +63,8 @@ export function LooseNotes({ notes, known, sessionKey, complete }: { notes: Sess
   if (!loose.length) return null;
   return (
     <div className="space-y-1.5">
-      {loose.map((n) => (
-        <NoteRow key={n.id} note={n} sessionKey={sessionKey} />
+      {grouped(loose).map((g) => (
+        <NoteRow key={g.note.id} note={g.note} more={g.more} sessionKey={sessionKey} />
       ))}
     </div>
   );
