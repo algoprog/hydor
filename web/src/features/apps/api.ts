@@ -1,6 +1,8 @@
 // Apps in the pages: what the server sends, where each page lives, and live news of runs.
-import { useEffect, useRef } from 'react';
-import type { AppBatch, AppDef, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AppBatch, AppDef, AppRecipe, AppRun, AppTemplate, RunAsk, RunProgress } from '@shared/apps';
+import { isActive } from '@shared/apps';
+import { api, enc } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 
 export interface Usage {
@@ -39,6 +41,14 @@ export interface RunDetail {
   recipe: RunRecipe;
   /** The app's address, while it exists. */
   slug: string | null;
+  /** Follow-ups after the task, oldest first. */
+  asks: RunAsk[];
+  /** What the agent said back to the task itself (the run's reply is to the latest message). */
+  first?: string;
+  /** Follow-ups waiting for the turn running now to end. */
+  queued: { id: string; text: string; at: number }[];
+  /** Why it takes no follow-ups (a public page's run, its session gone or open elsewhere). */
+  noAsks?: string;
 }
 
 export interface BatchDetail {
@@ -81,6 +91,40 @@ export function useRunEvents(fn: (run: AppRun) => void) {
       }),
     [],
   );
+}
+
+/** A run as its page shows it, kept current: on news of it, and every 2 s while it works or has follow-ups waiting. */
+export function useRunDetail(id: string) {
+  const [d, setD] = useState<RunDetail | null>(null);
+  const [err, setErr] = useState('');
+  // Only the latest look lands: an older answer arriving late would show the run going back.
+  const seq = useRef(0);
+  const load = useCallback(() => {
+    const n = ++seq.current;
+    return api<RunDetail>(`/api/apps/runs/${enc(id)}`).then(
+      (r) => {
+        if (n !== seq.current) return;
+        setD(r);
+        setErr('');
+      },
+      (e) => {
+        if (n === seq.current) setErr((e as Error).message);
+      },
+    );
+  }, [id]);
+  useEffect(() => {
+    setD(null);
+    setErr('');
+    load();
+  }, [load]);
+  useRunEvents((run) => run.id === id && load());
+  const busy = !!d && (isActive(d.run.status) || d.queued.length > 0);
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(load, 2000);
+    return () => clearInterval(t);
+  }, [busy, load]);
+  return { d, err, load };
 }
 
 export const money = (n?: number | null) => (n == null ? '' : n === 0 ? '$0' : n < 0.01 ? '<$0.01' : `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`);

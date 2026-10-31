@@ -34,8 +34,11 @@ export function followUpPref(): FollowUp {
   }
 }
 
-/** Messages waiting for the turn to end, each sendable now (into the turn), editable or removable. */
-export function Composer({ s }: { s: SessionSummary }) {
+/**
+ * Messages waiting for the turn to end, each sendable now (into the turn), editable or removable. `hint`:
+ * what the box suggests while the agent is free, where the page shows the session its own way (an app's result).
+ */
+export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const key = s.key;
   const lv = useLive((x) => x.byKey[key]);
   const live = lv?.live ?? s.live ?? null;
@@ -344,9 +347,11 @@ export function Composer({ s }: { s: SessionSummary }) {
                     ? followUpPref() === 'queue'
                       ? `Queue a message for when this turn ends${touch ? '' : ' · Ctrl+Enter sends it now'}`
                       : `Send a follow-up into the running turn${touch ? '' : ' · Ctrl+Enter queues it'}`
-                    : running
-                      ? `Message ${s.agent === 'claude' ? 'Claude' : s.agent === 'codex' ? 'Codex' : (s.acpName ?? 'the agent')}…`
-                      : 'Message to resume this session…'
+                    : hint
+                      ? hint
+                      : running
+                        ? `Message ${s.agent === 'claude' ? 'Claude' : s.agent === 'codex' ? 'Codex' : (s.acpName ?? 'the agent')}…`
+                        : 'Message to resume this session…'
             }
             className="block max-h-[40vh] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none disabled:cursor-not-allowed"
           />

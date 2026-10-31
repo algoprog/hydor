@@ -1,6 +1,7 @@
 // Apps: reusable tasks with a form, run from a gallery, the API, MCP or a public page.
 //
-//   /api/apps…                 the gallery, apps and their runs, keys, runs over CSV rows (signed in)
+//   /api/apps…                 the gallery, apps and their runs (and follow-ups to them), keys, runs over
+//                              CSV rows (signed in)
 //   POST /api/apps/:slug/run   a program runs an app with its API key (Authorization: Bearer napp_…),
 //                              waiting up to `wait` seconds: {status, result, reply, session}
 //   /a-api/:slug…              the public page's form and the visitor's own runs (public.ts)
@@ -15,13 +16,14 @@ import { config } from '../config.ts';
 import { runTools } from '../features/registry.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { AGENT_FILE } from '../models/config.ts';
+import { noteUserMessage } from '../updates.ts';
 import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
 import { batchCsv, MAX_ROWS, startBatch, startBatches, stopBatch } from './batch.ts';
 import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
-import { finish, markOf, noteAgentRun, progressOf, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, waitFor, WORK_DIR } from './runs.ts';
+import { finish, followUpsOf, markOf, noteAgentRun, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -41,6 +43,7 @@ import {
   runView,
   saveApp,
   usageSince,
+  type RunRecord,
 } from './store.ts';
 import { templateById, TEMPLATES } from './templates.ts';
 
@@ -190,12 +193,48 @@ function routes(d: Deps) {
     return { runs: listRuns(db, { app: a?.id ?? id, limit: 50, before: Number(q.before) || undefined }).map(runView) };
   });
 
+  /** Why a run takes no follow-ups, or nothing when it does. */
+  const noAsks = (r: RunRecord): string | undefined => {
+    if (r.source === 'public') return 'Runs from the public page take no follow-ups.';
+    const s = r.key ? sessions.summary(r.key) : null;
+    if (!s) return r.key ? 'Its session is gone.' : undefined;
+    if (s.external && (!s.live || s.live.status === 'exited')) return `Its session is open in ${s.external.client}: continue it there.`;
+    return undefined;
+  };
+
   app.get('/api/apps/runs/:runId', async (req) => {
     const r = getRun(db, P(req).runId);
     if (!r) throw new HttpError(404, 'No such run');
     const { name, icon, color, fields, answer, agent, acpAgent, model } = r.recipe;
     const a = r.app.startsWith('tpl:') ? null : getApp(db, r.app);
-    return { run: runView(r), progress: isActive(r.status) ? await progressOf(r, false) : { steps: [] }, recipe: { name, icon, color, fields, answer, agent, acpAgent, model }, slug: a?.slug ?? null };
+    const s = r.key ? sessions.summary(r.key) : null;
+    return {
+      run: runView(r),
+      progress: isActive(r.status) ? await progressOf(r, false) : { steps: [] },
+      recipe: { name, icon, color, fields, answer, agent, acpAgent, model },
+      slug: a?.slug ?? null,
+      ...(r.source === 'public' ? { asks: [] } : await followUpsOf(r)),
+      // Follow-ups typed while the agent works wait their turn in the session's queue.
+      queued: (s?.queue ?? []).map((m) => ({ id: m.id, text: m.text.slice(0, 4000), at: m.at })),
+      noAsks: noAsks(r),
+    };
+  });
+
+  /** A follow-up from the run's page: it goes to the run's session (after the turn running now, if one is). */
+  app.post('/api/apps/runs/:runId/ask', async (req) => {
+    const r = getRun(db, P(req).runId);
+    if (!r) throw new HttpError(404, 'No such run');
+    const why = noAsks(r);
+    if (why) throw new HttpError(409, why);
+    if (!r.key) throw new HttpError(409, 'It has not started yet: ask once it has.');
+    const text = String((req.body as { text?: unknown })?.text ?? '').trim();
+    if (!text) throw new HttpError(400, 'Write what to change');
+    if (text.length > 20_000) throw new HttpError(413, 'That is too long for a follow-up (at most 20,000 characters)');
+    noteUserMessage();
+    await sessions.deliverOrQueue(r.key, text);
+    // Sent: its turn has begun (a queued one opens the run when it goes out).
+    if (sessions.summary(r.key)?.live?.status === 'working') reopen(r.id);
+    return { run: runView(getRun(db, r.id)!) };
   });
 
   app.post('/api/apps/runs/:runId/stop', async (req) => {

@@ -2,12 +2,14 @@
 // it until its turn ends, nudges the agent once if it finished without handing in the answer fields,
 // then keeps the reply, the result and what it spent. Public runs use Custom with no shell and no files
 // (publicRun.ts), in a fresh folder under the system's temporary folder, deleted when they end.
+// After that, follow-ups refine it: a message to the run's session (from the run's page or the session
+// itself) opens the run again until that turn ends, and the agent hands in the whole updated result.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { SessionExtra } from '../../shared/features.ts';
-import type { AppRecipe, AppRun, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
+import type { AppRecipe, AppRun, RunAsk, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
 import { ACTIVE, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
 import type { Agent, AgentModel, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -19,7 +21,7 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { costOf, rateFor } from '../prices.ts';
 import { sessionExtra } from '../sessionExtra.ts';
-import { getRun, insertRun, listRuns, runView, updateRun, type RunRecord } from './store.ts';
+import { getRun, insertRun, listRuns, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
 
 /** Where an app's runs keep their files when the app names no folder: outside the app's data, which Custom treats as private. */
 export const WORK_DIR = process.env.NAGET_APPS_DIR || path.join(config.home, 'naget-apps');
@@ -49,8 +51,21 @@ const d = () => {
 
 /** The agent process (its run id) behind each app run, from the moment it starts. */
 const byAgentRun = new Map<string, string>();
-/** Runs being followed: when their session was last seen idle, whether a stop was asked for. */
-const followed = new Map<string, { idleSince: number; stopping?: boolean }>();
+
+/** What the server keeps about a run it follows. */
+interface Follow {
+  /** When its session was last seen idle (0: busy, or not looked at yet). */
+  idleSince: number;
+  stopping?: boolean;
+  /** Followed again for a follow-up: whether that turn handed in a result, and whether it was reminded to. */
+  ask?: { submitted: boolean; nudged: boolean };
+}
+const followed = new Map<string, Follow>();
+/** Runs being looked at right now, so two looks never both remind the agent. */
+const checking = new Set<string>();
+/** Runs whose end is being written (their reply and cost read), and those to follow again once it is. */
+const ending = new Set<string>();
+const reopenAfter = new Set<string>();
 const waiters = new Map<string, Set<() => void>>();
 const finishedHooks: ((r: RunRecord) => void)[] = [];
 
@@ -73,6 +88,17 @@ const cached = (id: string): RunRecord | null => {
   if (cache.size > 500) cache.clear();
   return r;
 };
+
+/** The run a session belongs to (null: none), asked whenever a session goes to work, so kept a while. */
+const runOfKey = new Map<string, { at: number; id: string | null }>();
+function runIdOf(key: string): string | null {
+  const hit = runOfKey.get(key);
+  if (hit && Date.now() - hit.at < 30_000) return hit.id;
+  const id = runIdByKey(d().db, key);
+  if (runOfKey.size > 2000) runOfKey.clear();
+  runOfKey.set(key, { at: Date.now(), id });
+  return id;
+}
 
 /** The app run a tool call comes from: by the agent process, else by the session's settings. */
 export function runOfCtx(ctx: Pick<RunCtx, 'runId' | 'key'>): { run: RunRecord; mark: AppMark } | null {
@@ -174,22 +200,31 @@ function modeFor(agent: Agent, acpAgent: string | undefined, mode: string | unde
   return acpAgent === CONSOLE_ID ? 'auto' : undefined;
 }
 
-/** What the agent is told about the run: the answer fields to hand in, and to finish without asking. */
+/** What the agent is told about the run: the answer fields to hand in, to finish without asking, and how follow-ups refine it. */
 export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appName'>): string {
   const lines = [
     `This session runs the app "${r.appName}" (Naget Agent Apps)${r.source === 'web' || r.source === 'test' ? '' : ': nobody watches it live'}. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`,
   ];
+  // A public page's visitor sends no follow-ups.
+  const later = r.source !== 'public';
   const a = r.recipe.answer;
   if (a.length) {
     lines.push(
-      'When you have the result, call the submit_result tool (on the naget-agent server) once, with these fields:',
+      'When you have the result, call the submit_result tool (on the naget-agent server) with these fields:',
       ...a.map((f) => {
         const kind = f.type === 'table' ? `table: a list of rows, each with ${(f.columns ?? []).map((c) => `${c.id} (${c.type})`).join(', ')}` : f.type === 'list' ? 'list of short texts' : f.type === 'markdown' ? 'text, Markdown' : f.type === 'yesno' ? 'true or false' : f.type;
         return `- ${f.id} (${kind}${f.required ? ', required' : ''}): ${f.label}${f.description ? ` — ${f.description}` : ''}`;
       }),
       'If it answers with problems, fix them and call it again. Then end with a short reply; the person sees the result as a card, so there is no need to repeat it all.',
     );
-  } else lines.push('Your last reply is the result the person sees: make it complete.');
+    if (later)
+      lines.push(
+        'Later messages may ask you to change the result. For each one that changes it, do the work, call submit_result again with the whole updated result (every field, not only what changed), then say in a sentence or two what changed. A message that changes nothing in it (thanks, a question about it) just gets its answer.',
+      );
+  } else {
+    lines.push('Your last reply is the result the person sees: make it complete.');
+    if (later) lines.push('Later messages may ask you to change it: then reply with the whole updated result again, not only what changed.');
+  }
   return lines.join('\n');
 }
 
@@ -248,7 +283,8 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
       extra,
     });
     updateRun(db, r.id, { key, status: 'running', startedAt: Date.now() });
-    const t = { idleSince: 0, stopping: followed.get(r.id)?.stopping };
+    runOfKey.set(key, { at: Date.now(), id: r.id });
+    const t: Follow = { idleSince: 0, stopping: followed.get(r.id)?.stopping };
     followed.set(r.id, t);
     // Runs nobody opens one by one stay out of the session list (they show under their app).
     if (r.source === 'public' || r.source === 'batch' || r.source === 'api' || r.source === 'mcp') sessions.setFlags(key, { archived: true });
@@ -260,6 +296,79 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
 }
 
 // ---- following -----------------------------------------------------------------------------------
+
+/** How the reminders the app sends an agent begin: they are not the person's own follow-ups. */
+const NUDGE = "You haven't handed in the result yet.";
+const RENUDGE = 'The result card still shows the earlier version.';
+const isReminder = (text: string) => [NUDGE, RENUDGE].some((p) => text.trimStart().startsWith(p));
+
+const nudgeText = (r: Pick<RunRecord, 'recipe'>) =>
+  `${NUDGE} Call submit_result now with the fields it asks for (${r.recipe.answer.map((f) => f.id).join(', ')}), from what you found. Where something could not be found, say so in that field rather than leaving it out.`;
+const renudgeText = () => `${RENUDGE} If your reply changed anything in the result, call submit_result now with the whole updated result (every field), so the person sees it. If nothing in it changed, just say so.`;
+
+type UserItem = Extract<TimelineItem, { kind: 'user' }>;
+const SUBMIT = /^mcp__(?:naget-agent|agent-console)__submit_result$/;
+
+/** The person's own messages: not notes from the agent's harness, slash commands or the app's reminders. */
+const isAsk = (i: TimelineItem): i is UserItem => i.kind === 'user' && (!i.meta || i.meta === 'queued') && (!!i.text.trim() || !!i.images) && !isReminder(i.text);
+
+interface Turn {
+  ask: UserItem;
+  said: string[];
+  /** It handed in a result in this turn. */
+  submitted: boolean;
+}
+
+/** A session in turns: the task (its first message), then each follow-up, with what the agent said and whether it handed in a result. */
+export function turnsOf(items: TimelineItem[]): Turn[] {
+  const turns: Turn[] = [];
+  for (const i of items) {
+    if (isAsk(i)) turns.push({ ask: i, said: [], submitted: false });
+    const cur = turns.at(-1);
+    if (!cur) continue;
+    if (i.kind === 'assistant' && i.text.trim()) cur.said.push(i.text.trim());
+    else if (i.kind === 'tool' && SUBMIT.test(i.tool.name) && i.tool.status === 'ok') cur.submitted = true;
+  }
+  return turns;
+}
+
+/** What the agent said back to one message: its last words, or a longer reply before a short "Done." after a reminder. */
+function replyIn(said: string[]): string | undefined {
+  if (!said.length) return undefined;
+  const last = said[said.length - 1];
+  const full = [...said].reverse().find((t) => t.length >= 300);
+  return (last.length < 300 && full ? full : last).slice(0, 60_000);
+}
+
+/** The run's reply: what the agent said back to the latest message (the task, or the latest follow-up). */
+function replyOf(items: TimelineItem[]): string | undefined {
+  const turns = turnsOf(items);
+  if (turns.length) return replyIn(turns[turns.length - 1].said);
+  return replyIn(items.filter((i): i is Extract<TimelineItem, { kind: 'assistant' }> => i.kind === 'assistant' && !!i.text.trim()).map((i) => i.text.trim()));
+}
+
+async function itemsOf(key: string): Promise<TimelineItem[]> {
+  const tl = await d().sessions.timeline(key).catch(() => null);
+  await tl?.readMore().catch(() => {});
+  return tl?.parser.items ?? [];
+}
+
+/**
+ * A run's session took a follow-up after the run ended (from the run's page, the session's own page, the
+ * queue, or the agent going on by itself): the run is followed again until that turn ends, and takes the
+ * new result if the agent hands one in. Public runs take none: their visitor has no session to ask in.
+ */
+export function reopen(id: string) {
+  const { db } = d();
+  const r = getRun(db, id);
+  if (!r?.key || r.source === 'public' || isActive(r.status)) return;
+  // Its end is still being written: follow it again once that is done.
+  if (ending.has(id)) return void reopenAfter.add(id);
+  followed.set(id, { idleSince: 0, ask: { submitted: false, nudged: false } });
+  updateRun(db, id, { status: 'running', startedAt: Date.now(), endedAt: null, error: null });
+  cache.delete(id);
+  changed(getRun(db, id));
+}
 
 /** Looks at a followed run's session and moves it on: running, waiting for you, or done. */
 async function check(id: string) {
@@ -286,29 +395,64 @@ async function check(id: string) {
     setTimeout(() => void check(id), 1700);
     return;
   }
-  if (Date.now() - t.idleSince < 1500) return;
-  if (r.recipe.answer.length && !r.result && !r.nudged && !t.stopping && st === 'idle') {
-    // Finished without the answer fields: one reminder.
-    updateRun(db, id, { nudged: true });
-    t.idleSince = 0;
-    try {
-      await sessions.deliverOrQueue(r.key, `You haven't handed in the result yet. Call submit_result now with the fields it asks for (${r.recipe.answer.map((f) => f.id).join(', ')}), from what you found. Where something could not be found, say so in that field rather than leaving it out.`);
-    } catch (e) {
-      finish(id, 'done', `The reminder to hand in the result could not be sent: ${(e as Error).message}`);
-    }
-    return;
+  if (Date.now() - t.idleSince < 1500 || checking.has(id)) return;
+  checking.add(id);
+  try {
+    await turnEnded(id, t, r, st, s?.live?.error);
+  } finally {
+    checking.delete(id);
   }
-  const failed = st === 'error' && !r.result;
-  finish(id, t.stopping ? 'stopped' : failed ? 'failed' : 'done', failed ? s?.live?.error || 'The agent stopped with an error' : undefined);
 }
 
-/** The last thing the agent said that reads like an answer (a short "Done." after the nudge does not). */
-function replyOf(items: TimelineItem[]): string | undefined {
-  const said = items.filter((i): i is Extract<TimelineItem, { kind: 'assistant' }> => i.kind === 'assistant' && !!i.text.trim()).map((i) => i.text.trim());
-  if (!said.length) return undefined;
-  const last = said[said.length - 1];
-  const full = [...said].reverse().find((t) => t.length >= 300);
-  return (last.length < 300 && full ? full : last).slice(0, 60_000);
+/** A followed run's turn ended: a reminder when the result is missing (once), else the run ends. */
+async function turnEnded(id: string, t: Follow, r: RunRecord, st: string | undefined, liveError?: string) {
+  const key = r.key!;
+  if (r.recipe.answer.length && !t.stopping && st === 'idle') {
+    if (!t.ask && !r.result && !r.nudged) {
+      // Finished without the answer fields: one reminder.
+      updateRun(d().db, id, { nudged: true });
+      return remind(id, t, key, nudgeText(r));
+    }
+    if (t.ask && !t.ask.submitted && !t.ask.nudged) {
+      // A follow-up answered with no new result: one reminder when there is no result at all, or when the
+      // reply reads like a changed result written out instead of handed in. Thanks and questions need none.
+      t.ask.nudged = true;
+      const turn = r.result ? turnsOf(await itemsOf(key)).at(-1) : undefined;
+      // Something moved on while the transcript was read: the next look decides.
+      if (followed.get(id) !== t) return;
+      if (d().sessions.summary(key)?.live?.status !== 'idle') return void (t.idleSince = 0);
+      if (!r.result) return remind(id, t, key, nudgeText(r));
+      if (turn && !turn.submitted && Math.max(0, ...turn.said.map((x) => x.length)) >= 300) return remind(id, t, key, renudgeText());
+    }
+  }
+  const err = st === 'error' ? liveError || 'The agent stopped with an error' : undefined;
+  const failed = !!err && !r.result;
+  finish(id, t.stopping ? 'stopped' : failed ? 'failed' : 'done', failed ? err : err && t.ask ? `The follow-up stopped with an error: ${err}` : undefined);
+}
+
+async function remind(id: string, t: Follow, key: string, text: string) {
+  t.idleSince = 0;
+  try {
+    await d().sessions.deliverOrQueue(key, text);
+  } catch (e) {
+    finish(id, 'done', `The reminder to hand in the result could not be sent: ${(e as Error).message}`);
+  }
+}
+
+/** The follow-ups after a run's task, for its page, and what the agent said back to the task itself. */
+export async function followUpsOf(r: RunRecord): Promise<{ asks: RunAsk[]; first?: string }> {
+  if (!r.key) return { asks: [] };
+  const live = d().sessions.liveSnapshot(r.key);
+  const items = await itemsOf(r.key);
+  // A message just sent is in the live overlay before the transcript has it (under another id, for a moment, once it does).
+  const ids = new Set(items.map((i) => i.id));
+  const sent = items.filter((i): i is UserItem => i.kind === 'user');
+  const landed = (i: TimelineItem) => ids.has(i.id) || (i.kind === 'user' && sent.some((u) => u.text === i.text && Math.abs((u.ts ?? 0) - (i.ts ?? 0)) < 120_000));
+  const turns = turnsOf([...items, ...live.overlay.items.filter((i) => !landed(i))]);
+  return {
+    first: turns[0] ? replyIn(turns[0].said) : undefined,
+    asks: turns.slice(1).map((x) => ({ id: x.ask.id, text: x.ask.text.slice(0, 20_000), at: x.ask.ts, reply: replyIn(x.said)?.slice(0, 20_000), updated: x.submitted })),
+  };
 }
 
 function customModel(id?: string): AgentModel | undefined {
@@ -369,6 +513,7 @@ export function finish(id: string, status: RunStatus, error?: string) {
   followed.delete(id);
   const r = getRun(db, id);
   if (!r || !isActive(r.status)) return;
+  ending.add(id);
   const done = async () => {
     let reply: string | undefined;
     let cost: number | undefined;
@@ -385,6 +530,7 @@ export function finish(id: string, status: RunStatus, error?: string) {
       error ??= 'The agent ended without an answer';
     }
     updateRun(db, id, { status, endedAt: Date.now(), ...(reply ? { reply } : {}), ...(cost !== undefined ? { costUsd: Math.round(cost * 10000) / 10000 } : {}), ...(error ? { error } : {}) });
+    ending.delete(id);
     const next = getRun(db, id)!;
     cache.delete(id);
     if (next.source === 'public') fs.rm(path.join(PUBLIC_DIR, id), { recursive: true, force: true }, () => {});
@@ -402,8 +548,14 @@ export function finish(id: string, status: RunStatus, error?: string) {
         h(next);
       } catch {}
     }
+    // A follow-up went in while it ended: follow that turn too.
+    if (reopenAfter.delete(id)) reopen(id);
   };
-  void done().catch((e) => console.warn(`[apps] finishing ${id}: ${(e as Error).message}`));
+  void done().catch((e) => {
+    ending.delete(id);
+    reopenAfter.delete(id);
+    console.warn(`[apps] finishing ${id}: ${(e as Error).message}`);
+  });
 }
 
 /** Resolves when the run ends, or after `ms`, with the run as it is then. */
@@ -444,9 +596,12 @@ export async function stopRun(id: string) {
   setTimeout(() => void check(id), 2500);
 }
 
-/** Saves what submit_result handed in. */
+/** Saves what submit_result handed in; a run that had ended is followed again (the agent went on with it). */
 export function saveResult(id: string, value: Record<string, unknown>) {
+  reopen(id);
   updateRun(d().db, id, { result: value });
+  const t = followed.get(id);
+  if (t?.ask) t.ask.submitted = true;
   cache.delete(id);
   changed(getRun(d().db, id));
 }
@@ -473,8 +628,11 @@ export async function progressOf(r: RunRecord, publicView: boolean): Promise<Run
   if (!r.key || r.status === 'queued') return { steps: [] };
   const { sessions } = d();
   const tl = await sessions.timeline(r.key).catch(() => null);
-  const items = tl?.parser.items ?? [];
+  const whole = tl?.parser.items ?? [];
   const live = sessions.liveSnapshot(r.key);
+  // This turn's steps only: after a follow-up, not those of the task before it.
+  const from = whole.findLastIndex(isAsk);
+  const items = from > 0 ? whole.slice(from) : whole;
   const tools = [...items, ...live.overlay.items].filter((i): i is Extract<TimelineItem, { kind: 'tool' }> => i.kind === 'tool');
   const seen = new Set<string>();
   const all = tools
@@ -497,11 +655,21 @@ export function startRuns(dd: Deps) {
     if (!r.key) finish(r.id, 'failed', 'The server restarted before the run started');
     else followed.set(r.id, { idleSince: 0 });
   }
-  sessions.on('live', (key: string) => {
+  sessions.on('live', (key: string, live?: { status?: string } | null) => {
+    let mine = false;
     for (const [id] of followed) {
       const r = cached(id);
-      if (r?.key === key) void check(id);
+      if (r?.key === key) {
+        mine = true;
+        void check(id);
+      }
     }
+    if (mine) return;
+    // An ended run's session at work again: a follow-up (or the agent going on by itself).
+    const st = live === undefined ? sessions.summary(key)?.live?.status : live?.status;
+    if (st !== 'working' && st !== 'waiting') return;
+    const id = runIdOf(key);
+    if (id) reopen(id);
   });
   setInterval(() => {
     for (const id of followed.keys()) void check(id);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, FilePen, FilePlus2, FolderOpen, GitBranch, GitFork, MoreHorizontal, PanelRight, Play, Square, SquareTerminal, UserRound, X } from 'lucide-react';
+import { ChevronRight, FilePen, FilePlus2, FolderOpen, GitBranch, GitFork, MessagesSquare, MoreHorizontal, PanelRight, Play, Square, SquareTerminal, UserRound, X } from 'lucide-react';
 import type { BackgroundTask, FileChange, SessionSummary, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { activityLabel, activityOf, canTakeOver, confirmResume, inBackground, isBusy, isWorking, takeoverDialog } from '../../lib/activity';
@@ -23,7 +23,8 @@ import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
 import { noteOpened } from '../palette/CommandPalette';
 import { FindBar } from './FindBar';
-import { FeatureDock } from '../registry';
+import { FeatureDock, sessionPaneOf, type SessionPane } from '../registry';
+import { useSessionShow, type SessionShow } from './show';
 
 function StatusPill({ s }: { s: SessionSummary }) {
   const a = activityOf(s);
@@ -252,6 +253,23 @@ function MovedOn({ s }: { s: SessionSummary }) {
       <button onClick={() => go(sessionPath(s.handoffTo!))} className="shrink-0 text-accent hover:underline">
         Open
       </button>
+    </div>
+  );
+}
+
+/** A session a capability shows its own way (an app's run as its result): that view, or the conversation. */
+function PaneSwitch({ pane, show, onChange }: { pane: SessionPane; show: SessionShow; onChange: (v: SessionShow) => void }) {
+  return (
+    <div className="flex shrink-0 justify-center border-b border-line px-3 py-1.5">
+      <Segmented
+        size="sm"
+        value={show}
+        onChange={onChange}
+        options={[
+          { value: 'pane', label: pane.label, icon: pane.icon },
+          { value: 'conversation', label: 'Conversation', icon: <MessagesSquare size={13} /> },
+        ]}
+      />
     </div>
   );
 }
@@ -530,6 +548,8 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
   const detailsOpen = mobile ? phoneDetails : savedDetails;
   const setDetails = (v: boolean) => (mobile ? setPhoneDetails(v) : useUI.getState().set({ detailsOpen: v }));
   const [missing, setMissing] = useState(false);
+  // A capability's view of the session (an app's run as its result) opens first, until you pick the conversation.
+  const chosen = useSessionShow((x) => x.byKey[sessionKey]);
 
   useEffect(() => {
     setMissing(false);
@@ -571,6 +591,10 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [sessionKey]);
+  // Finding looks through the conversation, so that is what shows.
+  useEffect(() => {
+    if (finding) useSessionShow.getState().show(sessionKey, 'conversation');
+  }, [finding, sessionKey]);
 
   // Looking at a session that finished since you last did marks it read (on every device).
   const unread = !!summary && (summary.doneAt ?? 0) > (summary.seenAt ?? 0);
@@ -590,6 +614,8 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
     setDetails(true);
   };
   const version = tl?.total ?? 0;
+  const pane = sessionPaneOf(summary);
+  const show: SessionShow = pane ? (chosen ?? 'pane') : 'conversation';
 
   return (
     <SessionCtx.Provider value={{ sessionKey, cwd: summary.cwd, openChanges, fork: summary.external ? undefined : (at) => setForking({ at }) }}>
@@ -597,14 +623,19 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <Header s={summary} detailsOpen={detailsOpen} onDetails={() => setDetails(!detailsOpen)} onFork={() => setForking({})} />
           <ForkedFrom s={summary} />
+          {pane && <PaneSwitch pane={pane} show={show} onChange={(v) => useSessionShow.getState().show(sessionKey, v)} />}
           <div className="relative flex min-h-0 flex-1 flex-col">
             {finding && <FindBar sessionKey={sessionKey} onClose={() => setFinding(false)} />}
-            <Timeline sessionKey={sessionKey} agent={summary.agent} live={summary.live ?? null} overlay={lv?.overlay} external={summary.external} />
+            {pane && show === 'pane' ? (
+              <pane.Body s={summary} />
+            ) : (
+              <Timeline sessionKey={sessionKey} agent={summary.agent} live={summary.live ?? null} overlay={lv?.overlay} external={summary.external} />
+            )}
           </div>
           <LimitBanner agent={summary.agent} account={summary.account} className="mx-3 mb-2 sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]" />
           <MovedOn s={summary} />
           <FeatureDock s={summary} />
-          <Composer s={summary} />
+          <Composer s={summary} hint={pane && show === 'pane' ? pane.placeholder : undefined} />
           <ForkDialog s={summary} at={forking} onClose={() => setForking(null)} />
         </div>
         {detailsOpen &&

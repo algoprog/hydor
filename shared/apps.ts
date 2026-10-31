@@ -150,6 +150,19 @@ export interface RunProgress {
   waiting?: string;
 }
 
+/**
+ * A follow-up in a run's session, sent after its task (from the run's page or the session itself):
+ * what the person asked, what the agent said back, and whether it handed in a new result.
+ */
+export interface RunAsk {
+  /** The message's timeline item. */
+  id: string;
+  text: string;
+  at?: number;
+  reply?: string;
+  updated: boolean;
+}
+
 export interface AppBatch {
   id: string;
   app: string;

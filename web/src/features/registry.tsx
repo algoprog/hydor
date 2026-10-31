@@ -1,6 +1,7 @@
 // The app's capabilities in the pages (search, browser, memory, assistants…). Each adds what it needs
 // through a WebFeature: views for its tools and notes in the conversation, a Settings section, pages,
-// sidebar entries, buttons by the message box, items in a session's menu, options on the start page.
+// sidebar entries, buttons by the message box, items in a session's menu, options on the start page,
+// and a view of the sessions it starts in place of their conversation (an app's run as its result).
 // A feature module may import components, but must not call into this registry at its top level.
 import type { ComponentType, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -35,6 +36,17 @@ export interface ToolView {
 /** A part of a session's menu: its main list, or its Session settings or More submenu. */
 export type SessionMenuPart = 'main' | 'settings' | 'more';
 
+/** Another view of a session than its conversation (an app's run as its result): it opens first, beside a switch to the conversation. */
+export interface SessionPane {
+  /** Its name and icon on the switch. */
+  label: string;
+  icon: ReactNode;
+  match: (s: SessionSummary) => boolean;
+  /** What the message box suggests while it shows. */
+  placeholder?: string;
+  Body: ComponentType<{ s: SessionSummary }>;
+}
+
 export interface FeatureSection {
   id: string;
   label: string;
@@ -64,6 +76,8 @@ export interface WebFeature {
   sessionMenuPart?: SessionMenuPart;
   /** Above a session's message box: a live browser, a spending notice… */
   SessionDock?: ComponentType<{ s: SessionSummary }>;
+  /** A view of the sessions it started, in place of their conversation until you switch. */
+  sessionPane?: SessionPane;
   /** Buttons beside the message box's attach button; `insert` adds text to the message being written. */
   ComposerButtons?: ComponentType<{ s?: SessionSummary; insert: (text: string) => void; disabled?: boolean }>;
   /** On the start page, options for the new session, kept in its settings. */
@@ -113,6 +127,12 @@ export function noteView(kind: string): ComponentType<{ note: SessionNote; sessi
 }
 
 export const featureSections = (): FeatureSection[] => features().flatMap((f) => f.settings ?? []);
+
+/** The view a capability gives this session, if one does. */
+export function sessionPaneOf(s: SessionSummary): SessionPane | undefined {
+  for (const f of features()) if (f.sessionPane?.match(s)) return f.sessionPane;
+  return undefined;
+}
 
 /** Each feature's items in one part of a session's menu. */
 export function FeatureMenuItems({ s, close, part }: { s: SessionSummary; close: () => void; part: SessionMenuPart }) {

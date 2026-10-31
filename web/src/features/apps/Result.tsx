@@ -175,8 +175,8 @@ function Elapsed({ from }: { from: number }) {
   return <span className="tnum">{duration(Date.now() - from)}</span>;
 }
 
-/** Where a run stands, in a line, with its latest steps while it works. */
-export function RunStatusCard({ run, progress, publicView, children }: { run: AppRun; progress?: RunProgress; publicView?: boolean; children?: ReactNode }) {
+/** Where a run stands, in a line, with its latest steps while it works; after a follow-up, how that one went. */
+export function RunStatusCard({ run, progress, publicView, children, followUp }: { run: AppRun; progress?: RunProgress; publicView?: boolean; children?: ReactNode; followUp?: { updated: boolean } }) {
   const active = isActive(run.status);
   const took = run.endedAt && (run.startedAt ?? run.createdAt) ? duration(run.endedAt - (run.startedAt ?? run.createdAt)) : '';
   const head = (() => {
@@ -198,7 +198,7 @@ export function RunStatusCard({ run, progress, publicView, children }: { run: Ap
       case 'waiting':
         return { icon: <Hand size={16} className="text-warn" />, text: progress?.waiting ?? 'Waiting for you', tone: 'text-warn' };
       case 'done':
-        return { icon: <Check size={16} className="text-ok" strokeWidth={2.6} />, text: `Done${took ? ` in ${took}` : ''}`, tone: '' };
+        return { icon: <Check size={16} className="text-ok" strokeWidth={2.6} />, text: `${followUp ? (followUp.updated ? 'Updated' : 'Answered') : 'Done'}${took ? ` in ${took}` : ''}`, tone: '' };
       case 'stopped':
         return { icon: <Square size={13} className="text-fg-3" />, text: 'Stopped', tone: 'text-fg-2' };
       default:
@@ -250,16 +250,39 @@ export function ReplyBlock({ text, folded }: { text: string; folded: boolean }) 
   );
 }
 
-/** Everything about a run below its header: status, result, reply. */
-export function RunBody({ run, progress, answer, publicView, name, statusExtra }: { run: AppRun; progress?: RunProgress; answer: AnswerField[]; publicView?: boolean; name?: string; statusExtra?: ReactNode }) {
+/**
+ * Everything about a run below its header: status, result, reply. Where follow-ups came after the task:
+ * `reply`, what the agent said back to the task (the run's own reply is to the latest one), and `followUp`,
+ * the latest of them.
+ */
+export function RunBody({
+  run,
+  progress,
+  answer,
+  publicView,
+  name,
+  statusExtra,
+  reply,
+  followUp,
+}: {
+  run: AppRun;
+  progress?: RunProgress;
+  answer: AnswerField[];
+  publicView?: boolean;
+  name?: string;
+  statusExtra?: ReactNode;
+  reply?: string;
+  followUp?: { updated: boolean };
+}) {
   const hasResult = !!run.result && Object.keys(run.result).length > 0;
+  const text = reply ?? run.reply;
   return (
     <div className="space-y-3">
-      <RunStatusCard run={run} progress={progress} publicView={publicView}>
+      <RunStatusCard run={run} progress={progress} publicView={publicView} followUp={followUp}>
         {statusExtra}
       </RunStatusCard>
       {hasResult && <ResultView answer={answer} result={run.result!} name={name} />}
-      {run.reply && (!isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={run.reply} folded={hasResult} />}
+      {text && (reply !== undefined || !isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={text} folded={hasResult} />}
     </div>
   );
 }
