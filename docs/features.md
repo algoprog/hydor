@@ -21,7 +21,7 @@ Everything Agent Console does, by area. [Back to the README](../README.md).
 
 Console is the app's own agent, for models beyond Claude Code's and Codex's. It works like them: it reads,
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
-Code (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
+Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context.
 
 Its models come from Settings → Models:
