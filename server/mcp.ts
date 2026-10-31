@@ -75,7 +75,7 @@ export function runToken(runId: string): string {
   return `${runId}.${sig}`;
 }
 
-function runOf(token: string): string | null {
+export function runOf(token: string): string | null {
   const [runId] = token.split('.');
   if (!runId) return null;
   const want = runToken(runId);

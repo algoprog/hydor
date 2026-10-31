@@ -3,6 +3,15 @@ import { cx } from './ui';
 
 /** Small agent marks: a starburst for Claude Code, a knot for Codex; `spinning` turns it slowly while it works. */
 export function AgentIcon({ agent, size = 16, className, spinning, name }: { agent: Agent; size?: number; className?: string; spinning?: boolean; name?: string }) {
+  if (agent === 'acp' && name === 'Console') {
+    // Console, the app's own agent: the app's mark, a prompt and its spark.
+    return (
+      <svg width={size} height={size} viewBox="96 120 384 290" className={cx('shrink-0 text-fg-2', spinning && 'spin-gentle', className)} aria-label="Console" role="img">
+        <path d="M140 162L250 256L140 350" fill="none" stroke="currentColor" strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M356 216Q371 285 440 300Q371 315 356 384Q341 315 272 300Q341 285 356 216Z" fill="var(--accent)" />
+      </svg>
+    );
+  }
   if (agent === 'acp') {
     // Another agent (Gemini CLI, OpenCode…): its first letter on a rounded tile.
     return (

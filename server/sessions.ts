@@ -21,9 +21,10 @@ import { buildHandoff, splitHandoff } from './handoff.ts';
 import { claudeTranscriptPath, findClaudeTranscript, Timeline } from './timeline.ts';
 import { removeSessionScratch } from './tasklog.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
-import { pageServerUrl } from './mcp.ts';
+import { pageServerUrl, runToken } from './mcp.ts';
 import { accountEnv, accountOfPath } from './accounts.ts';
-import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, findCommand } from './agents/acp.ts';
+import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
+import { ensureClaude, ensureCommand } from './clients.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -766,13 +767,16 @@ export class SessionManager extends EventEmitter {
   private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; acpAgent?: string }): Promise<Live> {
     const def = acpAgent(this.db, opts.acpAgent);
     const env = { ...agentBaseEnv(), ...(def.env ?? {}) };
-    const cmd = findCommand(def.command, env);
+    // Missing: installed now when the app knows its package (Gemini CLI, OpenCode…).
+    const cmd = findCommand(def.command, env) ?? (await ensureCommand(def.command).catch(() => null));
     if (!cmd) throw new HttpError(400, `${def.name} is not installed here (no ${def.command} on the PATH)${def.hint ? `. Install it: ${def.hint}` : ''}`);
     const id = opts.sessionId ?? crypto.randomUUID();
     const transcript = acpTranscriptPath(id);
     fs.mkdirSync(ACP_DIR, { recursive: true, mode: 0o700 });
     if (!fs.existsSync(transcript)) fs.writeFileSync(transcript, JSON.stringify({ t: 'meta', ts: Date.now(), agent: def.id, name: def.name, cwd }) + '\n', { mode: 0o600 });
     const runId = crypto.randomBytes(6).toString('hex');
+    // Console asks the app to get its model ready (start a vLLM server) at this run's own address.
+    if (def.id === CONSOLE_ID) env.AGENT_CONSOLE_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
     const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, pageServer: pageServerUrl(runId) };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };
     const runner = await Runner.start(meta, { cmd, args: def.args, cwd, env });
@@ -793,6 +797,7 @@ export class SessionManager extends EventEmitter {
   }
 
   async create(o: CreateOpts): Promise<string> {
+    if (o.agent === 'claude') await ensureClaude();
     let cwd = path.resolve(o.cwd || config.defaultCwd);
     let wt: WorktreeInfo | undefined;
     if (o.worktree) {
@@ -1527,7 +1532,11 @@ export class SessionManager extends EventEmitter {
   /** What each ACP agent offered when it last opened a session: its modes and models. */
   private acpOffers = new Map<string, Pick<AgentCatalog, 'models' | 'modes'>>();
 
+  /** Console's models and modes (set by the server, which keeps the models). */
+  consoleOffers?: () => AgentCatalog;
+
   async catalog(agent: Agent, acpId?: string): Promise<AgentCatalog> {
+    if (agent === 'acp' && acpId === CONSOLE_ID && this.consoleOffers) return this.consoleOffers();
     if (agent === 'acp') {
       const o = this.acpOffers.get(acpId ?? '');
       return { models: o?.models ?? [], modes: o?.modes ?? [], defaultMode: '' };

@@ -17,6 +17,28 @@ Everything Agent Console does, by area. [Back to the README](../README.md).
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
   shows its own usage and limits.
 
+## Console: any model
+
+Console is the app's own agent, for models beyond Claude Code's and Codex's. It works like them: it reads,
+edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
+Code (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
+long conversation to stay within the model's context.
+
+Its models come from Settings → Models:
+
+- **OpenRouter**: add a key, then pin the models to offer.
+- **Ollama**: the models of an Ollama server, with GGUF weights pulled straight from Hugging Face.
+- **vLLM**: Hugging Face models downloaded here and served on a GPU, started when a session first uses them.
+- **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, another provider).
+
+Before anything downloads, the app checks how a model would run on this machine: where (a GPU, or the CPU),
+the memory it needs, about how fast, and the disk it takes. Installed models show their size and remove
+with one click. Models without native tool calls are told about the tools in their own format, or in the
+prompt, and their calls are read from what they write.
+
+The agents' own programs install by themselves when first needed (Claude Code, Gemini CLI, OpenCode…,
+with npm into the app's folder), and the copies the app installed are kept up to date.
+
 ## Following along
 - A readable timeline: the agent's messages read like a chat, and its commands fold into small boxes with
   plain-words names ("Run the tests", "Read index.ts"), each a click away from its full output.

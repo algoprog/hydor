@@ -25,6 +25,7 @@ ones you start in VS Code or a terminal show up too.
 - Open pull requests on GitHub or Gitea, and review a branch file by file
 - Use a terminal, files, git, notebooks, scheduled tasks and your plans' limits in the same app
 - Switch between several accounts and machines from the sidebar
+- Run Console, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
 
 See [all features](docs/features.md).
 

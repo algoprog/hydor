@@ -31,7 +31,10 @@ import { askCommands, commandHistory, complete, migrateTermHistory, recordComman
 import { repoInfo } from './worktrees.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
-import { createMcpToken, mcpRoutes, mcpTokens, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken } from './mcp.ts';
+import { createMcpToken, mcpRoutes, mcpTokens, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
+import { ModelManager } from './models/manager.ts';
+import { clients as agentClients, ensureCommand, install as installClient, updateClients, useNewestCodex } from './clients.ts';
+import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { addAccount, addedAccounts, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
@@ -633,6 +636,55 @@ app.get('/api/catalog/:agent', async (req) => {
 
 // ---- ACP agents (Settings → More agents) ----------------------------------------------------------
 
+// ---- the agents' programs: installed when missing, kept current ------------------------------------
+
+useNewestCodex();
+const refreshClients = () =>
+  void updateClients().then((done) => done.length && console.log(`[clients] updated ${done.join(', ')}`), () => {});
+setTimeout(refreshClients, 10 * 60_000).unref();
+setInterval(refreshClients, 24 * 3600_000).unref();
+app.get('/api/clients', async () => ({ clients: agentClients() }));
+app.post('/api/clients/:id/install', async (req) => {
+  await installClient((req.params as { id: string }).id);
+  return { clients: agentClients() };
+});
+
+// ---- models for Console, the app's own agent -------------------------------------------------------
+
+const models = new ModelManager((state) => broadcast({ t: 'models', state }));
+sessions.consoleOffers = () => ({ models: models.options(), modes: CONSOLE_MODES.map((m) => ({ value: m.id, label: m.name, description: m.description })), defaultMode: 'ask' });
+app.get('/api/models', async () => models.state());
+app.put('/api/models', async (req) => models.configure((req.body ?? {}) as Parameters<ModelManager['configure']>[0]));
+app.get('/api/models/openrouter', async (req) => ({ models: await models.search(String((req.query as Record<string, string>).q ?? '')) }));
+/** What a Hugging Face model is, and whether (and how) it would run here, before anything downloads. */
+app.post('/api/models/inspect', async (req) => models.inspect(String((req.body as { input?: string } | undefined)?.input ?? '')));
+app.post('/api/models/install', async (req) => {
+  await models.install((req.body ?? {}) as { repo?: string; ollama?: string });
+  return models.state();
+});
+app.post('/api/models/cancel', async (req) => {
+  models.cancel(String((req.body as { key?: string } | undefined)?.key ?? ''));
+  return models.state();
+});
+app.post('/api/models/remove', async (req) => {
+  await models.uninstall(String((req.body as { id?: string } | undefined)?.id ?? ''));
+  return models.state();
+});
+app.post('/api/models/start', async (req) => {
+  const b = (req.body ?? {}) as { repo?: string; gpu?: number; maxLen?: number };
+  await models.start(String(b.repo ?? ''), { gpu: b.gpu, maxLen: b.maxLen });
+  return models.state();
+});
+app.post('/api/models/stop', async (req) => {
+  models.stop(String((req.body as { repo?: string } | undefined)?.repo ?? ''));
+  return models.state();
+});
+/** Console asks for its model to be ready (a vLLM server started and up); its run's token is the permission. */
+app.post('/agent/run/:token/ensure', async (req, reply) => {
+  if (!runOf((req.params as { token: string }).token)) return reply.code(403).send({ error: 'Not a running agent' });
+  return { model: await models.ensure(String((req.body as { id?: string } | undefined)?.id ?? '')) };
+});
+
 app.get('/api/acp-agents', async () => {
   const env = agentBaseEnv();
   const mark = (a: AcpAgentDef) => ({ ...a, installed: !!findCommand(a.command, { ...env, ...(a.env ?? {}) }) });
@@ -642,6 +694,10 @@ app.get('/api/acp-agents', async () => {
 app.post('/api/acp-agents', async (req) => {
   const a = saveAcpAgent(db, (req.body ?? {}) as Partial<AcpAgentDef>);
   broadcast({ t: 'acpAgents', agents: acpAgents(db) });
+  // Its program installs now (when the app knows how), so the first session need not wait for it.
+  void ensureCommand(a.command)
+    .then(() => broadcast({ t: 'acpAgents', agents: acpAgents(db) }))
+    .catch(() => {});
   return a;
 });
 app.delete('/api/acp-agents/:id', async (req) => {

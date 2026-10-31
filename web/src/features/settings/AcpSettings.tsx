@@ -6,6 +6,7 @@ import { CheckCircle2, Plus, Trash2, XCircle } from 'lucide-react';
 import type { AcpAgentDef } from '@shared/types';
 import { api, del, post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
+import { go } from '../../lib/nav';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, useConfirm } from '../../components/ui';
 
@@ -51,12 +52,20 @@ export function AcpSettings() {
           <div className="-my-1 divide-y divide-line">
             {data.agents.map((a) => (
               <AgentRow key={a.id} a={a}>
-                <Button size="sm" variant="ghost" onClick={() => setEdit(a)}>
-                  Edit
-                </Button>
-                <IconButton label="Remove" size="sm" onClick={() => remove(a)}>
-                  <Trash2 size={14} />
-                </IconButton>
+                {a.builtin ? (
+                  <Button size="sm" variant="ghost" onClick={() => go('/settings?s=models')}>
+                    Models
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="sm" variant="ghost" onClick={() => setEdit(a)}>
+                      Edit
+                    </Button>
+                    <IconButton label="Remove" size="sm" onClick={() => remove(a)}>
+                      <Trash2 size={14} />
+                    </IconButton>
+                  </>
+                )}
               </AgentRow>
             ))}
           </div>
@@ -93,7 +102,7 @@ function AgentRow({ a, children }: { a: Def; children: React.ReactNode }) {
         <div className="text-[13.5px] font-medium">{a.name}</div>
         <div className="flex items-center gap-1.5 truncate text-[12px] text-fg-3">
           {a.installed ? <CheckCircle2 size={12} className="text-ok" /> : <XCircle size={12} className="text-fg-3" />}
-          <span className="truncate font-mono text-[11.5px]">{[a.command, ...a.args].join(' ')}</span>
+          {a.builtin ? <span className="truncate">Built in: {a.hint?.replace(/^Built in: /, '')}</span> : <span className="truncate font-mono text-[11.5px]">{[a.command, ...a.args].join(' ')}</span>}
           {!a.installed && a.hint && <span className="truncate">· not installed: {a.hint}</span>}
         </div>
       </div>
