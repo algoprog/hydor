@@ -33,9 +33,15 @@ agents that speak ACP and take MCP servers.
 - **A browser**: agents open sites, click, type and read pages, in a Chromium of their own. You watch it live
   above the message box and take over to log in, solve a check or pay, on a computer or a phone; sites on your
   own network stay off limits unless you allow one.
-- **Memory**: after each reply, notes about you, the project and the session are written or updated, and a chip
-  under the reply shows what changed (undo, edit, delete). Turn it off for one session or for all; Settings →
-  Memory lists every note with when it was written and changed. Agents can also look up earlier sessions.
+- **Memory**: agents save notes about you, the project and the session when you ask or they learn something
+  lasting, some only until a date, and a chip under the reply shows what changed (undo, edit, delete). Each
+  agent starts with the notes that bear on what you asked, found by words and, once you turn it on, by meaning,
+  with LightOn's mDenseOn model on your own computer (on a GPU, or on the CPU in about 1.5 GB, only while
+  needed). Each night the helper model tidies memory up: it merges notes that say the same thing and, when
+  there are more than fit, sums related ones up in topics and a short profile; every change can be undone.
+  Settings → Memory lists every note with when it was written, changed and last needed, and suggests
+  removing the ones no agent needed for months. Turn it off for one session or for all. Agents can also look
+  up earlier sessions.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
   Images can be made and edited through OpenRouter.

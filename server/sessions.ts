@@ -754,7 +754,7 @@ export class SessionManager extends EventEmitter {
   private async spawn(
     agent: Agent,
     cwd: string,
-    opts: { sessionId?: string; threadId?: string; resume?: boolean; forkFrom?: string; forkAt?: string; model?: string; effort?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra },
+    opts: { sessionId?: string; threadId?: string; resume?: boolean; forkFrom?: string; forkAt?: string; model?: string; effort?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string },
   ): Promise<Live> {
     if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) throw new HttpError(400, `Folder not found: ${cwd}`);
     if (agent === 'acp') return this.spawnAcp(cwd, opts);
@@ -767,7 +767,7 @@ export class SessionManager extends EventEmitter {
     if (agent === 'claude') {
       const sessionId = opts.sessionId ?? crypto.randomUUID();
       // What the app's capabilities add: instructions (memory, the assistant), MCP servers, environment.
-      const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`) });
+      const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`), prompt: opts.prompt });
       Object.assign(env, add.env);
       const o = { cwd, sessionId, resume: !!opts.resume, forkFrom: opts.forkFrom, forkAt: opts.forkAt, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add };
       const meta: RunMeta = { runId, agent, key: `claude:${sessionId}`, createdAt: Date.now(), cwd, opts: { ...o, account } };
@@ -787,7 +787,7 @@ export class SessionManager extends EventEmitter {
       return l;
     }
     const known = opts.threadId ? `codex:${opts.threadId}` : undefined;
-    const add = await spawnAdditions({ agent, key: known, cwd, runId, resume: !!opts.threadId, extra: opts.extra ?? (known ? sessionExtra(this.db, known) : {}) });
+    const add = await spawnAdditions({ agent, key: known, cwd, runId, resume: !!opts.threadId, extra: opts.extra ?? (known ? sessionExtra(this.db, known) : {}), prompt: opts.prompt });
     Object.assign(env, add.env);
     const o = { cwd, threadId: opts.threadId, forkFrom: opts.forkFrom, forkLastTurn: opts.forkFrom ? opts.forkAt : undefined, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent, createdAt: Date.now(), cwd, opts: { ...o, account } };
@@ -811,7 +811,7 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An ACP agent (Gemini CLI, OpenCode…): its own command, driven over the Agent Client Protocol. */
-  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; acpAgent?: string; extra?: SessionExtra }): Promise<Live> {
+  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string }): Promise<Live> {
     const def = acpAgent(this.db, opts.acpAgent);
     const env = { ...agentBaseEnv(), ...(def.env ?? {}) };
     // Missing: installed now when the app knows its package (Gemini CLI, OpenCode…).
@@ -824,7 +824,7 @@ export class SessionManager extends EventEmitter {
     const runId = crypto.randomBytes(6).toString('hex');
     // Console asks the app to get its model ready (start a vLLM server) at this run's own address.
     if (def.id === CONSOLE_ID) env.NAGET_AGENT_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
-    const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`) });
+    const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt });
     Object.assign(env, add.env);
     const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };
@@ -855,7 +855,7 @@ export class SessionManager extends EventEmitter {
       cwd = made.cwd;
     }
     const mode = o.mode || (o.agent === 'claude' ? 'default' : o.agent === 'codex' ? 'auto' : undefined);
-    const l = await this.spawn(o.agent, cwd, { model: o.model || undefined, effort: o.effort || undefined, mode, account: o.account || undefined, acpAgent: o.acpAgent, extra: o.extra });
+    const l = await this.spawn(o.agent, cwd, { model: o.model || undefined, effort: o.effort || undefined, mode, account: o.account || undefined, acpAgent: o.acpAgent, extra: o.extra, prompt: (splitHandoff(o.prompt ?? '')?.request ?? o.prompt)?.slice(0, 2000) });
     const now = Date.now();
     this.db
       .prepare(
