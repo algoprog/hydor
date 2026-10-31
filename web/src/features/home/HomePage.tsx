@@ -391,7 +391,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
               {!task && agent !== 'acp' && (
                 <div data-closes>
                   <MenuItem icon={<FileText size={15} />} onClick={() => setInstructions(true)}>
-                    Edit the {instructionName(agent)} {agentName(agent)} reads here…
+                    Edit the {instructionName(agent)} {agentName(agent)} reads here
                   </MenuItem>
                 </div>
               )}

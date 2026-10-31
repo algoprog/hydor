@@ -10,13 +10,14 @@ import { setFlags, settle } from '../../lib/flags';
 import { go } from '../../lib/nav';
 import { toast, toastError, useUI } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
+import { useCatalog } from '../../components/AgentPickers';
 import { MenuBack, MenuItem, MenuSep, Popover, useConfirm } from '../../components/ui';
 import { FeatureMenuItems } from '../registry';
 import { deleteDialog } from '../sessions/SessionList';
 import { SnoozeItems } from '../sessions/SnoozeMenu';
 import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { openTerminalAt } from '../terminal/TerminalPanel';
-import { continueIn } from './Composer';
+import { continueIn, handoffName } from './Composer';
 import { GoalDialog } from './GoalBar';
 import { ShareDialog } from './ShareDialog';
 import { WorktreeDialog } from './WorktreeDialog';
@@ -33,15 +34,19 @@ interface Actions {
   onRename: () => void;
   onFork: () => void;
   onPullRequest: () => void;
+  /** Custom has a model to run (Settings → Models), so a conversation can continue there. */
+  customReady: boolean;
 }
 
 export function SessionMenu({ s, anchor, open, onClose, onRename, onFork, onPullRequest }: { s: SessionSummary; anchor: RefObject<HTMLElement | null>; open: boolean; onClose: () => void; onRename: () => void; onFork: () => void; onPullRequest: () => void }) {
   const [shown, setShown] = useState<Shown | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const hide = () => setShown(null);
+  // Known before the menu opens, so its items don't shift as it loads.
+  const customReady = !!useCatalog('acp', 'console')?.models.length;
   return (
     <>
-      {open && <MenuBody s={s} anchor={anchor} close={onClose} show={setShown} confirm={confirm} onRename={onRename} onFork={onFork} onPullRequest={onPullRequest} />}
+      {open && <MenuBody s={s} anchor={anchor} close={onClose} show={setShown} confirm={confirm} onRename={onRename} onFork={onFork} onPullRequest={onPullRequest} customReady={customReady} />}
       {confirmNode}
       {s.worktree && <WorktreeDialog s={s} open={shown === 'worktree'} onClose={hide} />}
       <GoalDialog s={s} open={shown === 'goal'} onClose={hide} />
@@ -52,7 +57,7 @@ export function SessionMenu({ s, anchor, open, onClose, onRename, onFork, onPull
 }
 
 /** There only while the menu is open, so it opens at its main list each time. */
-function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullRequest }: { s: SessionSummary } & Actions) {
+function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullRequest, customReady }: { s: SessionSummary } & Actions) {
   // A submenu in the main list's place; coming back slides the other way.
   const [at, setAt] = useState<{ sub: Submenu | null; back?: boolean }>({ sub: null });
   const enter = (sub: Submenu) => setAt({ sub });
@@ -61,8 +66,10 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
   const working = running && isBusy(activityOf(s));
   // Custom (the app's own agent) forks and keeps goals like Claude Code and Codex; other ACP agents do not.
   const custom = s.agent === 'acp' && s.acpAgent === 'console';
-  // Claude Code and Codex hand the conversation to each other (a Codex session open elsewhere is read-only here).
-  const other: Agent | null = s.agent === 'claude' ? 'codex' : s.agent === 'codex' && (running || !s.external) ? 'claude' : null;
+  // Claude Code and Codex hand the conversation to each other, and to Custom once it has a model (a Codex
+  // session open elsewhere is read-only here).
+  const handsOff = s.agent === 'claude' || (s.agent === 'codex' && (running || !s.external));
+  const targets: { agent: Agent; acp?: string }[] = handsOff ? [{ agent: s.agent === 'claude' ? 'codex' : 'claude' }, ...(customReady ? [{ agent: 'acp' as const, acp: 'console' }] : [])] : [];
   const resumeCmd = s.agent === 'claude' ? `cd ${s.cwd ?? '~'} && claude --resume ${s.id}` : `codex resume ${s.id}`;
 
   let items: ReactNode;
@@ -83,7 +90,7 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
               Review the changes
             </MenuItem>
             <MenuItem icon={<GitPullRequest size={15} />} onClick={() => (close(), onPullRequest())}>
-              {s.pr ? `Pull request #${s.pr.number}` : 'Open a pull request…'}
+              {s.pr ? `Pull request #${s.pr.number}` : 'Open a pull request'}
             </MenuItem>
           </>
         )}
@@ -183,22 +190,22 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
         <MenuSep />
         {!s.external && (s.agent !== 'acp' || custom) && (
           <MenuItem icon={<GitFork size={15} />} onClick={() => (close(), onFork())}>
-            Fork…
+            Fork
           </MenuItem>
         )}
-        {other && (
-          <MenuItem icon={<ArrowRightLeft size={15} />} onClick={() => (close(), continueIn(s.key, other))}>
-            Continue in {agentName(other)}…
+        {targets.map((t) => (
+          <MenuItem key={t.agent} icon={<ArrowRightLeft size={15} />} onClick={() => (close(), continueIn(s.key, t.agent, t.acp))}>
+            Continue in {handoffName(t.agent)}
           </MenuItem>
-        )}
+        ))}
         {!s.goal && !s.external && (s.agent !== 'acp' || custom) && (
           <MenuItem icon={<Target size={15} />} onClick={() => (close(), show('goal'))}>
-            Set a goal…
+            Set a goal
           </MenuItem>
         )}
         <FeatureMenuItems s={s} close={close} part="main" />
         <MenuItem icon={<Link2 size={15} />} onClick={() => (close(), show('share'))}>
-          Share a read-only link…
+          Share a read-only link
         </MenuItem>
         <MenuSep />
         {(s.cwd || s.worktree) && (

@@ -51,7 +51,7 @@ function StartOption({ value, onChange }: { value: SessionExtra; onChange: (patc
             go('/settings?s=memory');
           }}
         >
-          What agents remember…
+          What agents remember
         </MenuItem>
       </Popover>
     </>

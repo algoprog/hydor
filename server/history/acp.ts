@@ -14,6 +14,7 @@
 // `_meta.naget`, the cost when it knows it). Another ACP agent may send the cost alone.
 import type { FileChange, GoalInfo, SessionStats, TimelineItem, TodoEntry, ToolCategory, ToolInfo, ToolItem } from '../../shared/types.ts';
 import { ActivityLog, clip, emptyStats, firstLine, snippetDiff, wholeFileDiff, type Chunk } from './common.ts';
+import { splitHandoff } from '../handoff.ts';
 import type { ParserOptions, SummaryData } from './claude.ts';
 
 type Json = Record<string, any>;
@@ -207,7 +208,9 @@ export class AcpParser {
           this.upsert({ kind: 'system', id: `goal${this.seq++}`, seq: 0, ts, level: m.note.level === 'warn' ? 'warn' : 'info', text: String(m.note.text), detail: m.note.detail ? String(m.note.detail) : undefined });
         break;
       case 'prompt': {
-        const text = String(m.text ?? '');
+        // A conversation carried over from another agent: the request is what follows its context.
+        const ho = splitHandoff(String(m.text ?? ''));
+        const text = ho ? ho.request : String(m.text ?? '');
         const id = String(m.id ?? `u${this.seq++}`);
         this.open = null;
         this.turn = { id, start: ts ?? Date.now(), tools: 0 };
@@ -222,7 +225,7 @@ export class AcpParser {
         if (!this.summary.firstPrompt && text) this.summary.firstPrompt = firstLine(text, 300);
         if (text) this.summary.lastPrompt = firstLine(text, 300);
         this.chunk('user', text, ts);
-        this.upsert({ kind: 'user', id, seq: 0, ts, text, images: m.images || undefined, turn: id });
+        this.upsert({ kind: 'user', id, seq: 0, ts, text, images: m.images || undefined, turn: id, handoff: ho?.handoff });
         break;
       }
       case 'update':

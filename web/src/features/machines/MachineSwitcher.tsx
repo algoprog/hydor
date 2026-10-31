@@ -72,7 +72,7 @@ export function MachineSwitcher({ onGo }: { onGo?: () => void }) {
           className="flex h-8.5 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
         >
           <Settings2 size={14} className="text-fg-3" />
-          Add or change machines…
+          Add or change machines
         </button>
       </Popover>
     </>

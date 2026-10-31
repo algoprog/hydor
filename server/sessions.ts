@@ -988,11 +988,12 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
-   * Continues a session's conversation on the other agent: a new session in the same folder whose first
-   * message carries the conversation so far, then `prompt`. The two sessions link to each other.
+   * Continues a Claude Code or Codex session's conversation on another agent (the other of the two, or
+   * Custom): a new session in the same folder whose first message carries the conversation so far, then
+   * `prompt`. The two sessions link to each other.
    */
   async handoff(fromKey: string, o: Omit<CreateOpts, 'cwd' | 'title'>): Promise<string> {
-    if (fromKey.startsWith('acp:') || o.agent === 'acp') throw new HttpError(400, 'Hand-offs are between Claude Code and Codex');
+    if (fromKey.startsWith('acp:') || (o.agent === 'acp' && o.acpAgent !== CONSOLE_ID)) throw new HttpError(400, 'Hand-offs go from Claude Code or Codex to the other one or to Custom');
     const from = this.summary(fromKey);
     const cwd = this.sessionCwd(fromKey);
     if (!from || !cwd) throw new HttpError(404, 'Unknown session');

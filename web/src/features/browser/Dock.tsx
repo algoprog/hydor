@@ -239,7 +239,7 @@ function BrowserMenu({ s, view, close }: { s: SessionSummary; view: BrowserView;
       )}
       <ProfilePicker k={s.key} onPicked={close} />
       <MenuItem icon={<Globe size={14} />} onClick={() => setSites(true)}>
-        Sites for this session…
+        Sites for this session
       </MenuItem>
       <MenuSep />
       <MenuItem

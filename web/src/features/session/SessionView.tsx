@@ -15,7 +15,7 @@ import { DiffStat, DiffView } from '../../components/DiffView';
 import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
-import { Composer } from './Composer';
+import { Composer, handoffName } from './Composer';
 import { SessionCtx, ToolRow } from './items';
 import { TaskLogDialog, TaskRow, useStopTask } from './TaskLog';
 import { Timeline } from './Timeline';
@@ -242,12 +242,12 @@ function ForkedFrom({ s }: { s: SessionSummary }) {
 function MovedOn({ s }: { s: SessionSummary }) {
   const next = useSessions((x) => (s.handoffTo ? x.byKey[s.handoffTo] : undefined));
   if (!s.handoffTo) return null;
-  const agent = s.handoffTo.startsWith('codex:') ? 'codex' : 'claude';
+  const agent = s.handoffTo.startsWith('codex:') ? 'codex' : s.handoffTo.startsWith('acp:') ? 'acp' : 'claude';
   return (
     <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-2 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
-      <AgentIcon agent={agent} size={14} />
+      <AgentIcon agent={agent} name="Custom" size={14} />
       <span className="min-w-0 flex-1 truncate text-fg-2">
-        This conversation continued in {agentName(agent)}
+        This conversation continued in {handoffName(agent)}
         {next?.title ? <span className="text-fg"> · {next.title}</span> : null}
       </span>
       <button onClick={() => go(sessionPath(s.handoffTo!))} className="shrink-0 text-accent hover:underline">

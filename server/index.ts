@@ -38,7 +38,7 @@ import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { addAccount, addedAccounts, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
-import { ACP_PRESETS, acpAgents, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
+import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import * as setup from './setup.ts';
@@ -368,13 +368,15 @@ app.post('/api/sessions/:key/seen', async (req) => {
   return { ok: true };
 });
 
-/** Carries the conversation to a new session on the other agent (see server/handoff.ts). */
+/** Carries the conversation to a new session on another agent: the other of Claude Code and Codex, or Custom (see server/handoff.ts). */
 app.post('/api/sessions/:key/handoff', async (req) => {
   const b = req.body as any;
   noteUserMessage();
-  if (b?.agent !== 'claude' && b?.agent !== 'codex') throw new HttpError(400, 'Pick Claude Code or Codex');
+  const custom = b?.agent === 'acp' && b?.acpAgent === CONSOLE_ID;
+  if (b?.agent !== 'claude' && b?.agent !== 'codex' && !custom) throw new HttpError(400, 'Pick Claude Code, Codex or Custom');
   const key = await sessions.handoff(K(req), {
     agent: b.agent,
+    acpAgent: custom ? CONSOLE_ID : undefined,
     account: typeof b.account === 'string' && b.account ? b.account : undefined,
     prompt: typeof b.text === 'string' ? b.text : undefined,
     images: Array.isArray(b.images) ? b.images : [],

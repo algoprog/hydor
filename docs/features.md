@@ -8,7 +8,7 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
   thinks, and what it may do without asking you. The start page opens with what you picked there last,
   on any device: the agent and its model, the folder, the assistant, memory and a spending cap.
 - Switch models mid-session; the model menu lists the session's own agent's models. "Continue in Codex" (or
-  Claude Code) in the session's menu hands the conversation over to the other company's agent.
+  Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
 - Fork a session from any reply, or edit an earlier message and go on from there, with the files put back as
   they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.

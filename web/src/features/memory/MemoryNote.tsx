@@ -276,7 +276,7 @@ export function MemoryNote({ note, sessionKey, more }: { note: SessionNote; sess
         <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={270}>
           <SessionMemoryItem sessionKey={sessionKey} on={on} allOff={!!state && !state.enabled} close={() => setMenu(false)} />
           <MenuItem icon={<Settings2 size={15} />} onClick={() => (setMenu(false), go('/settings?s=memory'))}>
-            All memory…
+            All memory
           </MenuItem>
         </Popover>
       </div>

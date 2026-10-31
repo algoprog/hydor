@@ -578,7 +578,7 @@ export function SessionList({ query }: { query: string }) {
               <SnoozeItems s={menu} onDone={() => setMenu(null)} />
             ) : (
               <MenuItem icon={<AlarmClock size={14} />} onClick={() => setSnoozing(true)}>
-                Snooze…
+                Snooze
               </MenuItem>
             )}
             {!isBusy(activityOf(menu)) && (

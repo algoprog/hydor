@@ -65,8 +65,8 @@ export function AgentPicker({ agent, acpId, acpList, onPick, label }: { agent: A
           />
         ))}
         <MenuSep />
-        <MenuItem onClick={() => (setOpen(false), go('/settings?s=models'))}>Models for Custom…</MenuItem>
-        <MenuItem onClick={() => (setOpen(false), go('/settings?s=agents'))}>Add or manage agents…</MenuItem>
+        <MenuItem onClick={() => (setOpen(false), go('/settings?s=models'))}>Models for Custom</MenuItem>
+        <MenuItem onClick={() => (setOpen(false), go('/settings?s=agents'))}>Add or manage agents</MenuItem>
       </Popover>
     </>
   );
