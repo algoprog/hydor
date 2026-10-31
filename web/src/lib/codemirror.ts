@@ -11,9 +11,9 @@ import {
   syntaxHighlighting,
 } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search';
+import { highlightSelectionMatches, openSearchPanel, search, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState } from '@codemirror/state';
-import { oneDark } from '@codemirror/theme-one-dark';
+import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 import {
   crosshairCursor,
   drawSelection,
@@ -33,8 +33,12 @@ export interface EditorHandle {
   setWrap: (wrap: boolean) => void;
   setDoc: (doc: string) => void;
   gotoLine: (line: number) => void;
+  /** Opens the find bar: phones have no keyboard shortcut for it. */
+  find: () => void;
   destroy: () => void;
 }
+
+// Where two themes style the same thing, the one listed first in an editor's extensions wins.
 
 const lightTheme = EditorView.theme({
   '&': { backgroundColor: 'var(--bg)', color: 'var(--fg)' },
@@ -43,19 +47,77 @@ const lightTheme = EditorView.theme({
   '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--bg-2) 60%, transparent)' },
 });
 
-const darkTweaks = EditorView.theme(
+// Dark: the app's own colours (a custom theme's too), with One Dark's for the code itself.
+const darkTheme = EditorView.theme(
   {
-    '&': { backgroundColor: 'var(--bg)' },
-    '.cm-gutters': { backgroundColor: 'var(--bg)', border: 'none' },
+    '&': { backgroundColor: 'var(--bg)', color: 'var(--fg-2)' },
+    '.cm-content': { caretColor: 'var(--accent)' },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)' },
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+      backgroundColor: 'color-mix(in srgb, var(--accent) 30%, transparent)',
+    },
+    '.cm-gutters': { backgroundColor: 'var(--bg)', color: 'var(--fg-3)', border: 'none' },
     '.cm-activeLineGutter': { backgroundColor: 'var(--bg-2)' },
-    '.cm-activeLine': { backgroundColor: 'rgba(255,255,255,0.025)' },
+    '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--bg-2) 60%, transparent)' },
+    '.cm-selectionMatch': { backgroundColor: 'var(--accent-soft)' },
+    '.cm-searchMatch': { backgroundColor: 'color-mix(in srgb, var(--accent) 20%, transparent)', outline: '1px solid color-mix(in srgb, var(--accent) 55%, transparent)' },
+    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'color-mix(in srgb, var(--accent) 45%, transparent)' },
+    '&.cm-focused .cm-matchingBracket': { backgroundColor: 'color-mix(in srgb, var(--fg) 16%, transparent)' },
+    '&.cm-focused .cm-nonmatchingBracket': { backgroundColor: 'color-mix(in srgb, var(--err) 30%, transparent)' },
+    '.cm-foldPlaceholder': { backgroundColor: 'var(--bg-2)', border: 'none', color: 'var(--fg-2)' },
+    '.cm-tooltip': { border: '1px solid var(--line)', backgroundColor: 'var(--elevated)', color: 'var(--fg)' },
+    '.cm-tooltip .cm-tooltip-arrow:before': { borderTopColor: 'var(--line)', borderBottomColor: 'var(--line)' },
+    '.cm-tooltip .cm-tooltip-arrow:after': { borderTopColor: 'var(--elevated)', borderBottomColor: 'var(--elevated)' },
+    '.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: 'var(--bg-3)', color: 'var(--fg)' },
   },
   { dark: true },
 );
+const darkExt = [darkTheme, syntaxHighlighting(oneDarkHighlightStyle)];
+const lightExt = [lightTheme, syntaxHighlighting(defaultHighlightStyle, { fallback: true })];
 
+// The find bar in the app's style: CodeMirror draws its buttons and fields at 70% of the code's size.
+const panelTheme = EditorView.theme({
+  '.cm-panels': { backgroundColor: 'var(--bg-1)', color: 'var(--fg)' },
+  '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--line)' },
+  '.cm-panels.cm-panels-bottom': { borderTop: '1px solid var(--line)' },
+  '.cm-panel.cm-search': { padding: '6px 40px 6px 10px', fontFamily: 'var(--font-sans)' },
+  '.cm-textfield': { fontSize: '13px', color: 'var(--fg)', backgroundColor: 'var(--bg)', border: '1px solid var(--line-2)', borderRadius: '8px', padding: '4px 8px' },
+  '.cm-textfield:focus': { outline: 'none', borderColor: 'color-mix(in srgb, var(--accent) 70%, transparent)' },
+  '.cm-button': { fontSize: '12.5px', color: 'var(--fg-2)', backgroundColor: 'var(--bg-2)', backgroundImage: 'none', border: 'none', borderRadius: '8px', padding: '4px 10px' },
+  '.cm-button:active': { backgroundImage: 'none', backgroundColor: 'var(--bg-3)' },
+  '.cm-panel.cm-search label': { fontSize: '12.5px', color: 'var(--fg-2)' },
+  '.cm-panel.cm-search [name=close]': { top: '6px', right: '8px', width: '28px', height: '28px', borderRadius: '8px', color: 'var(--fg-3)', fontSize: '20px', lineHeight: '1' },
+});
+const phrases = EditorState.phrases.of({
+  next: 'Next',
+  previous: 'Previous',
+  all: 'All',
+  'match case': 'Match case',
+  regexp: 'Regex',
+  'by word': 'Whole word',
+  replace: 'Replace',
+  'replace all': 'Replace all',
+  close: 'Close',
+});
+
+// Phones: the last line clear of the home bar, and the find bar in three rows big enough to tap (find and
+// its buttons, replace and its buttons, the options) rather than six.
+const phoneTheme = EditorView.theme({
+  '.cm-content': { paddingBottom: 'calc(var(--safe-bottom) + 16px)' },
+  '.cm-line': { paddingRight: '10px' },
+  '.cm-panel.cm-search': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', padding: '8px 46px 8px 10px' },
+  '.cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label': { margin: '0' },
+  '.cm-panel.cm-search br': { display: 'none' },
+  '.cm-panel.cm-search .cm-textfield': { flex: '1 1 110px', minWidth: '0', minHeight: '34px' },
+  '.cm-panel.cm-search .cm-button': { minHeight: '34px', padding: '4px 9px' },
+  '.cm-panel.cm-search label': { order: '1', display: 'inline-flex', alignItems: 'center', minHeight: '30px', marginRight: '8px' },
+  '.cm-panel.cm-search [name=close]': { top: '9px', width: '32px', height: '32px' },
+});
+
+/** `phone`: no fold markers (too small to tap), no completions popping up while typing (Return would take one). */
 export async function createEditor(
   parent: HTMLElement,
-  o: { doc: string; path: string; dark: boolean; wrap: boolean; readOnly?: boolean; onChange: (doc: string) => void; onSave: () => void },
+  o: { doc: string; path: string; dark: boolean; wrap: boolean; phone?: boolean; readOnly?: boolean; onChange: (doc: string) => void; onSave: () => void },
 ): Promise<EditorHandle> {
   const theme = new Compartment();
   const wrap = new Compartment();
@@ -63,7 +125,7 @@ export async function createEditor(
   const base = o.path.split('/').pop() ?? '';
   const desc = LanguageDescription.matchFilename(languages, base);
   const support = desc ? await desc.load().catch(() => null) : null;
-  const themeExt = (dark: boolean) => (dark ? [oneDark, darkTweaks] : [lightTheme, syntaxHighlighting(defaultHighlightStyle, { fallback: true })]);
+  const themeExt = (dark: boolean) => (dark ? darkExt : lightExt);
 
   const view = new EditorView({
     parent,
@@ -74,14 +136,14 @@ export async function createEditor(
         highlightActiveLineGutter(),
         highlightSpecialChars(),
         history(),
-        foldGutter(),
+        o.phone ? [] : foldGutter(),
         drawSelection(),
         dropCursor(),
         EditorState.allowMultipleSelections.of(true),
         indentOnInput(),
         bracketMatching(),
         closeBrackets(),
-        autocompletion(),
+        autocompletion({ activateOnTyping: !o.phone }),
         rectangularSelection(),
         crosshairCursor(),
         highlightActiveLine(),
@@ -99,6 +161,9 @@ export async function createEditor(
         ]),
         EditorState.readOnly.of(!!o.readOnly),
         lang.of(support ?? []),
+        o.phone ? phoneTheme : [],
+        panelTheme,
+        phrases,
         theme.of(themeExt(o.dark)),
         wrap.of(o.wrap ? EditorView.lineWrapping : []),
         EditorView.updateListener.of((u) => {
@@ -118,6 +183,7 @@ export async function createEditor(
       view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: 'center' }) });
       view.focus();
     },
+    find: () => openSearchPanel(view),
     destroy: () => view.destroy(),
   };
 }
@@ -138,7 +204,6 @@ const cellTheme = EditorView.theme({
   '.cm-content': { padding: '8px 0' },
   '.cm-line': { padding: '0 12px' },
 });
-const cellDark = EditorView.theme({ '&': { backgroundColor: 'transparent' } }, { dark: true });
 
 /**
  * A notebook cell's editor: it grows with its text, runs on Shift/Ctrl/Alt+Enter, leaves on Escape,
@@ -161,7 +226,8 @@ export async function createCellEditor(
   const theme = new Compartment();
   const desc = LanguageDescription.matchLanguageName(languages, o.lang, true);
   const support = desc ? await desc.load().catch(() => null) : null;
-  const themeExt = (dark: boolean) => (dark ? [oneDark, darkTweaks, cellTheme, cellDark] : [lightTheme, cellTheme, syntaxHighlighting(defaultHighlightStyle, { fallback: true })]);
+  // The cell's own theme first, so its box shows through.
+  const themeExt = (dark: boolean) => [cellTheme, dark ? darkExt : lightExt];
   const atEdge = (v: EditorView, dir: -1 | 1) => {
     const { head, empty } = v.state.selection.main;
     if (!empty) return false;
