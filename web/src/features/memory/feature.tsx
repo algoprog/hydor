@@ -13,7 +13,7 @@ import { useMemoryState } from './state';
 
 function SessionMenu({ s, close }: { s: SessionSummary; close: () => void }) {
   const st = useMemoryState();
-  return <SessionMemoryItem sessionKey={s.key} on={s.extra?.memory !== false} allOff={!!st && !st.enabled} close={close} />;
+  return <SessionMemoryItem label="Memory" sessionKey={s.key} on={s.extra?.memory !== false} allOff={!!st && !st.enabled} close={close} />;
 }
 
 /** On the start page: start the session without memory (it neither reads nor writes notes). */
@@ -40,5 +40,6 @@ export const memoryFeature: WebFeature = {
   noteViews: { memory: MemoryNote },
   settings: [{ id: 'memory', label: 'Memory', icon: Brain, sub: 'What agents remember about you, your projects and each session, and when it was written', Body: MemorySettings }],
   SessionMenu,
+  sessionMenuPart: 'settings',
   StartOptions: StartOption,
 };

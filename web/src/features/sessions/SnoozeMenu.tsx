@@ -25,8 +25,9 @@ export function snoozeOptions(now = new Date()): { label: string; until: number 
   return out;
 }
 
-/** Menu rows for a session's menu: snooze options, or "Unsnooze" while snoozed. */
-export function SnoozeItems({ s, onDone }: { s: SessionSummary; onDone: () => void }) {
+/** Menu rows for a session's menu: snooze options, or "Unsnooze" while snoozed. A submenu with a title
+ * of its own leaves out the heading. */
+export function SnoozeItems({ s, onDone, heading = true }: { s: SessionSummary; onDone: () => void; heading?: boolean }) {
   const [custom, setCustom] = useState(false);
   const [value, setValue] = useState(() => {
     const d = new Date(at(1, 9));
@@ -69,7 +70,7 @@ export function SnoozeItems({ s, onDone }: { s: SessionSummary; onDone: () => vo
     );
   return (
     <>
-      <MenuLabel>Snooze until later</MenuLabel>
+      {heading && <MenuLabel>Snooze until later</MenuLabel>}
       {snoozeOptions().map((o) => (
         <MenuItem
           key={o.label}

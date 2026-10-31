@@ -10,7 +10,7 @@ import { AssistantsSettings } from './AssistantsSettings';
 import { AssistantIcon } from './icons';
 import { useAssistantsState } from './state';
 
-/** The assistant the session started as; it opens Settings → Assistants. */
+/** "Assistant · Researcher": the one the session started as; it opens Settings → Assistants. */
 function SessionMenu({ s, close }: { s: SessionSummary; close: () => void }) {
   const st = useAssistantsState();
   const id = s.extra?.assistant;
@@ -19,13 +19,13 @@ function SessionMenu({ s, close }: { s: SessionSummary; close: () => void }) {
   return (
     <MenuItem
       icon={<AssistantIcon icon={a.icon} size={14} plain />}
-      hint="Assistant"
+      hint={a.name}
       onClick={() => {
         close();
         go('/settings?s=assistants');
       }}
     >
-      {a.name}
+      Assistant
     </MenuItem>
   );
 }
@@ -43,4 +43,5 @@ export const assistantsFeature: WebFeature = {
   ],
   StartOptions: AssistantStartOption,
   SessionMenu,
+  sessionMenuPart: 'settings',
 };

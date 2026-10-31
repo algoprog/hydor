@@ -5,11 +5,11 @@ import { Badge, Button, cx, inputCls, MenuItem } from '../../components/ui';
 import type { MemoryChange } from '@shared/memory';
 import { setSessionMemory } from './state';
 
-/** "Memory for this session · On": turns it off, or back on. */
-export function SessionMemoryItem({ sessionKey, on, allOff, close }: { sessionKey: string; on: boolean; allOff: boolean; close: () => void }) {
+/** "Memory for this session · On" ("Memory" among a session's settings): turns it off, or back on. */
+export function SessionMemoryItem({ sessionKey, on, allOff, close, label = 'Memory for this session' }: { sessionKey: string; on: boolean; allOff: boolean; close: () => void; label?: string }) {
   return (
     <MenuItem icon={<Brain size={15} />} hint={allOff ? 'Off for all' : on ? 'On' : 'Off'} disabled={allOff} onClick={() => (close(), setSessionMemory(sessionKey, !on))}>
-      Memory for this session
+      {label}
     </MenuItem>
   );
 }

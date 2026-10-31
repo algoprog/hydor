@@ -20,6 +20,7 @@ export const opinionFeature: WebFeature = {
   id: 'opinion',
   noteViews: { opinion: OpinionCard },
   SessionMenu: OpinionMenuItem,
+  sessionMenuPart: 'main',
   // Nothing shows above the message box: the dock only holds the dialog.
   SessionDock: OpinionDialog,
 };

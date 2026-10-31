@@ -149,7 +149,7 @@ const LIST_CONNECTIONS: RunTool = {
         out.push(`- ${c.id}: ${c.entry.name}, ${c.entry.description}${tools?.length ? ` Tools: ${tools.slice(0, 40).join(', ')}${tools.length > 40 ? '…' : ''}.` : ''}${isRemote(c.entry) ? '' : ' (runs on this computer)'}${state}`);
       }
     } else out.push('No apps are connected for this session. The user connects them in Settings → Connections.');
-    if (off.length) out.push('', `Off for this session (the user can turn them on from the session's menu): ${off.map((c) => `${c.id} (${c.entry.name})`).join(', ')}.`);
+    if (off.length) out.push('', `Off for this session (the user can turn them on in the session's menu, under Session settings → Connected apps): ${off.map((c) => `${c.id} (${c.entry.name})`).join(', ')}.`);
     const keys = listSecrets(db);
     out.push('');
     if (keys.length) {

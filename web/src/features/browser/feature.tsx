@@ -47,5 +47,6 @@ export const browserFeature: WebFeature = {
   noteViews: { browser: BrowserNoteCard },
   SessionDock: BrowserDock,
   SessionMenu: BrowserMenuItem,
+  sessionMenuPart: 'more',
   settings: [{ id: 'browser', label: 'Browser', icon: Globe, sub: 'A web browser agents use, which you can watch and take over', Body: BrowserSettingsBody }],
 };

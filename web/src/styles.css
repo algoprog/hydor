@@ -385,6 +385,20 @@ html {
 .anim-slide-left {
   animation: slide-in-left 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+/* Back the other way: a menu returning from one of its submenus. */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-slide-right {
+  animation: slide-in-right 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
 .anim-fade {
   animation: overlay-in 220ms ease-out both;
 }

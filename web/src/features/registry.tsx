@@ -32,6 +32,9 @@ export interface ToolView {
   Row: ComponentType<{ item: ToolItem; sessionKey: string }>;
 }
 
+/** A part of a session's menu: its main list, or its Session settings or More submenu. */
+export type SessionMenuPart = 'main' | 'settings' | 'more';
+
 export interface FeatureSection {
   id: string;
   label: string;
@@ -55,8 +58,10 @@ export interface WebFeature {
   routes?: { match: (path: string) => boolean; Page: ComponentType }[];
   /** Entries among the sidebar's tools. */
   nav?: { path: string; label: string; icon: ReactNode; match?: (path: string) => boolean }[];
-  /** Items in a session's menu. */
+  /** Items in a session's menu… */
   SessionMenu?: ComponentType<{ s: SessionSummary; close: () => void }>;
+  /** …and the part they go in: More unless given, which keeps the main list short. */
+  sessionMenuPart?: SessionMenuPart;
   /** Above a session's message box: a live browser, a spending notice… */
   SessionDock?: ComponentType<{ s: SessionSummary }>;
   /** Buttons beside the message box's attach button; `insert` adds text to the message being written. */
@@ -109,11 +114,11 @@ export function noteView(kind: string): ComponentType<{ note: SessionNote; sessi
 
 export const featureSections = (): FeatureSection[] => features().flatMap((f) => f.settings ?? []);
 
-/** Each feature's items in a session's menu. */
-export function FeatureMenuItems({ s, close }: { s: SessionSummary; close: () => void }) {
+/** Each feature's items in one part of a session's menu. */
+export function FeatureMenuItems({ s, close, part }: { s: SessionSummary; close: () => void; part: SessionMenuPart }) {
   return (
     <>
-      {features().map((f) => (f.SessionMenu ? <f.SessionMenu key={f.id} s={s} close={close} /> : null))}
+      {features().map((f) => (f.SessionMenu && (f.sessionMenuPart ?? 'more') === part ? <f.SessionMenu key={f.id} s={s} close={close} /> : null))}
     </>
   );
 }

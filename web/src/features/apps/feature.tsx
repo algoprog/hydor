@@ -75,4 +75,5 @@ export const appsFeature: WebFeature = {
       Save as app…
     </MenuItem>
   ),
+  sessionMenuPart: 'more',
 };

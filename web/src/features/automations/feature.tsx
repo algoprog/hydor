@@ -95,5 +95,6 @@ export const automationsFeature: WebFeature = {
     task_notes: { Row: StepRow, step: (t) => ({ verb: arg(t, 'action') === 'read' ? 'Read' : 'Updated', title: 'the task’s notes' }) },
   },
   SessionMenu: MakeAutomation,
+  sessionMenuPart: 'more',
   SessionDock: DraftHost,
 };
