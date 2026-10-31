@@ -175,6 +175,14 @@ const PUBLISH_SITE: RunTool = {
   },
 };
 
+/**
+ * What every agent is told at its start: which of these tools fits what. Without it agents knew the
+ * tools only by name (Claude Code defers MCP tools' descriptions), and one asked for "a tracker I can
+ * keep" wrote an HTML file that never reached Pages.
+ */
+const INSTRUCTIONS =
+  'Pages: show_html shows a page in the conversation (a report, a chart, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Pages library, can go on a phone’s home screen, and keeps what it stores with naget.storage on every device (a file’s localStorage stays in one browser). get_page lists saved pages, to change one.';
+
 /** What the agent hears once the user decided on its publish_site card. */
 function outcome(r: PublishRequest, base: string): string {
   if (r.status === 'published' && r.site) {
@@ -326,4 +334,4 @@ function routes(d: Deps) {
   app.get('/site/:token/*', async (req, reply) => serveSite(db, req, reply));
 }
 
-export const pages: Feature = { id: 'pages', routes, tools: () => [SHOW_HTML, SAVE_PAGE, GET_PAGE, PUBLISH_SITE] };
+export const pages: Feature = { id: 'pages', routes, tools: () => [SHOW_HTML, SAVE_PAGE, GET_PAGE, PUBLISH_SITE], spawn: () => ({ instructions: [INSTRUCTIONS] }) };
