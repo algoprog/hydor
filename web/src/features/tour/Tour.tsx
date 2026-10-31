@@ -44,7 +44,8 @@ function savedUses(): Use[] | null {
 
 interface Step {
   id: string;
-  /** The element pointed at: [data-tour="…"]. None: the card sits in the middle. */
+  /** The element pointed at: [data-tour="…"]. It stays hidden until its step, so name it in styles.css
+   * ("the tour builds the app up") too. None: the card sits in the middle. */
   target?: string;
   title: string;
   body: ReactNode;
