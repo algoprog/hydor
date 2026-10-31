@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoute } from 'wouter';
-import { AlarmClock, Archive, CheckCheck, Pencil, Pin, PinOff, Target } from 'lucide-react';
+import { AlarmClock, Archive, CheckCheck, Pencil, Pin, PinOff, Target, Trash2 } from 'lucide-react';
 import {
   closestCenter,
   DndContext,
@@ -19,14 +19,14 @@ import {
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { SearchHit, SessionSummary } from '@shared/types';
-import { api, enc, post } from '../../lib/api';
+import { api, del, enc, post } from '../../lib/api';
 import { basename, dayGroup, markRuns, timeAgo } from '../../lib/format';
-import { openSession } from '../../lib/nav';
+import { go, openSession } from '../../lib/nav';
 import { activityOf, inBackground, isBusy, isWorking } from '../../lib/activity';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
-import { AgentIcon } from '../../components/AgentIcon';
+import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat } from '../../components/DiffView';
-import { cx, Throbber, MenuItem, Popover, useMediaQuery } from '../../components/ui';
+import { cx, Throbber, MenuItem, Popover, useConfirm, useMediaQuery } from '../../components/ui';
 import { Elapsed } from '../session/items';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
@@ -140,7 +140,17 @@ interface RowProps {
   renaming: boolean;
   onRename: (key: string | null) => void;
   onMenu: (s: SessionSummary, el: HTMLElement) => void;
+  /** Touch screens: a delete button at the row's end. */
+  onDelete?: (s: SessionSummary) => void;
 }
+
+/** Asking before a session is deleted: its transcript goes, for every app that shows it. */
+export const deleteDialog = (s: SessionSummary) => ({
+  title: 'Delete this session?',
+  body: <>The transcript is removed from disk ({agentName(s.agent, s.acpName)} history included), so it disappears from the CLI and VS Code too. This cannot be undone.</>,
+  confirm: 'Delete',
+  danger: true,
+});
 
 /** What a row shows; also the floating copy while it is dragged. */
 const RowBody = memo(function RowBody({
@@ -149,8 +159,9 @@ const RowBody = memo(function RowBody({
   home,
   renaming,
   onRename,
+  onDelete,
   lifted,
-}: Pick<RowProps, 's' | 'active' | 'home'> & { renaming?: boolean; onRename?: RowProps['onRename']; lifted?: boolean }) {
+}: Pick<RowProps, 's' | 'active' | 'home' | 'onDelete'> & { renaming?: boolean; onRename?: RowProps['onRename']; lifted?: boolean }) {
   const a = activityOf(s);
   const running = !!a;
   // A turn finished since the session was last looked at.
@@ -203,6 +214,24 @@ const RowBody = memo(function RowBody({
           {!running && <DiffStat added={s.stats.linesAdded} removed={s.stats.linesRemoved} className="text-[11px] opacity-75" compact />}
         </span>
       </span>
+      {onDelete && !renaming && (
+        <button
+          type="button"
+          aria-label="Delete session"
+          title="Delete session"
+          // Its own tap: not the row's (open, or pick up to drag).
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(s);
+          }}
+          className="-my-1 -mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center self-center rounded-lg text-fg-3 transition-colors active:bg-bg-3 active:text-err"
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
     </span>
   );
 });
@@ -214,7 +243,7 @@ interface DragBits {
   lifted: boolean;
 }
 
-function RowShell({ s, active, home, renaming, onRename, onMenu, drag }: RowProps & { drag: DragBits }) {
+function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, drag }: RowProps & { drag: DragBits }) {
   return (
     <div
       ref={drag.ref}
@@ -237,7 +266,7 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, drag }: RowProp
       }}
       className={cx('cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50', drag.lifted && 'opacity-40')}
     >
-      <RowBody s={s} active={active} home={home} renaming={renaming} onRename={onRename} />
+      <RowBody s={s} active={active} home={home} renaming={renaming} onRename={onRename} onDelete={onDelete} />
     </div>
   );
 }
@@ -343,6 +372,7 @@ export function SessionList({ query }: { query: string }) {
   const menuAnchor = useRef<HTMLElement | null>(null);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overGroup, setOverGroup] = useState<string | null>(null);
+  const [confirm, confirmNode] = useConfirm();
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     // Touch: hold a moment to pick a row up, so a swipe still scrolls the list.
@@ -432,6 +462,19 @@ export function SessionList({ query }: { query: string }) {
     [coarse],
   );
 
+  const onDelete = useCallback(
+    async (s: SessionSummary) => {
+      if (!(await confirm(deleteDialog(s)))) return;
+      try {
+        await del(`/api/sessions/${enc(s.key)}`);
+        if (s.key === activeKey) go('/');
+      } catch (e) {
+        toastError(e);
+      }
+    },
+    [confirm, activeKey],
+  );
+
   if (query.trim()) return <SearchResults q={query.trim()} />;
   if (!loaded) {
     return (
@@ -465,7 +508,7 @@ export function SessionList({ query }: { query: string }) {
       {groups.map((g, i) => {
         const sortable = orderable(g.label);
         const rows = g.items.map((s) => {
-          const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu };
+          const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined };
           return sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
         });
         return (
@@ -485,6 +528,7 @@ export function SessionList({ query }: { query: string }) {
         );
       })}
       {zoneAt === groups.length && <PinZone hot={overGroup === 'Pinned'} />}
+      {confirmNode}
       {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : null}</DragOverlay>, document.body)}
       <Popover anchor={menuAnchor} open={!!menu} onClose={() => (setMenu(null), setSnoozing(false))} width={snoozing ? 240 : 190}>
         {menu && snoozing && <SnoozeItems s={menu} onDone={() => (setMenu(null), setSnoozing(false))} />}

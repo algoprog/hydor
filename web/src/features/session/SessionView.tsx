@@ -22,6 +22,7 @@ import { Timeline } from './Timeline';
 import { LimitBanner } from '../usage/LimitReset';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from '../sessions/SnoozeMenu';
+import { deleteDialog } from '../sessions/SessionList';
 import { WorktreeDialog } from './WorktreeDialog';
 import { GoalDialog } from './GoalBar';
 import { PrBadge, PullRequestDialog } from './PullRequest';
@@ -274,13 +275,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
             icon={<Trash2 size={15} />}
             onClick={async () => {
               setMenu(false);
-              const ok = await confirm({
-                title: 'Delete this session?',
-                body: <>The transcript is removed from disk ({agentName(s.agent, s.acpName)} history included), so it disappears from the CLI and VS Code too. This cannot be undone.</>,
-                confirm: 'Delete',
-                danger: true,
-              });
-              if (!ok) return;
+              if (!(await confirm(deleteDialog(s)))) return;
               try {
                 await del(`/api/sessions/${enc(s.key)}`);
                 go('/');

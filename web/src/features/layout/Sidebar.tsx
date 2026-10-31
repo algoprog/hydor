@@ -107,7 +107,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   };
 
   return (
-    <aside className="flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)]">
+    <aside className={cx('flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)]', mobile && 'select-none [-webkit-touch-callout:none] [&_input]:select-text')}>
       <div className="flex h-14 shrink-0 items-center gap-2.5 px-4">
         <span className="group inline-flex">
           <Logo />
