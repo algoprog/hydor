@@ -42,6 +42,7 @@ import { ACP_PRESETS, acpAgents, findCommand, removeAcpAgent, saveAcpAgent } fro
 import { listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import * as setup from './setup.ts';
+import { setStartup, startupDefault, startupState } from './startup.ts';
 import { claudeRetention, setClaudeRetention } from './claudeHistory.ts';
 import { computeStats } from './stats.ts';
 import { SystemMonitor } from './system.ts';
@@ -225,6 +226,8 @@ app.post('/api/update-check', async () => ({ update: await checkUpdates() }));
 /** Pulls, builds and restarts now; progress arrives as update events. */
 app.post('/api/update', async () => ({ update: startUpdate(false) }));
 app.put('/api/update/auto', async (req) => ({ update: setAutoUpdate(!!(req.body as { on?: boolean } | undefined)?.on) }));
+app.get('/api/startup', async () => startupState());
+app.put('/api/startup', async (req) => setStartup(!!(req.body as { on?: boolean } | undefined)?.on));
 watchUpdates(db, (update) => broadcast({ t: 'update', update }));
 
 /** The web build the server hands out (its entry script), so open pages notice a newer one. */
@@ -1483,6 +1486,8 @@ setInterval(sweep, 6 * 3600_000).unref();
 await app.listen({ host: config.host, port: config.port });
 console.log(`[naget-agent] listening on http://${config.host}:${config.port}`);
 machines.start();
+// Starting with this computer is on by default (Settings → General).
+setTimeout(() => startupDefault(db), 3000).unref();
 // SSH tunnels end with the server (the service stops only its main process).
 process.on('exit', () => machines.shutdown());
 

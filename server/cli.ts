@@ -11,14 +11,9 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { ENV_FILE, UNIT, UNIT_PATH, unitText } from './service.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-// Installs from before the rename keep their agent-console service and settings file.
-const UNIT_DIR = path.join(os.homedir(), '.config/systemd/user');
-const OLD_UNIT = 'agent-console.service';
-const UNIT = !fs.existsSync(path.join(UNIT_DIR, 'naget-agent.service')) && fs.existsSync(path.join(UNIT_DIR, OLD_UNIT)) ? OLD_UNIT : 'naget-agent.service';
-const UNIT_PATH = path.join(UNIT_DIR, UNIT);
-const ENV_FILE = [path.join(os.homedir(), '.config/naget-agent.env'), path.join(os.homedir(), '.config/agent-console.env')].find((f) => fs.existsSync(f)) ?? path.join(os.homedir(), '.config/naget-agent.env');
 
 const [cmd, sub] = process.argv.slice(2);
 
@@ -65,26 +60,6 @@ async function auth() {
   return { db, auth: new AuthManager(db) };
 }
 
-function unitText(): string {
-  return `[Unit]
-Description=Naget Agent
-After=network-online.target
-
-[Service]
-WorkingDirectory=${ROOT}
-Environment=NODE_ENV=production
-# PORT, HOST, DATA_DIR, ALLOWED_ORIGINS and the like, one per line (optional).
-EnvironmentFile=-${ENV_FILE}
-ExecStart=${process.execPath} ${path.join(ROOT, 'dist/server/index.js')}
-Restart=on-failure
-# Live agents run in their own processes and must outlive restarts of the web server.
-KillMode=process
-
-[Install]
-WantedBy=default.target
-`;
-}
-
 if (cmd === 'set-password') {
   const { db, auth: a } = await auth();
   const { validatePassword } = await import('./auth.ts');
@@ -116,7 +91,7 @@ if (cmd === 'set-password') {
     process.exit(1);
   }
   fs.mkdirSync(path.dirname(UNIT_PATH), { recursive: true });
-  fs.writeFileSync(UNIT_PATH, unitText());
+  fs.writeFileSync(UNIT_PATH, unitText(ROOT));
   console.log(`Wrote ${UNIT_PATH}`);
   if (systemctl('daemon-reload') !== 0 || systemctl('enable', '--now', UNIT) !== 0) process.exit(1);
   // Without lingering, user services stop when you log out.

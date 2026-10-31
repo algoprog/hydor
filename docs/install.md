@@ -13,16 +13,36 @@ How to run Naget Agent with Docker or as a service of your user, and keep it up 
 
 ## With Docker
 
+The image is published as [`nagetai/naget-agent`](https://hub.docker.com/r/nagetai/naget-agent) for
+`linux/amd64` and `linux/arm64`, so it runs with Docker on Linux and with Docker Desktop on macOS (Intel or
+Apple silicon) and Windows. Pull it and run it:
+
+```bash
+mkdir -p workspace                                        # the folder the agents work in
+docker run -d --name naget-agent --restart unless-stopped -p 127.0.0.1:8790:8790 \
+  -v naget-agent-home:/home/node -v "$PWD/workspace:/workspace" nagetai/naget-agent
+docker logs naget-agent | grep setup                      # your one-time setup link
+```
+
+The published image runs the agents as user id 1000, the first user on most Linux systems. If yours is
+another (`id -u`), build the image yourself so the files the agents create in your folders are yours; on
+macOS and Windows, Docker Desktop takes care of this. To build it, from a clone of the repository:
+
 ```bash
 git clone https://github.com/Naget-Inc/naget-agent naget-agent && cd naget-agent
 printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env   # files the agents create will be yours
 mkdir -p workspace                                        # the folder the agents work in
-docker compose up -d --build
+docker compose up -d --build                              # without --build: the published image
 docker compose logs | grep setup                          # your one-time setup link
 ```
 
 Open the setup link from the log (`http://localhost:8790/setup?token=…`), choose a password, and the
 welcome tour sets up what you want to use: Claude Code, Codex, models or other agents.
+
+It starts again with the computer as long as Docker does (the restart policy `unless-stopped`; Docker
+Desktop has a setting to start when you sign in). To move to a newer image: `docker pull nagetai/naget-agent`,
+then remove the container and run it again (the `naget-agent-home` volume keeps your data), or
+`docker compose pull && docker compose up -d`.
 
 What the container keeps:
 
@@ -68,6 +88,12 @@ node dist/server/cli.js service install     # put it back
 
 Settings such as `PORT`, `HOST`, `DATA_DIR` or `ALLOWED_ORIGINS` go in `~/.config/naget-agent.env`, one
 `NAME=value` per line. Restarting the service never interrupts a running agent: the server reconnects to it.
+
+**Start when this computer starts** (Settings → General) is on by default: the service starts at boot, even
+before anyone logs in, and comes back if it stops. A copy started by hand (`npm start`) from a git clone
+sets up this service the first time it runs, with the settings it was started with; turn the switch off to
+keep it from starting at boot. With Docker, the restart policy decides instead; with a system service of your
+own, its `systemctl enable` does.
 
 If you missed the setup link, `node dist/server/cli.js setup-token` prints the token, to use as
 `/setup?token=<token>`.
