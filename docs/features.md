@@ -46,7 +46,8 @@ agents that speak ACP and take MCP servers.
 - **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in a library
   with storage of their own and an address for a phone's home screen, and folders publish at a link. Apps are
   tasks you repeat, each with a form: from templates or your own, run from the gallery, the API, MCP, a public
-  page, or once for each row of a CSV.
+  page, or once for each row of a CSV. Follow-ups refine a run's result, asked on its page or in its session,
+  which opens on that result with a switch to the conversation.
 - **Skills**: a library that comes with the app (clarify first, check before saying it is done,
   troubleshooting, research, writing, documents) for every agent. Agents propose new skills or fixes to them,
   saved only when you approve.

@@ -1,6 +1,7 @@
 // Script tests for Apps: filling the prompt, the form's checks, the answer fields' schema and
-// submit_result, API keys, rate limits and the public page's caps (through its routes, with a stand-in
-// for the session manager), and CSV in and out with runs over rows. Build and run with a scratch folder:
+// submit_result, follow-ups that refine a result, API keys, rate limits and the public page's caps
+// (through its routes, with a stand-in for the session manager), and CSV in and out with runs over rows.
+// Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/apps/apps-test.ts
 //   DATA_DIR=/tmp/naget-test-apps-unit node dist/dev/apps-test.js
 import assert from 'node:assert/strict';
@@ -20,7 +21,7 @@ import { apps } from './index.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { publicRunOf, publicRunPrompt } from './publicRun.ts';
-import { startRun, startRuns } from './runs.ts';
+import { runInstructions, saveResult, startRun, startRuns } from './runs.ts';
 import * as store from './store.ts';
 import { TEMPLATES } from './templates.ts';
 
@@ -58,9 +59,11 @@ class FakeSessions extends EventEmitter {
     const st = this.status.get(key);
     return st ? ({ key, agent: 'acp', stats: { tokensIn: 0, tokensOut: 0, tokensCached: 0 }, live: { status: st } } as any) : null;
   }
+  /** A whole conversation for a session, where a test gives one (messages, tool calls, replies). */
+  items = new Map<string, any[]>();
   async timeline(key: string) {
     const said = this.replies.get(key) ?? [];
-    return { parser: { items: said.map((text, i) => ({ kind: 'assistant', id: `a${i}`, seq: i, text })) }, readMore: async () => {} } as any;
+    return { parser: { items: this.items.get(key) ?? said.map((text, i) => ({ kind: 'assistant', id: `a${i}`, seq: i, text })) }, readMore: async () => {} } as any;
   }
   liveSnapshot() {
     return { live: null, overlay: { items: [], patches: {}, approvals: [] } };
@@ -76,6 +79,7 @@ class FakeSessions extends EventEmitter {
   /** Ends a session's turn with a reply. */
   end(key: string, reply = 'All done.') {
     this.replies.set(key, [...(this.replies.get(key) ?? []), reply]);
+    this.items.get(key)?.push({ kind: 'assistant', id: `a${this.items.get(key)!.length}`, seq: 0, text: reply });
     this.status.set(key, 'idle');
     this.emit('live', key);
   }
@@ -276,6 +280,126 @@ test('nudge: a run that ends without its result is reminded once, then ends', as
   // The reply that reads like an answer, not the short one after the reminder.
   assert.match(r.reply!, /^I wrote the plan/);
   assert.equal(sessions.sent.filter((s) => s.key === key).length, 1, 'only one reminder');
+});
+
+// ---- follow-ups ----------------------------------------------------------------------------------------
+
+/** What a transcript holds: a message, the answer handed in. */
+const message = (text: string) => ({ kind: 'user', id: `u-${Math.random().toString(36).slice(2, 8)}`, seq: 0, ts: Date.now(), text });
+const handedIn = () => ({ kind: 'tool', id: `t-${Math.random().toString(36).slice(2, 8)}`, seq: 0, tool: { name: 'mcp__naget-agent__submit_result', category: 'other', title: 'submit_result', status: 'ok' } });
+
+test('follow-ups: one from the run’s page opens the run again; its new result and reply land, and the page lists it', async () => {
+  const app = store.saveApp(db, { recipe: recipe({ name: 'Refined' }) });
+  const run = startRun({ app: app.id, slug: app.slug, recipe: app, source: 'web', inputs: { city: 'Athens' } });
+  await sleep(50);
+  const key = store.getRun(db, run.id)!.key!;
+  const mark = sessions.made.find((m) => m.key === key)!.o.extra.app;
+  const add = await apps.spawn!({ agent: 'claude', key, cwd: tmp, runId: 'agent-run-fu', resume: false, extra: { app: mark } }, deps);
+  assert.match(add!.instructions![0], /Later messages may ask you to change the result/);
+  const ctx: RunCtx = { runId: 'agent-run-fu', key, agent: 'claude', cwd: tmp, deps };
+  const [tool] = apps.tools!(ctx);
+  sessions.items.set(key, [message('Plan 3 days in Athens.')]);
+  await tool.run({ summary: 'Three days', days: [{ day: 1, plan: 'Acropolis' }] }, ctx);
+  sessions.items.get(key)!.push(handedIn());
+  sessions.end(key, 'Here is the plan.');
+  await sleep(2100);
+  assert.equal(store.getRun(db, run.id)!.status, 'done');
+  // Asked on the run's page: it goes to the session, and the run works again.
+  const res = await http.inject({ method: 'POST', url: `/api/apps/runs/${run.id}/ask`, payload: { text: 'Make day 1 lighter' } });
+  assert.equal(res.statusCode, 200, res.body);
+  assert.deepEqual(sessions.sent.at(-1), { key, text: 'Make day 1 lighter' });
+  const open = store.getRun(db, run.id)!;
+  assert.equal(open.status, 'running');
+  assert.equal(open.endedAt, undefined);
+  sessions.items.get(key)!.push(message('Make day 1 lighter'));
+  await tool.run({ summary: 'Three easier days', days: [{ day: 1, plan: 'Acropolis Museum' }] }, ctx);
+  sessions.items.get(key)!.push(handedIn());
+  sessions.end(key, 'Day 1 is lighter now: the museum instead of the hill.');
+  await sleep(2100);
+  const r = store.getRun(db, run.id)!;
+  assert.equal(r.status, 'done');
+  assert.equal((r.result as Record<string, unknown>).summary, 'Three easier days');
+  assert.equal(r.reply, 'Day 1 is lighter now: the museum instead of the hill.');
+  assert.equal(sessions.sent.filter((s) => s.key === key).length, 1, 'no reminder: it handed in the new result');
+  const page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${run.id}` })).json();
+  assert.equal(page.first, 'Here is the plan.');
+  assert.deepEqual(
+    page.asks.map((a: { text: string; updated: boolean; reply?: string }) => [a.text, a.updated, a.reply]),
+    [['Make day 1 lighter', true, 'Day 1 is lighter now: the museum instead of the hill.']],
+  );
+  assert.equal(page.noAsks, undefined);
+  assert.equal((await http.inject({ method: 'POST', url: `/api/apps/runs/${run.id}/ask`, payload: { text: ' ' } })).statusCode, 400);
+});
+
+test('follow-ups: one typed in the session opens the run too; a change only written out is reminded once, thanks are not', async () => {
+  const app = store.saveApp(db, { recipe: recipe({ name: 'Chatted' }) });
+  const run = startRun({ app: app.id, slug: app.slug, recipe: app, source: 'web', inputs: { city: 'Nafplio' } });
+  await sleep(50);
+  const key = store.getRun(db, run.id)!.key!;
+  sessions.items.set(key, [message('Plan 3 days in Nafplio.')]);
+  saveResult(run.id, { summary: 'A plan', cost: null, days: [] });
+  sessions.items.get(key)!.push(handedIn());
+  sessions.end(key, 'The plan is ready.');
+  await sleep(2100);
+  assert.equal(store.getRun(db, run.id)!.status, 'done');
+  // The session's own message box: the session goes to work, and the run follows it.
+  const work = (text: string) => {
+    sessions.items.get(key)!.push(message(text));
+    sessions.status.set(key, 'working');
+    sessions.emit('live', key, { status: 'working' });
+  };
+  const sent = () => sessions.sent.filter((s) => s.key === key);
+  work('Swap day 2 for a day on Spetses');
+  await sleep(50);
+  assert.equal(store.getRun(db, run.id)!.status, 'running');
+  sessions.end(key, 'Here is the new day 2 on Spetses: '.padEnd(400, 'ferry, beach, lunch, '));
+  await sleep(2300);
+  assert.equal(sent().length, 1, 'one reminder to hand in the changed result');
+  assert.match(sent()[0].text, /^The result card still shows the earlier version\. .*submit_result/);
+  assert.equal(store.getRun(db, run.id)!.status, 'running');
+  // It hands in the new result after the reminder.
+  sessions.items.get(key)!.push(message(sent()[0].text));
+  saveResult(run.id, { summary: 'A plan with Spetses', cost: null, days: [] });
+  sessions.items.get(key)!.push(handedIn());
+  sessions.end(key, 'Done.');
+  await sleep(2300);
+  let r = store.getRun(db, run.id)!;
+  assert.equal(r.status, 'done');
+  assert.equal((r.result as Record<string, unknown>).summary, 'A plan with Spetses');
+  assert.match(r.reply!, /^Here is the new day 2/, 'the reply that reads like an answer, not "Done."');
+  // Thanks: a short answer and no reminder.
+  work('Thanks!');
+  await sleep(50);
+  sessions.end(key, 'Glad it helps!');
+  await sleep(2300);
+  r = store.getRun(db, run.id)!;
+  assert.equal(r.status, 'done');
+  assert.equal(r.reply, 'Glad it helps!');
+  assert.equal(sent().length, 1, 'no reminder after thanks');
+  const page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${run.id}` })).json();
+  assert.equal(page.first, 'The plan is ready.');
+  // The app's reminder is not one of the person's follow-ups.
+  assert.deepEqual(
+    page.asks.map((a: { text: string; updated: boolean }) => [a.text, a.updated]),
+    [
+      ['Swap day 2 for a day on Spetses', true],
+      ['Thanks!', false],
+    ],
+  );
+});
+
+test('follow-ups: a public page’s run takes none, and its session at work again leaves it ended', async () => {
+  const r = store.insertRun(db, { app: 'pub', appName: 'Public', recipe: recipe(), source: 'public', inputs: {}, status: 'done' });
+  store.updateRun(db, r.id, { key: 'acp:public-fu' });
+  const res = await http.inject({ method: 'POST', url: `/api/apps/runs/${r.id}/ask`, payload: { text: 'More, please' } });
+  assert.equal(res.statusCode, 409);
+  assert.match(res.json().error, /public page/);
+  sessions.status.set('acp:public-fu', 'working');
+  sessions.emit('live', 'acp:public-fu', { status: 'working' });
+  await sleep(50);
+  assert.equal(store.getRun(db, r.id)!.status, 'done');
+  sessions.status.delete('acp:public-fu');
+  assert.doesNotMatch(runInstructions({ recipe: recipe(), source: 'public', appName: 'Public' }), /Later messages/);
 });
 
 // ---- API keys ----------------------------------------------------------------------------------------

@@ -1,17 +1,19 @@
 // One run's page: where it stands (live), its result as a card or table, the agent's reply, what was
-// asked, and a link to the full session.
-import { useEffect, useState } from 'react';
+// asked, the follow-ups that refined it and a box for the next one, and a link to the full session.
+import { useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ChevronRight, MessageSquareText, RotateCcw, Square, Trash2 } from 'lucide-react';
 import { isActive } from '@shared/apps';
-import { api, del, enc, post } from '../../lib/api';
+import { del, enc, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Button, cx, Empty, IconButton, Throbber, useConfirm } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
-import { appPath, SOURCE_LABEL, useRunEvents, type RunDetail } from './api';
+import { useSessionShow } from '../session/show';
+import { appPath, SOURCE_LABEL, useRunDetail, type RunDetail } from './api';
 import { AppIcon } from './AppIcon';
 import { RunsWith } from './AppPage';
+import { AskBox, FollowUps } from './FollowUps';
 import { RunBody } from './Result';
 
 function Asked({ d }: { d: RunDetail }) {
@@ -38,23 +40,39 @@ function Asked({ d }: { d: RunDetail }) {
   );
 }
 
+/** A run as its person sees it, on its page and in its session: the result, what was asked, the follow-ups. */
+export function RunView({ d, statusExtra }: { d: RunDetail; statusExtra?: ReactNode }) {
+  const r = d.run;
+  return (
+    <>
+      <RunBody
+        run={r}
+        progress={d.progress}
+        answer={d.recipe.answer}
+        name={d.recipe.name}
+        statusExtra={statusExtra}
+        reply={d.asks.length ? (d.first ?? '') : undefined}
+        followUp={d.asks.at(-1) && { updated: d.asks.at(-1)!.updated && d.recipe.answer.length > 0 }}
+      />
+      <Asked d={d} />
+      <FollowUps d={d} />
+      {!isActive(r.status) && (d.slug || r.app.startsWith('tpl:')) && (
+        <div className="flex justify-center pt-2">
+          <Button variant="ghost" icon={<RotateCcw size={14} />} onClick={() => go(`${appPath(r.app)}?again=${enc(r.id)}`)}>
+            Run again with these answers
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function RunPage({ id }: { id: string }) {
-  const [d, setD] = useState<RunDetail | null>(null);
-  const [err, setErr] = useState('');
+  const { d, err, load } = useRunDetail(id);
   const [ask, confirmNode] = useConfirm();
-  const load = () => api<RunDetail>(`/api/apps/runs/${enc(id)}`).then(setD, (e) => setErr((e as Error).message));
-  useEffect(() => {
-    load();
-  }, [id]);
-  useRunEvents((run) => run.id === id && load());
+  const scroller = useRef<HTMLDivElement>(null);
   const active = d ? isActive(d.run.status) : false;
-  // Steps and the reply come from the session: look again while it works.
-  useEffect(() => {
-    if (!active) return;
-    const t = setInterval(load, 2000);
-    return () => clearInterval(t);
-  }, [active, id]);
-  if (err) return <Empty title="This run could not be opened">{err}</Empty>;
+  if (err && !d) return <Empty title="This run could not be opened">{err}</Empty>;
   const r = d?.run;
   const back = d ? (d.slug ? appPath(r!.app) : r!.app.startsWith('tpl:') ? appPath(r!.app) : '/apps') : '/apps';
   return (
@@ -74,7 +92,15 @@ export function RunPage({ id }: { id: string }) {
           r && (
             <>
               {r.key && (
-                <Button size="sm" icon={<MessageSquareText size={14} />} onClick={() => openSession(r.key!)}>
+                <Button
+                  size="sm"
+                  icon={<MessageSquareText size={14} />}
+                  onClick={() => {
+                    // Its session opens on the conversation: the result is what this page shows.
+                    useSessionShow.getState().show(r.key!, 'conversation');
+                    openSession(r.key!);
+                  }}
+                >
                   <span className="max-sm:hidden">Open the session</span>
                   <span className="sm:hidden">Session</span>
                 </Button>
@@ -98,31 +124,27 @@ export function RunPage({ id }: { id: string }) {
           )
         }
       />
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         {!d ? (
           <div className="flex justify-center py-20 text-fg-3">
             <Throbber size={28} />
           </div>
         ) : (
           <div className="mx-auto max-w-[860px] space-y-3 px-4 py-5 sm:px-6">
-            <RunBody
-              run={d.run}
-              progress={d.progress}
-              answer={d.recipe.answer}
-              name={d.recipe.name}
-              statusExtra={<span className="max-sm:hidden"><RunsWith agent={d.recipe.agent} acpAgent={d.recipe.acpAgent} model={d.recipe.model} /></span>}
-            />
-            <Asked d={d} />
-            {!active && (d.slug || r!.app.startsWith('tpl:')) && (
-              <div className="flex justify-center pt-2">
-                <Button variant="ghost" icon={<RotateCcw size={14} />} onClick={() => go(`${appPath(r!.app)}?again=${enc(r!.id)}`)}>
-                  Run again with these answers
-                </Button>
-              </div>
-            )}
+            <RunView d={d} statusExtra={<span className="max-sm:hidden"><RunsWith agent={d.recipe.agent} acpAgent={d.recipe.acpAgent} model={d.recipe.model} /></span>} />
+            {d.noAsks && d.run.key && <p className="pt-1 text-center text-[12.5px] text-fg-3">{d.noAsks}</p>}
           </div>
         )}
       </div>
+      {d?.run.key && !d.noAsks && (
+        <AskBox
+          d={d}
+          onSent={() => {
+            // The follow-up shows at the end, where the agent's answer comes.
+            load().then(() => requestAnimationFrame(() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })));
+          }}
+        />
+      )}
       {confirmNode}
     </div>
   );

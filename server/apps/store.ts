@@ -216,7 +216,13 @@ export function runByKey(db: DB, key: string): RunRecord | null {
   return r ? toRun(r) : null;
 }
 
-export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: RunStatus; result: Record<string, unknown> | null; reply: string; error: string | null; costUsd: number; nudged: boolean; startedAt: number; endedAt: number }>) {
+/** The run a session belongs to, by id only (it is asked often). */
+export function runIdByKey(db: DB, key: string): string | null {
+  const r = db.prepare('select id from app_runs where key = ? order by created_at desc limit 1').get(key) as { id: string } | undefined;
+  return r?.id ?? null;
+}
+
+export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: RunStatus; result: Record<string, unknown> | null; reply: string; error: string | null; costUsd: number; nudged: boolean; startedAt: number; endedAt: number | null }>) {
   const sets: string[] = [];
   const vals: unknown[] = [];
   const put = (col: string, v: unknown) => {
