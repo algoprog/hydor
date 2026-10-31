@@ -1,26 +1,44 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { KeyRound, Lock } from 'lucide-react';
+import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { Blocks, KeyRound, Lock } from 'lucide-react';
 import { post } from '../../lib/api';
 import { useApp } from '../../lib/store';
-import { Button, inputCls } from '../../components/ui';
-import { Logo } from '../../components/Logo';
+import { Button, cx, inputCls } from '../../components/ui';
 import { AgentIcon } from '../../components/AgentIcon';
-import { setupDone, TOUR_STEP_COUNT, TourProgress } from '../tour/Tour';
+import { Aurora, HeroMark, setupDone, TOUR_SETUP_STEPS, TourProgress } from '../tour/Tour';
 
-function Shell({ title, sub, children }: { title: string; sub: ReactNode; children: ReactNode }) {
+const n = (i: number) => ({ '--i': i }) as CSSProperties;
+
+/** The sign-in screens: the mark draws itself over soft drifting light, then the card rises in. */
+function Shell({ title, sub, leaving, children }: { title: string; sub: ReactNode; leaving?: boolean; children: ReactNode }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-bg px-4 py-10">
-      <div className="anim-pop w-full max-w-[380px]">
-        <div className="mb-7 flex flex-col items-center gap-3 text-center">
-          <Logo size={40} />
-          <div>
-            <h1 className="text-[20px] font-semibold tracking-tight">{title}</h1>
-            <p className="mt-1 text-[14px] text-fg-3">{sub}</p>
+    <div className="relative flex min-h-full items-center justify-center bg-bg px-4 py-10">
+      <Aurora className="aurora-page" />
+      <div className="relative w-full max-w-[380px]">
+        <div className="mb-7 flex flex-col items-center gap-3.5 text-center">
+          <HeroMark size={52} />
+          <div className="tour-rise">
+            <h1 className="text-[20px] font-semibold tracking-tight" style={n(3)}>
+              {title}
+            </h1>
+            <p className="mt-1 text-[14px] text-fg-3" style={n(4)}>
+              {sub}
+            </p>
           </div>
         </div>
-        <div className="rounded-[20px] border border-line bg-panel p-6 shadow-lg">{children}</div>
-        <div className="mt-6 flex items-center justify-center gap-2 text-[12.5px] text-fg-3">
-          <AgentIcon agent="claude" size={14} /> Claude Code <span className="opacity-50">·</span> <AgentIcon agent="codex" size={14} /> Codex
+        <div className={cx('auth-card rounded-[20px] border border-line bg-panel p-6 shadow-lg', leaving && 'tour-card-out')}>{children}</div>
+        <div className="stagger mt-6 flex flex-wrap items-center justify-center gap-x-3.5 gap-y-1.5 text-[12.5px] text-fg-3">
+          <span className="flex items-center gap-1.5" style={n(16)}>
+            <AgentIcon agent="claude" size={14} /> Claude Code
+          </span>
+          <span className="flex items-center gap-1.5" style={n(17)}>
+            <AgentIcon agent="codex" size={14} /> Codex
+          </span>
+          <span className="flex items-center gap-1.5" style={n(18)}>
+            <AgentIcon agent="acp" name="Custom" size={14} /> Any model
+          </span>
+          <span className="flex items-center gap-1.5" style={n(19)}>
+            <Blocks size={13} /> More agents
+          </span>
         </div>
       </div>
     </div>
@@ -47,7 +65,7 @@ export function Login() {
     }
   };
   return (
-    <Shell title="Agent Console" sub="Sign in to continue.">
+    <Shell title="Naget Agent" sub="Sign in to continue.">
       <form onSubmit={submit} className="space-y-3">
         <div className="relative">
           <Lock size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
@@ -70,6 +88,7 @@ export function Setup() {
   const [pw2, setPw2] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (pw !== pw2) return setErr('The passwords differ');
@@ -77,25 +96,26 @@ export function Setup() {
     setErr('');
     try {
       await post('/api/auth/setup', { token, password: pw });
-      history.replaceState(null, '', '/');
-      setupDone();
-      useApp.getState().set({ auth: 'ok' });
+      // The card fades away, then the app comes in and the tour goes on.
+      setLeaving(true);
+      setTimeout(() => {
+        history.replaceState(null, '', '/');
+        setupDone();
+        useApp.getState().set({ auth: 'ok' });
+      }, 280);
     } catch (e2) {
       setErr((e2 as Error).message);
-    } finally {
       setBusy(false);
     }
   };
   return (
-    <Shell title="Welcome to Agent Console" sub="Let’s get you set up. It takes about a minute.">
+    <Shell title="Welcome to Naget Agent" sub="Let’s get you set up. It takes about a minute." leaving={leaving}>
       <div className="mb-4 flex items-center gap-3">
-        <TourProgress at={0} />
-        <span className="ml-auto text-[12px] text-fg-3">
-          Step 1 of {TOUR_STEP_COUNT}
-        </span>
+        <TourProgress at={0} total={TOUR_SETUP_STEPS} />
+        <span className="ml-auto text-[12px] text-fg-3">Step 1</span>
       </div>
       <h2 className="text-[15.5px] font-semibold tracking-tight">Choose a password</h2>
-      <p className="mt-1 mb-4 text-[13px] leading-relaxed text-fg-3">It keeps this console private, and you sign in with it on any device. You can change it later in Settings.</p>
+      <p className="mt-1 mb-4 text-[13px] leading-relaxed text-fg-3">It keeps this app private, and you sign in with it on any device. You can change it later in Settings.</p>
       <form onSubmit={submit} className="space-y-3">
         {!linked && (
           <div>
@@ -104,7 +124,7 @@ export function Setup() {
               <input className={`${input} pl-9 font-mono text-[13px]`} placeholder="Setup token" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" autoFocus />
             </div>
             <p className="mt-1.5 text-[11.5px] leading-snug text-fg-3">
-              Shows that you run this computer. It is in <span className="font-mono">~/.web-agent/setup-token</span>, and in the link the server printed when it started.
+              Shows that you run this computer. It is in <span className="font-mono">setup-token</span> in the app’s data folder (<span className="font-mono">~/.naget-agent</span>), and in the link the server printed when it started.
             </p>
           </div>
         )}

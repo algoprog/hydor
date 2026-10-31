@@ -89,7 +89,7 @@ export class Push {
       subs.map(async (s) => {
         try {
           const body = encryptPayload(payload, Buffer.from(s.p256dh, 'base64url'), Buffer.from(s.auth, 'base64url'));
-          const sub = /^https:\/\//.test(s.origin) ? s.origin : 'mailto:agent-console@localhost';
+          const sub = /^https:\/\//.test(s.origin) ? s.origin : 'mailto:naget-agent@localhost';
           const r = await fetch(s.endpoint, {
             method: 'POST',
             headers: { Authorization: this.vapid(s.endpoint, sub), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'high' },

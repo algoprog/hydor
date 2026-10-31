@@ -1,6 +1,6 @@
 # Installation
 
-How to run Agent Console with Docker or as a service of your user, and keep it up to date. [Back to the README](../README.md).
+How to run Naget Agent with Docker or as a service of your user, and keep it up to date. [Back to the README](../README.md).
 
 ## Requirements
 
@@ -14,7 +14,7 @@ How to run Agent Console with Docker or as a service of your user, and keep it u
 ## With Docker
 
 ```bash
-git clone https://github.com/Naget-Inc/agent-console agent-console && cd agent-console
+git clone https://github.com/Naget-Inc/naget-agent naget-agent && cd naget-agent
 printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env   # files the agents create will be yours
 mkdir -p workspace                                        # the folder the agents work in
 docker compose up -d --build
@@ -22,7 +22,7 @@ docker compose logs | grep setup                          # your one-time setup 
 ```
 
 Open the setup link from the log (`http://localhost:8790/setup?token=…`), choose a password, and the
-welcome tour walks you through signing in to Claude Code and Codex.
+welcome tour sets up what you want to use: Claude Code, Codex, models or other agents.
 
 What the container keeps:
 
@@ -42,7 +42,7 @@ Codex and says why in the mode menu. Claude Code's permission prompts work as us
 ## Without Docker
 
 ```bash
-git clone https://github.com/Naget-Inc/agent-console agent-console && cd agent-console
+git clone https://github.com/Naget-Inc/naget-agent naget-agent && cd naget-agent
 ./install.sh
 ```
 
@@ -51,8 +51,8 @@ builds the app and runs it as a systemd **user** service that starts at boot: no
 setup link (`http://localhost:8790/setup?token=…`): open it, choose a password, and the welcome tour does the
 rest.
 
-Without cloning first: `curl -fsSL https://raw.githubusercontent.com/Naget-Inc/agent-console/main/install.sh | bash`
-clones into `~/agent-console` (or `AGENT_CONSOLE_DIR`; `AGENT_CONSOLE_REPO` installs from another copy). `PORT=…` picks another port; `NO_SERVICE=1` only builds, and then
+Without cloning first: `curl -fsSL https://raw.githubusercontent.com/Naget-Inc/naget-agent/main/install.sh | bash`
+clones into `~/naget-agent` (or `NAGET_AGENT_DIR`; `NAGET_AGENT_REPO` installs from another copy). `PORT=…` picks another port; `NO_SERVICE=1` only builds, and then
 `npm start` runs it.
 
 Sessions run as the user who runs the server, with that user's `~/.claude` and `~/.codex`.
@@ -66,7 +66,7 @@ node dist/server/cli.js service uninstall   # stop it and remove the unit (your 
 node dist/server/cli.js service install     # put it back
 ```
 
-Settings such as `PORT`, `HOST`, `DATA_DIR` or `ALLOWED_ORIGINS` go in `~/.config/agent-console.env`, one
+Settings such as `PORT`, `HOST`, `DATA_DIR` or `ALLOWED_ORIGINS` go in `~/.config/naget-agent.env`, one
 `NAME=value` per line. Restarting the service never interrupts a running agent: the server reconnects to it.
 
 If you missed the setup link, `node dist/server/cli.js setup-token` prints the token, to use as
@@ -74,7 +74,7 @@ If you missed the setup link, `node dist/server/cli.js setup-token` prints the t
 
 ## Updates
 
-Agent Console checks for a newer version once a day and installs it by itself after 5 hours without a
+Naget Agent checks for a newer version once a day and installs it by itself after 5 hours without a
 message from you, at most once a day. Agents can be at work meanwhile: they carry on through the
 restart. Settings → General shows what is out, has **Update now** for updating at once, and a switch to
 turn the automatic updates off.
@@ -89,3 +89,8 @@ node dist/server/cli.js update   # pull, build, restart the service; running age
 
 The Docker container updates the copy of the app inside it. Rebuilding the image (`docker compose up -d
 --build`) starts again from your clone of the repository, so `git pull` before you do.
+
+The app was called Agent Console before version 0.5. Installs from then keep working as they are: the
+service stays `agent-console`, the data stays in `~/.web-agent`, and `~/.config/agent-console.env` is
+still read. With Docker the service is now named `naget-agent`, so rebuild with
+`docker compose up -d --build --remove-orphans` (your data volume stays).

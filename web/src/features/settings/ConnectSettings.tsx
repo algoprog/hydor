@@ -145,9 +145,9 @@ function NewToken({ open, onClose, onMade }: { open: boolean; onClose: () => voi
         <div className="space-y-3.5 text-[13px]">
           <p className="rounded-xl border border-warn/30 bg-warn/8 px-3 py-2 leading-relaxed">Copy it now: it is not shown again.</p>
           <Snippet label="Token" text={token} />
-          <Snippet label="Claude Code" text={`claude mcp add --transport http agent-console ${url} --header "Authorization: Bearer ${token}"`} />
-          <Snippet label="Codex (~/.codex/config.toml, with AGENT_CONSOLE_TOKEN set to the token)" text={`[mcp_servers.agent-console]\nurl = "${url}"\nbearer_token_env_var = "AGENT_CONSOLE_TOKEN"`} />
-          <Snippet label="Other clients (JSON)" text={JSON.stringify({ mcpServers: { 'agent-console': { type: 'http', url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2)} />
+          <Snippet label="Claude Code" text={`claude mcp add --transport http naget-agent ${url} --header "Authorization: Bearer ${token}"`} />
+          <Snippet label="Codex (~/.codex/config.toml, with NAGET_AGENT_TOKEN set to the token)" text={`[mcp_servers.naget-agent]\nurl = "${url}"\nbearer_token_env_var = "NAGET_AGENT_TOKEN"`} />
+          <Snippet label="Other clients (JSON)" text={JSON.stringify({ mcpServers: { 'naget-agent': { type: 'http', url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2)} />
           <p className={cx('text-[12px] leading-relaxed text-fg-3')}>The address is this page’s: an agent on another machine needs to reach it the same way your browser does.</p>
         </div>
       )}

@@ -73,7 +73,7 @@ let how: { code: number } | null | undefined;
 function restarter(): { code: number } | null {
   if (how !== undefined) return how;
   how = null;
-  if (process.env.AGENT_CONSOLE_RESTARTS === '1') return (how = { code: 0 });
+  if ((process.env.NAGET_AGENT_RESTARTS ?? process.env.AGENT_CONSOLE_RESTARTS) === '1') return (how = { code: 0 });
   if (!process.env.INVOCATION_ID) return how;
   try {
     const cg = fs.readFileSync('/proc/self/cgroup', 'utf8');

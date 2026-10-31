@@ -1,6 +1,6 @@
 {
-  "name": "Agent Console",
-  "short_name": "Agent Console",
+  "name": "Naget Agent",
+  "short_name": "Naget Agent",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#121110",
@@ -31,5 +31,5 @@
       "purpose": "any"
     }
   ],
-  "description": "Run Claude Code and Codex on your computer from any browser."
+  "description": "A self-hosted agent harness: Claude Code, Codex and any model, on your computer, from any browser."
 }

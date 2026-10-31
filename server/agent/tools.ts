@@ -431,7 +431,7 @@ export const TOOLS: Tool[] = [
     async run(a, ctx) {
       const url = String(a.url ?? '');
       if (!/^https?:\/\//.test(url)) return { ok: false, output: 'Give a full http(s) address' };
-      const r = await fetch(url, { signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(30_000)]), headers: { 'user-agent': 'Mozilla/5.0 (Agent Console)' } });
+      const r = await fetch(url, { signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(30_000)]), headers: { 'user-agent': 'Mozilla/5.0 (Naget Agent)' } });
       const type = r.headers.get('content-type') ?? '';
       const body = (await r.text()).slice(0, 3_000_000);
       const t = /html/.test(type) ? htmlText(body) : body;

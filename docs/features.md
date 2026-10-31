@@ -1,6 +1,6 @@
 # Features
 
-Everything Agent Console does, by area. [Back to the README](../README.md).
+Everything Naget Agent does, by area. [Back to the README](../README.md).
 
 ## Sessions
 - Start a Claude Code or Codex session in any folder, optionally in a worktree of its own (a new branch in a
@@ -17,9 +17,9 @@ Everything Agent Console does, by area. [Back to the README](../README.md).
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
   shows its own usage and limits.
 
-## Console: any model
+## Custom: any model
 
-Console is the app's own agent, for models beyond Claude Code's and Codex's. It works like them: it reads,
+Custom is the app's own agent, for models beyond Claude Code's and Codex's. It works like them: it reads,
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
 Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context.
@@ -80,6 +80,7 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
 - Search across all sessions, `Ctrl+K` for anything, `Ctrl+F` within a conversation.
-- A short welcome tour sets up your subscriptions on first run; the ? button shows it again.
-- Several machines: add other machines running Agent Console, over SSH or by address, and switch between
+- A short welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter or on this
+  computer, other agents), sets those up in place, then shows you around; the ? button shows it again.
+- Several machines: add other machines running Naget Agent, over SSH or by address, and switch between
   them from the sidebar. Notices from all of them reach you wherever you are.

@@ -674,7 +674,8 @@ export function Timeline({
   }, []);
 
   // Code and maths highlight late, so content keeps growing after a render; stay at the end
-  // while following.
+  // while following. (The content is there once the first page is: watch from then.)
+  const shown = !!tl && !(tl.loading && !tl.items.length);
   useEffect(() => {
     const el = content.current;
     if (!el) return;
@@ -684,8 +685,10 @@ export function Timeline({
       else restore();
     });
     ro.observe(el);
+    // So does the view itself changing size: the message box growing a line, the keyboard opening.
+    if (scroller.current) ro.observe(scroller.current);
     return () => ro.disconnect();
-  }, [sessionKey, !!tl]);
+  }, [sessionKey, shown]);
 
   useEffect(() => {
     const up = () => (dragging.current = false);
@@ -741,7 +744,7 @@ export function Timeline({
     }, 250);
   };
 
-  if (!tl || (tl.loading && !tl.items.length)) {
+  if (!shown) {
     return (
       <div className="flex flex-1 items-center justify-center text-fg-3">
         <Throbber size={34} />

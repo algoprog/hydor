@@ -59,6 +59,18 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     }
   });
   const acpList = useApp((s) => s.boot?.acpAgents);
+  // The tour sets the agent to one of those picked there.
+  useEffect(() => {
+    const pick = (e: Event) => {
+      const v = String((e as CustomEvent<string>).detail ?? '');
+      if (v.startsWith('acp:')) {
+        setAcpId(v.slice(4));
+        setAgent('acp');
+      } else if (v === 'claude' || v === 'codex') setAgent(v);
+    };
+    window.addEventListener('wa:agent', pick);
+    return () => window.removeEventListener('wa:agent', pick);
+  }, []);
   const cat = useCatalog(agent, acpId ?? undefined);
   const [cwd, setCwd] = useState('');
   const [instructions, setInstructions] = useState(false);

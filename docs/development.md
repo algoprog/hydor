@@ -1,6 +1,6 @@
 # Development
 
-Building and changing Agent Console. [Back to the README](../README.md).
+Building and changing Naget Agent. [Back to the README](../README.md).
 
 ```bash
 npm ci

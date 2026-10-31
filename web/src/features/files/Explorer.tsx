@@ -212,7 +212,7 @@ export function Explorer() {
   const remove = async (e: FsEntry) => {
     const ok = await confirm({
       title: `Delete ${e.name}?`,
-      body: isDir(e) ? 'The folder and everything in it moves to ~/.web-agent/trash.' : 'The file moves to ~/.web-agent/trash.',
+      body: `${isDir(e) ? 'The folder and everything in it moves' : 'The file moves'} to ${useApp.getState().boot?.dataDir ?? '~/.naget-agent'}/trash.`,
       confirm: 'Delete',
       danger: true,
     });

@@ -97,7 +97,7 @@ export function FolderPicker({ value, onChange, onPick, autoFocus }: { value: st
   );
 }
 
-/** "📁 web-agent ▾": the folder a new session will work in; opens a picker. */
+/** "📁 naget-agent ▾": the folder a new session will work in; opens a picker. */
 export function FolderChip({ value, onChange }: { value: string; onChange: (path: string) => void }) {
   const home = useApp((s) => s.boot?.home) ?? '';
   const ref = useRef<HTMLButtonElement>(null);

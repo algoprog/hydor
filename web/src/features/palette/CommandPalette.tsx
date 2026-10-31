@@ -190,7 +190,7 @@ export function CommandPalette() {
   };
   let lastGroup = '';
   return createPortal(
-    <div className="anim-overlay fixed inset-0 z-[55] flex justify-center bg-black/35 px-3 pt-[12vh]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+    <div className="anim-overlay scrim fixed inset-0 z-[55] flex justify-center px-3 pt-[12vh] [--scrim:0.26]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div role="dialog" aria-label="Command palette" className="anim-pop flex h-fit max-h-[70vh] w-full max-w-[620px] flex-col overflow-hidden rounded-2xl border border-line bg-elevated shadow-lg">
         <div className="flex items-center gap-2.5 border-b border-line px-4">
           <Search size={16} className="shrink-0 text-fg-3" />

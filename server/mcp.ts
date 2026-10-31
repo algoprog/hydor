@@ -1,4 +1,4 @@
-// Agent Console as an MCP server (Streamable HTTP, JSON replies, no event stream).
+// Naget Agent as an MCP server (Streamable HTTP, JSON replies, no event stream).
 //
 //   POST /mcp              other agents (Claude Code elsewhere, Cursor, …) with a bearer token from
 //                          Settings → Connect other agents: list, read, start and message sessions.
@@ -13,7 +13,7 @@ import { signWithKey } from './links.ts';
 import type { SessionManager } from './sessions.ts';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
-export const PAGE_SERVER = 'agent-console';
+export const PAGE_SERVER = 'naget-agent';
 export const MAX_PAGE = 2 * 1024 * 1024;
 
 interface Tool {
@@ -36,7 +36,7 @@ async function answer(m: Rpc, tools: Tool[], info: { instructions?: string }): P
       return ok({
         protocolVersion: PROTOCOLS.includes(asked) ? asked : PROTOCOLS[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'agent-console', title: 'Agent Console', version: config.version },
+        serverInfo: { name: 'naget-agent', title: 'Naget Agent', version: config.version },
         ...(info.instructions ? { instructions: info.instructions } : {}),
       });
     }
@@ -182,7 +182,7 @@ function sessionTools(sessions: SessionManager, publicUrl: (key: string) => stri
   return [
     {
       name: 'list_sessions',
-      description: 'The sessions in Agent Console (Claude Code and Codex), most recent first: key, agent, status, title, folder.',
+      description: 'The sessions in Naget Agent (Claude Code and Codex), most recent first: key, agent, status, title, folder.',
       inputSchema: {
         type: 'object',
         properties: { query: { type: 'string', description: 'Only titles or folders containing this.' }, limit: { type: 'number', description: 'How many (default 20, at most 100).' } },
@@ -267,7 +267,7 @@ function sessionTools(sessions: SessionManager, publicUrl: (key: string) => stri
 
 export function mcpRoutes(app: FastifyInstance, db: DB, sessions: SessionManager, publicUrl: (key: string) => string) {
   const tools = sessionTools(sessions, publicUrl);
-  const info = { instructions: 'Agent Console runs Claude Code and Codex sessions on this machine. Use list_sessions for keys, read_session to catch up, send_message to steer.' };
+  const info = { instructions: 'Naget Agent runs Claude Code and Codex sessions on this machine. Use list_sessions for keys, read_session to catch up, send_message to steer.' };
   app.post('/mcp', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
     if (!checkBearer(db, req)) return reply.code(401).header('WWW-Authenticate', 'Bearer').send({ error: 'A token from Settings → Connect other agents is needed' });
     return serve(req, reply, tools, info);

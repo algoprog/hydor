@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Agent Console in one container: the web app, Claude Code and Codex.
+# Naget Agent in one container: the agent harness, Claude Code and Codex.
 #
 #   docker compose up -d        (see compose.yaml and the README)
 #
@@ -43,7 +43,6 @@ ENV NODE_ENV=production \
     PORT=8790 \
     HOME=/home/node \
     LANG=C.UTF-8 \
-    DATA_DIR=/home/node/.web-agent \
     DEFAULT_CWD=/workspace \
     DISABLE_AUTOUPDATER=1
 EXPOSE 8790

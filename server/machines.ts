@@ -1,7 +1,7 @@
-// Other machines running Agent Console, used from this one. The app shows one machine at a time: under
+// Other machines running Naget Agent, used from this one. The app shows one machine at a time: under
 // /m/<id>/ its pages call that machine's API and sockets, which this server forwards there with an
 // access token made on that machine (Settings → Machines). A machine is reached by URL (on a VPN or a
-// private network) or over SSH, through a tunnel this server keeps open to the Agent Console listening
+// private network) or over SSH, through a tunnel this server keeps open to the Naget Agent listening
 // there on 127.0.0.1.
 //
 // While a machine is connected this server follows its events too: it counts the sessions there that
@@ -22,7 +22,7 @@ import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 
-/** What another Agent Console reports about the machine it runs on. */
+/** What another Naget Agent reports about the machine it runs on. */
 export function machineInfo() {
   let user = '';
   try {
@@ -107,7 +107,7 @@ interface Endpoint {
   socketPath?: string;
 }
 
-/** An SSH tunnel from a local socket to the machine's Agent Console on its 127.0.0.1. */
+/** An SSH tunnel from a local socket to the machine's Naget Agent on its 127.0.0.1. */
 class Tunnel {
   child: ChildProcess | null = null;
   private starting: Promise<void> | null = null;
@@ -262,7 +262,7 @@ class Machine extends EventEmitter {
             j = JSON.parse(data);
           } catch {}
           if (r.statusCode === 401) reject(new Error('It refused the access token: make a new one there (Settings → Machines) and paste it here'));
-          else if (!r.statusCode || r.statusCode >= 400 || !j) reject(new Error(j?.error ?? `It answered ${r.statusCode}${j ? '' : ', not as Agent Console does'}`));
+          else if (!r.statusCode || r.statusCode >= 400 || !j) reject(new Error(j?.error ?? `It answered ${r.statusCode}${j ? '' : ', not as Naget Agent does'}`));
           else resolve(j as T);
         });
       });
@@ -276,7 +276,7 @@ class Machine extends EventEmitter {
     const err = e as NodeJS.ErrnoException;
     const port = this.def.port ?? DEFAULT_PORT;
     if (this.tunnel && (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED' || /socket hang up/.test(err.message)))
-      return `Connected over SSH, but nothing answers on port ${port} there: is Agent Console running on that machine?`;
+      return `Connected over SSH, but nothing answers on port ${port} there: is Naget Agent running on that machine?`;
     if (err.code === 'ECONNREFUSED') return 'Nothing answers at that address';
     if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') return 'That host name is not known';
     if (err.code === 'ETIMEDOUT' || /timed out/.test(err.message)) return 'It did not answer in time';

@@ -1,15 +1,20 @@
 {
-  "name": "agent-console",
-  "version": "0.4.1",
+  "name": "naget-agent",
+  "version": "0.5.0",
   "private": true,
-  "description": "Self-hosted web app for Claude Code, Codex and other coding agents: run them on your own machine, follow their work live, approve what they ask and pick up on your phone.",
+  "description": "Self-hosted agent harness for Claude Code, Codex, other coding agents and any model, open-weight ones included: run them on your own machine, follow their work live, approve what they ask and pick up on your phone.",
   "keywords": [
     "claude-code",
     "codex",
     "coding-agents",
     "ai-agents",
     "agent-client-protocol",
+    "agent-harness",
     "self-hosted",
+    "open-weight-models",
+    "ollama",
+    "vllm",
+    "openrouter",
     "web-ui",
     "developer-tools",
     "anthropic",
@@ -18,13 +23,13 @@
     "terminal",
     "remote-development"
   ],
-  "homepage": "https://github.com/Naget-Inc/agent-console#readme",
+  "homepage": "https://github.com/Naget-Inc/naget-agent#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Naget-Inc/agent-console.git"
+    "url": "git+https://github.com/Naget-Inc/naget-agent.git"
   },
   "bugs": {
-    "url": "https://github.com/Naget-Inc/agent-console/issues"
+    "url": "https://github.com/Naget-Inc/naget-agent/issues"
   },
   "author": "Naget, Inc.",
   "license": "MIT",

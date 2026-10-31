@@ -1,4 +1,4 @@
-// Console: Agent Console's own agent, for any model from OpenRouter, Ollama, vLLM or another
+// Custom (its id is still console): Naget Agent's own agent, for any model from OpenRouter, Ollama, vLLM or another
 // OpenAI-compatible endpoint. It speaks the Agent Client Protocol on stdio like the other ACP agents
 // the app drives: the app opens sessions, sends prompts and answers permission requests; Console runs
 // the model with its tools, skills and MCP servers, keeps the conversation inside the model's context,
@@ -15,9 +15,9 @@ import { parseCalls, StreamFilter, stripMarkup } from './parse.ts';
 import { findSkills, MODES, systemPrompt, type Mode, type Skill } from './prompt.ts';
 import { clip, TOOLS, type Tool, type ToolCtx } from './tools.ts';
 
-const MODELS_FILE = process.env.AGENT_CONSOLE_MODELS ?? '';
-const STATE_DIR = process.env.AGENT_CONSOLE_STATE ?? '';
-const RUNTIME = process.env.AGENT_CONSOLE_RUNTIME ?? '';
+const MODELS_FILE = process.env.NAGET_AGENT_MODELS ?? '';
+const STATE_DIR = process.env.NAGET_AGENT_STATE ?? '';
+const RUNTIME = process.env.NAGET_AGENT_RUNTIME ?? '';
 
 // ---- the protocol --------------------------------------------------------------------------------
 
@@ -362,7 +362,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
       if (/<tool_call>|<\|tool_call_start\|>|(^|\n)\s*\[\s*[A-Za-z_][\w.]*\s*\(/.test(reply.text) && misfires++ < 2) {
         s.messages.push({
           role: 'user',
-          content: `That looks like a tool call Console could not run. The tools are: ${tools.map((t) => t.name).join(', ')}. Call one of them, by its exact name, with named arguments.`,
+          content: `That looks like a tool call that could not be run. The tools are: ${tools.map((t) => t.name).join(', ')}. Call one of them, by its exact name, with named arguments.`,
         });
         continue;
       }
@@ -405,7 +405,7 @@ async function runCall(s: Session, c: { id: string; name: string; raw: string },
     update(s.id, { sessionUpdate: 'tool_call', toolCallId: c.id, title, kind: 'other', status: 'failed', content: [{ type: 'content', content: { type: 'text', text: output } }] });
     return output;
   };
-  if (!tool) return fail(c.name || 'Unknown tool', `Console has no "${c.name}" tool. Its tools: ${tools.map((t) => t.name).join(', ')}.`);
+  if (!tool) return fail(c.name || 'Unknown tool', `There is no "${c.name}" tool. The tools: ${tools.map((t) => t.name).join(', ')}.`);
   let args: Record<string, any>;
   try {
     const raw = (c.raw || '{}').trim();
@@ -446,7 +446,7 @@ async function handle(m: any): Promise<unknown> {
         protocolVersion: 1,
         agentCapabilities: { loadSession: true, promptCapabilities: { image: true, embeddedContext: true }, mcpCapabilities: { http: true, sse: false } },
         authMethods: [],
-        agentInfo: { name: 'console', title: 'Console' },
+        agentInfo: { name: 'console', title: 'Custom' },
       };
     case 'session/new': {
       const s: Session = { id: crypto.randomUUID(), cwd: String(p.cwd ?? process.cwd()), mode: 'ask', messages: [], allow: [], textTools: [], mcpDefs: p.mcpServers ?? [] };
@@ -461,7 +461,7 @@ async function handle(m: any): Promise<unknown> {
         try {
           s = { ...JSON.parse(fs.readFileSync(stateFile(String(p.sessionId)), 'utf8')), mcpDefs: p.mcpServers ?? [] } as Session;
         } catch {
-          throw Object.assign(new Error('Console has no record of that session'), { code: -32002 });
+          throw Object.assign(new Error('There is no record of that session'), { code: -32002 });
         }
         if (p.cwd) s.cwd = String(p.cwd);
         sessions.set(s.id, s);

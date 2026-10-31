@@ -104,11 +104,18 @@ export function Composer({ s }: { s: SessionSummary }) {
     return () => window.removeEventListener(QUOTE_EVENT, onQuote);
   }, []);
 
+  // Fit the box to its text. Measuring collapses it for a moment: its frame holds its height meanwhile,
+  // or the conversation above would get taller for that moment and its scroll position slip.
   useLayoutEffect(() => {
     const el = ta.current;
     if (!el) return;
+    const frame = el.parentElement;
+    const scrolled = el.scrollTop;
+    if (frame) frame.style.minHeight = `${frame.offsetHeight}px`;
     el.style.height = '0px';
     el.style.height = `${Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.4))}px`;
+    el.scrollTop = scrolled;
+    if (frame) frame.style.minHeight = '';
   }, [text]);
 
   // A stopped session resumes on the model it last used unless one is picked here.

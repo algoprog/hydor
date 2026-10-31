@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import { config } from './config.ts';
 
 // Variables that describe the parent process, not the user's login environment.
 const DROP = new Set([
@@ -20,7 +21,7 @@ const DROP = new Set([
   'MANAGERPID',
   'NOTIFY_SOCKET',
 ]);
-const DROP_PREFIX = ['CLAUDECODE', 'CLAUDE_CODE_', 'CODEX_THREAD', 'CODEX_MANAGED', 'VSCODE_', 'BASH_FUNC_', 'npm_', 'NODE_ENV', 'WEB_AGENT'];
+const DROP_PREFIX = ['CLAUDECODE', 'CLAUDE_CODE_', 'CODEX_THREAD', 'CODEX_MANAGED', 'VSCODE_', 'BASH_FUNC_', 'npm_', 'NODE_ENV', 'WEB_AGENT', 'NAGET_AGENT_ROOT'];
 
 let cached: Record<string, string> | null = null;
 
@@ -32,7 +33,7 @@ export function agentBaseEnv(): Record<string, string> {
   if (cached) return cached;
   const user = os.userInfo();
   const shell = fs.existsSync('/bin/bash') ? '/bin/bash' : user.shell || '/bin/sh';
-  const marker = '__WEB_AGENT_ENV__';
+  const marker = '__NAGET_AGENT_ENV__';
   const res = spawnSync(
     '/usr/bin/env',
     [
@@ -67,7 +68,7 @@ export function agentBaseEnv(): Record<string, string> {
   const local = path.join(user.homedir, '.local/bin');
   if (!(env.PATH ?? '').split(':').includes(local)) env.PATH = `${local}:${env.PATH ?? '/usr/bin:/bin'}`;
   // Agents' programs the app installed itself (server/clients.ts), after the user's own.
-  env.PATH = `${env.PATH}:${path.join(process.env.DATA_DIR ?? path.join(user.homedir, '.web-agent'), 'clients/node_modules/.bin')}`;
+  env.PATH = `${env.PATH}:${path.join(config.dataDir, 'clients/node_modules/.bin')}`;
   const runtime = `/run/user/${user.uid}`;
   if (!env.XDG_RUNTIME_DIR && fs.existsSync(runtime)) env.XDG_RUNTIME_DIR = runtime;
   if (!env.DBUS_SESSION_BUS_ADDRESS && fs.existsSync(`${runtime}/bus`)) env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${runtime}/bus`;

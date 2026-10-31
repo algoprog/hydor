@@ -2,20 +2,21 @@
   <img src="web/public/icon-512.png" width="96" height="96" alt="" />
 </p>
 
-<h1 align="center">Agent Console</h1>
+<h1 align="center">Naget Agent</h1>
 
 <p align="center">
-  Run <b>Claude Code</b> and <b>Codex</b> on your own computer, access from any device.
+  Run <b>Claude Code</b>, <b>Codex</b> or <b>any model</b> on your own computer, access from any device.
 </p>
 
 <p align="center">
-  <a href="docs/media/agent-console-intro.mp4"><img src="docs/media/agent-console-intro.webp" width="720" alt="A one-minute tour of Agent Console: start an agent in a folder, follow its steps, approve a command, see the diff, continue on a phone, and switch between agents and machines" /></a>
+  <a href="docs/media/naget-agent-intro.mp4"><img src="docs/media/naget-agent-intro.webp" width="720" alt="A one-minute tour of Naget Agent: start an agent in a folder, follow its steps, approve a command, see the diff, continue on a phone, and switch between agents and machines" /></a>
 </p>
 
-Agent Console is a self-hosted web app for the coding agents you already use. It runs the official
-`claude` and `codex` command-line tools on your machine, with your own subscriptions, and gives them one
-interface you can open from your desk or your phone. Sessions keep running when you close the tab, and the
-ones you start in VS Code or a terminal show up too.
+Naget Agent is a self-hosted agent harness. It works on top of the coding agents you already use,
+running the official `claude` and `codex` command-line tools with your own subscriptions, and on top of the
+models themselves: its own agent, Custom, gives any model, open-weight ones included, the same tools, skills
+and MCP servers. All of it in one interface you can open from your desk or your phone. Sessions keep running
+when you close the tab, and the ones you start in VS Code or a terminal show up too.
 
 ## What you can do
 
@@ -25,7 +26,7 @@ ones you start in VS Code or a terminal show up too.
 - Open pull requests on GitHub or Gitea, and review a branch file by file
 - Use a terminal, files, git, notebooks, scheduled tasks and your plans' limits in the same app
 - Switch between several accounts and machines from the sidebar
-- Run Console, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
+- Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
 
 See [all features](docs/features.md).
 
@@ -34,7 +35,7 @@ See [all features](docs/features.md).
 With Docker:
 
 ```bash
-git clone https://github.com/Naget-Inc/agent-console && cd agent-console
+git clone https://github.com/Naget-Inc/naget-agent && cd naget-agent
 printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env && mkdir -p workspace
 docker compose up -d --build
 docker compose logs | grep setup   # your one-time setup link
@@ -43,11 +44,12 @@ docker compose logs | grep setup   # your one-time setup link
 Or on Linux, as a service of your user (needs Node.js 22.12+, git and tmux):
 
 ```bash
-git clone https://github.com/Naget-Inc/agent-console && cd agent-console
+git clone https://github.com/Naget-Inc/naget-agent && cd naget-agent
 ./install.sh
 ```
 
-Open the setup link it prints, choose a password, and a short tour signs you in to Claude Code and Codex.
+Open the setup link it prints, choose a password, and a short tour sets up what you want to use: Claude Code,
+Codex, models through OpenRouter or on your own GPU, or other agents.
 To use it from your phone, put HTTPS in front of it: see [remote access](docs/remote-access.md).
 
 ## Documentation
@@ -62,5 +64,5 @@ To use it from your phone, put HTTPS in front of it: see [remote access](docs/re
 
 ## License
 
-[MIT](LICENSE). Agent Console is an independent project, not affiliated with or endorsed by Anthropic or
+[MIT](LICENSE). Naget Agent is an independent project, not affiliated with or endorsed by Anthropic or
 OpenAI ([disclaimer](docs/how-it-works.md#disclaimer)).

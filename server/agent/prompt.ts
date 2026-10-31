@@ -94,7 +94,7 @@ export function instructions(cwd: string): string {
 export function systemPrompt(o: { cwd: string; mode: Mode; skills: Skill[]; textTools?: ToolSchema[]; small: boolean }): string {
   const git = gitSummary(o.cwd);
   const lines = [
-    'You are Console, a coding agent in Agent Console. You work in the user’s project on their own machine, with tools to read and change files and to run commands. Do the task, then reply briefly with what you did.',
+    'You are a coding agent in Naget Agent. You work in the user’s project on their own machine, with tools to read and change files and to run commands. Do the task, then reply briefly with what you did.',
     '',
     'How to work:',
     '- Work through the tools. A plan in prose changes nothing: when something needs doing, call the tool that does it, and keep going until the task is finished.',
