@@ -19,5 +19,6 @@ export const connectionsFeature: WebFeature = {
   // An agent asking for a key: a card outside the folded work, since it needs you.
   toolViews: { request_secret: { place: 'attention', Row: SecretCard } },
   SessionMenu: SessionAppsItem,
+  sessionMenuPart: 'settings',
   SessionDock: SessionAppsDialog,
 };

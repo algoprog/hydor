@@ -1,36 +1,29 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AlarmClock, Archive, CheckCheck, ChevronLeft, ChevronRight, Copy, FileDiff, FilePen, FilePlus2, FileText, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, MoreHorizontal, PanelRight, Pencil, Pin, Play, Shrink, Square, SquareTerminal, Target, Trash2, UserRound, X } from 'lucide-react';
+import { ChevronRight, FilePen, FilePlus2, FolderOpen, GitBranch, GitFork, MoreHorizontal, PanelRight, Play, Square, SquareTerminal, UserRound, X } from 'lucide-react';
 import type { BackgroundTask, FileChange, SessionSummary, ToolItem } from '@shared/types';
-import { api, del, enc, post } from '../../lib/api';
+import { api, enc, post } from '../../lib/api';
 import { activityLabel, activityOf, canTakeOver, confirmResume, inBackground, isBusy, isWorking, takeoverDialog } from '../../lib/activity';
 import { ago, basename, compact, dirname, money, prettyPath, tildify } from '../../lib/format';
 import { go, openFile, openSession, sessionPath } from '../../lib/nav';
-import { toast, toastError, useApp, useLive, useSessions, useTimeline, useUI, type DetailsTab } from '../../lib/store';
+import { toastError, useApp, useLive, useSessions, useTimeline, useUI, type DetailsTab } from '../../lib/store';
 import { live as socket } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { modelLabel, useCatalog } from '../../components/AgentPickers';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
-import { InstructionsDialog, instructionName } from '../settings/Instructions';
-import { openTerminalAt } from '../terminal/TerminalPanel';
 import { Composer } from './Composer';
 import { Elapsed, SessionCtx, ToolRow } from './items';
 import { taskKind, TaskLogDialog } from './TaskLog';
 import { Timeline } from './Timeline';
 import { LimitBanner } from '../usage/LimitReset';
-import { setFlags, settle } from '../../lib/flags';
-import { SnoozeItems } from '../sessions/SnoozeMenu';
-import { deleteDialog } from '../sessions/SessionList';
-import { WorktreeDialog } from './WorktreeDialog';
-import { GoalDialog } from './GoalBar';
 import { PrBadge, PullRequestDialog } from './PullRequest';
-import { ShareDialog } from './ShareDialog';
+import { SessionMenu } from './SessionMenu';
 import { noteOpened } from '../palette/CommandPalette';
 import { FindBar } from './FindBar';
-import { FeatureDock, FeatureMenuItems } from '../registry';
+import { FeatureDock } from '../registry';
 
 function StatusPill({ s }: { s: SessionSummary }) {
   const a = activityOf(s);
@@ -58,14 +51,9 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
   const cat = useCatalog(s.agent);
   const mobile = useIsMobile();
   const [menu, setMenu] = useState(false);
-  const [snoozing, setSnoozing] = useState(false);
-  const [worktreeOpen, setWorktreeOpen] = useState(false);
-  const [goalOpen, setGoalOpen] = useState(false);
   // The added account it runs as (Settings → Accounts), by name.
   const accountName = useApp((x) => (s.account ? x.boot?.accounts?.find((a) => a.id === s.account)?.name : undefined));
   const [prOpen, setPrOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [instructions, setInstructions] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState(s.title);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -74,15 +62,12 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
   const running = !!s.live && s.live.status !== 'exited';
   const working = running && isBusy(a);
   const elsewhere = a?.kind === 'external';
-  // Custom (the app's own agent) forks and keeps goals like Claude Code and Codex; other ACP agents do not.
-  const custom = s.agent === 'acp' && s.acpAgent === 'console';
   const st = s.stats;
 
   const rename = async () => {
     setRenaming(false);
     if (title.trim() && title.trim() !== s.title) await post(`/api/sessions/${enc(s.key)}/rename`, { title: title.trim() }).catch(toastError);
   };
-  const resumeCmd = s.agent === 'claude' ? `cd ${s.cwd ?? '~'} && claude --resume ${s.id}` : `codex resume ${s.id}`;
   const model = s.live?.model ?? s.model;
 
   let action: ReactNode = null;
@@ -163,144 +148,18 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
         <IconButton ref={menuRef} label="Session menu" onClick={() => setMenu((m) => !m)}>
           <MoreHorizontal size={18} />
         </IconButton>
-        <Popover anchor={menuRef} open={menu} onClose={() => (setMenu(false), setSnoozing(false))} align="end" width={250}>
-          {snoozing ? (
-            <>
-              <SnoozeItems s={s} onDone={() => (setMenu(false), setSnoozing(false))} />
-              <MenuSep />
-              <MenuItem icon={<ChevronLeft size={15} />} onClick={() => setSnoozing(false)}>
-                Back
-              </MenuItem>
-            </>
-          ) : (
-          <>
-          <MenuItem icon={<Pencil size={15} />} onClick={() => (setMenu(false), setTitle(s.title), setRenaming(true))}>
-            Rename
-          </MenuItem>
-          <MenuItem icon={<Pin size={15} />} onClick={() => (setMenu(false), setFlags(s, { pinned: !s.pinned }))}>
-            {s.pinned ? 'Unpin' : 'Pin to the top'}
-          </MenuItem>
-          {s.snoozedUntil ? (
-            <SnoozeItems s={s} onDone={() => setMenu(false)} />
-          ) : (
-            <MenuItem icon={<AlarmClock size={15} />} onClick={() => setSnoozing(true)}>
-              Snooze…
-            </MenuItem>
-          )}
-          {!working && (
-            <MenuItem
-              icon={<CheckCheck size={15} />}
-              onClick={async () => {
-                setMenu(false);
-                await settle(s);
-                // Finished work in a worktree: offer to clear the folder away too.
-                if (s.worktree) setWorktreeOpen(true);
-              }}
-            >
-              Settle: done for now
-            </MenuItem>
-          )}
-          {s.worktree && (
-            <MenuItem icon={<GitBranch size={15} />} onClick={() => (setMenu(false), setWorktreeOpen(true))}>
-              Worktree: {s.worktree.branch}
-            </MenuItem>
-          )}
-          {!s.goal && !s.external && (s.agent !== 'acp' || custom) && (
-            <MenuItem icon={<Target size={15} />} onClick={() => (setMenu(false), setGoalOpen(true))}>
-              Set a goal…
-            </MenuItem>
-          )}
-          {s.cwd && (
-            <MenuItem icon={<GitPullRequest size={15} />} onClick={() => (setMenu(false), setPrOpen(true))}>
-              {s.pr ? `Pull request #${s.pr.number}` : 'Open a pull request…'}
-            </MenuItem>
-          )}
-          {s.cwd && (
-            <MenuItem icon={<FileDiff size={15} />} onClick={() => (setMenu(false), go(`/review/${enc(s.key)}`))}>
-              Review the changes
-            </MenuItem>
-          )}
-          <MenuItem icon={<Link2 size={15} />} onClick={() => (setMenu(false), setShareOpen(true))}>
-            Share a read-only link…
-          </MenuItem>
-          <FeatureMenuItems s={s} close={() => setMenu(false)} />
-          {running && !working && (
-            <MenuItem icon={<Square size={13} />} onClick={() => (setMenu(false), post(`/api/sessions/${enc(s.key)}/stop`).catch(toastError))}>
-              Stop the agent process
-            </MenuItem>
-          )}
-          <MenuSep />
-          {s.cwd && (
-            <MenuItem icon={<FolderOpen size={15} />} onClick={() => (setMenu(false), useUI.getState().set({ explorerRoot: s.cwd! }), go('/files'))}>
-              Browse the folder
-            </MenuItem>
-          )}
-          {s.cwd && (
-            <MenuItem icon={<SquareTerminal size={15} />} onClick={() => (setMenu(false), openTerminalAt(s.cwd!))}>
-              Open a terminal here
-            </MenuItem>
-          )}
-          {s.cwd && s.agent !== 'acp' && (
-            <MenuItem icon={<FileText size={15} />} onClick={() => (setMenu(false), setInstructions(true))}>
-              Edit {instructionName(s.agent)}
-            </MenuItem>
-          )}
-          {!s.external && (s.agent !== 'acp' || custom) && (
-            <MenuItem icon={<GitFork size={15} />} onClick={() => (setMenu(false), onFork())}>
-              Fork…
-            </MenuItem>
-          )}
-          {!s.external && s.agent !== 'acp' && (
-            <MenuItem
-              icon={<Shrink size={15} />}
-              onClick={async () => {
-                setMenu(false);
-                const ok = await confirm({ title: 'Compact the conversation?', body: <>{agentName(s.agent)} replaces the history so far with a summary, which frees context for what comes next.</>, confirm: 'Compact' });
-                if (ok) post(`/api/sessions/${enc(s.key)}/compact`).then(() => toast('Compacting the conversation…'), toastError);
-              }}
-            >
-              Compact the conversation
-            </MenuItem>
-          )}
-          <MenuItem
-            icon={<Copy size={15} />}
-            onClick={() => {
-              setMenu(false);
-              navigator.clipboard.writeText(resumeCmd).then(() => toast('Copied the resume command', 'ok'));
-            }}
-          >
-            Copy the CLI resume command
-          </MenuItem>
-          <MenuSep />
-          <MenuItem icon={<Archive size={15} />} onClick={() => (setMenu(false), setFlags(s, { archived: !s.archived }))}>
-            {s.archived ? 'Unarchive' : 'Archive'}
-          </MenuItem>
-          <MenuItem
-            danger
-            icon={<Trash2 size={15} />}
-            onClick={async () => {
-              setMenu(false);
-              if (!(await confirm(deleteDialog(s)))) return;
-              try {
-                await del(`/api/sessions/${enc(s.key)}`);
-                go('/');
-              } catch (e) {
-                toastError(e);
-              }
-            }}
-          >
-            Delete session
-          </MenuItem>
-          </>
-          )}
-        </Popover>
+        <SessionMenu
+          s={s}
+          anchor={menuRef}
+          open={menu}
+          onClose={() => setMenu(false)}
+          onRename={() => (setTitle(s.title), setRenaming(true))}
+          onFork={onFork}
+          onPullRequest={() => setPrOpen(true)}
+        />
       </div>
       {confirmNode}
-      {s.worktree && <WorktreeDialog s={s} open={worktreeOpen} onClose={() => setWorktreeOpen(false)} />}
-      <GoalDialog s={s} open={goalOpen} onClose={() => setGoalOpen(false)} />
       {s.cwd && <PullRequestDialog s={s} open={prOpen} onClose={() => setPrOpen(false)} />}
-      <ShareDialog s={s} open={shareOpen} onClose={() => setShareOpen(false)} />
-      {s.cwd && <InstructionsDialog agent={s.agent} cwd={s.cwd} open={instructions} onClose={() => setInstructions(false)} />}
     </header>
   );
 }

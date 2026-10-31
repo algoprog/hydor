@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { Check, ChevronDown, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { ARCH, GoldGradient, MARK_BOX, NUGGET } from './Logo';
 import {
   forwardRef,
@@ -242,6 +242,7 @@ export function MenuItem({
   danger,
   checked,
   disabled,
+  submenu,
 }: {
   icon?: ReactNode;
   children: ReactNode;
@@ -250,6 +251,8 @@ export function MenuItem({
   danger?: boolean;
   checked?: boolean;
   disabled?: boolean;
+  /** It opens a submenu in the menu's place: a chevron at its end. */
+  submenu?: boolean;
 }) {
   return (
     <button
@@ -264,7 +267,20 @@ export function MenuItem({
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {hint && <span className="shrink-0 text-[11.5px] text-fg-3">{hint}</span>}
       {checked && <Check size={14} className="shrink-0 text-fg" strokeWidth={2.5} />}
+      {submenu && <ChevronRight size={14} className="shrink-0 text-fg-3" />}
     </button>
+  );
+}
+
+/** The top of a submenu shown in its menu's place: its title, which goes back. */
+export function MenuBack({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <>
+      <MenuItem icon={<ChevronLeft size={15} />} onClick={onClick}>
+        <span className="font-medium">{children}</span>
+      </MenuItem>
+      <MenuSep />
+    </>
   );
 }
 

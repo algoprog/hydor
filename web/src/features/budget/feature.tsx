@@ -152,6 +152,7 @@ export const budgetFeature: WebFeature = {
   id: 'budget',
   noteViews: { budget: CapNote },
   SessionMenu: CapMenuItem,
+  sessionMenuPart: 'settings',
   SessionDock: CapDock,
   StartOptions: StartCap,
 };

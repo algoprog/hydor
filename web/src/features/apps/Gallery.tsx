@@ -112,7 +112,7 @@ export function GalleryPage() {
               ) : (
                 <div className="rounded-2xl border border-dashed border-line-2 px-5 py-6 text-center">
                   <Empty icon={<LayoutGrid size={20} />} title="Make an app from any task you repeat">
-                    Start from a template below and save it as your own, build one from scratch, or open a session’s menu and choose Save as app.
+                    Start from a template below and save it as your own, build one from scratch, or choose More → Save as app in a session’s menu.
                   </Empty>
                 </div>
               )}
