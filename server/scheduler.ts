@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { OUTCOME_LABEL, scheduleText, watchText, type RunOutcome, type RunStatus, type RunTrigger, type ScheduledTask, type TaskExtra, type TaskRun, type TaskSchedule, type WatchSpec } from '../shared/automations.ts';
+import { OUTCOME_LABEL, runHead, scheduleText, watchText, type RunOutcome, type RunStatus, type RunTrigger, type ScheduledTask, type TaskExtra, type TaskRun, type TaskSchedule, type WatchSpec } from '../shared/automations.ts';
 import type { NotifyEvent } from '../shared/types.ts';
 import { acpAgents } from './agents/acp.ts';
 import { HttpError } from './auth.ts';
@@ -185,15 +185,6 @@ export function quote(tag: string, from: string, text: string): string {
   const safe = text.slice(0, 20_000).replace(new RegExp(`</?${tag}`, 'gi'), (t) => t.replace('<', '&lt;'));
   return `<${tag} from="${from.replace(/["<>]/g, '')}">\n${safe}\n</${tag}>`;
 }
-
-const WHY: Record<RunTrigger, string> = {
-  schedule: 'started on its schedule',
-  webhook: 'started by a call to its webhook',
-  watch: 'started because its watcher saw a change',
-  manual: 'started by hand',
-  rerun: 'run again with an earlier run’s input',
-  test: 'a test before it is saved or changed',
-};
 
 export class Scheduler extends EventEmitter {
   /** Tasks whose run is starting now. */
@@ -647,7 +638,7 @@ export class Scheduler extends EventEmitter {
   private preamble(r: Row, s: TaskSchedule, trigger: RunTrigger): string {
     const notes = r.notepad?.trim();
     return [
-      `This is ${trigger === 'test' ? 'a test run' : 'a run'} of the scheduled task “${r.name}” (${scheduleText(s, this.tz())}), ${WHY[trigger]}. It is now ${localNow(this.db)}.`,
+      runHead({ task: r.name, when: scheduleText(s, this.tz()), trigger, now: localNow(this.db) }),
       'When you finish, call report_outcome once: done, partial, blocked (you need the user) or failed, with a one-line summary the user will see. If there is nothing worth telling them this time, report silent (or begin your reply with [SILENT]): no notification goes out.',
       notes
         ? `Your notes from earlier runs (task_notes reads and changes them):\n<task-notes>\n${notes}\n</task-notes>`

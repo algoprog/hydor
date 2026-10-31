@@ -12,7 +12,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
-import type { RunMark, TaskProposal } from '../../shared/automations.ts';
+import { runHead, scheduleText, splitRunMessage, type RunMark, type TaskProposal } from '../../shared/automations.ts';
 import type { NotifyEvent, ServerEvent } from '../../shared/types.ts';
 import { openDb, kvSet } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
@@ -367,6 +367,30 @@ await test('Custom runs with its agent id, model, mode and session settings', as
   assert.equal(lastRun(t.id).status, 'running');
   assert.equal(lastRun(t.id).key, key);
   assert.throws(() => scheduler.save({ ...base, agent: 'acp', acpAgent: 'nope' }), /Pick which agent/);
+  scheduler.remove(t.id);
+});
+
+await test('a run’s message splits back into the task’s prompt and what the run added', async () => {
+  const t = scheduler.save({ ...base, name: 'Brief “daily”', prompt: 'Write the brief.\n\nFive lines.' });
+  await scheduler.runNow(t.id);
+  const first = splitRunMessage(sessions.created.at(-1).prompt)!;
+  assert.equal(first.task, 'Brief “daily”');
+  assert.equal(first.when, 'Daily at 09:00');
+  assert.equal(first.trigger, 'manual');
+  assert.equal(first.body, 'Write the brief.\n\nFive lines.');
+  assert.match(first.preamble, /report_outcome[\s\S]*task_notes/);
+  // Notes from earlier runs, blank lines and all, stay with the run's part.
+  scheduler.setNotes(t.id, 'Reported: A, B.\n\nSkipped: C.');
+  await scheduler.runNow(t.id);
+  const second = splitRunMessage(sessions.created.at(-1).prompt)!;
+  assert.equal(second.body, 'Write the brief.\n\nFive lines.');
+  assert.match(second.preamble, /<task-notes>\nReported: A, B\.\n\nSkipped: C\.\n<\/task-notes>$/);
+  // A watcher's schedule has brackets and commas of its own.
+  const when = scheduleText({ kind: 'watch', minutes: 5, watch: { kind: 'page', url: 'https://shop.example/x', match: 'price' } });
+  const w = splitRunMessage(`${runHead({ task: 'Price', when, trigger: 'watch', now: 'Monday' })}\nWhen you finish…\n\nCheck it.`)!;
+  assert.deepEqual([w.when, w.trigger, w.body], [when, 'watch', 'Check it.']);
+  assert.equal(splitRunMessage('This is a run of the scheduled task I made up.\n\nHi'), null);
+  assert.equal(splitRunMessage('Summarize the news'), null);
   scheduler.remove(t.id);
 });
 

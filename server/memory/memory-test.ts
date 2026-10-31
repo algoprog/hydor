@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { runHead } from '../../shared/automations.ts';
 import type { MemoryNoteData } from '../../shared/memory.ts';
 import type { TimelineItem, ToolInfo } from '../../shared/types.ts';
 import { openDb } from '../db.ts';
@@ -607,6 +608,15 @@ test('turns: the latest alone at first, then those after the cursor; steps by ti
   // A slash command, a note from the harness and a message from another session are not the user's words.
   const odd = turnsAfter([user('/compact', { meta: 'slash' }), user('Caveat: injected', { meta: 'note' }), user('do X', { peer: { name: 'bot' } }), reply('ok')]);
   assert.equal(odd.turns[0].user.length, 0);
+  // A scheduled run's message is the task's prompt again, not the user's words: its turn is left out,
+  // unless the user wrote in it too.
+  const run = user(`${runHead({ task: 'Daily brief', when: 'Daily at 14:27', trigger: 'schedule', now: 'Saturday' })}\nWhen you finish, call report_outcome once.\n\nThe brief is exactly 5 lines.`);
+  assert.equal(turnsAfter([run, tool({ title: 'search' }), reply('Five lines of news.'), end()]).turns.length, 0);
+  const joined = turnsAfter([run, user('Add one about chips', { meta: 'queued' }), reply('Done.'), end()]).turns;
+  assert.deepEqual(joined.map((t) => t.user), [['Add one about chips']]);
+  const seen = end();
+  const after = turnsAfter([seen, run, reply('Five lines of news.'), end(), user('Shorter next time'), reply('Noted.'), end()], seen.id).turns;
+  assert.deepEqual(after.map((t) => t.user), [['Shorter next time']]);
 });
 
 // ---- past conversations ---------------------------------------------------------------------------

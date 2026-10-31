@@ -222,3 +222,52 @@ export function watchText(w: WatchSpec): string {
 }
 
 export const JSON_OP_TEXT: Record<JsonOp, string> = { changed: 'changes', eq: 'equals', ne: 'is not', gt: 'is above', lt: 'is below', contains: 'contains' };
+
+// ---- the message a run starts with -----------------------------------------------------------------
+
+/** Why a run started, as its message tells the agent. */
+export const RUN_WHY: Record<RunTrigger, string> = {
+  schedule: 'started on its schedule',
+  webhook: 'started by a call to its webhook',
+  watch: 'started because its watcher saw a change',
+  manual: 'started by hand',
+  rerun: 'run again with an earlier run’s input',
+  test: 'a test before it is saved or changed',
+};
+
+/** The first line of a run's message (server/scheduler.ts): the task, how often it runs, why this run started, the time. */
+export function runHead(o: { task: string; when: string; trigger: RunTrigger; now: string }): string {
+  return `This is ${o.trigger === 'test' ? 'a test run' : 'a run'} of the scheduled task “${o.task}” (${o.when}), ${RUN_WHY[o.trigger]}. It is now ${o.now}.`;
+}
+
+const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// "How often" may hold parentheses and commas itself (a watcher's), so it runs up to the known "why".
+const RUN_HEAD = new RegExp(`^This is (?:a test run|a run) of the scheduled task “(.+?)” \\((.*)\\), (${Object.values(RUN_WHY).map(reEscape).join('|')})\\. It is now .+?\\.\\n`);
+
+/** A message a run sent: the task's own prompt, apart from what the run adds for its agent. */
+export interface RunMessage {
+  task: string;
+  /** How often it runs: "Daily at 14:27". */
+  when: string;
+  trigger: RunTrigger;
+  /** The run's lines for its agent: the time, report_outcome, its notes from earlier runs. */
+  preamble: string;
+  /** The task's prompt (a webhook's filled in, a re-run's input). */
+  body: string;
+}
+
+/** A run's message split in two; null for any other message. */
+export function splitRunMessage(text: string): RunMessage | null {
+  const m = RUN_HEAD.exec(text);
+  if (!m) return null;
+  let cut = text.indexOf('\n\n', m[0].length);
+  // The notes from earlier runs are a block of their own, which may hold blank lines.
+  const notes = text.indexOf('\n<task-notes>\n', m[0].length);
+  if (notes !== -1 && (cut === -1 || notes < cut)) {
+    const close = text.indexOf('\n</task-notes>', notes);
+    cut = close === -1 ? -1 : text.indexOf('\n\n', close);
+  }
+  if (cut === -1) return null;
+  const trigger = (Object.keys(RUN_WHY) as RunTrigger[]).find((k) => RUN_WHY[k] === m[3]) ?? 'schedule';
+  return { task: m[1], when: m[2], trigger, preamble: text.slice(0, cut), body: text.slice(cut + 2) };
+}

@@ -242,7 +242,33 @@ function rehypeStreamWords() {
   return (tree: any) => visit(tree);
 }
 
+/**
+ * Agents write for a terminal, where a line break starts a new line. In their replies it stays one (as
+ * GitHub keeps them in comments) instead of joining the lines into one paragraph; documents keep
+ * Markdown's own rule.
+ */
+function remarkLineBreaks() {
+  const visit = (node: any) => {
+    if (!node.children) return;
+    const out: any[] = [];
+    for (const child of node.children) {
+      if (child.type === 'text' && child.value.includes('\n')) {
+        child.value.split(/[ \t]*\r?\n/).forEach((part: string, i: number) => {
+          if (i) out.push({ type: 'break' });
+          if (part) out.push({ type: 'text', value: part });
+        });
+      } else {
+        visit(child);
+        out.push(child);
+      }
+    }
+    node.children = out;
+  };
+  return (tree: any) => visit(tree);
+}
+
 const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: true }]] as any;
+const remarkBreaks = [...remarkPlugins, remarkLineBreaks] as any;
 const rehypePlugins = [[rehypeKatex, katexOpts]] as any;
 const rehypeStreaming = [[rehypeKatex, katexOpts], rehypeStreamWords] as any;
 
@@ -250,6 +276,7 @@ const rehypeStreaming = [[rehypeKatex, katexOpts], rehypeStreamWords] as any;
  * `resolveImage` maps an image source to a URL that may load here, or null to show it as a link
  * (this page's policy blocks other sites' images). `rehypeExtra` runs first (documents and notebooks:
  * their HTML). `baseDir`: the folder of the document shown, for its relative links and #anchors.
+ * `breaks`: a single line break stays one (what agents write).
  */
 export const Markdown = memo(function Markdown({
   text,
@@ -260,6 +287,7 @@ export const Markdown = memo(function Markdown({
   resolveImage,
   rehypeExtra,
   baseDir,
+  breaks,
 }: {
   text: string;
   className?: string;
@@ -269,6 +297,7 @@ export const Markdown = memo(function Markdown({
   resolveImage?: (src: string) => string | null;
   rehypeExtra?: any[];
   baseDir?: string;
+  breaks?: boolean;
 }) {
   const src = useMemo(() => normalizeMath(text, !notebook), [text, notebook]);
   const comps = useMemo<Components>(
@@ -298,7 +327,7 @@ export const Markdown = memo(function Markdown({
   );
   return (
     <div className={cx('md', className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehype} components={comps}>
+      <ReactMarkdown remarkPlugins={breaks ? remarkBreaks : remarkPlugins} rehypePlugins={rehype} components={comps}>
         {src}
       </ReactMarkdown>
       {children}

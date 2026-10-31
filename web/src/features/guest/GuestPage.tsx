@@ -2,6 +2,7 @@
 // password, the sidebar or anything to type into. What a guest may see is decided by the server.
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, FilePen, Globe, ListChecks, MessageSquareText, Search, Terminal, Wrench } from 'lucide-react';
+import { splitRunMessage } from '@shared/automations';
 import type { Agent, ToolItem, TimelineItem } from '@shared/types';
 import { applyTheme } from '../../lib/theme';
 import { duration } from '../../lib/format';
@@ -110,9 +111,11 @@ export default function GuestPage({ token }: { token: string }) {
 
 function GuestItem({ it }: { it: TimelineItem }) {
   switch (it.kind) {
-    case 'user':
+    case 'user': {
       if (it.meta === 'note') return null;
       if (it.meta === 'command-output') return <div className="px-1 font-mono text-[12px] text-fg-3">{it.text}</div>;
+      const run = splitRunMessage(it.text);
+      if (run) return <div className="px-1 text-[12.5px] text-fg-3">Scheduled task <span className="text-fg-2">{run.task}</span> · {run.when}</div>;
       return (
         <div className="flex justify-end">
           <div className="max-w-[85%] rounded-2xl bg-bg-2 px-4 py-2.5 text-[14.5px] leading-relaxed whitespace-pre-wrap">
@@ -121,8 +124,9 @@ function GuestItem({ it }: { it: TimelineItem }) {
           </div>
         </div>
       );
+    }
     case 'assistant':
-      return <Markdown text={it.text} className="px-1 text-[15px]" />;
+      return <Markdown text={it.text} breaks className="px-1 text-[15px]" />;
     case 'tool':
       return isPageTool(it.tool.name) ? <HtmlPage item={it} /> : <GuestTool it={it} />;
     case 'system':

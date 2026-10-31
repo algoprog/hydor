@@ -8,6 +8,7 @@ import { api, enc, post, put } from '../../lib/api';
 import { duration, money } from '../../lib/format';
 import { openSession } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
+import { Markdown } from '../../components/Markdown';
 import { Button, cx, IconButton, inputCls, Throbber } from '../../components/ui';
 import { localTime, OutcomeBadge, TriggerIcon } from './parts';
 
@@ -29,10 +30,11 @@ function RunRow({ r, onRerun }: { r: TaskRun; onRerun: () => void }) {
           </span>
         </div>
         {(r.summary || r.error) && (
-          <button type="button" disabled={!long} onClick={() => setOpen((o) => !o)} className={cx('mt-0.5 block w-full text-left text-[12.5px] leading-snug text-fg-2', !open && 'line-clamp-2', long && 'cursor-pointer hover:text-fg')}>
-            {open ? r.reply : (r.summary ?? r.error)}
+          <button type="button" disabled={!long} aria-expanded={long ? open : undefined} onClick={() => setOpen((o) => !o)} className={cx('mt-0.5 block w-full text-left text-[12.5px] leading-snug text-fg-2', !open && 'line-clamp-2', long && 'cursor-pointer hover:text-fg')}>
+            {r.summary ?? r.error}
           </button>
         )}
+        {open && r.reply && <Markdown text={r.reply} breaks className="anim-expand mt-1.5 rounded-lg border border-line px-3 py-2 !text-[13px]" />}
       </div>
       <div className="flex shrink-0 items-center">
         {r.key && (

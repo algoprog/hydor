@@ -27,6 +27,7 @@ import {
   Wrench,
   XCircle,
 } from 'lucide-react';
+import { RUN_WHY, splitRunMessage, type RunMessage } from '@shared/automations';
 import type { FileChange, HandoffInfo, Question, TimelineItem, ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { confirmResume, takeoverDialog } from '../../lib/activity';
@@ -45,6 +46,7 @@ import { commandLabel, commandLine } from '../../lib/commands';
 import { toolView } from '../registry';
 import { mu } from '../../lib/machine';
 import { ReadAloudButton } from '../voice/ReadAloud';
+import { TriggerIcon } from '../automations/parts';
 
 /** The session's folder (paths inside it are shown relative to it) and a way to show its changes. */
 /** `fork(at)`: start a new session from this one, up to the transcript entry `at` (Claude) or all of it. */
@@ -695,7 +697,39 @@ function PeerMessage({ item }: { item: Extract<TimelineItem, { kind: 'user' }> }
             {p.mode && <span className="mr-1.5 rounded bg-bg-2 px-1.5 py-px">{p.mode}</span>}
             from another Claude session
           </div>
-          <Markdown text={item.text} className="!text-[13.5px] !leading-relaxed !text-fg-2" />
+          <Markdown text={item.text} breaks className="!text-[13.5px] !leading-relaxed !text-fg-2" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The message a scheduled task's run started with, as one line: the task and how often it runs. Its
+ * prompt is a click away, with what the app added for the run (the time, report_outcome, its notes).
+ */
+function RunMessageRow({ item, run }: { item: Extract<TimelineItem, { kind: 'user' }>; run: RunMessage }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="tl-item">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', open && 'bg-bg-2')}
+      >
+        <TriggerIcon trigger={run.trigger} size={14} className="!text-accent" />
+        <span className="max-w-[70%] shrink-0 truncate text-[13px] text-fg-2">
+          {run.trigger === 'test' ? 'Test run of' : 'Scheduled task'} <span className="font-medium text-fg">{run.task}</span>
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg-3">· {run.trigger === 'schedule' ? run.when : RUN_WHY[run.trigger]}</span>
+        <span className="shrink-0 text-[11px] text-fg-3">{clockTime(item.ts)}</span>
+        <ChevronRight size={14} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-90')} />
+      </button>
+      {open && (
+        <div className="anim-expand mt-1 mb-2 ml-[15px] border-l border-accent/30 pl-4">
+          <div className="text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-fg-2">{run.body}</div>
+          <div className="mt-2.5 text-[11.5px] text-fg-3">Added by the app for this run:</div>
+          <pre className="mt-1 max-h-60 overflow-auto rounded-lg bg-bg-1 px-3 py-2 font-mono text-[11.5px] whitespace-pre-wrap text-fg-3">{run.preamble}</pre>
         </div>
       )}
     </div>
@@ -715,9 +749,10 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
   const parsed = useMemo(() => {
     const { text, files } = splitAttachedFiles(item.text);
     const ide = splitIdeContext(text);
-    return { text: ide ? ide.request : text, files, context: ide?.context };
+    return { text: ide ? ide.request : text, files, context: ide?.context, run: splitRunMessage(item.text) };
   }, [item.text]);
   if (item.peer) return <PeerMessage item={item} />;
+  if (parsed.run) return <RunMessageRow item={item} run={parsed.run} />;
   if (item.meta === 'slash') {
     return (
       <div className="tl-item flex justify-end">
@@ -859,7 +894,7 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note }: { ite
   const { fork } = useContext(SessionCtx);
   return (
     <div data-seq={item.seq} data-quote className="tl-item group relative">
-      <Markdown text={text} streaming={revealing} className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
+      <Markdown text={text} streaming={revealing} breaks className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
       {!item.streaming && (
         <div className="absolute -top-1 -right-1 flex opacity-0 transition-opacity group-hover:opacity-100">
           {fork && item.entry && !note && (
