@@ -11,7 +11,7 @@ import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { ModelPicker, ModePicker, modelLabel, useCatalog } from '../../components/AgentPickers';
+import { EffortPicker, ModelPicker, ModePicker, modelLabel, useCatalog } from '../../components/AgentPickers';
 import { Button, cx, Empty, IconButton, MenuItem, Popover, Section, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
@@ -24,8 +24,8 @@ import { ShareTab } from './Share';
 
 type Tab = 'run' | 'runs' | 'rows' | 'share';
 
-/** "Claude Code · Sonnet 4.5 · Auto": what runs an app. */
-export function RunsWith({ agent, acpAgent, model, mode }: { agent: Agent; acpAgent?: string; model?: string; mode?: string }) {
+/** "Claude Code · Sonnet 4.5 · high effort · Auto": what runs an app. */
+export function RunsWith({ agent, acpAgent, model, effort, mode }: { agent: Agent; acpAgent?: string; model?: string; effort?: string; mode?: string }) {
   const cat = useCatalog(agent, agent === 'acp' ? acpAgent : undefined);
   const acp = useApp((s) => s.boot?.acpAgents)?.find((a: AcpAgentDef) => a.id === acpAgent);
   const modeLabel = cat?.modes.find((m) => m.value === mode)?.label;
@@ -34,6 +34,7 @@ export function RunsWith({ agent, acpAgent, model, mode }: { agent: Agent; acpAg
       <AgentIcon agent={agent} name={acp?.name} size={13} />
       <span className="truncate">
         {agentName(agent, acp?.name)} · {cat ? modelLabel(cat, model) : model || 'default model'}
+        {effort && agent !== 'acp' ? ` · ${effort} effort` : ''}
         {modeLabel ? ` · ${modeLabel}` : ''}
       </span>
     </span>
@@ -56,7 +57,7 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
   // A template runs with the agent picked here (the last one used for it, else its own).
   const remembered = (() => {
     try {
-      return JSON.parse(localStorage.getItem('wa.apps.agent') ?? 'null') as { agent: Agent; acpAgent?: string; model?: string | null; mode?: string | null } | null;
+      return JSON.parse(localStorage.getItem('wa.apps.agent') ?? 'null') as { agent: Agent; acpAgent?: string; model?: string | null; effort?: string | null; mode?: string | null } | null;
     } catch {
       return null;
     }
@@ -64,6 +65,7 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
   const [agent, setAgent] = useState<Agent>(template ? (remembered?.agent ?? recipe.agent) : recipe.agent);
   const [acpAgent, setAcpAgent] = useState<string | null>(template ? (remembered?.acpAgent ?? null) : (recipe.acpAgent ?? null));
   const [model, setModel] = useState<string | null>(template ? (remembered?.model ?? null) : (recipe.model ?? null));
+  const [effort, setEffort] = useState<string | null>(template ? (remembered?.effort ?? null) : (recipe.effort ?? null));
   const [mode, setMode] = useState<string | null>(template ? (remembered?.mode ?? null) : (recipe.mode ?? null));
   const acpList = useApp((s) => s.boot?.acpAgents) ?? [];
   const run = async () => {
@@ -72,7 +74,7 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
     if (Object.keys(errs).length) return toast('Fill in the questions marked first', 'error');
     setBusy(true);
     try {
-      const pick = template ? { agent, acpAgent: agent === 'acp' ? acpAgent : undefined, model: model ?? undefined, mode: mode ?? undefined } : {};
+      const pick = template ? { agent, acpAgent: agent === 'acp' ? acpAgent : undefined, model: model ?? undefined, effort: effort ?? undefined, mode: mode ?? undefined } : {};
       if (template) localStorage.setItem('wa.apps.agent', JSON.stringify(pick));
       const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...pick });
       go(runPath(r.run.id));
@@ -109,15 +111,17 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
                   setAgent(a);
                   setAcpAgent(aid);
                   setModel(null);
+                  setEffort(null);
                   setMode(null);
                 }}
               />
               <ModelPicker agent={agent} acp={acpAgent ?? undefined} value={model} onChange={(v) => setModel(v)} />
+              <EffortPicker agent={agent} acp={acpAgent ?? undefined} model={model} value={effort} onChange={setEffort} />
               <ModePicker agent={agent} acp={acpAgent ?? undefined} value={mode ?? (agent === 'acp' && acpAgent !== 'console' ? null : 'auto')} onChange={setMode} />
             </div>
           ) : (
             <div className="min-w-0 flex-1">
-              <RunsWith agent={recipe.agent} acpAgent={recipe.acpAgent} model={recipe.model} mode={recipe.mode ?? 'auto'} />
+              <RunsWith agent={recipe.agent} acpAgent={recipe.acpAgent} model={recipe.model} effort={recipe.effort} mode={recipe.mode ?? 'auto'} />
             </div>
           )}
           <Button variant="primary" icon={busy ? <Throbber /> : <Play size={14} fill="currentColor" />} onClick={run} disabled={busy} className="max-sm:w-full">
