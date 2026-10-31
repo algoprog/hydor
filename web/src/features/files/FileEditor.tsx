@@ -46,11 +46,16 @@ function isDark() {
   return document.documentElement.classList.contains('dark');
 }
 
-/** `embedded`: shown inside a dialog, so there is no Back button (the dialog closes instead). `actions` go in the toolbar. */
+/**
+ * `embedded`: shown inside a dialog, so there is no Back button (the dialog closes instead), nor a terminal
+ * (it would open behind the dialog). A dialog opens Markdown and HTML straight into editing, unless
+ * `preview` shows them as they look first, as the Files page does. `actions` go in the toolbar.
+ */
 export function FileEditor({
   path,
   line,
   embedded,
+  preview,
   onDirty,
   onSaved,
   actions,
@@ -58,6 +63,7 @@ export function FileEditor({
   path: string;
   line?: number;
   embedded?: boolean;
+  preview?: boolean;
   onDirty?: (dirty: boolean) => void;
   onSaved?: () => void;
   actions?: ReactNode;
@@ -126,9 +132,9 @@ export function FileEditor({
     // A dialog editor (CLAUDE.md, a skill) opens straight into editing and leaves the Files tabs alone.
     if (!embedded) useUI.getState().openTab({ id: `f:${path}`, kind: 'file', ref: path });
     setFile(null);
-    setMode((isMd || isHtml) && !embedded ? 'preview' : 'edit');
+    setMode((isMd || isHtml) && (!embedded || preview) ? 'preview' : 'edit');
     load();
-  }, [path, load, isMd, isHtml, embedded]);
+  }, [path, load, isMd, isHtml, embedded, preview]);
 
   // Mount CodeMirror once the text is loaded.
   useEffect(() => {
@@ -331,9 +337,11 @@ export function FileEditor({
             </>
           )}
           {actions}
-          <IconButton label="Terminal in this folder" size="sm" onClick={() => openTerminalAt(dirname(path))}>
-            <SquareTerminal size={14} />
-          </IconButton>
+          {!embedded && (
+            <IconButton label="Terminal in this folder" size="sm" onClick={() => openTerminalAt(dirname(path))}>
+              <SquareTerminal size={14} />
+            </IconButton>
+          )}
           <IconButton label="Download" size="sm" onClick={download}>
             <Download size={14} />
           </IconButton>

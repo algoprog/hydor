@@ -7,7 +7,7 @@ import type { ToolItem } from '@shared/types';
 import { openLightbox } from '../../components/Lightbox';
 import { basename, duration } from '../../lib/format';
 import { mu } from '../../lib/machine';
-import { go, openFile } from '../../lib/nav';
+import { go, showInFiles } from '../../lib/nav';
 import { Button, cx, IconButton } from '../../components/ui';
 import { download } from '../documents/FileCards';
 
@@ -97,7 +97,7 @@ export function GeneratedImages({ item }: { item: ToolItem; sessionKey: string }
             )}
             {!broken.has(p.path) && (
               <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-                <IconButton label="Show in the files" size="sm" onClick={() => openFile(p.path)} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white">
+                <IconButton label="Show in the files" size="sm" onClick={() => showInFiles(p.path)} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white">
                   <FolderOpen size={14} />
                 </IconButton>
                 <IconButton label="Download" size="sm" onClick={() => download(p.path)} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white">

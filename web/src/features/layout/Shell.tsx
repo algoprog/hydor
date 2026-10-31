@@ -6,6 +6,7 @@ import { cx, useIsMobile, useMediaQuery } from '../../components/ui';
 import { FilesPage } from '../files/FilesPage';
 import { QuickOpen } from '../files/FileSearch';
 import { UploadsPanel } from '../files/Uploads';
+import { FilePeek } from '../files/FilePeek';
 import { GitPage } from '../git/GitPage';
 import { HomePage } from '../home/HomePage';
 import { SessionView } from '../session/SessionView';
@@ -142,8 +143,8 @@ export function Shell() {
   const panelOpen = useUI((s) => s.panelOpen);
   const panelHeight = useUI((s) => s.panelHeight);
   const [loc] = useLocation();
-  // The ? sits in the corner only where it clears a centred composer, the terminal and the panel.
-  const roomy = useMediaQuery(sideOpen ? '(min-width: 1180px)' : '(min-width: 900px)');
+  // With the sidebar (and its Tour tile) hidden, the ? sits in the corner where it clears a centred composer, the terminal and the panel.
+  const roomy = useMediaQuery('(min-width: 900px)');
   useTitleBadge();
 
   // Moving to another page closes the drawer.
@@ -187,6 +188,7 @@ export function Shell() {
         <UploadsPanel />
         <QuickOpen />
         <CommandPalette />
+        <FilePeek />
         <Lightbox />
         <Tour />
       </div>
@@ -216,8 +218,9 @@ export function Shell() {
       <UploadsPanel />
       <QuickOpen />
       <CommandPalette />
+      <FilePeek />
       <Lightbox />
-      {roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}
+      {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}
       <Tour />
     </div>
   );

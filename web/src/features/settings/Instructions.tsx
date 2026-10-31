@@ -34,7 +34,7 @@ function hint(agent: Agent, f: InstructionFile, cwd: string, home?: string) {
 }
 
 /** Asks before closing or switching away from an editor with unsaved changes; one question at a time. */
-function useDiscardGuard() {
+export function useDiscardGuard() {
   const dirty = useRef(false);
   const asking = useRef(false);
   const [confirm, node] = useConfirm();
