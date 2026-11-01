@@ -3,6 +3,24 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.7.1 · 1 November 2026
+
+Spaces in the sidebar, each with documents of its own, and a tidier message box on phones.
+
+- **Spaces in the sidebar**, where Knowledge was. Each space has its own page with its sessions, its
+  documents and its settings; the Spaces page's second tab, Shared knowledge, holds the documents every
+  session searches.
+- **Documents for one space**: a space's Knowledge tab holds documents only its sessions search, and the
+  sessions they start. A switch there decides whether they search the shared knowledge too (on unless you
+  turn it off). A knowledge base moves into a space, or back to shared, from its menu; deleting a space keeps
+  its documents, shared from then on.
+- **The message box in a session, on a phone** (or a narrow window): one chip names the model, and the effort
+  and permissions when they are not the usual; it opens a sheet with the three and how much of the
+  conversation's room is used, with Compact. Nothing is cut off any more; wide windows keep the three side
+  by side.
+- **Chinese and Greek**: dark mode reads right in the theme hint, counts read right in Greek whatever the
+  number, and a few more words are in the right form.
+
 ## 0.7.0 · 1 November 2026
 
 The app in Chinese and Greek, hands-free voice, knowledge bases, deep research, spaces, a model arena and an
