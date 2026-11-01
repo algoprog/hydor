@@ -1,11 +1,14 @@
 // The skill library: skills that come with the app (skills/ in its folder), and skills agents learn:
 // an agent proposes one (skill_save) or an improvement to one (skill_patch), the user approves, edits
 // or dismisses it in a card, and approved ones are saved where every agent reads them. Claude Code,
-// Codex and Custom all get the library when they start (library.ts); Custom also gets a short rule
-// on using skills, and the text of any skill whose keywords the user's message uses, before each turn.
+// Codex and Custom all get the library when they start (library.ts); a session in a space gets the
+// space's own skills with it (spaceSkills.ts), and a proposal there can be kept for the space alone.
+// Custom also gets a short rule on using skills, and the text of any skill whose keywords the user's
+// message uses, before each turn.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { SessionExtra } from '../../shared/features.ts';
 import { skillLoaded } from '../../shared/skillpack.ts';
 import type { TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -14,8 +17,11 @@ import { config } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { addNote, notesOf } from '../notes.ts';
+import { sessionExtra } from '../sessionExtra.ts';
+import { spaceOfSession } from '../spaces/index.ts';
 import { folders, parseSkill, skillText, syncView, viewSkills, visibleSkills } from './library.ts';
 import { announce, decide, getProposal, history, libraryView, noteUse, pendingProposals, propose, removedSkills, removeSkill, restoreSkill } from './proposals.ts';
+import { spaceSkillDoc, spaceSkillText, spaceView } from './spaceSkills.ts';
 import { matchTriggers } from './triggers.ts';
 
 const triggersOn = (db: DB) => kvGet(db, 'skillpack.triggers') !== '0';
@@ -39,6 +45,23 @@ function freshView(): boolean {
   }
 }
 
+/** A space's view of skills, brought up to date: the library's with its own and those of the spaces it brings together. */
+function spaceViewOf(where: NonNullable<ReturnType<typeof spaceOfSession>>): string | null {
+  try {
+    return spaceView(where.space.id, where.members.map((m) => m.id));
+  } catch (e) {
+    warnOnce(e);
+    return null;
+  }
+}
+
+/** The plugin folder a session's agent reads its skills from, brought up to date: in a space, the space's view; else the library's. */
+function viewFor(db: DB, extra: SessionExtra): string | null {
+  if (!freshView()) return null;
+  const where = spaceOfSession(db, extra);
+  return (where && spaceViewOf(where)) ?? folders().view;
+}
+
 /** Whether the installed Claude Code takes --plugin-dir: an older one would not start with it. A yes is kept. */
 let pluginDir: Promise<boolean> | null = null;
 function claudeTakesPlugins(): Promise<boolean> {
@@ -52,6 +75,11 @@ function claudeTakesPlugins(): Promise<boolean> {
 // ---- the tools -----------------------------------------------------------------------------------
 
 const REASON = { type: 'string', description: 'One or two sentences for the user: what happened in this task that makes it worth keeping.' };
+const SPACE = {
+  type: 'boolean',
+  description:
+    'Only in a session in a space: true to keep it for that space alone (its sessions get it), for a method that belongs to that project rather than to every task of its kind. The user can still choose on the card. A change to a skill of the space’s own stays the space’s either way.',
+};
 const TRIGGERS = {
   type: 'array',
   items: { type: 'string' },
@@ -72,7 +100,17 @@ function answer(name: string, id: string, p: ReturnType<typeof getProposal>): st
 function run(kind: 'new' | 'patch') {
   return async (a: Record<string, any>, ctx: RunCtx): Promise<string> => {
     const d = ctx.deps;
-    const { proposal: p, replaced } = propose(d.db, { key: ctx.key, kind, name: String(a.name ?? ''), description: a.description, body: a.body, triggers: a.triggers, reason: a.reason, edits: a.edits });
+    const { proposal: p, replaced } = propose(d.db, {
+      key: ctx.key,
+      kind,
+      name: String(a.name ?? ''),
+      description: a.description,
+      body: a.body,
+      triggers: a.triggers,
+      reason: a.reason,
+      edits: a.edits,
+      space: a.space,
+    });
     for (const id of replaced) announce(d, getProposal(d.db, id));
     announce(d, p);
     return answer(p.name, p.id, p);
@@ -98,6 +136,7 @@ const SKILL_SAVE: RunTool = {
       },
       triggers: TRIGGERS,
       reason: REASON,
+      space: SPACE,
     },
     required: ['name', 'description', 'body'],
   },
@@ -107,7 +146,7 @@ const SKILL_SAVE: RunTool = {
 const SKILL_PATCH: RunTool = {
   name: 'skill_patch',
   description: [
-    'Propose an improvement to a skill in the app’s skill library (a built-in one, or one the user approved), for instance after following it and finding a step missing, wrong or unclear.',
+    'Propose an improvement to a skill in the app’s skill library (a built-in one, or one the user approved) or to one of the skills of the space the session is in, for instance after following it and finding a step missing, wrong or unclear.',
     'Give exact edits (find and replace on its current text), or a whole new body. The user approves first, in a card; their answer comes back to you as a message.',
     'A built-in skill changed this way is saved as the user’s own version, in its place.',
   ].join(' '),
@@ -124,6 +163,7 @@ const SKILL_PATCH: RunTool = {
       description: { type: 'string', description: 'A new description, when when-to-use-it should change.' },
       triggers: TRIGGERS,
       reason: REASON,
+      space: SPACE,
     },
     required: ['name'],
   },
@@ -169,7 +209,11 @@ function budget(d: Deps, key: string): number {
   }
 }
 
-async function customContext(s: { key: string; cwd: string }, d: Deps): Promise<string> {
+async function customContext(s: { key: string; cwd: string; extra: SessionExtra }, d: Deps): Promise<string> {
+  // In a space, its view is brought up to date for this turn: its skills (and the library's) reach Custom as soon as they change.
+  const where = spaceOfSession(d.db, s.extra);
+  const view = where ? spaceViewOf(where) : null;
+  const skills = view ? path.join(view, 'skills') : undefined;
   if (!triggersOn(d.db)) return RULE;
   const ask = await latestAsk(d, s.key);
   const st = active.get(s.key) ?? { prompt: '', skills: [] };
@@ -177,7 +221,7 @@ async function customContext(s: { key: string; cwd: string }, d: Deps): Promise<
     // A new message: what was brought in before fades, what it asks for now comes in.
     st.prompt = ask.id;
     st.skills = st.skills.map((x) => ({ ...x, left: x.left - 1 })).filter((x) => x.left > 0);
-    const visible = visibleSkills(s.cwd);
+    const visible = visibleSkills(s.cwd, skills);
     for (const m of matchTriggers(ask.text, visible).reverse()) {
       const had = st.skills.some((x) => x.name === m.name);
       st.skills = [{ name: m.name, trigger: m.trigger, left: TURNS }, ...st.skills.filter((x) => x.name !== m.name)].slice(0, 2);
@@ -189,7 +233,7 @@ async function customContext(s: { key: string; cwd: string }, d: Deps): Promise<
     active.set(s.key, st);
   }
   if (!st.skills.length) return RULE;
-  const visible = new Map(visibleSkills(s.cwd).map((x) => [x.name, x]));
+  const visible = new Map(visibleSkills(s.cwd, skills).map((x) => [x.name, x]));
   let room = budget(d, s.key);
   const parts: string[] = [];
   for (const a of st.skills) {
@@ -224,6 +268,11 @@ export const skillpack: Feature = {
     });
     app.get('/api/skillpack/skills/:name', async (req) => {
       const name = param(req, 'name');
+      // From a session (?key=): the skill its agent read, a space's own before the library's.
+      const key = String((req.query as { key?: string }).key ?? '');
+      const where = key ? spaceOfSession(db, sessionExtra(db, key)) : null;
+      const owner = where && [where.space, ...where.members].find((sp) => spaceSkillText(sp.id, name));
+      if (owner) return spaceSkillDoc(db, owner, name);
       const s = skillText(name);
       if (!s) throw new HttpError(404, `No skill named ${name} in the library`);
       return { name, text: s.text, source: s.source, file: s.file, history: history(db, name) };
@@ -244,16 +293,19 @@ export const skillpack: Feature = {
     });
     // Proposals from agents: the card asks, the answer goes back to the agent.
     app.get('/api/skillpack/proposals/:id', async (req) => ({ proposal: getProposal(db, param(req, 'id')) }));
-    app.post('/api/skillpack/proposals/:id/approve', async (req) => ({ proposal: await decide(d, param(req, 'id'), true, { text: typeof body(req).text === 'string' ? body(req).text : undefined }) }));
+    app.post('/api/skillpack/proposals/:id/approve', async (req) => ({
+      proposal: await decide(d, param(req, 'id'), true, { text: typeof body(req).text === 'string' ? body(req).text : undefined, scope: body(req).scope }),
+    }));
     app.post('/api/skillpack/proposals/:id/dismiss', async (req) => ({ proposal: await decide(d, param(req, 'id'), false, { note: typeof body(req).note === 'string' ? body(req).note : undefined }) }));
   },
   tools: () => [SKILL_SAVE, SKILL_PATCH],
-  async spawn(s) {
-    if (!freshView()) return undefined;
+  async spawn(s, d) {
+    const view = viewFor(d.db, s.extra);
+    if (!view) return undefined;
     // Claude Code: the view is a plugin for this session only. Codex: an extra folder of skills.
-    if (s.agent === 'claude') return (await claudeTakesPlugins()) ? { args: ['--plugin-dir', folders().view] } : undefined;
-    if (s.agent === 'codex') return { skillRoots: [viewSkills()] };
-    if (s.agent === 'acp' && s.acpAgent === CONSOLE_ID) return { env: { NAGET_SKILL_DIRS: viewSkills() } };
+    if (s.agent === 'claude') return (await claudeTakesPlugins()) ? { args: ['--plugin-dir', view] } : undefined;
+    if (s.agent === 'codex') return { skillRoots: [path.join(view, 'skills')] };
+    if (s.agent === 'acp' && s.acpAgent === CONSOLE_ID) return { env: { NAGET_SKILL_DIRS: path.join(view, 'skills') } };
     return undefined;
   },
   context: (s, d) => customContext(s, d),

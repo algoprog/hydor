@@ -1,8 +1,9 @@
-// Spaces: a project's sessions, files, documents, memory, instructions and assistant in one place, picked by
-// name on the start page in place of a folder. Each space has a folder of its own (its files, and so its project
-// memory), and can work with other folders of yours where they are; knowledge bases of its own
-// (shared/knowledge.ts) that only its sessions search, instructions every session in it gets, and the
-// assistant its sessions start as. What the server and the pages share.
+// Spaces: a project's sessions, files, documents, memory, instructions, skills and assistant in one place,
+// picked by name on the start page in place of a folder. Each space has a folder of its own (its files, and so
+// its project memory), and can work with other folders of yours where they are; knowledge bases of its own
+// (shared/knowledge.ts) that only its sessions search, instructions every session in it gets, skills of its
+// own its sessions get with the skill library (shared/skillpack.ts), and the assistant its sessions start as.
+// What the server and the pages share.
 
 export interface Space {
   id: string;
@@ -21,18 +22,20 @@ export interface Space {
   /** False: its sessions search only the space's own knowledge, not the shared knowledge too. */
   sharedKnowledge?: boolean;
   /**
-   * The spaces it brings together, by id: a group. Its sessions get theirs too: their documents, instructions
-   * and folders. A group brings in plain spaces, not other groups.
+   * The spaces it brings together, by id: a group. Its sessions get theirs too: their documents, instructions,
+   * skills and folders. A group brings in plain spaces, not other groups.
    */
   members?: string[];
   createdAt: number;
 }
 
-/** A space with how many sessions it has, when one was last at work, and how many documents its knowledge holds. */
+/** A space with how many sessions it has, when one was last at work, how many documents its knowledge holds, and its skills. */
 export interface SpaceView extends Space {
   sessions: number;
   lastAt?: number;
   docs: number;
+  /** How many skills of its own it has (its Skills tab). */
+  skills: number;
 }
 
 /** A space's colour, by name (as templates have theirs). */

@@ -1,7 +1,8 @@
 // Checks for the skill library, run as a script (no test framework): the bundled skills' frontmatter,
 // discovery (the bundled, learned and project folders, through the view every agent reads), keyword
 // triggers and Custom's instructions, recognising a skill being loaded, the secret and steering scan,
-// and a proposal's round trip (proposed, approved or dismissed, saved with its diff and history).
+// a proposal's round trip (proposed, approved or dismissed, saved with its diff and history), and
+// proposals in a space (kept for the space alone, or changing one of its own skills).
 //
 //   OUTDIR=dist/skill-tests node scripts/build-server.mjs server/skillpack/tests.ts
 //   DATA_DIR=/tmp/naget-skill-tests node dist/skill-tests/tests.js
@@ -19,12 +20,15 @@ import { APP_ROOT, config } from '../config.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { notesOf } from '../notes.ts';
+import { setSessionExtra } from '../sessionExtra.ts';
 import type { SessionManager } from '../sessions.ts';
+import { createSpace } from '../spaces/index.ts';
 import { lineDiff } from './diff.ts';
 import { skillpack } from './index.ts';
 import { composeSkill, folders, librarySkills, parseSkill, setFolders, skillText, syncView, viewSkills, visibleSkills } from './library.ts';
 import { history, libraryView, propose } from './proposals.ts';
 import { scanSkill, secretsMessage } from './scan.ts';
+import { spaceSkillsDir, spaceSkillText } from './spaceSkills.ts';
 import { matchTriggers, triggerPattern } from './triggers.ts';
 
 let passed = 0;
@@ -466,6 +470,62 @@ await test('a removed learned skill can come back, and its history keeps both st
     ['restore', 'remove'],
   );
   assert.equal((await app.inject({ method: 'POST', url: '/api/skillpack/skills/research/remove', payload: {} })).statusCode, 404, 'built-in skills stay');
+});
+
+await test('in a space: kept for the space alone or for every session as the user picks, its own skills changed in place, a library skill changed for it alone', async () => {
+  const sp = createSpace(db, { name: 'Garden', folder: root });
+  db.prepare('insert into app_sessions (key, agent, created_at, updated_at) values (?, ?, ?, ?)').run('claude:g1', 'claude', 1, 1);
+  setSessionExtra(db, 'claude:g1', { space: sp.id });
+  const run = async (name: string, a: Record<string, unknown>) => proposalOf(idOf(String(await tool(name).run(a, ctx('claude:g1')))));
+  const approve = (id: string, payload: Record<string, unknown> = {}) => app.inject({ method: 'POST', url: `/api/skillpack/proposals/${id}/approve`, payload });
+  const body = '# Sowing\n\n1. Check the last frost date.\n2. Sow the slow ones indoors six weeks before.\n3. Harden them off for a week.';
+  // The agent suggests the space: the card offers it, and approving keeps it there alone.
+  const a = await run('skill_save', { name: 'sowing-plan', description: 'Use when planning what to sow in the garden and when.', body, space: true });
+  assert.equal(a.scope, 'space');
+  assert.deepEqual(a.space, { id: sp.id, name: 'Garden' });
+  assert.equal((await approve(a.id)).statusCode, 200);
+  assert.ok(spaceSkillText(sp.id, 'sowing-plan'));
+  assert.equal(skillText('sowing-plan'), null, 'not in the library');
+  assert.match(sessions.delivered.at(-1)!.text, /It is one of the skills of the space “Garden” now, for its sessions alone: Custom has it/);
+  assert.equal(history(db, 'sowing-plan', sp.id)[0].action, 'create');
+  // The user can keep it for every session instead; outside a space there is no choice.
+  const b = await run('skill_save', { name: 'compost-check', description: 'Use when checking whether compost is ready to use.', body, space: true });
+  assert.equal((await approve(b.id, { scope: 'library' })).json().proposal.scope, 'library');
+  assert.equal(skillText('compost-check')?.source, 'learned');
+  assert.equal(spaceSkillText(sp.id, 'compost-check'), null);
+  const c = await proposalOf(idOf(String(await tool('skill_save').run({ name: 'tool-care', description: 'Use when cleaning and oiling garden tools.', body, space: true }, ctx('claude:s9')))));
+  assert.equal(c.space, undefined);
+  assert.equal(c.scope, 'library');
+  // A name the space has already is refused, as one the library has is.
+  await assert.rejects(tool('skill_save').run({ name: 'sowing-plan', description: 'Use when sowing.', body }, ctx('claude:g1')), /The space Garden has a skill named sowing-plan already/);
+  // A change to the space's own skill stays the space's, whatever is asked.
+  const d = await run('skill_patch', { name: 'sowing-plan', edits: [{ find: 'six weeks', replace: 'eight weeks' }] });
+  assert.equal(d.spaceSkill, true);
+  assert.equal(d.scope, 'space');
+  assert.equal((await approve(d.id, { scope: 'library' })).statusCode, 200);
+  assert.match(spaceSkillText(sp.id, 'sowing-plan')!.text, /eight weeks/);
+  assert.equal(skillText('sowing-plan'), null);
+  // A library skill changed for the space alone: its folder is copied in, the library's stays as it was.
+  const before = skillText('troubleshooting')!.text;
+  const e = await run('skill_patch', { name: 'troubleshooting', edits: [{ find: '## 5. After two failed fixes, step back', replace: '## 5. After one failed fix, step back' }] });
+  assert.equal(e.scope, 'library', 'every session, unless the user picks the space');
+  assert.equal((await approve(e.id, { scope: 'space' })).statusCode, 200);
+  assert.match(spaceSkillText(sp.id, 'troubleshooting')!.text, /After one failed fix/);
+  assert.ok(fs.existsSync(path.join(spaceSkillsDir(sp.id), 'troubleshooting', 'references', 'log.md')), 'its references came along');
+  assert.equal(skillText('troubleshooting')!.text, before);
+  assert.match(sessions.delivered.at(-1)!.text, /saved as the space’s own version/);
+  // A skill's pill in the space's session opens the space's; elsewhere, the library's.
+  const own = (await app.inject({ method: 'GET', url: '/api/skillpack/skills/troubleshooting?key=claude:g1' })).json();
+  assert.equal(own.source, 'space');
+  assert.deepEqual(own.space, { id: sp.id, name: 'Garden' });
+  assert.match(own.text, /After one failed fix/);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/skillpack/skills/troubleshooting?key=claude:s9' })).json().source, 'learned');
+  assert.equal((await app.inject({ method: 'GET', url: '/api/skillpack/skills/sowing-plan' })).statusCode, 404);
+  // Custom in the space has its skills in its list, and its keywords bring them in.
+  const custom = await skillpack.spawn!({ cwd: root, runId: 'r', resume: false, agent: 'acp', acpAgent: 'console', extra: { space: sp.id } }, deps);
+  const dirs = custom!.env!.NAGET_SKILL_DIRS;
+  assert.equal(fs.readlinkSync(path.join(dirs, 'sowing-plan')), path.join(spaceSkillsDir(sp.id), 'sowing-plan'));
+  assert.equal(fs.readlinkSync(path.join(dirs, 'troubleshooting')), path.join(spaceSkillsDir(sp.id), 'troubleshooting'));
 });
 
 await test('the line diff: hunks with context, counts, and a new file', () => {

@@ -1,6 +1,7 @@
 // Script tests for spaces: a new space gets a folder of its own (or uses one given), its fields are cleaned,
 // its sessions are counted, it can leave the shared knowledge out, a session in it is told its instructions,
-// and a group brings spaces together. Build and run with a scratch data folder:
+// a group brings spaces together, and a space has skills of its own that its sessions get with the skill
+// library's. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/spaces/spaces-test.ts
 //   DATA_DIR=/tmp/naget-test-spaces node dist/dev/spaces-test.js
 import assert from 'node:assert/strict';
@@ -8,11 +9,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { setSettings } from '../assistants/store.ts';
+import { APP_ROOT, config } from '../config.ts';
 import { openDb } from '../db.ts';
 import { registerFeatures, spawnAdditions } from '../features/registry.ts';
 import type { Deps } from '../features/types.ts';
 import { guidelines } from '../guidelines/index.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
+import { history } from '../skillpack/history.ts';
+import { skillpack } from '../skillpack/index.ts';
+import { folders, librarySkills, parseSkill, setFolders, skillText } from '../skillpack/library.ts';
+import { copyToSpace, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, spaceSkillsDir, spaceSkillsView, spaceSkillText } from '../skillpack/spaceSkills.ts';
 import { createSpace, deleteSpace, sessionsIn, spaceById, spaces, spaceViews, updateSpace } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -22,6 +28,8 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-spaces-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
+// The skill library: the app's own skills, learned ones and the views agents read, in the scratch folder.
+setFolders({ bundled: path.join(APP_ROOT, 'skills'), learned: path.join(tmp, 'learned'), view: path.join(tmp, 'view', 'naget') });
 setSettings(db, { taskRoot: path.join(tmp, 'Naget') });
 registerFeatures([spaces, guidelines], { db, app: { get() {}, post() {}, put() {}, patch() {}, delete() {} } } as unknown as Deps);
 let passed = 0;
@@ -164,6 +172,116 @@ test('deleting a space keeps its folder and sessions', () => {
   assert.equal(sessionsIn(db, a.id).length, 3);
 });
 
+const BODY = '1. List the ingredients first, in grams.\n2. Then the steps, numbered, one action each.\n3. End with how many it serves.';
+const linkOf = (view: string, name: string) => fs.readlinkSync(path.join(view, 'skills', name));
+
+test('a space has skills of its own: written, changed, renamed, removed and brought back, each with its history', () => {
+  const sp = createSpace(db, { name: 'Recipes' });
+  const k = saveSpaceSkill(db, sp.id, { name: 'Recipe format', description: 'Use when writing down a recipe for the book', body: BODY, triggers: ['write a recipe'] });
+  assert.equal(k.name, 'recipe-format');
+  assert.equal(k.uses, 0);
+  assert.equal(spaceViews(db).find((x) => x.id === sp.id)!.skills, 1);
+  assert.ok(fs.existsSync(path.join(spaceSkillsDir(sp.id), 'recipe-format', 'SKILL.md')), 'in the data folder');
+  assert.ok(!fs.existsSync(path.join(sp.folder, '.claude')), 'nothing in the space’s own folder');
+  // The rules: a name, when to use it, real steps, no secrets, one of a name.
+  assert.throws(() => saveSpaceSkill(db, sp.id, { name: 'recipe-format', description: 'Use when writing a recipe again', body: BODY }), /already/);
+  assert.throws(() => saveSpaceSkill(db, sp.id, { name: '!', description: 'Use when writing a recipe', body: BODY }), /short name/);
+  assert.throws(() => saveSpaceSkill(db, sp.id, { name: 'tiny', description: 'Use when', body: BODY }), /when to use/);
+  assert.throws(() => saveSpaceSkill(db, sp.id, { name: 'tiny', description: 'Use when writing a recipe', body: 'Too short.' }), /more than that/);
+  assert.throws(() => saveSpaceSkill(db, sp.id, { name: 'leaky', description: 'Use when ordering from the shop', body: `${BODY}\nUse the key sk-ant-${'a1B2c3D4'.repeat(4)} to order.` }), /holds a secret/);
+  // Changed: what is not given stays (its keywords too); renamed: its other files and its history go with it.
+  fs.writeFileSync(path.join(spaceSkillsDir(sp.id), 'recipe-format', 'example.md'), '# Pancakes');
+  saveSpaceSkill(db, sp.id, { description: 'Use when writing down any recipe for the family book' }, 'recipe-format');
+  assert.deepEqual(parseSkill(spaceSkillText(sp.id, 'recipe-format')!.text).triggers, ['write a recipe']);
+  const renamed = saveSpaceSkill(db, sp.id, { name: 'family-recipe' }, 'recipe-format');
+  assert.equal(renamed.name, 'family-recipe');
+  assert.equal(spaceSkillText(sp.id, 'recipe-format'), null);
+  assert.equal(parseSkill(spaceSkillText(sp.id, 'family-recipe')!.text).name, 'family-recipe');
+  assert.ok(fs.existsSync(path.join(spaceSkillsDir(sp.id), 'family-recipe', 'example.md')));
+  assert.deepEqual(
+    history(db, 'family-recipe', sp.id).map((c) => c.action),
+    ['update', 'update', 'create'],
+  );
+  assert.equal(history(db, 'family-recipe').length, 0, 'not the library’s history');
+  // Removed, it can come back as it was; the library knows nothing of it.
+  removeSpaceSkill(db, sp.id, 'family-recipe');
+  assert.deepEqual(
+    spaceSkillsView(db, sp.id).removed.map((r) => r.name),
+    ['family-recipe'],
+  );
+  restoreSpaceSkill(db, sp.id, 'family-recipe');
+  assert.equal(spaceSkillsView(db, sp.id).removed.length, 0);
+  assert.equal(parseSkill(spaceSkillText(sp.id, 'family-recipe')!.text).description, 'Use when writing down any recipe for the family book');
+  assert.equal(skillText('family-recipe'), null);
+  assert.throws(() => restoreSpaceSkill(db, sp.id, 'family-recipe'), /Nothing to bring back|already/);
+  // A library skill copied in, to change for the space alone, with its other files.
+  const lib = librarySkills().find((x) => x.source === 'bundled' && fs.readdirSync(path.dirname(x.file)).length > 1)!;
+  const copy = copyToSpace(db, sp.id, lib.dir);
+  assert.equal(copy.overrides, true);
+  assert.deepEqual(fs.readdirSync(path.join(spaceSkillsDir(sp.id), lib.dir)).sort(), fs.readdirSync(path.dirname(lib.file)).sort());
+  assert.throws(() => copyToSpace(db, sp.id, lib.dir), /already/);
+  assert.throws(() => copyToSpace(db, sp.id, 'no-such-skill'), /no skill named/);
+  deleteSpace(db, sp.id);
+});
+
+test('a session in a space gets its skills with the library’s, its own in place of one of the same name; a group gets its spaces’ too', async () => {
+  const deps = { db } as unknown as Deps;
+  const base = { cwd: tmp, runId: 'r', resume: false };
+  const kitchen = createSpace(db, { name: 'Kitchen' });
+  const garden = createSpace(db, { name: 'Garden' });
+  const home = createSpace(db, { name: 'Home', members: [kitchen.id, garden.id] });
+  saveSpaceSkill(db, kitchen.id, { name: 'recipe-format', description: 'Use when writing down a recipe', body: BODY });
+  saveSpaceSkill(db, kitchen.id, { name: 'writing', description: 'Use when writing anything for the kitchen book', body: BODY });
+  saveSpaceSkill(db, garden.id, { name: 'writing', description: 'Use when writing anything about the garden', body: BODY });
+  saveSpaceSkill(db, garden.id, { name: 'sowing-plan', description: 'Use when planning what to sow and when', body: BODY });
+  // Outside a space: the library's view.
+  assert.deepEqual((await skillpack.spawn!({ ...base, agent: 'codex', extra: {} }, deps))?.skillRoots, [path.join(folders().view, 'skills')]);
+  // In the kitchen: a view of its own, the library's skills with its own in place of the library's writing.
+  const codex = await skillpack.spawn!({ ...base, agent: 'codex', extra: { space: kitchen.id } }, deps);
+  const view = path.dirname(codex!.skillRoots![0]);
+  assert.notEqual(view, folders().view);
+  assert.equal(linkOf(view, 'recipe-format'), path.join(spaceSkillsDir(kitchen.id), 'recipe-format'));
+  assert.equal(linkOf(view, 'writing'), path.join(spaceSkillsDir(kitchen.id), 'writing'));
+  assert.equal(linkOf(view, 'research'), path.join(APP_ROOT, 'skills', 'research'));
+  assert.ok(!fs.existsSync(path.join(view, 'skills', 'sowing-plan')), 'not another space’s');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(view, '.claude-plugin', 'plugin.json'), 'utf8')).name, 'naget', 'skills keep their names');
+  const custom = await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'console', extra: { space: kitchen.id } }, deps);
+  assert.equal(custom?.env?.NAGET_SKILL_DIRS, path.join(view, 'skills'));
+  // In the group: the spaces' skills too, the first space's before the next one's.
+  const group = path.dirname((await skillpack.spawn!({ ...base, agent: 'codex', extra: { space: home.id } }, deps))!.skillRoots![0]);
+  assert.equal(linkOf(group, 'sowing-plan'), path.join(spaceSkillsDir(garden.id), 'sowing-plan'));
+  assert.equal(linkOf(group, 'writing'), path.join(spaceSkillsDir(kitchen.id), 'writing'));
+  // The agent is told which skills are the space's.
+  const told = (await spawnAdditions({ ...base, agent: 'codex', key: 'codex:k1', extra: { space: kitchen.id } })).instructions.join('\n');
+  assert.match(told, /Skills of the space's own: recipe-format and writing\. They are in your skills list/);
+  const toldGroup = (await spawnAdditions({ ...base, agent: 'codex', key: 'codex:h1', extra: { space: home.id } })).instructions.join('\n');
+  assert.match(toldGroup, /Skills of the space's own: recipe-format, writing and sowing-plan\./);
+  // A skill removed from the space is gone from its view at the next start; the library's comes back.
+  removeSpaceSkill(db, kitchen.id, 'writing');
+  await skillpack.spawn!({ ...base, agent: 'codex', extra: { space: kitchen.id } }, deps);
+  assert.equal(linkOf(view, 'writing'), path.join(APP_ROOT, 'skills', 'writing'));
+  for (const sp of [home, kitchen, garden]) deleteSpace(db, sp.id);
+});
+
+test('deleting a space puts its skills in the skill library, named for the space when the library has one of the name', () => {
+  const sp = createSpace(db, { name: 'Thesis 2026' });
+  saveSpaceSkill(db, sp.id, { name: 'citation-style', description: 'Use when citing a source in the thesis', body: BODY });
+  saveSpaceSkill(db, sp.id, { name: 'research', description: 'Use when looking up papers for the thesis', body: BODY });
+  assert.deepEqual(deleteSpace(db, sp.id).sort(), ['citation-style', 'research-thesis-2026']);
+  assert.equal(skillText('citation-style')?.source, 'learned');
+  const kept = parseSkill(skillText('research-thesis-2026')!.text);
+  assert.equal(kept.name, 'research-thesis-2026');
+  assert.equal(kept.description, 'Use when looking up papers for the thesis');
+  assert.equal(skillText('research')?.source, 'bundled', 'the library’s own stays as it was');
+  assert.deepEqual(
+    history(db, 'citation-style').map((c) => c.action),
+    ['create'],
+  );
+  assert.ok(!fs.existsSync(spaceSkillsDir(sp.id)), 'its own folder of skills is gone');
+  assert.ok(fs.existsSync(path.join(folders().view, 'skills', 'citation-style')), 'in the library’s view');
+  for (const n of ['citation-style', 'research-thesis-2026']) fs.rmSync(path.join(folders().learned, n), { recursive: true });
+});
+
 for (const [name, fn] of tests) {
   try {
     await fn();
@@ -176,3 +294,4 @@ for (const [name, fn] of tests) {
 }
 console.log(`\n${passed}/${tests.length} passed`);
 fs.rmSync(tmp, { recursive: true, force: true });
+fs.rmSync(path.join(config.dataDir, 'spaces'), { recursive: true, force: true });

@@ -1,7 +1,7 @@
 // The skill library, shared by the server and the pages: the skills that come with the app, the ones
-// the user approved (learned), the proposals that wait for approval, and how a skill being loaded is
-// recognised in any agent's conversation (Claude Code's Skill tool, Custom's skill tool, a SKILL.md
-// read by Codex or another agent).
+// the user approved (learned), a space's own skills, the proposals that wait for approval, and how a
+// skill being loaded is recognised in any agent's conversation (Claude Code's Skill tool, Custom's skill
+// tool, a SKILL.md read by Codex or another agent).
 import type { ToolInfo } from './types.ts';
 
 export type SkillSource = 'bundled' | 'learned';
@@ -21,6 +21,40 @@ export interface LibrarySkill {
   /** How many times an agent loaded it, and when last. */
   uses: number;
   lastUsed?: number;
+}
+
+/** A skill of a space's own (shared/spaces.ts): its sessions get it with the library, in place of a library skill of its name. */
+export interface SpaceSkill {
+  name: string;
+  /** When to use it, as its frontmatter says. */
+  description: string;
+  triggers: string[];
+  /** A library skill of the same name, which it takes the place of in the space. */
+  overrides?: boolean;
+  /** Its SKILL.md. */
+  path: string;
+  updatedAt: number;
+  /** How many times an agent in the space loaded it, and when last. */
+  uses: number;
+  lastUsed?: number;
+}
+
+/** A space's skills, as its page shows them. */
+export interface SpaceSkills {
+  skills: SpaceSkill[];
+  /** Skills it had, which can come back. */
+  removed: { name: string; at: number }[];
+}
+
+/** A skill as it reads, to show it whole: the library's, or a space's own. */
+export interface SkillDoc {
+  name: string;
+  text: string;
+  source: SkillSource | 'space';
+  /** For a space's own skill: which space. */
+  space?: { id: string; name: string };
+  file: string;
+  history: SkillChange[];
 }
 
 /** Something in a proposal the user should look at: a secret, or text that tries to steer agents. */
@@ -55,6 +89,12 @@ export interface SkillProposal {
   findings: ScanFinding[];
   /** It changes a built-in skill: saved as the user's own version, which takes its place. */
   bundled?: boolean;
+  /** The space it can be kept in alone (the session's), or whose own skill it changes. */
+  space?: { id: string; name: string };
+  /** Where it is kept: the skill library, for every session, or the space alone. */
+  scope: 'library' | 'space';
+  /** It changes a skill of the space's own, so it stays the space's. */
+  spaceSkill?: boolean;
   createdAt: number;
   decidedAt?: number;
   /** What was saved, when the user changed the text before approving. */

@@ -1,12 +1,13 @@
-// Spaces: a project's sessions, files, documents, memory, guidelines and assistant together, picked by name
-// on the start page in place of a folder. A space's folder holds its files and is where its sessions work, so
-// its project memory is the folder's (server/memory keys a project by its folder); it can also work with other
-// folders of yours, where they are (Claude Code works in them as in its own); its knowledge bases are
+// Spaces: a project's sessions, files, documents, memory, guidelines, skills and assistant together, picked by
+// name on the start page in place of a folder. A space's folder holds its files and is where its sessions work,
+// so its project memory is the folder's (server/memory keys a project by its folder); it can also work with
+// other folders of yours, where they are (Claude Code works in them as in its own); its knowledge bases are
 // searched by its sessions alone, with the shared ones too unless it leaves them out (server/knowledge/scope.ts);
-// every session started in it (extra.space) gets its guidelines (server/guidelines), and starts as its assistant.
-// A group brings other spaces together: its sessions also get their documents, guidelines and folders (Claude
-// Code works in those folders too). Deleting a space keeps its folder and sessions, and its knowledge bases
-// become shared; it leaves the groups it was in.
+// every session started in it (extra.space) gets its guidelines (server/guidelines) and its own skills with the
+// skill library's (server/skillpack/spaceSkills.ts), and starts as its assistant. A group brings other spaces
+// together: its sessions also get their documents, guidelines, skills and folders (Claude Code works in those
+// folders too). Deleting a space keeps its folder and sessions, its knowledge bases become shared and its
+// skills join the skill library; it leaves the groups it was in.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
+import { copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, skillsOf, spaceSkillDoc, spaceSkillsView } from '../skillpack/spaceSkills.ts';
 
 const made = new WeakSet<DB>();
 function tables(db: DB) {
@@ -35,7 +37,7 @@ export function spaceById(db: DB, id: string): Space | null {
   return r ? JSON.parse(r.data) : null;
 }
 
-/** Spaces with how many sessions each has, when one last was at work, and how many documents their knowledge holds. */
+/** Spaces with how many sessions each has, when one last was at work, how many documents their knowledge holds, and how many skills they have. */
 export function spaceViews(db: DB): SpaceView[] {
   const docs = docsBySpace(db);
   const counts = new Map(
@@ -44,7 +46,7 @@ export function spaceViews(db: DB): SpaceView[] {
       r,
     ]),
   );
-  return allSpaces(db).map((s) => ({ ...s, sessions: counts.get(s.id)?.n ?? 0, lastAt: counts.get(s.id)?.last ?? undefined, docs: docs.get(s.id) ?? 0 }));
+  return allSpaces(db).map((s) => ({ ...s, sessions: counts.get(s.id)?.n ?? 0, lastAt: counts.get(s.id)?.last ?? undefined, docs: docs.get(s.id) ?? 0, skills: skillsOf(s.id).length }));
 }
 
 /** A space's sessions, the last at work first. */
@@ -147,22 +149,35 @@ export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Spa
   return next;
 }
 
-export function deleteSpace(db: DB, id: string) {
+/** Deletes a space; returns the names its skills have in the skill library now. */
+export function deleteSpace(db: DB, id: string): string[] {
   tables(db);
+  const s = spaceById(db, id);
   db.prepare('delete from spaces where id = ?').run(id);
   releaseSpace(db, id);
+  const skills = s ? releaseSpaceSkills(db, s) : [];
   // It leaves the groups it was in.
   for (const g of allSpaces(db).filter((x) => x.members?.includes(id))) {
     const members = g.members!.filter((m) => m !== id);
     const { members: _had, ...rest } = g;
     db.prepare('update spaces set data = ? where id = ?').run(JSON.stringify(members.length ? { ...rest, members } : rest), g.id);
   }
+  return skills;
 }
 
 /** The spaces a group brings together, as they are now (none for a plain space). */
 export function membersNow(db: DB, s: Space): Space[] {
   return (s.members ?? []).map((id) => spaceById(db, id)).filter((x): x is Space => !!x);
 }
+
+/** The space a session is in (its extra.space), with the spaces it brings together; null outside one. */
+export function spaceOfSession(db: DB, extra: { space?: unknown }): { space: Space; members: Space[] } | null {
+  const space = typeof extra.space === 'string' && extra.space ? spaceById(db, extra.space) : null;
+  return space ? { space, members: membersNow(db, space) } : null;
+}
+
+/** A space, and the groups that bring it in: the sessions where its skills are used. */
+const withGroups = (db: DB, id: string) => [id, ...allSpaces(db).filter((g) => g.members?.includes(id)).map((g) => g.id)];
 
 /** Most of a space's files a new session is told of by name. */
 const GLANCE = 40;
@@ -194,12 +209,16 @@ export function folderGlance(dir: string): string | null {
   return named.join(', ') + (list.length > GLANCE ? ` … and ${list.length - GLANCE} more` : '');
 }
 
+/** "a, b and c". */
+const and = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : (xs[0] ?? ''));
+
 /**
  * What a session in a space is told; in a group, of each space it brings together too. The space's own
  * guidelines come with the user's other Agent Guidelines (server/guidelines), the most general first.
  * `glance`: what its folder holds now (folderGlance), files the user added to the space among them.
+ * `skills`: the names of its own skills, and of those of the spaces it brings together (server/skillpack).
  */
-export function spaceInstructions(s: Space, members: Space[] = [], glance?: string | null): string {
+export function spaceInstructions(s: Space, members: Space[] = [], glance?: string | null, skills: string[] = []): string {
   const lines = [
     `# Space: ${s.name}`,
     `The user keeps this work in a space of its own, "${s.name}"${s.description ? ` (${s.description})` : ''}: its sessions, files, memory and guidelines belong together. Its folder, ${s.folder}, holds the space's files: keep what you make for it there.`,
@@ -207,6 +226,11 @@ export function spaceInstructions(s: Space, members: Space[] = [], glance?: stri
   if (glance) lines.push('', `In its folder now (the last changed first; the user adds files to the space there): ${glance}. Open those the task needs.`);
   if (s.folders?.length)
     lines.push('', `It also works with ${s.folders.length === 1 ? 'this folder' : 'these folders'} of the user's, where ${s.folders.length === 1 ? 'it is' : 'they are'}: ${s.folders.join(', ')}. They belong to the space too: use them as the task needs.`);
+  if (skills.length)
+    lines.push(
+      '',
+      `Skills of the space's own: ${and(skills)}. They are in your skills list with the others, in place of any of the same name, and say how this work is done here: when one fits the task, use it.`,
+    );
   if (members.length) {
     lines.push(
       '',
@@ -244,10 +268,54 @@ export const spaces: Feature = {
       return s;
     });
     d.app.delete('/api/spaces/:id', async (req) => {
-      deleteSpace(d.db, id(req));
+      const skills = deleteSpace(d.db, id(req));
       changed();
-      // Its knowledge bases are shared now.
+      // Its knowledge bases are shared now, and its skills in the library.
       d.broadcast({ t: 'feature', id: 'knowledge', data: { changed: true } });
+      if (skills.length) d.broadcast({ t: 'feature', id: 'skillpack', data: { library: true } });
+      return { ok: true, skills };
+    });
+
+    // Its own skills (server/skillpack/spaceSkills.ts).
+    const space = (req: { params: unknown }) => {
+      const s = spaceById(d.db, id(req));
+      if (!s) throw new HttpError(404, 'No such space');
+      return s;
+    };
+    const skill = (req: { params: unknown }) => String((req.params as { name: string }).name);
+    const skillsChanged = (s: Space) => {
+      changed();
+      d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id } });
+    };
+    d.app.get('/api/spaces/:id/skills', async (req) => spaceSkillsView(d.db, space(req).id, withGroups(d.db, space(req).id)));
+    d.app.get('/api/spaces/:id/skills/:name', async (req) => {
+      const doc = spaceSkillDoc(d.db, space(req), skill(req));
+      if (!doc) throw new HttpError(404, `The space has no skill named ${skill(req)}`);
+      return doc;
+    });
+    d.app.post('/api/spaces/:id/skills', async (req) => {
+      const s = space(req);
+      const b = body(req);
+      const out = typeof b.from === 'string' && b.from ? copyToSpace(d.db, s.id, b.from) : saveSpaceSkill(d.db, s.id, b);
+      skillsChanged(s);
+      return out;
+    });
+    d.app.put('/api/spaces/:id/skills/:name', async (req) => {
+      const s = space(req);
+      const out = saveSpaceSkill(d.db, s.id, body(req), skill(req));
+      skillsChanged(s);
+      return out;
+    });
+    d.app.delete('/api/spaces/:id/skills/:name', async (req) => {
+      const s = space(req);
+      removeSpaceSkill(d.db, s.id, skill(req));
+      skillsChanged(s);
+      return { ok: true };
+    });
+    d.app.post('/api/spaces/:id/skills/:name/restore', async (req) => {
+      const s = space(req);
+      restoreSpaceSkill(d.db, s.id, skill(req));
+      skillsChanged(s);
       return { ok: true };
     });
   },
@@ -257,6 +325,8 @@ export const spaces: Feature = {
     const members = membersNow(d.db, sp);
     // Claude Code works in the space's other folders, and those of the spaces a group brings together, as in its own.
     const dirs = s.agent === 'claude' ? [...new Set([...(sp.folders ?? []), ...members.flatMap((m) => [m.folder, ...(m.folders ?? [])])])].filter((f) => f !== sp.folder && fs.existsSync(f)) : [];
-    return { instructions: [spaceInstructions(sp, members, folderGlance(sp.folder))], ...(dirs.length ? { args: dirs.flatMap((f) => ['--add-dir', f]) } : {}) };
+    // Its skills reach the agent with the library's (server/skillpack): here it is told they are there.
+    const skills = [...new Set([sp, ...members].flatMap((m) => skillsOf(m.id).map((k) => k.name)))];
+    return { instructions: [spaceInstructions(sp, members, folderGlance(sp.folder), skills)], ...(dirs.length ? { args: dirs.flatMap((f) => ['--add-dir', f]) } : {}) };
   },
 };

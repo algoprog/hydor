@@ -56,13 +56,16 @@ agents that speak ACP and take MCP servers.
   Settings → Memory lists every note with when it was written, changed and last needed, and suggests
   removing the ones no agent needed for months. Turn it off for one session or for all. Agents can also look
   up earlier sessions.
-- **Spaces** (in the sidebar): a project's sessions, files, documents, memory, guidelines and assistant together,
-  like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a folder:
-  its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
+- **Spaces** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
+  together, like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a
+  folder: its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
-  guidelines and start as its assistant. Its Files tab shows its folders; files come in from Files, a file's
-  window or an agent's file cards with Add to a space. A group brings several spaces together: its sessions work
-  with all of them, their folders, documents and guidelines. The sidebar's filter shows one space's sessions.
+  guidelines and its own skills and start as its assistant. Its Files tab shows its folders; files come in from
+  Files, a file's window or an agent's file cards with Add to a space. Its Skills tab holds skills only its
+  sessions get, with the skill library: written there, copied from the library to change for the space alone, or
+  proposed by an agent working in it and kept for the space when you approve. A group brings several spaces
+  together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar's
+  filter shows one space's sessions.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
@@ -90,8 +93,9 @@ agents that speak ACP and take MCP servers.
   API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's result, asked on its page
   or in its session, which opens on that result with a switch to the conversation.
 - **Skills**: a library that comes with the app (clarify first, check before saying it is done,
-  troubleshooting, research, writing, documents) for every agent. Agents propose new skills or fixes to them,
-  saved only when you approve.
+  troubleshooting, research, writing, documents) for every agent, and skills of a space's own for its sessions.
+  Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a space, for the
+  space alone.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
   on this machine; replies can be read aloud. Hands-free mode (the headphones by the message box) is for
   walking: say what you want, and it starts, steers and checks sessions, answers approvals and reads you the

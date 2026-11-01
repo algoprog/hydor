@@ -7,7 +7,7 @@ import type { LibrarySkill, SkillLibrary, SkillProposal } from '@shared/skillpac
 import { api, enc, post, put } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { ago, tildify } from '../../lib/format';
-import { openSession } from '../../lib/nav';
+import { go, openSession } from '../../lib/nav';
 import { toast, toastError, useApp, useSessions } from '../../lib/store';
 import { Badge, Button, Dialog, IconButton, Section, Switch, Throbber, useConfirm } from '../../components/ui';
 import { ProposalPanel } from './ProposalCard';
@@ -184,6 +184,12 @@ export function LibrarySettings() {
           </p>
           <p>
             Your own skills for every agent can go in <span className="font-mono text-fg-2">{tildify(lib.folders.learned, home)}</span>, one folder per skill with its SKILL.md.
+          </p>
+          <p>
+            A space can have skills of its own too, which only its sessions get: on the space’s page, its Skills tab.{' '}
+            <button type="button" onClick={() => go('/spaces')} className="font-medium text-accent hover:underline">
+              Spaces
+            </button>
           </p>
         </div>
       </Section>

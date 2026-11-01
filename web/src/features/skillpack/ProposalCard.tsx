@@ -1,7 +1,8 @@
 // A skill an agent proposed (skill_save) or a change it proposed to one (skill_patch), as a card in the
 // conversation: why it is worth keeping, when it applies, the text or the change, and anything in it
 // that needs a look. Nothing is saved until you approve it here (or in Settings → Skill library); you
-// can edit it first, or dismiss it with a note. Your answer goes back to the agent as a message.
+// can edit it first, or dismiss it with a note. In a space, you pick whether it is kept for every
+// session or for the space alone. Your answer goes back to the agent as a message.
 import { useEffect, useState } from 'react';
 import { BookPlus, Check, ChevronRight, FilePen, TriangleAlert, X } from 'lucide-react';
 import { parseSkill, type SkillProposal } from '@shared/skillpack';
@@ -44,8 +45,11 @@ export function ProposalPanel({ p, onChange, framed = true }: { p: SkillProposal
   const [dismissing, setDismissing] = useState(false);
   const [note, setNote] = useState('');
   const [view, setView] = useState<'changes' | 'skill'>(p.kind === 'patch' ? 'changes' : 'skill');
+  // Where it goes: the library, or the session's space alone (a skill of the space's own stays there).
+  const [scope, setScope] = useState<SkillProposal['scope']>(p.scope);
   const [confirm, confirmNode] = useConfirm();
   const pending = p.status === 'pending';
+  const toSpace = (pending ? scope : p.scope) === 'space' && p.space;
   const final = p.saved ?? p.after;
   const fm = parseSkill(final);
   const before = p.before ? parseSkill(p.before) : null;
@@ -60,7 +64,7 @@ export function ProposalPanel({ p, onChange, framed = true }: { p: SkillProposal
     }
     setBusy(yes ? 'yes' : 'no');
     try {
-      const r = await post<{ proposal: SkillProposal }>(`/api/skillpack/proposals/${enc(p.id)}/${yes ? 'approve' : 'dismiss'}`, yes ? (text !== undefined ? { text } : {}) : { note });
+      const r = await post<{ proposal: SkillProposal }>(`/api/skillpack/proposals/${enc(p.id)}/${yes ? 'approve' : 'dismiss'}`, yes ? { ...(text !== undefined ? { text } : {}), scope } : { note });
       onChange(r.proposal);
       setEditing(false);
       setDismissing(false);
@@ -124,8 +128,24 @@ export function ProposalPanel({ p, onChange, framed = true }: { p: SkillProposal
             {view === 'changes' ? <DiffView diff={p.diff} /> : <Markdown text={fm.body} className="px-4 py-3 text-[13.5px]" />}
           </div>
         </div>
+        {p.space && pending && !p.spaceSkill && (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+            <span className="text-[12.5px] text-fg-3">Keep it for</span>
+            <Segmented
+              size="sm"
+              value={scope}
+              onChange={setScope}
+              options={[
+                { value: 'library', label: 'Every session' },
+                { value: 'space', label: <span translate="no">{p.space.name}</span> },
+              ]}
+            />
+          </div>
+        )}
         {p.saved && <p className="text-[12px] text-fg-3">You edited it before saving; this is the saved version.</p>}
-        {p.bundled && pending && <p className="text-[12px] text-fg-3">A built-in skill: approving saves your own version in its place. The original stays with the app.</p>}
+        {p.spaceSkill && p.space && pending && <p className="text-[12px] text-fg-3">{`A skill of the space ${p.space.name}: the change stays in it.`}</p>}
+        {p.kind === 'patch' && !p.spaceSkill && toSpace && pending && <p className="text-[12px] text-fg-3">Saved as the space’s own version; other sessions keep the library’s as it is.</p>}
+        {p.bundled && pending && !toSpace && <p className="text-[12px] text-fg-3">A built-in skill: approving saves your own version in its place. The original stays with the app.</p>}
         {p.note && <p className="text-[12.5px] text-fg-3">Your note: {p.note}</p>}
         {dismissing && (
           <textarea
@@ -166,11 +186,19 @@ export function ProposalPanel({ p, onChange, framed = true }: { p: SkillProposal
         ) : (
           <>
             <span className="text-[12.5px] text-fg-3">
-              {p.status === 'approved' ? 'In your skill library: every agent can use it.' : p.status === 'replaced' ? 'A newer proposal took its place.' : 'Nothing was saved.'}
+              {p.status === 'approved' && toSpace ? (
+                `In the skills of ${p.space!.name}: its sessions can use it.`
+              ) : p.status === 'approved' ? (
+                'In your skill library: every agent can use it.'
+              ) : p.status === 'replaced' ? (
+                'A newer proposal took its place.'
+              ) : (
+                'Nothing was saved.'
+              )}
             </span>
             {p.status === 'approved' && (
-              <button type="button" onClick={() => go('/settings?s=skillpack')} className="text-[12.5px] text-accent hover:underline">
-                Skill library
+              <button type="button" onClick={() => go(toSpace ? `/spaces/${p.space!.id}/skills` : '/settings?s=skillpack')} className="text-[12.5px] text-accent hover:underline">
+                {toSpace ? 'The space’s skills' : 'Skill library'}
               </button>
             )}
           </>
