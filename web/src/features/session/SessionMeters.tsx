@@ -26,7 +26,7 @@ const exact = (ms: number): string => {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
-/** Output throughput (tok/s) of the last reply, and — for Claude — the prompt cache's time to expiry. */
+/** Output throughput (tok/s) of the last reply, and — for Claude — the prompt cache's time to expiry. In a wide message box only (its @container). */
 export function SessionMeters({ live }: { live: LiveState | null }) {
   const cacheAt = live?.cacheAt;
   const ttl = live?.cacheTtlMs;
@@ -56,7 +56,7 @@ export function SessionMeters({ live }: { live: LiveState | null }) {
   }
   if (!parts.length) return null;
   return (
-    <span className="mr-1.5 hidden items-center text-[11.5px] text-fg-3 sm:inline-flex">
+    <span className="mr-1.5 hidden items-center text-[11.5px] text-fg-3 @3xl:inline-flex">
       {parts.map((p, i) => (
         <span key={i} className="inline-flex items-center">
           {i > 0 && <span className="mx-1.5 text-fg-3/40">·</span>}
