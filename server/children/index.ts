@@ -19,7 +19,6 @@ import { addNote } from '../notes.ts';
 import { lastTurn, opensTurn, type Turn } from '../opinion/turns.ts';
 import { childKeys, parentOf } from './family.ts';
 import { childMode, modeFamily } from './modes.ts';
-import { MEMBER_INSTRUCTIONS } from '../swarm/instructions.ts';
 import { roleOf } from '../swarm/roles.ts';
 
 export { childKeys, parentOf } from './family.ts';
@@ -72,8 +71,6 @@ interface Target {
   model?: string;
   /** "Custom · Qwen3 Coder", "Claude Code", "Gemini CLI". */
   label: string;
-  /** Takes no instructions from the app (an ACP agent other than Custom): told with its brief instead. */
-  plain?: boolean;
 }
 
 /** Custom's models (Settings → Models), as its agent process reads them. */
@@ -116,7 +113,7 @@ export function pickAgent(d: Deps, ctx: Pick<RunCtx, 'agent' | 'acpAgent' | 'key
   const others = acpAgents(d.db).filter((a) => a.id !== CONSOLE_ID);
   const a = others.find((x) => x.id.toLowerCase() === want || x.name.toLowerCase() === want);
   if (!a) throw new Error(`There is no agent "${String(agentArg)}". Pick custom (with a model), claude, codex${others.length ? `, or one of ${others.map((x) => x.id).join(', ')}` : ''}.`);
-  return { agent: 'acp', acpAgent: a.id, model: model || undefined, label: a.name, plain: true };
+  return { agent: 'acp', acpAgent: a.id, model: model || undefined, label: a.name };
 }
 
 /** The folder a child works in: the parent's, or one it names (relative to the parent's). */
@@ -198,8 +195,7 @@ function startTool(d: Deps, max: number): RunTool {
           agent: target.agent,
           acpAgent: target.acpAgent,
           cwd,
-          // An agent that takes no instructions from the app gets them with its brief.
-          prompt: target.plain ? `${brief}\n\n(${CHILD_INSTRUCTIONS})${lead ? `\n\n${MEMBER_INSTRUCTIONS}` : ''}` : brief,
+          prompt: brief,
           model: target.model,
           effort,
           mode,

@@ -16,7 +16,7 @@ import { AGENT_FILE, MODELS_DIR } from '../models/config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { SpawnAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
-import { acpText } from '../history/acp.ts';
+import { acpBriefing, acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig } from './live.ts';
 import { RpcPeer } from './rpc.ts';
@@ -115,6 +115,17 @@ export function acpSessionOf(file: string): string | undefined {
   }
 }
 
+/** The ACP session that last had the app's instructions, from the transcript. */
+function briefedSession(file: string): string | undefined {
+  try {
+    let found: string | undefined;
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) if (line.startsWith('{"t":"briefed"')) found = /"of":"([^"]*)"/.exec(line)?.[1] ?? found;
+    return found;
+  } catch {
+    return undefined;
+  }
+}
+
 // ---- a running session ----------------------------------------------------------------------------
 
 export interface AcpOpts {
@@ -141,6 +152,8 @@ export class AcpLive extends LiveAdapter {
   private loading = false;
   private prompting = false;
   private permissions = new Map<string, { rpcId: string | number; options: Json[] }>();
+  /** The ACP session has had the app's instructions (they go with its first message), by its id. */
+  private briefed?: string;
   /** Lines the agent printed in this run so far; each transcript entry notes how many were handled. */
   private ln = 0;
   private caught: { handled: number; answered: Set<string> } | null = null;
@@ -363,12 +376,26 @@ export class AcpLive extends LiveAdapter {
     }
   }
 
+  /**
+   * The app's instructions, once per ACP session, for an agent other than Custom (which reads them before
+   * each turn): before the first message of a new session, or of one opened before they were sent.
+   */
+  private briefing(): Json[] {
+    const instructions = this.o.def.id === CONSOLE_ID ? [] : (this.o.add?.instructions ?? []).filter((t) => t.trim());
+    if (!instructions.length || !this.acpSession) return [];
+    this.briefed ??= briefedSession(this.o.transcript) ?? '';
+    if (this.briefed === this.acpSession) return [];
+    this.briefed = this.acpSession;
+    this.record({ t: 'briefed', of: this.acpSession });
+    return [{ type: 'text', text: acpBriefing(instructions) }];
+  }
+
   async sendMessage(text: string, images: ImageInput[]): Promise<void> {
     if (!this.acpSession) throw new HttpError(409, 'The agent is still starting');
     if (this.prompting) throw new HttpError(409, 'The agent takes one message at a time: send it when this turn ends');
     const id = `u${Date.now().toString(36)}${crypto.randomBytes(2).toString('hex')}`;
+    const prompt: Json[] = this.briefing();
     this.record({ t: 'prompt', id, text, images: images.length || undefined });
-    const prompt: Json[] = [];
     if (text) prompt.push({ type: 'text', text });
     if (this.caps.promptCapabilities?.image) for (const img of images) prompt.push({ type: 'image', mimeType: img.mediaType, data: img.data });
     this.prompting = true;
