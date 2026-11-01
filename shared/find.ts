@@ -245,6 +245,7 @@ export function placeOf(pathname: string, search: string, pagePaths: Record<stri
   if (a && a[1] !== 'new') return `app:${decodeURIComponent(a[1])}`;
   const pg = /^\/pages\/([^/]+)$/.exec(pathname);
   if (pg) return `page:${decodeURIComponent(pg[1])}`;
-  const full = `${pathname}${q.get('tab') ? `?tab=${q.get('tab')}` : ''}`;
+  // A page's tab (Published pages), or a place on the Files page (its trash, the recent files).
+  const full = `${pathname}${q.get('tab') ? `?tab=${q.get('tab')}` : q.get('place') ? `?place=${q.get('place')}` : ''}`;
   return pagePaths[full] ?? pagePaths[pathname] ?? null;
 }

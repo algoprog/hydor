@@ -116,9 +116,11 @@ When an agent has made files for you (a document, a spreadsheet, slides, a PDF, 
 - an icon by type, in its colour (Word blue, Excel green, PowerPoint orange, PDF red), or a small picture for an image;
 - the file's name, what it is and its size ("Word document · 24 KB");
 - the agent's caption ("The budget, a sheet per quarter");
-- **Open**, and a download button.
+- **Open**, a download button, and **More** (⋯).
 
 **Open** shows the file in the file viewer, in a window over the conversation, which stays where it was (on a phone the window comes up from the bottom of the screen). **Open in Files** at its top takes the file to the Files page; the cross, or Escape, closes the window. The download button saves the file on your device.
+
+**More** (⋯), on a card and at the top of the window, has **Start a session with it** (the start page, with the file in its message box), **Add to a space** (copies it into a space's folder), **Show in Files** (on a card) and **Copy path**. See [Start a session with files](/guide/files-git#start-a-session-with-files) and [Add files to a space](/guide/files-git#add-files-to-a-space).
 
 A file deleted or moved since shows as **No longer there**. If an agent names a file that doesn't exist, you see "Could not show the files" with the reason, and the agent is told to fix it.
 
@@ -161,7 +163,7 @@ Pictures are saved in an **images** folder inside the session's folder, named af
 In the conversation:
 
 - While the model works, a placeholder in the shape asked for says "Making an image" with the time so far, and the description under it.
-- Then the pictures show with the reply, with the description and the model's name under them. Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files** and **Download** appear when you point at it (on a phone they are always there).
+- Then the pictures show with the reply, with the description and the model's name under them. Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a space**, **Copy path**) appear when you point at it (on a phone they are always there).
 - Without an OpenRouter key you see "Images need an OpenRouter key", with **Add an OpenRouter key**. When the model makes nothing, you see "No image this time" with its reason.
 
 ## Dictate a message

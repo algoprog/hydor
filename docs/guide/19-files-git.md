@@ -1,6 +1,6 @@
 # Files, Git, Terminal and Preview
 
-The tools around the agents: browse, open and edit the files on this computer, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the dev servers running here and a live view of the computer (System) are here too, so you can check and finish an agent's work without leaving the app.
+The tools around the agents: browse, find, open and edit the files on this computer, add them to spaces and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the dev servers running here and a live view of the computer (System) are here too, so you can check and finish an agent's work without leaving the app.
 
 ![Git: a project’s changes, a message for the commit, and its recent commits](images/files-git.webp)
 
@@ -8,28 +8,52 @@ The tools around the agents: browse, open and edit the files on this computer, s
 
 Click **Files** in the sidebar's tools, or go to [Files](/files). On a computer the page has two parts:
 
-- On the left, a switch between **Files** (the folder tree) and **Search** (search inside the files, see [Search inside files](/guide/files-git#search-inside-files)).
-- On the right, the files you opened, each in a tab. With none open it says "No file open" and reminds you of Ctrl+P (⌘P on a Mac).
+- On the left, the **places**: the files you opened lately, your home folder, folders you pinned, your spaces' folders, the folders sessions worked in, and the trash (see [Places](/guide/files-git#places)).
+- On the right, the folder you are in, with what is in it (see [Browse a folder](/guide/files-git#browse-a-folder)). Files you open show there too, each in a tab: the first tab goes back to the folder.
 
-On a phone the tree fills the screen. A file opens on a page of its own, with **Back** to return to the tree.
+In a small window, the places fold into the page's title: it names the folder you are in, and a click on it lists the places.
+
+On a phone the folder fills the screen. Its name at the top opens the places, from the bottom of the screen; **‹** with the folder above's name, under the title, goes up a folder, and your phone's Back goes to the folder you were in before. A file opens on a page of its own, with **Back**.
 
 Other ways in:
 
-- Click the folder under a session's title, or use the session's menu (⋯) → **Folder and code** → **Browse the folder**: the tree opens at that folder.
+- Click the folder under a session's title, or use the session's menu (⋯) → **Folder and code** → **Browse the folder**: Files opens at that folder.
 - A file an agent changed or handed you, or a link to a file in its reply, opens in a window over the conversation, so you keep your place. **Open in Files** moves it to the Files page; ✕ or Esc closes it (if you changed it without saving, it asks "Discard your changes?" first).
+- A space's **Files** tab shows the space's own folders (see [Spaces and knowledge](/guide/spaces)).
 
-## Browse folders in the tree
+## Places
 
-The tree starts at a root folder, at first the folder new sessions start in. Its path shows at the top, with `~` for your home folder.
+- **Go to a folder**: find a folder by its name, or type its path (`~/code/shop`); the spaces and pinned folders come first. Tab, or the arrow at a row's end, lists the folders inside one.
+- **Recent files**: the files you opened lately in this browser, the last first, each with its folder. Those no longer there say so; **Clear those gone** takes them off the list.
+- **Home folder**: your own folder, where your files are. The folder new sessions start in shows below it when it isn't your home folder.
+- **Pinned**: folders you pinned, the same on every device. To pin one, use its menu or the folder's ⋯ → **Pin to Places**; to unpin it, point at it and click ✕, or use **Unpin from Places**.
+- **Spaces**: each space's own folder.
+- **Sessions worked in**: the folders sessions worked in lately.
+- **Trash**: what you deleted (see [Delete and put back](/guide/files-git#delete-and-put-back)).
 
-- **Change the root**: click the path and type another. Subfolders are suggested as you type, along with folders your sessions worked in (marked "recent"); Tab takes a suggestion and goes into it. Press **Open**, or **Cancel**.
-- **Up one folder** (the arrow button) moves the root to the folder above.
-- A folder's menu → **Open as root** makes it the root.
-- Click a folder to open or close it. The tree remembers which folders were open, for each root.
-- The tree refreshes itself every 5 seconds while you look at it, so files the agents make appear on their own. **Refresh** does it at once.
-- **Show dotfiles** / **Hide dotfiles** (the eye button) shows or hides files and folders whose names start with a dot. The `.github` folder always shows.
+On a computer, drop files or rows on a folder among the places to put them there.
 
-The root folder and your open tabs are kept in this browser, separately for each machine you use (see [Other machines](/guide/devices#use-other-machines-from-one-app)).
+## Browse a folder
+
+The bar over the folder holds, from the left:
+
+- **The folder above** (the up arrow).
+- The folder's path, in steps: a house for your home folder, then **code › shop**; a folder outside your home folder starts from **Computer** (`/`). Click a step to go there, or drop rows on it to move them there. A long path folds its middle into **…**, which lists the folders between. The last step, or the small arrow beside it, opens **Go to a folder**.
+- **Find in** *the folder*: narrows the list to the names that hold what you type, as you type. Enter, or the line **Search everything in … for "…", inside files too** at the top of the list, searches every folder under this one, file names and what is in the files (see [Search files](/guide/files-git#search-files)).
+- **New**: **New folder**, **New file**, **Upload files** and **Upload a folder**.
+- **As a list** or **As tiles, with pictures**: tiles show pictures as themselves, a good way to look through photos.
+- **More** (⋯): **Sort by** (**Name**, **Date changed**, **Size** or **Kind**, and **The other way round**), **Show hidden files**, **Pin to Places**, **New session in this folder**, **Open a terminal here**, **Copy path**, **Download as .zip** and **Refresh**.
+
+The list puts folders first. For each thing it shows its name, when it changed ("just now", "5 min ago", the time for today, "Yesterday", or the date) and its size. Click a column's title to sort by it, and again for the other way round. In a narrow window the bar keeps the field behind a search button, and **As a list** and **As tiles, with pictures** move under **More**; the date and size columns give way to the names.
+
+- Click a folder to go into it, or its arrow to open it in place, as in a tree; the folder remembers which of its folders were open.
+- Click a file to open it.
+- The line at the bottom counts the folders and files and adds up their size.
+- The list refreshes every 5 seconds while you look at it, so files the agents make appear on their own.
+
+On a phone each row shows the size and date under the name; the search button opens the field, **More** holds **As a list**, **As tiles, with pictures** and **Pick several** too, and the **+** button at the bottom right adds a folder, a file or uploads.
+
+Each folder has an address of its own, so the browser's Back goes to the folder you were in. The folder shown is also the one other parts of the app mean by "the folder open in Files". It is kept in this browser, separately for each machine you use (see [Other machines](/guide/devices#use-other-machines-from-one-app)).
 
 ### What the letters beside files mean
 
@@ -45,43 +69,112 @@ Inside a git repository (a folder whose history git keeps), files with changes s
 
 ## Work with files and folders
 
-Every row in the tree has a menu. Point at the row and click **More** (⋯), right-click it, or on a phone press and hold it. The menu holds:
+Every row has a menu. Point at the row and click **More** (⋯) at its end, or right-click it; on a phone, tap its ⋯. It holds:
 
-- **Open** (a file) or **Open as root** (a folder).
-- **New file here** and **New folder here**.
-- **Upload files here** and **Upload a folder here**.
-- **Open terminal here**: a new shell in that folder, in the bottom panel on a computer or on the Terminal page on a phone.
-- **New agent session here**: the start page, with that folder picked.
-- **Rename**.
+- **Open**.
+- **Start a session with it** (a file; see [Start a session with files](/guide/files-git#start-a-session-with-files)), or **New session in this folder** (a folder: the start page, with that folder picked).
+- **Add to a space** (see [Add files to a space](/guide/files-git#add-files-to-a-space)).
+- **Pin to Places** or **Unpin from Places** (a folder).
+- **Rename** (F2), **Duplicate**, **Move to** and **Copy to**.
+- **Open a terminal here** (a folder): a new shell in that folder, in the bottom panel on a computer or on the Terminal page on a phone.
 - **Copy path**: the full path, to paste anywhere.
-- **Download** (a file).
-- **Delete**.
+- **Download**, or **Download as .zip** for a folder.
+- **Delete** (the Delete key).
 
-The buttons at the top of the tree do the same for the root folder: **New file**, **New folder** and **Upload files**.
+### Pick several
+
+To act on several things at once, pick them:
+
+- On a computer, click the box at the start of a row (it shows when you point at the row), Ctrl+click (⌘+click on a Mac) to add one, Shift+click to pick everything from the last one picked, or press Ctrl+A for all.
+- On a phone, press and hold a row, then tap the others; or **More** → **Pick several**.
+
+The bar then says how many are picked, with **Start a session**, **Add to a space**, **Move to**, **Delete**, and **More** (⋯) for the rest of the menu: **Copy to**, **Copy paths**, **Download as .zip** and so on. ✕ (or Esc) unpicks them all.
+
+### Use the keyboard
+
+With the list in use (click it first), on a computer:
+
+| Keys | What they do |
+| --- | --- |
+| ↑ ↓ | Move to the row above or below (Shift picks as it goes) |
+| → ← | Open or close a folder in place; in tiles, the tile beside |
+| Enter | Open |
+| Space | Pick or unpick |
+| Backspace | The folder above |
+| Delete | Delete |
+| F2 | Rename |
+| Ctrl+A | Pick all |
+| Esc | Unpick all, then empty the field |
+
+Typing a letter starts **Find in** with it.
 
 ### Make a file or folder
 
-1. Click **New file** or **New folder** (or the row menu's **New file here** / **New folder here**).
-2. Type the name in the field that appears in the tree and press Enter. Esc cancels.
+1. Click **New** → **New folder** or **New file** (on a phone, the **+** button).
+2. Type the name in the field that appears in the list and press Enter. Esc cancels.
 
 A new file is empty and opens in the editor at once. If the name is taken, the app says so and makes nothing.
 
 ### Rename or move
 
 - **Rename** turns the name into a field. Enter keeps the new name, Esc leaves it as it was.
-- On a computer, drag a row onto another folder to move it there, or onto the empty part of the tree to move it to the root folder. A folder can't go into itself, and nothing is replaced: if the place already has something with that name, the move stops.
+- **Move to** lists your spaces and pinned folders first, then the folders used lately, with a field to find any folder by name or type its path. Pick one, and the file or folder moves there. A message says where it went, with **Undo**.
+- On a computer, drag rows onto a folder (in the list, a step of the path or among the places) to move them there; files picked together move together. Hold Alt (Option on a Mac) as you drop to copy instead.
 
-### Delete
+A folder can't go into itself, and moving replaces nothing: if the place already has something with that name, the move stops.
 
-**Delete** asks first, then moves the file, or the folder with everything in it, to the trash folder in the app's data folder. The question says where that is (for example `~/.naget-agent/trash`). To get something back, show dotfiles, open that folder in the tree and move it out: its name starts with the date and time it was deleted.
+### Duplicate and copy
 
-- Your home folder and the top folder (`/`) can't be deleted.
-- Something on another disk than the app's data folder can't move to the trash, so it is deleted for good.
+- **Duplicate** makes a copy beside it, named with "copy" after the name (`report copy.pdf`, then `report copy 2.pdf`).
+- **Copy to** copies into another folder, picked as for **Move to**. If the name is taken there, the copy is named the same way. **Show** on the message opens that folder.
+
+### Delete and put back
+
+**Delete** moves the file, or the folder with everything in it, to the trash at once, and a message says so with **Undo**. Nothing is lost until you empty the trash.
+
+**Trash**, among the places, lists what you deleted, the last first: each with where it was, when it went and its size.
+
+- **Put back** returns it to where it was. If something else took its place since, it comes back beside it with "copy" after its name. Things deleted before the app kept where they came from ask for a folder instead.
+- Its **More** (⋯) has **Put it in another folder** and **Delete for good**.
+- **Empty the trash** deletes everything in it for good, once you say so.
+
+The trash is a folder in the app's data folder (for example `~/.naget-agent/trash`); its page says where. Your home folder and the top folder (`/`) can't be deleted. Something on another disk than the app's data folder can't go to the trash: the app asks "Delete … for good?" first.
+
+### Download
+
+A file downloads as itself. A folder, or several things picked together, download as one .zip file, made as it downloads. A .zip leaves out `.git` and `node_modules` folders, and holds up to 4 GB and 65,000 files.
+
+## Add files to a space
+
+A space keeps a project's files in its folder, and can work with other folders of yours where they are (see [Spaces and knowledge](/guide/spaces)). To add to one:
+
+1. Open the menu of a file or folder (or pick several), and click **Add to a space**.
+2. Pick the space, or **New space** to make one for them first.
+
+A file is copied into the space's folder. A folder isn't copied: it joins the folders the space works with, where it is. A message says what was added, with **Show**, which opens the space's **Files** tab. Something already in the space stays as it is.
+
+**Add to a space** is also in a file's **More** (⋯) in the editor, in the window a file opens in over a session, on the cards of files an agent handed you, and on pictures an agent made.
+
+Sessions you start in the space then find the files there: each is told what the space's folder holds and which other folders it works with.
+
+## Start a session with files
+
+To have a new session start with some files:
+
+1. Open the menu of a file (or pick several) and click **Start a session with it** (or **Start a session**, on the bar of what is picked).
+2. The start page opens with them in the message box, each marked "on this computer". Remove one with its ✕, add files from your device with the paperclip, pick the agent and folder as usual.
+3. Type what to do with them and press **Start**.
+
+Nothing is uploaded: the message names each file by its path, so the agent opens it where it is, and pictures (PNG, JPEG, GIF and WebP up to 5 MB) also go to the model to look at. Up to 20 files go with one message.
+
+For a folder, **New session in this folder** opens the start page with the session set to work in it.
+
+**Start a session with it** is also in a file's **More** (⋯) in the editor, in the window a file opens in over a session, on the cards of files an agent handed you, and on pictures an agent made.
 
 ## Upload files and folders
 
-- **Upload files** at the top of the tree uploads into the root folder. A row's menu has **Upload files here** and **Upload a folder here**.
-- On a computer, drag files or whole folders from your desktop onto a folder in the tree, or onto the empty part of the tree to upload into the root ("Drop files or folders on a folder to upload"). Empty folders come along too.
+- **New** → **Upload files** or **Upload a folder** uploads into the folder you are in. On a phone, the **+** button → **Upload files** picks files or photos from the phone.
+- On a computer, drag files or whole folders from your desktop onto the folder, onto a folder in it, or onto a place ("Drop files here to upload them"). Empty folders come along too.
 
 Uploads show in the **Uploads** panel at the bottom right: how much has gone, file by file. **Cancel** stops one, and ✕ clears a finished one from the panel. Big files go up in 32 MB pieces.
 
@@ -93,7 +186,7 @@ Before anything is sent, the app checks for files with the same names in that fo
 
 ## Open and edit a file
 
-Click a file in the tree. It opens in the editor, in a tab of its own. The last 12 files you opened stay as tabs: click one to go back to it, and close it with its ✕ or a middle click.
+Click a file in the folder. It opens in the editor, in a tab of its own. The first tab goes back to the folder (or the search, the recent files or the trash) you opened it from. The last 12 files you opened stay as tabs: click one to go back to it, and close it with its ✕ or a middle click. **Recent files**, among the places, lists the ones you opened lately.
 
 The editor numbers the lines, colours the text by the file's language, matches brackets and, on a computer, folds blocks and suggests completions as you type. Tab indents.
 
@@ -109,11 +202,12 @@ On a computer, the bar above the file shows its path and these buttons:
 - **Word wrap**: wraps long lines instead of scrolling sideways. The choice is remembered.
 - **Terminal in this folder**: a new shell in the file's folder.
 - **Download**.
+- **More** (⋯): **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**.
 - **Save**.
 
 To find text in the file, press Ctrl+F (⌘F on a Mac) while the cursor is in it: a find bar opens at the top, with replace.
 
-On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Save** (once you change something) and **More** (⋯), which holds **Find**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder** and **Download**. Phones wrap long lines unless you turn **Word wrap** off.
+On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Save** (once you change something) and **More** (⋯), which holds **Find**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
 
 ### When the file changes while you have it open
 
@@ -161,25 +255,29 @@ A video opens in the app's own player, which fills the viewer:
 
 ## Find a file by name
 
-Press Ctrl+P (⌘P on a Mac) on any page. "Go to file in …" searches the Files page's root folder by name: type a few letters of the name in order (`invq3` finds `invoices/q3-report.xlsx`). Files whose own name holds what you typed come first. Move with ↑ and ↓, open with Enter or a click. It lists up to 60 files, hidden ones included.
+Press Ctrl+P (⌘P on a Mac) on any page. "Go to file in …" searches the folder open in Files by name: type a few letters of the name in order (`invq3` finds `invoices/q3-report.xlsx`). Files whose own name holds what you typed come first. Move with ↑ and ↓, open with Enter or a click. It lists up to 60 files, hidden ones included.
 
 The search box (Ctrl+K, ⌘K on a Mac) finds files by name too, from the same folder, once you type two letters.
 
-## Search inside files
+## Search files
 
-Click **Search** above the tree, or go to [Search in files](/search).
+One search finds files by their names and by the text inside them, everywhere under a folder. Type in a folder's **Find in** field and press Enter, or go to [Search in files](/search).
 
-1. Type what to look for in "Search in files". Results come as you type, grouped by file, each with its number of matches.
-2. Click a line to open the file at that line, or a file's name to open it.
+1. Type what to look for in "Search names and the text inside files". Results come as you type.
+2. Under the field, **In** says where it searches: at first the folder you came from. Click it to search somewhere else: a space's folder, a pinned folder, one sessions worked in, your **Home folder**, or any folder you find by name or type the path of.
+3. Narrow it down if you like:
+   - **All kinds of files** picks the kind: **Text and notes**, **Code**, **Data and settings**, **Web pages** or **Notebooks**. Or type names like these in the same menu, separated by commas (`*.md, *.py`); a `!` in front leaves those out (`!dist/**`).
+   - **Hidden files too** searches files and folders whose names start with a dot.
+   - In the field, **Match case** matches capitals exactly (without it, a search in lower case ignores case, and one with a capital letter in it matches case), and **Regular expression** reads what you type as a pattern (`colou?r`) instead of plain text.
 
-Next to the field:
+The results come in two parts:
 
-- **Match case**: matches capitals exactly. Without it, a search in lower case ignores case, and one with a capital letter in it matches case.
-- **Regular expression**: reads what you type as a pattern (`colou?r`) instead of plain text.
+- **Files by that name**: up to 30 files whose names hold what you typed, each with its folder.
+- **Inside files**: the matching lines, grouped by file, each file with its number of matches. Click a line to open the file at that line, or a file's name to open it.
 
-Under it, "Files to include, e.g. *.ts, !dist/**" narrows the search: patterns separated by commas, and a `!` in front leaves those files out.
+Each result's **More** (⋯) has **Show in its folder**, **Start a session with it**, **Add to a space** and the rest of a file's menu.
 
-The search covers the tree's root folder (the line "in …" names it); change the root to search elsewhere. It skips hidden files, files the folder's `.gitignore` leaves out and files over 4 MB. It stops at 50 matches in a file and 1,000 in all ("Showing the first 1000 matches."), or after 15 seconds, and lists the first 30 matching lines of each file.
+The search is in the page's address, so Back and a reload keep it. It skips files the folder's `.gitignore` leaves out and files over 4 MB. It stops at 50 matches in a file and 1,000 in all, or after 15 seconds, and shows the first 30 matching lines of each file. PDF, Word and other documents are found by their names, not the text inside them; for agents to search inside them, add them to [knowledge](/guide/spaces#shared-knowledge-documents-every-session-can-search).
 
 ## Run a Jupyter notebook
 
@@ -418,6 +516,8 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 
 ## Ask an agent
 
+- "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 space."
+- "Which files in ~/code/shop mention the checkout, and what does each do with it?"
 - "Open a pull request for this session's branch, with a title and description written from the commits."
 - "Link https://github.com/acme/site/pull/42 to this session."
 - "Have the checks on this session's pull request passed yet?"

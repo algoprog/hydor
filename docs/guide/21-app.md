@@ -172,7 +172,7 @@ If you have forgotten it, run this on the computer the app runs on, in the app's
 
 ## Where the app keeps its data
 
-The app keeps its own data in one folder, its data folder: `~/.naget-agent` in your home folder (`~/.web-agent` on installs from before version 0.5, or wherever the `DATA_DIR` setting points). The app names it when you delete something on the Files page, since deleted files go to the trash in it. It holds:
+The app keeps its own data in one folder, its data folder: `~/.naget-agent` in your home folder (`~/.web-agent` on installs from before version 0.5, or wherever the `DATA_DIR` setting points). Files you delete on the Files page go to the trash in it; **Trash**, among the Files page's places, says where. It holds:
 
 - the password, as a hash (the password itself is never stored);
 - the database with the session list, search, settings and the app's other records;
@@ -192,7 +192,7 @@ Some choices belong to the browser you make them in, so each device can differ:
 - the language;
 - what Enter does while an agent works;
 - terminal suggestions, the notification sound, and whether this device gets notifications;
-- the Files page's folder and open files;
+- the Files page's folder, open files, recent files, and how folders show (a list or tiles, and their order); pinned folders are kept on the server, the same on every device;
 - files marked **Viewed** when reviewing a branch;
 - whether the "What's new" note was shown.
 

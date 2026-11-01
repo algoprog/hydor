@@ -78,7 +78,28 @@ test('a session in a space is told what it is, where its files go, and its guide
   assert.match(text, /\(Receipts and the yearly return\)/);
   assert.ok(text.includes(a.folder));
   assert.match(text, /# Agent Guidelines\n[\s\S]*## For the space “Taxes 2026”\nAmounts in EUR/);
+  assert.doesNotMatch(text, /In its folder now/, 'an empty folder says nothing');
   assert.deepEqual((await spawnAdditions({ agent: 'claude', key: 'claude:x', cwd: tmp, runId: 'r', resume: false, extra: {} })).instructions, []);
+});
+
+test('a new session in a space is told what its folder holds: the last changed first, folders marked, hidden files left out', async () => {
+  const [a] = spaceViews(db);
+  fs.writeFileSync(path.join(a.folder, 'notes.md'), 'x');
+  fs.mkdirSync(path.join(a.folder, 'Receipts'));
+  fs.writeFileSync(path.join(a.folder, '.secret'), 'x');
+  const old = Date.now() / 1000 - 3600;
+  fs.utimesSync(path.join(a.folder, 'notes.md'), old, old);
+  fs.writeFileSync(path.join(a.folder, 'contract.pdf'), 'x');
+  const text = (await spawnAdditions({ agent: 'codex', key: 'codex:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } })).instructions.join('\n');
+  const line = /In its folder now \(.*?\): (.*)\. Open those/.exec(text)?.[1] ?? '';
+  assert.ok(line.startsWith('contract.pdf, ') || line.startsWith('Receipts/, '), line);
+  assert.ok(line.endsWith('notes.md'), line);
+  assert.ok(line.includes('Receipts/'), line);
+  assert.ok(!line.includes('.secret'), line);
+  for (let i = 0; i < 45; i++) fs.writeFileSync(path.join(a.folder, `f${i}.txt`), 'x');
+  const more = (await spawnAdditions({ agent: 'codex', key: 'codex:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } })).instructions.join('\n');
+  assert.match(more, / … and 8 more\. Open those/);
+  for (const n of fs.readdirSync(a.folder)) fs.rmSync(path.join(a.folder, n), { recursive: true });
 });
 
 test('a group brings spaces together: plain spaces that exist, once; its sessions are told of each and Claude Code works in their folders', async () => {
@@ -104,6 +125,35 @@ test('a group brings spaces together: plain spaces that exist, once; its session
   assert.deepEqual(spaceById(db, all.id)!.members, [taxes.id]);
   assert.equal(updateSpace(db, all.id, { members: [] }).members, undefined);
   for (const s of spaceViews(db).filter((x) => x.name === 'Everything' || x.name === 'Bigger')) deleteSpace(db, s.id);
+});
+
+test('a space can work in a folder you have, and with more folders of yours; Claude Code works in them as in its own', async () => {
+  const shop = fs.mkdtempSync(path.join(tmp, 'shop-'));
+  const papers = fs.mkdtempSync(path.join(tmp, 'papers-'));
+  const notes = fs.mkdtempSync(path.join(tmp, 'notes-'));
+  fs.mkdirSync(path.join(shop, 'src'));
+  // Its own folder (inside it too) and repeats come once or not at all; a folder that isn't there is refused.
+  const sp = createSpace(db, { name: 'Shop', folder: shop, folders: [papers, `${papers}/`, shop, path.join(shop, 'src'), '  '] });
+  assert.equal(sp.folder, shop, 'no new folder is made');
+  assert.deepEqual(sp.folders, [papers]);
+  assert.throws(() => createSpace(db, { name: 'X', folders: [path.join(tmp, 'nowhere')] }), /No folder at/);
+  assert.equal(spaceViews(db).filter((x) => x.name === 'X').length, 0, 'nothing is made when a folder is wrong');
+  const add = await spawnAdditions({ agent: 'claude', key: 'claude:f1', cwd: shop, runId: 'r', resume: false, extra: { space: sp.id } });
+  assert.deepEqual(add.args, ['--add-dir', papers]);
+  assert.match(add.instructions.join('\n'), new RegExp(`It also works with this folder of the user's, where it is: ${papers}\.`));
+  // Changing something else keeps them; a new list replaces them; an empty one clears them.
+  assert.deepEqual(updateSpace(db, sp.id, { description: 'The web shop' }).folders, [papers]);
+  assert.deepEqual(updateSpace(db, sp.id, { folders: [papers, notes] }).folders, [papers, notes]);
+  assert.throws(() => updateSpace(db, sp.id, { folders: 'nope' }), /a list of folders/);
+  // A group's sessions get the folders its spaces work with too.
+  const g = createSpace(db, { name: 'All work', members: [sp.id] });
+  const ga = await spawnAdditions({ agent: 'claude', key: 'claude:g2', cwd: g.folder, runId: 'r', resume: false, extra: { space: g.id } });
+  assert.deepEqual(ga.args, ['--add-dir', shop, '--add-dir', papers, '--add-dir', notes]);
+  assert.match(ga.instructions.join('\n'), /## Shop \(The web shop\)\nIts folder: .*\nIt also works with: /);
+  assert.equal(updateSpace(db, sp.id, { folders: [] }).folders, undefined);
+  deleteSpace(db, g.id);
+  deleteSpace(db, sp.id);
+  assert.ok(fs.existsSync(shop) && fs.existsSync(papers), 'deleting a space leaves the folders alone');
 });
 
 test('deleting a space keeps its folder and sessions', () => {

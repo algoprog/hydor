@@ -1,6 +1,7 @@
 // Spaces: a project's sessions, files, documents, memory, guidelines and assistant together, picked by name
 // on the start page in place of a folder. A space's folder holds its files and is where its sessions work, so
-// its project memory is the folder's (server/memory keys a project by its folder); its knowledge bases are
+// its project memory is the folder's (server/memory keys a project by its folder); it can also work with other
+// folders of yours, where they are (Claude Code works in them as in its own); its knowledge bases are
 // searched by its sessions alone, with the shared ones too unless it leaves them out (server/knowledge/scope.ts);
 // every session started in it (extra.space) gets its guidelines (server/guidelines), and starts as its assistant.
 // A group brings other spaces together: its sessions also get their documents, guidelines and folders (Claude
@@ -9,7 +10,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isGroup, MAX_GROUP, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, type Space, type SpaceView } from '../../shared/spaces.ts';
+import { isGroup, MAX_FOLDERS, MAX_GROUP, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, type Space, type SpaceView } from '../../shared/spaces.ts';
 import { taskRoot } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -66,6 +67,32 @@ function newFolder(db: DB, name: string): string {
   }
 }
 
+const home = (p: string) => p.replace(/^~(?=\/|$)/, process.env.HOME ?? '~');
+const isFolder = (p: string) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The folders it works with besides its own, as given (or kept from `prev`): folders that exist, each once,
+ * not its own folder nor one inside it (its sessions have those already).
+ */
+function foldersOf(b: Record<string, unknown>, prev: Space | undefined, own: string | undefined): string[] | undefined {
+  if (b.folders === undefined) return prev?.folders;
+  if (!Array.isArray(b.folders)) throw new HttpError(400, 'folders: a list of folders');
+  const out: string[] = [];
+  for (const f of b.folders) {
+    const p = path.resolve(home(String(f ?? '').trim()));
+    if (!String(f ?? '').trim() || out.includes(p) || (own && (p === own || p.startsWith(own + path.sep)))) continue;
+    if (!isFolder(p)) throw new HttpError(400, `No folder at ${p}`);
+    out.push(p);
+  }
+  return out.length ? out.slice(0, MAX_FOLDERS) : undefined;
+}
+
 /** A space's fields as given (or kept from `prev`); a new one's colour is the next of the list. */
 function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor = 'blue'): Omit<Space, 'id' | 'createdAt' | 'folder'> {
   const name = b.name !== undefined ? clean(b.name, 60) : (prev?.name ?? '');
@@ -98,12 +125,12 @@ export function createSpace(db: DB, b: Record<string, unknown>): Space {
   tables(db);
   const colors = Object.keys(SPACE_COLORS);
   const f = { ...fields(b, undefined, colors[allSpaces(db).length % colors.length]), members: membersOf(db, b, undefined) };
-  let folder: string;
-  if (typeof b.folder === 'string' && b.folder.trim()) {
-    folder = path.resolve(b.folder.trim().replace(/^~(?=\/|$)/, process.env.HOME ?? '~'));
-    if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new HttpError(400, `No folder at ${folder}`);
-  } else folder = newFolder(db, f.name);
-  const s: Space = { id: `sp${crypto.randomBytes(5).toString('hex')}`, ...f, folder, createdAt: Date.now() };
+  const given = typeof b.folder === 'string' && b.folder.trim() ? path.resolve(home(b.folder.trim())) : null;
+  if (given && !isFolder(given)) throw new HttpError(400, `No folder at ${given}`);
+  // The others are checked before a new folder is made for it.
+  const folders = foldersOf(b, undefined, given ?? undefined);
+  const folder = given ?? newFolder(db, f.name);
+  const s: Space = { id: `sp${crypto.randomBytes(5).toString('hex')}`, ...f, folder, ...(folders ? { folders } : {}), createdAt: Date.now() };
   if (!s.members) delete s.members;
   db.prepare('insert into spaces (id, data, created_at) values (?, ?, ?)').run(s.id, JSON.stringify(s), s.createdAt);
   return s;
@@ -112,9 +139,10 @@ export function createSpace(db: DB, b: Record<string, unknown>): Space {
 export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Space {
   const prev = spaceById(db, id);
   if (!prev) throw new HttpError(404, 'No such space');
-  const { sharedKnowledge: _was, members: _had, ...kept } = prev;
+  const { sharedKnowledge: _was, members: _had, folders: _also, ...kept } = prev;
   const members = membersOf(db, b, prev);
-  const next: Space = { ...kept, ...fields(b, prev), ...(members ? { members } : {}) };
+  const folders = foldersOf(b, prev, prev.folder);
+  const next: Space = { ...kept, ...fields(b, prev), ...(members ? { members } : {}), ...(folders ? { folders } : {}) };
   db.prepare('update spaces set data = ? where id = ?').run(JSON.stringify(next), id);
   return next;
 }
@@ -136,15 +164,49 @@ export function membersNow(db: DB, s: Space): Space[] {
   return (s.members ?? []).map((id) => spaceById(db, id)).filter((x): x is Space => !!x);
 }
 
+/** Most of a space's files a new session is told of by name. */
+const GLANCE = 40;
+
+/**
+ * What a space's folder holds, at its top, for a new session: "contract.pdf, notes.md, Receipts/ (folder) …
+ * and 12 more", the last changed first. Hidden files are left out; null when there is nothing.
+ */
+export function folderGlance(dir: string): string | null {
+  let list: fs.Dirent[];
+  try {
+    list = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.name.startsWith('.'));
+  } catch {
+    return null;
+  }
+  if (!list.length) return null;
+  const when = (e: fs.Dirent) => {
+    try {
+      return fs.statSync(path.join(dir, e.name)).mtimeMs;
+    } catch {
+      return 0;
+    }
+  };
+  const named = list
+    .map((e) => ({ e, t: when(e) }))
+    .sort((a, b) => b.t - a.t)
+    .slice(0, GLANCE)
+    .map(({ e }) => (e.isDirectory() ? `${e.name}/` : e.name));
+  return named.join(', ') + (list.length > GLANCE ? ` … and ${list.length - GLANCE} more` : '');
+}
+
 /**
  * What a session in a space is told; in a group, of each space it brings together too. The space's own
  * guidelines come with the user's other Agent Guidelines (server/guidelines), the most general first.
+ * `glance`: what its folder holds now (folderGlance), files the user added to the space among them.
  */
-export function spaceInstructions(s: Space, members: Space[] = []): string {
+export function spaceInstructions(s: Space, members: Space[] = [], glance?: string | null): string {
   const lines = [
     `# Space: ${s.name}`,
     `The user keeps this work in a space of its own, "${s.name}"${s.description ? ` (${s.description})` : ''}: its sessions, files, memory and guidelines belong together. Its folder, ${s.folder}, holds the space's files: keep what you make for it there.`,
   ];
+  if (glance) lines.push('', `In its folder now (the last changed first; the user adds files to the space there): ${glance}. Open those the task needs.`);
+  if (s.folders?.length)
+    lines.push('', `It also works with ${s.folders.length === 1 ? 'this folder' : 'these folders'} of the user's, where ${s.folders.length === 1 ? 'it is' : 'they are'}: ${s.folders.join(', ')}. They belong to the space too: use them as the task needs.`);
   if (members.length) {
     lines.push(
       '',
@@ -152,6 +214,7 @@ export function spaceInstructions(s: Space, members: Space[] = []): string {
     );
     for (const m of members) {
       lines.push('', `## ${m.name}${m.description ? ` (${m.description})` : ''}`, `Its folder: ${m.folder}`);
+      if (m.folders?.length) lines.push(`It also works with: ${m.folders.join(', ')}`);
       if (m.instructions) lines.push(m.instructions);
     }
   }
@@ -192,8 +255,8 @@ export const spaces: Feature = {
     const sp = typeof s.extra.space === 'string' ? spaceById(d.db, s.extra.space) : null;
     if (!sp) return undefined;
     const members = membersNow(d.db, sp);
-    // Claude Code works in the folders of the spaces a group brings together as in its own.
-    const dirs = s.agent === 'claude' ? members.map((m) => m.folder).filter((f) => fs.existsSync(f)) : [];
-    return { instructions: [spaceInstructions(sp, members)], ...(dirs.length ? { args: dirs.flatMap((f) => ['--add-dir', f]) } : {}) };
+    // Claude Code works in the space's other folders, and those of the spaces a group brings together, as in its own.
+    const dirs = s.agent === 'claude' ? [...new Set([...(sp.folders ?? []), ...members.flatMap((m) => [m.folder, ...(m.folders ?? [])])])].filter((f) => f !== sp.folder && fs.existsSync(f)) : [];
+    return { instructions: [spaceInstructions(sp, members, folderGlance(sp.folder))], ...(dirs.length ? { args: dirs.flatMap((f) => ['--add-dir', f]) } : {}) };
   },
 };

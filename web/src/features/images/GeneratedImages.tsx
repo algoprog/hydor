@@ -10,6 +10,7 @@ import { mu } from '../../lib/machine';
 import { go, showInFiles } from '../../lib/nav';
 import { Button, cx, IconButton } from '../../components/ui';
 import { download } from '../documents/FileCards';
+import { FileMore } from '../files/SpaceMenu';
 
 interface Pic {
   path: string;
@@ -103,6 +104,7 @@ export function GeneratedImages({ item }: { item: ToolItem; sessionKey: string }
                 <IconButton label="Download" size="sm" onClick={() => download(p.path)} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white">
                   <Download size={14} />
                 </IconButton>
+                <FileMore path={p.path} inFiles={false} small iconSize={14} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white" />
               </div>
             )}
           </div>

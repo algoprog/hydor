@@ -1,4 +1,4 @@
-import { FileText, X } from 'lucide-react';
+import { FileText, Folder, X } from 'lucide-react';
 import type { Attachment } from '../lib/attachments';
 import { bytes } from '../lib/format';
 import { cx } from './ui';
@@ -37,11 +37,14 @@ export function AttachmentList({ items, onRemove, className }: { items: Attachme
             <Remove name={a.name} onClick={() => onRemove(a)} />
           </div>
         ) : (
-          <div key={a.id} className="relative flex h-14 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-bg-1 pr-3 pl-2.5" title={a.name}>
-            <FileText size={18} className="shrink-0 text-fg-3" />
+          // A file on the host says so: it goes by its path, nothing is uploaded.
+          <div key={a.id} className="relative flex h-14 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-bg-1 pr-3 pl-2.5" title={a.path ?? a.name}>
+            {a.dir ? <Folder size={18} className="shrink-0 text-accent/80" /> : <FileText size={18} className="shrink-0 text-fg-3" />}
             <span className="min-w-0">
-              <span className="block truncate text-[12.5px] font-medium">{a.name}</span>
-              <span className="block text-[11px] text-fg-3">{bytes(a.size)}</span>
+              <span translate="no" className="block truncate text-[12.5px] font-medium">
+                {a.name}
+              </span>
+              <span className="block truncate text-[11px] text-fg-3">{a.path ? (a.dir ? 'Folder on this computer' : a.size ? `${bytes(a.size)} · on this computer` : 'On this computer') : bytes(a.size)}</span>
             </span>
             <Remove name={a.name} onClick={() => onRemove(a)} />
           </div>

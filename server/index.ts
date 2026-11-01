@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import compress from '@fastify/compress';
@@ -16,6 +17,7 @@ import { kvGet, kvSet, openDb } from './db.ts';
 import { agentBaseEnv } from './env.ts';
 import { ClaudeControl, CodexControl, ensureProbeDir, publicFlow } from './agents/control.ts';
 import * as files from './files.ts';
+import { zipPlan, zipStream } from './zip.ts';
 import { previewItem } from './history/common.ts';
 import { Indexer, searchSessions } from './indexer/index.ts';
 import { SessionManager, type CreateOpts } from './sessions.ts';
@@ -330,6 +332,7 @@ app.post('/api/sessions', async (req) => {
     prompt,
     images: Array.isArray(b.images) ? b.images : [],
     files: Array.isArray(b.files) ? b.files : [],
+    paths: Array.isArray(b.paths) ? b.paths : [],
     model: b.model || undefined,
     effort: b.effort || undefined,
     mode: b.mode || undefined,
@@ -969,7 +972,46 @@ app.put('/api/fs/write', async (req) => {
 });
 app.post('/api/fs/mkdir', async (req) => files.makeDir((req.body as any)?.path));
 app.post('/api/fs/rename', async (req) => files.renamePath((req.body as any)?.from, (req.body as any)?.to));
-app.post('/api/fs/delete', async (req) => files.deletePath((req.body as any)?.path));
+app.post('/api/fs/delete', async (req) => files.deletePath((req.body as any)?.path, { forGood: (req.body as any)?.forGood === true }));
+app.post('/api/fs/copy', async (req) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  return files.copyPath(String(b.from ?? ''), { to: typeof b.to === 'string' ? b.to : undefined, into: typeof b.into === 'string' ? b.into : undefined });
+});
+// The trash: what was deleted, where it came from, putting it back.
+app.get('/api/fs/trash', async () => files.listTrash());
+app.post('/api/fs/trash/restore', async (req) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  return files.restoreFromTrash(String(b.path ?? ''), typeof b.into === 'string' && b.into ? b.into : undefined);
+});
+app.post('/api/fs/trash/delete', async (req) => files.deleteForGood(String(((req.body ?? {}) as Record<string, unknown>).path ?? '')));
+app.post('/api/fs/trash/empty', async () => files.emptyTrash());
+/** Files and folders as one .zip (?path= once for each), made as it downloads; with check=1, whether it can be (its name and size). */
+app.get('/api/fs/zip', async (req, reply) => {
+  const q = req.query as Record<string, string | string[] | undefined>;
+  const list = ([] as string[]).concat(q.path ?? []).slice(0, 500).map((p) => files.resolvePath(p));
+  const { entries, name } = await zipPlan(list);
+  if (q.check === '1') return { name, files: entries.filter((e) => !e.dir).length, bytes: entries.reduce((n, e) => n + e.size, 0) };
+  reply.header('Content-Type', 'application/zip');
+  reply.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+  reply.header('Cache-Control', 'private, no-cache');
+  return reply.send(Readable.from(zipStream(entries)));
+});
+/** The folders pinned in Files, among its places: the same on every device. */
+const filePins = (): string[] => {
+  try {
+    const v = JSON.parse(kvGet(db, 'files.pins') ?? '[]');
+    return Array.isArray(v) ? v.filter((p): p is string => typeof p === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+app.get('/api/fs/pins', async () => ({ pins: filePins() }));
+app.put('/api/fs/pins', async (req) => {
+  const v = ((req.body ?? {}) as Record<string, unknown>).pins;
+  const pins = [...new Set((Array.isArray(v) ? v : []).filter((p): p is string => typeof p === 'string' && p.startsWith('/') && p.length <= 4096))].slice(0, 30);
+  kvSet(db, 'files.pins', JSON.stringify(pins));
+  return { pins };
+});
 app.post('/api/fs/exists', async (req) => ({ existing: await files.existing(((req.body as any)?.paths ?? []).slice(0, 10_000)) }));
 app.get('/api/fs/search', async (req) => {
   const q = req.query as Record<string, string>;
