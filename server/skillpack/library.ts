@@ -1,7 +1,8 @@
 // The skill library's folders: the skills that come with the app (skills/ in its folder), the ones the
 // user approved or put there (skills/ in the data folder), and one view of both that every agent
 // reads: a folder of links, one per skill, where a learned skill takes the place of a built-in one of
-// the same name. Claude Code loads the view as a plugin (--plugin-dir), Codex as an extra skills
+// the same name. A space's sessions read a view of their own, with the space's skills too
+// (spaceSkills.ts). Claude Code loads the view as a plugin (--plugin-dir), Codex as an extra skills
 // folder (skills/extraRoots/set) and Custom from its skills list (NAGET_SKILL_DIRS). Nothing is written
 // into the user's ~/.claude or ~/.codex.
 import fs from 'node:fs';
@@ -32,6 +33,8 @@ export const setFolders = (f: Folders) => {
 };
 /** The folder of links agents read skills from. */
 export const viewSkills = () => path.join(roots.view, 'skills');
+/** The plugin folder a space's sessions get instead: the library's skills with the space's own. */
+export const spaceViewRoot = (id: string) => path.join(path.dirname(roots.view), 'spaces', id);
 
 // ---- SKILL.md ------------------------------------------------------------------------------------
 
@@ -50,6 +53,27 @@ export function composeSkill(p: { name: string; description: string; triggers?: 
   return `${head.join('\n')}\n${p.body.replace(/^\s*\n/, '').trimEnd()}\n`;
 }
 
+/** Longest SKILL.md the library takes: longer guides belong in reference files. */
+export const MAX_SKILL = 20_000;
+
+/** "Release notes" → release-notes. */
+export const slug = (s: string) =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+
+/** Throws, in words for whoever wrote it, when a SKILL.md cannot be saved as the skill `name`. */
+export function checkText(name: string, text: string) {
+  const fm = parseSkill(text);
+  if (fm.name !== name) throw new Error(`The skill's frontmatter must keep name: ${name}.`);
+  if (!fm.description || fm.description.length < 10) throw new Error('The skill needs a description that says when to use it.');
+  if (fm.body.trim().length < 40) throw new Error('The skill needs more than that: the steps or advice someone would follow.');
+  if (text.length > MAX_SKILL) throw new Error(`That is ${text.length.toLocaleString('en')} characters; a skill holds at most ${MAX_SKILL.toLocaleString('en')}. Keep the main steps and cut the rest.`);
+}
+
 // ---- the folders ---------------------------------------------------------------------------------
 
 export interface FolderSkill {
@@ -59,8 +83,8 @@ export interface FolderSkill {
   description: string;
   triggers: string[];
   file: string;
-  /** own: the user's or the project's own folders. */
-  source: SkillSource | 'own';
+  /** own: the user's or the project's own folders; space: a space's own skills. */
+  source: SkillSource | 'own' | 'space';
   mtime: number;
 }
 
@@ -87,14 +111,14 @@ export function folderSkills(root: string, source: FolderSkill['source']): Folde
 
 /**
  * The skills Custom sees from a folder, in the order its skills list takes them (the project's, the
- * user's, then the library's through the view): the first of a name wins.
+ * user's, then the library's through the view, or through `view`, a space's): the first of a name wins.
  */
-export function visibleSkills(cwd: string): FolderSkill[] {
+export function visibleSkills(cwd: string, view?: string): FolderSkill[] {
   const home = os.homedir();
   const own = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
   const seen = new Set<string>();
   const out: FolderSkill[] = [];
-  const lib = librarySkills().map((s) => ({ ...s, file: path.join(viewSkills(), s.dir, 'SKILL.md') }));
+  const lib = view ? folderSkills(view, 'space') : librarySkills().map((s) => ({ ...s, file: path.join(viewSkills(), s.dir, 'SKILL.md') }));
   for (const s of [...own.flatMap((d) => folderSkills(d, 'own')), ...lib]) {
     if (seen.has(s.name)) continue;
     seen.add(s.name);
@@ -159,22 +183,27 @@ export function removeLearned(name: string) {
   syncView();
 }
 
+/** The library's skills by folder name, each linked to its learned folder or else its built-in one. */
+function libraryLinks(): Map<string, string> {
+  const want = new Map<string, string>();
+  for (const s of folderSkills(roots.bundled, 'bundled')) want.set(s.dir, path.join(roots.bundled, s.dir));
+  for (const s of folderSkills(roots.learned, 'learned')) want.set(s.dir, path.join(roots.learned, s.dir));
+  return want;
+}
+
 /**
- * Brings the view up to date: a link per skill, to its learned folder or else its built-in one, and
- * the plugin's manifest. Only links are added or removed there; anything else is left alone.
+ * Brings a view up to date: a link per skill of `want` (folder name → the folder it links to), and the
+ * plugin's manifest. Only links are added or removed there; anything else is left alone.
  */
-export function syncView() {
-  const dir = viewSkills();
+function syncLinks(root: string, want: Map<string, string>, description: string) {
+  const dir = path.join(root, 'skills');
   fs.mkdirSync(dir, { recursive: true });
-  const manifest = path.join(roots.view, '.claude-plugin', 'plugin.json');
-  const meta = JSON.stringify({ name: 'naget', description: 'Skills that come with Naget Agent, and the ones you approved in it.' }, null, 2) + '\n';
+  const manifest = path.join(root, '.claude-plugin', 'plugin.json');
+  const meta = JSON.stringify({ name: 'naget', description }, null, 2) + '\n';
   if (readOr(manifest) !== meta) {
     fs.mkdirSync(path.dirname(manifest), { recursive: true });
     fs.writeFileSync(manifest, meta);
   }
-  const want = new Map<string, string>();
-  for (const s of folderSkills(roots.bundled, 'bundled')) want.set(s.dir, path.join(roots.bundled, s.dir));
-  for (const s of folderSkills(roots.learned, 'learned')) want.set(s.dir, path.join(roots.learned, s.dir));
   for (const n of fs.readdirSync(dir)) {
     const p = path.join(dir, n);
     try {
@@ -193,4 +222,22 @@ export function syncView() {
       }
     }
   }
+}
+
+/** Brings the view every agent reads up to date: a link per skill, to its learned folder or else its built-in one. */
+export function syncView() {
+  syncLinks(roots.view, libraryLinks(), 'Skills that come with Naget Agent, and the ones you approved in it.');
+}
+
+/**
+ * Brings the view of a space's sessions up to date and returns its plugin folder: the library's skills,
+ * with those in `extra` folders of skills (the space's own first, then those of the spaces a group brings
+ * together) in place of any of the same name. Still a plugin named "naget", so skills keep their names.
+ */
+export function syncSpaceView(id: string, extra: string[]): string {
+  const want = libraryLinks();
+  for (const dir of [...extra].reverse()) for (const s of folderSkills(dir, 'space')) want.set(s.dir, path.join(dir, s.dir));
+  const root = spaceViewRoot(id);
+  syncLinks(root, want, 'Skills that come with Naget Agent, the ones you approved in it, and those of a space of yours.');
+  return root;
 }

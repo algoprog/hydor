@@ -1,6 +1,6 @@
 # Skills
 
-Skills are written methods that agents load when a task calls for them: how to research a question, track down a problem, make a Word document or clean up after a task. This topic covers the skill library that comes with the app, the skills agents learn with your approval, keywords that bring a skill in for Custom, and Claude Code's and Codex's own skills.
+Skills are written methods that agents load when a task calls for them: how to research a question, track down a problem, make a Word document or clean up after a task. This topic covers the skill library that comes with the app, the skills agents learn with your approval, a space's own skills, keywords that bring a skill in for Custom, and Claude Code's and Codex's own skills.
 
 ![Settings → Skill library: skills agents learned with your approval, and those that come with the app](images/skills.webp)
 
@@ -10,9 +10,10 @@ A skill is a short guide an agent follows for one kind of work. Each one is a fo
 
 Agents don't read every skill all the time. At the start of a session an agent sees only each skill's name and its "when to use it" line. When a task fits one, it loads that skill and follows it. A greeting, a quick question or a small, clear change needs none.
 
-Skills come from two places in the app:
+Skills come from three places in the app:
 
 - **The skill library**, in [Settings → Skill library](/settings?s=skillpack): the skills that come with the app, and the ones agents learned with your approval. Claude Code, Codex and Custom sessions started from the app all get it.
+- **A space's own skills**, on the space's **Skills** tab: only the sessions started in the space get them, with the library. See [Give a space skills of its own](/guide/spaces#give-a-space-skills-of-its-own).
 - **Claude Code's and Codex's own skills**, in [Settings → Skills](/settings?s=skills): the skills in your own folders and in a project's folder, which those agents read wherever they run.
 
 An assistant can also name skills it favors: when one of them fits the task, the agent loads it before it starts. See [Assistants](/guide/assistants).
@@ -27,6 +28,8 @@ Every Claude Code, Codex and Custom session the app starts gets the skill librar
 
 Sessions started outside the app, in a terminal or in VS Code, don't see the library. Nothing of it is written into your Claude Code or Codex settings.
 
+A session in a space gets the space's own skills in the same plugin, folder or list, with the library's. A space's skill with the name of a library skill takes its place in that space's sessions.
+
 Your own skills and your projects' skills come first. When one of them has the same name as a skill in the library, agents use yours.
 
 Custom reads its skills from several folders, in this order: the project's own skills (in its `.claude/skills` and `.agents/skills` folders), your own skills for Claude Code (`~/.claude/skills`) and Codex (`~/.agents/skills` and `~/.codex/skills`), then the library. Where two skills share a name, the first one found wins. So a skill you write in Settings → Skills, for Claude Code or for Codex, reaches Custom too.
@@ -35,7 +38,7 @@ Custom reads its skills from several folders, in this order: the project's own s
 
 When an agent loads a skill, a small pill shows in the conversation: **Using skill research**, with a spinner while the agent reads it. This works for Claude Code, Codex and Custom alike.
 
-Click the pill to read the skill: what it says, when it applies and its history (see [Read a skill and its history](#read-a-skill-and-its-history)). If the skill isn't part of the app's library, the window says so: it comes from your own or the project's skills folder.
+Click the pill to read the skill: what it says, when it applies and its history (see [Read a skill and its history](#read-a-skill-and-its-history)). If the skill isn't part of the app's library, the window says so: it comes from your own or the project's skills folder. In a space, the pill opens the space's own skill when that is the one the agent used: the window's badge shows the space's name, and **The space's skills** opens its Skills tab.
 
 When your own words brought a skill into a Custom session, the pill says which words did it: "brought in by “research” in your message". See [Bring skills in by keywords](#bring-skills-in-by-keywords).
 
@@ -80,7 +83,7 @@ Built-in skills have no Remove button. You can't delete them, but an agent can p
 
 Click a skill's name in the skill library, or a **Using skill** pill in a conversation. A window opens with:
 
-- the skill's name and a badge: **Built in** or **Learned**;
+- the skill's name and a badge: **Built in**, **Learned**, or the space's name for a space's own skill;
 - when to use it;
 - its keywords, if it has any: "Custom brings it in when you say" and the words;
 - two tabs: **Skill**, the whole guide as the agents read it, and **History**, with the number of changes;
@@ -134,10 +137,13 @@ Below that:
 - Its keywords for Custom, if it has any: "Custom brings it in when you say" and the words.
 - Warnings, if any (see [Warnings on the card](#warnings-on-the-card)).
 - The text, with a switch between **Text** (for a new skill) or **Changes** (for an improvement, line by line) and **Skill** (the guide as it reads), and how many lines it adds and removes.
+- In a space, **Keep it for**: **Every session** or the space's name (see [Skills agents propose in a space](/guide/spaces#skills-agents-propose-in-a-space)).
 
 ### Approve it
 
 Click **Approve**. The skill is saved into your library, and the card says it is in your skill library: every agent can use it. A **Skill library** link takes you there.
+
+With the space's name picked under **Keep it for**, it is saved in the space's skills instead: the card says it is in them, and **The space's skills** takes you there.
 
 Custom has the skill from its next turn; Claude Code and Codex from their next sessions.
 
@@ -181,7 +187,7 @@ A proposal waits in three places, and an answer in any one of them shows everywh
 - At most five proposals from one conversation wait for you at a time.
 - When the agent proposes the same skill again before you answer, the newer proposal takes the older one's place, which shows **Replaced**.
 - If a skill of that name was saved, or the skill changed, after the proposal was made, approving fails with a message. Dismiss it and ask the agent again.
-- Agents can improve only skills in the app's library. Skills in your own folders or a project's are not changed this way: edit those in [Settings → Skills](/settings?s=skills).
+- Agents can improve only skills in the app's library and a space's own skills. Skills in your own folders or a project's are not changed this way: edit those in [Settings → Skills](/settings?s=skills).
 - Answered proposals stay on their cards in old conversations for half a year.
 
 ## Your version of a built-in skill
@@ -265,4 +271,5 @@ The app makes the skill's folder and its SKILL.md, with the name, your line and 
 - "Show me what changed in the research skill since I approved it."
 - "Remove the learned skill release-notes", or "Bring back the skill I removed yesterday."
 - "Turn off bringing skills in by keywords for Custom."
+- "Which skills does my Thesis space have of its own, and how often were they used?"
 - "List Claude Code's skills for ~/projects/shop and turn off the one called deploy."

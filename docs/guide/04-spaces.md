@@ -1,6 +1,6 @@
 # Spaces and knowledge
 
-A space keeps one project together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using spaces and groups of spaces, and adding, searching and managing the documents agents search.
+A space keeps one project together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows, skills of its own and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using spaces and groups of spaces, giving a space skills of its own, and adding, searching and managing the documents agents search.
 
 ![The Spaces page: each project’s sessions, documents and guidelines in one place](images/spaces.webp)
 
@@ -10,6 +10,7 @@ A space is a project with everything that belongs to it, like Projects in ChatGP
 
 - **works in the space's folder**. The agent is told that this folder holds the space's files, what is in it now (the last changed first), and to keep what it makes for the space there. It also works with the other folders the space works with, where they are: Claude Code works in them as in its own folder, and other agents are told where they are;
 - **follows the space's guidelines**: what every agent in the space should know, such as who the work is for, how to work and what to keep in mind (see [Agent Guidelines](/guide/guidelines));
+- **gets the space's own skills** with your skill library: written methods for how its work is done, which agents load when a task calls for them (see [Give a space skills of its own](#give-a-space-skills-of-its-own));
 - **starts as the space's assistant**, when the space has one (see [Assistants](/guide/assistants));
 - **remembers what earlier sessions in the space learned**: agents keep notes about a project by its folder, so the sessions of a space share them (see [Memory](/guide/memory));
 - **searches the space's own documents**, and the shared knowledge too unless the space turns that off (see [Which sessions search which knowledge](#which-sessions-search-which-knowledge)).
@@ -46,7 +47,7 @@ Click a card to open the space's own page. With no spaces yet, the page says wha
 
 Unless you picked a folder you have, the app makes the space a folder of its own, named after it, in a **Spaces** folder where task folders go: "Taxes 2026" gets `~/Naget/Spaces/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/assistants#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Spaces page, the new space's page opens. Made from the start page, the new space is picked for the session you are about to start.
 
-Two more things are set on the space's **Settings** tab afterwards: the assistant its sessions start as, and the spaces it brings together. Its documents go on its **Knowledge** tab, and more folders on its **Files** tab.
+Two more things are set on the space's **Settings** tab afterwards: the assistant its sessions start as, and the spaces it brings together. Its documents go on its **Knowledge** tab, its skills on its **Skills** tab, and more folders on its **Files** tab.
 
 ### A space for a folder you already have
 
@@ -69,7 +70,7 @@ When the space's folder is a Git repository, the end of the menu offers **New wo
 
 ## A space's own page
 
-Click a space on the Spaces page to open it. At the top are its mark and name, what it is about, and two buttons: **All spaces** goes back to the list (on a phone only its arrow shows), and **New session** starts a session in the space. Below them are four tabs: **Sessions**, **Files**, **Knowledge** and **Settings**; **Sessions** and **Knowledge** have a count.
+Click a space on the Spaces page to open it. At the top are its mark and name, what it is about, and two buttons: **All spaces** goes back to the list (on a phone only its arrow shows), and **New session** starts a session in the space. Below them are five tabs: **Sessions**, **Files**, **Knowledge**, **Skills** and **Settings**. **Sessions**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out to fit.
 
 ### Sessions
 
@@ -78,7 +79,7 @@ Click a space on the Spaces page to open it. At the top are its mark and name, w
 - Next to them, the folder's path.
 - Below, the sessions started in the space, the one at work most recently first, each with its agent's icon, its title and how long ago it was at work. Click one to open it.
 
-With no sessions yet, the tab says that **New session** starts one here, with the space's folder, assistant and guidelines.
+With no sessions yet, the tab says that **New session** starts one here, with the space's folder, assistant, guidelines and skills.
 
 ### Files
 
@@ -95,6 +96,10 @@ To add files from elsewhere, use **Add to a space** on the Files page, in a file
 
 The space's own documents, which only its sessions search, and whether they search the shared knowledge too. See [Give a space documents of its own](#give-a-space-documents-of-its-own).
 
+### Skills
+
+The space's own skills, which only its sessions get, with your skill library. See [Give a space skills of its own](#give-a-space-skills-of-its-own).
+
 ### Settings
 
 Everything about the space itself:
@@ -104,6 +109,45 @@ Everything about the space itself:
 - **Its sessions start as**: **The assistant picked on the start page** (the default: picking the space leaves the start page's assistant as it is), or any of your assistants, built in or your own. Picking the space on the start page then picks that assistant too.
 - The colour dots.
 - **Save**, which turns on once you change something, and **Delete the space**.
+
+## Give a space skills of its own
+
+Skills are written methods that agents load when a task calls for them (see [Skills](/guide/skills)). Your skill library reaches every session; a space can also have skills of its own, which only its sessions get: how its work is done, step by step. "Cite in APA 7 and check every DOI" for a thesis, say, or "ingredients in grams, then numbered steps" for a family cookbook. They are on the space's **Skills** tab.
+
+With none yet, the tab says what they are for, with two buttons:
+
+- **New skill** opens a window with three fields, then **Add the skill**:
+  - **Name**: lowercase words with dashes, such as `citation-style`. Spaces and capitals turn into that when you leave the field. Agents know the skill by this name.
+  - **When to use it**: one line, such as "Use when citing a source in the thesis". Agents see it in every session of the space, and read the rest of the skill only when a task fits.
+  - **The skill**: the steps in order, the checks and the mistakes to avoid, in Markdown.
+- **From the library** lists the skills of your skill library that the space doesn't have yet, with a field to find one by name or by what it is for. Until you type, eight show, and how many more there are. Pick one: it is copied into the space with its other files (examples, scripts), and the window to change it opens. Change it for the space alone: the library's stays as it is for every other session.
+
+A skill needs a name of 2 to 64 characters, a line on when to use it of at least 10 characters, and steps of more than a few words; the whole skill holds at most 20,000 characters. A skill that looks like it holds a password, a key or a token is refused: write where the secret is kept instead.
+
+### The list of a space's skills
+
+Each skill shows as a row: its name, when to use it, how often agents in the space (and in groups that bring it in) used it, and how long ago it was saved. A skill with the name of one in your skill library has the badge **In place of the library's**: the space's sessions get it instead of the library's.
+
+- Click a name to read the skill and its **History** of changes; **Change** at the bottom of that window edits it.
+- The pencil changes it: its name, when to use it and its text. A new name keeps its other files and its history.
+- The bin removes it, after you confirm. The space's sessions stop seeing it, or go back to the library's skill of that name. Removed skills are listed under the list, after **Removed:**: click one to bring it back as it was.
+
+**New skill** and **From the library** stay under the list.
+
+### How agents get them
+
+Every Claude Code, Codex and Custom session started in the space gets its skills together with your skill library: Claude Code in the same plugin named "naget" (naget:citation-style), Codex in the same extra folder of skills, Custom in its list of skills. The agent is also told which skills are the space's own, and to use one when it fits the task. Custom has a skill you add or change from its next turn; Claude Code and Codex from their next session.
+
+The skills are kept in the app's data folder, not in the space's folder, so your files stay as they are. A group's sessions also get the skills of the spaces it brings together (see [What sessions in a group get](#what-sessions-in-a-group-get)).
+
+### Skills agents propose in a space
+
+After a task that took real effort, an agent can propose keeping its method as a skill, or improving one it followed, and you approve, edit or dismiss it (see [Approve, edit or dismiss a proposed skill](/guide/skills#approve-edit-or-dismiss-a-proposed-skill)). When the session is in a space, the card asks where to keep it, under **Keep it for**:
+
+- **Every session**: in your skill library, as outside a space;
+- the space's name: in the space's skills alone. For an improvement to a library skill, the space gets its own version with the change, and the library's stays as it was.
+
+The agent suggests one of the two; you choose before you approve. An improvement to one of the space's own skills has no choice: it stays the space's.
 
 ## Change a space
 
@@ -120,18 +164,20 @@ Deleting a space keeps everything that was in it:
 - **Its folder** and the files in it stay where they are, and so do the folders it worked with.
 - **Its sessions** stay, and no longer belong to a space.
 - **Its documents** move to the shared knowledge, so every session can search them from then on. To keep them apart, move their knowledge base into another space (see [Rename, move, read again or delete a knowledge base](#rename-move-read-again-or-delete-a-knowledge-base)).
+- **Its skills** move to your skill library, so every session gets them from then on. One with the name of a skill the library has already takes the space's name after its own: the Thesis space's `research` becomes `research-thesis`.
 - **What agents remember** about its folder stays: notes belong to the folder, not to the space.
 - It leaves any group it was in. A group left with none of its spaces becomes a plain space.
 
 ## Bring spaces together in a group
 
-A group is a space that brings several spaces together, for work that spans them: "Everything for the thesis" bringing in "Thesis" and "Reading notes", say. It has everything a space has: a name, a folder of its own, guidelines, documents and an assistant. Its sessions also work with every space it brings together.
+A group is a space that brings several spaces together, for work that spans them: "Everything for the thesis" bringing in "Thesis" and "Reading notes", say. It has everything a space has: a name, a folder of its own, guidelines, documents, skills and an assistant. Its sessions also work with every space it brings together.
 
 ### What sessions in a group get
 
 - **The spaces' folders**: Claude Code can work in each of them as in its own folder; other agents are told where each one is. What a session makes goes in the group's own folder, unless you say otherwise.
 - **The spaces' guidelines**: after the group's own, each space's name, what it is about, its folder and its guidelines.
 - **The spaces' documents**: searched together with the group's own documents and the shared knowledge (unless the group turns the shared knowledge off). The agent is told which space each knowledge base comes from.
+- **The spaces' skills**, with the group's own and your skill library. Where two have the same name, the group's own comes first, then that of the space it brought in first.
 - **Memory** comes from the group's own folder. The notes agents kept in each space stay with that space.
 
 ### Make a group
@@ -144,7 +190,7 @@ A group is a space that brings several spaces together, for work that spans them
 
 You can also turn an existing space into a group: on its **Settings** tab, pick spaces under **The spaces it brings together** and click **Save**. Change a group's spaces the same way. Take all of them out and it is a plain space again.
 
-A group's **Knowledge** tab also shows **Also the documents of the spaces it brings together**: each of its spaces, with how many documents it has. Click one to open that space's Knowledge tab.
+A group's **Knowledge** tab also shows **Also the documents of the spaces it brings together**: each of its spaces, with how many documents it has. Click one to open that space's Knowledge tab. Its **Skills** tab shows **Also the skills of the spaces it brings together** the same way.
 
 ### Limits
 
@@ -270,6 +316,8 @@ The knowledge tools never bring up another space's documents, not even when an a
 - "Make a space called Shop for my project in ~/code/shop."
 - "Copy ~/Downloads/contract.pdf into my Taxes 2026 space, and have it work with ~/Documents/Receipts too."
 - "Group my Thesis and Reading notes spaces into one called Everything for the thesis."
+- "Give my Thesis space a skill: cite in APA 7, and check that every DOI resolves before I hand a chapter in."
+- "Copy the writing skill into my Garden space, and change it there to use plain words for children."
 - "Add the folder ~/Documents/Manuals to my shared knowledge."
 - "Move the Contracts knowledge base into the Taxes 2026 space, and stop that space from searching the shared knowledge."
 - "Which knowledge bases do I have, and which documents couldn't be read?"

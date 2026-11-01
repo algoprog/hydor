@@ -36,8 +36,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - Give every agent memory of you and your projects, your documents (knowledge bases it searches and cites),
   your apps and services (connected once), skills, child sessions, and tasks that run on a schedule or when
   something changes
-- Keep each project together in a space, run deep research that ends in a cited report, compare models side by
-  side, and use the app in English, Chinese or Greek
+- Keep each project together in a space, with its own documents, guidelines and skills, run deep research that
+  ends in a cited report, compare models side by side, and use the app in English, Chinese or Greek
 - Write your Agent Guidelines once, for every session, a space or one session, and every agent follows them,
   whichever it is
 - Ask any agent how the app works, from Help or in any session, or have it change a setting or set something up

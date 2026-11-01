@@ -1,25 +1,20 @@
 // A skill in the pages: the chip where an agent loads one ("Using skill research"), the note where
-// your words brought one into Custom's turn, and a dialog to read a skill of the library and its
-// history of changes.
+// your words brought one into Custom's turn, and a dialog to read a skill (of the library, or a space's
+// own) and its history of changes.
 import { useEffect, useState } from 'react';
 import { ChevronRight, History, Sparkles } from 'lucide-react';
-import { parseSkill, skillLoaded, type SkillChange } from '@shared/skillpack';
+import { parseSkill, skillLoaded, type SkillChange, type SkillDoc } from '@shared/skillpack';
 import type { SessionNote } from '@shared/features';
 import type { ToolItem } from '@shared/types';
 import { api, enc } from '../../lib/api';
 import { ago, tildify } from '../../lib/format';
+import { go } from '../../lib/nav';
 import { useApp } from '../../lib/store';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Markdown } from '../../components/Markdown';
 import { Badge, Button, cx, Dialog, Tabs, Throbber } from '../../components/ui';
 
-export interface SkillDoc {
-  name: string;
-  text: string;
-  source: 'bundled' | 'learned';
-  file: string;
-  history: SkillChange[];
-}
+export type { SkillDoc };
 
 const ACTION: Record<SkillChange['action'], string> = { create: 'Saved', update: 'Changed', remove: 'Removed', restore: 'Brought back' };
 
@@ -44,23 +39,28 @@ function Change({ c, first }: { c: SkillChange; first: boolean }) {
   );
 }
 
-/** A skill of the library: what it says, and every change approved for it. */
-export function SkillDialog({ name, onClose, history }: { name: string; onClose: () => void; history?: boolean }) {
+/**
+ * A skill: what it says, and every change approved for it. The library's, a space's own (`space`, its
+ * id), or the one a session's agent read (`sessionKey`: in a space, its own before the library's).
+ * `onChange`: a button to change a space's skill.
+ */
+export function SkillDialog({ name, onClose, history, space, sessionKey, onChange }: { name: string; onClose: () => void; history?: boolean; space?: string; sessionKey?: string; onChange?: () => void }) {
   const home = useApp((s) => s.boot?.home);
   const [doc, setDoc] = useState<SkillDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'skill' | 'history'>(history ? 'history' : 'skill');
   useEffect(() => {
     let alive = true;
-    api<SkillDoc>(`/api/skillpack/skills/${enc(name)}`).then(
+    api<SkillDoc>(space ? `/api/spaces/${enc(space)}/skills/${enc(name)}` : `/api/skillpack/skills/${enc(name)}${sessionKey ? `?key=${enc(sessionKey)}` : ''}`).then(
       (d) => alive && setDoc(d),
       (e: Error) => alive && setError(e.message),
     );
     return () => {
       alive = false;
     };
-  }, [name]);
+  }, [name, space, sessionKey]);
   const fm = doc ? parseSkill(doc.text) : null;
+  const ofSpace = doc?.source === 'space' ? doc.space : undefined;
   return (
     <Dialog
       open
@@ -70,10 +70,28 @@ export function SkillDialog({ name, onClose, history }: { name: string; onClose:
         <span className="flex items-center gap-2">
           <Sparkles size={16} className="shrink-0 text-accent" />
           <span className="truncate">{name}</span>
-          {doc && <Badge tone={doc.source === 'learned' ? 'ok' : 'neutral'}>{doc.source === 'learned' ? 'Learned' : 'Built in'}</Badge>}
+          {doc && (
+            <Badge tone={doc.source === 'bundled' ? 'neutral' : doc.source === 'learned' ? 'ok' : 'info'}>
+              {ofSpace ? <span translate="no">{ofSpace.name}</span> : doc.source === 'learned' ? 'Learned' : 'Built in'}
+            </Badge>
+          )}
         </span>
       }
-      footer={<Button onClick={onClose}>Close</Button>}
+      footer={
+        <>
+          {ofSpace && onChange && (
+            <Button variant="ghost" onClick={onChange}>
+              Change
+            </Button>
+          )}
+          {ofSpace && !onChange && (
+            <Button variant="ghost" onClick={() => (onClose(), go(`/spaces/${ofSpace.id}/skills`))}>
+              The space’s skills
+            </Button>
+          )}
+          <Button onClick={onClose}>Close</Button>
+        </>
+      }
     >
       {error ? (
         <p className="py-3 text-[13.5px] leading-relaxed text-fg-2">
@@ -108,7 +126,7 @@ export function SkillDialog({ name, onClose, history }: { name: string; onClose:
             </div>
           ) : (
             <p className="flex items-center gap-2 py-2 text-[13px] text-fg-3">
-              <History size={14} /> {doc.source === 'learned' ? 'No changes recorded yet.' : 'Built in, as it came with the app. Changes you approve are saved as your own version.'}
+              <History size={14} /> {doc.source !== 'bundled' ? 'No changes recorded yet.' : 'Built in, as it came with the app. Changes you approve are saved as your own version.'}
             </p>
           )}
           <p className="truncate font-mono text-[11.5px] text-fg-3" title={doc.file}>
@@ -154,28 +172,28 @@ function Pill({ name, why, busy, onOpen }: { name: string; why?: string; busy?: 
   );
 }
 
-/** An agent loaded a skill: Claude Code's Skill tool, Custom's skill tool, a SKILL.md read. */
-export function SkillChip({ item }: { item: ToolItem; sessionKey: string }) {
+/** An agent loaded a skill: Claude Code's Skill tool, Custom's skill tool, a SKILL.md read. In a space, its own may be the one. */
+export function SkillChip({ item, sessionKey }: { item: ToolItem; sessionKey: string }) {
   const [open, setOpen] = useState(false);
   const name = skillLoaded(item.tool) ?? 'a skill';
   const busy = item.tool.status === 'running' || item.tool.status === 'pending';
   return (
     <>
       <Pill name={name} busy={busy} onOpen={() => setOpen(true)} />
-      {open && <SkillDialog name={name} onClose={() => setOpen(false)} />}
+      {open && <SkillDialog name={name} sessionKey={sessionKey} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
 /** Your message used a skill's keywords, so Custom got the skill with it. */
-export function TriggerNote({ note }: { note: SessionNote; sessionKey: string }) {
+export function TriggerNote({ note, sessionKey }: { note: SessionNote; sessionKey: string }) {
   const [open, setOpen] = useState(false);
   const d = (note.data ?? {}) as { skill?: string; trigger?: string };
   if (!d.skill) return null;
   return (
     <>
       <Pill name={d.skill} why={d.trigger ? `brought in by “${d.trigger.replace(/\*$/, '…')}” in your message` : undefined} onOpen={() => setOpen(true)} />
-      {open && <SkillDialog name={d.skill} onClose={() => setOpen(false)} />}
+      {open && <SkillDialog name={d.skill} sessionKey={sessionKey} onClose={() => setOpen(false)} />}
     </>
   );
 }
