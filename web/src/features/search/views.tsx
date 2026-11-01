@@ -10,6 +10,7 @@ import { api, enc } from '../../lib/api';
 import { duration } from '../../lib/format';
 import { Markdown } from '../../components/Markdown';
 import { Badge, cx } from '../../components/ui';
+import { LOCALE } from '../../i18n/locale';
 
 /** The tool's whole answer: a conversation keeps only the start and end of a long one at first. */
 function useFullOutput(item: ToolItem, sessionKey: string, open: boolean): string | undefined {
@@ -88,7 +89,7 @@ function day(d: string): string {
   const t = Date.parse(d.length === 4 ? `${d}-01-01` : d.length === 7 ? `${d}-01` : d);
   if (!Number.isFinite(t)) return d;
   if (d.length === 4) return d;
-  return new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: d.length === 10 ? 'numeric' : undefined, timeZone: 'UTC' });
+  return new Date(t).toLocaleDateString(LOCALE, { year: 'numeric', month: 'short', day: d.length === 10 ? 'numeric' : undefined, timeZone: 'UTC' });
 }
 
 function Results({ p, more }: { p: ParsedSearch; more: boolean }) {

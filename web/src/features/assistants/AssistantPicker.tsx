@@ -97,7 +97,7 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
         label="Assistant"
         open={open}
         onClick={() => setOpen((o) => !o)}
-        title={cur ? `${cur.name}: ${cur.description}` : 'Which assistant this session starts as'}
+        title={cur ? `${cur.name}\n${cur.description}` : 'Which assistant this session starts as'}
         value={
           <span className="inline-flex items-center gap-1.5">
             <AssistantIcon icon={cur?.icon ?? 'sparkles'} size={13} plain className="shrink-0 text-fg-3" />

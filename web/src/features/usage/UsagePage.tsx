@@ -12,6 +12,7 @@ import { StatsBody } from '../stats/StatsPage';
 import { ArenaBoard } from '../arena/ArenaBoard';
 import { LimitBanner, ResetList } from './LimitReset';
 import { RefreshIcon } from '../../components/RefreshIcon';
+import { LOCALE } from '../../i18n/locale';
 
 function WindowRow({ w }: { w: UsageWindow }) {
   const left = w.usedPercent == null ? null : Math.max(0, 100 - w.usedPercent);
@@ -27,7 +28,7 @@ function WindowRow({ w }: { w: UsageWindow }) {
       <Meter percent={w.usedPercent} />
       <div className="mt-1 flex justify-between text-[11.5px] text-fg-3">
         <span>{left == null ? '' : `${pct(left)} left`}</span>
-        <span title={w.resetsAt ? new Date(w.resetsAt).toLocaleString() : ''}>{w.resetsAt ? `resets ${untilText(w.resetsAt)}` : ''}</span>
+        <span title={w.resetsAt ? new Date(w.resetsAt).toLocaleString(LOCALE) : ''}>{w.resetsAt ? `resets ${untilText(w.resetsAt)}` : ''}</span>
       </div>
     </div>
   );
@@ -127,7 +128,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
               </div>
               <Columns
                 label="Tokens per day"
-                data={u.daily.slice(-30).map((d) => ({ key: d.date, value: d.tokens, label: new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }))}
+                data={u.daily.slice(-30).map((d) => ({ key: d.date, value: d.tokens, label: new Date(d.date + 'T00:00:00').toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' }) }))}
                 format={(v) => compact(v, 0)}
                 height={130}
               />

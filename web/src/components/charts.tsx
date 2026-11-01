@@ -2,6 +2,7 @@
 // solid hairline grids, a crosshair tooltip on time series, severity-coloured meters.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { cx } from './ui';
+import { LOCALE } from '../i18n/locale';
 
 function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
@@ -140,7 +141,7 @@ export function TimeSeries({
               <span className="text-fg-3">{s.label}</span>
             </div>
           ))}
-          <div className="mt-0.5 text-[10.5px] text-fg-3">{new Date(times[hover]).toLocaleTimeString()}</div>
+          <div className="mt-0.5 text-[10.5px] text-fg-3">{new Date(times[hover]).toLocaleTimeString(LOCALE)}</div>
         </div>
       )}
     </div>

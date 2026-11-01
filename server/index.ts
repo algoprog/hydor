@@ -60,6 +60,7 @@ import { eventSent, featureContext, inboxItems, registerFeatures, startFeatures 
 import { arenaOf } from '../shared/arena.ts';
 import { startMatch } from './arena/index.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
+import { appWords } from './language/index.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
@@ -1334,17 +1335,25 @@ system.on('sample', (sample) => toSubscribers(SYSTEM_CHANNEL, { t: 'system', sam
 kernels.on('op', (id: string, e: KernelOp) => toSubscribers(`kernel:${id}`, { t: 'kernel', id, e }));
 sessions.on('toast', (t: { level: 'info' | 'error'; text: string }) => broadcast({ t: 'toast', ...t }));
 scheduler.on('changed', () => broadcast({ t: 'tasks' }));
+/** A notice for a phone, in the language the user reads the app in: its status, and its Approve and Deny buttons. */
+function pushed(n: NotifyEvent) {
+  const tr = appWords(db);
+  const a = n.approval;
+  const approval = a && { ...a, title: tr(a.title), approve: { ...a.approve, label: tr(a.approve.label) }, deny: { ...a.deny, label: tr(a.deny.label) } };
+  return { n: { ...n, approval }, t: noticeText(n, tr) };
+}
 sessions.on('notify', (n: NotifyEvent) => {
   broadcast({ t: 'notify', n });
   // A notification shows a title and a body: the session's name, then the status and the reply.
-  push.send({ ...n, ...noticeText(n), url: `/s/${encodeURIComponent(n.key)}`, api: '' }).catch(() => {});
+  const p = pushed(n);
+  push.send({ ...p.n, ...p.t, url: `/s/${encodeURIComponent(n.key)}`, api: '' }).catch(() => {});
 });
 // Other machines' notices come here too, so one device hears from all of them.
 machines.on('notify', (n: NotifyEvent) => {
   broadcast({ t: 'notify', n });
-  const t = noticeText(n);
+  const p = pushed(n);
   // Its Approve and Deny go to that machine, through this server.
-  push.send({ ...n, title: t.title, body: `${n.machine!.name} · ${t.body}`, url: `/m/${n.machine!.id}/s/${encodeURIComponent(n.key)}`, api: `/m/${n.machine!.id}` }).catch(() => {});
+  push.send({ ...p.n, title: p.t.title, body: `${n.machine!.name} · ${p.t.body}`, url: `/m/${n.machine!.id}/s/${encodeURIComponent(n.key)}`, api: `/m/${n.machine!.id}` }).catch(() => {});
 });
 machines.on('changed', () => broadcast({ t: 'machines' }));
 /** A sign-in finished: with a session waiting out a limit, the new account's usage says when it continues. */

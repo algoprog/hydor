@@ -207,7 +207,9 @@ function PageRow({ page }: { page: PageInfo }) {
       <button type="button" onClick={open} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <Letter page={page} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13.5px] leading-5 font-medium text-fg">{page.title}</span>
+          <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
+            {page.title}
+          </span>
           <span className="block truncate text-[12px] leading-4 text-fg-3">
             {ago(page.updatedAt)} · version {page.version}
             {page.storageBytes ? ` · keeps ${bytes(page.storageBytes)}` : ''}

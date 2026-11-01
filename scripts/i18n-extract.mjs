@@ -15,7 +15,7 @@ const files = (dir, re) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (re.test(e.name) && !/-test\.ts$|selftest\.ts$/.test(e.name)) out.push(p);
+      else if (re.test(e.name) && !/-test\.ts$|selftest\.ts$|\.test\.ts$/.test(e.name) && !p.includes(`${path.sep}tests${path.sep}`)) out.push(p);
     }
   };
   walk(dir);
@@ -25,12 +25,17 @@ const files = (dir, re) => {
 /** Where a slash starts a regular expression rather than a division: after these, or at the start. */
 const REGEX_AFTER = new Set(['', '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+', '-', '*', '%', '<', '>', '~', '^', 'return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete', 'void', 'throw', 'instanceof', 'yield', 'await']);
 
-/** The string literals of compiled JavaScript: quoted ones as they are, template literals with {0}, {1}… for their parts. */
-function literals(js) {
+/**
+ * The string literals of compiled JavaScript: quoted ones as they are, template literals with {0}, {1}… for their parts.
+ * `shown` gets the strings a sentence shows as one of its values (`Memory: ${on ? 'on' : 'off'}`): words even when
+ * they are single ones in lowercase, which elsewhere read as keys.
+ */
+function literals(js, shown = []) {
   const out = [];
   let i = 0;
-  let prev = '';
   const n = js.length;
+  // Inside a value of one of the QUIET keys: what goes to an agent or a shell, never shown as it is.
+  let quiet = 0;
   /** An escape at js[i] (its backslash): what it stands for, moving past it. */
   const escape = () => {
     const e = js[i + 1];
@@ -57,71 +62,98 @@ function literals(js) {
     i++;
     let s = '';
     let k = 0;
+    const values = [];
     while (i < n && js[i] !== '`') {
       if (js[i] === '\\') s += escape();
       else if (js[i] === '$' && js[i + 1] === '{') {
         i += 2;
-        expression();
+        code(values);
         s += `{${k++}}`;
       } else s += js[i++];
     }
     i++;
+    if (!quiet && isText(s, true)) shown.push(...values);
     return s;
   };
-  /** Skips a ${…} part up to its closing brace, with strings and templates inside it. */
-  const expression = () => {
-    let depth = 1;
-    while (i < n && depth) {
+  /**
+   * Reads code from js[i], keeping its strings. `values`: inside a template's ${…} part, read up to its closing
+   * brace the same way as the rest (a regular expression in it holds no string; the strings in it are kept too);
+   * the strings it can come to (`a ? 'x' : 'y'`, `a ?? 'x'`), not those it compares or passes on, go in `values`.
+   */
+  const code = (values) => {
+    const inside = !!values;
+    let prev = '';
+    // The name before the last colon: an object's key, for the value after it.
+    let key = '';
+    let depth = 0;
+    // Brackets and parentheses open in this part: a string in them is an argument or an element, not its value.
+    let nest = 0;
+    // Where a QUIET key's value in brackets (a prompt's lines) began, to speak again after it.
+    const muted = [];
+    while (i < n) {
       const c = js[i];
-      if (c === '"' || c === "'") quoted();
-      else if (c === '`') template();
-      else {
-        if (c === '{') depth++;
-        else if (c === '}') depth--;
+      if (/\s/.test(c)) {
+        i++;
+      } else if (c === '/' && js[i + 1] === '/') {
+        while (i < n && js[i] !== '\n') i++;
+      } else if (c === '/' && js[i + 1] === '*') {
+        const e = js.indexOf('*/', i + 2);
+        i = e < 0 ? n : e + 2;
+      } else if (c === '"' || c === "'") {
+        const s = quoted();
+        if (!quiet && !(prev === ':' && QUIET.has(key))) {
+          out.push(s);
+          if (inside && !depth && !nest && ['', '?', ':', '|', '&'].includes(prev) && !/^\s*([=!]=|[.([])/.test(js.slice(i, i + 4))) values.push(s);
+        }
+        prev = 'str';
+      } else if (c === '`') {
+        const mute = prev === ':' && QUIET.has(key);
+        quiet += mute;
+        const s = template();
+        quiet -= mute;
+        if (!quiet && !mute) out.push(s);
+        prev = 'str';
+      } else if (c === '/' && REGEX_AFTER.has(prev)) {
+        // A regular expression: up to its closing slash (not one in a [class]), then its flags.
+        i++;
+        let cls = false;
+        while (i < n && (js[i] !== '/' || cls)) {
+          if (js[i] === '\\') i++;
+          else if (js[i] === '[') cls = true;
+          else if (js[i] === ']') cls = false;
+          i++;
+        }
+        i++;
+        while (i < n && /[a-z]/.test(js[i])) i++;
+        prev = 'regex';
+      } else if (/[A-Za-z_$0-9]/.test(c)) {
+        let j = i;
+        while (j < n && /[A-Za-z_$0-9]/.test(js[j])) j++;
+        prev = js.slice(i, j);
+        i = j;
+      } else {
+        if (inside && c === '{') depth++;
+        else if (inside && c === '}' && depth-- === 0) {
+          i++;
+          return;
+        } else if (c === '(' || c === '[') {
+          if (prev === ':' && QUIET.has(key)) muted.push(nest), quiet++;
+          nest++;
+        } else if (c === ')' || c === ']') {
+          nest--;
+          if (muted.at(-1) === nest) muted.pop(), quiet--;
+        } else if (c === ':') key = prev;
+        prev = c;
         i++;
       }
     }
   };
-  while (i < n) {
-    const c = js[i];
-    if (/\s/.test(c)) {
-      i++;
-    } else if (c === '/' && js[i + 1] === '/') {
-      while (i < n && js[i] !== '\n') i++;
-    } else if (c === '/' && js[i + 1] === '*') {
-      const e = js.indexOf('*/', i + 2);
-      i = e < 0 ? n : e + 2;
-    } else if (c === '"' || c === "'") {
-      out.push(quoted());
-      prev = 'str';
-    } else if (c === '`') {
-      out.push(template());
-      prev = 'str';
-    } else if (c === '/' && REGEX_AFTER.has(prev)) {
-      // A regular expression: up to its closing slash (not one in a [class]), then its flags.
-      i++;
-      let cls = false;
-      while (i < n && (js[i] !== '/' || cls)) {
-        if (js[i] === '\\') i++;
-        else if (js[i] === '[') cls = true;
-        else if (js[i] === ']') cls = false;
-        i++;
-      }
-      i++;
-      while (i < n && /[a-z]/.test(js[i])) i++;
-      prev = 'regex';
-    } else if (/[A-Za-z_$0-9]/.test(c)) {
-      let j = i;
-      while (j < n && /[A-Za-z_$0-9]/.test(js[j])) j++;
-      prev = js.slice(i, j);
-      i = j;
-    } else {
-      prev = c;
-      i++;
-    }
-  }
+  code();
   return out;
 }
+
+/** Keys whose values go to an agent (a scheduled task's prompt) or a shell (its command), not to the pages. */
+const QUIET = new Set(['prompt', 'command']);
 
 /** Utilities that are bare words. */
 const UTILITIES = /^(flex|grid|block|inline|inline-flex|inline-block|hidden|contents|relative|absolute|fixed|sticky|static|truncate|italic|underline|uppercase|lowercase|capitalize|grow|shrink|border|rounded|shadow|ring|outline|transition|transform|group|peer|container|prose|tnum|ico|isolate|invisible|visible|antialiased|select-none|resize|break-words)$/;
@@ -134,17 +166,28 @@ const CLASSY = /^[!-]?[a-z0-9@&\[\]:._\/()%#,'"=*+>~-]+$/;
  */
 function isText(s, jsx = false) {
   const t = s.replace(/\s+/g, ' ').trim();
-  if (t.length < 2 || t.length > 400 || !/[A-Za-z]/.test(t)) return false;
+  if (t.length < 2 || t.length > 2000 || !/[A-Za-z]/.test(t)) return false;
   const bare = t.replace(/\{\d+\}/g, '');
   if (!/[A-Za-z]{2}/.test(bare)) return false;
   if (/^(https?:|\/|\.\/|#|data:|mailto:)/.test(t) || /:\/\//.test(t)) return false;
   if (/=>|===|!==|&&|\|\||\$\(|\bfunction\b|\breturn\b|^\w+\(|\)\s*\{|@__PURE__|\bjsxs?\(|className:|children:|;\s*(const|let|var|if|for)\b/.test(t)) return false;
   if (/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/.test(t)) return false;
   if (/^(color-mix|translate|rgba?|hsla?|var|calc|url|linear-gradient)\(/.test(t)) return false;
+  // Commands, a browser's name for itself, CSS transitions, and ids made from a word and a value ("ac-{0}").
+  if (/^(curl|df|npm|npx|node|git|sudo|pip|python3?|brew|apt|ssh|uv|docker)\s.*(\s--?[a-zA-Z]|\||\/)/.test(t) || /^Mozilla\/\d/.test(t)) return false;
+  if (/\b(left|top|width|height|opacity|transform)\s+\d+m?s\b/.test(t)) return false;
+  if ((/^[a-z0-9{}\-:._]+$/.test(t) && /[-:.]\{\d+\}|\{\d+\}[-:.]/.test(t)) || /^\{\d+\}[a-z]+\{\d+\}$/.test(t)) return false;
+  // SQL, and a log's lines ("[restore] …").
+  if (/^(select|insert|update|delete|create|drop|alter|pragma|with)\b.*\b(from|into|set|table|index|where|values)\b/i.test(t) || /^\[[a-z-]+\] /.test(t)) return false;
+  if (/^[a-z_.]+ (=|is|<|>|in) [?(\d]|^\{\d+\} (where|and|or) .*[=?]/.test(t)) return false;
   const tokens = bare.split(' ').filter(Boolean);
   // A list of classes (Tailwind's): lowercase tokens, most of them utilities (a dash, colon or bracket inside
-  // them, or a bare utility's name). A sentence ending in "read:" or holding a "re-run" is not one.
-  const utility = (k) => /[-:\[\/](?!$)/.test(k.replace(/[.,;:!?)]+$/, '').replace(/^\(/, '')) || UTILITIES.test(k);
+  // them, a fraction or opacity after a slash, or a bare utility's name). A sentence ending in "read:" or holding
+  // a "re-run" or a "tok/s" is not one.
+  const utility = (k) => {
+    const w = k.replace(/[.,;:!?)]+$/, '').replace(/^\(/, '');
+    return /[-:\[](?!$)/.test(w) || /\/[\d[]/.test(w) || UTILITIES.test(k);
+  };
   if (tokens.every((k) => CLASSY.test(k)) && tokens.filter(utility).length >= Math.ceil(tokens.length / 2) && tokens.some((k) => /[-:\[\/]/.test(k) || UTILITIES.test(k))) return false;
   if (tokens.length === 1) {
     const w = tokens[0];
@@ -229,21 +272,53 @@ for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(p
   if (f.includes(`${path.sep}i18n${path.sep}`)) continue;
   const src = fs.readFileSync(f, 'utf8');
   const js = transformSync(src, { loader: f.endsWith('x') ? 'tsx' : 'ts', jsx: 'automatic', minifyWhitespace: false, legalComments: 'none' }).code;
-  for (const s of literals(js)) add(s, path.relative(ROOT, f));
-  for (const s of sentences(js)) typeof s === 'string' ? add(s, path.relative(ROOT, f), true) : add(s.jsx, path.relative(ROOT, f), true);
+  const where = path.relative(ROOT, f);
+  const shown = [];
+  for (const s of literals(js, shown)) add(s, where);
+  for (const s of shown) add(s, where, true);
+  for (const s of sentences(js)) typeof s === 'string' ? add(s, where, true) : add(s.jsx, where, true);
+  // Counts made with a page's plural(n, 'commit'[, 'commits']) helper: "{0} commit{1}", or each form as a pattern.
+  for (const m of js.matchAll(/\bplural\([^;]*?,\s*(["'])([^"'\n]+)\1\s*(?:,\s*(["'])([^"'\n]+)\3\s*)?\)/g)) {
+    if (m[4]) for (const w of [m[2], m[4]]) add(`{0} ${w}`, where, true);
+    else add(`{0} ${m[2]}{1}`, where, true);
+  }
+  // An element's only text ("utilization", "now"), and words pushed onto a list the page joins: words even when single.
+  for (const m of js.matchAll(/children: ((["'])(?:(?!\2)[^\\]|\\.)*\2)(?=\s*[,}])|\.push\(((["'])(?:(?!\4)[^\\]|\\.)*\4)\)/g)) add(literals(m[1] ?? m[3])[0], where, true);
 }
-// The server's messages that show in the pages: errors (HttpError) and the names and lines of what ships.
+// The server's messages that show in the pages: errors (in toasts), except those its tools give agents, and the
+// names and lines of what ships.
 for (const f of files(path.join(ROOT, 'server'), /\.ts$/)) {
   const src = fs.readFileSync(f, 'utf8');
-  for (const m of src.matchAll(/new HttpError\(\s*\d+\s*,\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, path.relative(ROOT, f));
+  const where = path.relative(ROOT, f);
+  for (const m of src.matchAll(/new HttpError\(\s*\d+\s*,\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
+  if (!/(^|\/)(tools|mcp)\.ts$/.test(where)) for (const m of src.matchAll(/new Error\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
 }
-for (const f of ['server/assistants/builtins.ts', 'server/apps/templates.ts']) {
+// Whole files whose strings the pages show: the search providers, the helper model's choices, the agents' list, and
+// the sessions' notices (a session finished, needs you, failed) and messages.
+for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) => `server/search/${x}.ts`).concat('server/helper.ts', 'server/agents/acp.ts', 'server/sessions.ts')) {
+  const js = transformSync(fs.readFileSync(path.join(ROOT, f), 'utf8'), { loader: 'ts', legalComments: 'none' }).code;
+  for (const s of literals(js)) add(s, f);
+}
+// The names and lines of what ships, and of the choices the server offers (permission modes, the buttons of an approval).
+const NAMED = ['assistants/builtins', 'apps/templates', 'apps/draft', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api'];
+for (const f of NAMED.map((x) => `server/${x}.ts`)) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
-  for (const m of src.matchAll(/\b(name|label|description|placeholder|help|title)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
+  for (const m of src.matchAll(/\b(name|label|description|detail|placeholder|help|title|category)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
 }
 for (const f of fs.readdirSync(path.join(ROOT, 'catalog/connections')).filter((x) => x.endsWith('.json'))) {
   const e = JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog/connections', f), 'utf8'));
-  for (const s of [e.description, ...(e.fields ?? []).flatMap((x) => [x.label, x.help])]) if (typeof s === 'string') add(s, `catalog/connections/${f}`);
+  for (const s of [e.name, e.description, ...(e.fields ?? []).flatMap((x) => [x.label, x.help])]) if (typeof s === 'string') add(s, `catalog/connections/${f}`);
+}
+// The skills that come with the app: what each is for (Settings → Skill library).
+for (const d of fs.readdirSync(path.join(ROOT, 'skills'))) {
+  const md = path.join(ROOT, 'skills', d, 'SKILL.md');
+  const description = fs.existsSync(md) && /^description:\s*(.+)$/m.exec(fs.readFileSync(md, 'utf8'))?.[1];
+  if (description) add(description.replace(/^(["'])(.*)\1$/, '$2'), `skills/${d}/SKILL.md`);
+}
+// The guide's topics that are in English only (the API): their titles show among the translated ones.
+for (const f of fs.readdirSync(path.join(ROOT, 'docs/guide')).filter((x) => x.endsWith('.md') && x !== 'README.md' && !fs.existsSync(path.join(ROOT, 'docs/guide/zh', x)))) {
+  const title = /^# (.+)$/m.exec(fs.readFileSync(path.join(ROOT, 'docs/guide', f), 'utf8'))?.[1];
+  if (title) add(title, `docs/guide/${f}`);
 }
 
 const out = Object.fromEntries([...found.entries()].sort((a, b) => a[0].localeCompare(b[0])));

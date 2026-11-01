@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { CalendarClock, Eye, FlaskConical, Play, RotateCcw, Webhook, type LucideIcon } from 'lucide-react';
 import { OUTCOME_LABEL, TRIGGER_LABEL, type RunStatus, type RunTrigger } from '@shared/automations';
 import { Badge, cx, inputCls } from '../../components/ui';
+import { LOCALE } from '../../i18n/locale';
 
 const TONE: Record<RunStatus, 'ok' | 'err' | 'warn' | 'info' | 'neutral'> = {
   running: 'info',
@@ -53,7 +54,7 @@ export function RunDots({ recent }: { recent?: { status: RunStatus; at: number }
         .slice(0, 6)
         .reverse()
         .map((r, i) => (
-          <span key={i} title={`${OUTCOME_LABEL[r.status]} · ${new Date(r.at).toLocaleString()}`} className={cx('h-[7px] w-[7px] rounded-full', DOT[r.status])} />
+          <span key={i} title={`${OUTCOME_LABEL[r.status]} · ${new Date(r.at).toLocaleString(LOCALE)}`} className={cx('h-[7px] w-[7px] rounded-full', DOT[r.status])} />
         ))}
     </span>
   );
@@ -62,9 +63,9 @@ export function RunDots({ recent }: { recent?: { status: RunStatus; at: number }
 /** "Fri 6 Nov, 09:00", in a time zone (the browser's own when not given). */
 export function localTime(at: number, tz?: string): string {
   try {
-    return new Intl.DateTimeFormat(undefined, { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(at);
+    return new Intl.DateTimeFormat(LOCALE, { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(at);
   } catch {
-    return new Date(at).toLocaleString();
+    return new Date(at).toLocaleString(LOCALE);
   }
 }
 

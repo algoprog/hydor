@@ -9,7 +9,7 @@ import { translator, type Dictionary } from '@shared/translate';
 
 type Dict = Dictionary;
 
-let translate: (s: string) => string | null = () => null;
+let translate: (s: string, split?: boolean) => string | null = () => null;
 
 /** Words the page says rather than shows (hands-free mode), in the user's language when the dictionary has them. */
 export const tr = (s: string) => translate(s) ?? s;
@@ -56,7 +56,7 @@ function onText(node: Text) {
 /** A sentence in pieces (beside an icon, say): whole into its first piece when the dictionary has it, else piece by piece. */
 function onSentence(run: Text[]) {
   for (const k of run) if (!source.has(k)) source.set(k, k.nodeValue ?? '');
-  const t = translate(run.map((k) => source.get(k)!).join(''));
+  const t = translate(run.map((k) => source.get(k)!).join(''), false);
   if (t != null) return run.forEach((k, i) => put(k, i === 0 ? t : ''));
   for (const k of run) {
     const v = source.get(k)!;

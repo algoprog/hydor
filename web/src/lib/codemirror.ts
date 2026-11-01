@@ -26,6 +26,7 @@ import {
   lineNumbers,
   rectangularSelection,
 } from '@codemirror/view';
+import { tr } from '../i18n/runtime';
 
 export interface EditorHandle {
   view: EditorView;
@@ -88,7 +89,13 @@ const panelTheme = EditorView.theme({
   '.cm-panel.cm-search label': { fontSize: '12.5px', color: 'var(--fg-2)' },
   '.cm-panel.cm-search [name=close]': { top: '6px', right: '8px', width: '28px', height: '28px', borderRadius: '8px', color: 'var(--fg-3)', fontSize: '20px', lineHeight: '1' },
 });
-const phrases = EditorState.phrases.of({
+/**
+ * The words CodeMirror draws itself (its search panel, Go to line, folding, completions), as the app writes them,
+ * in the language it is shown in: the page's translation leaves the editor alone.
+ */
+const PHRASES: Record<string, string> = {
+  Find: 'Find',
+  Replace: 'Replace',
   next: 'Next',
   previous: 'Previous',
   all: 'All',
@@ -98,7 +105,25 @@ const phrases = EditorState.phrases.of({
   replace: 'Replace',
   'replace all': 'Replace all',
   close: 'Close',
-});
+  'current match': 'current match',
+  'on line': 'on line',
+  'replaced $ matches': 'replaced $ matches',
+  'replaced match on line $': 'replaced match on line $',
+  'Go to line': 'Go to line',
+  go: 'Go',
+  'folded code': 'folded code',
+  unfold: 'Unfold',
+  'Fold line': 'Fold line',
+  'Unfold line': 'Unfold line',
+  'Folded lines': 'Folded lines',
+  'Unfolded lines': 'Unfolded lines',
+  Completions: 'Completions',
+  Diagnostics: 'Diagnostics',
+  'No diagnostics': 'No diagnostics',
+  'Control character': 'Control character',
+  'Selection deleted': 'Selection deleted',
+};
+const phrases = () => EditorState.phrases.of(Object.fromEntries(Object.entries(PHRASES).map(([k, v]) => [k, tr(v)])));
 
 // Phones: the last line clear of the home bar, and the find bar in three rows big enough to tap (find and
 // its buttons, replace and its buttons, the options) rather than six.
@@ -163,7 +188,7 @@ export async function createEditor(
         lang.of(support ?? []),
         o.phone ? phoneTheme : [],
         panelTheme,
-        phrases,
+        phrases(),
         theme.of(themeExt(o.dark)),
         wrap.of(o.wrap ? EditorView.lineWrapping : []),
         EditorView.updateListener.of((u) => {
@@ -245,6 +270,7 @@ export async function createCellEditor(
     state: EditorState.create({
       doc: o.doc,
       extensions: [
+        phrases(),
         highlightSpecialChars(),
         history(),
         drawSelection(),

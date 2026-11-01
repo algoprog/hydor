@@ -10,6 +10,7 @@ import { openFile } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Button, cx, IconButton, inputCls, Popover, Throbber, useConfirm } from '../../components/ui';
+import { LOCALE } from '../../i18n/locale';
 
 type Apply = (r: GitActionResult, action: string, ok?: string) => void;
 const q = (path: string) => `path=${encodeURIComponent(path)}`;
@@ -357,7 +358,7 @@ function CommitRow({ path, c, authors }: { path: string; c: GitCommit; authors: 
             <>
               {d.message.includes('\n') && <pre className="mb-2 font-sans text-[12.5px] whitespace-pre-wrap text-fg-2">{d.message.split('\n').slice(1).join('\n').trim()}</pre>}
               <div className="text-[12px] text-fg-3">
-                {d.author} · {new Date(d.ts).toLocaleString()} · {d.files.length} file{d.files.length === 1 ? '' : 's'}
+                {d.author} · {new Date(d.ts).toLocaleString(LOCALE)} · {d.files.length} file{d.files.length === 1 ? '' : 's'}
               </div>
               <div className="mt-1.5 space-y-px">
                 {d.files.map((f) => (

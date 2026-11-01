@@ -100,8 +100,10 @@ agents that speak ACP and take MCP servers.
   on this machine; replies can be read aloud. Hands-free mode (the headphones by the message box) is for
   walking: say what you want, and it starts, steers and checks sessions, answers approvals and reads you the
   results, telling you when the session it follows finishes or needs you.
-- **Your language**: the app in English, Chinese (Simplified) or Greek (Settings → General → Language), and
-  agents write to you in it. Translations live in `web/src/i18n`: `npm run i18n:extract` lists every string.
+- **Your language**: the app in English, Chinese (Simplified) or Greek (Settings → General → Language), with
+  dates and times written that way and notifications in it too, and agents write to you in it. Translations
+  live in `web/src/i18n`: `npm run i18n:extract` lists every string, the server's messages and what ships with
+  the app (skills, connections, search providers) included.
 - **Model arena**: under Options, send the same prompt to one or two more models; their answers show side by
   side, you keep the best one and the others are archived. Usage → Arena shows which models win on your own
   tasks, as a rating over the matches you decided.

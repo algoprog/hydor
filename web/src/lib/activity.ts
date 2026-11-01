@@ -1,4 +1,5 @@
 import type { SessionSummary } from '@shared/types';
+import { tr } from '../i18n/runtime';
 
 export interface Activity {
   /** app: run by this console; external: VS Code or a terminal. */
@@ -55,8 +56,9 @@ export async function confirmResume(s: SessionSummary): Promise<boolean> {
   if (s.external) return false;
   const age = Date.now() - (s.updatedAt ?? 0);
   if (age > 15_000 || s.createdByApp) return true;
+  // The browser's own dialog, which the page's translation does not reach.
   return window.confirm(
-    `This session was written to ${Math.max(1, Math.round(age / 1000))} s ago, maybe from VS Code or a terminal. Resuming it here while it runs elsewhere can corrupt its history. Resume anyway?`,
+    tr(`This session was written to ${Math.max(1, Math.round(age / 1000))} s ago, maybe from VS Code or a terminal. Resuming it here while it runs elsewhere can corrupt its history. Resume anyway?`),
   );
 }
 

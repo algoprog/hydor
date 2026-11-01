@@ -3,6 +3,7 @@
 // (a phone in a pocket). Push needs this device's permission and a subscription the server keeps.
 import type { NotifyEvent } from '@shared/types';
 import { noticeText } from '@shared/notice';
+import { tr } from '../i18n/runtime';
 import { api, post } from './api';
 import { machineId, machinePath } from './machine';
 import { ownName } from './machines';
@@ -128,7 +129,7 @@ export function handleNotify(n: NotifyEvent, own = false) {
     useToasts.getState().notice({ key: `${on ?? ''}/${n.key}`, agent: n.agent, kind: n.kind, title: n.title, body: n.body, machine: where, open: () => goFull(path) });
   } else if (!pushOn && 'Notification' in window && Notification.permission === 'granted') {
     // The service worker shows pushed ones; without a subscription the page does it.
-    const t = noticeText(n);
+    const t = noticeText(n, tr);
     const note = new Notification(t.title, { body: where ? `${where} · ${t.body}` : t.body, tag: `${on ?? ''}/${n.key}`, icon: '/icon-192.png?v=3' });
     note.onclick = () => {
       window.focus();

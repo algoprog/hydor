@@ -20,8 +20,12 @@ export function noticeLine(n: { kind: NotifyEvent['kind']; body?: string }): { s
   return { status, detail: n.body && n.body !== status ? n.body : undefined };
 }
 
-/** A notice as a system notification: the session's name as the title, the status first in the body. */
-export function noticeText(n: NotifyEvent): { title: string; body: string } {
+/**
+ * A notice as a system notification: the session's name as the title, the status first in the body. `tr` puts
+ * the app's own words of it in the user's language: the status (a question's "Needs your approval"), and what
+ * went wrong; a reply stays as the agent wrote it.
+ */
+export function noticeText(n: NotifyEvent, tr: (s: string) => string = (s) => s): { title: string; body: string } {
   const { status, detail } = noticeLine(n);
-  return { title: shortTitle(n.title || 'Naget Agent'), body: detail ? `${status} · ${detail}` : status };
+  return { title: shortTitle(n.title || 'Naget Agent'), body: detail ? `${tr(status)} · ${n.kind === 'failed' ? tr(detail) : detail}` : tr(status) };
 }

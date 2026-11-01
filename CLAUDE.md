@@ -43,7 +43,9 @@ rename or remove something users can see or do (a page, a button, a setting or a
    of it; keep them saying what the app does now.
 4. **The search box and translations**: `shared/find-catalog.ts` and the shipped vectors (below; the guide's sections
    are searchable too, so a changed section needs `npm run find:vectors`), and new UI text in `web/src/i18n`
-   (`npm run i18n:extract`, then translate it into Chinese and Greek).
+   (`npm run i18n:extract`, then translate it into Chinese and Greek). Where a page shows what people or agents
+   wrote (names, descriptions, notes, captions), mark it `translate="no"`; write dates and times with `LOCALE`
+   (`web/src/i18n/locale.ts`).
 5. **Release notes** in `CHANGELOG.md` when you make a version (above).
 
 `server/guide/guide-test.ts` fails when a guide link points nowhere, a Settings section is not named in the guide,

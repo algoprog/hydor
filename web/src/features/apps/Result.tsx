@@ -9,6 +9,7 @@ import { duration } from '../../lib/format';
 import { Markdown } from '../../components/Markdown';
 import { cx, Throbber } from '../../components/ui';
 import { money } from './api';
+import { LOCALE } from '../../i18n/locale';
 
 const humanize = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' ');
 
@@ -29,7 +30,7 @@ function Value({ v, type }: { v: unknown; type?: string }) {
   }
   if (type === 'date' && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
     const d = new Date(`${v}T12:00:00`);
-    return <span>{d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>;
+    return <span>{d.toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>;
   }
   if (typeof v === 'number') return <span className="tnum">{v.toLocaleString()}</span>;
   return <span className="whitespace-pre-wrap">{cellText(v)}</span>;

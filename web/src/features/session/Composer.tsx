@@ -257,7 +257,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const modeOn = on.c && on.mode && on.mode !== on.c.defaultMode ? (on.c.modes.find((m) => m.value === on.mode)?.label ?? null) : null;
   const modeNow = on.c?.modes.find((m) => m.value === (on.mode ?? on.c?.defaultMode))?.label;
   const summary = [on.c ? modelLabel(on.c, on.model) : '…', effortOn, modeOn].filter(Boolean).join(' · ');
-  const optionsTitle = [`Model: ${on.c ? modelLabel(on.c, on.model) : '…'}`, `Effort: ${effortOn ?? 'default'}`, modeNow && `Permissions: ${modeNow} (Shift+Tab cycles)`].filter(Boolean).join('\n');
+  const optionsTitle = [`Model: ${on.c ? modelLabel(on.c, on.model) : '…'}`, effortOn ? `Effort: ${effortOn}` : 'Effort: default', modeNow && `Permissions: ${modeNow} (Shift+Tab cycles)`].filter(Boolean).join('\n');
   const compact = async () => {
     const ok = await confirm({ title: 'Compact the conversation?', body: <>The history so far becomes a summary, which frees context. {ctx}% is in use.</>, confirm: 'Compact' });
     if (ok) post(`/api/sessions/${enc(key)}/compact`).then(() => toast('Compacting the conversation…'), toastError);

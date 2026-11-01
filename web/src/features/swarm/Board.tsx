@@ -41,7 +41,9 @@ function MemberRow({ s, stopped, onOpen }: { s: SessionSummary; stopped: boolean
         <StatusDot s={s} className="absolute -right-0.5 -bottom-0.5 ring-2 ring-elevated" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13.5px] text-fg">{s.title}</span>
+        <span translate="no" className="block truncate text-[13.5px] text-fg">
+          {s.title}
+        </span>
         <span className="flex min-w-0 text-[12px] text-fg-3">{a ? <ActivityText s={s} className="min-w-0" /> : <span>{stopped ? 'Stopped' : s.live?.error ? 'Stopped with an error' : 'Finished its turn'}</span>}</span>
       </span>
       <ChevronRight size={15} className="shrink-0 text-fg-3" />

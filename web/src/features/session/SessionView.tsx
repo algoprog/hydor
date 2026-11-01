@@ -24,6 +24,7 @@ import { SessionMenu } from './SessionMenu';
 import { FindBar } from './FindBar';
 import { FeatureDock, sessionPaneOf, type SessionPane } from '../registry';
 import { useSessionShow, type SessionShow } from './show';
+import { LOCALE } from '../../i18n/locale';
 
 function StatusPill({ s }: { s: SessionSummary }) {
   const a = activityOf(s);
@@ -442,7 +443,7 @@ function InfoPanel({ s }: { s: SessionSummary }) {
           {(lv?.effort ?? s.prefs?.effort) && <span className="text-fg-3"> · {lv?.effort ?? s.prefs?.effort} effort</span>}
         </InfoRow>
         {ctx != null && <InfoRow label="Context">{ctx}% of {compact(lv!.contextWindow)} tokens</InfoRow>}
-        <InfoRow label="Started">{s.createdAt ? new Date(s.createdAt).toLocaleString() : '—'}</InfoRow>
+        <InfoRow label="Started">{s.createdAt ? new Date(s.createdAt).toLocaleString(LOCALE) : '—'}</InfoRow>
         <InfoRow label="Last active">{ago(s.updatedAt) || '—'}</InfoRow>
         <InfoRow label="Activity">
           {st.userMessages} prompts · {st.turns} turns · {st.toolCalls.toLocaleString()} tool calls · {st.commands.toLocaleString()} commands

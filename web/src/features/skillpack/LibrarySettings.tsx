@@ -20,12 +20,16 @@ function SkillRow({ s, onOpen, onHistory, onRemove }: { s: LibrarySkill; onOpen:
     <div className="flex items-start gap-3 py-2.5">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <button type="button" onClick={onOpen} className="min-w-0 truncate text-left text-[14px] font-medium hover:underline">
+          <button type="button" onClick={onOpen} translate="no" className="min-w-0 truncate text-left text-[14px] font-medium hover:underline">
             {s.name}
           </button>
           {s.overrides && <Badge tone="info">Your version of a built-in skill</Badge>}
         </div>
-        {s.description && <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">{s.description}</div>}
+        {s.description && (
+          <div translate={s.source === 'learned' ? 'no' : undefined} className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">
+            {s.description}
+          </div>
+        )}
         <div className="mt-1 text-[11.5px] text-fg-3">
           {used(s)}
           {s.updatedAt ? ` · saved ${ago(s.updatedAt)}` : ''}

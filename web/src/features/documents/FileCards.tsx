@@ -62,11 +62,17 @@ function FileCard({ card, stat }: { card: Card; stat: Stat }) {
           <FileIcon path={card.path} />
         )}
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13.5px] leading-5 font-medium text-fg">{name}</span>
+          <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
+            {name}
+          </span>
           <span className="block truncate text-[12px] leading-4 text-fg-3">
             {gone ? 'No longer there' : `${kindLabel(card.path)}${stat?.size != null ? ` · ${bytes(stat.size)}` : ''}`}
           </span>
-          {card.caption && <span className="mt-1 line-clamp-2 block text-[12.5px] leading-snug text-fg-2">{card.caption}</span>}
+          {card.caption && (
+            <span translate="no" className="mt-1 line-clamp-2 block text-[12.5px] leading-snug text-fg-2">
+              {card.caption}
+            </span>
+          )}
         </span>
       </button>
       {!gone && (

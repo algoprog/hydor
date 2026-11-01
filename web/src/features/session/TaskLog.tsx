@@ -5,6 +5,7 @@ import { duration } from '../../lib/format';
 import { toastError } from '../../lib/store';
 import { Button, cx, Dialog, Throbber, useConfirm } from '../../components/ui';
 import { Elapsed } from './items';
+import { LOCALE } from '../../i18n/locale';
 
 /** "Command", "Agent", "Monitor" for the CLI's task types (local_bash, local_agent, …). */
 export function taskKind(kind?: string): string {
@@ -16,7 +17,7 @@ export function taskKind(kind?: string): string {
   return 'Task';
 }
 
-const clock = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const clock = (ts: number) => new Date(ts).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 /** Stops a background task once you say so: a long one's work would end with it. Resolves whether it was stopped. */
 export function useStopTask(sessionKey: string) {

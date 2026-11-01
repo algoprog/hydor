@@ -8,12 +8,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { preferred } from '../../shared/i18n.ts';
+import { noticeText } from '../../shared/notice.ts';
 import { keepsValues, translator } from '../../shared/translate.ts';
 import { APP_ROOT } from '../config.ts';
 import { openDb } from '../db.ts';
 import { registerFeatures, spawnAdditions } from '../features/registry.ts';
 import type { Deps } from '../features/types.ts';
-import { language, userLang } from './index.ts';
+import { appWords, language, userLang } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -52,6 +53,64 @@ test('the translator: whole strings, patterns whose values move, spaces kept, un
   assert.equal(v('Start an agent in any folder on studio-box'), '在studio-box的任意文件夹中启动智能体');
 });
 
+test('the translator leaves what it has no entry for in English, whole, and takes lines and facts one by one', () => {
+  const t = translator({
+    '{0} and {1}': '{0}和{1}',
+    'Use {0}': '使用 {0}',
+    '{0} files': '{0} 个文件',
+    '{0} {1} files': '{0} {1} 个文件',
+    '{0} changed': '{0} 个已更改',
+    '{0} file{1} changed': '{0} 个文件已更改',
+    'Brings together {0}': '组合了 {0}',
+    'Goal: {0}': '目标：{0}',
+    'Excel workbook': 'Excel 工作簿',
+    'Memory: on': '记忆：开启',
+    'Effort: {0}': '思考强度：{0}',
+    High: '高',
+    'up to {0} results': '最多 {0} 条结果',
+    '· next {0}': '· 下次：{0}',
+    'in {0} h{1}': '{0} 小时{1}后',
+    '{0} min': '{0} 分钟',
+    '{0} ago': '{0} 前',
+    'Added {0}': '添加于 {0}',
+    '{0} at {1}': '{0} {1}',
+    Sun: '周日',
+    Wed: '周三',
+  });
+  // A pattern with little fixed text takes a few words, not most of a sentence it sits in (a note, a description).
+  assert.equal(t('Use when a request is big or open-ended and a wrong guess would waste real work'), null);
+  assert.equal(t('General: Help with anything: questions, writing, planning, files'), null);
+  assert.equal(t('Receipts, forms and deadlines for the year'), null);
+  assert.equal(t('The garden and Taxes 2026'), 'The garden和Taxes 2026');
+  assert.equal(t('Use Brave Search'), '使用 Brave Search');
+  // After a label it holds whatever the label names; the surer pattern (more fixed text) goes first.
+  assert.equal(t('Goal: Write a two-page summary of the quarter for the board, with the charts'), '目标：Write a two-page summary of the quarter for the board, with the charts');
+  assert.equal(t('1 file changed'), '1 个文件已更改');
+  // Lines one by one; facts joined by " · " part by part (also as written after a dot); values with numbers, and lists of the app's words.
+  assert.equal(t('Effort: High\nMemory: on'), '思考强度：高\n记忆：开启');
+  assert.equal(t('Excel workbook · 17.6 KB'), 'Excel 工作簿 · 17.6 KB');
+  assert.equal(t('Sun, Wed at 18:00 · next in 2 h 28 min'), '周日, 周三 18:00 · 下次：2 小时 28 分钟后');
+  assert.equal(t('Added 3m ago'), '添加于 3m 前');
+  // A value glued to a word that the translation keeps takes what follows it; fewer loose values win a tie; a value
+  // never spans a " · ".
+  const w = translator({ 'Working{0}': '工作中{0}', ', checked {0}': '，检查于 {0}', '{0}, checked {1}': '{0}，检查频率：{1}', '{0} ago': '{0} 前', 'On{0}': '开启{0}', 'On {0}': '已切换到 {0}', '{0} at {1}': '{0} {1}', '· {0} at once': '· 同时 {0} 个' });
+  assert.equal(w('Working, checked 5m ago'), '工作中，检查于 5m 前');
+  assert.equal(w('On · 4 at once'), '开启 · 同时 4 个');
+  // A value in quotes is a name: as it is, however long.
+  const q = translator({ 'Delete “{0}”?': '删除“{0}”？', Notes: '笔记' });
+  assert.equal(q('Delete “Notes”?'), '删除“Notes”？');
+  assert.equal(q('Delete “Planting calendar for the garden, zone 5b, with frost dates”?'), '删除“Planting calendar for the garden, zone 5b, with frost dates”？');
+  // A sentence the page built from pieces is not split: its pieces go one by one instead.
+  assert.equal(t('Excel workbook · 17.6 KB', false), null);
+  // The first letter matches in either case, and the translation follows the source's case.
+  assert.equal(t('Up to 100 results'), '最多 100 条结果');
+  const el = translator({ On: 'Ενεργό', 'up to {0} results': 'έως {0} αποτελέσματα', 'Pdf files': 'PDF αρχεία' });
+  assert.equal(el('on'), 'ενεργό');
+  assert.equal(el('Up to 30 results'), 'Έως 30 αποτελέσματα');
+  // A translation that starts with an acronym keeps it.
+  assert.equal(el('pdf files'), 'PDF αρχεία');
+});
+
 test('the browser’s language picks one the app has, else English', () => {
   assert.equal(preferred(['el-GR', 'en']), 'el');
   assert.equal(preferred(['zh-CN']), 'zh');
@@ -77,6 +136,20 @@ test('agents are asked to write in the user’s language; English asks nothing',
   assert.deepEqual((await spawnAdditions(info)).instructions, []);
   db.prepare("insert or replace into kv (k, v) values ('ui.language', 'zh')").run();
   assert.match((await spawnAdditions(info)).instructions.join('\n'), /reads this app in Chinese \(Simplified\)\. Write to them in Chinese \(Simplified\)/);
+});
+
+test('what the server says outside the pages (a phone’s notifications) comes in the user’s language', () => {
+  db.prepare("insert or replace into kv (k, v) values ('ui.language', 'en')").run();
+  assert.equal(appWords(db)('Finished'), 'Finished');
+  db.prepare("insert or replace into kv (k, v) values ('ui.language', 'el')").run();
+  const tr = appWords(db);
+  const el = read('el.json');
+  assert.equal(tr('Finished'), el.Finished);
+  assert.equal(tr('Something no dictionary has'), 'Something no dictionary has');
+  // The status in the language; the reply as the agent wrote it.
+  const done = { key: 'claude:k', kind: 'done', title: 'Plan the trip', body: 'Here is the plan.', agent: 'claude', at: 0 } as const;
+  assert.deepEqual(noticeText(done, tr), { title: 'Plan the trip', body: `${el.Finished} · Here is the plan.` });
+  assert.deepEqual(noticeText({ ...done, kind: 'waiting', body: 'Needs your approval' }, tr), { title: 'Plan the trip', body: el['Needs your approval'] });
 });
 
 for (const [name, fn] of tests) {
