@@ -1,6 +1,7 @@
 // What a session has spent, at API prices: the agent's own figure when its transcript has one (Claude
 // Code's cost, Custom's per call), else its tokens at the model's price (server/prices.ts). A model on
-// this machine costs nothing. A session's cap covers the child sessions it started too.
+// this machine costs nothing. A session's cap covers the child sessions it started too. While a turn
+// runs, the model calls its agent reports come in ahead of the indexer: see setLiveSpend.
 import type { BudgetState } from '../../shared/budget.ts';
 import type { Agent } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
@@ -32,6 +33,17 @@ export function rowCost(db: DB, r: Row): number | null {
   return costOf(db, model, t);
 }
 
+/** What one model call cost, as the agent reported it: its own figure, else its tokens at the model's price. */
+export function callCost(db: DB, agent: Agent, model: string | undefined, c: { usd?: number; tokens?: { in: number; cached: number; out: number } }): number | null {
+  if (c.usd !== undefined) return c.usd;
+  const t = c.tokens ?? { in: 0, cached: 0, out: 0 };
+  return rowCost(db, { agent, model: model ?? null, tokens_in: t.in, tokens_out: t.out, tokens_cached: t.cached, cost_usd: null, parent_key: null });
+}
+
+/** A session's own spending as best known: the indexer's figure, or more when its running turn has spent more than that already. */
+let liveSpend: (key: string, indexed: number) => number = (_key, indexed) => indexed;
+export const setLiveSpend = (fn: typeof liveSpend) => (liveSpend = fn);
+
 /** A session's own spending: its transcript, and its agent's own helpers' (Claude's subagents, Codex's sub-agent threads). */
 export function ownSpend(db: DB, key: string): { usd: number; unpriced: boolean } {
   const rows = db.prepare('select agent, model, tokens_in, tokens_out, tokens_cached, cost_usd, parent_key from sessions where key = ? or parent_key = ?').all(key, key) as Row[];
@@ -57,14 +69,15 @@ export function capOf(db: DB, key: string): number | undefined {
 /** What counts against a session's cap: its own spending and its children's. */
 export function spending(db: DB, key: string): { spentUsd: number; ownUsd: number; childrenUsd: number; unpriced: boolean } {
   const own = ownSpend(db, key);
+  const ownUsd = liveSpend(key, own.usd);
   let kids = 0;
   let unpriced = own.unpriced;
   for (const k of childKeys(db, key)) {
     const c = ownSpend(db, k);
-    kids += c.usd;
+    kids += liveSpend(k, c.usd);
     unpriced ||= c.unpriced;
   }
-  return { spentUsd: own.usd + kids, ownUsd: own.usd, childrenUsd: kids, unpriced };
+  return { spentUsd: ownUsd + kids, ownUsd, childrenUsd: kids, unpriced };
 }
 
 /** A cap that is reached: the session's own, or (for a child session) its parent's, which covers it too. */

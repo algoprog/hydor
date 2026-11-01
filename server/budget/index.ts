@@ -1,15 +1,17 @@
 // Spending caps: a session stops when what it has spent, at API prices, reaches its cap. The cap covers
-// the child sessions it starts. A turn that runs past it is stopped with a note under it, and new
-// messages wait (beforeSend) until the cap is raised or cleared. Scheduled tasks pass a cap to the
-// sessions they start with capExtra().
+// the child sessions it starts. It is checked after each model call the agent reports (Claude Code's
+// messages, Codex's token counts, Custom's usage), so the turn stops right after the call that reached
+// it, with a note under it; new messages wait (beforeSend) until the cap is raised or cleared. Scheduled
+// tasks pass a cap to the sessions they start with capExtra().
 import { parseCap, usd, type BudgetNote, type BudgetState } from '../../shared/budget.ts';
 import type { SessionSummary } from '../../shared/types.ts';
+import type { ModelCall } from '../agents/live.ts';
 import { HttpError } from '../auth.ts';
 import { childKeys, parentOf } from '../children/family.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { addNote } from '../notes.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
-import { budgetState, capOf, capReached } from './spend.ts';
+import { budgetState, callCost, capOf, capReached, ownSpend, setLiveSpend } from './spend.ts';
 
 export { budgetState, capOf, capReached, childShare, spending } from './spend.ts';
 
@@ -31,6 +33,38 @@ const stopped = new Map<string, number>();
 const told = new Map<string, string>();
 
 const titleOf = (d: Deps, key: string) => d.sessions.summary(key)?.title ?? 'the session that started this one';
+
+/**
+ * What each session's latest turn spent as its agent reported the calls, ahead of the indexer: what had
+ * been spent when the turn began, and each call's cost by its id. It stays until the next turn begins.
+ */
+interface TurnSpend {
+  turn: number;
+  base: number;
+  calls: Map<string, number>;
+}
+const turns = new Map<string, TurnSpend>();
+const turnTotal = (t: TurnSpend) => t.base + [...t.calls.values()].reduce((a, b) => a + b, 0);
+
+/** The indexer's figure, or more while the turn's reported calls run ahead of it. */
+setLiveSpend((key, indexed) => {
+  const t = turns.get(key);
+  return t ? Math.max(indexed, turnTotal(t)) : indexed;
+});
+
+/** A model call finished: counted at once, and the session checked against its cap (and its parent's). */
+function onCall(d: Deps, key: string, c: ModelCall) {
+  const turn = d.sessions.lives.get(key)?.adapter.state.turnStartedAt ?? 0;
+  let t = turns.get(key);
+  if (!t || t.turn !== turn) {
+    // The last turn's own count may still be ahead of the indexer.
+    const indexed = ownSpend(d.db, key).usd;
+    t = { turn, base: t ? Math.max(indexed, turnTotal(t)) : indexed, calls: new Map() };
+    turns.set(key, t);
+  }
+  t.calls.set(c.id, callCost(d.db, key.split(':')[0] as SessionSummary['agent'], c.model, c) ?? 0);
+  void checkBudget(d, key).catch(() => {});
+}
 
 /** Tells the pages showing the session where it stands, when that changed. */
 function tell(d: Deps, s: BudgetState) {
@@ -101,13 +135,14 @@ export const budget: Feature = {
   },
 
   start(d) {
-    // Spending grows as transcripts do: each indexed change comes as a list update.
+    // After each model call an agent reports, for the sessions with a cap to watch.
+    d.sessions.on('call', (key: string, c: ModelCall) => {
+      if (capOf(d.db, key) != null || parentOf(d.db, key)) onCall(d, key, c);
+    });
+    // Spending also grows as transcripts are indexed (agents that report no calls, sessions run elsewhere):
+    // each indexed change comes as a list update.
     d.sessions.on('sessions', (upsert: SessionSummary[]) => {
       for (const s of upsert) if (watched(s)) void checkBudget(d, s.key).catch(() => {});
     });
-    // And while turns run, every few seconds besides.
-    setInterval(() => {
-      for (const [key, l] of d.sessions.lives) if (RUNNING.has(l.adapter.state.status)) void checkBudget(d, key).catch(() => {});
-    }, 4000).unref();
   },
 };

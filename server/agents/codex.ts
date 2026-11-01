@@ -7,7 +7,7 @@ import { codexGoal, commandInfo, fileChanges, unwrapShellString } from '../histo
 import type { Runner, RunSpec } from '../runner/client.ts';
 import { HttpError } from '../auth.ts';
 import { elicitCard, elicitCheck, elicitResult } from './elicit.ts';
-import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig } from './live.ts';
+import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
 import { RpcPeer } from './rpc.ts';
 import { splitHandoff } from '../handoff.ts';
 import type { SpawnAdditions } from '../features/types.ts';
@@ -175,6 +175,11 @@ export class CodexLive extends LiveAdapter {
   settings: Json = {};
   private turnStartMs = 0;
   private lastTurnOut = 0;
+  /** Lines re-read after a restart: they report no model calls again. */
+  private replaying = false;
+  /** The thread's running token totals as last reported, and how many calls this process saw. */
+  private usageTotal: Json | null = null;
+  private calls = 0;
   private serverReqs = new Map<string, { id: string | number; method: string; params: Json }>();
   private next: Json = {};
 
@@ -261,12 +266,39 @@ export class CodexLive extends LiveAdapter {
       return;
     }
     this.touch();
+    this.replaying = replay;
     if (this.rpc.settle(m)) return;
     if (m.id != null && m.method) this.onServerRequest(m);
     else if (m.method) this.onNotification(m.method, m.params ?? {});
     else if (m.result?.thread?.id && !this.sessionId) this.onThread(m.result);
     this.emit('activity');
     this.changed();
+  }
+
+  /**
+   * A model call's use: what the thread's totals grew by since the last report (its first report in this
+   * process gives the last call's own, as the totals may hold the whole thread's history).
+   */
+  private callFrom(u: Json) {
+    const tot = u.total;
+    if (!tot) return;
+    const was = this.usageTotal;
+    this.usageTotal = tot;
+    const n = (o: Json | null | undefined, k: string) => (typeof o?.[k] === 'number' ? o[k] : 0);
+    let base: Json | null = was;
+    let now: Json = tot;
+    // Counters that went down were restarted: the last call's own use stands for it.
+    if (!was || n(tot, 'inputTokens') < n(was, 'inputTokens') || n(tot, 'outputTokens') < n(was, 'outputTokens')) {
+      if (!u.last) return;
+      base = null;
+      now = u.last;
+    }
+    const dIn = n(now, 'inputTokens') - n(base, 'inputTokens');
+    const dCached = n(now, 'cachedInputTokens') - n(base, 'cachedInputTokens');
+    const dOut = n(now, 'outputTokens') - n(base, 'outputTokens');
+    if (dIn <= 0 && dOut <= 0) return;
+    const call: ModelCall = { id: `codex-${this.runner.meta.runId}-${++this.calls}`, model: this.state.model, tokens: { in: Math.max(0, dIn - dCached), cached: Math.max(0, dCached), out: Math.max(0, dOut) } };
+    this.emit('call', call);
   }
 
   private onNotification(method: string, p: Json) {
@@ -394,6 +426,7 @@ export class CodexLive extends LiveAdapter {
       }
       case 'thread/tokenUsage/updated': {
         const u = p.tokenUsage ?? {};
+        if (!this.replaying) this.callFrom(u);
         if (u.last) this.state.contextTokens = u.last.inputTokens ?? undefined;
         if (u.modelContextWindow) this.state.contextWindow = u.modelContextWindow;
         if (typeof u.last?.outputTokens === 'number') this.lastTurnOut = u.last.outputTokens;
