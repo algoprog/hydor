@@ -1,5 +1,6 @@
 // Every capability of the app, in the order they register.
 import { apps } from '../apps/index.ts';
+import { arena } from '../arena/index.ts';
 import { assistants } from '../assistants/index.ts';
 import { automations } from '../automations/index.ts';
 import { browser } from '../browser/index.ts';
@@ -23,4 +24,4 @@ import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, knowledge, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, find, releaseNotes];
+export const FEATURES: Feature[] = [pages, search, browser, memory, knowledge, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, find, releaseNotes];

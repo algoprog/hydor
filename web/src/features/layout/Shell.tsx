@@ -51,7 +51,7 @@ function useDrag(onMove: (dy: number) => void) {
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
   const session = loc.startsWith('/s/');
-  const section = session ? loc : loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' ? '/usage' : loc;
+  const section = session ? loc : loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc;
   return (
     <div key={section} className={cx('h-full', !session && 'anim-fade')}>
       <Page />
@@ -74,7 +74,7 @@ function Page() {
   if (loc === '/inbox') return <InboxPage />;
   if (loc === '/preview') return <PreviewPage />;
   if (loc === '/git') return <GitPage selected={new URLSearchParams(search).get('path')} />;
-  if (loc === '/usage' || loc === '/stats') return <UsagePage tab={loc === '/stats' ? 'activity' : 'limits'} />;
+  if (loc === '/usage' || loc === '/stats' || loc === '/arena') return <UsagePage tab={loc === '/stats' ? 'activity' : loc === '/arena' ? 'arena' : 'limits'} />;
   if (loc === '/system') return <SystemPage />;
   if (loc === '/settings') {
     const q = new URLSearchParams(search);

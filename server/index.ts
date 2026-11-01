@@ -17,7 +17,7 @@ import { ClaudeControl, CodexControl, ensureProbeDir, publicFlow } from './agent
 import * as files from './files.ts';
 import { previewItem } from './history/common.ts';
 import { Indexer, searchSessions } from './indexer/index.ts';
-import { SessionManager } from './sessions.ts';
+import { SessionManager, type CreateOpts } from './sessions.ts';
 import { GitRepos } from './git.ts';
 import { installIpykernel } from './notebook/envs.ts';
 import { Push } from './push.ts';
@@ -54,6 +54,8 @@ import { readTaskLog, taskOutputPath } from './tasklog.ts';
 import * as terms from './terminals.ts';
 import { FEATURES } from './features/index.ts';
 import { eventSent, featureContext, inboxItems, registerFeatures, startFeatures } from './features/registry.ts';
+import { arenaOf } from '../shared/arena.ts';
+import { startMatch } from './arena/index.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
@@ -316,7 +318,9 @@ app.post('/api/sessions', async (req) => {
   if (b.agent === 'acp' && typeof b.acpAgent !== 'string') throw new HttpError(400, 'Pick which agent');
   const extra = b.extra && typeof b.extra === 'object' && !Array.isArray(b.extra) ? (b.extra as SessionExtra) : undefined;
   const prompt = typeof b.prompt === 'string' ? b.prompt : undefined;
-  const key = await sessions.create({
+  // Other models picked for the arena: the same prompt goes to each, in a match (server/arena).
+  const others = arenaOf(extra);
+  const opts: CreateOpts = {
     acpAgent: b.agent === 'acp' ? b.acpAgent : undefined,
     agent: b.agent,
     cwd: files.resolvePath(b.cwd),
@@ -329,8 +333,10 @@ app.post('/api/sessions', async (req) => {
     title: b.title || undefined,
     worktree: !!b.worktree,
     account: typeof b.account === 'string' && b.account ? b.account : undefined,
-    extra,
-  });
+    extra: others ? { ...extra, arena: undefined } : extra,
+  };
+  const key = await sessions.create(opts);
+  if (others) await startMatch({ db, sessions, broadcast }, { key, agent: b.agent, ...(opts.acpAgent ? { acpAgent: opts.acpAgent } : {}), ...(opts.model ? { model: opts.model } : {}) }, opts, others);
   return { key };
 });
 /** Whether a folder is in a git repository (and on which branch): the home page offers a worktree then. */

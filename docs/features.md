@@ -71,6 +71,9 @@ agents that speak ACP and take MCP servers.
   saved only when you approve.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
   on this machine; replies can be read aloud.
+- **Model arena**: under Options, send the same prompt to one or two more models; their answers show side by
+  side, you keep the best one and the others are archived. Usage → Arena shows which models win on your own
+  tasks, as a rating over the matches you decided.
 - **A second opinion, and caps**: one click has another company's model check a turn's work against what you
   asked; a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
 
