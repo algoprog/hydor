@@ -21,9 +21,14 @@ rename or remove something users can see or do (a page, a button, a setting or a
 
 1. **The guide**, `docs/guide/NN-<topic>.md`: the app's Help page shows it, the search box (Ctrl+K) finds its
    sections, and agents read it (`app_guide`) to answer questions about the app and to know how to change it for
-   the user. Change the section that describes the feature, and its topic's "Ask an agent" examples. A Settings
-   section or option also goes in `docs/guide/30-settings.md` (made from `shared/find-catalog.ts`: keep the two
-   alike). An `/api/` route goes in `docs/guide/90-api.md`, one bullet in its area:
+   the user. Change the section that describes the feature, and its topic's "Ask an agent" examples. The guide is
+   also in Chinese and Greek (`docs/guide/zh/`, `docs/guide/el/`: every topic but the API), shown when the app is
+   in that language: change the translations with the English. A translation keeps the English topic's headings
+   in the same places (they take its section ids) and the same link addresses in the same order, on-screen labels
+   as the app's own dictionaries translate them (`web/src/i18n/*.json`); a topic out of step shows in English.
+   A Settings section or option: run `npm run guide:settings`, which writes `30-settings.md` in all three
+   languages from `shared/find-catalog.ts` and the dictionaries. An `/api/` route goes in
+   `docs/guide/90-api.md`, one bullet in its area:
    `` - `METHOD /api/path/:param` — what it does. Body: `{ field: type — meaning }`. Returns: `{ … }`. `` (routes
    agents must not use are listed in `server/guide/api.ts` RULES, which refuses them, and in the test's
    `UNDOCUMENTED`). Write as the guide does: plain words for people who are not programmers, second person, the
@@ -40,7 +45,7 @@ rename or remove something users can see or do (a page, a button, a setting or a
 5. **Release notes** in `CHANGELOG.md` when you make a version (above).
 
 `server/guide/guide-test.ts` fails when a guide link points nowhere, a Settings section is not named in the guide,
-or an `/api/` route is missing from `docs/guide/90-api.md`:
+an `/api/` route is missing from `docs/guide/90-api.md`, or a translation is missing or out of step:
 
 ```bash
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/naget-test-guide node dist/dev/guide-test.js

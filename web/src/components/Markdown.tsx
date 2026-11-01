@@ -191,13 +191,19 @@ function makeLink(baseDir?: string, app?: boolean): Components['a'] {
   };
 }
 
-/** GitHub-style ids on a document's headings, so `#quick-start` links land. */
-function rehypeHeadingIds() {
+/**
+ * GitHub-style ids on a document's headings, so `#quick-start` links land; or, given `ids`, those (the guide's
+ * translations take the English headings' ids, one per heading below the title, in order).
+ */
+function rehypeHeadingIds(o?: { ids?: string[] }) {
   return (tree: any) => {
     const seen = new Map<string, number>();
+    let at = 0;
     const visit = (node: any) => {
       for (const c of node.children ?? []) {
-        if (c.type === 'element' && /^h[1-6]$/.test(c.tagName) && !c.properties?.id) {
+        if (o?.ids && c.type === 'element' && /^h[2-6]$/.test(c.tagName) && o.ids[at] !== undefined) {
+          c.properties = { ...c.properties, id: o.ids[at++] };
+        } else if (c.type === 'element' && /^h[1-6]$/.test(c.tagName) && !c.properties?.id) {
           const base = hastText(c)
             .toLowerCase()
             .trim()
@@ -321,6 +327,7 @@ export const Markdown = memo(function Markdown({
   baseDir,
   breaks,
   app,
+  headingIds,
 }: {
   text: string;
   className?: string;
@@ -333,6 +340,8 @@ export const Markdown = memo(function Markdown({
   breaks?: boolean;
   /** The app's own text (the guide): `/…` links are its pages, and headings get ids for `#section` links. */
   app?: boolean;
+  /** The ids its headings take, in order (a translated guide topic: the English ones). */
+  headingIds?: string[];
 }) {
   const src = useMemo(() => normalizeMath(text, !notebook), [text, notebook]);
   const comps = useMemo<Components>(
@@ -357,8 +366,8 @@ export const Markdown = memo(function Markdown({
     [resolveImage, baseDir, app],
   );
   const rehype = useMemo(
-    () => [...(rehypeExtra ?? []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir || app ? [rehypeHeadingIds] : [])],
-    [rehypeExtra, streaming, baseDir, app],
+    () => [...(rehypeExtra ?? []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir || app ? [[rehypeHeadingIds, { ids: headingIds }]] : [])],
+    [rehypeExtra, streaming, baseDir, app, headingIds],
   );
   return (
     <div className={cx('md', className)}>

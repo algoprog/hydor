@@ -7,6 +7,7 @@ import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
 import { Button, cx, Throbber, Empty, IconButton, MenuItem, MenuSep, Popover, useIsMobile } from '../../components/ui';
+import { VideoPlayer } from '../../components/VideoPlayer';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { mu } from '../../lib/machine';
 import { isPreviewable } from '@shared/documents';
@@ -37,6 +38,9 @@ const MEDIA: Record<string, 'image' | 'pdf' | 'video' | 'audio'> = {
   mp4: 'video',
   webm: 'video',
   mov: 'video',
+  m4v: 'video',
+  mkv: 'video',
+  ogv: 'video',
   mp3: 'audio',
   wav: 'audio',
   ogg: 'audio',
@@ -378,10 +382,10 @@ export function FileEditor({
             <OfficePreview path={path} mtime={file.mtime} />
           </Suspense>
         ) : media && (file.binary || ext === 'svg') ? (
-          <div className="flex h-full items-center justify-center overflow-auto bg-bg-1 p-4">
+          <div className={cx('flex h-full items-center justify-center overflow-auto bg-bg-1', media === 'video' ? 'p-0 sm:p-3' : 'p-4')}>
             {media === 'image' && <img src={raw} alt={basename(path)} className="max-h-full max-w-full rounded-lg border border-line bg-[repeating-conic-gradient(var(--bg-2)_0%_25%,var(--bg)_0%_50%)] [background-size:16px_16px] object-contain" />}
             {media === 'pdf' && <iframe src={raw} title={basename(path)} className="h-full w-full rounded-lg border border-line bg-white" />}
-            {media === 'video' && <video src={raw} controls className="max-h-full max-w-full rounded-lg" />}
+            {media === 'video' && <VideoPlayer key={`${path}:${file.mtime}`} src={raw} name={basename(path)} downloadUrl={`${raw}&download=1`} />}
             {media === 'audio' && <audio src={raw} controls />}
           </div>
         ) : file.binary ? (

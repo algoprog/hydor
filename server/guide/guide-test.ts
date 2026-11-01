@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { OPTIONS, SECTIONS } from '../../shared/find-catalog.ts';
-import { headingId, parseTopic } from '../../shared/guide.ts';
+import { headingId, parseTopic, topicId, translatedTopic } from '../../shared/guide.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
 import { setSettings, toneOf } from '../assistants/store.ts';
@@ -154,6 +154,56 @@ test('the guide covers the app: every API route is in the API topic, or one agen
   // The API topic writes a route as `METHOD /api/path` (params as :name).
   const missing = [...routes].filter((r) => !UNDOCUMENTED.test(r.split(' ')[1]) && !api.includes(r));
   assert.deepEqual(missing, [], 'routes the guide’s API topic (docs/guide/90-api.md) does not list');
+});
+
+test('a translation takes the English headings’ ids by their place; one out of step shows in English', () => {
+  const en = parseTopic('04-spaces.md', '# Spaces\n\nAbout spaces.\n\n## Make a space\nSteps.\n### Pick a folder\nWhere.\n## Delete a space\nGone.');
+  const zh = translatedTopic(en, '04-spaces.md', '# 空间\n\n关于空间。\n\n## 创建空间\n步骤。\n### 选择文件夹\n位置。\n## 删除空间\n没了。')!;
+  assert.equal(zh.title, '空间');
+  assert.equal(zh.summary, '关于空间。');
+  assert.deepEqual(
+    zh.sections.map((x) => [x.id, x.title]),
+    [
+      ['make-a-space', '创建空间'],
+      ['delete-a-space', '删除空间'],
+    ],
+  );
+  assert.deepEqual(zh.anchors, ['make-a-space', 'pick-a-folder', 'delete-a-space']);
+  assert.equal(translatedTopic(en, '04-spaces.md', '# 空间\n\n关于。\n\n## 创建空间\n## 删除空间\n'), null, 'a heading missing');
+  assert.equal(translatedTopic(en, '04-spaces.md', '# 空间\n\n关于。\n\n## 创建空间\n## 选择文件夹\n## 删除空间\n'), null, 'a level changed');
+});
+
+/** A file's link addresses, in order. */
+const linksOf = (md: string) => [...md.matchAll(/\]\(([^)\s]+)\)/g)].map((m) => m[1]);
+
+test('the translations: every topic but the API one, each with the English headings in their places and the same links', () => {
+  for (const lang of ['zh', 'el'] as const) {
+    const dir = path.join(APP_ROOT, 'docs', 'guide', lang);
+    const files = fs.readdirSync(dir).filter((f) => /^\d+-[a-z0-9-]+\.md$/.test(f));
+    const problems: string[] = [];
+    for (const f of files) {
+      const enFile = path.join(APP_ROOT, 'docs', 'guide', f);
+      if (!fs.existsSync(enFile)) {
+        problems.push(`${lang}/${f}: no English topic of that name`);
+        continue;
+      }
+      const enText = fs.readFileSync(enFile, 'utf8');
+      const text = fs.readFileSync(path.join(dir, f), 'utf8');
+      const t = translatedTopic(parseTopic(f, enText), f, text);
+      if (!t) problems.push(`${lang}/${f}: its headings are not the English one's (a heading or a level more or less)`);
+      else if (!t.summary || t.title === t.id) problems.push(`${lang}/${f}: a "# Title" and a paragraph under it`);
+      if (JSON.stringify(linksOf(text)) !== JSON.stringify(linksOf(enText))) problems.push(`${lang}/${f}: its links are not the English one's, in the same order`);
+    }
+    const missing = topics.filter((t) => t.id !== 'api' && !files.some((f) => topicId(f) === t.id)).map((t) => t.id);
+    if (missing.length) problems.push(`${lang}: no translation of ${missing.join(', ')}`);
+    assert.deepEqual(problems, [], 'translations out of step with the English: translate the change (CLAUDE.md, "Docs")');
+    const shown = guideTopics(lang);
+    assert.deepEqual(
+      shown.map((t) => t.id),
+      topics.map((t) => t.id),
+    );
+    assert.notEqual(shown.find((t) => t.id === 'spaces')!.title, byId.get('spaces')!.title, `${lang}: the translated title shows`);
+  }
 });
 
 test('finding sections by words: the one about it first', () => {
