@@ -22,7 +22,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 
 - Start Claude Code, Codex or another [ACP](https://agentclientprotocol.com) agent (Gemini CLI, OpenCode…) in any folder
 - Follow every step in plain words, approve commands and edits, and see each change as a diff
-- Get a notification when a session finishes or needs you, and carry on from your phone
+- Get a notification when a session finishes or needs you (approve right from it), see everything waiting on you
+  in one inbox, and carry on from your phone, or talk to it hands-free while you walk
 - Open pull requests on GitHub or Gitea, and review a branch file by file
 - Use a terminal, files, git, notebooks, scheduled tasks and your plans' limits in the same app
 - Switch between several accounts and machines from the sidebar
@@ -30,8 +31,11 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - Get help with anything, not just code: assistants for research, writing and planning, web search (Naget Search by
   default) and a browser you can watch and take over, documents in and out, small tools and pages you keep, and
   templates for tasks you repeat
-- Give every agent memory of you and your projects, your apps and services (connected once), skills, child
-  sessions, and tasks that run on a schedule or when something changes
+- Give every agent memory of you and your projects, your documents (knowledge bases it searches and cites),
+  your apps and services (connected once), skills, child sessions, and tasks that run on a schedule or when
+  something changes
+- Keep each project together in a space, run deep research that ends in a cited report, compare models side by
+  side, and use the app in English, Chinese or Greek
 
 See [all features](docs/features.md).
 

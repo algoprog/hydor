@@ -3,6 +3,43 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.7.0 · 1 November 2026
+
+The app in Chinese and Greek, hands-free voice, knowledge bases, deep research, spaces, a model arena and an
+inbox for everything waiting on you.
+
+- **Your language**: the whole app in Chinese (Simplified) or Greek, picked in Settings → General → Language
+  (it starts in your browser's language when it has it). Agents write to you in it too; conversations, files
+  and code stay as they were written.
+- **Hands-free**: the headphones by the message box open a voice mode for walking. Say "start a session to
+  plan my weekend", "how are my sessions doing?", "read me the answer", "approve" or "stop", and hear what it
+  did. It tells you when the session it follows finishes or needs you, and keeps the screen on.
+- **Inbox**: everything waiting on you, from every session, scheduled task and machine, in one list (the tray
+  by the sidebar's title shows how many). Approvals, questions and forms are answered right there. A plain
+  yes-or-no approval has Approve and Deny on the push notification itself, where the browser shows buttons.
+- **Knowledge bases**: drop documents or a folder in once, on the Knowledge page, and every agent can search
+  them: by their words, by what they mean (with search by meaning on) or for exact text, citing the file and
+  the page. A folder on this computer is read where it is and kept up to date.
+- **Deep research**: one switch under Options. The agent plans the searches, sends researchers after each
+  part, digs into what they leave open, checks the key claims against two sources and delivers a cited
+  report as a page or a Word document, within the researchers at a time, rounds and searches you set.
+- **Spaces**: a project's sessions, files, memory, instructions and assistant together, like Projects in
+  ChatGPT or Claude. Pick a space by name in the folder menu instead of a folder; the sidebar's filter shows
+  one space's sessions, and the Spaces page keeps them.
+- **Model arena**: under Options, send the same prompt to one or two more models, compare their answers side
+  by side and keep the best. Usage → Arena shows which models win on your own tasks.
+- **Forms from connected apps**: when an app needs something from you partway through (a date, a choice, a
+  page to approve on), its form shows as a card in the session, whichever agent is working. Codex's own
+  servers ask the same way.
+- **Stricter spending caps**: checked after each model call, so a turn stops right after the call that
+  reaches the cap, rather than seconds later.
+- **A safer browser**: every connection the agents' browser makes goes through a checkpoint of the app's, so
+  neither WebSockets nor web addresses that change where they point can reach this computer or its network.
+- **Gemini CLI, OpenCode and the other ACP agents** get memory, the assistant and how you like to be talked
+  to, like Claude Code and Codex.
+- On a phone: the session list scrolls without catching and the drawer opens at once, and a template's result
+  table too wide for the screen shows a card a row.
+
 ## 0.6.3 · 1 November 2026
 
 Swarm mode for hard problems, agents that clean up after themselves, Templates (what Apps were called), and
