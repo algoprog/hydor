@@ -17,8 +17,8 @@ wait on it. The answer tells the agent which provider answered, and which filter
 
 `read_page` reads a page through the app's safe fetch (public addresses only), in parts when it is
 long. Given a question, it returns only the parts of the page that answer it: through Naget Search's
-context filter while Naget Search is on, else the paragraphs that share the most words with the
-question.
+context filter while Naget Search is on and has a key (unlike its searches, the filter takes no requests
+without one), else the paragraphs that share the most words with the question.
 
 ## Adding a provider
 
