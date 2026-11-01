@@ -19,7 +19,7 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { findAgentFiles, parseAgentFile, readAgentFile } from './importer.ts';
 import { instructionsFor, spawnFor } from './instructions.ts';
-import { allAssistants, DEFAULT_TASK_ROOT, findAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
+import { allAssistants, cleanUpOn, DEFAULT_TASK_ROOT, findAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
 import { dayIn, makeTaskFolder } from './taskFolder.ts';
 
 // ---- for other capabilities -----------------------------------------------------------------------------
@@ -52,7 +52,7 @@ export function assistantStart(
 
 function routes(d: Deps) {
   const { app, db } = d;
-  const state = (): AssistantsState => ({ assistants: allAssistants(db), tone: toneOf(db), taskRoot: taskRoot(db), defaultTaskRoot: DEFAULT_TASK_ROOT });
+  const state = (): AssistantsState => ({ assistants: allAssistants(db), tone: toneOf(db), taskRoot: taskRoot(db), defaultTaskRoot: DEFAULT_TASK_ROOT, cleanUp: cleanUpOn(db) });
   // Open pages (the start page's picker, Settings) load the list again.
   const changed = () => d.broadcast({ t: 'feature', id: 'assistants', data: { changed: true } });
   const body = (req: { body?: unknown }) => (req.body ?? {}) as Record<string, unknown>;

@@ -12,6 +12,7 @@ import { BUILTINS } from './builtins.ts';
 const MINE = 'assistants.mine';
 const TONE = 'assistants.tone';
 const ROOT = 'assistants.taskRoot';
+const CLEAN_UP = 'assistants.cleanUp';
 
 export const DEFAULT_TASK_ROOT = path.join(config.home, 'Naget');
 export const MAX_INSTRUCTIONS = 20_000;
@@ -114,10 +115,14 @@ export const toneOf = (db: DB): string => kvGet(db, TONE) ?? '';
 /** Where new task folders go. */
 export const taskRoot = (db: DB): string => kvGet(db, ROOT) || DEFAULT_TASK_ROOT;
 
+/** Whether every agent hears to clean up after a task (on unless turned off). */
+export const cleanUpOn = (db: DB): boolean => kvGet(db, CLEAN_UP) !== '0';
+
 const expand = (p: string) => (p === '~' || p.startsWith('~/') ? path.join(os.homedir(), p.slice(1)) : p);
 
-export function setSettings(db: DB, b: { tone?: unknown; taskRoot?: unknown }) {
+export function setSettings(db: DB, b: { tone?: unknown; taskRoot?: unknown; cleanUp?: unknown }) {
   if (b.tone !== undefined) kvSet(db, TONE, str(b.tone, MAX_TONE));
+  if (typeof b.cleanUp === 'boolean') kvSet(db, CLEAN_UP, b.cleanUp ? '1' : '0');
   if (b.taskRoot !== undefined) {
     const p = expand(str(b.taskRoot, 1000));
     if (p && !path.isAbsolute(p)) throw new HttpError(400, 'Give the full path of a folder, like ~/Naget');

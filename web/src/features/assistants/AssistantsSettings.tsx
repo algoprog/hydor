@@ -75,6 +75,7 @@ export function AssistantsSettings() {
         </div>
       </Section>
       <ToneSection tone={st.tone} />
+      <CleanUpSection on={st.cleanUp} />
       <TaskFolderSection st={st} />
       <EditAssistant value={edit} onClose={() => setEdit(null)} />
       <ImportDialog open={importing} onClose={() => setImporting(false)} />
@@ -118,6 +119,28 @@ function ToneSection({ tone }: { tone: string }) {
           Save
         </Button>
       </div>
+    </Section>
+  );
+}
+
+// ---- cleaning up after a task ------------------------------------------------------------------------------
+
+function CleanUpSection({ on }: { on: boolean }) {
+  const set = (cleanUp: boolean) =>
+    put<AssistantsState>('/api/assistants/settings', { cleanUp })
+      .then((r) => (saved(r), toast(cleanUp ? 'Agents clean up after a task from their next session' : 'Agents leave what they made in place from their next session', 'ok')), toastError);
+  return (
+    <Section title="When a task is done" sub="What every agent does at the end of a task, whatever the assistant">
+      <label className="flex cursor-pointer items-start gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] text-fg">Clean up after a task</span>
+          <span className="mt-0.5 block text-[12.5px] leading-snug text-fg-3">
+            The agent removes what it made along the way and no longer needs: scratch and test files, temporary data, extra branches and worktrees, processes it started. It keeps
+            the work you asked for, never touches what it did not make, asks first about anything large or unclear, and says what it removed.
+          </span>
+        </span>
+        <Switch on={on} onChange={set} label="Clean up after a task" className="mt-0.5" />
+      </label>
     </Section>
   );
 }

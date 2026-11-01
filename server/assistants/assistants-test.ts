@@ -28,7 +28,8 @@ import { BUILTINS } from './builtins.ts';
 import { assistants, assistantById, assistantStart, listAssistants } from './index.ts';
 import { findAgentFiles, parseAgentFile, parseFrontmatter } from './importer.ts';
 import { instructionsFor, spawnFor } from './instructions.ts';
-import { cleanAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
+import { cleanAssistant, cleanUpOn, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
+import { cleanup } from '../cleanup/index.ts';
 import { dayIn, makeTaskFolder, slugOf, taskFolderName } from './taskFolder.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -378,6 +379,20 @@ test('settings: the tone (trimmed, capped) and the task root (~ read as home)', 
   assert.equal(taskRoot(db), path.join(os.homedir(), 'Naget'));
   assert.equal(toneOf(db).length, 600);
   setSettings(db, { tone: '' });
+});
+
+test('settings: cleaning up after a task is on until turned off, and every agent hears of it then', async () => {
+  assert.equal(cleanUpOn(db), true);
+  const spawnOf = () => cleanup.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: {} }, { db } as never);
+  assert.match((spawnOf() as { instructions: string[] }).instructions[0], /^Cleaning up: when a task is done/);
+  setSettings(db, { cleanUp: false });
+  assert.equal(cleanUpOn(db), false);
+  assert.equal(spawnOf(), undefined);
+  // Anything but a yes or no leaves it as it is.
+  setSettings(db, { cleanUp: 'yes' });
+  assert.equal(cleanUpOn(db), false);
+  setSettings(db, { cleanUp: true });
+  assert.equal(cleanUpOn(db), true);
 });
 
 test('routes: the list, a task folder, an import, and Custom’s runtime question', async () => {
