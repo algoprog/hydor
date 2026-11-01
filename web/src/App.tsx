@@ -3,6 +3,7 @@ import { Router } from 'wouter';
 import type { AppTheme } from '@shared/themes';
 import { api, onUnauthorized } from './lib/api';
 import { machineBase, machineId } from './lib/machine';
+import { currentLang } from './i18n';
 import { useMachines } from './lib/machines';
 import { useApp, useSessions, useUI, useUsage, type Bootstrap } from './lib/store';
 import { applyTheme, setCustomThemes, useThemes } from './lib/theme';
@@ -47,6 +48,8 @@ export function App() {
     // The browser's time zone, so agents and schedules speak in local time.
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (tz) api('/api/me/timezone', { method: 'PUT', body: { tz } }).catch(() => {});
+    // The language the pages are in, so agents reply in it.
+    api('/api/me/language', { method: 'PUT', body: { lang: currentLang() } }).catch(() => {});
     api<Bootstrap>('/api/bootstrap')
       .then((b) => {
         useApp.getState().set({ boot: b, indexing: b.indexing });

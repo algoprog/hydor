@@ -12,6 +12,8 @@ import { cx } from '../../components/ui';
 import { enc, post } from '../../lib/api';
 import { mu } from '../../lib/machine';
 import { useSessions } from '../../lib/store';
+import { currentLang } from '../../i18n';
+import { tr } from '../../i18n/runtime';
 import { parts, speakable } from './plain';
 import { canRecord, canSpeak, SpeechRecognition, speechLang, useServerVoice, useVoicePrefs } from './prefs';
 import { toWav } from './wav';
@@ -20,11 +22,15 @@ export const useHandsFree = create<{ open: boolean; focus?: string }>(() => ({ o
 
 /** Opens hands-free mode, about a session when one is given. The first words are said within the tap (Safari wants that). */
 export function openHandsFree(focus?: string) {
-  say('I’m listening.');
+  say(tr('I’m listening.'));
   useHandsFree.setState({ open: true, focus });
 }
 
 // ---- speaking -----------------------------------------------------------------------------------------
+
+/** The language spoken and heard: Settings → Voice's, else the app's own (Greek → el-GR), else the browser's. */
+const LOCALES: Record<string, string> = { zh: 'zh-CN', el: 'el-GR' };
+const voiceLang = () => useVoicePrefs.getState().lang || LOCALES[currentLang()] || speechLang();
 
 let speaking: { cancel: () => void } | null = null;
 
@@ -58,7 +64,7 @@ function say(text: string): Promise<void> {
       if (voice) {
         u.voice = voice;
         u.lang = voice.lang;
-      } else u.lang = speechLang(p.lang);
+      } else u.lang = voiceLang();
       u.rate = Math.min(2, Math.max(0.5, p.rate || 1));
       u.onend = next;
       u.onerror = end;
@@ -190,7 +196,8 @@ function hearOnServer(lang: string, onLevel: (v: number) => void): Listening {
 
 type Phase = 'listening' | 'thinking' | 'speaking' | 'paused';
 
-const BYE = /^(stop listening|goodbye|bye|that'?s all|end hands-free|exit)\b/i;
+/** Saying goodbye ends hands-free mode, in the app's languages too. */
+const BYE = /^(stop listening|goodbye|bye|that'?s all|end hands-free|exit|αντίο|τέλος|γεια σου|再见|拜拜|结束)/i;
 
 export function HandsFree() {
   const { open, focus } = useHandsFree();
@@ -226,7 +233,12 @@ export function HandsFree() {
       if (n.machine) return;
       const mine = n.key === useHandsFree.getState().focus;
       if (n.kind === 'done' && !mine) return;
-      const text = n.kind === 'waiting' ? `${n.title} needs you: ${n.body}. ${n.approval ? 'Say approve or deny.' : 'Answer it on the screen.'}` : n.kind === 'done' ? `${n.title} is done. Say “read it” to hear the answer.` : `${n.title} stopped with an error.`;
+      const text =
+        n.kind === 'waiting'
+          ? `${tr(`${n.title} needs you:`)} ${n.body}. ${tr(n.approval ? 'Say approve or deny.' : 'Answer it on the screen.')}`
+          : n.kind === 'done'
+            ? tr(`${n.title} is done. Say “read it” to hear the answer.`)
+            : tr(`${n.title} stopped with an error.`);
       announce.current.push(text);
       if (n.kind === 'waiting') useHandsFree.setState({ focus: n.key });
       // Said at once: the listening stops for it, and starts again after.
@@ -240,7 +252,7 @@ export function HandsFree() {
     if (!open || !canHear) return;
     alive.current = true;
     paused.current = false;
-    const lang = speechLang(useVoicePrefs.getState().lang);
+    const lang = voiceLang();
     void (async () => {
       // The greeting said within the tap that opened this ends first.
       while (window.speechSynthesis?.speaking && alive.current) await new Promise((r) => setTimeout(r, 150));
@@ -265,16 +277,16 @@ export function HandsFree() {
         } catch (e) {
           // No microphone to listen with: said once, then it waits for a tap.
           paused.current = true;
-          setReply(e instanceof Deaf ? `${e.message} Allow it in the browser, then tap to listen.` : 'Listening stopped. Tap to listen again.');
+          setReply(e instanceof Deaf ? `${tr(e.message)} ${tr('Allow it in the browser, then tap to listen.')}` : tr('Listening stopped. Tap to listen again.'));
           setPhase('paused');
-          if (e instanceof Deaf) await say(e.message);
+          if (e instanceof Deaf) await say(tr(e.message));
         }
         listening.current = null;
         setLevel(0);
         if (!alive.current || !text) continue;
         setHeard(text);
         if (BYE.test(text)) {
-          await say('Bye.');
+          await say(tr('Bye.'));
           useHandsFree.setState({ open: false });
           break;
         }

@@ -826,6 +826,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
             {text && (
               <div
                 ref={body}
+                translate="no"
                 className={cx(
                   'text-[15px] leading-relaxed break-words whitespace-pre-wrap',
                   long && !expanded && 'max-h-[6lh] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_2lh),transparent)]',

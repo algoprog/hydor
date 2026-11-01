@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { useSearch } from 'wouter';
 import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
 import { featureSections } from '../registry';
+import { isLang, LANGS } from '@shared/i18n';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, StartupState, UpdateState } from '@shared/types';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
@@ -14,6 +15,7 @@ import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { FolderChip } from '../../components/FolderPicker';
 import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, Throbber, inputCls, Section, Segmented, Switch, Tabs, useConfirm, useIsMobile } from '../../components/ui';
+import { currentLang, setLang } from '../../i18n';
 import { chime, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
 import { PageHeader } from '../layout/PageHeader';
 import { followUpPref, type FollowUp } from '../session/Composer';
@@ -373,6 +375,16 @@ function GeneralSettings() {
       <ThemeSettings />
       <Section>
         <div className="-my-2 divide-y divide-line">
+          <SettingRow label="Language" hint="The language the app is shown in. Agents write to you in it too.">
+            {/* Each language by its own name, never translated. */}
+            <select translate="no" className={cx(inputCls, 'h-8.5 max-w-[220px] pr-8 text-[13px]')} value={currentLang()} onChange={(e) => isLang(e.target.value) && setLang(e.target.value)} aria-label="Language">
+              {LANGS.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </SettingRow>
           <SettingRow
             label="Sending while an agent works"
             hint={

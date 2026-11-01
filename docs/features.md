@@ -74,7 +74,11 @@ agents that speak ACP and take MCP servers.
   troubleshooting, research, writing, documents) for every agent. Agents propose new skills or fixes to them,
   saved only when you approve.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
-  on this machine; replies can be read aloud.
+  on this machine; replies can be read aloud. Hands-free mode (the headphones by the message box) is for
+  walking: say what you want, and it starts, steers and checks sessions, answers approvals and reads you the
+  results, telling you when the session it follows finishes or needs you.
+- **Your language**: the app in English, Chinese (Simplified) or Greek (Settings → General → Language), and
+  agents write to you in it. Translations live in `web/src/i18n`: `npm run i18n:extract` lists every string.
 - **Model arena**: under Options, send the same prompt to one or two more models; their answers show side by
   side, you keep the best one and the others are archived. Usage → Arena shows which models win on your own
   tasks, as a rating over the matches you decided.

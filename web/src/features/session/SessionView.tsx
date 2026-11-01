@@ -113,7 +113,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
                 className="h-7 min-w-0 flex-1 rounded-lg border border-accent/60 bg-bg-1 px-2 text-[15px] font-semibold outline-none"
               />
             ) : (
-              <button onDoubleClick={() => (setTitle(s.title), setRenaming(true))} className="min-w-0 truncate text-left text-[15px] font-semibold tracking-tight" title={`${s.title} (double-click to rename)`}>
+              <button translate="no" onDoubleClick={() => (setTitle(s.title), setRenaming(true))} className="min-w-0 truncate text-left text-[15px] font-semibold tracking-tight" title={`${s.title} (double-click to rename)`}>
                 {s.title}
               </button>
             )}
