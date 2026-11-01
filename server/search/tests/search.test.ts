@@ -551,6 +551,20 @@ describe('the search service and its tools', () => {
     assert.equal(sources?.searches[0].top[0].url, 'https://patents.google.com/patent/US8481204B2/en');
   });
 
+  it('reads a page for a question by its words without a key, and leaves Naget Search to search', async () => {
+    const text = 'Intro about nothing much at all here.\n\nThe Moss Landing storage plant holds 3 GWh of batteries.\n\nUnrelated closing words for the page here.';
+    const { f, calls } = fake((c) => (c.url.startsWith('https://naget.com/') ? json(200, { data: [] }) : html(200, `<html><head><title>Moss</title></head><body><p>${text.split('\n\n').join('</p><p>')}</p></body></html>`)));
+    const svc = new SearchService({ kv: memory(), fetch: f });
+    assert.match(svc.naget().why ?? '', /only with a key/);
+    assert.equal(svc.naget().ctx, undefined);
+    const fetched: FetchedPage = { url: 'https://93.184.215.14/x', status: 200, contentType: 'text/html', title: 'Moss', text };
+    const r = await readPage({ url: 'https://93.184.215.14/x', question: 'How big is Moss Landing storage?', page: 1 }, { fetchPage: async () => fetched, extract: async () => null, nagetWhy: svc.naget().why });
+    assert.equal(parsePage(r.text)!.body.split('\n\n')[0], 'The Moss Landing storage plant holds 3 GWh of batteries.');
+    assert.match(r.text, /only with a key/);
+    assert.equal(calls.filter((c) => c.url.includes('/context-filter')).length, 0);
+    assert.equal(svc.searcher.resting.get('naget'), undefined, 'Naget Search does not rest');
+  });
+
   it('says clearly when no provider works', async () => {
     const { f } = fake((c) => (c.url.startsWith('https://naget.com/') ? json(403, fixture('naget-403.json')) : html(202, fixture('duckduckgo-anomaly.html'))));
     const [web] = searchTools(new SearchService({ kv: memory(), fetch: f }));

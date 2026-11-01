@@ -251,10 +251,15 @@ export class SearchService {
     this.emit({ kind: 'settings' });
   }
 
-  /** Naget Search's settings for its other services (the context filter), while it is on and not resting. */
+  /**
+   * Naget Search's settings for its other services (the context filter), while it is on and not resting.
+   * Searching needs no key, but the context filter does: without one it is not asked at all, so its
+   * refusal never rests Naget Search for the searches that follow.
+   */
   naget(): { ctx?: ProviderCtx; why?: string } {
     const c = this.configured().find((x) => x.provider.id === 'naget');
     if (!c?.enabled) return { why: 'Naget Search is off in Settings → Search' };
+    if (!c.key) return { why: 'Naget Search picks the parts of a page that answer a question only with a key (Settings → Search)' };
     const rest = this.searcher.resting.get('naget');
     if (rest && rest.until > Date.now()) return { why: rest.message };
     return { ctx: { key: c.key, url: c.url, signal: AbortSignal.timeout(120_000), fetch: this.fetch, credits: (x) => this.noteCredits(x) } };
