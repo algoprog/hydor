@@ -182,6 +182,8 @@ export class ClaudeLive extends LiveAdapter {
         if (!m.parent_tool_use_id) this.onStream(m.event ?? {});
         break;
       case 'assistant':
+        // "You've hit your session limit": the plan's usage ran out mid-turn.
+        if (!replay && m.error === 'rate_limit') this.emit('limithit');
         if (!replay) this.callFrom(m);
         if (!m.parent_tool_use_id) this.onAssistant(m);
         break;
@@ -445,6 +447,7 @@ export class ClaudeLive extends LiveAdapter {
 
   /** `replay`: re-read after a restart; an old turn's error is already in the transcript, so it is not re-added. */
   private onResult(m: Json, replay = false) {
+    if (!replay && m.is_error && /hit your .*limit/i.test(String(m.result ?? ''))) this.emit('limithit');
     this.approvals.clear();
     this.state.status = 'idle';
     this.state.turnStartedAt = undefined;

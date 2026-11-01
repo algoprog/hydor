@@ -537,11 +537,14 @@ export class SessionManager extends EventEmitter {
       }
       // A turn that ended because the plan's usage ran out: another account with usage left takes the session
       // over now, or it continues by itself after the reset, as you asked.
+      // The turn says so itself (limitHits), or the account's usage does.
+      const hit = this.limitHits.delete(s.key);
       if ((st === 'idle' || st === 'error') && busy(prev.status) && s.agent !== 'acp' && this.onLimited && !this.resumeLookup?.(s.key)) {
         const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
-        if (lim?.resetsAt && lim.resetsAt > now) {
-          if (kvGet(this.db, 'auto_switch') === '1' && !s.external) this.switchAtLimit(s.key, lim.resetsAt).catch((e) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` }));
-          else if (kvGet(this.db, 'auto_resume') === '1') this.onLimited(s.key, lim.resetsAt + 60_000);
+        const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
+        if (hit || resetsAt) {
+          if (kvGet(this.db, 'auto_switch') === '1' && !s.external) this.switchAtLimit(s.key, resetsAt).catch((e) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` }));
+          else if (kvGet(this.db, 'auto_resume') === '1') this.resumeAfterLimit(s.key, resetsAt).catch(() => {});
         }
       }
       // The capabilities hear of every ended turn (memory notes, spending, automations), once its last lines are in.
@@ -733,6 +736,7 @@ export class SessionManager extends EventEmitter {
         this.timelines.get(key)?.setPath(p);
       }
     });
+    adapter.on('limithit', () => this.limitHits.add(key));
     adapter.on('ratelimit', (info: any) => {
       // Limits belong to the account the session runs as.
       const account = this.lives.get(key)?.account;
@@ -740,13 +744,15 @@ export class SessionManager extends EventEmitter {
       if (adapter.agent === 'claude') {
         const u = this.controlFor('claude', account).applyRateLimit(info);
         if (u) tell(u);
+        // Not read since the app started: read it, so this and later limits count.
+        else this.usageOf('claude', account).catch(() => {});
       } else {
         const ctl = this.controlFor('codex', account);
         const u = mergeCodexSnapshot(ctl.lastUsage, info);
         if (u) {
           ctl.lastUsage = u;
           tell(u);
-        }
+        } else this.usageOf('codex', account).catch(() => {});
       }
     });
     adapter.on('result', async () => {
@@ -1146,10 +1152,23 @@ export class SessionManager extends EventEmitter {
     const ctl = this.controlFor(agent, account);
     const last = ctl.lastUsage;
     if (last && Date.now() - last.fetchedAt <= fresh) return last;
-    const u = await (ctl instanceof ClaudeControl ? ctl.usage(this.liveClaudeUsage(account)) : ctl.usage()).catch(() => undefined);
-    if (u) this.emit('usage', account ? { accounts: { [account]: u } } : { [agent]: u });
-    return u ?? last ?? undefined;
+    // One read at a time per account.
+    const id = `${agent}:${account ?? ''}`;
+    let read = this.usageReads.get(id);
+    if (!read) {
+      read = (ctl instanceof ClaudeControl ? ctl.usage(this.liveClaudeUsage(account)) : ctl.usage())
+        .then((u) => {
+          this.emit('usage', account ? { accounts: { [account]: u } } : { [agent]: u });
+          return u;
+        })
+        .catch(() => undefined)
+        .finally(() => this.usageReads.delete(id));
+      this.usageReads.set(id, read);
+    }
+    return (await read) ?? last ?? undefined;
   }
+
+  private usageReads = new Map<string, Promise<AgentUsage | undefined>>();
 
   private static usedUp = (u: AgentUsage | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
 
@@ -1174,7 +1193,7 @@ export class SessionManager extends EventEmitter {
   }
 
   /** At a usage limit, with Switch accounts on: another account with usage left takes the session over and it continues; with none, it waits for the first reset (when Resume after usage limits is on). */
-  private async switchAtLimit(key: string, resetsAt: number) {
+  private async switchAtLimit(key: string, resetsAt: number | undefined) {
     if (this.switching.has(key)) return;
     this.switching.add(key);
     try {
@@ -1182,7 +1201,7 @@ export class SessionManager extends EventEmitter {
       const from = this.accountOf(key);
       const to = await this.freeAccount(agent, from);
       if (!to) {
-        if (kvGet(this.db, 'auto_resume') === '1') this.onLimited?.(key, (this.limitLiftsAt(key) ?? resetsAt) + 60_000);
+        if (kvGet(this.db, 'auto_resume') === '1') await this.resumeAfterLimit(key, resetsAt);
         return;
       }
       if (await this.carryOver(key, from, to.id)) return;
@@ -1194,6 +1213,40 @@ export class SessionManager extends EventEmitter {
 
   /** Sessions moving to another account right now. */
   private switching = new Set<string>();
+  /** Sessions whose running turn stopped on the plan's usage limit, as the agent said. */
+  private limitHits = new Set<string>();
+
+  /** Continues the session a minute after its limit lifts; when its usage did not say when, it is read first. */
+  private async resumeAfterLimit(key: string, resetsAt: number | undefined) {
+    const agent = agentOfKey(key);
+    if (agent === 'acp') return;
+    if (!resetsAt) {
+      const u = await this.usageOf(agent, this.accountOf(key), 0);
+      const r = u?.limited?.resetsAt ?? Math.max(0, ...(u?.windows ?? []).filter((w) => (w.usedPercent ?? 0) >= 100).map((w) => w.resetsAt ?? 0));
+      if (r > Date.now()) resetsAt = r;
+    }
+    const lifts = this.limitLiftsAt(key);
+    const at = typeof lifts === 'number' ? lifts : resetsAt;
+    if (at && !this.resumeLookup?.(key)) this.onLimited?.(key, at + 60_000);
+  }
+
+  /**
+   * Before a message goes to a session whose account its usage says is at the limit, with Switch accounts on:
+   * another account with usage left takes it first, so the message is not turned away.
+   */
+  private async switchBeforeSend(key: string) {
+    const agent = agentOfKey(key);
+    if (agent === 'acp' || kvGet(this.db, 'auto_switch') !== '1' || this.switching.has(key) || this.external.get(key)) return;
+    const st = this.lives.get(key)?.adapter.state.status;
+    if (st === 'working' || st === 'waiting' || st === 'starting') return;
+    if (!this.controlFor(agent, this.accountOf(key)).lastUsage?.limited) return;
+    this.switching.add(key);
+    try {
+      await this.beforeResume(key);
+    } finally {
+      this.switching.delete(key);
+    }
+  }
 
   /**
    * Before a session continues after a usage limit, with Switch accounts on: when its own account is still at
@@ -1630,6 +1683,7 @@ export class SessionManager extends EventEmitter {
   async send(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = []) {
     if (!text.trim() && !images.length && !files.length) throw new HttpError(400, 'Empty message');
     await beforeSend(key);
+    await this.switchBeforeSend(key).catch(() => {});
     if (!this.lives.has(key)) await this.start(key);
     const l = this.live(key);
     // ACP agents take one message at a time: one sent mid-turn waits in the queue.
