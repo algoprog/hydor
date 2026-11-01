@@ -113,6 +113,8 @@ export function chime(kind: NotifyEvent['kind']) {
  * notification. `own`: it came on this server's own socket while the page shows another machine.
  */
 export function handleNotify(n: NotifyEvent, own = false) {
+  // Hands-free mode says what it hears of (features/voice/HandsFree.tsx).
+  window.dispatchEvent(new CustomEvent('naget:notify', { detail: n }));
   // The machine the session is on (null: this server's own).
   const on = n.machine ? n.machine.id : own ? null : machineId;
   // The machine this page shows sends its own notices.

@@ -3,7 +3,7 @@
 // (fetched when it opens) apps, scheduled tasks, assistants, skills, pages and connections. Each entry says where
 // it is and goes there: a setting opens its section and points at it by its words (`find=`, lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, AppWindow, ArrowRight, Bot, Cable, CalendarClock, CircleHelp, FileSearch, FolderTree, Gauge, GitBranch, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, ScrollText, Settings, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, AppWindow, ArrowRight, Bot, Cable, CalendarClock, CircleHelp, FileSearch, FolderTree, Gauge, GitBranch, Headphones, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, ScrollText, Settings, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import type { ScheduledTask } from '@shared/automations';
@@ -18,6 +18,7 @@ import { appPath, type Gallery } from '../apps/api';
 import { openReleaseNotes } from '../settings/Releases';
 import { settingsSections } from '../settings/SettingsPage';
 import { startTour } from '../tour/Tour';
+import { startHandsFree } from '../voice/HandsFree';
 
 export type Group = 'Settings' | 'Go to' | 'Actions' | 'Sessions' | 'In messages' | 'Memory' | 'Templates' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Themes' | 'Files';
 
@@ -59,6 +60,7 @@ const PAGE_ICONS: Record<string, ReactNode> = {
 const ACTS: Record<NonNullable<CatalogItem['act']>, { icon: ReactNode; run: () => void; hint?: string }> = {
   tour: { icon: <CircleHelp size={15} />, run: () => startTour() },
   releases: { icon: <ScrollText size={15} />, run: () => openReleaseNotes() },
+  handsfree: { icon: <Headphones size={15} />, run: () => startHandsFree() },
   theme: {
     icon: <Moon size={15} />,
     run: () => {

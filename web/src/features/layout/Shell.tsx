@@ -22,6 +22,7 @@ import { CommandPalette, usePalette } from '../palette/CommandPalette';
 import { ReleaseNotes, WhatsNew } from '../settings/Releases';
 import { Lightbox } from '../../components/Lightbox';
 import { HelpButton, Tour } from '../tour/Tour';
+import { HandsFree } from '../voice/HandsFree';
 import { ReviewPage } from '../review/ReviewPage';
 import { PreviewPage } from '../preview/PreviewPage';
 import { features } from '../registry';
@@ -204,6 +205,7 @@ export function Shell() {
         <FilePeek />
         <Lightbox />
         <Tour />
+        <HandsFree />
       </div>
     );
   }
@@ -237,6 +239,7 @@ export function Shell() {
       <Lightbox />
       {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}
       <Tour />
+      <HandsFree />
     </div>
   );
 }

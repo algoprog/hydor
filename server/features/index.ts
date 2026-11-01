@@ -13,6 +13,7 @@ import { documents } from '../documents/index.ts';
 import { find } from '../find/index.ts';
 import { images } from '../images/index.ts';
 import { knowledge } from '../knowledge/index.ts';
+import { language } from '../language/index.ts';
 import { memory } from '../memory/index.ts';
 import { opinion } from '../opinion/index.ts';
 import { pages } from '../pages/index.ts';
@@ -25,4 +26,4 @@ import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, knowledge, spaces, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, find, releaseNotes];
+export const FEATURES: Feature[] = [pages, search, browser, memory, knowledge, spaces, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, language, find, releaseNotes];

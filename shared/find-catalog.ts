@@ -19,7 +19,7 @@ export interface CatalogItem {
   where?: string;
   /** What opening it does: a page, an action, a Settings section (and the words to point at there), a theme. */
   path?: string;
-  act?: 'tour' | 'theme' | 'sidebar' | 'panel' | 'releases';
+  act?: 'tour' | 'theme' | 'sidebar' | 'panel' | 'releases' | 'handsfree';
   section?: string;
   find?: string;
   theme?: string;
@@ -213,6 +213,7 @@ const PAGES: [string, string, string, string, string][] = [
 
 const ACTIONS: [CatalogItem['act'] & string, string, string, string][] = [
   ['tour', 'Take the tour', 'help tour guide welcome onboarding how', 'A short walk through the app'],
+  ['handsfree', 'Talk hands-free', 'voice speak talk hands free walking listen read aloud conversation microphone', 'Start, steer and check sessions by voice, and hear the results'],
   ['releases', 'Release notes', 'what is new whats new changelog changes version history updates', 'What changed in each version of the app'],
   ['theme', 'Switch between light and dark', 'theme dark light mode appearance night day', 'Turns the theme to light or dark'],
   ['sidebar', 'Show or hide the sidebar', 'sidebar toggle hide show', 'Ctrl+B'],
