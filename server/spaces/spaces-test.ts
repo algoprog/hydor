@@ -1,5 +1,6 @@
 // Script tests for spaces: a new space gets a folder of its own (or uses one given), its fields are cleaned,
-// its sessions are counted, it can leave the shared knowledge out, and a session in it is told its instructions. Build and run with a scratch data folder:
+// its sessions are counted, it can leave the shared knowledge out, a session in it is told its instructions,
+// and a group brings spaces together. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/spaces/spaces-test.ts
 //   DATA_DIR=/tmp/naget-test-spaces node dist/dev/spaces-test.js
 import assert from 'node:assert/strict';
@@ -77,6 +78,31 @@ test('a session in a space is told what it is, where its files go, and its instr
   assert.ok(text.includes(a.folder));
   assert.match(text, /Amounts in EUR/);
   assert.deepEqual((await spawnAdditions({ agent: 'claude', key: 'claude:x', cwd: tmp, runId: 'r', resume: false, extra: {} })).instructions, []);
+});
+
+test('a group brings spaces together: plain spaces that exist, once; its sessions are told of each and Claude Code works in their folders', async () => {
+  const [taxes] = spaceViews(db);
+  const thesis = createSpace(db, { name: 'Thesis', description: 'Dairy farming', instructions: 'Cite in APA style.' });
+  const all = createSpace(db, { name: 'Everything', members: [taxes.id, thesis.id, thesis.id, 'spnothere'] });
+  assert.deepEqual(all.members, [taxes.id, thesis.id]);
+  // No groups inside groups, and a space in a group does not become one.
+  assert.equal(createSpace(db, { name: 'Bigger', members: [all.id, thesis.id] }).members?.join(), thesis.id);
+  assert.throws(() => updateSpace(db, thesis.id, { members: [taxes.id] }), /in a group already/);
+  const add = await spawnAdditions({ agent: 'claude', key: 'claude:g1', cwd: all.folder, runId: 'r', resume: false, extra: { space: all.id } });
+  const text = add.instructions.join('\n');
+  assert.match(text, /"Everything" brings together 2 more spaces/);
+  assert.match(text, /## Thesis \(Dairy farming\)\nIts folder: .*thesis\nCite in APA style\./);
+  assert.match(text, /## Taxes 2026 \(Receipts and the yearly return\)\nIts folder: /);
+  assert.deepEqual(add.args, ['--add-dir', taxes.folder, '--add-dir', thesis.folder]);
+  // Codex reads their folders as it is; only Claude Code needs them named.
+  assert.deepEqual((await spawnAdditions({ agent: 'codex', key: 'codex:g1', cwd: all.folder, runId: 'r', resume: false, extra: { space: all.id } })).args, []);
+  // Changing something else keeps who is in it; an empty list makes it a plain space again.
+  assert.equal(updateSpace(db, all.id, { description: 'All of it' }).members?.length, 2);
+  // Deleting a space takes it out of the groups it was in.
+  deleteSpace(db, thesis.id);
+  assert.deepEqual(spaceById(db, all.id)!.members, [taxes.id]);
+  assert.equal(updateSpace(db, all.id, { members: [] }).members, undefined);
+  for (const s of spaceViews(db).filter((x) => x.name === 'Everything' || x.name === 'Bigger')) deleteSpace(db, s.id);
 });
 
 test('deleting a space keeps its folder and sessions', () => {

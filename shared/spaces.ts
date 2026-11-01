@@ -17,6 +17,11 @@ export interface Space {
   assistant?: string;
   /** False: its sessions search only the space's own knowledge, not the shared knowledge too. */
   sharedKnowledge?: boolean;
+  /**
+   * The spaces it brings together, by id: a group. Its sessions get theirs too: their documents, instructions
+   * and folders. A group brings in plain spaces, not other groups.
+   */
+  members?: string[];
   createdAt: number;
 }
 
@@ -42,3 +47,8 @@ export const SPACE_COLORS: Record<string, string> = {
 export const spaceColor = (s: Pick<Space, 'color'>) => SPACE_COLORS[s.color] ?? SPACE_COLORS.blue;
 
 export const MAX_SPACE_INSTRUCTIONS = 4000;
+/** Most spaces a group brings together. */
+export const MAX_GROUP = 12;
+
+/** A space that brings others together. */
+export const isGroup = (s: Pick<Space, 'members'>) => !!s.members?.length;
