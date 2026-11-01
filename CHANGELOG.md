@@ -3,6 +3,38 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.8.0 · 1 November 2026
+
+A guide to every part of the app, agents that answer from it and work the app for you, one set of guidelines for
+every agent, and every session kept until you no longer need it.
+
+- **Help**: a guide to every part of the app, under Help in the sidebar (where Tour was; the tour starts from
+  there), in English, Chinese and Greek. It has contents, a search, and links that open the setting or page they
+  name; its sections show in the search box too.
+- **Agents that work the app**: ask any agent how something works and it answers from the guide, with a link to
+  the place. Ask it to change a setting or set something up (a space, an assistant, a scheduled task, memory
+  notes…) and it does it: each change shows you a card first, with what changes, to allow once, for the rest of
+  the session, or not. When it needs details from you, it shows a form. Your password, keys, approvals,
+  permissions and spending caps stay yours.
+- **Agent Guidelines**: one text every agent follows, whichever it is (Claude Code, Codex, Custom or an ACP agent),
+  for every session (Settings → Agents → Agent Guidelines), for a space, or for one session (Options on the start
+  page, or the session's menu). The more specific wins, and a change reaches a running session from your next
+  message. They take the place of Settings → Instructions and "How the agents talk to you" (what you wrote there
+  moved in); CLAUDE.md and AGENTS.md stay editable, folded away beneath them.
+- **Every session kept**: Claude Code no longer deletes conversations after 30 days, and the app keeps its own link
+  to every conversation, so one that an agent's program deletes comes back. Sessions nobody used for a year are
+  deleted instead (Settings → General → Delete inactive sessions: on or off, and how long); pinned and busy ones
+  stay, and their numbers stay in Activity.
+- **Activity by agent and model**: Custom and every other agent by name, in the filter and under By agent; By
+  model counts sessions and prompts too, and a click on a model shows the page for it alone.
+- **Videos in Files** play in the app's own player: drag or click along the bar (the time shows under the
+  pointer, the part loaded is paler), volume, speed from 0.5× to 2×, loop, picture in picture, full screen and
+  keyboard shortcuts; on a phone, double-tap a side to skip 10 seconds. Videos stream in parts, so they start at
+  once, seek anywhere, and play on iPhones. A video the browser can't play says so and offers the download.
+- **Esc no longer stops a session**: it only closes what is open (the find bar, a list, a menu). Stop stops it.
+- **The tour** goes straight to each part of the app as it comes to rest, and Settings arrives with the other
+  tools.
+
 ## 0.7.2 · 1 November 2026
 
 Groups of spaces, a search box that learns what you use, and text cut short that scrolls into view.
