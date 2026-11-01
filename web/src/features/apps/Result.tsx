@@ -1,9 +1,9 @@
 // A run as its person sees it: where it stands (with the latest steps while it works), the structured
-// result (short fields as a card, long text, lists, and tables that scroll sideways on a phone), and
-// the agent's own reply. The owner's pages and the public page show the same.
-import { useEffect, useState, type ReactNode } from 'react';
+// result (short fields as a card, long text, lists, and tables, which on a phone become a card a row
+// when they would not fit), and the agent's own reply. The owner's pages and the public page show the same.
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { Check, ChevronRight, CircleAlert, Clock, Copy, Download, Hand, Square } from 'lucide-react';
-import type { AnswerField, AppRun, RunProgress } from '@shared/apps';
+import type { AnswerColumn, AnswerField, AppRun, RunProgress } from '@shared/apps';
 import { cellText, isActive, toCsv } from '@shared/apps';
 import { duration } from '../../lib/format';
 import { Markdown } from '../../components/Markdown';
@@ -66,33 +66,129 @@ function SmallButton({ icon, children, onClick }: { icon: ReactNode; children: R
   );
 }
 
-export function ResultTable({ f, rows }: { f: AnswerField; rows: Record<string, unknown>[] }) {
-  const cols = f.columns?.length ? f.columns : Object.keys(rows[0] ?? {}).map((id) => ({ id, label: humanize(id), type: 'text' as const }));
-  if (!rows.length) return <div className="text-[13px] text-fg-3">Nothing here.</div>;
+type Row = Record<string, unknown>;
+
+const blank = (v: unknown) => cellText(v).trim() === '';
+
+/** About how many characters a cell shows: a date as Value writes it, a link by its host. */
+function shownChars(v: unknown, type: string): number {
+  const s = cellText(v);
+  if (type === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(s)) return 17;
+  if (type === 'url' || /^https?:\/\/\S+$/.test(s)) return s.replace(/^https?:\/\/(www\.)?/, '').split('/')[0].length;
+  return s.length;
+}
+
+/** A column that reads on a line of a phone (numbers, dates, links, names, prices): one long cell does not change that. */
+function isShort(c: AnswerColumn, rows: Row[]): boolean {
+  if (c.type !== 'text') return true;
+  const lens = rows.map((r) => shownChars(r[c.id], c.type)).filter((n) => n > 0);
+  return lens.filter((n) => n <= 28).length >= lens.length * 0.8;
+}
+
+/** The width a column needs to read well in a table: its usual cell when short, room for a few words a line when not. */
+function colWidth(c: AnswerColumn, rows: Row[]): number {
+  if (!isShort(c, rows)) return 180;
+  return Math.max(c.label.length, ...rows.map((r) => shownChars(r[c.id], c.type)).filter((n) => n <= 28)) * 7 + 20;
+}
+
+function useWidth(): [(el: HTMLDivElement | null) => void, number] {
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+  const [w, setW] = useState(0);
+  useLayoutEffect(() => {
+    if (!el) return;
+    setW(el.clientWidth);
+    const ro = new ResizeObserver(() => setW(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return [setEl, w];
+}
+
+/**
+ * A table too wide for a phone, as a card a row: the first column (and the dates right after it) names
+ * the row ("Day 1 · Fri, Mar 26, 2027"), short values sit beside their label, long text under it.
+ */
+function RowCards({ cols, rows }: { cols: AnswerColumn[]; rows: Row[] }) {
+  let n = 1;
+  while (n < cols.length && cols[n].type === 'date') n++;
+  const [head, dates, rest] = [cols[0], cols.slice(1, n), cols.slice(n)];
+  const inline = new Set(rest.filter((c) => isShort(c, rows)).map((c) => c.id));
   return (
-    <div className="-mx-1 overflow-x-auto px-1 pb-1">
-      <table className="w-full min-w-[520px] border-separate border-spacing-0 text-[13px]">
-        <thead>
-          <tr>
-            {cols.map((c) => (
-              <th key={c.id} className="border-b border-line px-2.5 py-2 text-left text-[12px] font-medium whitespace-nowrap text-fg-3 first:pl-0">
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="align-top">
+    <div className="divide-y divide-line">
+      {rows.map((r, i) => (
+        <div key={i} className="py-3.5 first:pt-1.5 last:pb-0.5">
+          <div className="text-[14.5px] leading-snug font-semibold">
+            {(head.type === 'number' || head.type === 'yesno') && `${head.label} `}
+            <Value v={r[head.id]} type={head.type} />
+            {dates.map(
+              (c) =>
+                !blank(r[c.id]) && (
+                  <span key={c.id} className="font-normal text-fg-2">
+                    {' · '}
+                    <Value v={r[c.id]} type={c.type} />
+                  </span>
+                ),
+            )}
+          </div>
+          <dl className="mt-2 space-y-2.5">
+            {rest.map((c) =>
+              blank(r[c.id]) ? null : inline.has(c.id) ? (
+                <div key={c.id} className="flex gap-3">
+                  <dt className="w-24 shrink-0 pt-px text-[12.5px] text-fg-3">{c.label}</dt>
+                  <dd className="min-w-0 flex-1 text-[14px] leading-snug">
+                    <Value v={r[c.id]} type={c.type} />
+                  </dd>
+                </div>
+              ) : (
+                <div key={c.id}>
+                  <dt className="text-[12.5px] text-fg-3">{c.label}</dt>
+                  <dd className="mt-0.5 text-[14px] leading-relaxed">
+                    <Value v={r[c.id]} type={c.type} />
+                  </dd>
+                </div>
+              ),
+            )}
+          </dl>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ResultTable({ f, rows }: { f: AnswerField; rows: Row[] }) {
+  const [ref, width] = useWidth();
+  const cols: AnswerColumn[] = f.columns?.length ? f.columns : Object.keys(rows[0] ?? {}).map((id) => ({ id, label: humanize(id), type: 'text' as const }));
+  if (!rows.length) return <div className="text-[13px] text-fg-3">Nothing here.</div>;
+  // A phone (or a narrow pane) gets a card a row when the columns would not fit; a wider screen keeps the table.
+  const cards = width > 0 && width < 640 && cols.reduce((sum, c) => sum + colWidth(c, rows), 0) > width;
+  return (
+    <div ref={ref} className="-mx-1 overflow-x-auto px-1 pb-1">
+      {cards ? (
+        <RowCards cols={cols} rows={rows} />
+      ) : (
+        <table className="w-full border-separate border-spacing-0 text-[13px]">
+          <thead>
+            <tr>
               {cols.map((c) => (
-                <td key={c.id} className={cx('border-b border-line px-2.5 py-2 leading-snug first:pl-0', c.type === 'number' && 'text-right', (c.type === 'number' || c.type === 'date') && 'whitespace-nowrap')}>
-                  <Value v={r[c.id]} type={c.type} />
-                </td>
+                <th key={c.id} className="border-b border-line px-2.5 py-2 text-left text-[12px] font-medium whitespace-nowrap text-fg-3 first:pl-0">
+                  {c.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="align-top">
+                {cols.map((c) => (
+                  <td key={c.id} className={cx('border-b border-line px-2.5 py-2 leading-snug first:pl-0', c.type === 'number' && 'text-right', (c.type === 'number' || c.type === 'date') && 'whitespace-nowrap')}>
+                    <Value v={r[c.id]} type={c.type} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
