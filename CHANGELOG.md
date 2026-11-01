@@ -3,6 +3,47 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.9.0 · 1 November 2026
+
+Pages you watch being written and change yourself, with the agent building on your version; before and after
+screenshots of the web apps agents change; and Pages, Preview, Git, Files and Help made anew.
+
+- **Pages you can change**: a page an agent writes shows as it comes, beside the conversation on a wide screen
+  (in the conversation on a phone). Change it yourself: click a part to rewrite its words, move, copy or delete
+  it, add headings, pictures, tables and more, and change its colours, spacing and width; or edit its HTML with
+  the page beside it, at a computer's, tablet's or phone's size. When you save, the agent hears what you changed
+  with your next message and builds on your version. HTML files an agent writes open the same way.
+- **Pages, redone**: each page as a card with a picture of it, find and sort, and New page to start from a blank
+  page, notes, a checklist or a tracker, or to ask an agent for one. A page's Share puts its phone address and
+  publishing together, and What it keeps shows the data it keeps, to read, download or clear.
+- **Before and after**: when an agent changes how a web app looks, it shows you screenshots of each screen from
+  before and after, on a computer's or a phone's screen, to compare with a slider or side by side, with Looks
+  good and Change something.
+- **Preview, redone**: the web apps running on your computer, told apart from other servers, with their project
+  and page title, shown inside the app with an address bar, back, forward and device sizes. Where your browser
+  can't reach the preview port (behind a tunnel), it shows pictures of the screen instead. Ask an agent about a
+  screen, or save a picture of it.
+- **Git, redone**: one Sync button that asks in plain words what to do when both sides moved on; merges that stop
+  on conflicts list the files to settle, with an agent to resolve them; the history as a graph with a search,
+  where a commit can be explained, reverted, undone or tagged; branches to merge, compare, rename and publish;
+  stashes to look inside; diffs side by side, with one part of a file put back; and repositories you add from a
+  folder or clone from a link.
+- **Files, redone**: places on the left (recent files, home, pinned folders, spaces, the trash), pick several,
+  drag to move, a trash to put things back from, and a search that finds names and text under the folder you
+  pick. Files go to a space or a new session in a click, and a space can work in folders you have.
+- **Help, redone**: one box that searches the guide or asks an agent, topics as cards with pictures, and
+  sections to open one by one.
+- **Accounts switch at a limit**: a session whose account runs out of usage carries on with another account of
+  the same agent, also when the limit stops a turn before its usage was read.
+- **Spaces' own skills**: skills only a space's sessions get, written on its Skills tab or copied from the
+  library to change for the space alone.
+- **The whole app in Chinese and Greek**, with dates written the language's way and notifications in it too.
+- **Deep research**: the bar says what it is doing and opens the report when it is ready, and each researcher's
+  reply is a line that opens to what it found. Its session opens again instead of a black page.
+- **The start page** keeps what you wrote, attached and set while you visit other pages, and Options →
+  Guidelines stays open while you type in it.
+- Videos, pictures, PDFs and audio over 10 MB open in their player or viewer again.
+
 ## 0.8.0 · 1 November 2026
 
 A guide to every part of the app, agents that answer from it and work the app for you, one set of guidelines for
