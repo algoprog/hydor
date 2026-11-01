@@ -2,14 +2,15 @@
 // their words, the app's places and actions, every setting, themes and the sessions you have, with apps, tasks,
 // assistants, skills, pages and connections (fetched when it opens); then what the server adds: sessions about
 // the same thing in other words, messages that hold the words, memory notes, and files. With search by meaning
-// on (Settings → Memory) things also match what they mean. The best match comes first; a preview beside the
-// list says more about the one picked, and opening it goes there: a setting opens its section and points at it,
-// a message opens its session where it was said.
+// on (Settings → Memory) things also match what they mean. The best match comes first, and among what matches
+// what you use comes up: what you picked here before (most for what you typed the same) and the places you
+// visit (usage.ts). A preview beside the list says more about the one picked, and opening it goes there: a
+// setting opens its section and points at it, a message opens its session where it was said.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { ArrowRight, Brain, ChevronDown, CornerDownLeft, FileText, MessageSquareText, Search, Sparkles, X } from 'lucide-react';
-import { matchItem, queryWords, type FindResponse } from '@shared/find';
+import { matchItem, matchStrength, queryAffinity, queryWords, usageBoost, type FindResponse, type FindUsage } from '@shared/find';
 import type { SessionSummary } from '@shared/types';
 import { api } from '../../lib/api';
 import { MOD, markRuns, timeAgo } from '../../lib/format';
@@ -19,31 +20,15 @@ import { AgentIcon } from '../../components/AgentIcon';
 import { cx, Kbd, Throbber, useIsMobile, useMediaQuery } from '../../components/ui';
 import { folderName } from '../sessions/SessionList';
 import { liveEntries, staticEntries, type Entry, type Group } from './catalog';
+import { loadUsage, notePick, useFindUsage } from './usage';
 
 export const usePalette = create<{ open: boolean }>(() => ({ open: false }));
 export const openPalette = () => usePalette.setState({ open: true });
 
-const FRECENCY = 'wa.frecency';
-
-/** How often and how lately each session was opened, to rank sessions in the search box. */
-export function noteOpened(key: string) {
-  try {
-    const m = JSON.parse(localStorage.getItem(FRECENCY) ?? '{}') as Record<string, { n: number; t: number }>;
-    m[key] = { n: (m[key]?.n ?? 0) + 1, t: Date.now() };
-    const keep = Object.entries(m)
-      .sort((a, b) => b[1].t - a[1].t)
-      .slice(0, 300);
-    localStorage.setItem(FRECENCY, JSON.stringify(Object.fromEntries(keep)));
-  } catch {}
-}
-
-function frecency(): Record<string, { n: number; t: number }> {
-  try {
-    return JSON.parse(localStorage.getItem(FRECENCY) ?? '{}');
-  } catch {
-    return {};
-  }
-}
+// Sessions opened used to be counted in this browser alone; the server counts every visit now (usage.ts).
+try {
+  localStorage.removeItem('wa.frecency');
+} catch {}
 
 // ---- ranking ------------------------------------------------------------------------------------
 
@@ -51,6 +36,8 @@ function frecency(): Record<string, { n: number; t: number }> {
 interface Hit {
   entry: Entry;
   score: number;
+  /** How strongly it matches (0 to 1, matchStrength): what use adds counts as much. */
+  strength?: number;
   /** Parts of the title to mark. */
   marks?: [number, number][];
   /** Instead of the title, for a message (its words marked). */
@@ -80,6 +67,8 @@ const SHOWN = 4;
 
 /** Rank fusion: a list's first counts 1/8, its tenth 1/17. */
 const rrf = (rank: number) => 1 / (8 + rank);
+/** Picked for what was typed at least this much before: it shows even before it matches otherwise. */
+const RECALL = 1;
 
 function marked(title: string, marks?: [number, number][]): ReactNode {
   if (!marks?.length) return title;
@@ -133,37 +122,37 @@ interface Found {
   groups: { group: Group; hits: Hit[] }[];
 }
 
-function rank(q: string, entries: Entry[], sessions: SessionSummary[], server: FindResponse | null, files: string[], home?: string): Found {
+function rank(q: string, entries: Entry[], sessions: SessionSummary[], server: FindResponse | null, files: string[], usage: FindUsage | null, home?: string): Found {
   const words = queryWords(q);
+  const affinity = queryAffinity(usage, q);
   const hits = new Map<string, Hit>();
   const add = (h: Hit) => {
     const was = hits.get(h.entry.id);
-    if (was) was.score += h.score;
-    else hits.set(h.entry.id, h);
+    if (!was) return void hits.set(h.entry.id, h);
+    was.score += h.score;
+    was.strength = Math.max(was.strength ?? 0, h.strength ?? 0);
   };
   // The page's own entries: by their words now, and by meaning once the server says.
   const byWords = entries
     .map((e) => ({ e, m: matchItem(e, words, q) }))
     .filter((x) => x.m.score > 0)
     .sort((a, b) => b.m.score - a.m.score);
-  byWords.forEach(({ e, m }, i) => add({ entry: e, score: rrf(i) + (m.score >= 60 ? 0.15 : m.score >= 40 ? 0.07 : 0), marks: m.marks }));
+  byWords.forEach(({ e, m }, i) => add({ entry: e, score: rrf(i) + (m.score >= 60 ? 0.15 : m.score >= 40 ? 0.07 : 0), marks: m.marks, strength: matchStrength(m.score) }));
   const known = new Map(entries.map((e) => [e.id, e]));
+  // Alike in meaning holds about as well as a good match by words.
   server?.alike.forEach((c, i) => {
     const e = known.get(c.id);
-    if (e) add({ entry: e, score: 0.8 * rrf(i) });
+    if (e) add({ entry: e, score: 0.8 * rrf(i), strength: 0.6 });
   });
   // Sessions: their titles and folders here, and what the server finds by title or meaning.
-  const f = frecency();
-  const now = Date.now();
-  const used = (key: string) => (f[key] ? Math.log2(1 + f[key].n) * Math.exp(-(now - f[key].t) / (14 * 86400_000)) * 0.01 : 0);
   sessions
     .filter((s) => !s.archived)
     .map((s) => ({ s, m: matchItem({ title: s.title ?? '', keywords: `${folderName(s.cwd, home)} ${s.gitBranch ?? ''}`, text: s.firstPrompt }, words, q) }))
     .filter((x) => x.m.score > 0)
     .sort((a, b) => b.m.score - a.m.score)
     .slice(0, 30)
-    .forEach(({ s, m }, i) => add({ entry: sessionEntry(s, home), score: rrf(i) + used(s.key), marks: m.marks }));
-  server?.sessions.forEach((s, i) => add({ entry: sessionEntry(s, home), score: 0.8 * rrf(i) }));
+    .forEach(({ s, m }, i) => add({ entry: sessionEntry(s, home), score: rrf(i), marks: m.marks, strength: matchStrength(m.score) }));
+  server?.sessions.forEach((s, i) => add({ entry: sessionEntry(s, home), score: 0.8 * rrf(i), strength: 0.6 }));
   server?.messages.forEach((m, i) => {
     const e = sessionEntry({ key: m.key, agent: m.agent, title: m.title, cwd: m.cwd, updatedAt: m.updatedAt }, home, q.trim());
     add({ entry: { ...e, id: `m:${m.key}:${m.ts ?? i}`, group: 'In messages', icon: <MessageSquareText size={15} />, body: m.snippet.replace(/[\u0001\u0002]/g, ''), hint: m.ts ? timeAgo(m.ts) : e.hint }, score: rrf(i), label: <span className="line-clamp-1">{snippet(m.snippet)}</span>, sub: m.title });
@@ -193,24 +182,44 @@ function rank(q: string, entries: Entry[], sessions: SessionSummary[], server: F
       marks: matchItem({ title: p.split('/').pop() || p }, words, q).marks,
     }),
   );
-  const all = [...hits.values()].map((h) => ({ ...h, score: h.score * WEIGHT[h.entry.group] })).sort((a, b) => b.score - a.score);
+  // What was picked for this query before shows at once, even before it matches by words or meaning.
+  const byKey = new Map(sessions.map((s) => [`s:${s.key}`, s]));
+  for (const [id, a] of affinity) {
+    if (a < RECALL || hits.has(id)) continue;
+    const e = known.get(id);
+    const s = byKey.get(id);
+    if (e) add({ entry: e, score: rrf(10) });
+    else if (s && !s.archived) add({ entry: sessionEntry(s, home), score: rrf(10) });
+  }
+  // Then what is used comes up among what matches.
+  const all = [...hits.values()].map((h) => ({ ...h, score: (h.score + usageBoost(usage, affinity, h.entry.id, h.entry.within, h.strength ?? 0.5)) * WEIGHT[h.entry.group] })).sort((a, b) => b.score - a.score);
   const top = all[0] ?? null;
   const groups = new Map<Group, Hit[]>();
   for (const h of all.slice(1)) groups.set(h.entry.group, [...(groups.get(h.entry.group) ?? []), h]);
   return { top, groups: [...groups.entries()].map(([group, hits]) => ({ group, hits })) };
 }
 
-/** With nothing typed: recent sessions, and a few places. */
-function start(sessions: SessionSummary[], entries: Entry[], home?: string): Found {
-  const f = frecency();
+/** Suggested with nothing typed until use says otherwise. */
+const SUGGEST = ['go:new', 'go:settings', 'sec:memory', 'go:usage', 'go:search-files'];
+
+/** With nothing typed: the sessions used last, and the places used most (a few suggestions before there are any). */
+function start(sessions: SessionSummary[], entries: Entry[], usage: FindUsage | null, home?: string): Found {
+  const v = usage?.visits ?? {};
   const recent = sessions
     .filter((s) => !s.archived)
-    .map((s) => ({ s, t: Math.max(f[s.key]?.t ?? 0, s.updatedAt ?? 0) + (f[s.key] ? Math.log2(1 + f[s.key].n) * 3600_000 : 0) }))
+    .map((s) => {
+      const u = v[`s:${s.key}`];
+      return { s, t: Math.max(u?.at ?? 0, s.updatedAt ?? 0) + (u ? Math.log2(1 + u.n) * 3600_000 : 0) };
+    })
     .sort((a, b) => b.t - a.t)
     .slice(0, 5)
     .map(({ s }) => ({ entry: sessionEntry(s, home), score: 0 }));
-  const pick = ['go:new', 'go:settings', 'sec:memory', 'go:usage', 'go:search-files'];
-  const places = pick.map((id) => entries.find((e) => e.id === id)).filter((e): e is Entry => !!e);
+  const use = (e: Entry) => (usage?.picks[e.id] ?? 0) + (v[e.id]?.n ?? 0);
+  const used = entries
+    .filter((e) => e.group !== 'Sessions' && use(e) >= 1)
+    .sort((a, b) => use(b) - use(a))
+    .slice(0, 5);
+  const places = [...used, ...SUGGEST.map((id) => entries.find((e) => e.id === id)).filter((e): e is Entry => !!e && !used.includes(e))].slice(0, 5);
   return { top: null, groups: [...(recent.length ? [{ group: 'Sessions' as Group, hits: recent }] : []), { group: 'Go to' as Group, hits: places.map((entry) => ({ entry, score: 0 })) }] };
 }
 
@@ -230,6 +239,7 @@ export function CommandPalette() {
   const [files, setFiles] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [more, setMore] = useState<Set<Group>>(new Set());
+  const usage = useFindUsage((s) => s.usage);
   const listRef = useRef<HTMLDivElement>(null);
   // Beside the list, a preview of the one picked, where there is room.
   const wide = useMediaQuery('(min-width: 900px)') && !mobile;
@@ -246,6 +256,7 @@ export function CommandPalette() {
     setMore(new Set());
     let alive = true;
     liveEntries().then((l) => alive && setLive(l));
+    void loadUsage();
     return () => {
       alive = false;
     };
@@ -284,8 +295,8 @@ export function CommandPalette() {
   const found = useMemo<Found>(() => {
     if (!open) return { top: null, groups: [] };
     const list = Object.values(sessions);
-    return q.trim() ? rank(q, entries, list, server, files, home) : start(list, entries, home);
-  }, [open, q, entries, sessions, server, files, home]);
+    return q.trim() ? rank(q, entries, list, server, files, usage, home) : start(list, entries, usage, home);
+  }, [open, q, entries, sessions, server, files, usage, home]);
 
   // The rows, in order, for the keys: the best match, then each group's (and its "more").
   type Row = { kind: 'hit'; hit: Hit; group?: Group; first?: boolean } | { kind: 'more'; group: Group; n: number };
@@ -312,6 +323,7 @@ export function CommandPalette() {
     if (!r) return;
     if (r.kind === 'more') return setMore((m) => new Set(m).add(r.group));
     close();
+    notePick(r.hit.entry.id, q);
     r.hit.entry.run();
   };
   const current = rows[sel]?.kind === 'hit' ? (rows[sel] as { hit: Hit }).hit : null;

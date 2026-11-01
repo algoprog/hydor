@@ -19,6 +19,7 @@ import { UsagePage } from '../usage/UsagePage';
 import { Sidebar } from './Sidebar';
 import { undoLast } from '../../lib/flags';
 import { CommandPalette, usePalette } from '../palette/CommandPalette';
+import { CountVisits } from '../palette/usage';
 import { ReleaseNotes, WhatsNew } from '../settings/Releases';
 import { Lightbox } from '../../components/Lightbox';
 import { HelpButton, Tour } from '../tour/Tour';
@@ -200,6 +201,7 @@ export function Shell() {
         <UploadsPanel />
         <QuickOpen />
         <CommandPalette />
+        <CountVisits />
         <ReleaseNotes />
         <WhatsNew />
         <FilePeek />
@@ -233,6 +235,7 @@ export function Shell() {
       <UploadsPanel />
       <QuickOpen />
       <CommandPalette />
+      <CountVisits />
       <ReleaseNotes />
       <WhatsNew />
       <FilePeek />

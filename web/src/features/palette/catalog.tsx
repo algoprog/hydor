@@ -35,6 +35,8 @@ export interface Entry extends Findable {
   facts?: [string, string][];
   /** What opening it does, in a few words ("Opens Settings → Memory, at this option"). */
   opens?: string;
+  /** The place it is in (a setting's section, sec:memory): visiting that counts for it too, half as much. */
+  within?: string;
   run: () => void;
 }
 
@@ -88,16 +90,22 @@ export function staticEntries(): Entry[] {
       const s = secs.get(it.section);
       if (!s) continue;
       const Icon = s.icon;
-      out.push({ ...base, icon: <Icon size={15} />, opens: it.find ? `Opens Settings → ${s.label}, at this option` : `Opens Settings → ${s.label}`, run: () => go(settingsAt(it.section!, it.find)) });
+      out.push({
+        ...base,
+        icon: <Icon size={15} />,
+        opens: it.find ? `Opens Settings → ${s.label}, at this option` : `Opens Settings → ${s.label}`,
+        within: it.find ? `sec:${it.section}` : undefined,
+        run: () => go(settingsAt(it.section!, it.find)),
+      });
     } else if (it.theme) {
       const t = themes.find((x) => x.name === it.theme);
-      if (t) out.push({ ...base, icon: <Palette size={15} />, opens: 'Switches to it', run: () => pickTheme(t) });
+      if (t) out.push({ ...base, icon: <Palette size={15} />, opens: 'Switches to it', within: 'sec:general', run: () => pickTheme(t) });
     }
   }
   const shipped = new Set(catalogItems().map((it) => it.theme));
   for (const t of themes)
     if (!shipped.has(t.name))
-      out.push({ id: `theme:${t.id}`, group: 'Themes', icon: <Palette size={15} />, title: t.name, keywords: `theme appearance ${t.base}`, text: `A ${t.base} theme of your own`, where: 'Settings › App › General', opens: 'Switches to it', run: () => pickTheme(t) });
+      out.push({ id: `theme:${t.id}`, group: 'Themes', icon: <Palette size={15} />, title: t.name, keywords: `theme appearance ${t.base}`, text: `A ${t.base} theme of your own`, where: 'Settings › App › General', opens: 'Switches to it', within: 'sec:general', run: () => pickTheme(t) });
   return out;
 }
 
@@ -131,12 +139,13 @@ export async function liveEntries(): Promise<Entry[]> {
       where: 'Settings › Agents › Scheduled tasks',
       body: t.prompt.slice(0, 400),
       opens: 'Opens Settings → Scheduled tasks, at this task',
+      within: 'sec:tasks',
       run: () => go(settingsAt('tasks', t.name)),
     });
   for (const a of Array.isArray(assistants) ? assistants : (assistants?.assistants ?? []))
-    out.push({ id: `asst:${a.id}`, group: 'Assistants', icon: <Bot size={15} />, title: a.name, keywords: 'assistant', text: a.description, where: 'Settings › Capabilities › Assistants', body: a.description, opens: 'Opens Settings → Assistants, at this one', run: () => go(settingsAt('assistants', a.name)) });
+    out.push({ id: `asst:${a.id}`, group: 'Assistants', icon: <Bot size={15} />, title: a.name, keywords: 'assistant', text: a.description, where: 'Settings › Capabilities › Assistants', body: a.description, opens: 'Opens Settings → Assistants, at this one', within: 'sec:assistants', run: () => go(settingsAt('assistants', a.name)) });
   for (const s of lib?.skills ?? [])
-    out.push({ id: `skill:${s.name}`, group: 'Skills', icon: <Library size={15} />, title: s.name, keywords: `skill ${s.triggers.join(' ')}`, text: s.description, where: 'Settings › Capabilities › Skill library', body: s.description, opens: 'Opens the skill library, at this skill', run: () => go(settingsAt('skillpack', s.name)) });
+    out.push({ id: `skill:${s.name}`, group: 'Skills', icon: <Library size={15} />, title: s.name, keywords: `skill ${s.triggers.join(' ')}`, text: s.description, where: 'Settings › Capabilities › Skill library', body: s.description, opens: 'Opens the skill library, at this skill', within: 'sec:skillpack', run: () => go(settingsAt('skillpack', s.name)) });
   for (const p of pages?.pages ?? [])
     out.push({ id: `page:${p.id}`, group: 'Pages', icon: <AppWindow size={15} />, title: p.title, keywords: 'page published', where: 'Pages', body: `Version ${p.version}`, opens: 'Opens the page', run: () => go(`/pages/${encodeURIComponent(p.id)}`) });
   for (const c of conns?.connections ?? [])
@@ -150,6 +159,7 @@ export async function liveEntries(): Promise<Entry[]> {
       where: 'Settings › Capabilities › Connections',
       body: c.app?.description,
       opens: 'Opens Settings → Connections, at this one',
+      within: 'sec:connections',
       run: () => go(settingsAt('connections', c.name)),
     });
   held = { at: Date.now(), entries: out };
