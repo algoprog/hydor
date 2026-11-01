@@ -15,7 +15,8 @@ import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
 import { agentBaseEnv } from './env.ts';
 import { ExternalWatcher } from './external.ts';
-import type { Indexer } from './indexer/index.ts';
+import { keptOfTranscript, type Indexer } from './indexer/index.ts';
+import { forget as forgetKept } from './indexer/kept.ts';
 import { Runner, type RunMeta } from './runner/client.ts';
 import { buildHandoff, splitHandoff } from './handoff.ts';
 import { claudeTranscriptPath, findClaudeTranscript, Timeline } from './timeline.ts';
@@ -1599,8 +1600,11 @@ export class SessionManager extends EventEmitter {
     this.markSeen(key);
   }
 
-  /** Stops the session and deletes its transcript (and Codex thread state). */
-  async remove(key: string) {
+  /**
+   * Stops the session and deletes its transcript (and Codex thread state). With `keepActivity` (the clean-up of
+   * inactive sessions), its numbers stay in Activity, as for a transcript deleted elsewhere.
+   */
+  async remove(key: string, o: { keepActivity?: boolean } = {}) {
     dropNotes(this.db, key);
     const l = this.lives.get(key);
     if (l) {
@@ -1614,6 +1618,9 @@ export class SessionManager extends EventEmitter {
       this.lives.delete(key);
     }
     const file = this.transcriptFor(key);
+    // The app's own link to it goes first, or the indexer would bring the transcript back.
+    const kept = file ? keptOfTranscript(file) : null;
+    if (kept) forgetKept(kept);
     if (key.startsWith('acp:')) {
       if (file) fs.rmSync(file, { force: true });
     } else if (key.startsWith('codex:')) {
@@ -1640,8 +1647,14 @@ export class SessionManager extends EventEmitter {
     for (const m of [...(this.queues.get(key) ?? [])]) this.dropQueued(key, m.id);
     this.db.prepare('delete from queued where key = ?').run(key);
     this.db.prepare('delete from chunk_text where key = ?').run(key);
-    this.db.prepare('delete from activity where key = ? or root = ?').run(key, key);
-    this.db.prepare('delete from retired where key = ?').run(key);
+    if (o.keepActivity)
+      this.db
+        .prepare('insert or replace into retired (key, cwd, model, acp_agent) select s.key, s.cwd, s.model, a.acp_agent from sessions s left join app_sessions a on a.key = s.key where s.key = ?')
+        .run(key);
+    else {
+      this.db.prepare('delete from activity where key = ? or root = ?').run(key, key);
+      this.db.prepare('delete from retired where key = ?').run(key);
+    }
     this.db.prepare('delete from sessions where key = ?').run(key);
     this.db.prepare('delete from app_sessions where key = ?').run(key);
     // Sessions it continued from, or into, no longer point at it.

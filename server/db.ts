@@ -191,6 +191,12 @@ export function openDb(file = paths.db): DB {
       db.exec('alter table activity add column gen_ms integer not null default 0');
     } catch {}
   }
+  // A deleted session's ACP agent (Custom, Gemini CLI…), so Activity still names it.
+  if (!(db.prepare('pragma table_info(retired)').all() as { name: string }[]).some((c) => c.name === 'acp_agent')) {
+    try {
+      db.exec('alter table retired add column acp_agent text');
+    } catch {}
+  }
   // Holds prompts and session text: owner-only, like the transcripts it indexes.
   for (const f of [file, `${file}-wal`, `${file}-shm`]) {
     try {

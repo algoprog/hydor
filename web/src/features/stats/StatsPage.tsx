@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, BarChart3, CircleDollarSign, FileDiff, FolderGit2, Gauge, MessageSquare, Minus, Plus, SquareTerminal, Table2, TextCursorInput, Users } from 'lucide-react';
+import { ArrowDown, ArrowUp, BarChart3, CircleDollarSign, FileDiff, FolderGit2, Gauge, MessageSquare, Minus, Plus, SquareTerminal, Table2, TextCursorInput, Users, X } from 'lucide-react';
 import type { StatsGranularity, StatsResponse, StatsTotals } from '@shared/types';
-import { api, put } from '../../lib/api';
+import { api } from '../../lib/api';
 import { useCountUp } from '../../lib/motion';
 import { compact, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toast, toastError, useApp } from '../../lib/store';
+import { toastError, useApp } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Columns, DivergingColumns, Legend, StackedColumns } from '../../components/charts';
-import { Button, cx, Throbber, Segmented, useIsMobile } from '../../components/ui';
+import { cx, Throbber, Segmented, useIsMobile } from '../../components/ui';
 import { ModelPricesDialog } from './ModelPrices';
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -67,43 +67,6 @@ function Tile({
   );
 }
 
-/** Where the history starts, and why Claude Code's can start late: it deletes conversations after 30
- * days unless told to keep them (the stats keep whatever the app has already counted). */
-function HistoryNote({ data, g }: { data: StatsResponse | null; g: StatsGranularity }) {
-  const from = data?.firstByAgent?.claude;
-  const show = (g === 'month' || g === 'year') && from != null && Date.now() - from < 45 * 86_400_000;
-  const [keep, setKeep] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (show && keep == null)
-      api<{ keep: boolean }>('/api/claude-retention')
-        .then((r) => setKeep(r.keep))
-        .catch(() => {});
-  }, [show, keep]);
-  if (!show) return null;
-  const since = new Date(from).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const turnOn = async () => {
-    try {
-      setKeep((await put<{ keep: boolean }>('/api/claude-retention', { keep: true })).keep);
-      toast('Claude Code now keeps its conversations', 'ok');
-    } catch (e) {
-      toastError(e);
-    }
-  };
-  return (
-    <div className="anim-in mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-panel px-3.5 py-2.5 text-[12.5px] leading-relaxed text-fg-2">
-      <span className="min-w-[220px] flex-1">
-        Claude Code's activity starts on {since}:{' '}
-        {keep ? 'older conversations were deleted before it was set to keep them.' : 'Claude Code deleted older conversations, as it does after 30 days.'}
-      </span>
-      {keep === false && (
-        <Button size="sm" variant="secondary" onClick={turnOn}>
-          Keep Claude Code's history
-        </Button>
-      )}
-    </div>
-  );
-}
-
 function Card({ title, sub, children, className }: { title: string; sub?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
     <section className={cx('rounded-2xl border border-line bg-panel p-4', className)}>
@@ -137,7 +100,11 @@ export function StatsBody() {
       return 'day';
     }
   });
-  const [agent, setAgent] = useState<'all' | 'claude' | 'codex'>('all');
+  // All agents or one: claude, codex, or an ACP agent by id ("acp:console" is Custom); all models or one.
+  const [agent, setAgent] = useState<string>('all');
+  const [model, setModel] = useState<string | null>(null);
+  // The agents that have activity, from the last look at all of them (the filter offers those).
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const [data, setData] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -149,11 +116,14 @@ export function StatsBody() {
       localStorage.setItem('wa.stats.g', g);
     } catch {}
     setLoading(true);
-    api<StatsResponse>(`/api/stats?granularity=${g}&agent=${agent}&tz=${encodeURIComponent(TZ)}`)
-      .then(setData)
+    api<StatsResponse>(`/api/stats?granularity=${g}&agent=${encodeURIComponent(agent)}&tz=${encodeURIComponent(TZ)}${model ? `&model=${encodeURIComponent(model)}` : ''}`)
+      .then((r) => {
+        setData(r);
+        if (agent === 'all' && !model) setAgents(r.agents.map(({ id, name }) => ({ id, name })));
+      })
       .catch(toastError)
       .finally(() => setLoading(false));
-  }, [g, agent, rev]);
+  }, [g, agent, model, rev]);
 
   const sz = useIsMobile() ? 'sm' : 'md';
   const t = data?.totals;
@@ -177,16 +147,30 @@ export function StatsBody() {
               { value: 'year', label: 'Yearly' },
             ]}
           />
-          <Segmented
-            size={sz}
-            value={agent}
-            onChange={setAgent}
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'claude', label: 'Claude', icon: <AgentIcon agent="claude" size={12} /> },
-              { value: 'codex', label: 'Codex', icon: <AgentIcon agent="codex" size={12} /> },
-            ]}
-          />
+          {/* Every agent that did something: on a narrow screen they scroll sideways rather than wrap. */}
+          <div className="max-w-full overflow-x-auto [scrollbar-width:none]">
+            <div className="w-max">
+              <Segmented
+                size={sz}
+                value={agent}
+                onChange={setAgent}
+                options={[
+                  { value: 'all', label: 'All' },
+                  ...(agents.length ? agents : [{ id: 'claude', name: 'Claude' }, { id: 'codex', name: 'Codex' }]).map((a) => ({
+                    value: a.id,
+                    label: a.id === 'claude' ? 'Claude' : a.name,
+                    icon: <AgentIcon agent={a.id.startsWith('acp') ? 'acp' : (a.id as 'claude' | 'codex')} name={a.name} size={12} />,
+                  })),
+                ]}
+              />
+            </div>
+          </div>
+          {model && (
+            <button onClick={() => setModel(null)} title="Show every model" className="inline-flex h-8 max-w-[260px] items-center gap-1.5 rounded-lg bg-accent-soft px-2.5 text-[12.5px] text-accent">
+              <span className="truncate font-mono">{model}</span>
+              <X size={13} className="shrink-0" />
+            </button>
+          )}
           <Segmented
             size={sz}
             value={view}
@@ -201,7 +185,6 @@ export function StatsBody() {
             {hasPrev && ` · arrows compare with the ${PREV[g]}`} · {TZ}
           </span>
         </div>
-        <HistoryNote data={data} g={g} />
 
         {!data ? (
           <div className="flex justify-center py-20 text-fg-3">
@@ -357,14 +340,13 @@ export function StatsBody() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(['claude', 'codex', 'acp'] as const).map((a) => {
-                      const v = data.byAgent[a];
-                      if (!v || (a === 'acp' && !v.sessions)) return null;
+                    {data.agents.map((v) => {
+                      const a = v.id;
                       return (
                         <tr key={a} className="border-t border-line">
                           <td className="py-1.5 pr-3">
                             <span className="flex items-center gap-1.5 whitespace-nowrap">
-                              <AgentIcon agent={a} size={13} /> {a === 'claude' ? 'Claude Code' : a === 'codex' ? 'Codex' : 'Other agents'}
+                              <AgentIcon agent={a.startsWith('acp') ? 'acp' : (a as 'claude' | 'codex')} name={v.name} size={13} /> {v.name}
                             </span>
                           </td>
                           <td className="py-1.5 pr-3 text-right">{num(v.sessions)}</td>
@@ -411,11 +393,15 @@ export function StatsBody() {
                 </div>
               </Card>
               <Card
+                className="lg:col-span-2"
                 title="By model"
                 sub={
-                  <button onClick={() => setPricing(true)} className="text-accent hover:underline">
-                    Model prices
-                  </button>
+                  <span>
+                    {model ? 'Showing one model · ' : 'Click a model to see it alone · '}
+                    <button onClick={() => setPricing(true)} className="text-accent hover:underline">
+                      Model prices
+                    </button>
+                  </span>
                 }
               >
                 <div className="overflow-x-auto">
@@ -423,6 +409,8 @@ export function StatsBody() {
                   <thead>
                     <tr className="text-left text-[11px] text-fg-3">
                       <th className="py-1.5 pr-3 font-medium">Model</th>
+                      <th className="w-[64px] py-1.5 pr-3 text-right font-medium sm:w-auto">Sessions</th>
+                      <th className="hidden py-1.5 pr-3 text-right font-medium sm:table-cell">Prompts</th>
                       <th className="hidden py-1.5 pr-3 text-right font-medium sm:table-cell">Input</th>
                       <th className="hidden py-1.5 pr-3 text-right font-medium sm:table-cell">Cached</th>
                       <th className="w-[64px] py-1.5 pr-3 text-right font-medium sm:w-auto">Output</th>
@@ -433,8 +421,13 @@ export function StatsBody() {
                     {data.byModel.slice(0, 12).map((m) => (
                       <tr key={m.model} className="border-t border-line">
                         <td className="truncate py-1.5 pr-3 font-mono text-[12px] sm:max-w-[220px]" title={m.price ? `$${m.price.input}/M in · $${m.price.output}/M out (${m.price.source === 'custom' ? 'your price' : 'public price table'})` : 'No price known'}>
-                          {m.model}
+                          {/* A model opens the page for it alone. */}
+                          <button onClick={() => setModel(model === m.model ? null : m.model)} className="max-w-full truncate text-left hover:text-accent">
+                            {m.model}
+                          </button>
                         </td>
+                        <td className="py-1.5 pr-3 text-right">{num(m.sessions ?? 0)}</td>
+                        <td className="hidden py-1.5 pr-3 text-right sm:table-cell">{num(m.prompts ?? 0)}</td>
                         <td className="hidden py-1.5 pr-3 text-right sm:table-cell">{compact(m.tokensIn)}</td>
                         <td className="hidden py-1.5 pr-3 text-right sm:table-cell">{compact(m.tokensCached)}</td>
                         <td className="py-1.5 pr-3 text-right">{compact(m.tokensOut)}</td>

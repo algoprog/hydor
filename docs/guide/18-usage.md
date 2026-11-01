@@ -86,7 +86,8 @@ The **Activity** tab (`/stats`) counts what the agents did, from the sessions th
 At the top:
 
 - **Daily** (the last 30 days), **Weekly** (26 weeks), **Monthly** (12 months, or since your history starts) or **Yearly** (by year). The page remembers your pick.
-- **All**, **Claude** or **Codex**: which agent's work to count.
+- **All**, or one agent: **Claude**, **Codex**, **Custom**, and any other agent that has done something here (Gemini CLI, OpenCode…).
+- A model's chip, when you picked one model in **By model** below: the page then counts that model alone. Click the chip (its **✕**) to see every model again.
 - **Charts** or **Table**.
 
 The line beside them names the range and your time zone. Days, weeks and months follow your time zone.
@@ -105,9 +106,9 @@ The small arrow on a tile compares with the same length of time just before ("ar
 
 Below, in both views:
 
-- **By agent**: Claude Code, Codex and Other agents (Custom and the ACP agents), with sessions, prompts, lines, input and output.
+- **By agent**: each agent by name (Claude Code, Codex, Custom, Gemini CLI and the others that did something), with sessions, prompts, lines, input and output.
 - **Top projects**: the folders with the most lines changed.
-- **By model**: each model's input, cached input, output and API cost. A model without a known price shows **set a price** instead. Hover over a model for its price per million tokens and where it comes from ("your price" or "public price table").
+- **By model**: each model's sessions, prompts, input, cached input, output and API cost, Custom's models (OpenRouter, Ollama, vLLM…) as much as Claude's and Codex's. Click a model to see the whole page for it alone. A model without a known price shows **set a price** instead. Hover over a model for its price per million tokens and where it comes from ("your price" or "public price table").
 
 On a phone the tiles sit two to a row, and some table columns are left out.
 
@@ -135,13 +136,13 @@ Spending caps use the same prices, but take an agent's own figure where it repor
 
 The bin icon on a row (**Use the table's price**) clears your price for that model. To count a model on this computer as free, give it 0 for input and output.
 
-## Keep Claude Code's history
+## Every session is kept
 
-Claude Code deletes its conversations after 30 days unless told to keep them. When that has cut your history short, the **Monthly** and **Yearly** views of Activity say so: "Claude Code's activity starts on …: Claude Code deleted older conversations, as it does after 30 days."
+The app keeps every session and its numbers, whatever the agent's own program does. Claude Code deletes its conversations after 30 days unless told otherwise, so the app tells it to keep them (in every Claude Code account whose settings don't say how long), and the app keeps its own link to every conversation file of Claude Code and Codex: a conversation the agent's program (or anyone) deletes comes back, listed and openable as before. The link is the same file under a second name, so it takes no extra disk space.
 
-Click **Keep Claude Code's history** in that note. Claude Code then keeps its conversations ("Claude Code now keeps its conversations"), so old sessions stay listed and openable. Conversations deleted before can't come back.
+What goes is what nobody uses: sessions inactive for a year are deleted, unless you change that in [Settings → General → Delete inactive sessions](/settings?s=general&find=Delete%20inactive%20sessions) (see [Delete inactive sessions](/guide/app#delete-inactive-sessions)). Their numbers stay in Activity.
 
-Activity keeps whatever the app has already counted, even after Claude Code deletes the conversation.
+Conversations Claude Code deleted before this, while the app wasn't keeping them, can't come back; Activity's history starts where the app first counted them.
 
 ## Cap what a session spends
 
@@ -158,7 +159,7 @@ The **Arena** tab (`/arena`) shows which models win on your own tasks. On the st
 
 ## Can I reset the numbers?
 
-There is no button to clear Activity. Deleting a session (its menu → **Delete session**) takes its numbers out of Activity too. The limits on the Limits tab are your plans' own: they reset on the provider's schedule, or with a [limit reset](#use-a-limit-reset).
+There is no button to clear Activity. Deleting a session yourself (its menu → **Delete session**) takes its numbers out of Activity too; sessions deleted because they were inactive keep theirs. The limits on the Limits tab are your plans' own: they reset on the provider's schedule, or with a [limit reset](#use-a-limit-reset).
 
 ## Ask an agent
 
@@ -167,4 +168,5 @@ There is no button to clear Activity. Deleting a session (its menu → **Delete 
 - "Continue my session 'Refactor auth' when the Codex limit resets."
 - "What would last month's work have cost at API prices, by model?"
 - "Count my Ollama models as free in the cost estimates."
-- "Keep Claude Code's conversations instead of deleting them after 30 days."
+- "How much did Custom do this month, and with which models?"
+- "Delete sessions after two years of inactivity instead of one."

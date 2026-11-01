@@ -638,6 +638,13 @@ export interface ActivityCounters {
   genMs: number;
 }
 
+/** Deleting sessions nobody used for a while (Settings → General → Delete inactive sessions). */
+export interface RetentionSettings {
+  on: boolean;
+  /** How long a session may stay inactive, in days. */
+  days: number;
+}
+
 /** Estimated API cost in dollars, for priced models (subscriptions are flat-rate). */
 export type StatsTotals = ActivityCounters & { sessions: number; cost?: number };
 
@@ -652,6 +659,9 @@ export interface ModelPrice {
 /** Tokens and estimated cost of one model over the window shown. */
 export interface ModelUsage {
   model: string;
+  /** Sessions and prompts with this model, in the window. */
+  sessions?: number;
+  prompts?: number;
   tokensIn: number;
   tokensCached: number;
   tokensOut: number;
@@ -673,12 +683,17 @@ export interface StatsResponse {
   firstByAgent?: Partial<Record<Agent, number>>;
   granularity: StatsGranularity;
   tz: string;
-  agent: 'all' | Agent;
+  /** The agent shown: all, one of the three kinds, or one ACP agent ("acp:console" is Custom). */
+  agent: string;
+  /** The one model shown, when the page asked for one. */
+  model?: string;
   buckets: StatsBucket[];
   totals: StatsTotals;
   /** The same number of buckets just before this window. */
   previous: StatsTotals;
   byAgent: Record<Agent, StatsTotals>;
+  /** Each agent with activity in the window, by name: Claude Code, Codex, then each ACP agent (Custom…). */
+  agents: (StatsTotals & { id: string; name: string })[];
   projects: (StatsTotals & { cwd: string })[];
   byModel: ModelUsage[];
 }

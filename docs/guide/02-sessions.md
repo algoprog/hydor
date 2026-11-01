@@ -304,6 +304,8 @@ Most of these are in the session's menu (⋯), and, on a computer, when you righ
 - **Archive** / **Unarchive**: takes the session out of the list; nothing is deleted. Archived sessions are found with **Search sessions** in the sidebar; open one and choose **Unarchive** in its menu.
 - **Delete session**: after you confirm, the session's history is removed from disk, so it disappears from the agent's own command line and VS Code too. This cannot be undone. On a touch screen, the bin at the end of a session's row does the same.
 
+Until you delete it, the app keeps every session, even when the agent's own program deletes its conversation (Claude Code does after 30 days unless told otherwise): it comes back, listed and openable. Sessions nobody used for a year are deleted by themselves, unless you pin them or change that in Settings → General (see [Delete inactive sessions](/guide/app#delete-inactive-sessions)).
+
 Pin, unpin, archive, unarchive and snooze show a notice with **Undo**, and Ctrl+Z undoes them within 8 seconds.
 
 ## Share a read-only link

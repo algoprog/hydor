@@ -1,5 +1,7 @@
 // Activity stats: per-hour rows from the indexer, grouped into the viewer's local
-// days, ISO weeks, months or years.
+// days, ISO weeks, months or years; for every agent or one (each ACP agent by name: Custom, Gemini CLI…),
+// and every model or one.
+import { ACP_PRESETS, acpAgents, CONSOLE_ID } from './agents/acp.ts';
 import { rateFor } from './prices.ts';
 import type { Agent, ModelUsage, StatsBucket, StatsGranularity, StatsResponse, StatsTotals } from '../shared/types.ts';
 import type { DB } from './db.ts';
@@ -129,7 +131,17 @@ function keyStart(g: StatsGranularity, key: string): number {
   return civil(y, m, d);
 }
 
-export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: string; agent?: string; count?: number }): StatsResponse {
+/** An agent's name in the stats: Claude Code, Codex, or an ACP agent's ("acp:console" is Custom). */
+function agentName(db: DB, id: string): string {
+  if (id === 'claude') return 'Claude Code';
+  if (id === 'codex') return 'Codex';
+  const acp = id.startsWith('acp:') ? id.slice(4) : '';
+  if (!acp) return 'Other agents';
+  if (acp === CONSOLE_ID) return 'Custom';
+  return [...acpAgents(db), ...ACP_PRESETS].find((a) => a.id === acp)?.name ?? acp;
+}
+
+export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: string; agent?: string; model?: string; count?: number }): StatsResponse {
   const g = q.granularity;
   let tz = q.tz || 'UTC';
   let fmt: Intl.DateTimeFormat;
@@ -139,7 +151,10 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
     tz = 'UTC';
     fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric' });
   }
-  const agent = q.agent === 'claude' || q.agent === 'codex' ? q.agent : 'all';
+  // All agents, one kind (claude, codex, acp), or one ACP agent (acp:console is Custom).
+  const agent = q.agent === 'claude' || q.agent === 'codex' || q.agent === 'acp' || /^acp:[\w.-]{1,64}$/.test(q.agent ?? '') ? q.agent! : 'all';
+  const kind = agent.startsWith('acp') ? 'acp' : agent;
+  const onlyModel = q.model?.trim() || undefined;
   const n = Math.max(1, Math.min(q.count ?? DEFAULT_COUNT[g], 400));
   const now = Date.now();
   const today = localDate(fmt, now);
@@ -164,11 +179,7 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
   // Two days of slack either side of the local-midnight boundary.
   const fromHour = Math.floor((keyStart(g, startKey) - 2 * 86400_000) / 3_600_000);
 
-  const rows = db
-    .prepare(`select * from activity where hour >= ?${agent === 'all' ? '' : ' and agent = ?'}`)
-    .all(...(agent === 'all' ? [fromHour] : [fromHour, agent])) as Row[];
-
-  // Folders and models of the sessions, and of those whose transcript the agent has since deleted.
+  // Folders and models of the sessions, and of those whose transcript is gone (deleted, or cleaned up as inactive).
   const cwdOf = new Map<string, string>();
   const modelOf = new Map<string, string>();
   for (const table of ['retired', 'sessions']) {
@@ -178,12 +189,22 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
       if (r.model) modelOf.set(r.key, r.model);
     }
   }
+  // Which ACP agent each ACP session ran (Custom, Gemini CLI…).
+  const acpOf = new Map<string, string>();
+  for (const r of db.prepare("select key, acp_agent from retired where acp_agent is not null union all select key, acp_agent from app_sessions where key like 'acp:%' and acp_agent is not null").all() as { key: string; acp_agent: string }[])
+    acpOf.set(r.key, r.acp_agent);
+  const agentOfRow = (r: Row) => (r.agent === 'acp' ? `acp:${acpOf.get(r.key) ?? acpOf.get(r.root) ?? '?'}` : r.agent);
+
+  const rows = (
+    db.prepare(`select * from activity where hour >= ?${kind === 'all' ? '' : ' and agent = ?'}`).all(...(kind === 'all' ? [fromHour] : [fromHour, kind])) as Row[]
+  ).filter((r) => (!agent.startsWith('acp:') || agentOfRow(r) === agent) && (!onlyModel || (modelOf.get(r.key) ?? '(unknown)') === onlyModel));
   const rates = new Map<string, ReturnType<typeof rateFor>>();
   const rate = (m: string) => {
     if (!rates.has(m)) rates.set(m, rateFor(db, m));
     return rates.get(m)!;
   };
-  const byModel = new Map<string, ModelUsage>();
+  const byModel = new Map<string, ModelUsage & { roots: Set<string> }>();
+  const byAgentId = new Map<string, StatsTotals & { roots: Set<string> }>();
 
   const buckets = new Map<string, StatsBucket & { roots: Set<string> }>();
   for (const k of keys) buckets.set(k, { key: k, label: labelFor(g, k), start: keyStart(g, k), ...emptyTotals(), roots: new Set() });
@@ -214,13 +235,20 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
       totalRoots.add(r.root);
       add(byAgent[r.agent], r, cost);
       agentRoots[r.agent].add(r.root);
+      const aid = agentOfRow(r);
+      let ag = byAgentId.get(aid);
+      if (!ag) byAgentId.set(aid, (ag = { ...emptyTotals(), roots: new Set() }));
+      add(ag, r, cost);
+      ag.roots.add(r.root);
       const cwd = cwdOf.get(r.root) ?? cwdOf.get(r.key) ?? '(unknown)';
       let p = projects.get(cwd);
       if (!p) projects.set(cwd, (p = { cwd, ...emptyTotals(), roots: new Set() }));
       add(p, r, cost);
       p.roots.add(r.root);
       let mu = byModel.get(model);
-      if (!mu) byModel.set(model, (mu = { model, tokensIn: 0, tokensCached: 0, tokensOut: 0, cost: rt ? 0 : null, price: rt }));
+      if (!mu) byModel.set(model, (mu = { model, sessions: 0, prompts: 0, tokensIn: 0, tokensCached: 0, tokensOut: 0, cost: rt ? 0 : null, price: rt, roots: new Set() }));
+      mu.roots.add(r.root);
+      mu.prompts! += r.prompts;
       mu.tokensIn += r.tokens_in;
       mu.tokensCached += r.tokens_cached;
       mu.tokensOut += r.tokens_out;
@@ -238,16 +266,23 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
     granularity: g,
     tz,
     agent,
+    model: onlyModel,
     firstAt: first.h != null ? first.h * 3_600_000 : undefined,
     firstByAgent,
     buckets: [...buckets.values()].map(({ roots, ...b }) => ({ ...b, sessions: roots.size })),
     totals,
     previous,
     byAgent,
+    agents: [...byAgentId.entries()]
+      .map(([id, { roots, ...t }]) => ({ ...t, id, name: agentName(db, id), sessions: roots.size }))
+      .sort((a, b) => (a.id === 'claude' ? -2 : a.id === 'codex' ? -1 : 0) - (b.id === 'claude' ? -2 : b.id === 'codex' ? -1 : 0) || b.tokensOut - a.tokensOut),
     projects: [...projects.values()]
       .map(({ roots, ...p }) => ({ ...p, sessions: roots.size }))
       .sort((a, b) => b.linesAdded + b.linesRemoved - (a.linesAdded + a.linesRemoved) || b.tokensOut - a.tokensOut)
       .slice(0, 12),
-    byModel: [...byModel.values()].filter((m) => m.tokensIn + m.tokensCached + m.tokensOut > 0).sort((a, b) => (b.cost ?? -1) - (a.cost ?? -1) || b.tokensOut - a.tokensOut),
+    byModel: [...byModel.values()]
+      .map(({ roots, ...m }) => ({ ...m, sessions: roots.size }))
+      .filter((m) => m.tokensIn + m.tokensCached + m.tokensOut > 0 || (m.prompts ?? 0) > 0)
+      .sort((a, b) => (b.cost ?? -1) - (a.cost ?? -1) || b.tokensOut - a.tokensOut),
   };
 }

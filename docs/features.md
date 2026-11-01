@@ -181,7 +181,12 @@ with npm into the app's folder), and the copies the app installed are kept up to
   payload, and wait for the reply (`?wait=60`). Sessions stopped by a usage limit can continue by themselves
   when it resets.
 - Usage: how much of each plan's limits you have used and when they reset, what the same work would cost
-  through the API, and activity over time.
+  through the API, and activity over time, for every agent or one (Custom and the ACP agents by name) and every
+  model or one.
+- Every session is kept, whatever the agent's own program does: Claude Code is told to keep its conversations,
+  and the app keeps its own link to every conversation file (no extra disk), so one that gets deleted comes back.
+  Sessions nobody used for a year are deleted (Settings → General → Delete inactive sessions: on or off, and how
+  long); pinned and busy ones stay, and their numbers stay in Activity.
 - System: CPU, memory, GPUs, disks, network and the busiest processes, live.
 - Settings: sign the agents in and out from the browser, and manage MCP servers, skills, plugins, Agent
   Guidelines and the CLAUDE.md / AGENTS.md instruction files.

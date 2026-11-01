@@ -4,6 +4,13 @@ import { Worker } from 'node:worker_threads';
 import type { SearchHit } from '../../shared/types.ts';
 import { agentRoots, APP_ROOT, config, paths } from '../config.ts';
 import type { DB } from '../db.ts';
+import { keptPath } from './kept.ts';
+
+/** Where the app keeps its own link to every Claude Code and Codex transcript (kept.ts). */
+export const KEPT_DIR = path.join(config.dataDir, 'kept');
+
+/** The kept link of a transcript, if the app keeps one for it. */
+export const keptOfTranscript = (file: string) => keptPath(file, [...agentRoots.claudeProjects, ...agentRoots.codexHomes], KEPT_DIR);
 
 /** Main-thread handle on the indexer worker. Emits 'updated' ({keys, removed}) and 'progress'. */
 export class Indexer extends EventEmitter {
@@ -12,7 +19,7 @@ export class Indexer extends EventEmitter {
 
   start() {
     const w = new Worker(path.join(APP_ROOT, 'dist/server/index-worker.js'), {
-      workerData: { dbPath: paths.db, claudeProjectsDirs: agentRoots.claudeProjects, codexHomes: agentRoots.codexHomes, acpDir: path.join(config.dataDir, 'acp') },
+      workerData: { dbPath: paths.db, claudeProjectsDirs: agentRoots.claudeProjects, codexHomes: agentRoots.codexHomes, acpDir: path.join(config.dataDir, 'acp'), keptDir: KEPT_DIR },
     });
     this.worker = w;
     w.on('message', (m: { type: string; keys?: string[]; removed?: string[]; done?: number; total?: number; running?: boolean; path?: string; message?: string }) => {
