@@ -29,6 +29,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { RUN_WHY, splitRunMessage, type RunMessage } from '@shared/automations';
+import { childReplyOf } from '@shared/children';
 import type { FileChange, HandoffInfo, Question, TimelineItem, ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { confirmResume, takeoverDialog } from '../../lib/activity';
@@ -48,6 +49,7 @@ import { toolView } from '../registry';
 import { mu } from '../../lib/machine';
 import { ReadAloudButton } from '../voice/ReadAloud';
 import { TriggerIcon } from '../automations/parts';
+import { ChildReplyRow } from '../children/ChildReply';
 
 /** The session's folder (paths inside it are shown relative to it) and a way to show its changes. */
 /** `fork(at)`: start a new session from this one, up to the transcript entry `at` (Claude) or all of it. */
@@ -779,7 +781,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
   const parsed = useMemo(() => {
     const { text, files } = splitAttachedFiles(item.text);
     const ide = splitIdeContext(text);
-    return { text: ide ? ide.request : text, files, context: ide?.context, run: splitRunMessage(item.text) };
+    return { text: ide ? ide.request : text, files, context: ide?.context, run: splitRunMessage(item.text), child: childReplyOf(item.text) };
   }, [item.text]);
   // A long message shows its first lines, the rest a click away; it folds again after.
   const long = useRunsPast(body, FOLD_PAST, parsed.text);
@@ -792,6 +794,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
   }, []);
   if (item.peer) return <PeerMessage item={item} />;
   if (parsed.run) return <RunMessageRow item={item} run={parsed.run} />;
+  if (parsed.child) return <ChildReplyRow item={item} reply={parsed.child} />;
   if (item.meta === 'slash') {
     return (
       <div className="tl-item flex justify-end">

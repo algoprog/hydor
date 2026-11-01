@@ -130,9 +130,15 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
         <div style={{ height: Math.min(Math.max(height, 60), 900) }} className="relative border-t border-line transition-[height] duration-200">
           {!full && <PageFrame key={frameKey} html={page.html} title={title} store={store} onHeight={setHeight} onPick={onPick} />}
           {height > 900 && !full && (
-            <button onClick={() => setFull(true)} className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent pt-8 pb-2 text-[12.5px] font-medium text-white">
-              See the whole page
-            </button>
+            // The page fades into the card under the button, so its words never run behind the button's.
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-panel via-panel/85 to-transparent pt-14 pb-3">
+              <button
+                onClick={() => setFull(true)}
+                className="pointer-events-auto rounded-full border border-line-2 bg-bg-1 px-3.5 py-1.5 text-[12.5px] font-medium text-fg shadow-sm transition-colors hover:bg-bg-2"
+              >
+                See the whole page
+              </button>
+            </div>
           )}
         </div>
       )}

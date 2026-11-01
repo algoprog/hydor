@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import type { ChildNote } from '../../shared/children.ts';
+import { childReplyOf, type ChildNote } from '../../shared/children.ts';
 import type { Agent, AgentModel, LiveState, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { budget } from '../budget/index.ts';
@@ -302,6 +302,20 @@ test('stopped, failed, or no reply: the parent hears how it ended', () => {
   const t = (o: Partial<{ reply: string; status: string }>) => ({ items: [], files: [], commands: [], last: end(), reply: '', ...o });
   assert.equal(resultMessage({ ...base, turn: t({ status: 'interrupted', reply: 'half' }), stopped: 'its spending cap was reached' }), '[The child session "T" (acp:x, Custom · M) was stopped before it finished: its spending cap was reached. What it wrote is below.]\n\nhalf');
   assert.equal(resultMessage({ ...base, turn: t({ status: 'failed' }), error: 'model not found' }), '[The child session "T" (acp:x, Custom · M) stopped with an error: model not found]\n(It wrote no reply. child_sessions shows how it stands; the user can open it at L.)');
+});
+
+test('the parent’s conversation reads each kind of reply back as it was sent', () => {
+  const base = { key: 'claude:x-1', title: 'Find "the" papers (2018)', label: 'Claude Code · claude-opus-5-5', link: 'https://naget.test/s/claude%3Ax-1' };
+  const t = (o: Partial<{ reply: string; status: string }>) => ({ items: [], files: [], commands: [], last: end(), reply: '', ...o });
+  const who = { title: base.title, key: base.key, label: base.label };
+  assert.deepEqual(childReplyOf(resultMessage({ ...base, turn: t({ reply: '# Found\n\nTwelve papers.' }) })), { ...who, ended: 'replied', text: '# Found\n\nTwelve papers.' });
+  assert.deepEqual(childReplyOf(resultMessage({ ...base, turn: t({ reply: 'x'.repeat(5000) }), summary: 'Twelve papers, two disputed.\n\nOne gap.' })), { ...who, ended: 'replied', summaryOf: 5000, text: 'Twelve papers, two disputed.\n\nOne gap.' });
+  assert.deepEqual(childReplyOf(resultMessage({ ...base, turn: t({ status: 'interrupted', reply: 'half' }), stopped: 'its spending cap was reached' })), { ...who, ended: 'stopped', why: 'its spending cap was reached', text: 'half' });
+  assert.deepEqual(childReplyOf(resultMessage({ ...base, turn: t({ status: 'interrupted' }) })), { ...who, ended: 'stopped', text: '' });
+  assert.deepEqual(childReplyOf(resultMessage({ ...base, turn: t({ status: 'failed' }), error: 'model not found [404]' })), { ...who, ended: 'failed', why: 'model not found [404]', text: '' });
+  // Anything else is a message like any other.
+  assert.equal(childReplyOf('[Reply from me] hello'), null);
+  assert.equal(childReplyOf('papers on latent sparse retrieval'), null);
 });
 
 test('a parent over its cap gets the reply in its queue instead', async () => {

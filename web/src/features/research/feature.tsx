@@ -1,6 +1,6 @@
 // Deep research: on the start page, an option under Options (with its breadth, depth, search budget and what
-// it delivers); in the lead's session, a bar over the message box with the rounds, the searches used and the
-// researchers at work; in a researcher's, whose research it is part of.
+// it delivers); in the lead's session, a bar over the message box with what it is doing, the searches used and
+// its report once delivered; in a researcher's, whose research it is part of.
 import { useEffect, useRef, useState } from 'react';
 import { Telescope } from 'lucide-react';
 import type { SessionExtra } from '@shared/features';
@@ -10,9 +10,11 @@ import { OptionRow, Popover, Segmented, SettingChip } from '../../components/ui'
 import { activityOf, isBusy } from '../../lib/activity';
 import { api, enc } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
-import { openSession } from '../../lib/nav';
-import { useSessions } from '../../lib/store';
-import type { WebFeature } from '../registry';
+import { go, openFile, openSession } from '../../lib/nav';
+import { useApp, useSessions, useTimeline } from '../../lib/store';
+import { resolveIn } from '../documents/fileTypes';
+import { usePagesStore } from '../pages/state';
+import { nagetTool, type WebFeature } from '../registry';
 
 const DOCK = 'mx-3 mb-2 flex items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]';
 /** The settings picked last, for the next research (the mode itself is picked each time: it costs more). */
@@ -25,27 +27,77 @@ const last = (): ResearchSettings => {
   }
 };
 
-/** In the lead's session: which round, how much of the search budget is used, the researchers at work. */
+/** The report once the lead has delivered it: its page in Pages, or the Word document it handed over. */
+function useReport(s: SessionSummary, r: ResearchSettings): { open: () => void } | null {
+  const pages = usePagesStore((x) => x.pages);
+  const items = useTimeline((x) => x.byKey[s.key]?.items);
+  const home = useApp((x) => x.boot?.home);
+  useEffect(() => {
+    if (r.format === 'page' && !usePagesStore.getState().pages) usePagesStore.getState().loadPages().catch(() => {});
+  }, [r.format]);
+  if (r.format === 'page') {
+    const page = pages?.filter((p) => p.sessionKey === s.key).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    return page ? { open: () => go(`/pages/${page.id}`) } : null;
+  }
+  for (let i = (items?.length ?? 0) - 1; i >= 0; i--) {
+    const it = items![i];
+    if (it.kind !== 'tool' || nagetTool(it.tool.name) !== 'present_files') continue;
+    const files = (it.tool.input as { files?: unknown } | undefined)?.files;
+    const doc = (Array.isArray(files) ? files : []).map((f) => (typeof f === 'string' ? f : (f as { path?: unknown } | null)?.path)).find((p): p is string => typeof p === 'string' && /\.docx$/i.test(p));
+    if (doc) return { open: () => openFile(resolveIn(doc, s.cwd, home)) };
+  }
+  return null;
+}
+
+/** In the lead's session: what the research is doing now, the searches it has used, and its report once it is there. */
 function LeadDock({ s, r }: { s: SessionSummary; r: ResearchSettings }) {
   const [st, setSt] = useState<ResearchState | null>(null);
   useEffect(() => {
     api<ResearchState>(`/api/research/${enc(s.key)}`).then(setSt, () => {});
   }, [s.key]);
   useFeatureEvent('research', (e) => e.key === s.key && setSt(e.data as ResearchState));
-  // Counts, not a list: a selector that makes a new array on every call never settles, and React gives up (a blank page).
+  // A count, not a list: a selector that makes a new array on every call never settles, and React gives up (a blank page).
   const keys = st?.researchers ?? [];
-  const kids = useSessions((x) => keys.filter((k) => x.byKey[k]).length);
   const working = useSessions((x) => keys.filter((k) => isBusy(activityOf(x.byKey[k]))).length);
+  const report = useReport(s, r);
+  const leading = isBusy(activityOf(s));
   const rounds = st?.rounds ?? 0;
-  const round = rounds > r.depth ? 'checking' : rounds ? `round ${rounds} of ${r.depth}` : 'planning';
+  // Whole sentences, so that each translates as one.
+  const now = working
+    ? rounds > r.depth
+      ? `Checking the sources · ${working} researcher${working === 1 ? '' : 's'} at work`
+      : `Round ${rounds} of ${r.depth} · ${working} researcher${working === 1 ? '' : 's'} at work`
+    : report && !leading
+      ? 'Report ready'
+      : !rounds
+        ? 'Planning'
+        : leading
+          ? rounds >= r.depth
+            ? 'Writing the report'
+            : 'Reading the reports'
+          : `Round ${Math.min(rounds, r.depth)} of ${r.depth}`;
   return (
-    <div className={DOCK}>
+    <div
+      className={DOCK}
+      title={
+        r.format === 'document'
+          ? `${r.breadth} researchers at a time, ${r.depth} rounds and at most ${r.queries} searches. The report comes as a Word document.`
+          : `${r.breadth} researchers at a time, ${r.depth} rounds and at most ${r.queries} searches. The report comes as a page in Pages.`
+      }
+    >
       <Telescope size={14} className="shrink-0 text-fg-3" />
       <span className="min-w-0 flex-1 truncate text-fg-2">
-        <span className="font-medium text-fg">Deep research</span> · {round} · {st?.used ?? 0} of {r.queries} searches
-        {kids ? ` · ${working ? `${working} researching` : 'researchers done'}` : ''}
+        <span className="font-medium text-fg">Deep research</span> · {now}
+        <span className="text-fg-3">
+          {' '}
+          · {st?.used ?? 0} of {r.queries} searches
+        </span>
       </span>
-      <span className="shrink-0 text-fg-3 max-sm:hidden">{r.format === 'document' ? 'Word document' : 'Page'}</span>
+      {report && (
+        <button type="button" onClick={report.open} className="shrink-0 font-medium text-accent hover:underline">
+          Open report
+        </button>
+      )}
     </div>
   );
 }

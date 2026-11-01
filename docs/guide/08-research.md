@@ -44,9 +44,9 @@ Researchers search with the app's own web search and read pages with its page re
 
 ### Follow it in the session
 
-A bar above the lead session's message box shows where the research stands: **Deep research** · "planning", then "round 1 of 2", then "checking" · how much of the budget is used ("12 of 60 searches") · "3 researching", or "researchers done". On a wider screen it also says what the report will be: Page or Word document.
+A bar above the lead session's message box shows what the research is doing: **Deep research** · "Planning", then "Round 1 of 2 · 4 researchers at work", "Reading the reports" between rounds, "Checking the sources" while researchers check the key claims, "Writing the report", and at the end "Report ready" · and how much of the budget is used ("12 of 60 searches"). Once the report is there, **Open report** at the right of the bar opens it: the page in Pages, or the Word document. Point at the bar to see the research's settings and what the report will be.
 
-Each researcher shows as a card in the lead's conversation and sits under the lead in the sidebar, like any [child session](/guide/research#follow-child-sessions). Open one to watch it work: its bar says "Researching for" and the lead's title, with **Lead** to go back.
+Each researcher shows as a card marked "Researcher" in the lead's conversation and sits under the lead in the sidebar, like any [child session](/guide/research#follow-child-sessions). What each one reports back shows as a line, "Reply from" and its title, with the start of what it found: click the line to read it. Open a researcher to watch it work: its bar says "Researching for" and the lead's title, with **Lead** to go back.
 
 ### The report
 
@@ -72,6 +72,8 @@ The child sees nothing of the parent's conversation, so the agent writes it a br
 
 When a child's turn ends, its reply goes back to the parent as a message, which wakes the parent. If the parent is busy, the message waits in its queue until its turn ends.
 
+In the parent's conversation, the reply shows as one line: "Reply from", the child's title and the start of what it wrote. Click the line to read the reply (its summary, when it was long), then **Open its session** or **Read the whole reply** to go to the child. A child stopped before it finished shows as "… was stopped", and one that failed as "… stopped with an error".
+
 - A reply longer than about 4,000 characters arrives as a short summary written by the helper model ([Agents, accounts and models](/guide/agents-models)); the parent can still read it whole.
 - If a child stops with an error, or is stopped before it finishes, the parent is told that too.
 - The parent can check on its children at any time (what each is doing, its agent and model, what it has spent, the start of its latest reply) and send one of them more to do.
@@ -81,7 +83,7 @@ You can open a child and talk to it like any other session. Whatever it replies 
 
 ### Follow child sessions
 
-- **In the parent's conversation**: a card for each child, under the turn that started it. It shows the child's title, "Child session", its agent and model, what it is doing now ("Not running" or "Stopped with an error" when it has stopped), when it was last active and what it has spent. Click it (**Open**) to go to the child. While the child works, the square button beside it stops the child's turn.
+- **In the parent's conversation**: a card for each child, under the turn that started it. It shows the child's title, "Child session" ("Researcher" in a deep research), its agent and model, what it is doing now ("Not running" or "Stopped with an error" when it has stopped), when it was last active and what it has spent. Click it (**Open**) to go to the child. While the child works, the square button beside it stops the child's turn.
 - **In the sidebar**: children sit under their parent, folded into one line such as "3 child sessions · 1 needs you · 2 working". Click the line to unfold them; it stays open while you are in one of them. On a phone, where the sidebar is a drawer, tapping the line unfolds it without closing the drawer.
 - **In the child**: a bar above the message box says "Child of" and the parent's title ("its replies go back there"), with **Open parent**.
 

@@ -2,7 +2,7 @@
 import type { ResearchSettings } from '../../shared/research.ts';
 
 const DELIVER: Record<ResearchSettings['format'], string> = {
-  page: 'Deliver the report as a page the user keeps, with save_page: a clear title, the answer in a few sentences first, then sections, a numbered citation [1] after each claim, and the sources at the end (title, site, date, link, each [n] linking to it).',
+  page: 'Deliver the report as a page the user keeps, with save_page: a clear title, the answer in a few sentences first, then sections, a numbered citation [1] after each claim, and the sources at the end (title, site, date, link, each [n] linking to it). It shows as a card with your reply, and the bar over the message box opens it: name it in your summary, without its link.',
   document:
     'Deliver the report as a Word document (.docx) in the session’s folder, with the word-documents skill: a clear title, the answer in a few sentences first, then sections with headings, a numbered citation [1] after each claim, and the sources at the end (title, site, date, link). Then show it with present_files.',
 };
