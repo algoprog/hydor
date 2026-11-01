@@ -340,7 +340,8 @@ async function pass(initial: boolean) {
     // for the stats, with its folder and model.
     const rows = db.prepare('select key, path from sessions').all() as { key: string; path: string }[];
     const gone = rows.filter((r) => {
-      if (known.has(r.path)) return false;
+      // Listed, or put there since the listing (a session moved to another account).
+      if (known.has(r.path) || fs.existsSync(r.path)) return false;
       const k = keptOf(r.path);
       return !(k && restore(r.path, k));
     });

@@ -631,6 +631,32 @@ function AutoResumeSetting() {
   );
 }
 
+/** A session whose account runs out of usage moves to another account of its agent with usage left. Kept on the server. */
+function AutoSwitchSetting() {
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    api<{ autoSwitch: boolean }>('/api/app-settings')
+      .then((r) => setOn(r.autoSwitch))
+      .catch(() => setOn(false));
+  }, []);
+  return (
+    <SettingRow label="Switch accounts at a limit" hint="When a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on. New sessions skip an account at its limit.">
+      {on === null ? (
+        <Throbber className="text-fg-3" />
+      ) : (
+        <Switch
+          on={on}
+          label="Switch accounts at a limit"
+          onChange={(v) => {
+            setOn(v);
+            put('/api/app-settings', { autoSwitch: v }).catch((e) => (setOn(!v), toastError(e)));
+          }}
+        />
+      )}
+    </SettingRow>
+  );
+}
+
 /** How long a session may stay inactive before the app deletes it. */
 const AGES: [number, string][] = [
   [90, '3 months'],
@@ -850,6 +876,7 @@ function AccountSettings() {
                 }
               />
             ))}
+            <AutoSwitchSetting />
           </div>
         )}
       </Section>

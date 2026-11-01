@@ -67,6 +67,8 @@ How the timing works, with the switch or with **Resume at reset**:
 - If the limit lifts early (you used a reset, or signed in with another account), the session continues right away. If it was continued early in the last 15 minutes and hit the limit again, it waits for the reset instead.
 - **Cancel** on the notice stops a planned continue.
 
+With more than one account for the agent, [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) carries the session on with another account right away instead, and waits only when every account is at its limit (see [Agents, accounts and models](/guide/agents-models#use-all-your-accounts-switch-at-a-limit)).
+
 ## Use a limit reset
 
 Some plans give you limit resets: Codex reset credits and Claude reset grants. Using one clears the plan's usage limits now instead of waiting for them to reset.

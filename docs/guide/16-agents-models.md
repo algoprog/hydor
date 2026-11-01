@@ -114,7 +114,18 @@ When the agent you picked has added accounts, the start page's **Options** shows
 - Each added account is listed by name.
 - **Manage accounts** opens Settings → Accounts.
 
-The start page remembers your choice for that agent. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts; to use another one, start a new session.
+The start page remembers your choice for that agent. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts. It changes by itself only with **Switch accounts at a limit** (below).
+
+## Use all your accounts: switch at a limit
+
+With two or more accounts for the same agent, the app can use them all: when one runs out of usage, your work carries on with another. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) and turn on **Switch accounts at a limit**, under **More accounts** ("When a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on. New sessions skip an account at its limit."). It is off until you turn it on, and it works while no browser is open.
+
+- When a turn stops because the session's account hit its usage limit, the app picks another signed-in account of the same agent that still has usage (the least used one), moves the session there with all its history, and sends "… reached its usage limit, so this session now runs on …. Continue where you left off." A note at the top of the app says which account it moved to.
+- Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex.
+- A Codex goal moves with the session and keeps going.
+- When every account is at its limit, nothing moves. With **Resume after usage limits** on, the session continues when the first account resets, on that account. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
+- A new session started on an account that is at its limit starts on one with usage left instead.
+- Sessions open in VS Code or a terminal stay on their account.
 
 ## Add Gemini CLI, OpenCode and other ACP agents
 
@@ -314,3 +325,4 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Add the newest DeepSeek model from OpenRouter to my models." (once your OpenRouter key is set)
 - "Make the helper model one that sees images."
 - "Stop the vLLM model that's running, to free the graphics card."
+- "Use all my Claude accounts: when one hits its limit, carry on with another."

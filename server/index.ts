@@ -532,11 +532,13 @@ app.delete('/api/sessions/:key/resume-at', async (req) => {
   return { ok: true };
 });
 /** App-wide switches kept on the server (they act while no browser is open). */
-app.get('/api/app-settings', async () => ({ autoResume: kvGet(db, 'auto_resume') === '1' }));
+const appSettings = () => ({ autoResume: kvGet(db, 'auto_resume') === '1', autoSwitch: kvGet(db, 'auto_switch') === '1' });
+app.get('/api/app-settings', async () => appSettings());
 app.put('/api/app-settings', async (req) => {
   const b = (req.body ?? {}) as any;
   if (typeof b.autoResume === 'boolean') kvSet(db, 'auto_resume', b.autoResume ? '1' : '0');
-  return { autoResume: kvGet(db, 'auto_resume') === '1' };
+  if (typeof b.autoSwitch === 'boolean') kvSet(db, 'auto_switch', b.autoSwitch ? '1' : '0');
+  return appSettings();
 });
 // A webhook task's address, /hooks/<secret>, is served by the automations (server/automations/hooks.ts).
 
