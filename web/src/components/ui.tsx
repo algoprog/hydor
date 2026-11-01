@@ -126,14 +126,14 @@ export function useOutside(refs: RefObject<HTMLElement | null>[], onOutside: () 
   }, [active, onOutside, refs]);
 }
 
-// Open popovers in the order they opened. A popover nested inside another (e.g. the folder picker's
-// suggestions inside the folder chip) portals to <body>, so the outer one can't see it as a DOM child;
-// this stack lets each popover treat a click in a later-opened popover as inside, not an outside click.
+// Open popovers and dialogs in the order they opened. One opened from inside a popover (the folder picker's
+// suggestions inside the folder chip, the Guidelines dialog under Options) portals to <body>, so the popover
+// can't see it as a DOM child; this stack lets each popover treat a click in a layer opened later as inside,
+// not an outside click, and lets Escape close only the topmost.
 const popoverStack: HTMLElement[] = [];
 
-/** Closes a popover on a click outside it, its anchor, and any popover opened on top of it; Escape closes only the topmost. */
-function usePopoverDismiss(node: RefObject<HTMLElement | null>, anchor: RefObject<HTMLElement | null>, onClose: () => void, open: boolean) {
-  // Register in open order once per open, so re-renders (e.g. typing) never reorder the nesting stack.
+/** Puts an open popover or dialog on the stack, once per open, so re-renders (e.g. typing) never reorder it. */
+function useStacked(node: RefObject<HTMLElement | null>, open: boolean) {
   useEffect(() => {
     if (!open) return;
     const el = node.current;
@@ -144,6 +144,14 @@ function usePopoverDismiss(node: RefObject<HTMLElement | null>, anchor: RefObjec
       if (i >= 0) popoverStack.splice(i, 1);
     };
   }, [open, node]);
+}
+
+/** Whether nothing was opened over this layer since it opened. */
+const onTop = (el: HTMLElement | null) => !el || popoverStack[popoverStack.length - 1] === el;
+
+/** Closes a popover on a click outside it, its anchor, and any popover or dialog opened on top of it; Escape closes only the topmost. */
+function usePopoverDismiss(node: RefObject<HTMLElement | null>, anchor: RefObject<HTMLElement | null>, onClose: () => void, open: boolean) {
+  useStacked(node, open);
 
   useEffect(() => {
     if (!open) return;
@@ -152,11 +160,11 @@ function usePopoverDismiss(node: RefObject<HTMLElement | null>, anchor: RefObjec
       const el = node.current;
       if (el?.contains(t) || anchor.current?.contains(t)) return;
       const i = el ? popoverStack.indexOf(el) : -1;
-      for (let j = i + 1; j < popoverStack.length; j++) if (popoverStack[j].contains(t)) return; // inside a popover opened on top
+      for (let j = i + 1; j < popoverStack.length; j++) if (popoverStack[j].contains(t)) return; // inside a layer opened on top
       onClose();
     };
     const k = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && (!node.current || popoverStack[popoverStack.length - 1] === node.current)) onClose();
+      if (e.key === 'Escape' && onTop(node.current)) onClose();
     };
     document.addEventListener('pointerdown', h, true);
     document.addEventListener('keydown', k);
@@ -517,15 +525,27 @@ export function Dialog({
   width?: number;
   footer?: ReactNode;
 }) {
+  // On the popovers' stack: a dialog opened from a popover (Options → Guidelines) is over it, so a click in it
+  // isn't a click outside the popover, which would close the popover and the dialog inside it.
+  const ref = useRef<HTMLDivElement>(null);
+  useStacked(ref, open);
+  // A tap on the dimmed page closes it on the tap's click, not as it goes down, so that click can't land on
+  // what was under it (the Options sheet on a phone); a press that began in the dialog (selecting text) doesn't.
+  const pressed = useRef(false);
   useEffect(() => {
     if (!open) return;
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && onTop(ref.current) && onClose();
     document.addEventListener('keydown', k);
     return () => document.removeEventListener('keydown', k);
   }, [open, onClose]);
   if (!open) return null;
   return createPortal(
-    <div className="anim-overlay scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      ref={ref}
+      className="anim-overlay scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+      onPointerDown={(e) => (pressed.current = e.target === e.currentTarget)}
+      onClick={(e) => pressed.current && e.target === e.currentTarget && onClose()}
+    >
       <div
         role="dialog"
         aria-modal
