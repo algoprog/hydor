@@ -199,6 +199,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['terminal', 'Terminal', '/terminal', 'shell console command line bash', 'Shells on this computer'],
   ['apps', 'Templates', '/apps', 'app apps gallery templates ready-made tasks tools forms', 'Tasks you run again and again: fill in a form, and an agent does the job'],
   ['new-app', 'New template', '/apps/new', 'create build make new template app apps form tool', 'A template anyone can run from a form'],
+  ['knowledge', 'Knowledge', '/knowledge', 'knowledge base documents folder pdf files search rag library cite sources', 'Your documents, for every agent to search and cite'],
   ['pages', 'Pages', '/pages', 'saved pages html reports small tools app apps tracker calculator checklist', 'Small tools and pages agents made for you, and what you published'],
   ['published', 'Published pages', '/pages?tab=published', 'published public share link', 'Pages anyone with the link can open'],
   ['preview', 'Preview', '/preview', 'dev server localhost web app browser', 'Look at a dev server running here'],

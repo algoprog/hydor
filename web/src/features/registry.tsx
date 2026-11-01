@@ -17,6 +17,7 @@ import { connectionsFeature } from './connections/feature';
 import { customFeature } from './custom/feature';
 import { documentsFeature } from './documents/feature';
 import { imagesFeature } from './images/feature';
+import { knowledgeFeature } from './knowledge/feature';
 import { memoryFeature } from './memory/feature';
 import { opinionFeature } from './opinion/feature';
 import { pagesFeature } from './pages/feature';
@@ -96,6 +97,7 @@ export const features = (): WebFeature[] =>
     searchFeature,
     browserFeature,
     memoryFeature,
+    knowledgeFeature,
     childrenFeature,
     opinionFeature,
     budgetFeature,
