@@ -168,6 +168,9 @@ export function liveItem(it: Json, ts: number): TimelineItem | null {
   }
 }
 
+/** A turn error that says the plan's usage ran out (Codex's usageLimitExceeded). */
+const usageLimitHit = (e: Json | undefined) => !!e && /usage_?limit_?(exceeded|reached)/i.test(JSON.stringify(e.codexErrorInfo ?? e.code ?? ''));
+
 export class CodexLive extends LiveAdapter {
   readonly agent = 'codex' as const;
   rpc: RpcPeer;
@@ -348,6 +351,7 @@ export class CodexLive extends LiveAdapter {
           if (sec > 0.1) this.state.tokPerSec = Math.round(this.lastTurnOut / sec);
         }
         this.approvals.clear();
+        if (t.status === 'failed' && usageLimitHit(t.error)) this.emit('limithit');
         if (t.status === 'failed' && t.error?.message) {
           let msg = String(t.error.message);
           try {
@@ -450,6 +454,7 @@ export class CodexLive extends LiveAdapter {
         if (this.state.status === 'waiting' && !this.approvals.size) this.state.status = 'working';
         break;
       case 'error': {
+        if (!p.willRetry && usageLimitHit(p.error)) this.emit('limithit');
         const msg = p.error?.message ?? 'Error';
         let text = String(msg);
         try {

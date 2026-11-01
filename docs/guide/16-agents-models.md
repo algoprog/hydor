@@ -124,7 +124,7 @@ With two or more accounts for the same agent, the app can use them all: when one
 - Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex.
 - A Codex goal moves with the session and keeps going.
 - When every account is at its limit, nothing moves. With **Resume after usage limits** on, the session continues when the first account resets, on that account. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
-- A new session started on an account that is at its limit starts on one with usage left instead.
+- A new session started on an account that is at its limit starts on one with usage left instead, and a message you send to a session whose account is at its limit moves the session first, so the message isn't turned away.
 - Sessions open in VS Code or a terminal stay on their account.
 
 ## Add Gemini CLI, OpenCode and other ACP agents

@@ -54,6 +54,7 @@ export interface LiveConfig {
  *   'activity'   the agent wrote something; re-read the transcript
  *   'identity'   the session id / transcript path became known
  *   'ratelimit'  fresh plan-usage numbers
+ *   'limithit'   the turn stopped because the plan's usage ran out
  *   'call'       a model call finished: what it used (ModelCall)
  *   'exit'
  */
