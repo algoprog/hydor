@@ -339,8 +339,8 @@ test('child_sessions: each child’s state, and one’s whole latest reply', asy
 test('the setting: how many at once', async () => {
   const routes = new Map<string, (req: any) => Promise<any>>();
   children.routes!({ ...deps, app: { get: (p: string, h: any) => routes.set(`GET ${p}`, h), put: (p: string, h: any) => routes.set(`PUT ${p}`, h) } } as unknown as Deps);
-  assert.deepEqual(await routes.get('GET /api/children/settings')!({}), { maxRunning: 4 });
-  assert.deepEqual(await routes.get('PUT /api/children/settings')!({ body: { maxRunning: 6 } }), { maxRunning: 6 });
+  assert.deepEqual(await routes.get('GET /api/children/settings')!({}), { maxRunning: 4, swarmSize: 5 });
+  assert.deepEqual(await routes.get('PUT /api/children/settings')!({ body: { maxRunning: 6 } }), { maxRunning: 6, swarmSize: 5 });
   await assert.rejects(routes.get('PUT /api/children/settings')!({ body: { maxRunning: 0 } }), (e: unknown) => e instanceof HttpError && e.status === 400);
 });
 

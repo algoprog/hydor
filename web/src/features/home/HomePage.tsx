@@ -241,7 +241,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   const modeOn = cat && mode && mode !== cat.defaultMode ? (cat.modes.find((m) => m.value === mode)?.label ?? null) : null;
   const acctOn = acct ? (accounts.find((a) => a.id === acct)?.name ?? null) : null;
   const capOn = typeof extra.capUsd === 'number' ? usd(extra.capUsd) : null;
-  const changed = [effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
+  const changed = [extra.swarm === true ? 'Swarm' : null, effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
   const modeNow = cat?.modes.find((m) => m.value === (mode ?? cat.defaultMode))?.label;
   const optionsTitle = [
     agent !== 'acp' && `Effort: ${effortOn ?? 'default'}`,
@@ -249,6 +249,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     acctOn && `Account: ${acctOn}`,
     `Memory: ${extra.memory === false ? 'off' : 'on'}`,
     `Spending cap: ${capOn ?? 'none'}`,
+    `Swarm: ${extra.swarm === true ? 'on' : 'off'}`,
   ]
     .filter(Boolean)
     .join('\n');

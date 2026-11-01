@@ -17,7 +17,8 @@ import { pages } from '../pages/index.ts';
 import { releaseNotes } from '../releases/index.ts';
 import { search } from '../search/index.ts';
 import { skillpack } from '../skillpack/index.ts';
+import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, children, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, find, releaseNotes];
+export const FEATURES: Feature[] = [pages, search, browser, memory, children, swarm, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, find, releaseNotes];

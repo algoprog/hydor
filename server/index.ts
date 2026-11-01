@@ -8,6 +8,7 @@ import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
 import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
+import type { SessionExtra } from '../shared/features.ts';
 import { AuthManager, HttpError, SESSION_COOKIE } from './auth.ts';
 import { config, ensureDirs, paths } from './config.ts';
 import { kvGet, kvSet, openDb } from './db.ts';
@@ -30,6 +31,9 @@ import { accountViews, createPr, ghToken, prDescribe, prDraft, prFromUrl, refres
 import { askCommands, commandHistory, complete, migrateTermHistory, recordCommand } from './termsuggest.ts';
 import { repoInfo, WORKTREES_ROOT } from './worktrees.ts';
 import { taskRoot } from './assistants/store.ts';
+import { swarmSize } from './children/index.ts';
+import { leadInstructions } from './swarm/instructions.ts';
+import { leadsSwarm } from '../shared/swarm.ts';
 import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
@@ -313,11 +317,15 @@ app.post('/api/sessions', async (req) => {
   noteUserMessage();
   if (b?.agent !== 'claude' && b?.agent !== 'codex' && b?.agent !== 'acp') throw new HttpError(400, 'Pick an agent');
   if (b.agent === 'acp' && typeof b.acpAgent !== 'string') throw new HttpError(400, 'Pick which agent');
+  const extra = b.extra && typeof b.extra === 'object' && !Array.isArray(b.extra) ? (b.extra as SessionExtra) : undefined;
+  let prompt = typeof b.prompt === 'string' ? b.prompt : undefined;
+  // Swarm mode for an agent that takes no instructions from the app: they come with the task.
+  if (leadsSwarm(extra) && b.agent === 'acp' && b.acpAgent !== CONSOLE_ID && prompt?.trim()) prompt = `${leadInstructions(swarmSize(db))}\n\nThe task:\n\n${prompt}`;
   const key = await sessions.create({
     acpAgent: b.agent === 'acp' ? b.acpAgent : undefined,
     agent: b.agent,
     cwd: files.resolvePath(b.cwd),
-    prompt: typeof b.prompt === 'string' ? b.prompt : undefined,
+    prompt,
     images: Array.isArray(b.images) ? b.images : [],
     files: Array.isArray(b.files) ? b.files : [],
     model: b.model || undefined,
@@ -326,7 +334,7 @@ app.post('/api/sessions', async (req) => {
     title: b.title || undefined,
     worktree: !!b.worktree,
     account: typeof b.account === 'string' && b.account ? b.account : undefined,
-    extra: b.extra && typeof b.extra === 'object' && !Array.isArray(b.extra) ? b.extra : undefined,
+    extra,
   });
   return { key };
 });
