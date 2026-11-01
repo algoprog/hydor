@@ -45,6 +45,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "i18n:extract": "node scripts/i18n-extract.mjs",
     "find:vectors": "OUTDIR=dist/dev node scripts/build-server.mjs scripts/find-vectors.ts && DATA_DIR=/tmp/naget-find-vectors node dist/dev/find-vectors.js",
+    "guide:settings": "node scripts/guide-settings.mjs",
     "start": "node dist/server/index.js",
     "set-password": "node dist/server/cli.js set-password"
   },

@@ -1,9 +1,11 @@
 // The guide's text, read from this copy's docs/guide (so it matches the version running and an update brings
-// its own), and found by words, or by meaning too when search by meaning is on (the sections' vectors ship
-// with the app, server/find/shipped-vectors.json).
+// its own), in English or in a translation (docs/guide/<lang>/, topic by topic: one missing or out of step with
+// the English shows in English), and found by words, or by meaning too when search by meaning is on (the
+// English sections' vectors ship with the app, server/find/shipped-vectors.json).
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_TOPICS, parseTopic, plainText, sectionText, type GuideSection, type GuideTopic } from '../../shared/guide.ts';
+import { AGENT_TOPICS, parseTopic, plainText, sectionText, translatedTopic, type GuideSection, type GuideTopic } from '../../shared/guide.ts';
+import type { Lang } from '../../shared/i18n.ts';
 import { APP_ROOT } from '../config.ts';
 import type { DB } from '../db.ts';
 import { hashOf, shippedVectors } from '../find/index.ts';
@@ -12,10 +14,18 @@ import { queryTable, scale, scoreAt } from '../memory/vectors.ts';
 
 export const GUIDE_DIR = path.join(APP_ROOT, 'docs', 'guide');
 
-let read: { sig: string; topics: GuideTopic[] } | null = null;
+const read = new Map<Lang, { sig: string; topics: GuideTopic[] }>();
 
-/** Every topic, in the files' order; read again when a file changes. */
-export function guideTopics(): GuideTopic[] {
+const mtime = (p: string) => {
+  try {
+    return fs.statSync(p).mtimeMs;
+  } catch {
+    return 0;
+  }
+};
+
+/** Every topic, in the files' order, in English or a translation; read again when a file changes. */
+export function guideTopics(lang: Lang = 'en'): GuideTopic[] {
   let files: string[] = [];
   try {
     files = fs
@@ -25,9 +35,21 @@ export function guideTopics(): GuideTopic[] {
   } catch {
     return [];
   }
-  const sig = files.map((f) => `${f}:${fs.statSync(path.join(GUIDE_DIR, f)).mtimeMs}`).join('|');
-  if (read?.sig !== sig) read = { sig, topics: files.map((f) => parseTopic(f, fs.readFileSync(path.join(GUIDE_DIR, f), 'utf8'))) };
-  return read.topics;
+  const dir = path.join(GUIDE_DIR, lang);
+  const sig = files.map((f) => `${f}:${mtime(path.join(GUIDE_DIR, f))}:${lang === 'en' ? 0 : mtime(path.join(dir, f))}`).join('|');
+  const had = read.get(lang);
+  if (had?.sig === sig) return had.topics;
+  const en = lang === 'en' ? null : guideTopics('en');
+  const topics = files.map((f, i) => {
+    if (!en) return parseTopic(f, fs.readFileSync(path.join(GUIDE_DIR, f), 'utf8'));
+    try {
+      return translatedTopic(en[i], f, fs.readFileSync(path.join(dir, f), 'utf8')) ?? en[i];
+    } catch {
+      return en[i];
+    }
+  });
+  read.set(lang, { sig, topics });
+  return topics;
 }
 
 /** The sections the search box finds (and that ship with vectors): the API is for agents, not there. */

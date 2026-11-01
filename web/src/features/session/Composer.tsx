@@ -247,18 +247,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     }
   };
 
+  // Only the Stop button stops a turn: Esc closes what is open (the find bar, a menu, a list) and nothing more.
   const interrupt = () => post(`/api/sessions/${enc(key)}/interrupt`).catch(toastError);
-
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && working && !document.querySelector('[role="dialog"]')) {
-        e.preventDefault();
-        interrupt();
-      }
-    };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  });
 
   const tasks = (running ? live!.backgroundTasks : ext?.backgroundTasks) ?? [];
   const ctx = live?.contextTokens && live?.contextWindow ? Math.round((live.contextTokens / live.contextWindow) * 100) : null;
@@ -535,7 +525,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             {working && (
               <button
                 onClick={interrupt}
-                title="Stop (Esc)"
+                title="Stop"
                 aria-label="Stop the current turn"
                 className="anim-pop-in ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-fg text-bg transition duration-150 hover:opacity-85 active:scale-90"
               >

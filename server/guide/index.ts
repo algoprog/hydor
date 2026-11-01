@@ -4,6 +4,8 @@
 // app what the user could do in its pages (api.ts: with the user's OK on a card), and ask_form to ask for several
 // details at once with a form (form.ts).
 import { AGENT_TOPICS, type GuideResponse, type GuideTopic } from '../../shared/guide.ts';
+import { isLang } from '../../shared/i18n.ts';
+import { userLang } from '../language/index.ts';
 import type { Feature, RunTool } from '../features/types.ts';
 import { appApi } from './api.ts';
 import { findSections, guideTopics } from './content.ts';
@@ -44,7 +46,12 @@ const APP_GUIDE: RunTool = {
   },
   async run(a, ctx) {
     const base = ctx.deps.publicBase();
-    const topics = guideTopics();
+    // In the language the user reads the app in, so its words are the ones on their screen; found by the English.
+    const topics = guideTopics(userLang(ctx.deps.db));
+    const local = (h: { topic: GuideTopic; section: { id: string } }) => {
+      const t = topics.find((x) => x.id === h.topic.id) ?? h.topic;
+      return { topic: t, section: t.sections.find((x) => x.id === h.section.id) ?? (h.section as GuideTopic['sections'][number]) };
+    };
     if (!topics.length) return 'This copy of the app has no guide (docs/guide is missing).';
     const topic = typeof a.topic === 'string' ? a.topic.trim().toLowerCase().replace(/^\d+-|\.md$/g, '') : '';
     const query = typeof a.query === 'string' ? a.query.trim() : '';
@@ -61,7 +68,7 @@ const APP_GUIDE: RunTool = {
       return `# ${t.title}\n${base}/guide/${t.id}\n\n${body.length > TOPIC_MAX ? `${body.slice(0, TOPIC_MAX)}\n… (cut: read the rest by section)` : body}`;
     }
     if (!query) return contents(topics, base);
-    const hits = await findSections(ctx.deps.db, query, 6);
+    const hits = (await findSections(ctx.deps.db, query, 6)).map((h) => ({ ...h, ...local(h) }));
     if (!hits.length) return `Nothing in the guide matches “${query}”. The contents:\n\n${contents(topics, base)}`;
     const full = hits.slice(0, 3).map((h) => {
       const text = absolute(h.section.text, base);
@@ -133,7 +140,10 @@ export const GUIDE_INSTRUCTIONS =
 export const guide: Feature = {
   id: 'guide',
   routes(d) {
-    d.app.get('/api/guide', async (): Promise<GuideResponse> => ({ topics: guideTopics() }));
+    d.app.get('/api/guide', async (req): Promise<GuideResponse> => {
+      const lang = (req.query as { lang?: string }).lang;
+      return { topics: guideTopics(isLang(lang) ? lang : 'en') };
+    });
   },
   tools: () => [APP_GUIDE, APP_API, ASK_FORM],
   spawn: () => ({ instructions: [GUIDE_INSTRUCTIONS] }),

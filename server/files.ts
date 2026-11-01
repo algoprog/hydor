@@ -168,6 +168,9 @@ const MIME: Record<string, string> = {
   mp4: 'video/mp4',
   webm: 'video/webm',
   mov: 'video/quicktime',
+  m4v: 'video/mp4',
+  mkv: 'video/x-matroska',
+  ogv: 'video/ogg',
   mp3: 'audio/mpeg',
   wav: 'audio/wav',
   ogg: 'audio/ogg',
@@ -175,6 +178,26 @@ const MIME: Record<string, string> = {
   json: 'application/json',
   html: 'text/plain; charset=utf-8',
 };
+
+/**
+ * The part of a file a Range header asks for (`bytes=0-1023`, `bytes=1024-`, `bytes=-500`): its first and last
+ * byte; 'all' without a header (or with one it does not read); 'bad' for a range outside the file (416).
+ * Videos need it: browsers seek by asking for the part they need, and Safari plays none without it.
+ */
+export function byteRange(header: string | undefined, size: number): { start: number; end: number } | 'all' | 'bad' {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(header ?? '').trim());
+  if (!m || (!m[1] && !m[2])) return 'all';
+  if (!m[1]) {
+    // The last n bytes.
+    const n = Number(m[2]);
+    if (!n) return 'bad';
+    return { start: Math.max(0, size - n), end: size - 1 };
+  }
+  const start = Number(m[1]);
+  const end = m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  if (start >= size || start > end) return 'bad';
+  return { start, end };
+}
 
 export function mimeFor(file: string): string {
   return MIME[path.extname(file).slice(1).toLowerCase()] ?? 'application/octet-stream';

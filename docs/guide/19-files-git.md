@@ -134,7 +134,7 @@ The file viewer shows files as they look:
 
 - **Images** (PNG, JPEG, GIF, WebP, SVG, ICO, BMP, AVIF): shown whole, on a checkerboard where they are see-through.
 - **PDFs**: in your browser's own PDF viewer.
-- **Video** (MP4, WebM, MOV) and **audio** (MP3, WAV, OGG): they play in place.
+- **Video** (MP4, WebM, MOV and M4V; MKV and OGV where your browser plays them): in the app's own player (see [Watch a video](#watch-a-video) below). **Audio** (MP3, WAV, OGG) plays in place.
 - **Office documents**: Word (.docx, .doc and the like), Excel (.xlsx, .xls), PowerPoint (.pptx, .ppt), OpenDocument (.odt, .ods, .odp), RTF and EPUB. A switch at the top picks the view:
   - **Pages**: the document as LibreOffice lays it out, page by page ("Laying out the pages…" the first time). This view is there only when LibreOffice is installed on this computer, and not for EPUB books.
   - **Text**: its text, sheets and slides as the app reads them.
@@ -143,6 +143,19 @@ The file viewer shows files as they look:
 - **Markdown** and **HTML**: see **Preview** and **Show as a page** above.
 
 **Download** is always in the bar.
+
+### Watch a video
+
+A video opens in the app's own player, which fills the viewer:
+
+- **Play and pause**: the round button in the middle, the button at the bottom left, a click on the picture, or Space (K works too). A double click on the picture fills the screen.
+- **Move through it**: drag along the bar at the bottom, or click a point on it; resting the pointer on the bar shows the time there, and its paler part is what has loaded. ← and → move 5 seconds, J and L 10 seconds, Home and End go to the start and the end, 0 to 9 jump to that tenth of the video, and , and . step one frame while it is paused.
+- **Sound**: the speaker mutes and unmutes it (M). On a computer, rest the pointer on the speaker for a volume slider; ↑ and ↓ change the volume too.
+- **Speed**: the **1×** button picks from 0.5× to 2× (**Normal** is 1×).
+- **Loop** plays it again from the start each time it ends, **Picture in picture** keeps it playing in a small window over everything else (where your browser has it), **Download** saves the file, and **Full screen** (F) fills the screen; the same button, or Esc, comes back.
+- The controls fade while it plays and come back when you move the pointer. The player remembers your volume and speed for the next video.
+- **On a phone**: tap the picture to show or hide the controls, and double-tap its left or right side to go back or forward 10 seconds. On an iPhone, full screen uses the phone's own video player.
+- A video your browser can't play (MKV and AVI files often use codecs browsers don't) says "This video can’t play here", with **Download** to watch it in a video app.
 
 ## Find a file by name
 

@@ -923,11 +923,19 @@ app.get('/api/fs/raw', async (req, reply) => {
   const st = await fs.promises.stat(p).catch(() => null);
   if (!st || !st.isFile()) throw new HttpError(404, 'Not found');
   reply.header('Content-Type', q.download === '1' ? 'application/octet-stream' : files.mimeFor(p));
-  reply.header('Content-Length', st.size);
   // User files never run as part of this app: no scripts, unique origin.
   reply.header('Content-Security-Policy', 'sandbox; default-src \'none\'; img-src \'self\' data:; media-src \'self\'; style-src \'unsafe-inline\'');
   reply.header('Cache-Control', 'private, no-cache');
   if (q.download === '1') reply.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(p))}`);
+  // A part of the file, as a video player asks for one to seek (and Safari to play at all).
+  reply.header('Accept-Ranges', 'bytes');
+  const range = files.byteRange(req.headers.range, st.size);
+  if (range === 'bad') return reply.code(416).header('Content-Range', `bytes */${st.size}`).send();
+  if (range !== 'all') {
+    reply.code(206).header('Content-Range', `bytes ${range.start}-${range.end}/${st.size}`).header('Content-Length', range.end - range.start + 1);
+    return reply.send(fs.createReadStream(p, { start: range.start, end: range.end }));
+  }
+  reply.header('Content-Length', st.size);
   return reply.send(fs.createReadStream(p));
 });
 /** An HTML file shown as a page: sandboxed, able to load the files next to it, for an hour. */

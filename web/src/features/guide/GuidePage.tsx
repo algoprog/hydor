@@ -25,16 +25,18 @@ interface Found {
   score: number;
 }
 
-/** Sections that hold the words, best first. */
+/** Sections that hold the words, best first; also the typed text as it is, for writing without spaces (Chinese). */
 function search(topics: GuideTopic[], q: string): Found[] {
   const words = queryWords(q);
-  if (!words.length) return [];
+  const whole = q.trim().toLowerCase();
+  if (!words.length && !whole) return [];
   const out: Found[] = [];
   for (const t of topics)
     for (const s of t.sections) {
       const text = plainText(s.text);
-      const { score } = matchItem({ title: s.title, keywords: t.title, text }, words, q);
-      if (score > 0) out.push({ topic: t, id: s.id, title: s.title, snippet: snippetOf(text, words), score });
+      let { score } = words.length ? matchItem({ title: s.title, keywords: t.title, text }, words, q) : { score: 0 };
+      if (!score && whole.length > 1) score = s.title.toLowerCase().includes(whole) ? 3 : text.toLowerCase().includes(whole) ? 1 : 0;
+      if (score > 0) out.push({ topic: t, id: s.id, title: s.title, snippet: snippetOf(text, words.length ? words : [whole]), score });
     }
   return out.sort((a, b) => b.score - a.score).slice(0, 30);
 }
@@ -164,7 +166,7 @@ function TopicView({ topic, next, onOpen }: { topic: GuideTopic; next?: GuideTop
   return (
     <article>
       <h2 className="mb-3 text-[22px] font-semibold tracking-tight">{topic.title}</h2>
-      <Markdown text={topic.body} app className="guide !text-[14px] !leading-relaxed" />
+      <Markdown text={topic.body} app headingIds={topic.anchors} className="guide !text-[14px] !leading-relaxed" />
       {next && (
         <button onClick={() => onOpen(next.id)} className="mt-10 flex w-full items-center gap-3 rounded-xl border border-line px-4 py-3 text-left transition-colors hover:bg-bg-1">
           <span className="min-w-0 flex-1">

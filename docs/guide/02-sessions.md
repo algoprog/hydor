@@ -243,7 +243,7 @@ A wide message box shows small meters on the right of its bottom row:
 
 ## Stop a turn, stop the agent or resume
 
-- **Stop a turn**: press **Stop** in the header, the round square button by the message box, or Esc. The agent stops what it is doing; the turn shows "Stopped after…". The agent stays ready for your next message, and the queue pauses until you resume it.
+- **Stop a turn**: press **Stop** in the header, or the round square button by the message box. (Esc doesn't stop it: it only closes what is open, such as the find bar or a list.) The agent stops what it is doing; the turn shows "Stopped after…". The agent stays ready for your next message, and the queue pauses until you resume it.
 - **Stop the agent process**: the session's menu (⋯) → **More** → **Stop the agent process**, when no turn is running. The agent's program ends; the session and its history stay, and it shows **Stopped**.
 - **Resume**: the header's **Resume** starts the agent again with the whole conversation, or just send a message ("Message to resume this session…"). If the session was written to seconds ago, perhaps from VS Code or a terminal, the app asks first, since two programs writing one session can damage its history.
 - An agent left idle stops by itself after three hours (when nothing waits for you and no background task runs); your next message starts it again.

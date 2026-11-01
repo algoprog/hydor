@@ -2,6 +2,8 @@
 
 Every part of the app, described for the people using it. The app shows this guide under **Help** in the sidebar, its search box (Ctrl+K) finds its sections, and the agents in the app read it to answer questions about the app and to change things in it for you. Links that start with `/` point to places in the app.
 
+The guide is also in [Chinese (简体中文)](zh/) and [Greek (Ελληνικά)](el/), every topic but the API: the app shows them when it is in that language.
+
 - [Getting started](01-start.md)
 - [Sessions](02-sessions.md)
 - [Agent Guidelines](03-guidelines.md)

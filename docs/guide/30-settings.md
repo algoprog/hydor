@@ -225,7 +225,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Custom
 
-[Settings → Custom](/settings?s=custom): auto mode, a sandbox for commands, and how long goals run. More in [Custom, the app’s own agent](/guide/custom).
+[Settings → Custom](/settings?s=custom): auto mode, a sandbox for commands, and how long goals run. More in [Custom, the app's own agent](/guide/custom).
 
 - [**Auto mode**](/settings?s=custom&find=Auto%20mode): Custom approves safe steps by itself.
 - [**Sandbox for commands**](/settings?s=custom&find=Sandbox%20for%20commands): Commands run in a sandbox.

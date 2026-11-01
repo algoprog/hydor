@@ -185,7 +185,6 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 | Shift+Enter | A new line | The message box |
 | Ctrl+Enter | While the agent works: the opposite of Enter (queue instead of joining the turn, or the other way round). On a phone: sends | The message box |
 | Shift+Tab | Switches to the next permissions mode | The message box, on the start page or in a session |
-| Esc | Stops the running turn | In a session, with no dialog open |
 | ↑ in an empty box | Brings back your earlier messages in this session, one by one (↓ goes forward again) | The message box in a session |
 | Ctrl+S | Puts the draft aside; in an empty box, brings it back | The message box in a session |
 | @ | Lists files in the session's folder to point at | The message box |

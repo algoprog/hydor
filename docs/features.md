@@ -162,7 +162,9 @@ with npm into the app's folder), and the copies the app installed are kept up to
 
 ## Around the agents
 - Files: a file browser with git status, an editor, Markdown and HTML preview, diffs, search across files,
-  quick open and uploads. Jupyter notebooks open and run.
+  quick open and uploads. Jupyter notebooks open and run. Videos play in the app's own player (seek with a
+  preview of the time, speed, loop, picture in picture, full screen, keyboard shortcuts, double-tap to skip on a
+  phone), streamed in parts so they start at once and seek anywhere.
 - Git: your repositories with their changes, ahead/behind counts, fetch, pull and push. Commit from the app (pick
   the files, see each diff, have the message drafted from the changes, commit and push in one go), discard a
   file's changes, switch or create branches and delete merged ones, stash and apply, and open any commit to
