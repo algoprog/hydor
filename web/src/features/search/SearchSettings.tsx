@@ -276,7 +276,7 @@ function ProviderRow({
                   </div>
                   {test.sample?.map((r) => (
                     <a key={r.url} href={r.url} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-fg-3 hover:text-accent">
-                      {r.title} <span className="text-fg-3/70">· {siteOf(r.url)}</span>
+                      <span translate="no">{r.title}</span> <span className="text-fg-3/70">· {siteOf(r.url)}</span>
                     </a>
                   ))}
                 </>

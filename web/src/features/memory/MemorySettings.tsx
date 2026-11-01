@@ -16,14 +16,15 @@ import { go, sessionPath } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { ChangeBadge, EntryEditor } from './parts';
 import { placeName, SOURCE, useMemory, useMemoryState } from './state';
+import { LOCALE } from '../../i18n/locale';
 
 type Filter = 'all' | MemoryScope | 'stale' | 'deleted';
 type HistoryRow = MemoryHistoryRow & { sessionTitle?: string };
 
 const ORDER: Record<MemoryScope, number> = { global: 0, repo: 1, session: 2 };
 const ACTION: Record<MemoryHistoryRow['action'], string> = { added: 'Added', updated: 'Changed', deleted: 'Deleted', restored: 'Restored', expiry: 'End date' };
-const when = (t: number) => new Date(t).toLocaleString();
-const dayOf = (t: number) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+const when = (t: number) => new Date(t).toLocaleString(LOCALE);
+const dayOf = (t: number) => new Date(t).toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 /** A date input's value, and back: the end of that day, here. */
 const inputDay = (t: number) => {
   const d = new Date(t);
@@ -53,7 +54,7 @@ function Row({ label, hint, children }: { label: string; hint?: ReactNode; child
 
 function SessionLink({ k, title }: { k: string; title?: string }) {
   return (
-    <button onClick={() => go(sessionPath(k))} title={title ?? k} className="inline max-w-[16rem] truncate align-bottom text-fg-2 underline-offset-2 hover:text-fg hover:underline">
+    <button onClick={() => go(sessionPath(k))} title={title ?? k} translate={title ? 'no' : undefined} className="inline max-w-[16rem] truncate align-bottom text-fg-2 underline-offset-2 hover:text-fg hover:underline">
       {title ?? 'a session that is gone'}
     </button>
   );
@@ -284,7 +285,7 @@ function Children({ id }: { id: number }) {
   return (
     <ul className="mt-2 space-y-1 border-l-2 border-line pl-3 text-[12.5px] leading-snug">
       {list.map((e) => (
-        <li key={e.id} className={cx('break-words', e.status === 'deleted' ? 'text-fg-3 line-through decoration-fg-3/60' : 'text-fg-2')}>
+        <li key={e.id} translate="no" className={cx('break-words', e.status === 'deleted' ? 'text-fg-3 line-through decoration-fg-3/60' : 'text-fg-2')}>
           {e.text}
         </li>
       ))}
@@ -351,7 +352,7 @@ function EntryRow({ e, reload, stale }: { e: MemoryListEntry; reload: () => void
                   {e.kind === 'topic' ? 'Topic' : 'Profile'}
                 </Badge>
               )}
-              {e.text}
+              <span translate="no">{e.text}</span>
             </div>
           )}
           <div className="mt-1 text-[12px] leading-snug text-fg-3">

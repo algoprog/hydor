@@ -3,6 +3,7 @@
 import type { SessionSummary } from '@shared/types';
 import { enc, post } from './api';
 import { toastError, useSessions, useToasts } from './store';
+import { LOCALE } from '../i18n/locale';
 
 type Flags = { pinned?: boolean; archived?: boolean; snoozedUntil?: number | null };
 
@@ -18,13 +19,13 @@ function apply(key: string, f: Flags) {
 export function whenLabel(ts: number): string {
   const d = new Date(ts);
   const now = new Date();
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const time = d.toLocaleTimeString(LOCALE, { hour: 'numeric', minute: '2-digit' });
   const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const days = Math.round((day(d) - day(now)) / 86400_000);
   if (days === 0) return time;
   if (days === 1) return `tomorrow ${time}`;
-  if (days > 1 && days < 7) return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${time}`;
-  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
+  if (days > 1 && days < 7) return `${d.toLocaleDateString(LOCALE, { weekday: 'short' })} ${time}`;
+  return `${d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
 /** Finished work out of the way: the agent process stops and the session counts as read. */

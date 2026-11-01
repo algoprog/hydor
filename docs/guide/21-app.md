@@ -80,9 +80,9 @@ The theme is added to your own and used at once. If the text isn't a theme, the 
 
 Picking one reloads the page in that language. The choice is kept in this browser; at first the app follows your browser's language when it has it, and English otherwise.
 
-Only the app's own words change. What people and agents wrote stays as it was: conversations, files, code and terminals.
+Only the app's own words change, and dates and times are written the way that language writes them. What people and agents wrote stays as it was: conversations, memory notes, the names and descriptions you gave things, files, code and terminals.
 
-Agents write to you in the language you pick: they are asked to, unless you write to them in another language or ask for one, and code, commands and file names stay as they are. This reaches each agent when it starts or resumes. The app tells agents its language each time it opens, so if your devices are set to different languages, agents follow the one opened last.
+Agents write to you in the language you pick: they are asked to, unless you write to them in another language or ask for one, and code, commands and file names stay as they are. This reaches each agent when it starts or resumes. Notifications come in the language too, on your phone as well. The app tells agents its language each time it opens, so if your devices are set to different languages, agents and notifications follow the one opened last.
 
 ## Decide what Enter does while an agent works
 

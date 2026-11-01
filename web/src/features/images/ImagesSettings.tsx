@@ -8,6 +8,7 @@ import { api, put } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Button, cx, inputCls, Section, Segmented, Switch, Throbber } from '../../components/ui';
+import { LOCALE } from '../../i18n/locale';
 
 const DAY = 86_400_000;
 export const aboutPrice = (n?: number) => (n == null ? undefined : `about $${n >= 0.1 ? n.toFixed(2) : n.toPrecision(1)} an image`);
@@ -55,7 +56,7 @@ function ModelRow({ m, selected, onPick }: { m: ImageModel; selected?: boolean; 
         <div className="mt-0.5 flex flex-wrap gap-x-3 text-[12px] text-fg-3">
           {m.org && <span className="text-fg-2">{m.org}</span>}
           {aboutPrice(m.perImage) && <span title="For one image of about a megapixel; OpenRouter bills by image tokens">{aboutPrice(m.perImage)}</span>}
-          {m.created && <span>{new Date(m.created).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</span>}
+          {m.created && <span>{new Date(m.created).toLocaleDateString(LOCALE, { month: 'short', year: 'numeric' })}</span>}
         </div>
         <div className="mt-0.5 truncate font-mono text-[11px] text-fg-3/80">{m.id}</div>
       </div>

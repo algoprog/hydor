@@ -1,3 +1,5 @@
+import { LOCALE } from '../i18n/locale';
+
 /** Short relative time for lists: "just now", "5m", "2h", "3d". */
 export function timeAgo(ts?: number | null, now = Date.now()): string {
   if (!ts) return '';
@@ -108,7 +110,7 @@ export function joinPath(a: string, b: string): string {
 
 // Made once: `toLocaleString` with options builds a new formatter on every call, and the session list
 // asks for hundreds of months on each update (most of its time went there).
-const monthName = new Intl.DateTimeFormat(undefined, { month: 'long' });
+const monthName = new Intl.DateTimeFormat(LOCALE, { month: 'long' });
 
 export function dayGroup(ts?: number, now = new Date()): string {
   if (!ts) return 'Older';
@@ -126,8 +128,8 @@ export function clockTime(ts?: number): string {
   const d = new Date(ts);
   const sameDay = new Date().toDateString() === d.toDateString();
   return sameDay
-    ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    ? d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleString(LOCALE, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export function pct(n?: number | null): string {

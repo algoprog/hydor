@@ -22,6 +22,7 @@ import { HookOptions } from '../automations/HookOptions';
 import { boxCls, browserZone, localTime, OutcomeBadge, RunDots } from '../automations/parts';
 import { defaultMode, lastAgent, TemplateGallery } from '../automations/Templates';
 import { blankWatch, WatchForm } from '../automations/WatchForm';
+import { LOCALE } from '../../i18n/locale';
 
 export { scheduleText };
 
@@ -54,11 +55,13 @@ function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTask; onEd
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-[13.5px] font-medium text-fg">{t.name}</span>
+            <span translate="no" className="truncate text-[13.5px] font-medium text-fg">
+              {t.name}
+            </span>
             <AgentIcon agent={t.agent} name={acpName} size={13} />
           </div>
           <div className="mt-0.5 truncate text-[12px] text-fg-3">
-            {scheduleText(t.schedule)} · {t.target ? 'posts into a session' : `new session in ${t.cwd === home ? '~' : basename(t.cwd)}`}
+            {scheduleText(t.schedule, undefined, LOCALE)} · {t.target ? 'posts into a session' : `new session in ${t.cwd === home ? '~' : basename(t.cwd)}`}
             {t.enabled && t.nextAt ? ` · next ${untilText(t.nextAt)}` : ''}
           </div>
           {t.schedule.kind === 'watch' && t.check && (

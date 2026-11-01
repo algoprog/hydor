@@ -317,15 +317,16 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const capOn = typeof extra.capUsd === 'number' ? usd(extra.capUsd) : null;
   const changed = [extra.swarm === true ? 'Swarm' : null, extra.research ? 'Deep research' : null, arenaOf(extra) ? 'Arena' : null, effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
   const modeNow = cat?.modes.find((m) => m.value === (mode ?? cat.defaultMode))?.label;
+  // Whole lines where a word is a setting's state ("Memory: on"), so each translates as one.
   const optionsTitle = [
-    agent !== 'acp' && `Effort: ${effortOn ?? 'default'}`,
+    agent !== 'acp' && (effortOn ? `Effort: ${effortOn}` : 'Effort: default'),
     modeNow && `Permissions: ${modeNow}`,
     acctOn && `Account: ${acctOn}`,
-    `Memory: ${extra.memory === false ? 'off' : 'on'}`,
-    `Spending cap: ${capOn ?? 'none'}`,
-    `Swarm: ${extra.swarm === true ? 'on' : 'off'}`,
-    `Deep research: ${extra.research ? 'on' : 'off'}`,
-    `Arena: ${arenaOf(extra) ? 'on' : 'off'}`,
+    extra.memory === false ? 'Memory: off' : 'Memory: on',
+    capOn ? `Spending cap: ${capOn}` : 'Spending cap: none',
+    extra.swarm === true ? 'Swarm: on' : 'Swarm: off',
+    extra.research ? 'Deep research: on' : 'Deep research: off',
+    arenaOf(extra) ? 'Arena: on' : 'Arena: off',
   ]
     .filter(Boolean)
     .join('\n');
@@ -519,7 +520,9 @@ function RecentSessions() {
           <button key={s.key} onClick={() => openSession(s.key)} className="flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left last:border-0 active:bg-bg-2">
             <AgentIcon agent={s.agent} name={s.acpName} size={16} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14.5px]">{s.title}</span>
+              <span translate="no" className="block truncate text-[14.5px]">
+                {s.title}
+              </span>
               <span className="mt-0.5 flex text-[12.5px] text-fg-3">
                 {activityOf(s) ? <ActivityText s={s} /> : <span className="truncate">{folderName(s.cwd, home)} · {timeAgo(s.updatedAt)}</span>}
               </span>

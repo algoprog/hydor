@@ -69,8 +69,12 @@ function List() {
                 <button key={s.id} type="button" onClick={() => go(`/spaces/${s.id}`)} className="flex items-start gap-3 rounded-xl border border-line bg-panel p-3.5 text-left transition-colors hover:bg-bg-2">
                   <SpaceMark s={s} size={36} className="rounded-[10px]" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold">{s.name}</span>
-                    <span className="block truncate text-[12.5px] text-fg-3">{isGroup(s) ? `Brings together ${memberNames(s, spaces)}` : s.description || tildify(s.folder, home)}</span>
+                    <span translate="no" className="block truncate text-[14px] font-semibold">
+                      {s.name}
+                    </span>
+                    <span translate={isGroup(s) ? undefined : 'no'} className="block truncate text-[12.5px] text-fg-3">
+                      {isGroup(s) ? `Brings together ${memberNames(s, spaces)}` : s.description || tildify(s.folder, home)}
+                    </span>
                     <span className="mt-0.5 block text-[12px] text-fg-3">
                       <span>
                         {s.sessions} session{s.sessions === 1 ? '' : 's'}
@@ -215,7 +219,9 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
             {members.map((m) => (
               <button key={m.id} type="button" onClick={() => go(`/spaces/${m.id}/knowledge`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
                 <SpaceMark s={m} size={15} />
-                <span className="min-w-0 truncate">{m.name}</span>
+                <span translate="no" className="min-w-0 truncate">
+                  {m.name}
+                </span>
                 <span className="tnum text-fg-3">{m.docs}</span>
               </button>
             ))}
@@ -386,12 +392,12 @@ function Detail({ id, tab }: { id: string; tab: Tab }) {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={
-          <span className="flex items-center gap-2">
+          <span translate="no" className="flex items-center gap-2">
             <SpaceMark s={s} size={20} />
             {s.name}
           </span>
         }
-        sub={isGroup(s) ? `Brings together ${memberNames(s, spaces)}` : s.description || 'Space'}
+        sub={isGroup(s) ? `Brings together ${memberNames(s, spaces)}` : s.description ? <span translate="no">{s.description}</span> : 'Space'}
         actions={
           <>
             <Button size="sm" variant="ghost" icon={<ArrowLeft size={14} />} onClick={() => go('/spaces')}>

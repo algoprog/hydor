@@ -175,14 +175,14 @@ export const TRIGGER_LABEL: Record<RunTrigger, string> = {
   test: 'Test run',
 };
 
-/** "Every 30 min", "Weekdays at 9:00", "Once, Nov 3 9:00", "When its webhook is called"; a time zone formats a once. */
-export function scheduleText(s: TaskSchedule, tz?: string): string {
+/** "Every 30 min", "Weekdays at 9:00", "Once, Nov 3 9:00", "When its webhook is called"; a time zone (and a locale) formats a once. */
+export function scheduleText(s: TaskSchedule, tz?: string, locale = 'en-GB'): string {
   const every = (m: number) => (m % 60 === 0 ? `every ${m / 60 === 1 ? 'hour' : `${m / 60} hours`}` : `every ${m} min`);
   switch (s.kind) {
     case 'every':
       return every(s.minutes).replace(/^e/, 'E');
     case 'once':
-      return `Once, ${new Date(s.at).toLocaleString('en-GB', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`;
+      return `Once, ${new Date(s.at).toLocaleString(locale, { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`;
     case 'webhook':
       return 'When its webhook is called';
     case 'cron':

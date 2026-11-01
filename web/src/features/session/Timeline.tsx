@@ -14,6 +14,7 @@ import { AssistantBlock, Elapsed, hiddenThought, SessionCtx, StepLine, stepsIcon
 import { toolView } from '../registry';
 import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
 import type { SessionNote } from '@shared/features';
+import { LOCALE } from '../../i18n/locale';
 
 type Block = { kind: 'item'; item: TimelineItem } | { kind: 'group'; id: string; items: TimelineItem[] };
 
@@ -172,7 +173,7 @@ function dayLabel(ts: number): string {
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   if (ts >= start) return 'Today';
   if (ts >= start - 86400_000) return 'Yesterday';
-  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+  return d.toLocaleDateString(LOCALE, { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
 }
 
 const isActive = (i: TimelineItem) => (i.kind === 'tool' && (i.tool.status === 'running' || i.tool.status === 'pending')) || (i.kind === 'thinking' && !!i.streaming);

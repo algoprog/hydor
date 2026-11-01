@@ -6,6 +6,7 @@ import { pct, untilText } from '../../lib/format';
 import { toast, toastError, useUsage } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { Button, cx, useConfirm } from '../../components/ui';
+import { LOCALE } from '../../i18n/locale';
 
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
@@ -190,7 +191,7 @@ export function ResetList({ u, account }: { u: AgentUsage; account?: string }) {
         <div className="text-[12.5px] text-fg-3">
           No limit resets right now
           {rc.nextAvailableAt ? `; the next one comes ${untilText(rc.nextAvailableAt)}` : ''}
-          {rc.cooldownUntil && rc.cooldownUntil > Date.now() ? `; resets cool down until ${new Date(rc.cooldownUntil).toLocaleString()}` : ''}.
+          {rc.cooldownUntil && rc.cooldownUntil > Date.now() ? `; resets cool down until ${new Date(rc.cooldownUntil).toLocaleString(LOCALE)}` : ''}.
         </div>
       )}
       {reset.node}

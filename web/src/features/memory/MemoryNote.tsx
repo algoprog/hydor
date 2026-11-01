@@ -187,15 +187,17 @@ function ChangeRow({ row, entry, here, reload }: { row: Row; entry?: MemoryEntry
         </div>
       ) : (
         <div className="mt-1 text-[13.5px] leading-snug break-words">
-          {struck ? (
-            <div className="text-fg-3 line-through decoration-fg-3/60">{c.after}</div>
-          ) : c.before && c.after ? (
-            <WordDiff from={c.before} to={c.after} />
-          ) : c.after ? (
-            <div className="text-fg">{c.after}</div>
-          ) : (
-            c.before && <div className="text-fg-3 line-through decoration-fg-3/60">{c.before}</div>
-          )}
+          <div translate="no">
+            {struck ? (
+              <div className="text-fg-3 line-through decoration-fg-3/60">{c.after}</div>
+            ) : c.before && c.after ? (
+              <WordDiff from={c.before} to={c.after} />
+            ) : c.after ? (
+              <div className="text-fg">{c.after}</div>
+            ) : (
+              c.before && <div className="text-fg-3 line-through decoration-fg-3/60">{c.before}</div>
+            )}
+          </div>
           {now && (
             <>
               <button onClick={() => setShowNow((v) => !v)} aria-expanded={showNow} className="mt-1.5 inline-flex items-center gap-1 rounded-md text-[12px] text-fg-3 transition-colors hover:text-fg">
@@ -203,7 +205,7 @@ function ChangeRow({ row, entry, here, reload }: { row: Row; entry?: MemoryEntry
                 Changed again since
               </button>
               {showNow && (
-                <div className="mt-1 border-l-2 border-line pl-2.5">
+                <div translate="no" className="mt-1 border-l-2 border-line pl-2.5">
                   <WordDiff from={c.after!} to={now} />
                 </div>
               )}

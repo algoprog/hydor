@@ -51,6 +51,7 @@ import { Crumbs, upOf } from './Places';
 import { setPinned, setPrefs, useFilesPrefs, usePinned, type SortBy } from './prefs';
 import { SpaceChoices } from './SpaceMenu';
 import { NewSpaceDialog } from '../spaces/parts';
+import { LOCALE } from '../../i18n/locale';
 
 export interface FsEntry {
   name: string;
@@ -87,10 +88,10 @@ export function sortEntries(list: FsEntry[], by: SortBy, reverse: boolean): FsEn
 }
 
 // Made once: a formatter made for each row would cost a lot in a big folder.
-const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
-const dayFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
-const yearFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-const fullFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const timeFmt = new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute: '2-digit' });
+const dayFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short' });
+const yearFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
+const fullFmt = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
 
 /** When something changed, as a list says it: just now, 5 min ago, 14:32 (today), Yesterday, 12 Oct, 12 Oct 2024. */
 export function changedWhen(t: number, now = Date.now()): string {

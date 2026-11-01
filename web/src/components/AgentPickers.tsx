@@ -291,7 +291,7 @@ export function ModePicker({
       icon={label ? undefined : <ShieldCheck size={13} className="shrink-0" />}
       label={label}
       value={cur?.label ?? (label ? (c ? 'Default' : '…') : 'Mode')}
-      title={`${label ? 'What the agent may do without asking you' : 'Mode'} (Shift+Tab cycles)${cur?.description ? `\n${cur.label}: ${cur.description}` : ''}`}
+      title={`${label ? 'What the agent may do without asking you' : 'Mode'} (Shift+Tab cycles)${cur?.description ? `\n${cur.label} · ${cur.description}` : ''}`}
       disabled={disabled}
       width={300}
     >

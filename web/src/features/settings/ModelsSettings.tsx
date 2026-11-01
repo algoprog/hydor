@@ -6,6 +6,7 @@ import { toast, toastError } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { Button, cx, inputCls, Section, Throbber, useConfirm } from '../../components/ui';
 import { HelperModel } from './HelperModel';
+import { LOCALE } from '../../i18n/locale';
 
 const GiB = 1024 ** 3;
 export const size = (b: number) => (b >= 10 * GiB ? `${Math.round(b / GiB)} GB` : b >= 0.1 * GiB ? `${(b / GiB).toFixed(1)} GB` : `${Math.round(b / 1024 ** 2)} MB`);
@@ -174,7 +175,7 @@ export const dollars = (n: number) => `$${n >= 10 ? Math.round(n) : n >= 1 ? n.t
 export const count = (n: number) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${+(n / 1e3).toFixed(1)}K` : String(n));
 /** 14.8B, 600M */
 export const paramsShort = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B` : `${Math.round(n / 1e6)}M`);
-const month = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+const month = (ms: number) => new Date(ms).toLocaleDateString(LOCALE, { month: 'short', year: 'numeric' });
 const DAY = 86_400_000;
 
 /** A maker's initial on a tile of its own colour. */
@@ -359,6 +360,7 @@ export function MachineCard({ st }: { st: ModelsState }) {
   const lo = Math.min(...mem);
   const hi = Math.max(...mem);
   const best = [...m.gpus].sort((a, b) => b.freeBytes - a.freeBytes)[0];
+  const per = hi - lo > 1.5 * GiB ? `${size(lo)}–${size(hi)}` : size(hi);
   return (
     <div className="rounded-xl border border-line bg-bg-1 p-2.5">
       <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-1 max-sm:gap-1.5">
@@ -366,7 +368,7 @@ export function MachineCard({ st }: { st: ModelsState }) {
           icon={<Cpu size={12} />}
           label="Graphics"
           value={gpus || 'No GPU'}
-          sub={m.gpus.length ? `${hi - lo > 1.5 * GiB ? `${size(lo)}–${size(hi)}` : size(hi)}${m.gpus.length > 1 ? ' each' : ''}` : 'models run on the processor'}
+          sub={m.gpus.length > 1 ? `${per} each` : m.gpus.length ? per : 'models run on the processor'}
         />
         <Stat icon={<MemoryStick size={12} />} label="Memory" value={size(m.ramBytes)} sub={`${size(m.ramFreeBytes)} free`} />
         <Stat icon={<HardDrive size={12} />} label="Disk" value={`${size(st.storage.freeBytes)} free`} sub={st.storage.usedBytes ? `models take ${size(st.storage.usedBytes)}` : 'for downloads'} />

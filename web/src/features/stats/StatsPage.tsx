@@ -9,6 +9,7 @@ import { toastError, useApp } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Columns, DivergingColumns, Legend, StackedColumns } from '../../components/charts';
 import { cx, Throbber, Segmented, useIsMobile } from '../../components/ui';
+import { LOCALE } from '../../i18n/locale';
 import { ModelPricesDialog } from './ModelPrices';
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -81,6 +82,13 @@ function Card({ title, sub, children, className }: { title: string; sub?: React.
 
 const num = (n: number) => n.toLocaleString();
 
+/** A period's name in the language the app is shown in ("10月31日", "31 Οκτ"); in English, the server's ("Oct 31"). */
+function periodLabel(g: StatsGranularity, key: string, label: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  if (!LOCALE || g === 'year' || !y || !m) return label;
+  return new Date(Date.UTC(y, m - 1, d || 1)).toLocaleDateString(LOCALE, g === 'month' ? { month: 'short', year: 'numeric', timeZone: 'UTC' } : { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
 /** Average output throughput (tokens/sec) over a bucket's reply-generation time. */
 const tps = (t: { tokensOut: number; genMs: number }) => (t.genMs > 0 ? Math.round(t.tokensOut / (t.genMs / 1000)) : 0);
 
@@ -129,7 +137,7 @@ export function StatsBody() {
   const t = data?.totals;
   const p = data?.previous;
   const hasPrev = g !== 'year' && !!p && (p.prompts > 0 || p.tokensOut > 0);
-  const b = data?.buckets ?? [];
+  const b = (data?.buckets ?? []).map((x) => ({ ...x, label: periodLabel(g, x.key, x.label) }));
 
   return (
     <div>

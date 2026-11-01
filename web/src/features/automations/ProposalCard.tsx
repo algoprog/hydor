@@ -16,6 +16,7 @@ import { Badge, Button, cx, Throbber } from '../../components/ui';
 import { TaskEditor } from '../settings/TasksSettings';
 import { localTime } from './parts';
 import { StepRow } from './StepRow';
+import { LOCALE } from '../../i18n/locale';
 
 const WORDS: Record<TaskProposal['action'], { ask: string; yes: string; done: string; no: string; declined: string; icon: LucideIcon }> = {
   create: { ask: 'Schedule this task?', yes: 'Schedule it', done: 'Scheduled', no: 'Not now', declined: 'Not scheduled', icon: CalendarPlus },
@@ -92,7 +93,7 @@ function Changes({ p, sessionKey }: { p: TaskProposal; sessionKey: string }) {
   const b = p.task;
   const rows: [string, ReactNode, ReactNode][] = [];
   if (a.name !== b.name) rows.push(['Name', a.name, b.name]);
-  if (JSON.stringify(a.schedule) !== JSON.stringify(b.schedule)) rows.push(['When', scheduleText(a.schedule, p.tz), <When p={p} t={b} />]);
+  if (JSON.stringify(a.schedule) !== JSON.stringify(b.schedule)) rows.push(['When', scheduleText(a.schedule, p.tz, LOCALE), <When p={p} t={b} />]);
   if (a.prompt !== b.prompt) rows.push(['Does', <span className="line-clamp-2">{a.prompt}</span>, <Prompt text={b.prompt} />]);
   if (a.agent !== b.agent || a.acpAgent !== b.acpAgent || a.model !== b.model || a.cwd !== b.cwd || a.target !== b.target) rows.push(['Runs', <Who t={a} sessionKey={sessionKey} />, <Who t={b} sessionKey={sessionKey} />]);
   return (

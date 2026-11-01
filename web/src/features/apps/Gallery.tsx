@@ -13,7 +13,8 @@ import { PageHeader } from '../layout/PageHeader';
 import { appPath, runPath, useRunEvents, type Gallery } from './api';
 import { AppIcon } from './AppIcon';
 
-function Card({ icon, color, name, description, meta, onClick }: { icon: string; color: string; name: string; description: string; meta?: React.ReactNode; onClick: () => void }) {
+/** `own`: one of yours, whose name and description stay as you wrote them in every language. */
+function Card({ icon, color, name, description, meta, own, onClick }: { icon: string; color: string; name: string; description: string; meta?: React.ReactNode; own?: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -23,8 +24,12 @@ function Card({ icon, color, name, description, meta, onClick }: { icon: string;
       <div className="flex w-full items-start gap-3">
         <AppIcon icon={icon} color={color} size={40} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[14.5px] font-semibold tracking-tight">{name}</div>
-          <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">{description || 'No description'}</div>
+          <div translate={own ? 'no' : undefined} className="truncate text-[14.5px] font-semibold tracking-tight">
+            {name}
+          </div>
+          <div translate={own && description ? 'no' : undefined} className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">
+            {description || 'No description'}
+          </div>
         </div>
       </div>
       {meta && <div className="flex w-full min-w-0 items-center gap-2 text-[12px] text-fg-3">{meta}</div>}
@@ -91,6 +96,7 @@ export function GalleryPage() {
                       color={a.color}
                       name={a.name}
                       description={a.description}
+                      own
                       onClick={() => go(appPath(a.id))}
                       meta={
                         <>
