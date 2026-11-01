@@ -1,5 +1,4 @@
-// What a swarm's lead and its members are told when they start (Feature.spawn), or with their first message
-// for an agent that takes no instructions from the app.
+// What a swarm's lead and its members are told when they start (Feature.spawn).
 
 /** The lead: a session started in Swarm mode, with at most `size` members working at once. */
 export const leadInstructions = (size: number) =>

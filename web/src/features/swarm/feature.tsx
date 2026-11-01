@@ -81,7 +81,8 @@ function SwarmStartOption({ value, onChange }: { value: SessionExtra; onChange: 
   const size = useChildSettingsState()?.swarmSize;
   const on = leadsSwarm(value);
   const set = (swarm: true | undefined) => {
-    onChange({ swarm });
+    // A swarm and a deep research both lead child sessions: one or the other.
+    onChange(swarm ? { swarm, research: undefined } : { swarm });
     setOpen(false);
   };
   return (
