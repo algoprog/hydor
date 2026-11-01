@@ -35,12 +35,12 @@ the real app's).
   inside it, signs in, and removes everything at the end (`--keep` keeps the folder). The app gets stand-ins
   for `claude` and `codex` that only say their version and that Alex is signed in, so no agent runs and no
   real account is read: the app starts agents' programs with the computer's own login environment.
-- `demo.mjs` is the made-up world: folders and a git repository with history and one change not committed,
-  sessions written as Claude Code transcripts (steps, a web search, files handed over), and what the app's own
-  API keeps (spaces, guidelines, memory notes, scheduled tasks at times well away from now, pages, templates,
-  learned skills). What only a running agent or a real account has is answered to the page instead
-  (`overrides`): two sessions waiting on a card, Claude Code's model list, the plans' usage, the inbox and
-  Settings → Models.
+- `demo.mjs` is the made-up world: folders and a git repository with history, a remote beside the home that lacks
+  its last commit, and one change not committed, sessions written as Claude Code transcripts (steps, a web
+  search, files handed over), and what the app's own API keeps (spaces, guidelines, memory notes, scheduled tasks
+  at times well away from now, pages, templates, learned skills). What only a running agent or a real account has
+  is answered to the page instead (`overrides`): two sessions waiting on a card, Claude Code's model list, the
+  plans' usage, the inbox and Settings → Models.
 - `shots.mjs` lists the shots: the page, what to open on it (a menu, a folded group of steps) and the part to
   keep. Desktop shots are 1280×800 CSS pixels (taller where a page needs it) at twice the resolution, cut to
   that part and at most 1600 pixels wide; `devices` is a 390×844 phone at 780 pixels wide.

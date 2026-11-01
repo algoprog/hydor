@@ -26,7 +26,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   in one inbox, and carry on from your phone, or talk to it hands-free while you walk
 - Open pull requests on GitHub or Gitea, and review a branch file by file
 - Use a terminal, a file browser (add files to a space or a new session in a click, a trash to put things back
-  from), git, notebooks, scheduled tasks and your plans' limits in the same app
+  from), git (one Sync button, the history as a graph, merges and conflicts in plain words), notebooks,
+  scheduled tasks and your plans' limits in the same app
 - Switch between several accounts and machines from the sidebar, and sign in several Claude or Codex plans: when
   one hits its limit, sessions carry on with another
 - Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM

@@ -190,10 +190,15 @@ with npm into the app's folder), and the copies the app installed are kept up to
   Markdown and HTML preview and diffs, quick open, and uploads. Jupyter notebooks open and run. Videos play in the app's own player (seek with a
   preview of the time, speed, loop, picture in picture, full screen, keyboard shortcuts, double-tap to skip on a
   phone), streamed in parts so they start at once and seek anywhere.
-- Git: your repositories with their changes, ahead/behind counts, fetch, pull and push. Commit from the app (pick
-  the files, see each diff, have the message drafted from the changes, commit and push in one go), discard a
-  file's changes, switch or create branches and delete merged ones, stash and apply, and open any commit to
-  see what it changed.
+- Git: your repositories (those sessions worked in, and any you add: a folder on this computer, which can start
+  a repository, or a clone from a link) with what changed and one Sync button that brings in and sends up
+  commits, asking in plain words how to put them together when both sides moved on (your commits on top, or a
+  merge). Commit from the app (pick the files, see each diff unified or side by side, put back one part of a
+  file, have the message drafted from the changes, amend the last commit while no remote has it, commit and
+  push in one go). A merge or rebase that stops on conflicts lists the files to settle, with Continue, Stop or
+  an agent to resolve them. The history as a graph with branch and tag labels and a search; a commit can be
+  explained by an agent, reverted, tagged, branched from or undone. Branches to switch, merge, compare,
+  rename, publish and delete (saying which commits would be lost), and stashes to look inside, apply and drop.
 - Preview: the web apps running on this computer (dev servers, told apart from APIs and databases, with their
   project, page title and framework), shown inside the app at a computer's, tablet's or phone's width with an
   address bar, back and forward; as pictures taken on this computer where the browser can't reach the preview
