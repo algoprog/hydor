@@ -1,7 +1,7 @@
 // Making or changing an app: its face, the questions of its form, the task with the answers put in,
 // the answer fields of its result, who does it (agent, model, mode, assistant, folder), which tools it
-// may use, its limits, and a test run of what is on screen before saving. "Save as app" in a session's
-// menu opens it with a draft from that session.
+// may use, its limits, and a test run of what is on screen before saving. "Save as template" in a
+// session's menu opens it with a draft from that session.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, FlaskConical, Plus, Trash2, X } from 'lucide-react';
 import type { Agent } from '@shared/types';
@@ -242,7 +242,7 @@ function TestRun({ recipe, appId, open, onClose }: { recipe: AppRecipe; appId: s
     <Dialog
       open={open}
       onClose={onClose}
-      title={`Test run · ${recipe.name || 'Untitled app'}`}
+      title={`Test run · ${recipe.name || 'Untitled template'}`}
       width={640}
       footer={
         run ? (
@@ -330,7 +330,7 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-fg-3">
         <Throbber size={28} />
-        {from && <div className="text-[13px]">Drafting an app from the session…</div>}
+        {from && <div className="text-[13px]">Drafting a template from the session…</div>}
       </div>
     );
 
@@ -381,7 +381,7 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
   };
 
   const save = async () => {
-    if (!recipe.name.trim()) return toast('Give the app a name', 'error');
+    if (!recipe.name.trim()) return toast('Give the template a name', 'error');
     if (!recipe.prompt.trim()) return toast('Write the task: it is what the agent is asked to do', 'error');
     setBusy(true);
     try {
@@ -407,7 +407,7 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
             <IconButton label="Back" size="sm" onClick={() => go(back)} className="-ml-1">
               <ArrowLeft size={17} />
             </IconButton>
-            <span className="truncate">{saved ? `Edit ${saved.name}` : 'New app'}</span>
+            <span className="truncate">{saved ? `Edit ${saved.name}` : 'New template'}</span>
           </span>
         }
         actions={

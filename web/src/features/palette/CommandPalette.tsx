@@ -64,7 +64,7 @@ const WEIGHT: Record<Group, number> = {
   'Go to': 1,
   Actions: 0.95,
   Sessions: 0.95,
-  Apps: 0.9,
+  Templates: 0.9,
   'Scheduled tasks': 0.9,
   Assistants: 0.9,
   Skills: 0.85,
@@ -359,7 +359,7 @@ export function CommandPalette() {
                 pick(sel);
               }
             }}
-            placeholder="Search settings, sessions, apps, notes, files…"
+            placeholder="Search settings, sessions, templates, notes, files…"
             enterKeyHint="go"
             className="h-14 min-w-0 flex-1 bg-transparent text-[17px] outline-none placeholder:text-fg-3"
           />
@@ -450,7 +450,7 @@ export function CommandPalette() {
 
 /** More about the one picked: where it is, what it says, and where opening it goes. */
 function Preview({ hit, q }: { hit: Hit | null; q: string }) {
-  if (!hit) return <div className="hidden w-[45%] items-center justify-center p-6 text-center text-[13px] text-fg-3 md:flex">{q.trim() ? '' : 'Settings, sessions, apps, notes and files, all in one place'}</div>;
+  if (!hit) return <div className="hidden w-[45%] items-center justify-center p-6 text-center text-[13px] text-fg-3 md:flex">{q.trim() ? '' : 'Settings, sessions, templates, notes and files, all in one place'}</div>;
   const e = hit.entry;
   const facts = (e.facts ?? []).filter(([, v]) => v);
   return (

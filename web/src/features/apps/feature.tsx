@@ -1,4 +1,4 @@
-// Apps: reusable tasks with a form, a gallery, and public pages.
+// Apps: reusable tasks with a form, a gallery, and public pages. People see them as Templates.
 //
 //   /apps                 the gallery: your apps, the latest runs, templates
 //   /apps/<id>            an app: its form and Run, runs, rows of a CSV, API and sharing
@@ -72,7 +72,7 @@ function SubmitRow({ item, sessionKey }: { item: ToolItem; sessionKey: string })
 export const appsFeature: WebFeature = {
   id: 'apps',
   routes: [{ match: (p) => p === '/apps' || p.startsWith('/apps/'), Page: AppsRoutes }],
-  nav: [{ path: '/apps', label: 'Apps', icon: <LayoutGrid size={17} />, match: (p) => p === '/apps' || p.startsWith('/apps/') }],
+  nav: [{ path: '/apps', label: 'Templates', icon: <LayoutGrid size={17} />, match: (p) => p === '/apps' || p.startsWith('/apps/') }],
   toolViews: { submit_result: { place: 'answer', Row: SubmitRow } },
   sessionPane: { label: 'Result', icon: <ClipboardCheck size={13} />, match: (s) => !!runOfSession(s), placeholder: 'Ask for a change to the result…', Body: AppSessionPane },
   SessionMenu: ({ s, close }) => (
@@ -83,7 +83,7 @@ export const appsFeature: WebFeature = {
         go(`/apps/new?from=${enc(s.key)}`);
       }}
     >
-      Save as app
+      Save as template
     </MenuItem>
   ),
   sessionMenuPart: 'more',

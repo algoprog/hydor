@@ -46,7 +46,7 @@ export function AppSessionPane({ s }: { s: SessionSummary }) {
   }, [count]);
   if (err && !d)
     return (
-      <Empty title="This app run could not be opened">
+      <Empty title="This run could not be opened">
         {err}
         <div className="mt-3">
           <Button size="sm" icon={<MessagesSquare size={14} />} onClick={conversation}>
@@ -71,7 +71,7 @@ export function AppSessionPane({ s }: { s: SessionSummary }) {
         <div className="flex min-w-0 items-center gap-2.5 px-0.5">
           <AppIcon icon={d.recipe.icon} color={d.recipe.color} size={22} />
           {app ? (
-            <button onClick={() => go(app)} className="min-w-0 truncate text-[13.5px] font-semibold transition-colors hover:text-accent" title="Open the app">
+            <button onClick={() => go(app)} className="min-w-0 truncate text-[13.5px] font-semibold transition-colors hover:text-accent" title="Open the template">
               {d.recipe.name}
             </button>
           ) : (

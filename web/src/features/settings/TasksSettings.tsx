@@ -1,7 +1,7 @@
 // Scheduled tasks: agent work that starts by itself: at a time of day (in your time zone), every so
 // often, once, by a cron expression, when a webhook calls, or when a watcher sees a change. Each run
 // starts a new session (or posts into one you pick) with the task's prompt, and the task's history
-// keeps how each run went. Templates start common ones from a short form.
+// keeps how each run went. Examples start common ones from a short form.
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Clock, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MoreHorizontal, Pencil, Play, Plus, Trash2, TriangleAlert, Webhook } from 'lucide-react';
 import { scheduleText, type ScheduledTask, type TaskDraft, type TaskRun } from '@shared/automations';
@@ -548,7 +548,7 @@ export function TasksSettings() {
           </div>
         ) : (
           <Empty icon={<Clock size={20} />} title="No scheduled tasks yet">
-            Run a prompt every morning, once at a set time, whenever a service such as GitHub calls a webhook, or when a page, a feed or a folder changes. Or start from a template below; agents can also set one up when you ask them in a
+            Run a prompt every morning, once at a set time, whenever a service such as GitHub calls a webhook, or when a page, a feed or a folder changes. Or start from an example below; agents can also set one up when you ask them in a
             conversation.
           </Empty>
         )}

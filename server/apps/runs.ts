@@ -45,7 +45,7 @@ export const markOf = (extra: SessionExtra | undefined): AppMark | null => {
 
 let deps: Deps | null = null;
 const d = () => {
-  if (!deps) throw new Error('Apps are still starting');
+  if (!deps) throw new Error('Templates are still starting');
   return deps;
 };
 
@@ -203,7 +203,7 @@ function modeFor(agent: Agent, acpAgent: string | undefined, mode: string | unde
 /** What the agent is told about the run: the answer fields to hand in, to finish without asking, and how follow-ups refine it. */
 export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appName'>): string {
   const lines = [
-    `This session runs the app "${r.appName}" (Naget Agent Apps)${r.source === 'web' || r.source === 'test' ? '' : ': nobody watches it live'}. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`,
+    `This session runs the template "${r.appName}" (Naget Agent Templates)${r.source === 'web' || r.source === 'test' ? '' : ': nobody watches it live'}. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`,
   ];
   // A public page's visitor sends no follow-ups.
   const later = r.source !== 'public';
@@ -238,7 +238,7 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
     if (o.public) cwd = path.join(PUBLIC_DIR, r.id);
     else if (recipe.cwd) {
       cwd = path.resolve(recipe.cwd.replace(/^~(?=\/|$)/, config.home));
-      if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) throw new Error(`The app’s folder is not there: ${cwd}`);
+      if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) throw new Error(`The template’s folder is not there: ${cwd}`);
       fresh = false;
     } else cwd = path.join(WORK_DIR, o.slug, `${stamp(r.createdAt)}-${r.id.slice(0, 4)}`);
     if (fresh) fs.mkdirSync(cwd, { recursive: true, mode: 0o700 });
