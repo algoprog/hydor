@@ -11,6 +11,7 @@ import { custom } from '../custom/index.ts';
 import { documents } from '../documents/index.ts';
 import { find } from '../find/index.ts';
 import { images } from '../images/index.ts';
+import { knowledge } from '../knowledge/index.ts';
 import { memory } from '../memory/index.ts';
 import { opinion } from '../opinion/index.ts';
 import { pages } from '../pages/index.ts';
@@ -21,4 +22,4 @@ import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, children, swarm, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, find, releaseNotes];
+export const FEATURES: Feature[] = [pages, search, browser, memory, knowledge, children, swarm, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, find, releaseNotes];

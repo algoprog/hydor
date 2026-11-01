@@ -34,13 +34,19 @@ function UsageHint() {
   );
 }
 
-/** How many sessions wait on you, here and on the other machines, as a dot with a number on "Inbox". */
-function InboxCount() {
+/** The inbox, by the sidebar's title: how many sessions wait on you, here and on the other machines, on its corner. */
+function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) => void }) {
   const here = useSessions((s) => Object.values(s.byKey).filter((x) => activityOf(x)?.status === 'waiting').length);
   const there = useMachines((s) => s.list.filter((m) => m.id !== machineId && m.status.state === 'online').reduce((n, m) => n + m.status.waiting, 0));
   const n = here + there;
-  if (!n) return null;
-  return <span className="tnum absolute top-1.5 left-[calc(50%+5px)] min-w-4 rounded-full bg-warn px-1 text-center text-[10px] leading-4 font-semibold text-bg">{n > 99 ? '99+' : n}</span>;
+  return (
+    <span className="relative inline-flex">
+      <IconButton label={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'} active={active} onClick={() => onGo('/inbox')}>
+        <Inbox size={17} />
+      </IconButton>
+      {n > 0 && <span className="tnum pointer-events-none absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-warn px-1 text-center text-[10px] leading-4 font-semibold text-bg">{n > 99 ? '99+' : n}</span>}
+    </span>
+  );
 }
 
 /** A tool: icon over label, four to a row, so the sessions keep the room (on phones and computers alike). */
@@ -113,6 +119,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
             <WifiOff size={15} />
           </span>
         )}
+        <InboxButton active={loc === '/inbox'} onGo={nav} />
         {mobile ? (
           <IconButton label="Close menu" onClick={close}>
             <X size={18} />
@@ -196,7 +203,6 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
       </div>
 
       <nav data-tour="tools" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
-        <NavItem path="/inbox" match={loc === '/inbox'} label="Inbox" icon={<Inbox size={17} />} extra={<InboxCount />} onGo={nav} />
         <NavItem path="/files" match={loc === '/files' || loc === '/file' || loc === '/search'} label="Files" icon={<FolderTree size={17} />} onGo={nav} />
         <NavItem path="/git" match={loc === '/git'} label="Git" icon={<GitBranch size={17} />} onGo={nav} />
         <NavItem path="/terminal" match={loc === '/terminal'} label="Terminal" icon={<SquareTerminal size={17} />} onGo={nav} anim="ico-nudge" />

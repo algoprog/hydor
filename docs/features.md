@@ -43,6 +43,10 @@ agents that speak ACP and take MCP servers.
   Settings → Memory lists every note with when it was written, changed and last needed, and suggests
   removing the ones no agent needed for months. Turn it off for one session or for all. Agents can also look
   up earlier sessions.
+- **Knowledge bases**: drop documents or a folder in once (the Knowledge page), and every agent can search them:
+  by their words (a full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning
+  on) or for exact text, as grep would; each passage cites its file and page. A folder on this computer is read
+  where it is and kept up to date.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
   Images can be made and edited through OpenRouter.
