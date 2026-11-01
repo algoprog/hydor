@@ -32,8 +32,10 @@ function LeadDock({ s, r }: { s: SessionSummary; r: ResearchSettings }) {
     api<ResearchState>(`/api/research/${enc(s.key)}`).then(setSt, () => {});
   }, [s.key]);
   useFeatureEvent('research', (e) => e.key === s.key && setSt(e.data as ResearchState));
-  const kids = useSessions((x) => (st?.researchers ?? []).map((k) => x.byKey[k]).filter(Boolean));
-  const working = kids.filter((k) => isBusy(activityOf(k))).length;
+  // Counts, not a list: a selector that makes a new array on every call never settles, and React gives up (a blank page).
+  const keys = st?.researchers ?? [];
+  const kids = useSessions((x) => keys.filter((k) => x.byKey[k]).length);
+  const working = useSessions((x) => keys.filter((k) => isBusy(activityOf(x.byKey[k]))).length);
   const rounds = st?.rounds ?? 0;
   const round = rounds > r.depth ? 'checking' : rounds ? `round ${rounds} of ${r.depth}` : 'planning';
   return (
@@ -41,7 +43,7 @@ function LeadDock({ s, r }: { s: SessionSummary; r: ResearchSettings }) {
       <Telescope size={14} className="shrink-0 text-fg-3" />
       <span className="min-w-0 flex-1 truncate text-fg-2">
         <span className="font-medium text-fg">Deep research</span> · {round} · {st?.used ?? 0} of {r.queries} searches
-        {kids.length ? ` · ${working ? `${working} researching` : 'researchers done'}` : ''}
+        {kids ? ` · ${working ? `${working} researching` : 'researchers done'}` : ''}
       </span>
       <span className="shrink-0 text-fg-3 max-sm:hidden">{r.format === 'document' ? 'Word document' : 'Page'}</span>
     </div>
