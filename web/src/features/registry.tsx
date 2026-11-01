@@ -17,6 +17,8 @@ import { childrenFeature } from './children/feature';
 import { connectionsFeature } from './connections/feature';
 import { customFeature } from './custom/feature';
 import { documentsFeature } from './documents/feature';
+import { guideFeature } from './guide/feature';
+import { guidelinesFeature } from './guidelines/feature';
 import { imagesFeature } from './images/feature';
 import { knowledgeFeature } from './knowledge/feature';
 import { memoryFeature } from './memory/feature';
@@ -117,6 +119,8 @@ export const features = (): WebFeature[] =>
     appsFeature,
     skillpackFeature,
     customFeature,
+    guidelinesFeature,
+    guideFeature,
   ]);
 
 /** A tool of the app's own MCP server, by its bare name; null for any other tool. The server was called agent-console once. */

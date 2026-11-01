@@ -14,7 +14,6 @@ import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
 import { SessionList } from '../sessions/SessionList';
 import { openPalette } from '../palette/CommandPalette';
-import { startTour } from '../tour/Tour';
 import { machineId } from '../../lib/machine';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
 import { features } from '../registry';
@@ -261,16 +260,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
             openPalette();
           }}
         />
-        <NavItem
-          path=""
-          match={false}
-          label="Tour"
-          icon={<CircleHelp size={17} />}
-          onGo={() => {
-            if (mobile) close();
-            startTour();
-          }}
-        />
+        <NavItem path="/guide" match={loc === '/guide' || loc.startsWith('/guide/')} label="Help" icon={<CircleHelp size={17} />} onGo={nav} />
       </nav>
     </aside>
   );

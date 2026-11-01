@@ -134,8 +134,8 @@ export function NewSpaceDialog({ open, onClose, onMade, group }: { open: boolean
       <div className="space-y-3.5">
         <div className="text-[13px] leading-relaxed text-fg-2">
           {group
-            ? 'A group brings spaces together: sessions in it work with all of them, their files, documents and instructions. It gets a folder of its own for what is made in it.'
-            : 'A space keeps a project’s sessions, files, documents and memory together, with instructions every agent in it gets. It gets a folder of its own.'}
+            ? 'A group brings spaces together: sessions in it work with all of them, their files, documents and guidelines. It gets a folder of its own for what is made in it.'
+            : 'A space keeps a project’s sessions, files, documents and memory together, with guidelines every agent in it follows. It gets a folder of its own.'}
         </div>
         <label className="block">
           <span className="mb-1 block text-[13px] font-medium">Name</span>
@@ -159,7 +159,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group }: { open: boolean
           <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
         </label>
         <label className="block">
-          <span className="mb-1 block text-[13px] font-medium">What every agent in it should know</span>
+          <span className="mb-1 block text-[13px] font-medium">Agent Guidelines: what every agent in it follows</span>
           <textarea
             rows={3}
             className={cx(inputCls, 'h-auto resize-none py-2 leading-relaxed')}

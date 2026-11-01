@@ -1535,6 +1535,28 @@ export class SessionManager extends EventEmitter {
     return null;
   }
 
+  /** The run id of a session's agent process, while one runs. */
+  runOf(key: string): string | undefined {
+    return this.lives.get(key)?.runner.meta.runId;
+  }
+
+  /**
+   * Ends a session's agent process while it is idle, so the next message starts it afresh with what its
+   * instructions say now (changed Agent Guidelines). Unlike stop, its queue stays as it is.
+   */
+  async recycle(key: string): Promise<void> {
+    const l = this.lives.get(key);
+    if (!l || l.adapter.state.status !== 'idle') return;
+    const exited = new Promise<void>((resolve) => {
+      if (l.adapter.exited) return resolve();
+      l.adapter.once('exit', () => resolve());
+      setTimeout(resolve, 10_000).unref?.();
+    });
+    l.adapter.stop();
+    await exited;
+    if (this.lives.get(key) === l) this.lives.delete(key);
+  }
+
   /** The live session an agent process belongs to, by the run id it was started with. */
   liveByRun(runId: string): { key: string; agent: Agent; cwd: string; acpAgent?: string } | null {
     for (const l of this.lives.values()) if (l.runner.meta.runId === runId) return { key: l.key, agent: l.agent, cwd: l.cwd, acpAgent: l.acpAgent };

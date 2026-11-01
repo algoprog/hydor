@@ -1,9 +1,9 @@
-// Spaces: a project's sessions, files, documents, memory, instructions and assistant together, picked by name
+// Spaces: a project's sessions, files, documents, memory, guidelines and assistant together, picked by name
 // on the start page in place of a folder. A space's folder holds its files and is where its sessions work, so
 // its project memory is the folder's (server/memory keys a project by its folder); its knowledge bases are
 // searched by its sessions alone, with the shared ones too unless it leaves them out (server/knowledge/scope.ts);
-// every session started in it (extra.space) is told its instructions, and starts as its assistant. A group
-// brings other spaces together: its sessions also get theirs, their documents, instructions and folders (Claude
+// every session started in it (extra.space) gets its guidelines (server/guidelines), and starts as its assistant.
+// A group brings other spaces together: its sessions also get their documents, guidelines and folders (Claude
 // Code works in those folders too). Deleting a space keeps its folder and sessions, and its knowledge bases
 // become shared; it leaves the groups it was in.
 import crypto from 'node:crypto';
@@ -136,13 +136,15 @@ export function membersNow(db: DB, s: Space): Space[] {
   return (s.members ?? []).map((id) => spaceById(db, id)).filter((x): x is Space => !!x);
 }
 
-/** What a session in a space is told; in a group, of each space it brings together too. */
+/**
+ * What a session in a space is told; in a group, of each space it brings together too. The space's own
+ * guidelines come with the user's other Agent Guidelines (server/guidelines), the most general first.
+ */
 export function spaceInstructions(s: Space, members: Space[] = []): string {
   const lines = [
     `# Space: ${s.name}`,
-    `The user keeps this work in a space of its own, "${s.name}"${s.description ? ` (${s.description})` : ''}: its sessions, files, memory and these instructions belong together. Its folder, ${s.folder}, holds the space's files: keep what you make for it there.`,
+    `The user keeps this work in a space of its own, "${s.name}"${s.description ? ` (${s.description})` : ''}: its sessions, files, memory and guidelines belong together. Its folder, ${s.folder}, holds the space's files: keep what you make for it there.`,
   ];
-  if (s.instructions) lines.push('', s.instructions);
   if (members.length) {
     lines.push(
       '',

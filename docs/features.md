@@ -26,7 +26,18 @@ agents that speak ACP and take MCP servers.
 
 - **Assistants**: start as a Researcher, Writer, Tutor, Planner, Analyst or Coder, or one of your own (its
   instructions, model, tools and connected apps; import Claude Code's agent files). A task without a folder gets
-  one of its own (`~/Naget/<date>-<task>`), and you can say once how the agents should talk to you.
+  one of its own (`~/Naget/<date>-<task>`).
+- **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
+  how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,
+  Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a space, and
+  one session (the start page's Options, or the session's menu); the more specific wins. A changed session's
+  agent follows the new ones from the next message. CLAUDE.md and AGENTS.md still work, and can be edited there too.
+- **Agents that work the app**: every agent knows the app's own guide (the `app_guide` tool) and answers questions
+  about it from there, with links to the place. Ask it to change a setting or set something up (a space, an
+  assistant, a scheduled task, memory notes…) and it does it through the app's API (`app_api`): reading runs at
+  once, and each change shows you a card first, with what changes before → after, to allow once, for the rest of
+  the session, or not. When it needs details it shows a form (`ask_form`). Passwords, keys' values, approvals,
+  permissions, spending caps, files and commands stay yours.
 - **The web**: search with Naget Search (its own index of the web, papers, patents and filings; free daily
   searches without a key) or SearXNG, Brave Search and DuckDuckGo, by category, site or date, up to 100 results;
   read whole pages, or only the parts that answer a question. Each search shows its results, and each reply its
@@ -43,11 +54,11 @@ agents that speak ACP and take MCP servers.
   Settings → Memory lists every note with when it was written, changed and last needed, and suggests
   removing the ones no agent needed for months. Turn it off for one session or for all. Agents can also look
   up earlier sessions.
-- **Spaces** (in the sidebar): a project's sessions, files, documents, memory, instructions and assistant together,
+- **Spaces** (in the sidebar): a project's sessions, files, documents, memory, guidelines and assistant together,
   like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a folder:
   its sessions work in its own folder, remember what its earlier sessions learned, search its documents, get its
-  instructions and start as its assistant. A group brings several spaces together: its sessions work with all
-  of them, their folders, documents and instructions. The sidebar's filter shows one space's sessions.
+  guidelines and start as its assistant. A group brings several spaces together: its sessions work with all
+  of them, their folders, documents and guidelines. The sidebar's filter shows one space's sessions.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
@@ -172,8 +183,8 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Usage: how much of each plan's limits you have used and when they reset, what the same work would cost
   through the API, and activity over time.
 - System: CPU, memory, GPUs, disks, network and the busiest processes, live.
-- Settings: sign the agents in and out from the browser, and manage MCP servers, skills, plugins and the
-  CLAUDE.md / AGENTS.md instruction files.
+- Settings: sign the agents in and out from the browser, and manage MCP servers, skills, plugins, Agent
+  Guidelines and the CLAUDE.md / AGENTS.md instruction files.
 - An MCP server of its own, so an agent elsewhere can list, read, start and steer sessions here.
 
 ## Everywhere
@@ -187,8 +198,9 @@ with npm into the app's folder), and the copies the app installed are kept up to
   ahead of time, and what you make gets them as you make it. `Ctrl+F` finds within a conversation.
 - A short welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter or on this
   computer, other agents) and sets those up, on pages that fill the screen. Then it shows you around as the
-  app builds itself up: each part arrives as it is explained, the rest as the tour ends. The ? button shows
-  it again.
+  app builds itself up: each part arrives as it is explained, the rest as the tour ends. Help shows it again.
+- Help (in the sidebar): a guide to every part of the app, with its contents, a search, and links that open the
+  place they name; its sections show in the search box too. The same guide is in [docs/guide](guide/).
 - Starts when the computer starts (on by default; Settings → General), as a service of your user.
 - Several machines: add other machines running Naget Agent, over SSH or by address, and switch between
   them from the sidebar. Notices from all of them reach you wherever you are.

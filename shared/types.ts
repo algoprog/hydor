@@ -72,6 +72,8 @@ export interface ApprovalRequest {
   form?: ApprovalForm;
   /** Asked by a connected app rather than the agent: its name. */
   from?: string;
+  /** The detail is plain words in Markdown (a change to the app, ask_form's message), not a command's output. */
+  prose?: boolean;
   createdAt: number;
 }
 

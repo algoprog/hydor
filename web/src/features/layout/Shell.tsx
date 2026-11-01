@@ -53,7 +53,7 @@ function useDrag(onMove: (dy: number) => void) {
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
   const session = loc.startsWith('/s/');
-  const section = session ? loc : loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc;
+  const section = session ? loc : loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc;
   return (
     <div key={section} className={cx('h-full', !session && 'anim-fade')}>
       <Page />
@@ -80,7 +80,8 @@ function Page() {
   if (loc === '/system') return <SystemPage />;
   if (loc === '/settings') {
     const q = new URLSearchParams(search);
-    const s = q.get('s');
+    // Instructions (CLAUDE.md and AGENTS.md) are part of Agent Guidelines now.
+    const s = q.get('s') === 'instructions' ? 'guidelines' : q.get('s');
     const agent = q.get('agent');
     return <SettingsPage section={isSettingsSection(s) ? s : null} cwd={q.get('cwd')} agent={agent === 'claude' || agent === 'codex' ? agent : null} />;
   }

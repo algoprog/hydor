@@ -10,6 +10,7 @@ import type { WebSocket } from 'ws';
 import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { AuthManager, HttpError, SESSION_COOKIE } from './auth.ts';
+import { isInternal } from './internal.ts';
 import { config, ensureDirs, paths } from './config.ts';
 import { kvGet, kvSet, openDb } from './db.ts';
 import { agentBaseEnv } from './env.ts';
@@ -155,6 +156,8 @@ app.addHook('onRequest', async (req, reply) => {
   const other = /^\/m\/[a-z0-9-]+(\/.*)$/.exec(url);
   if (other) url = other[1];
   if (!url.startsWith('/api/') && !url.startsWith('/ws')) return;
+  // The app's own calls from inside the server (an agent's app_api): their secret stands in for the sign-in.
+  if (!other && isInternal(req)) return;
   // Another Naget Agent using this machine, with an access token: not a browser, so no origin to check.
   const token = other ? null : bearerOf(req.headers.authorization);
   // An app's API key (server/apps) opens only its run endpoints (start one, ask about one), which check the key themselves.

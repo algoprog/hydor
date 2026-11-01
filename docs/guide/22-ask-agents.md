@@ -1,0 +1,80 @@
+# Let agents work the app for you
+
+Every agent here knows this guide and can work the app for you. Ask how something works and it answers from the guide, with a link to the right place. Ask it to change a setting or set something up (a space, an assistant, a scheduled task) and it does it, after you confirm on a card. When it needs details from you, it shows a form to fill in.
+
+## Ask how to do something
+
+In any session, with any agent, ask about the app the way you would ask a person: "How do I share this session with a colleague?", "Where do I turn on notifications on my phone?", "What does Auto mode do?". The agent looks the answer up in this guide, so it describes the app as it is now, and its links open the place it names.
+
+You can also read the guide yourself: **Help** in the sidebar, or search it from the search box (Ctrl+K, ⌘K on a Mac), where its sections show under **Guide**.
+
+## Ask an agent to change a setting or set something up
+
+Agents can do in the app what you could do in its pages. Some examples of what you can ask:
+
+- "Turn on search by meaning."
+- "Make a space called Thesis for my dissertation, with the Researcher assistant."
+- "Every weekday at 8, give me a news brief on renewable energy."
+- "Add to my guidelines that answers should be short."
+- "Use Brave Search before DuckDuckGo."
+- "Delete the memory notes about my old job."
+- "Which templates do I have? Run the trip planner for a long weekend in Lisbon."
+- "Switch this device to the light theme."
+
+The agent first reads how things are now, then asks you to confirm the change on a card in the conversation. Reading never asks: an agent can always look at your settings, spaces, tasks and the rest to answer you.
+
+## The card: confirming a change
+
+Before an agent changes anything, a card shows in the conversation (and in your [inbox](/inbox), with a notification if you're away). It says:
+
+- **What the change is**, in the agent's words: "Make the space “Thesis”".
+- **What changes**, field by field: a setting as it is now and as it will be ("**Results**: 10 → 20"), or what a new thing will be made with.
+- **The call itself**, in small print (for example `PUT /api/search/settings`), so you can see exactly what will happen whatever the agent says.
+
+Then you choose:
+
+- **Allow** makes the change.
+- **Allow for this session** makes it, and lets this session make more changes of the same everyday kind without asking again. Changes that ask every time (below) still ask.
+- **Don’t** (or **Decline**) changes nothing. You can say why, or what to do instead, and the agent reads it.
+
+Some changes ask every time, even after **Allow for this session**: deleting anything, starting a session or a scheduled task's run, sending a message to another session, adding an MCP server or plugin, changing what agents may do in Custom or the browser, adding a machine or an account, downloading a model, updating the app. For a deletion the button says **Delete**.
+
+A card waits about nine minutes. If you don't answer by then, it goes away and the agent asks you in its reply instead.
+
+## When an agent needs details: forms
+
+When an agent needs several things from you, it can show a form in the conversation instead of a list of questions: a trip's dates and budget, a new template's name and fields. Fill it in and click the button (**Send**, or what the agent called it); **Not now** closes it, and the agent carries on without it or asks in words.
+
+A card for a change can carry a form too: "Make a space" can show the name, description and guidelines the agent guessed, for you to correct before you click **Save**.
+
+## What agents can't do in the app
+
+Some things stay yours. An agent that tries gets told where you do it:
+
+- your password and signing in and out ([Settings → Password](/settings?s=security), [Accounts](/settings?s=accounts));
+- the values of keys: an agent asks for a key with a card where you type it into the vault, and never sees it ([Connections, keys and tools](/guide/connections));
+- making access tokens for other machines or agents, and a template's API keys;
+- answering approval cards, its own or another session's, and deciding on cards that ask you (a proposed skill, a scheduled task, publishing);
+- a session's permissions and its spending cap;
+- files, commands, terminals and git through the app: agents use their own tools for those, which ask you as the session's permissions say.
+
+## Permissions and the cards
+
+What a session's permissions allow decides how much the cards ask:
+
+- **Plan** (and Codex's **Read only**): the agent can read the app's settings and answer questions, but changes nothing. It tells you what it would change.
+- **Ask**, **Accept edits**, **Auto** and the like: changes ask on a card, as above.
+- **Bypass** (Claude Code) and **Full access** (Codex): no cards; the agent makes the changes you ask for. A form still shows when the agent needs details.
+- Custom's **Full access**: only the changes that ask every time show a card.
+
+## Settings kept on each device
+
+A few settings belong to each device rather than the app: the theme, the language, the notification sound, what Enter does while an agent works, terminal suggestions and whether the sidebar shows. An agent can change these on the device you're talking to it from (the pages showing that session), without a card: "Switch to the dark theme", "Use the Sage theme", "Show the app in Greek". Your other devices keep their own.
+
+## Ask an agent
+
+- "How do I get notifications on my phone?"
+- "Make a space for my garden projects and give it the guideline: we live in a cold climate."
+- "Turn the browser's screenshots off."
+- "Show me which scheduled tasks I have, and turn off the price watch."
+- "Switch this device to the light theme."

@@ -11,6 +11,8 @@ import { connections } from '../connections/index.ts';
 import { custom } from '../custom/index.ts';
 import { documents } from '../documents/index.ts';
 import { find } from '../find/index.ts';
+import { guide } from '../guide/index.ts';
+import { guidelines } from '../guidelines/index.ts';
 import { images } from '../images/index.ts';
 import { knowledge } from '../knowledge/index.ts';
 import { language } from '../language/index.ts';
@@ -26,4 +28,5 @@ import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, knowledge, spaces, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, language, find, releaseNotes];
+// The user's guidelines lead what an agent is told.
+export const FEATURES: Feature[] = [guidelines, pages, search, browser, memory, knowledge, spaces, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, language, guide, find, releaseNotes];

@@ -1,5 +1,5 @@
 // The welcome tour. The first time someone opens the app (right after choosing a password on a new
-// install), and whenever they press the ? button, it asks what they want to use (Claude Code, Codex,
+// install), and whenever they start it again from Help, it asks what they want to use (Claude Code, Codex,
 // models through OpenRouter or on this computer, other agents) and sets each of those up, on pages that
 // fill the screen while the app behind is empty. Then it builds the app up as it shows it around: a step
 // points at an element marked data-tour="…", which arrives as the step comes, with the rest of the page
@@ -650,7 +650,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       target: 'nav-settings',
       sidebar: true,
       title: 'Get notified',
-      body: 'Hear when a session finishes or needs your answer, even with the app closed. Settings also holds your accounts, models, MCP servers, skills and instructions.',
+      body: 'Hear when a session finishes or needs your answer, even with the app closed. Settings also holds your accounts, models, MCP servers, skills and the guidelines every agent follows.',
       Extra: NotifySetup,
     },
     {
@@ -679,7 +679,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
             Review every file it changed. {MOD}F finds text in the conversation.
           </Feature>
           <div className="pt-1 text-[12.5px] text-fg-3" style={{ '--i': 5 } as CSSProperties}>
-            Take this tour again any time with the <CircleHelp size={13} className="inline -translate-y-px" /> button.
+            Help (<CircleHelp size={13} className="inline -translate-y-px" />) explains every part of the app, and takes you on this tour again.
           </div>
         </div>
       ),
@@ -1171,14 +1171,14 @@ export function Tour() {
   );
 }
 
-/** Desktop: the ? in the bottom-right corner that opens the tour again. */
+/** Desktop: the ? in the bottom-right corner, while the sidebar is hidden: Help, the guide (with the tour). */
 export function HelpButton() {
   return (
     <button
-      onClick={() => startTour()}
+      onClick={() => go('/guide')}
       className="fixed right-4 bottom-4 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-line-2 bg-elevated text-fg-2 shadow-lg transition-colors hover:text-fg"
-      aria-label="Take the tour"
-      title="Take the tour"
+      aria-label="Help"
+      title="Help: the guide to every part of the app"
     >
       <CircleHelp size={18} />
     </button>

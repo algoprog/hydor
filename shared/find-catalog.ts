@@ -40,7 +40,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['accounts', 'Accounts', 'Agents', 'The Claude Code and Codex sign-ins every session uses'],
   ['agents', 'More agents', 'Agents', 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP'],
   ['models', 'Models', 'Agents', 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM'],
-  ['instructions', 'Instructions', 'Agents', 'CLAUDE.md and AGENTS.md: what the agents read at the start of every session'],
+  ['guidelines', 'Agent Guidelines', 'Agents', 'What every agent follows: in every session, in a space, or in one session'],
   ['mcp', 'MCP servers', 'Agents', 'Tools the agents can call'],
   ['skills', 'Skills', 'Agents', 'Know-how the agents load when a task calls for it'],
   ['plugins', 'Plugins', 'Agents', 'Claude Code add-ons that bundle skills, commands, agents and MCP servers'],
@@ -52,7 +52,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['images', 'Images', 'Capabilities', 'Pictures agents make for you, with an image model through OpenRouter'],
   ['connections', 'Connections', 'Capabilities', 'Apps every agent can use, from a marketplace anyone can add to, and a vault for keys'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
-  ['assistants', 'Assistants', 'Capabilities', 'Presets to start sessions as (Researcher, Writer, Tutor…), how the agents talk to you, and where task folders go'],
+  ['assistants', 'Assistants', 'Capabilities', 'Presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go'],
   ['skillpack', 'Skill library', 'Capabilities', 'Skills that come with the app, and the ones agents learned with your approval'],
   ['custom', 'Custom', 'Capabilities', 'Auto mode, a sandbox for commands, and how long goals run'],
 ];
@@ -104,8 +104,11 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['models', 'OpenRouter', 'openrouter api key models cloud', 'Models through OpenRouter, with your key'],
   ['models', 'Runtimes and endpoints', 'ollama vllm openai compatible endpoint url', 'Ollama, vLLM and other OpenAI-compatible endpoints'],
   ['models', 'Hugging Face token', 'hf token gated private', 'Only for gated or private models'],
-  // Agents › Instructions
-  ['instructions', 'Read in this order', 'claude.md agents.md instructions rules files', 'The instruction files agents read, in order', 'Instruction files'],
+  // Agents › Agent Guidelines
+  ['guidelines', 'For every session', 'rules instructions preferences system prompt always never how to talk to you tone style claude.md agents.md', 'What every agent follows, in every session', 'Agent Guidelines for every session'],
+  ['guidelines', 'For a space', 'space project guidelines instructions', 'Guidelines the sessions in a space follow', 'Guidelines for a space'],
+  ['guidelines', 'For one session', 'session guidelines instructions start page', 'Guidelines for one session, from the start page or the session’s menu', 'Guidelines for one session'],
+  ['guidelines', 'Files Claude Code and Codex read too', 'claude.md agents.md instruction files project folder', 'CLAUDE.md and AGENTS.md, which Claude Code and Codex read on their own', 'CLAUDE.md and AGENTS.md'],
   // Agents › MCP servers
   ['mcp', 'Add server', 'mcp tools server add', 'A tool server for Claude Code or Codex', 'Add an MCP server'],
   ['mcp', 'Check connections', 'mcp status connected failed', 'See whether each MCP server answers', 'Check MCP servers'],
@@ -169,7 +172,6 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['voice', 'Read aloud', 'text to speech tts read replies voice speak', 'Have replies read aloud'],
   // Capabilities › Assistants
   ['assistants', 'New assistant', 'assistant preset create researcher writer tutor', 'A preset to start sessions as'],
-  ['assistants', 'How the agents talk to you', 'tone style voice personality', 'The tone every agent takes with you'],
   ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where an assistant’s new task folders go'],
   // Capabilities › Skill library
@@ -200,7 +202,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['terminal', 'Terminal', '/terminal', 'shell console command line bash', 'Shells on this computer'],
   ['apps', 'Templates', '/apps', 'app apps gallery templates ready-made tasks tools forms', 'Tasks you run again and again: fill in a form, and an agent does the job'],
   ['new-app', 'New template', '/apps/new', 'create build make new template app apps form tool', 'A template anyone can run from a form'],
-  ['spaces', 'Spaces', '/spaces', 'spaces projects workspace group sessions files documents knowledge memory instructions folder', 'Each project’s sessions, documents and instructions, together'],
+  ['spaces', 'Spaces', '/spaces', 'spaces projects workspace group sessions files documents knowledge memory guidelines instructions folder', 'Each project’s sessions, documents and guidelines, together'],
   ['knowledge', 'Shared knowledge', '/knowledge', 'knowledge base documents folder pdf files search rag library cite sources', 'Documents every session can search and cite'],
   ['pages', 'Pages', '/pages', 'saved pages html reports small tools app apps tracker calculator checklist', 'Small tools and pages agents made for you, and what you published'],
   ['published', 'Published pages', '/pages?tab=published', 'published public share link', 'Pages anyone with the link can open'],
@@ -210,6 +212,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['stats', 'Activity', '/stats', 'activity stats statistics tokens cost', 'What the agents did, over time'],
   ['system', 'System', '/system', 'system cpu gpu memory ram disk processes', 'This computer: processors, GPUs, memory, disks, the busiest processes'],
   ['settings', 'Settings', '/settings', 'settings preferences options configuration', 'Everything the app can be set to'],
+  ['guide', 'Help', '/guide', 'help guide manual documentation how to learn tutorial faq questions explain', 'The guide to every part of the app'],
 ];
 
 const ACTIONS: [CatalogItem['act'] & string, string, string, string][] = [
