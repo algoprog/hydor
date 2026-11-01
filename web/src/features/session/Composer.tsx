@@ -1,12 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowRightLeft, ArrowUp, ListTodo, MonitorUp, Paperclip, Square, X } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { ArrowRightLeft, ArrowUp, ChevronDown, ListTodo, MonitorUp, Paperclip, SlidersHorizontal, Square, X } from 'lucide-react';
 import type { Agent, BackgroundTask, SessionSummary } from '@shared/types';
 import { enc, post } from '../../lib/api';
 import { openSession } from '../../lib/nav';
 import { toast, toastError, useLive, useTimeline } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
-import { cx, Popover, useConfirm } from '../../components/ui';
+import { cx, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
 import { confirmResume, takeoverDialog } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
 import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
@@ -39,6 +39,34 @@ export function followUpPref(): FollowUp {
   } catch {
     return 'steer';
   }
+}
+
+/**
+ * Where the box is narrow (a phone, a small window): the model, with the effort and permissions when they are
+ * set, as one chip, and those three (and the context) in its menu, a sheet from the bottom on a phone.
+ */
+function OptionsChip({ summary, title, children }: { summary: string; title: string; children: ReactNode }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <SheetsOnPhone.Provider value>
+      <button
+        ref={ref}
+        type="button"
+        title={title}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={cx('inline-flex h-8 min-w-0 items-center gap-1.5 rounded-lg px-2 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg', open && 'bg-bg-2 text-fg')}
+      >
+        <SlidersHorizontal size={13} className="shrink-0" />
+        <span className="truncate">{summary}</span>
+        <ChevronDown size={12} className="shrink-0 opacity-60" />
+      </button>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={290} prefer="above" title="Options">
+        <SettingLayout.Provider value="row">{children}</SettingLayout.Provider>
+      </Popover>
+    </SheetsOnPhone.Provider>
+  );
 }
 
 /**
@@ -236,6 +264,17 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const ctx = live?.contextTokens && live?.contextWindow ? Math.round((live.contextTokens / live.contextWindow) * 100) : null;
   const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   const canSend = (!!(text.trim() || atts.length) || !!move) && !busy && !locked;
+  // The narrow box's chip: the model, then the effort and permissions when they are not the usual.
+  const on = move ? { c: moveCat, model: move.model, effort: move.effort, mode: move.mode } : { c: cat, model, effort, mode };
+  const effortOn = on.effort ? on.effort[0].toUpperCase() + on.effort.slice(1) : null;
+  const modeOn = on.c && on.mode && on.mode !== on.c.defaultMode ? (on.c.modes.find((m) => m.value === on.mode)?.label ?? null) : null;
+  const modeNow = on.c?.modes.find((m) => m.value === (on.mode ?? on.c?.defaultMode))?.label;
+  const summary = [on.c ? modelLabel(on.c, on.model) : '…', effortOn, modeOn].filter(Boolean).join(' · ');
+  const optionsTitle = [`Model: ${on.c ? modelLabel(on.c, on.model) : '…'}`, `Effort: ${effortOn ?? 'default'}`, modeNow && `Permissions: ${modeNow} (Shift+Tab cycles)`].filter(Boolean).join('\n');
+  const compact = async () => {
+    const ok = await confirm({ title: 'Compact the conversation?', body: <>The history so far becomes a summary, which frees context. {ctx}% is in use.</>, confirm: 'Compact' });
+    if (ok) post(`/api/sessions/${enc(key)}/compact`).then(() => toast('Compacting the conversation…'), toastError);
+  };
 
   return (
     <div className="shrink-0 px-3 pb-[max(10px,var(--safe-bottom))] sm:px-6 sm:pb-5">
@@ -257,7 +296,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
           </div>
         )}
         <div
-          className="relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50"
+          className="@container relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50"
           onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
           onDrop={(e) => {
             if (!e.dataTransfer.files.length || locked) return;
@@ -377,20 +416,53 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             className="block max-h-[40vh] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none disabled:cursor-not-allowed"
           />
           <div className="flex items-center gap-1 px-2.5 pt-0.5 pb-2.5">
-            <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-              {move ? (
-                <>
-                  <ModelPicker agent={move.agent} acp={move.acp} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
-                  <EffortPicker agent={move.agent} acp={move.acp} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
-                  <ModePicker agent={move.agent} acp={move.acp} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
-                </>
-              ) : (
-                <>
-                  <ModelPicker agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
-                  <EffortPicker agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
-                  <ModePicker agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
-                </>
-              )}
+            <div className="flex min-w-0 flex-1 items-center gap-0.5">
+              {/* Wide: the model, effort and permissions side by side. Narrow: one chip, the three in its menu. */}
+              <span className="hidden @2xl:contents">
+                {move ? (
+                  <>
+                    <ModelPicker agent={move.agent} acp={move.acp} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
+                    <EffortPicker agent={move.agent} acp={move.acp} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
+                    <ModePicker agent={move.agent} acp={move.acp} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
+                  </>
+                ) : (
+                  <>
+                    <ModelPicker agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
+                    <EffortPicker agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
+                    <ModePicker agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
+                  </>
+                )}
+              </span>
+              <span className="contents @2xl:hidden">
+                <OptionsChip summary={summary} title={optionsTitle}>
+                  {move ? (
+                    <>
+                      <ModelPicker label="Model" agent={move.agent} acp={move.acp} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
+                      <EffortPicker label="Effort" agent={move.agent} acp={move.acp} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
+                      <ModePicker label="Permissions" agent={move.agent} acp={move.acp} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
+                    </>
+                  ) : (
+                    <>
+                      <ModelPicker label="Model" agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
+                      <EffortPicker label="Effort" agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
+                      <ModePicker label="Permissions" agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
+                      {ctx != null && (
+                        <button
+                          type="button"
+                          disabled={working}
+                          onClick={() => void compact()}
+                          title="Compact the conversation: the history so far becomes a summary, which frees context"
+                          className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50 max-sm:h-11 max-sm:text-[14.5px]"
+                        >
+                          <span className="shrink-0 text-fg-2">Context</span>
+                          <span className={cx('tnum ml-auto min-w-0 truncate pl-3 font-medium', ctx > 85 ? 'text-warn' : 'text-fg')}>{ctx}% in use</span>
+                          <span className="shrink-0 text-[12.5px] font-medium text-accent">Compact</span>
+                        </button>
+                      )}
+                    </>
+                  )}
+                </OptionsChip>
+              </span>
               {tasks.length > 0 && (
                 <>
                   <button
@@ -425,11 +497,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
               <button
                 type="button"
                 disabled={working}
-                onClick={async () => {
-                  const ok = await confirm({ title: 'Compact the conversation?', body: <>The history so far becomes a summary, which frees context. {ctx}% is in use.</>, confirm: 'Compact' });
-                  if (ok) post(`/api/sessions/${enc(key)}/compact`).then(() => toast('Compacting the conversation…'), toastError);
-                }}
-                className={cx('tnum mr-1 hidden rounded-md px-1 text-[11.5px] transition-colors hover:bg-bg-2 disabled:pointer-events-none sm:inline', ctx > 85 ? 'text-warn' : 'text-fg-3')}
+                onClick={() => void compact()}
+                className={cx('tnum mr-1 hidden rounded-md px-1 text-[11.5px] transition-colors hover:bg-bg-2 disabled:pointer-events-none @2xl:inline', ctx > 85 ? 'text-warn' : 'text-fg-3')}
                 title={`${live?.contextTokens?.toLocaleString()} of ${live?.contextWindow?.toLocaleString()} context tokens · click to compact`}
               >
                 {ctx}% context
