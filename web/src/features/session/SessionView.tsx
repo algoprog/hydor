@@ -21,7 +21,6 @@ import { TaskLogDialog, TaskRow, useStopTask } from './TaskLog';
 import { Timeline } from './Timeline';
 import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
-import { noteOpened } from '../palette/CommandPalette';
 import { FindBar } from './FindBar';
 import { FeatureDock, sessionPaneOf, type SessionPane } from '../registry';
 import { useSessionShow, type SessionShow } from './show';
@@ -559,7 +558,6 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
     return liveState !== s.live ? { ...s, live: liveState } : s;
   }, [s, lv?.live]);
 
-  useEffect(() => noteOpened(sessionKey), [sessionKey]);
   const [forking, setForking] = useState<{ at?: string } | null>(null);
 
   // Ctrl+F finds in this session's messages (editors and terminals keep their own); the search box opens a

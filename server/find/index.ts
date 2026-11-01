@@ -4,7 +4,8 @@
 // assistants, skills, pages and connected apps (sources.ts). Their vectors come from two places. What ships with
 // the app has them in shipped-vectors.json, made ahead of time (npm run find:vectors), so no one computes them.
 // What people make gets its vector the moment it is made or changed, as the pages are told (event, below), and
-// keeps it in find_vectors by the hash of its text, 4 bits a number like memory's notes.
+// keeps it in find_vectors by the hash of its text, 4 bits a number like memory's notes. What you pick from the
+// box and the places you visit are kept too (usage.ts), and lift what matches.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +20,7 @@ import { findNotes } from '../memory/search.ts';
 import { memoryOn } from '../memory/store.ts';
 import { BYTES, quantize, queryTable, scale, scoreAt, VECTOR_MODEL } from '../memory/vectors.ts';
 import { itemsOf, KINDS, MAX_SESSIONS, sessionItem, type Item, type Kind } from './sources.ts';
+import { findUsage, noteUsage } from './usage.ts';
 
 /**
  * Below this, a text is not taken as being about the query (mDenseOn, a query against an entry as the search box
@@ -234,6 +236,13 @@ export const find: Feature = {
   id: 'find',
   routes(d) {
     d.app.get('/api/find', async (req) => findAll(d, String((req.query as { q?: string }).q ?? '')));
+    // What the search box learns from use (usage.ts): what was picked from it, and the places visited.
+    d.app.get('/api/find/usage', async () => findUsage(d.db));
+    d.app.post('/api/find/usage', async (req) => {
+      const b = (req.body ?? {}) as { picks?: unknown; visits?: unknown };
+      noteUsage(d.db, { picks: Array.isArray(b.picks) ? b.picks : [], visits: Array.isArray(b.visits) ? b.visits.map(String) : [] });
+      return { ok: true };
+    });
   },
   event: onEvent,
   start(d) {

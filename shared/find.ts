@@ -2,7 +2,9 @@
 // server. A word of the query counts when an item holds it whole, at the start of one of its words (typed so
 // far), inside one, or with its letters in order (a typo); the title counts most, then
 // other names for it, then its description. Words like "how" or "the" do not count, and items holding more
-// of the query's words come first. What the search box gets from the server is typed here too.
+// of the query's words come first. Among what matches, what you use comes up: what you picked from the box
+// before (most when you typed the same), and the places you visit. What the search box gets from the server
+// is typed here too.
 import type { MemoryKind, MemoryScope } from './memory.ts';
 import type { Agent, SearchHit } from './types.ts';
 
@@ -170,4 +172,79 @@ export interface FindResponse {
   sessions: FoundSession[];
   messages: SearchHit[];
   notes: FoundNote[];
+}
+
+// ---- what you use ---------------------------------------------------------------------------------
+
+/**
+ * How the search box knows what you use (server/find/usage.ts keeps it, for every device). Each count is
+ * worth less as it ages (a visit halves in two weeks, a pick in a month), so what you use now counts most.
+ * Picks and visits are keyed by the ids the search box gives things; a place is a page (go:usage), a Settings
+ * section (sec:memory), a session (s:<key>), a template (app:<id>), a page (page:<id>) or a file (f:<path>).
+ */
+export interface FindUsage {
+  /** Things picked from the search box. */
+  picks: Record<string, number>;
+  /** Places visited, by any way there, and when last. */
+  visits: Record<string, { n: number; at: number }>;
+  /** What was typed when something was picked: [query (usageQuery), id, count]. */
+  queries: [string, string, number][];
+}
+
+export const PICK_HALF_LIFE = 30 * 86400_000;
+export const VISIT_HALF_LIFE = 14 * 86400_000;
+
+/** A count `n` made at `at`, as it is worth at `now`. */
+export const decayed = (n: number, at: number, now: number, half: number) => n * 2 ** (-Math.max(0, now - at) / half);
+
+/** A query as picks remember it: folded, spaces tidied, short. */
+export const usageQuery = (q: string) => fold(q).trim().replace(/\s+/g, ' ').slice(0, 40);
+
+/**
+ * How much each thing was picked for this query before: what was typed the same counts whole, a longer query
+ * that starts with this one (typed so far) 0.6, a shorter one this one goes on from 0.4.
+ */
+export function queryAffinity(u: FindUsage | null, q: string): Map<string, number> {
+  const out = new Map<string, number>();
+  const cq = usageQuery(q);
+  if (!u || cq.length < 2) return out;
+  for (const [sq, id, n] of u.queries) {
+    const w = sq === cq ? 1 : sq.startsWith(cq) ? 0.6 : sq.length >= 3 && cq.startsWith(sq) ? 0.4 : 0;
+    if (w) out.set(id, (out.get(id) ?? 0) + w * n);
+  }
+  return out;
+}
+
+/**
+ * What use adds to a match's score: picked for this query before (up to 0.3: enough to bring a match up from
+ * a few places down), picked at all (up to 0.08), visited (up to 0.08; the section a setting is in, 0.3 of
+ * its visits). The last two count as much as the item matches (`strength`, 0 to 1: a title that starts with
+ * what was typed 1, a word in its description far less), so a place used often does not pass a clearly better
+ * match on the strength of a stray word. The best match by words alone scores about 0.13 to 0.28.
+ */
+export function usageBoost(u: FindUsage | null, affinity: Map<string, number>, id: string, within?: string, strength = 1): number {
+  if (!u) return 0;
+  const a = affinity.get(id) ?? 0;
+  const p = u.picks[id] ?? 0;
+  const v = (u.visits[id]?.n ?? 0) + (within ? 0.3 * (u.visits[within]?.n ?? 0) : 0);
+  return Math.min(0.3, 0.12 * Math.log2(1 + a)) + strength * (Math.min(0.08, 0.03 * Math.log2(1 + p)) + Math.min(0.08, 0.025 * Math.log2(1 + v)));
+}
+
+/** How strongly a match by words holds (matchItem's score): 1 for a title that starts with what was typed. */
+export const matchStrength = (score: number) => Math.max(0.3, Math.min(1, score / 30));
+
+/** Where an address is, as a place the search box can find (null: nowhere it lists). */
+export function placeOf(pathname: string, search: string, pagePaths: Record<string, string>): string | null {
+  const q = new URLSearchParams(search);
+  if (pathname.startsWith('/s/')) return `s:${decodeURIComponent(pathname.slice(3))}`;
+  if (pathname === '/settings') return q.get('s') ? `sec:${q.get('s')}` : 'go:settings';
+  if (pathname === '/file') return q.get('path') ? `f:${q.get('path')}` : null;
+  const t = /^\/apps\/t\/([^/]+)$/.exec(pathname);
+  if (t) return `app:tpl:${decodeURIComponent(t[1])}`;
+  const a = /^\/apps\/([^/]+)$/.exec(pathname);
+  if (a && a[1] !== 'new') return `app:${decodeURIComponent(a[1])}`;
+  const pg = /^\/pages\/([^/]+)$/.exec(pathname);
+  if (pg) return `page:${decodeURIComponent(pg[1])}`;
+  const full = `${pathname}${q.get('tab') ? `?tab=${q.get('tab')}` : ''}`;
+  return pagePaths[full] ?? pagePaths[pathname] ?? null;
 }

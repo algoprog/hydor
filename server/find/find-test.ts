@@ -2,14 +2,15 @@
 // catalog of what ships with the app (shared/find-catalog.ts) against the Settings pages, and its vectors made
 // ahead of time (shipped-vectors.json: npm run find:vectors when this fails); and what the server adds
 // (index.ts): what ships, found by meaning, sessions and tasks given their vectors the moment the pages hear of
-// them, messages and memory notes; with a made-up embedder in place of the model. Build and run:
+// them, messages and memory notes; with a made-up embedder in place of the model; and what use adds (usage.ts):
+// picks and visits that age, and how they lift what matches. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/find/find-test.ts
 //   DATA_DIR=/tmp/naget-test-find node dist/dev/find-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { matchItem, queryWords } from '../../shared/find.ts';
+import { matchItem, matchStrength, placeOf, queryAffinity, queryWords, usageBoost } from '../../shared/find.ts';
 import { catalogItems, catalogText, OPTIONS, SECTIONS } from '../../shared/find-catalog.ts';
 import type { ScheduledTask } from '../../shared/automations.ts';
 import type { SessionSummary } from '../../shared/types.ts';
@@ -20,6 +21,7 @@ import * as store from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
 import { dropLists, findAll, hashOf, makeWaiting, onEvent, setShippedForTests, shippedVectors } from './index.ts';
 import { shippedItems } from './sources.ts';
+import { findUsage, noteUsage } from './usage.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -190,6 +192,63 @@ test('with search by meaning: what ships found in other words; sessions and task
   assert.ok(!(await findAll(d, 'holiday plans')).sessions.some((x) => x.meaning));
   setEmbedderForTests(null);
   kvSet(db, 'memory.meaning', '0');
+});
+
+test('use: picks (with what was typed) and visits, worth half after their half-life, kept apart', () => {
+  const day = 86400_000;
+  const t0 = Date.UTC(2026, 10, 1);
+  noteUsage(db, { picks: [{ id: 'sec:memory', q: '  Mem ' }, { id: 'sec:memory', q: 'mem' }, { id: 'go:usage', q: '' }], visits: ['go:usage', 'go:usage', 's:claude:a'] }, t0);
+  const u = findUsage(db, t0);
+  assert.equal(u.picks['sec:memory'], 2);
+  assert.equal(u.picks['go:usage'], 1);
+  assert.deepEqual(u.queries, [['mem', 'sec:memory', 2]]);
+  assert.deepEqual(u.visits['go:usage'], { n: 2, at: t0 });
+  // Two weeks on, a visit is worth half and a pick still about 70%; adding to it starts from what it is worth.
+  const later = findUsage(db, t0 + 14 * day);
+  assert.ok(Math.abs(later.visits['go:usage'].n - 1) < 1e-9);
+  assert.ok(Math.abs(later.picks['sec:memory'] - 2 * 2 ** (-14 / 30)) < 1e-9);
+  noteUsage(db, { visits: ['go:usage'] }, t0 + 14 * day);
+  assert.ok(Math.abs(findUsage(db, t0 + 14 * day).visits['go:usage'].n - 2) < 1e-9);
+  // Long unused, it is forgotten.
+  assert.equal(findUsage(db, t0 + 400 * day).picks['sec:memory'], undefined);
+});
+
+test('use lifts what matches: picked for the same words most, then picked at all and visited; never past a clearly better match', () => {
+  const u = { picks: { 'sec:memory': 3, 'go:usage': 1 }, visits: { 'sec:memory': { n: 5, at: 0 }, 'go:stats': { n: 40, at: 0 } }, queries: [['memory', 'sec:memory', 3], ['us', 'go:usage', 1]] as [string, string, number][] };
+  // Typed so far ("mem" of "memory") counts 0.6 of each pick, the same words whole, more words 0.4.
+  const near = (a: number | undefined, b: number) => assert.ok(a !== undefined && Math.abs(a - b) < 1e-9, `${a} is not ${b}`);
+  near(queryAffinity(u, 'mem').get('sec:memory'), 1.8);
+  near(queryAffinity(u, 'Memory').get('sec:memory'), 3);
+  near(queryAffinity(u, 'memory notes').get('sec:memory'), 1.2);
+  assert.equal(queryAffinity(u, 'm').size, 0);
+  // "us" was too short to stand for a longer query.
+  assert.equal(queryAffinity(u, 'usage').get('go:usage'), undefined);
+  const boost = (id: string, q: string, within?: string) => usageBoost(u, queryAffinity(u, q), id, within);
+  assert.ok(boost('sec:memory', 'memory') > boost('sec:memory', 'notes'));
+  // Visits alone top out at 0.08; picks for the query at 0.3, all together under 0.46.
+  assert.ok(Math.abs(boost('go:stats', 'x') - 0.08) < 1e-9);
+  assert.ok(boost('sec:memory', 'memory') <= 0.46);
+  // A setting gets 0.3 of its section's visits; a weak match by words gets less of what visits add.
+  assert.ok(Math.abs(boost('opt:memory:x', 'x', 'sec:memory') - 0.025 * Math.log2(1 + 1.5)) < 1e-9);
+  assert.ok(Math.abs(usageBoost(u, new Map(), 'go:stats', undefined, matchStrength(9)) - 0.3 * 0.08) < 1e-9);
+  // What was picked for these words counts whole however it matches.
+  assert.ok(usageBoost(u, queryAffinity(u, 'memory'), 'sec:memory', undefined, 0.3) > 0.24);
+  assert.equal(usageBoost(null, new Map(), 'sec:memory'), 0);
+});
+
+test('places: each address as the search box lists it', () => {
+  const pages = Object.fromEntries(catalogItems().filter((it) => it.path).map((it) => [it.path!, it.id]));
+  assert.equal(placeOf('/s/claude%3Aabc', '', pages), 's:claude:abc');
+  assert.equal(placeOf('/settings', '?s=memory&find=Search%20by%20meaning', pages), 'sec:memory');
+  assert.equal(placeOf('/settings', '', pages), 'go:settings');
+  assert.equal(placeOf('/apps/t/invoice', '', pages), 'app:tpl:invoice');
+  assert.equal(placeOf('/apps/ab12', '', pages), 'app:ab12');
+  assert.equal(placeOf('/apps/new', '', pages), 'go:new-app');
+  assert.equal(placeOf('/pages', '?tab=published', pages), 'go:published');
+  assert.equal(placeOf('/pages/p1', '', pages), 'page:p1');
+  assert.equal(placeOf('/spaces', '', pages), 'go:spaces');
+  assert.equal(placeOf('/file', '?path=%2Fhome%2Fa.md&line=3', pages), 'f:/home/a.md');
+  assert.equal(placeOf('/review/x', '', pages), null);
 });
 
 for (const [name, fn] of tests) {

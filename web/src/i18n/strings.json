@@ -3292,7 +3292,7 @@
 "Searching…":"web/src/features/search/views.tsx",
 "searxng self-hosted search address":"shared/find-catalog.ts",
 "SEC filing":"web/src/features/search/views.tsx",
-"sec:{0}":"shared/find-catalog.ts",
+"sec:{0}":"web/src/features/palette/catalog.tsx",
 "second account work personal subscription":"shared/find-catalog.ts",
 "Second opinion":"web/src/features/opinion/OpinionCard.tsx",
 "Secondary text":"shared/themes.ts",
