@@ -10,6 +10,7 @@ import { Readable } from 'node:stream';
 import zlib from 'node:zlib';
 import type { ChromeDownload, ChromeInfo } from '../../shared/browser.ts';
 import { config } from '../config.ts';
+import { proxyArgs } from './proxy.ts';
 
 export const BROWSER_DIR = path.join(config.dataDir, 'browser');
 const CFT_DIR = path.join(BROWSER_DIR, 'chrome');
@@ -173,7 +174,15 @@ export function plainUserAgent(ua: string): string {
   return ua.replace(/HeadlessChrome\//, 'Chrome/');
 }
 
-function args(o: { userDataDir: string; headless: boolean; shell?: boolean }, sandbox: boolean): string[] {
+interface LaunchOpts {
+  userDataDir: string;
+  headless: boolean;
+  shell?: boolean;
+  /** The port of the app's proxy every connection goes through (proxy.ts). */
+  proxy?: number;
+}
+
+function args(o: LaunchOpts, sandbox: boolean): string[] {
   const a = [
     '--remote-debugging-port=0',
     `--user-data-dir=${o.userDataDir}`,
@@ -193,6 +202,7 @@ function args(o: { userDataDir: string; headless: boolean; shell?: boolean }, sa
     // WebRTC must not reveal or reach the local network either.
     '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
     '--window-size=1280,800',
+    ...(o.proxy ? proxyArgs(o.proxy) : []),
   ];
   if (o.headless || o.shell) a.push('--headless');
   if (!sandbox) a.push('--no-sandbox');
@@ -200,7 +210,7 @@ function args(o: { userDataDir: string; headless: boolean; shell?: boolean }, sa
   return a;
 }
 
-function start(bin: string, o: { userDataDir: string; headless: boolean; shell?: boolean }, sandbox: boolean): Promise<Launched> {
+function start(bin: string, o: LaunchOpts, sandbox: boolean): Promise<Launched> {
   return new Promise((resolve, reject) => {
     const proc = spawn(bin, args(o, sandbox), { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env } });
     let err = '';
@@ -228,7 +238,7 @@ function start(bin: string, o: { userDataDir: string; headless: boolean; shell?:
   });
 }
 
-export async function launchChrome(c: ChromeInfo, o: { userDataDir: string; headless: boolean }): Promise<Launched> {
+export async function launchChrome(c: ChromeInfo, o: Omit<LaunchOpts, 'shell'>): Promise<Launched> {
   fs.mkdirSync(o.userDataDir, { recursive: true, mode: 0o700 });
   const opts = { ...o, shell: c.shell };
   if (!noSandbox.has(c.path)) {

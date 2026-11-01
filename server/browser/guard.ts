@@ -1,6 +1,8 @@
 // What the browser's pages may reach: every request is paused (CDP Fetch, for the whole browser) and
 // goes on only when its address is public, or the session allowed it (its own dev server), and the
 // sites the user listed allow it. Pages from the web stay away from this machine and its network.
+// Each connection is checked once more where it is made, by the browser's proxy (proxy.ts): WebSockets,
+// which this never sees, and names that answer differently by the time Chromium looks them up.
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { privateIp } from '../web/fetch.ts';
