@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { MAX_RUNNING_DEFAULT, MAX_RUNNING_LIMIT, SWARM_SIZE_DEFAULT, SWARM_SIZE_LIMIT, type ChildNote, type ChildSettings } from '../../shared/children.ts';
+import { researchOf } from '../../shared/research.ts';
 import type { Agent, AgentModel, SessionSummary } from '../../shared/types.ts';
 import { acpAgents, CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
@@ -38,8 +39,9 @@ export function swarmSize(db: DB): number {
   return Number.isInteger(n) && n >= 1 ? Math.min(n, SWARM_SIZE_LIMIT) : SWARM_SIZE_DEFAULT;
 }
 
-/** How many of a session's children may work at once: a swarm's size for a swarm's lead. */
-export const maxFor = (db: DB, ctx: { runId?: string; key: string }): number => (roleOf(db, ctx)?.role === 'lead' ? swarmSize(db) : maxRunning(db));
+/** How many of a session's children may work at once: a swarm's size for a swarm's lead, a deep research's breadth for its lead. */
+export const maxFor = (db: DB, ctx: { runId?: string; key: string }): number =>
+  roleOf(db, ctx)?.role === 'lead' ? swarmSize(db) : (researchOf(sessionExtra(db, ctx.key))?.breadth ?? maxRunning(db));
 
 /** A reply longer than this comes back as a summary, with the way to read it whole. */
 export const LONG_REPLY = 4000;

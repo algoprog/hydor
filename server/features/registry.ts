@@ -55,18 +55,32 @@ export function runTools(ctx: RunCtx): RunTool[] {
     }),
   );
   const scrubs = list.filter((f) => f.scrub);
-  if (!scrubs.length) return tools;
+  const arounds = list.filter((f) => f.aroundTool);
+  if (!scrubs.length && !arounds.length) return tools;
   const clean = (t: string) => scrubs.reduce((s, f) => f.scrub!(s), t);
   return tools.map((t) => ({
     ...t,
     async run(a, c) {
+      // A capability may answer in the tool's place (a budget spent), or add a line to its answer.
+      const notes: string[] = [];
+      for (const f of arounds) {
+        let x;
+        try {
+          x = f.aroundTool!(t.name, c);
+        } catch (e) {
+          warn(f, 'aroundTool', e);
+        }
+        if (x?.refuse) return { text: x.refuse, isError: true };
+        if (x?.note) notes.push(x.note);
+      }
       let r;
       try {
         r = await t.run(a, c);
       } catch (e) {
         throw new Error(clean(String((e as Error)?.message ?? e)));
       }
-      return typeof r === 'string' ? clean(r) : { ...r, text: clean(r.text) };
+      const add = (s: string) => clean(notes.length ? `${s}\n\n${notes.join('\n')}` : s);
+      return typeof r === 'string' ? add(r) : { ...r, text: add(r.text) };
     },
   }));
 }

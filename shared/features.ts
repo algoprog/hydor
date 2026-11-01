@@ -1,5 +1,6 @@
 // What the app's capabilities (search, browser, memory, assistants…) share between server and pages:
 // the settings a session keeps beyond its agent's own, and the notes the app adds to a conversation.
+import type { ResearchSettings } from './research.ts';
 
 /** Settings a session keeps beyond its agent's own. Each capability reads and writes its own fields. */
 export interface SessionExtra {
@@ -13,6 +14,8 @@ export interface SessionExtra {
   parent?: string;
   /** Swarm: this session leads a team of agents that attack its task from different angles. */
   swarm?: boolean;
+  /** Deep research: this session leads a research, with these settings (shared/research.ts). */
+  research?: ResearchSettings;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

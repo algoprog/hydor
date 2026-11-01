@@ -112,6 +112,11 @@ export interface Feature {
   tools?(ctx: RunCtx): RunTool[];
   /** Whether a run may have a tool of its own MCP server, any capability's (an app's run gets only those it allows). */
   allowTool?(name: string, ctx: RunCtx): boolean;
+  /**
+   * Just before a tool of the session's own server runs, any capability's: `refuse` answers the agent in its
+   * place (a budget spent), `note` is added to what it returns (how much of the budget is left).
+   */
+  aroundTool?(name: string, ctx: RunCtx): { refuse?: string; note?: string } | null | undefined;
   /** What an agent gets when it starts (or resumes). */
   spawn?(s: SpawnInfo, d: Deps): SpawnAdditions | undefined | Promise<SpawnAdditions | undefined>;
   /** Instructions for Custom, read afresh before each of its turns. */
