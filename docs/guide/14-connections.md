@@ -2,6 +2,8 @@
 
 Connect the apps and services you use (Notion, Gmail, GitHub, Stripe, a folder on this computer…) once, and every agent can work with them. Keep API keys in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
 
+![Settings → Connections: apps to connect, by category](images/connections.webp)
+
 ## What connections, keys and tools are
 
 Agents can do more when you give them tools. There are three places to do that:

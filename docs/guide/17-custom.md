@@ -2,6 +2,8 @@
 
 Custom is Naget Agent's own agent: it runs any model you add, from OpenRouter, Ollama, vLLM or another OpenAI-compatible server, with the same tools, skills and connections as Claude Code and Codex. This topic covers what it can do, its permission modes and how it checks commands, Auto mode, the sandbox for commands, goals, how it copes with long work and weaker models, and its settings.
 
+![Settings → Models: the helper model, and models on this computer](images/custom.webp)
+
 ## What Custom is, and when to use it
 
 Claude Code only runs Anthropic's models, and Codex only OpenAI's. Custom runs any model you set up in [Settings → Agents → Models](/settings?s=models): open models on your own computer, cheap or free models through OpenRouter, or a server of your own. See [Agents, accounts and models](/guide/agents-models) for adding models.

@@ -2,6 +2,8 @@
 
 Claude Code and Codex run on plans with usage limits, and every model call has a price. This topic shows where to see how much of each plan you've used and when it resets, what happens at a limit (and how to have sessions continue by themselves), what the agents did over time, and how the app estimates costs, including prices you set yourself.
 
+![Usage: how much of each plan you have used, and when it resets](images/usage.webp)
+
 ## Open the Usage page
 
 Click **Usage** in the sidebar (on a phone, open the sidebar first). A thin bar under the Usage icon shows the most-used limit of Claude Code and Codex at a glance; it turns red when one is used up. Hover over it to see each limit's percentage.

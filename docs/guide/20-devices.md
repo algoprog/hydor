@@ -2,6 +2,8 @@
 
 Naget Agent works from any browser: on your phone, on another computer, and across several machines that each run it. This topic covers using it on a phone, reaching it safely from elsewhere, working with other machines from one app, sharing a session with a read-only link, letting agents elsewhere start and steer sessions here, and adding the GitHub or Gitea accounts that pull requests open with.
 
+![The app on a phone: a session that needs you](images/devices.webp)
+
 ## Use the app on a phone
 
 The app on a phone is the same app as on a computer, laid out for a small screen (a narrow window on a computer gets this layout too). What changes:

@@ -2,6 +2,8 @@
 
 Naget Agent runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI or OpenCode. This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
 
+![Picking the agent on the start page: Claude Code, Codex or Custom](images/agents-models.webp)
+
 ## Which agent should I use?
 
 An agent is the program that does the work in a session: it reads your message, uses tools (files, commands, the web) and answers. The model is the AI behind it. Every agent here gets the same help from the app (web search, the browser, memory, skills, your connections), but they differ in where their models come from.

@@ -2,6 +2,8 @@
 
 An assistant is a preset you start a session as: it tells the agent who it is for this session and how to go about the work, and can limit what the agent may use, favor some skills, turn on connected apps, and suggest an agent, model and permissions. This topic covers the seven assistants that come with the app, picking one on the start page, making, changing, deleting and importing your own, the task folders a session gets when you pick no folder, and having agents clean up after a task.
 
+![Picking an assistant on the start page: General, Researcher, Writer, Coder, Tutor, Planner or Analyst](images/assistants.webp)
+
 ## What an assistant is
 
 When you start a session, you pick an assistant on the start page. Its instructions go on top of the agent's own, so the same agent works as a careful researcher in one session and as a patient tutor in the next. It works with every agent: Claude Code, Codex, Custom (the app's own agent) and the agents that speak ACP (the Agent Client Protocol), such as Gemini CLI or OpenCode.

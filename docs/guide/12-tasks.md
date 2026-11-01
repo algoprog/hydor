@@ -2,6 +2,8 @@
 
 A scheduled task is agent work that starts by itself: at a time of day, every few minutes or hours, once, when another service calls its webhook, or when something you watch changes. Use one for a morning brief, a reminder, a price or a page to keep an eye on, a weekly report or a review of each new pull request, and the result comes to you without you having to start a session.
 
+![Settings → Scheduled tasks: work that starts by itself](images/tasks.webp)
+
 ## What a scheduled task is
 
 A scheduled task is a prompt with a trigger. Each time the trigger fires, the app starts a run: a new session with the task's agent, model and folder, whose first message is the task's prompt (or, if you choose, the prompt goes into a session you already have). The agent works as it does in any session. At the end it says how it went in one line, and the task's history keeps that line, the cost and a link to the session.

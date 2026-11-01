@@ -2,6 +2,8 @@
 
 A session is one conversation with an agent, in one folder: you say what you want, the agent works, and you follow along, approve what it wants to do and steer it. This topic covers everything about sessions: the start page and its options, what you see while an agent works, messaging it mid-turn, and everything in a session's menu, from forking and goals to worktrees and sharing.
 
+![A session at work: the agent’s steps and replies, and a card asking to run a command](images/sessions.webp)
+
 ## Start a session
 
 **New session** at the top of the sidebar opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session opens at once and the agent starts on your message.

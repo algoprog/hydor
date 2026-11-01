@@ -2,6 +2,8 @@
 
 A template is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result as a card or a table. This topic covers the ready-made templates, running one and refining its result, making your own, and sharing one through an API key, other agents, a public page or a spreadsheet of rows.
 
+![Templates: your own, and ready-made ones to start from](images/templates.webp)
+
 ## What a template is
 
 A template holds everything a task needs except the details that change each time:

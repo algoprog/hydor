@@ -2,6 +2,8 @@
 
 This topic shows you around Naget Agent: what it is, what is on the screen, how to start your first session, how to find anything with the search box, and how to use the app on a phone. It ends with every keyboard shortcut in one table.
 
+![The app: the sidebar with your sessions on the left, and the start page, where you say what you want done](images/start.webp)
+
 ## What Naget Agent is
 
 Naget Agent runs AI agents on your own computer, and you use them from any browser, at your desk or on your phone. An agent is a program that works on a task for you: it reads and writes files, runs commands, searches the web and tells you what it did. You can use Claude Code and Codex with your own subscriptions, Custom (the app's own agent, which works with any model, including open models on your own computer), and other agents such as Gemini CLI or OpenCode. Each conversation with an agent is a **session**. Sessions keep running when you close the page, so you can start one at your desk and answer it from your phone. Many people use it for code, but it helps with anything: research, writing, documents, planning and everyday tasks.
@@ -69,7 +71,7 @@ The bottom of the sidebar holds the app's tools, four to a row:
 - **System**: this computer's processors, GPUs, memory, disks and busiest processes, live.
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
 - **Search**: opens the search box (the same as Ctrl+K).
-- **Help**: opens this guide. The welcome tour starts from there too.
+- **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
 
 ### The start page
 
@@ -201,8 +203,14 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 
 ## Get help
 
-- **Help** in the sidebar opens this guide, with its contents and a search. Its sections also turn up in the search box (Ctrl+K).
-- The welcome tour shows you around and sets up the agents you want to use. Start it from Help, from [Take the tour](/settings?s=general&find=Take%20the%20tour) in Settings → App → General, or by typing "tour" in the search box.
+**Help** in the sidebar opens this guide. Type a question or a few words in the box at the top of its first page:
+
+- **Sections that match** show as you type; click one to open it. The search box (Ctrl+K) finds them too.
+- **Press Enter**, or click **Ask**, and an agent answers in a panel beside the guide, with links to the right place. It can also change a setting or set something up for you, once you confirm the change on a card. The answer is an ordinary session, with the agent and model you picked last on the start page: ask more in the panel, or open it on its own page with the arrow at the panel's top.
+
+**Ask an agent**, at the top of every Help page, opens the same panel; so does "Ask an agent about the app" in the search box. The topics are grouped under the box. Each one opens its sections one at a time (**Open all** shows them all) and ends with things to ask an agent: click one to put it in the panel's box, change it if you like, and send it.
+
+- The welcome tour shows you around and sets up the agents you want to use. Start it with **Take the tour** at the top of Help, from [Take the tour](/settings?s=general&find=Take%20the%20tour) in Settings → App → General, or by typing "tour" in the search box.
 - **Release notes** (in Settings → App → General, or from the search box) say what changed in each version. After an update, a "What's new" note shows once.
 - Agents in the app read this guide too: ask any session "how do I…" and it can answer, or do it for you (see [Let agents work the app for you](/guide/ask-agents)).
 

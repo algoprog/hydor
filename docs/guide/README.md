@@ -29,4 +29,6 @@ The guide is also in [Chinese (简体中文)](zh/) and [Greek (Ελληνικά)
 - [Every setting](30-settings.md)
 - [The app's API](90-api.md)
 
+Each topic shows a picture of its part of the app, from [images](images/) (a dark and a light one), taken from a demo copy of the app with made-up data by [scripts/guide-shots](../../scripts/guide-shots/).
+
 To change the guide, see "Docs" in [CLAUDE.md](../../CLAUDE.md).

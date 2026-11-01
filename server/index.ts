@@ -337,6 +337,8 @@ app.post('/api/sessions', async (req) => {
     worktree: !!b.worktree,
     account: typeof b.account === 'string' && b.account ? b.account : undefined,
     extra: others ? { ...extra, arena: undefined } : extra,
+    // A question asked on Help leaves the agent's remembered model, effort and permissions as they were.
+    remember: extra?.help ? false : undefined,
   };
   const key = await sessions.create(opts);
   if (others) await startMatch({ db, sessions, broadcast }, { key, agent: b.agent, ...(opts.acpAgent ? { acpAgent: opts.acpAgent } : {}), ...(opts.model ? { model: opts.model } : {}) }, opts, others);

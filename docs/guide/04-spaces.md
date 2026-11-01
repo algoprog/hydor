@@ -2,6 +2,8 @@
 
 A space keeps one project together: its sessions, a folder for its files, documents of its own, what agents remember about it, the guidelines every agent in it follows and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using spaces and groups of spaces, and adding, searching and managing the documents agents search.
 
+![The Spaces page: each project’s sessions, documents and guidelines in one place](images/spaces.webp)
+
 ## What a space is
 
 A space is a project with everything that belongs to it, like Projects in ChatGPT or Claude. A tax return, a thesis, a garden, a website: each can be a space. On the start page you pick a space by its name instead of a folder, and every session you start in it:

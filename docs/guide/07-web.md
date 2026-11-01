@@ -2,6 +2,8 @@
 
 Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources under each reply, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings.
 
+![An agent that searched the web, read pages and compared what it found in a table](images/web.webp)
+
 ## How agents search the web
 
 Every agent you run here (Claude Code, Codex, Custom and agents that speak ACP) gets two tools from the app: a web search, and a way to read a page. They work the same whatever the model, so a small model on your own computer searches as well as a large one.

@@ -2,6 +2,8 @@
 
 Agents in Naget Agent remember what matters from one session to the next: facts about you, about each project, and where a task stands. This topic covers what they keep and when, what an agent starts with, how to see, correct or undo what was saved, and everything in Settings → Memory, including search by meaning and the nightly tidy-up. Use it so agents stop asking the same things twice, and so you always know what they know.
 
+![Settings → Memory: what agents remember about you and your projects](images/memory.webp)
+
 ## What agents remember
 
 Memory is a set of short notes, called memory notes. Each is a sentence or two, at most 500 characters. Every agent the app runs shares them: Claude Code, Codex, Custom and the agents that speak ACP, such as Gemini CLI. Each note belongs to one of three places:

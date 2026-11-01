@@ -33,7 +33,9 @@ rename or remove something users can see or do (a page, a button, a setting or a
    agents must not use are listed in `server/guide/api.ts` RULES, which refuses them, and in the test's
    `UNDOCUMENTED`). Write as the guide does: plain words for people who are not programmers, second person, the
    UI's own labels in bold with arrows (**Settings → Capabilities → Memory**), links to the place
-   (`/settings?s=<section>&find=<option>`, `/guide/<topic>#<section>`), no source file names.
+   (`/settings?s=<section>&find=<option>`, `/guide/<topic>#<section>`), no source file names. Each topic shows a
+   picture of its part of the app (`docs/guide/images/<topic>.webp`, and `-light.webp`, under its intro in all
+   three languages): when that part's look changes, take it again with `scripts/guide-shots` (its README says how).
 2. **The GitHub docs**: `README.md` (what the app is and does) and `docs/features.md` (everything, by area), plus the
    ones the change touches: `docs/install.md`, `docs/configuration.md`, `docs/how-it-works.md`, `docs/machines.md`,
    `docs/remote-access.md`, `docs/search-providers.md`, `docs/development.md`.
