@@ -859,14 +859,54 @@ export interface GitCommit {
   ts: number;
 }
 
+/** A branch or tag on a commit, as the history shows it. */
+export interface GitRef {
+  /** "main", "origin/main" (a remote branch), "v1.2". */
+  name: string;
+  kind: 'branch' | 'remote' | 'tag';
+  /** The branch checked out. */
+  current?: boolean;
+}
+
+/** A commit in the history: its parents (to draw the graph from) and the branches and tags on it. */
+export interface GitLogCommit extends GitCommit {
+  parents: string[];
+  refs: GitRef[];
+  email?: string;
+  /** HEAD points at it. */
+  head?: boolean;
+}
+
 export interface GitFileStatus {
   path: string;
   /** Porcelain XY: "M.", ".M", "A.", "D.", "R.", "??", "UU"… */
   code: string;
   from?: string;
+  /** Both sides changed it (a merge or rebase that stopped): to settle. */
+  conflict?: boolean;
+  /** Lines added and removed against the last commit (a new file: all its lines). */
+  added?: number;
+  removed?: number;
+  binary?: boolean;
 }
 
-/** A repository a session worked in, against its upstream. */
+export type GitOperationKind = 'merge' | 'rebase' | 'cherry-pick' | 'revert';
+
+/** A merge, rebase, revert or cherry-pick that stopped on conflicts, waiting to be continued or stopped. */
+export interface GitOperation {
+  kind: GitOperationKind;
+  /** What is merged in, or rebased onto ("origin/main"). */
+  onto?: string;
+  /** A rebase's commit being put on top when it stopped; a revert's or cherry-pick's commit. */
+  stoppedAt?: GitCommit;
+  /** A rebase's progress: commit `step` of `steps`. */
+  step?: number;
+  steps?: number;
+  /** The files that clash, and whether each is settled (no conflict markers left in it). */
+  conflicts: { path: string; resolved: boolean }[];
+}
+
+/** A repository a session worked in, or one added on the Git page, against its upstream. */
 export interface GitRepo {
   path: string;
   name: string;
@@ -883,6 +923,12 @@ export interface GitRepo {
   fetchedAt?: number;
   sessions: number;
   lastUsed?: number;
+  /** Added on the Git page (a folder, or a clone), not found through a session. */
+  manual?: boolean;
+  /** The branch tracks one the remote doesn't have (deleted there, or never pushed): it can be published again. */
+  upstreamGone?: boolean;
+  /** A merge, rebase, revert or cherry-pick is under way. */
+  operation?: GitOperationKind;
   error?: string;
 }
 
@@ -891,15 +937,25 @@ export interface GitRepoDetail extends GitRepo {
   toPush: GitCommit[];
   toPull: GitCommit[];
   files: GitFileStatus[];
-  recent: GitCommit[];
   stashes: GitStash[];
+  /** The commit checked out; null before the first commit. */
+  head: string | null;
+  /** A remote has HEAD already, so it can't be amended or undone without rewriting what others have. */
+  headPushed: boolean;
+  op: GitOperation | null;
+  /** How many tags the repository has. */
+  tags: number;
 }
 
 export interface GitStash {
   /** stash@{0} */
   ref: string;
   message: string;
+  /** The branch it was made on. */
+  branch?: string;
   ts: number;
+  /** Files it holds, new ones included. */
+  files?: number;
 }
 
 export interface GitBranch {
@@ -908,24 +964,85 @@ export interface GitBranch {
   upstream?: string;
   /** "ahead 2, behind 1", or "gone" when its upstream was deleted. */
   track?: string;
+  ahead?: number;
+  behind?: number;
+  /** Its upstream was deleted on the remote. */
+  gone?: boolean;
   subject: string;
+  hash?: string;
+  author?: string;
   /** In the current branch already: safe to delete. */
   merged: boolean;
+  /** A remote branch ("origin/name"). */
+  remote?: boolean;
+  /** A remote branch's local branch, if one tracks it or has its name. */
+  local?: string;
 }
 
-/** One commit: its message, the files it changed and their diffs. */
+/** A file a commit or stash changed, with its diff. */
+export interface GitChangedFile {
+  path: string;
+  added: number;
+  removed: number;
+  binary?: boolean;
+  /** A added, M modified, D deleted, R renamed, C copied. */
+  status?: string;
+  from?: string;
+  diff: string;
+}
+
+/** One commit: its message, where it sits, the files it changed and their diffs. */
 export interface GitCommitDetail {
   hash: string;
   author: string;
+  email?: string;
   ts: number;
   message: string;
-  files: { path: string; added: number; removed: number; diff: string }[];
+  parents: string[];
+  refs: GitRef[];
+  /** It is HEAD. */
+  head: boolean;
+  /** A remote branch has it. */
+  pushed: boolean;
+  files: GitChangedFile[];
+}
+
+export interface GitStashDetail {
+  ref: string;
+  files: GitChangedFile[];
 }
 
 export interface GitActionResult {
   ok: boolean;
   output: string;
   repo: GitRepoDetail;
+}
+
+/** What Sync (or Pull) did, or why it stopped. */
+export interface GitSyncResult extends GitActionResult {
+  /** The branch and its remote both moved on: nothing changed; ask how to put them together. */
+  diverged?: { ahead: number; behind: number };
+  /** The step that failed. */
+  failed?: 'fetch' | 'pull' | 'push';
+  /** Bringing in the remote's commits stopped on conflicts (a merge or rebase is under way). */
+  conflicts?: boolean;
+  pulled?: number;
+  pushed?: number;
+  published?: boolean;
+}
+
+/** A clone from a link, running in the background. */
+export interface GitCloneJob {
+  id: string;
+  /** The address, a password in it hidden. */
+  url: string;
+  dest: string;
+  state: 'running' | 'done' | 'failed';
+  /** What git is doing ("Receiving objects") and how far it got. */
+  phase?: string;
+  percent?: number;
+  output?: string;
+  repo?: GitRepo;
 }
 
 // ---- agent setup: MCP servers, skills, plugins, instruction files ----

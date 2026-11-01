@@ -1558,6 +1558,31 @@ html {
   color: inherit;
   border-radius: 2px;
 }
+/* Side by side: the old version left, the new one right; long lines wrap rather than scroll. */
+.diff table.split {
+  table-layout: fixed;
+  min-width: 0;
+}
+.diff table.split td {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.diff table.split td.ln {
+  width: auto;
+  min-width: 0;
+}
+.diff table.split td.txt + td.ln {
+  border-left: 1px solid var(--line);
+}
+.diff td.add {
+  background: var(--add-bg);
+}
+.diff td.del {
+  background: var(--del-bg);
+}
+.diff td.none {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
 
 /* ---- xterm ------------------------------------------------------------------ */
 

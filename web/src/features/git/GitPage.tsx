@@ -1,312 +1,163 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, CloudDownload, GitBranch, GitCommitHorizontal, SquareTerminal, Upload, X } from 'lucide-react';
-import type { GitActionResult, GitCommit, GitRepo, GitRepoDetail } from '@shared/types';
+// The Git page. On the left, the repositories: those your sessions worked in and those you added (a folder on
+// this computer, or a clone from a link), the most recently used first, each with its branch and small marks
+// for files changed, commits to push and to pull. On the right, the repository picked (RepoView). In a window
+// too narrow for both, the list folds into the page's title; on a phone the list is a page and a repository
+// another, with a way back.
+import { useEffect, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, ChevronDown, CloudDownload, GitBranch, Search, TriangleAlert } from 'lucide-react';
+import type { GitRepo } from '@shared/types';
 import { api, post } from '../../lib/api';
-import { ago, tildify, timeAgo } from '../../lib/format';
-import { go, openFile } from '../../lib/nav';
+import { timeAgo, tildify } from '../../lib/format';
+import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
-import { Button, cx, Throbber, Empty, IconButton, useConfirm, useIsMobile } from '../../components/ui';
-import { PageHeader } from '../layout/PageHeader';
-import { openTerminalAt } from '../terminal/TerminalPanel';
 import { RefreshIcon } from '../../components/RefreshIcon';
-import { BranchMenu, Changes, CommitList, Stashes, StashButton } from './GitWork';
+import { cx, Empty, IconButton, Popover, SheetsOnPhone, Throbber, useIsMobile } from '../../components/ui';
+import { PageHeader } from '../layout/PageHeader';
+import { AddRepo } from './AddRepo';
+import { repoUrl, useWidth } from './parts';
+import { RepoView } from './RepoView';
 
-const repoUrl = (p: string) => `/git?path=${encodeURIComponent(p)}`;
-const plural = (n: number, one: string, many = one + 's') => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+/** What the list keeps of a repository (a detail has much more). */
+const summary = (r: GitRepo): GitRepo => ({
+  path: r.path,
+  name: r.name,
+  branch: r.branch,
+  upstream: r.upstream,
+  ahead: r.ahead,
+  behind: r.behind,
+  changed: r.changed,
+  remote: r.remote,
+  lastCommit: r.lastCommit,
+  fetchedAt: r.fetchedAt,
+  sessions: r.sessions,
+  lastUsed: r.lastUsed,
+  manual: r.manual,
+  upstreamGone: r.upstreamGone,
+  operation: r.operation,
+  error: r.error,
+});
 
-/** ↑3 ↓1, "Up to date" or "Local only": where a branch stands against its upstream. */
-function SyncBadges({ r, size = 'sm' }: { r: GitRepo; size?: 'sm' | 'md' }) {
-  const cls = size === 'md' ? 'h-6 px-2 text-[12.5px]' : 'h-5 px-1.5 text-[11.5px]';
-  if (!r.branch) return <span className={cx('inline-flex items-center rounded-md bg-bg-2 text-fg-3', cls)}>Detached</span>;
-  if (!r.upstream) return <span className={cx('inline-flex items-center rounded-md bg-bg-2 text-fg-3', cls)}>Local only</span>;
-  if (!r.ahead && !r.behind)
-    return (
-      <span className={cx('inline-flex items-center gap-1 rounded-md bg-ok/10 text-ok', cls)}>
-        <Check size={12} /> Up to date
-      </span>
-    );
+function RepoRow({ r, active, onPick }: { r: GitRepo; active: boolean; onPick: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1">
-      {r.ahead > 0 && (
-        <span className={cx('tnum inline-flex items-center gap-0.5 rounded-md bg-accent/12 font-medium text-accent', cls)} title={`${plural(r.ahead, 'commit')} to push`}>
-          <ArrowUp size={12} />
-          {r.ahead}
-        </span>
-      )}
-      {r.behind > 0 && (
-        <span className={cx('tnum inline-flex items-center gap-0.5 rounded-md bg-warn/12 font-medium text-warn', cls)} title={`${plural(r.behind, 'commit')} to pull`}>
-          <ArrowDown size={12} />
-          {r.behind}
-        </span>
-      )}
-    </span>
-  );
-}
-
-function RepoRow({ r, active }: { r: GitRepo; active: boolean }) {
-  return (
-    <button onClick={() => go(repoUrl(r.path))} className={cx('flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors', active ? 'bg-bg-3' : 'hover:bg-bg-2')}>
-      <GitBranch size={16} className="mt-0.5 shrink-0 text-fg-3" />
+    <button
+      onClick={onPick}
+      aria-current={active ? 'page' : undefined}
+      className={cx('flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors max-md:py-3', active ? 'bg-bg-3' : 'hover:bg-bg-2 max-md:active:bg-bg-2')}
+    >
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{r.name}</span>
-          <SyncBadges r={r} />
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span translate="no" className="truncate text-[13.5px] font-medium max-md:text-[15px]">
+            {r.name}
+          </span>
+          {r.operation && (
+            <span className="shrink-0 rounded bg-err/15 px-1 text-[10.5px] font-medium text-err" title="A merge or rebase stopped on files that clash">
+              {r.operation === 'rebase' ? 'Rebasing' : r.operation === 'merge' ? 'Merging' : 'Stopped'}
+            </span>
+          )}
+          {r.error && <TriangleAlert size={12} className="shrink-0 text-err" aria-label="Git couldn’t read it" />}
         </span>
-        <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-fg-3">
-          <span className="truncate">{r.branch ?? 'detached HEAD'}</span>
-          {r.changed !== 0 && <span className="shrink-0">· {r.changed < 0 ? 'changes' : `${r.changed.toLocaleString()} changed`}</span>}
-          {r.lastCommit && <span className="shrink-0">· {timeAgo(r.lastCommit.ts)}</span>}
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] text-fg-3">
+          <GitBranch size={11} className="shrink-0" />
+          <span translate="no" className="truncate">
+            {r.branch ?? 'detached'}
+          </span>
+          {r.changed > 0 && (
+            <span className="tnum flex shrink-0 items-center gap-1 text-warn" title={r.changed === 1 ? '1 file changed' : `${r.changed} files changed`}>
+              <span className="size-1.5 rounded-full bg-warn" />
+              {r.changed}
+            </span>
+          )}
+          {r.ahead > 0 && (
+            <span className="tnum flex shrink-0 items-center text-accent" title={r.ahead === 1 ? '1 commit to push' : `${r.ahead} commits to push`}>
+              <ArrowUp size={11} />
+              {r.ahead}
+            </span>
+          )}
+          {r.behind > 0 && (
+            <span className="tnum flex shrink-0 items-center text-warn" title={r.behind === 1 ? '1 commit to pull' : `${r.behind} commits to pull`}>
+              <ArrowDown size={11} />
+              {r.behind}
+            </span>
+          )}
         </span>
       </span>
+      {r.lastCommit && (
+        <span className="tnum shrink-0 self-start pt-0.5 text-[11.5px] text-fg-3" title="The last commit">
+          {timeAgo(r.lastCommit.ts)}
+        </span>
+      )}
     </button>
   );
 }
 
-function Section({ title, count, children, action }: { title: string; count?: number; children: ReactNode; action?: ReactNode }) {
-  return (
-    <section className="mt-7">
-      <div className="mb-2 flex items-center gap-2 px-1">
-        <h2 className="text-[13.5px] font-semibold">{title}</h2>
-        {count != null && <span className="tnum rounded-md bg-bg-2 px-1.5 text-[11.5px] text-fg-3">{count.toLocaleString()}</span>}
-        <span className="flex-1" />
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function RepoDetail({ path, onChanged, onBack }: { path: string; onChanged: (r: GitRepo) => void; onBack?: () => void }) {
+/** The repositories, with a field to find one once there are more than a few. `limit`: how many show before typing. */
+function RepoList({ repos, selected, onPick, limit, find }: { repos: GitRepo[]; selected: string | null; onPick: (p: string) => void; limit?: number; find?: boolean }) {
   const home = useApp((s) => s.boot?.home);
-  const [repo, setRepo] = useState<GitRepoDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [failure, setFailure] = useState<{ action: string; output: string } | null>(null);
-  const [confirm, confirmNode] = useConfirm();
-  /** The repository after an action from the app: shown, and its failure explained. */
-  const apply = (r: GitActionResult, action: string, ok?: string) => {
-    setRepo(r.repo);
-    onChanged(r.repo);
-    if (!r.ok) setFailure({ action, output: r.output });
-    else {
-      setFailure(null);
-      if (ok) toast(ok, 'ok');
-    }
-  };
-
-  useEffect(() => {
-    setRepo(null);
-    setError(null);
-    setFailure(null);
-    api<GitRepoDetail>(`/api/git/repo?path=${encodeURIComponent(path)}`)
-      .then(setRepo)
-      .catch((e) => setError(e.message));
-  }, [path]);
-
-  const run = async (action: 'fetch' | 'pull' | 'push', publish = false) => {
-    const before = repo;
-    setBusy(action);
-    setFailure(null);
-    try {
-      const r = await post<GitActionResult>(`/api/git/${action}`, { path, publish });
-      setRepo(r.repo);
-      onChanged(r.repo);
-      if (!r.ok) setFailure({ action, output: r.output });
-      else if (action === 'fetch') toast(r.repo.behind ? `Fetched · ${plural(r.repo.behind, 'commit')} to pull` : 'Fetched · nothing to pull', 'ok');
-      else if (action === 'pull') toast(`Pulled ${plural(before?.behind ?? 0, 'commit')}`, 'ok');
-      else toast(publish ? `Published ${r.repo.branch}` : `Pushed ${plural(before?.ahead ?? 0, 'commit')}`, 'ok');
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const push = async (publish: boolean) => {
-    if (!repo) return;
-    const n = repo.toPush.length;
-    const ok = await confirm({
-      title: publish ? `Publish ${repo.branch} to ${repo.remote}?` : `Push ${plural(repo.ahead, 'commit')} to ${repo.upstream}?`,
-      body: (
-        <div className="space-y-2">
-          <div>
-            {publish
-              ? `This creates ${repo.remote}/${repo.branch} and sets it as the branch's upstream.`
-              : 'Everything on this branch that the remote does not have goes up, including commits other sessions made.'}
-          </div>
-          {n > 0 && (
-            <ul className="max-h-56 space-y-1 overflow-y-auto rounded-lg bg-bg-1 px-3 py-2 text-[12.5px]">
-              {repo.toPush.slice(0, 12).map((c) => (
-                <li key={c.hash} className="truncate">
-                  <code className="mr-2 font-mono text-fg-3">{c.hash.slice(0, 7)}</code>
-                  {c.subject}
-                </li>
-              ))}
-              {repo.ahead > 12 && <li className="text-fg-3">and {plural(repo.ahead - 12, 'more commit')}</li>}
-            </ul>
-          )}
-        </div>
-      ),
-      confirm: publish ? 'Publish' : 'Push',
-    });
-    if (ok) run('push', publish);
-  };
-
-  if (error) return <Empty title="Could not read this repository">{error}</Empty>;
-  if (!repo)
-    return (
-      <div className="flex h-full items-center justify-center py-20 text-fg-3">
-        <Throbber size={34} />
-      </div>
-    );
-
-  const canPublish = !repo.upstream && !!repo.remote && !!repo.branch;
+  const [q, setQ] = useState('');
+  const text = q.trim().toLowerCase();
+  const found = text ? repos.filter((r) => r.name.toLowerCase().includes(text) || tildify(r.path, home).toLowerCase().includes(text)) : repos;
+  const shown = limit && !text ? found.slice(0, limit) : found;
   return (
-    <div className="anim-fade mx-auto w-full max-w-[860px] px-4 py-6 sm:px-8">
-      <div className="flex items-start gap-3">
-        {onBack && (
-          <IconButton label="All repositories" onClick={onBack} className="-ml-1">
-            <ArrowLeft size={18} />
-          </IconButton>
-        )}
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[20px] font-semibold tracking-tight">{repo.name}</h1>
-          <div className="mt-0.5 truncate font-mono text-[12.5px] text-fg-3" title={repo.path}>
-            {tildify(repo.path, home)}
-          </div>
+    <div className="p-2">
+      {(find || repos.length > 6) && (
+        <div className="relative mb-1.5">
+          <Search size={14} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-3" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && found[0] && onPick(found[0].path)}
+            autoFocus={find}
+            placeholder="Find a repository"
+            aria-label="Find a repository"
+            spellCheck={false}
+            className="h-8.5 w-full rounded-lg bg-bg-2 pr-2.5 pl-8 text-[13px] outline-none placeholder:text-fg-3 max-md:h-10 max-md:text-[15px]"
+          />
         </div>
-        <IconButton label="Open a terminal here" onClick={() => openTerminalAt(repo.path)}>
-          <SquareTerminal size={17} />
-        </IconButton>
+      )}
+      <div className="space-y-px">
+        {shown.map((r) => (
+          <RepoRow key={r.path} r={r} active={r.path === selected} onPick={() => onPick(r.path)} />
+        ))}
       </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-[13px]">
-        <BranchMenu repo={repo} apply={apply} />
-        <span className="text-fg-3">{repo.upstream ? `tracks ${repo.upstream}` : repo.remote ? 'not on the remote yet' : 'no remote'}</span>
-        {repo.upstream && <SyncBadges r={repo} size="md" />}
-      </div>
-
-      {!repo.remote ? (
-        <div className="mt-5 text-[13px] text-fg-3">
-          This repository has no remote. Add one in a terminal (<code className="font-mono text-[12.5px] text-fg-2">git remote add origin &lt;url&gt;</code>
-          ), then publish the branch from here.
-        </div>
-      ) : (
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" icon={<RefreshIcon size={14} />} disabled={!!busy} onClick={() => run('fetch')}>
-            {busy === 'fetch' ? 'Fetching…' : 'Fetch'}
-          </Button>
-          <Button
-            size="sm"
-            variant={repo.behind > 0 ? 'primary' : 'secondary'}
-            icon={<CloudDownload size={14} />}
-            disabled={!!busy || !repo.upstream || repo.behind === 0}
-            title={!repo.upstream ? 'No upstream to pull from' : repo.behind === 0 ? 'Nothing to pull' : 'Fast-forward only: never makes a merge commit'}
-            onClick={() => run('pull')}
-          >
-            {busy === 'pull' ? 'Pulling…' : repo.behind > 0 ? `Pull ${repo.behind}` : 'Pull'}
-          </Button>
-          {canPublish ? (
-            <Button size="sm" variant="primary" icon={<Upload size={14} />} disabled={!!busy} onClick={() => push(true)}>
-              {busy === 'push' ? 'Publishing…' : 'Publish branch'}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant={repo.ahead > 0 ? 'primary' : 'secondary'}
-              icon={<Upload size={14} />}
-              disabled={!!busy || !repo.upstream || repo.ahead === 0}
-              title={!repo.upstream ? 'No upstream to push to' : repo.ahead === 0 ? 'Nothing to push' : undefined}
-              onClick={() => push(false)}
-            >
-              {busy === 'push' ? 'Pushing…' : repo.ahead > 0 ? `Push ${repo.ahead}` : 'Push'}
-            </Button>
-          )}
-          <span className="text-[12px] text-fg-3">{repo.fetchedAt ? `Fetched ${ago(repo.fetchedAt)}` : 'Never fetched'}</span>
-        </div>
-      )}
-
-      {failure && (
-        <div className="anim-expand mt-4 rounded-xl border border-err/35 bg-err/5 px-3 py-2.5">
-          <div className="flex items-center gap-2 text-[13px]">
-            <span className="font-medium text-err">{failure.action[0].toUpperCase() + failure.action.slice(1)} failed</span>
-            {failure.action === 'pull' && <span className="text-fg-3">Merge or rebase in a terminal when the branches have diverged.</span>}
-            <span className="flex-1" />
-            <IconButton label="Dismiss" size="sm" onClick={() => setFailure(null)}>
-              <X size={14} />
-            </IconButton>
-          </div>
-          {failure.output && <pre className="term-out mt-2 max-h-48 overflow-auto rounded-lg px-3 py-2">{failure.output}</pre>}
-        </div>
-      )}
-
-      {repo.upstream && (
-        <>
-          <Section title="To push" count={repo.ahead}>
-            <CommitList path={repo.path} commits={repo.toPush} empty={`Nothing to push: ${repo.upstream} has every commit on this branch.`} />
-            {repo.ahead > repo.toPush.length && <div className="mt-1.5 px-1 text-[12px] text-fg-3">Showing the latest {repo.toPush.length}.</div>}
-          </Section>
-          <Section title="To pull" count={repo.behind}>
-            <CommitList path={repo.path} commits={repo.toPull} empty={repo.fetchedAt ? 'Nothing new on the remote since the last fetch.' : 'Fetch to see what is new on the remote.'} />
-          </Section>
-        </>
-      )}
-
-      <Section title="Changes" count={repo.changed >= 0 ? repo.changed : undefined} action={<StashButton repo={repo} apply={apply} />}>
-        <Changes key={repo.path} repo={repo} apply={apply} />
-      </Section>
-
-      {repo.stashes.length > 0 && (
-        <Section title="Stashes" count={repo.stashes.length}>
-          <Stashes repo={repo} apply={apply} />
-        </Section>
-      )}
-
-      <Section title="Recent commits">
-        <CommitList path={repo.path} commits={repo.recent} empty="No commits yet." />
-      </Section>
-
-      {repo.remotes.length > 0 && (
-        <div className="mt-6 space-y-0.5 px-1 text-[12px] text-fg-3">
-          {repo.remotes.map((r) => (
-            <div key={r.name} className="truncate">
-              <GitCommitHorizontal size={12} className="mr-1.5 inline" />
-              {r.name} · <span className="font-mono">{r.url}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {confirmNode}
+      {text && !found.length && <div className="px-2.5 py-2 text-[12.5px] text-fg-3">No repository by that name</div>}
+      {!text && found.length > shown.length && <div className="px-2.5 py-1.5 text-[12px] text-fg-3">{`${found.length - shown.length} more: type to find them`}</div>}
     </div>
   );
 }
 
-/** Repositories the sessions worked in, how they stand against their remotes, and push/pull. */
+/** Repositories your sessions worked in and those you added, how each stands against its remote, and working on them. */
 export function GitPage({ selected }: { selected: string | null }) {
   const mobile = useIsMobile();
   const [repos, setRepos] = useState<GitRepo[] | null>(null);
   const [busy, setBusy] = useState<'refresh' | 'fetch' | null>(null);
+  const [page, pageWidth] = useWidth<HTMLDivElement>();
+  const fold = !mobile && pageWidth > 0 && pageWidth < 840;
+  const [picker, setPicker] = useState(false);
+  const titleRef = useRef<HTMLButtonElement>(null);
 
   const load = async (refresh = false) => {
-    setBusy(refresh ? 'refresh' : null);
+    if (refresh) setBusy('refresh');
     try {
-      const r = await api<{ repos: GitRepo[] }>(`/api/git/repos${refresh ? '?refresh=1' : ''}`);
-      setRepos(r.repos);
+      setRepos((await api<{ repos: GitRepo[] }>(`/api/git/repos${refresh ? '?refresh=1' : ''}`)).repos);
     } catch (e) {
       toastError(e);
+      setRepos((l) => l ?? []);
     } finally {
       setBusy(null);
     }
   };
   useEffect(() => {
-    load();
+    void load();
   }, []);
+  // On a computer the most recently used repository opens when none is picked.
+  useEffect(() => {
+    if (!mobile && !selected && repos?.length) go(repoUrl(repos[0].path), true);
+  }, [mobile, selected, repos]);
 
   const fetchAll = async () => {
     setBusy('fetch');
     try {
-      const r = await post<{ repos: GitRepo[] }>('/api/git/fetch-all');
-      setRepos(r.repos);
+      setRepos((await post<{ repos: GitRepo[] }>('/api/git/fetch-all')).repos);
       toast('Fetched every remote', 'ok');
     } catch (e) {
       toastError(e);
@@ -314,66 +165,103 @@ export function GitPage({ selected }: { selected: string | null }) {
       setBusy(null);
     }
   };
-
-  const onChanged = (r: GitRepo) => setRepos((l) => l?.map((x) => (x.path === r.path ? { ...x, ...r } : x)) ?? l);
+  const onChanged = (r: GitRepo) => setRepos((l) => (l ? (l.some((x) => x.path === r.path) ? l.map((x) => (x.path === r.path ? summary(r) : x)) : [summary(r), ...l]) : l));
+  const onAdded = (r: GitRepo) => {
+    setRepos((l) => [summary(r), ...(l ?? []).filter((x) => x.path !== r.path)]);
+    go(repoUrl(r.path));
+  };
+  const onRemoved = (p: string) => {
+    toast('Removed from the list', 'ok');
+    const rest = (repos ?? []).filter((x) => x.path !== p);
+    setRepos(rest);
+    go(!mobile && rest.length ? repoUrl(rest[0].path) : '/git', true);
+  };
+  const pick = (p: string) => {
+    setPicker(false);
+    go(repoUrl(p));
+  };
   const actions = (
     <>
-      <Button size="sm" variant="ghost" icon={<CloudDownload size={14} />} disabled={!!busy} onClick={fetchAll} title="Fetch every repository's remote">
-        <span className="hidden sm:inline">{busy === 'fetch' ? 'Fetching…' : 'Fetch all'}</span>
-      </Button>
+      <AddRepo onAdded={onAdded} compact={mobile} />
+      <IconButton label="Fetch every repository’s remote" onClick={fetchAll} disabled={!!busy}>
+        {busy === 'fetch' ? <Throbber /> : <CloudDownload size={16} />}
+      </IconButton>
       <IconButton label="Refresh" onClick={() => load(true)} disabled={!!busy}>
         <RefreshIcon size={15} busy={busy === 'refresh'} />
       </IconButton>
     </>
   );
-
+  const empty = (
+    <Empty icon={<GitBranch size={20} />} title="No repositories yet">
+      Repositories show up here once a session works in one. Or add one yourself:
+      <div className="mt-4">
+        <AddRepo onAdded={onAdded} buttons />
+      </div>
+    </Empty>
+  );
   const list = !repos ? (
     <div className="flex justify-center py-16 text-fg-3">
       <Throbber size={28} />
     </div>
   ) : !repos.length ? (
-    <Empty icon={<GitBranch size={20} />} title="No repositories yet">
-      Repositories show up here once a session works in one.
-    </Empty>
+    empty
   ) : (
-    <div className="space-y-0.5 p-2">
-      {repos.map((r) => (
-        <RepoRow key={r.path} r={r} active={r.path === selected} />
-      ))}
-    </div>
+    <RepoList repos={repos} selected={selected} onPick={pick} />
   );
 
-  if (mobile) {
-    if (selected) {
-      return (
-        <div className="h-full overflow-y-auto pt-[var(--safe-top)]">
-          <RepoDetail path={selected} onChanged={onChanged} onBack={() => go('/git')} />
-        </div>
-      );
-    }
+  if (mobile)
     return (
-      <div className="flex h-full min-h-0 flex-col">
-        <PageHeader title="Git" sub="Repositories your sessions worked in" actions={actions} />
-        <div className="min-h-0 flex-1 overflow-y-auto">{list}</div>
-      </div>
+      <SheetsOnPhone.Provider value>
+        {selected ? (
+          <div className="h-full">
+            <RepoView key={selected} path={selected} onChanged={onChanged} onBack={() => go('/git')} onRemoved={() => onRemoved(selected)} />
+          </div>
+        ) : (
+          <div className="flex h-full min-h-0 flex-col">
+            <PageHeader title="Git" actions={actions} />
+            <div className="min-h-0 flex-1 overflow-y-auto">{list}</div>
+          </div>
+        )}
+      </SheetsOnPhone.Provider>
     );
-  }
 
+  const current = repos?.find((r) => r.path === selected);
+  const title = fold ? (
+    <button ref={titleRef} type="button" onClick={() => setPicker((o) => !o)} className="-ml-1 flex max-w-full min-w-0 items-center gap-1 rounded-lg px-1 text-left hover:bg-bg-2" aria-label="Repositories">
+      <span translate="no" className="truncate">
+        {current?.name ?? 'Git'}
+      </span>
+      <ChevronDown size={15} className="shrink-0 text-fg-3" />
+    </button>
+  ) : (
+    'Git'
+  );
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Git" sub="Repositories your sessions worked in" actions={actions} />
+    <div ref={page} className="flex h-full min-h-0 flex-col">
+      <PageHeader title={title} actions={actions} />
       <div className="flex min-h-0 flex-1">
-        <div className="w-[340px] shrink-0 overflow-y-auto border-r border-line bg-bg-1">{list}</div>
-        <div className="min-w-0 flex-1 overflow-y-auto">
+        {!fold && !!repos?.length && (
+          <nav aria-label="Repositories" className="w-[248px] shrink-0 overflow-y-auto border-r border-line bg-bg-1">
+            {list}
+          </nav>
+        )}
+        <div className="min-w-0 flex-1">
           {selected ? (
-            <RepoDetail key={selected} path={selected} onChanged={onChanged} />
+            <RepoView key={selected} path={selected} onChanged={onChanged} onRemoved={() => onRemoved(selected)} />
+          ) : repos && !repos.length ? (
+            empty
           ) : (
-            <Empty icon={<GitBranch size={20} />} title="Pick a repository">
-              See what is waiting to be pushed or pulled, and the files that changed.
-            </Empty>
+            <div className="flex h-full items-center justify-center text-fg-3">
+              <Throbber size={28} />
+            </div>
           )}
         </div>
       </div>
+      {fold && repos && (
+        <Popover anchor={titleRef} open={picker} onClose={() => setPicker(false)} width={320} title="Repositories">
+          <RepoList repos={repos} selected={selected} onPick={pick} limit={8} find />
+        </Popover>
+      )}
     </div>
   );
 }

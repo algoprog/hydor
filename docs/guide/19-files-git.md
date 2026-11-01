@@ -2,7 +2,7 @@
 
 The tools around the agents: browse, find, open and edit the files on this computer, add them to spaces and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the web apps running here, before and after screenshots of an agent's changes to one, and a live view of the computer (System) are here too, so you can check and finish an agent's work without leaving the app.
 
-![Git: a project’s changes, a message for the commit, and its recent commits](images/files-git.webp)
+![Git: a repository’s changes beside one file’s diff, the commit box, and Sync](images/files-git.webp)
 
 ## Open the Files page
 
@@ -324,69 +324,122 @@ Ctrl+S (⌘S on a Mac) saves. As with other files, if the notebook changes on di
 
 ## See your repositories on the Git page
 
-Click **Git** in the sidebar, or go to [Git](/git). It lists the git repositories your sessions worked in, most recently used first: those holding a session's folder or a file a session edited (throwaway places such as `/tmp` are left out). To see a repository here, start a session in it.
+Click **Git** in the sidebar, or go to [Git](/git). On the left it lists your git repositories, the most recently used first: those your sessions worked in (a session's folder, or a file a session edited; throwaway places such as `/tmp` are left out) and those you added yourself. Once there are more than six, a field at the top finds one by name.
 
-Each repository shows its name, its branch, how many files changed and when the last commit was made, with a badge:
+Each repository shows its name and branch, and small marks when there is something to do:
 
-- **↑ 3**: three commits to push. **↓ 2**: two commits to pull.
-- **Up to date**: the branch matches the copy on the remote (the server the repository is shared through, such as GitHub).
-- **Local only**: the branch isn't on the remote yet. **Detached**: not on any branch.
+- **● 3**: three files changed and not committed yet.
+- **↑ 2**: two commits to push. **↓ 1**: one commit to pull.
+- **Merging** or **Rebasing**: a merge stopped on files that clash (see [When a merge stops on conflicts](/guide/files-git#when-a-merge-stops-on-conflicts)).
+- On the right, how long ago the last commit was made.
 
-At the top, **Fetch all** asks every repository's remote what is new, and **Refresh** reads the list again.
+At the top of the page, **Fetch every repository’s remote** (the cloud) asks every remote what is new, and **Refresh** reads the list again.
 
-Click a repository to open it. On a computer it opens beside the list; on a phone it fills the screen, with a back arrow to the list. Its page shows the name and folder, **Open a terminal here**, the branch menu, what the branch tracks ("tracks origin/main", "not on the remote yet" or "no remote") and these parts, top to bottom: **To push**, **To pull**, **Changes**, **Stashes** and **Recent commits**, then the remotes' addresses.
+Click a repository to open it beside the list. At its top: its name and folder, the branch you are on, a line on where it stands against the remote, **Sync** and a ⋯ menu. Under them, four tabs: **Changes**, **History**, **Branches** and **Stashes**. On a computer the repository you used last opens when you come to the page. In a small window the list folds into the page's title (click the repository's name to pick another); on a phone the list is a page of its own, and a repository opens over it with a back arrow.
 
-## Fetch, pull and push
+### Add a repository
 
-- **Fetch** asks the remote what is new without changing your files. The line beside it says when that last happened ("Never fetched" at first). **To pull** then lists the commits waiting there.
-- **Pull** (it shows the count: **Pull 2**) brings those commits in, fast-forward only: it never makes a merge commit. If your branch and the remote's have both moved on, it fails and says to merge or rebase in a terminal.
-- **Push** (**Push 3**) sends your commits up, after a question that lists them. Everything on the branch that the remote lacks goes up, including commits other sessions made.
-- **Publish branch** appears instead of **Push** when the branch isn't on the remote yet: it creates it there and makes it the branch's upstream (the remote branch it tracks).
+**Add** at the top of the page has two ways:
 
-When one of these fails, a red box says "… failed" with git's own message; ✕ dismisses it. A repository without a remote says so: add one in a terminal (`git remote add origin <address>`), then publish the branch from here.
+- **Add a folder on this computer**: type or pick a project's folder and click **Add**. A folder inside a repository adds that repository. A folder git doesn't keep yet can start a repository of its own: **Start a repository here** (git's `git init`).
+- **Clone from a link**: paste the address of a repository on GitHub, GitLab or another git server (`https://…`, `ssh://…` or `git@host:owner/project`). **Where it goes** suggests a folder of its own (in `~/code` if you have one); it must not exist yet, or be empty. **Clone** shows how far it got; you can close the dialog and it carries on. The repository opens when it is done.
 
-The app's git never asks for a password. Pushing and pulling use this computer's SSH keys or saved git credentials, and fail with git's message if those don't work without a prompt.
+What you add stays on the list until you take it off: ⋯ → **Remove from the list**. Its folder stays as it is.
+
+## Sync with the remote
+
+The remote is where the repository is shared, such as GitHub. The line under the branch says where yours stands: "2 to push · 1 to pull · fetched 5m ago", **Up to date**, **Not on the remote yet** or **No remote**.
+
+**Sync** does what is needed in one click: it asks the remote what is new, brings those commits in, then sends yours up. Its arrows show how many go each way (**Sync ↑2 ↓1**). A branch the remote doesn't have yet shows **Publish branch** instead: it puts the branch there and keeps the two in step from then on.
+
+When your branch and the remote's have both moved on, Sync changes nothing yet and asks how to put them together:
+
+- **Put my commits on top**: your commits go after the remote's, as if you had made them later, so the history stays one straight line (git calls this a rebase).
+- **Merge**: a merge commit joins the two lines; every commit stays as it was.
+
+Then Sync sends yours up. If both sides changed the same lines, it stops so you can settle them (see [When a merge stops on conflicts](/guide/files-git#when-a-merge-stops-on-conflicts)). If your uncommitted changes touch files that changed on the remote, it says so: commit them or put them aside in a stash first.
+
+The ⋯ menu has the steps one at a time, and the rest:
+
+- **Fetch** asks the remote what is new without changing anything here. **Pull** brings it in (when both sides moved on, it asks the same question). **Push** sends your commits up.
+- **Open a terminal here**, **Show in Files** and **Copy path**.
+- **Remotes**: the repository's remotes and their addresses. A repository without one says **No remote · Add one**: paste an address and click **Add remote** (it is called origin), then **Publish branch**.
+- **Push tags**, when the repository has tags.
+
+When something doesn't go through, a red box says what happened, in plain words when it can, with **What git said** for git's own message. The app's git never asks for a password: pushing and pulling use this computer's SSH keys or saved git credentials, and say so when those don't work without a prompt.
 
 ## Commit changes
 
-**Changes** lists every changed file, with what happened to it (New, Added, Modified, Deleted, Renamed, Copied, Conflict). There is no separate staging step: you tick the files that go into the commit.
+**Changes** lists every file changed since the last commit, with the letters the Files page uses (see [What the letters beside files mean](/guide/files-git#what-the-letters-beside-files-mean)), its name in bold with its folder after it, and the lines added and removed. Click a file to see its changes beside the list (on a phone, on a page of their own). Where there is room, **Unified** and **Side by side** show the old and new lines one under the other or next to each other.
 
-- Each file has a box to tick; the box at the top ticks or unticks them all, and says how many are in ("4 of 6 in the commit"). Long lists show the first 60 files and **Show all … files**.
-- Click a file to see its changes. **Open the file** opens it in the editor.
-- **Discard the changes** puts a file back as it was in the last commit; for a new file it's **Delete the new file**. Both ask first and can't be undone.
+There is no separate staging step: each file has a box that puts it in the next commit (all of them at first), and the box at the top ticks or unticks them all ("3 of 4 in the commit").
 
-To commit:
+- **Discard this part**, at the top of each part of a file's changes, puts just those lines back as they were in the last commit (after a question).
+- A file's ⋯ menu: **Open the file**, **Show in Files**, **Discard the changes** (for a new file, **Delete the new file**; both ask first and can't be undone), and **Ignore it** (a new file) or **Stop tracking and ignore** (a file git keeps: the next commit takes it out of the repository, and it stays on this computer). Both add it to `.gitignore`.
+- The box icon at the top of the list puts every change aside in a stash (see [Put changes aside with a stash](/guide/files-git#put-changes-aside-with-a-stash)).
 
-1. Tick the files.
-2. Write the commit message in "Commit message", or click **Write message**: a model reads the ticked files' changes and drafts a message in the style of the repository's recent ones (Claude when Claude Code is signed in, Codex otherwise). Edit it as you like.
-3. Click **Commit**, or **Commit & push** to send it to the remote straight away (that one shows only when the repository has a remote, and publishes the branch if it isn't there yet).
+To commit, at the bottom of the list:
+
+1. Write a summary of the change, and a description if it needs one. Or click **Write message**: a model reads the changes you ticked and drafts both, in the style of the repository's recent commits (Claude when Claude Code is signed in, Codex otherwise).
+2. Click **Commit**, or **Commit & push** to send it to the remote straight away (that publishes the branch if the remote doesn't have it yet). Ctrl+Enter commits too.
 
 Only the ticked files go in, even if others were staged elsewhere.
 
-## Switch, create and delete branches
+**Amend the last commit** shows while no remote has the last commit yet: tick it to change that commit instead of making a new one. Its message fills in for you to edit, the files you tick join it, and the buttons become **Amend** and **Amend & push**.
 
-Click the branch name (the button with the branch icon) to open the branch menu:
+When everything is committed, Changes says **Nothing to commit** and shows the last commit: click it to open it in History.
 
-- **New branch from here**: type a name and click **Create**. The new branch starts from where you are, and you switch to it.
-- The branches, newest first, each with when it last changed, how it stands against its remote branch and "merged" when its work is already in the current branch. Click one to switch to it. With uncommitted changes, the app asks first: the changes come along, and if they clash with that branch git refuses and nothing changes.
-- A merged branch has a delete button. Only merged branches can be deleted here, so no commit is lost.
+## When a merge stops on conflicts
 
-## Put changes aside with a stash
+When both sides changed the same lines (a Sync that brings commits in, merging a branch, reverting a commit), git stops part way, and the repository says so above its tabs: "Merging origin/main into main stopped: 1 file clashes". The files that clash are listed there and marked **C** in Changes; click one to see it.
 
-**Stash** (next to **Changes**) puts every change aside, new files included, and leaves the folder as it was at the last commit. The stash then shows under **Stashes**, with its message and when it was made:
+In each such file, git has put both versions between markers: `<<<<<<<` and yours, `=======`, then theirs up to `>>>>>>>`. Open the file, keep what should stay and delete the markers. A file shows as settled, with a tick, once no markers are left. Then:
 
-- **Apply** brings the changes back and removes the stash from the list.
-- **Drop** deletes the stash, after a question. This can't be undone.
+- **Ask an agent to resolve them** opens the start page with a prompt for this repository: an agent settles the files, checks that they still work and tells you what it chose. Nothing starts until you send it.
+- **Continue**, once every file is settled, finishes what stopped (the merge's commit, or the rest of your commits put on top).
+- **Stop the merge** (or **Stop putting them on top**, **Stop the revert**) puts everything back as it was before it began, after a question. What you changed to settle the files is lost.
+
+Until then, Sync and the commit box wait: Continue makes the commit.
 
 ## Look through the history
 
-- **To push**: commits on your branch that the remote lacks (up to the latest 100).
-- **To pull**: commits on the remote that you lack, as of the last fetch.
-- **Recent commits**: the last 15 commits.
+**History** lists the commits, newest first, with a graph on the left of how branches split and join: each line is a branch and each dot a commit; a ring is a commit the remote doesn't have yet. Labels show the branches (yours outlined), the remote's branches (with a cloud) and the tags on each commit, then its message, who made it and when.
 
-**To push** and **To pull** show only when the branch tracks a branch on the remote.
+- **This branch** shows the history that led to the branch you are on; **All branches** shows every branch's, the remote's too.
+- **Find a commit** finds commits by words in their message, their author's name or address, or their hash.
+- **Load more**, at the end, shows older commits.
 
-Click a commit to open it: its full message, author, date and the files it changed with the lines added and removed. Click a file to see its changes.
+Click a commit to open it beside the list (on a phone, on a page of its own): its whole message, author, date and hash (click the hash to copy it), the branches and tags on it, and the files it changed, each opening to its diff. A merge says which commits it joined.
+
+- **Explain** opens the start page with a prompt that asks an agent to explain the commit in plain words.
+- **Undo this commit** shows on the last commit while no remote has it: the commit goes away, and what it changed goes back to Changes, ready to commit again.
+- The ⋯ menu also has **Copy hash**, **New branch from here** (a branch that starts at this commit; you switch to it), **Tag this commit** (a name such as `v1.2.0` and, if you like, a message; **Push tags** in the repository's ⋯ menu sends tags to the remote) and **Revert this commit**: a new commit that undoes what this one changed, after a question. The commit itself stays in the history.
+
+## Work with branches
+
+Click the branch's name under the repository's to switch: the branches here come first, newest first, with ↑↓ against their branch on the remote, then those **Only on the remote**. Type to find one; a name that is no branch yet offers **New branch “…” from here**. With uncommitted changes the app asks first: they come along, and if they clash with that branch, git refuses and nothing changes. A branch only on the remote becomes a branch here that tracks it.
+
+**Branches** shows the branch you are on first, then the others, each with its last commit and marks: **merged** (its work is in your branch already), **only here** (not on the remote), **gone from the remote**, and ↑↓ against its branch on the remote. **New branch** makes one from where you are and switches to it. Each branch has **Switch** and a ⋯ menu:
+
+- **Merge into** *your branch*: its work joins yours. If both changed the same lines, the merge stops so you can settle them.
+- **Compare with** *your branch*: the commits each has that the other lacks. Click one to open it.
+- **Publish** puts a branch that is only here on the remote.
+- **Rename**: its branch on the remote keeps its name.
+- **Delete**: a merged branch goes at once, as nothing is lost. For one not merged, the question lists the commits no other branch has, and **Delete anyway** deletes it with them.
+
+Folded under **Only on the remote** are the remote's branches with none here: **Check out** makes one here that tracks it, and switches to it.
+
+## Put changes aside with a stash
+
+A stash puts your uncommitted changes aside, so you can work on something else and bring them back later. **Stash changes** (on the **Stashes** tab, or the box icon at the top of Changes) asks what the changes are and whether to **Take new files too**; the files then go back to how they were at the last commit.
+
+**Stashes** lists them with their message, the branch they were made on, when, and how many files. Click one to see what it holds, file by file:
+
+- **Apply and remove** brings the changes back and takes the stash off the list.
+- **Apply** brings them back and keeps the stash.
+- The bin drops it, after a question. This can't be undone.
+
+If the changes clash with what the files hold now, the files that clash are marked **C** in Changes: settle them as after a merge, and commit.
 
 ## Open a pull request from a session
 
@@ -543,6 +596,8 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "Link https://github.com/acme/site/pull/42 to this session."
 - "Have the checks on this session's pull request passed yet?"
 - "Write a reading guide for what this branch changes."
+- "Resolve the merge conflicts in ~/code/shop-api: keep what each side meant, then tell me what you chose."
+- "What changed in ~/code/shop-api this week? Sum up the commits in plain words."
 - "Which dev servers are running on this computer right now?"
 - "Make the checkout page's button bigger, and show me before and after on a phone."
 - "What's using the most memory on this computer?"

@@ -62,7 +62,7 @@ const git = (cwd, args, home, date) =>
     },
   });
 
-/** Alex's home: two code projects (one a git repository with history and a change not yet committed), documents, task folders. */
+/** Alex's home: two code projects (one a git repository with history, a commit not pushed and a change not yet committed), documents, task folders. */
 export function makeFiles(home, now) {
   const shop = path.join(home, 'code/shop-api');
   write(path.join(shop, 'README.md'), '# Shop API\n\nThe online shop\'s API: carts, checkout and orders.\n\n```bash\nnpm install\nnpm test\n```\n');
@@ -82,11 +82,20 @@ export function makeFiles(home, now) {
     [2 * DAY, 'Checkout: discounts for members'],
     [1 * DAY, 'Tests for the checkout total'],
   ];
-  for (const [ago, msg] of commits) {
+  // A remote to sync with, beside Alex's home: it has every commit but the last, which Sync would send up.
+  const remote = path.join(path.dirname(home), 'remote', 'shop-api.git');
+  for (const [i, [ago, msg]] of commits.entries()) {
     fs.appendFileSync(path.join(shop, 'CHANGELOG.md'), `- ${msg}\n`);
     git(shop, ['add', '-A'], home);
     git(shop, ['commit', '-q', '-m', msg], home, now - ago);
+    if (i === commits.length - 2) {
+      fs.mkdirSync(path.dirname(remote), { recursive: true });
+      git(path.dirname(remote), ['init', '-q', '--bare', '-b', 'main', remote], home);
+      git(shop, ['remote', 'add', 'origin', remote], home);
+      git(shop, ['push', '-q', '-u', 'origin', 'main'], home);
+    }
   }
+  git(shop, ['fetch', '-q'], home);
   // The agent's fix, not committed yet: Git shows it as a change.
   write(path.join(shop, 'src/checkout/total.ts'), TOTAL_AFTER);
 

@@ -202,7 +202,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['search-files', 'Search in files', '/search', 'grep find text in files code names where folder', 'Find files by their names and the text inside them, in any folder'],
   ['files-recent', 'Recent files', '/files?place=recent', 'recent files opened lately last history', 'The files you opened lately'],
   ['files-trash', 'Trash', '/files?place=trash', 'trash deleted files put back restore undelete recycle bin empty', 'What you deleted in Files, to put back or delete for good'],
-  ['git', 'Git', '/git', 'repositories commits branches push pull diff', 'Repositories, changes, branches and history'],
+  ['git', 'Git', '/git', 'repositories commits branches push pull sync diff merge conflicts rebase stash clone tags history graph', 'Repositories, changes, branches and history'],
   ['terminal', 'Terminal', '/terminal', 'shell console command line bash', 'Shells on this computer'],
   ['apps', 'Templates', '/apps', 'app apps gallery templates ready-made tasks tools forms', 'Tasks you run again and again: fill in a form, and an agent does the job'],
   ['new-app', 'New template', '/apps/new', 'create build make new template app apps form tool', 'A template anyone can run from a form'],

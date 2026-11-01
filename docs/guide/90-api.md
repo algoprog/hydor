@@ -586,7 +586,7 @@ These routes serve the app’s own pages, need the user’s browser, or are the 
 - `PUT /api/models` with `openrouterKey`, `hfToken` or `endpoint.apiKey` — key values; the user types them in Settings.
 - `POST /agent/run/:token/ensure`, `/describe`, `/review`, `GET /agent/run/:token/custom`, `/context`, `/assistant` — Custom's own calls during a run (start its vLLM model, describe images, Auto mode's check, settings, instructions), allowed only with that run's token.
 - `/api/fs/*` (list, read, stat, raw, view-link, write, mkdir, rename, delete, exists, search, find, diff, recent, upload) and `/view/:token/*` — files: agents read and change files with their own tools, with the user's approvals; raw and view serve files to the browser.
-- `/api/git/*` (repos, repo, fetch, pull, push, fetch-all, diff, show, commit, message, discard, branches, switch, branch-delete, stash, stash/:action) — agents use git through their own command tool, with the user's approvals.
+- `/api/git/*` (repos, clone, clone/:id, repo, fetch, sync, pull, push, fetch-all, remote, diff, show, log, commit, message, discard, discard-hunk, ignore, revert, undo-commit, continue, abort, branches, switch, branch-delete, branch-rename, merge, compare, branch-only, tag, push-tags, stash, stash/show, stash/:action) — the Git page's own calls; agents use git through their own command tool, with the user's approvals.
 - `/api/terminals*` (list, create, rename, close, context, complete, ask), `/ws/term/:id` and `/api/terminal-history` — the user's shells and their typed history; the socket streams.
 - `/api/kernels*` and `/nbframe` — Jupyter kernels, run from the notebook page.
 - `/api/uploads` — attachments sent with messages.

@@ -1032,39 +1032,83 @@ app.get('/api/fs/recent', async (req) => {
 });
 
 // ---- git -----------------------------------------------------------------------------------
+/** The request's fields: the body's, else the query's (a DELETE's or GET's). */
+const gitArgs = (req: FastifyRequest) => ({ ...((req.query ?? {}) as Record<string, unknown>), ...((req.body ?? {}) as Record<string, unknown>) });
 const repoPath = (req: FastifyRequest) => {
-  const p = String(((req.body ?? req.query) as Record<string, unknown>)?.path ?? '');
+  const p = String(gitArgs(req).path ?? '');
   if (!p.startsWith('/')) throw new HttpError(400, 'Which repository?');
   return p;
 };
+const gitStr = (req: FastifyRequest, k: string) => String(gitArgs(req)[k] ?? '').trim();
+const gitMode = (v: unknown) => (v === 'rebase' || v === 'merge' ? v : undefined);
 app.get('/api/git/repos', async (req) => ({ repos: await gitRepos.list((req.query as Record<string, string>).refresh === '1') }));
+app.post('/api/git/repos', async (req) => {
+  const dir = gitStr(req, 'path');
+  if (!dir) throw new HttpError(400, 'Which folder?');
+  return gitRepos.add(files.resolvePath(dir), !!gitArgs(req).init);
+});
+app.delete('/api/git/repos', async (req) => {
+  gitRepos.remove(repoPath(req));
+  return { repos: await gitRepos.list(true) };
+});
+app.post('/api/git/clone', async (req) => {
+  const dest = gitStr(req, 'dest');
+  if (!dest) throw new HttpError(400, 'Where should it go?');
+  return gitRepos.clone(gitStr(req, 'url'), files.resolvePath(dest));
+});
+app.get('/api/git/clone/:id', async (req) => gitRepos.cloneJob((req.params as { id: string }).id));
 app.get('/api/git/repo', async (req) => gitRepos.detail(repoPath(req)));
 app.post('/api/git/fetch', async (req) => gitRepos.fetch(repoPath(req)));
-app.post('/api/git/pull', async (req) => gitRepos.pull(repoPath(req)));
-app.post('/api/git/push', async (req) => gitRepos.push(repoPath(req), !!(req.body as Record<string, unknown>)?.publish));
+app.post('/api/git/sync', async (req) => gitRepos.sync(repoPath(req), { mode: gitMode(gitArgs(req).mode), push: true }));
+app.post('/api/git/pull', async (req) => gitRepos.sync(repoPath(req), { mode: gitMode(gitArgs(req).mode), push: false }));
+app.post('/api/git/push', async (req) => gitRepos.push(repoPath(req), !!gitArgs(req).publish, gitStr(req, 'branch') || undefined));
 app.post('/api/git/fetch-all', async () => ({ repos: await gitRepos.fetchAll() }));
-app.get('/api/git/diff', async (req) => gitRepos.fileDiff(repoPath(req), String((req.query as Record<string, string>).file ?? '')));
-app.get('/api/git/show', async (req) => gitRepos.commitDetail(repoPath(req), String((req.query as Record<string, string>).hash ?? '')));
+app.post('/api/git/remote', async (req) => gitRepos.addRemote(repoPath(req), gitStr(req, 'name'), gitStr(req, 'url')));
+app.get('/api/git/diff', async (req) => gitRepos.fileDiff(repoPath(req), gitStr(req, 'file'), gitStr(req, 'from') || undefined));
+app.get('/api/git/show', async (req) => gitRepos.commitDetail(repoPath(req), gitStr(req, 'hash')));
+app.get('/api/git/log', async (req) => {
+  const a = gitArgs(req);
+  return gitRepos.log(repoPath(req), { skip: Number(a.skip) || 0, limit: Number(a.limit) || 100, q: gitStr(req, 'q'), all: a.all === '1' || a.all === true });
+});
 app.post('/api/git/commit', async (req) => {
-  const b = (req.body ?? {}) as Record<string, unknown>;
-  return gitRepos.commit(repoPath(req), Array.isArray(b.files) ? b.files.map(String) : [], String(b.message ?? ''), !!b.push);
+  const b = gitArgs(req);
+  return gitRepos.commit(repoPath(req), Array.isArray(b.files) ? b.files.map(String) : [], String(b.message ?? ''), !!b.push, !!b.amend);
 });
 app.post('/api/git/message', async (req) => {
-  const b = (req.body ?? {}) as Record<string, unknown>;
+  const b = gitArgs(req);
   return gitRepos.suggestMessage(repoPath(req), Array.isArray(b.files) ? b.files.map(String) : []);
 });
-app.post('/api/git/discard', async (req) => gitRepos.discard(repoPath(req), String(((req.body ?? {}) as Record<string, unknown>).file ?? '')));
+app.post('/api/git/discard', async (req) => {
+  const b = gitArgs(req);
+  return gitRepos.discard(repoPath(req), Array.isArray(b.files) ? b.files.map(String) : [String(b.file ?? '')]);
+});
+app.post('/api/git/discard-hunk', async (req) => gitRepos.discardHunk(repoPath(req), gitStr(req, 'file'), String(gitArgs(req).hunk ?? '')));
+app.post('/api/git/ignore', async (req) => gitRepos.ignore(repoPath(req), gitStr(req, 'file')));
+app.post('/api/git/revert', async (req) => gitRepos.revert(repoPath(req), gitStr(req, 'hash')));
+app.post('/api/git/undo-commit', async (req) => gitRepos.undoCommit(repoPath(req), gitStr(req, 'hash')));
+app.post('/api/git/continue', async (req) => gitRepos.continueOp(repoPath(req)));
+app.post('/api/git/abort', async (req) => gitRepos.abortOp(repoPath(req)));
 app.get('/api/git/branches', async (req) => gitRepos.branches(repoPath(req)));
 app.post('/api/git/switch', async (req) => {
-  const b = (req.body ?? {}) as Record<string, unknown>;
-  return gitRepos.switchBranch(repoPath(req), String(b.branch ?? '').trim(), !!b.create);
+  const b = gitArgs(req);
+  return gitRepos.switchBranch(repoPath(req), gitStr(req, 'branch'), !!b.create, { from: gitStr(req, 'from') || undefined, track: !!b.track });
 });
-app.post('/api/git/branch-delete', async (req) => gitRepos.deleteBranch(repoPath(req), String(((req.body ?? {}) as Record<string, unknown>).branch ?? '')));
-app.post('/api/git/stash', async (req) => gitRepos.stash(repoPath(req), String(((req.body ?? {}) as Record<string, unknown>).message ?? '')));
+app.post('/api/git/branch-delete', async (req) => gitRepos.deleteBranch(repoPath(req), gitStr(req, 'branch'), !!gitArgs(req).force));
+app.post('/api/git/branch-rename', async (req) => gitRepos.renameBranch(repoPath(req), gitStr(req, 'from'), gitStr(req, 'to')));
+app.post('/api/git/merge', async (req) => gitRepos.merge(repoPath(req), gitStr(req, 'branch')));
+app.get('/api/git/compare', async (req) => gitRepos.compare(repoPath(req), gitStr(req, 'branch')));
+app.get('/api/git/branch-only', async (req) => gitRepos.branchOnly(repoPath(req), gitStr(req, 'branch')));
+app.post('/api/git/tag', async (req) => gitRepos.tag(repoPath(req), gitStr(req, 'name'), gitStr(req, 'hash'), gitStr(req, 'message') || undefined));
+app.post('/api/git/push-tags', async (req) => gitRepos.pushTags(repoPath(req), gitStr(req, 'name') || undefined));
+app.post('/api/git/stash', async (req) => {
+  const b = gitArgs(req);
+  return gitRepos.stash(repoPath(req), String(b.message ?? ''), b.untracked !== false);
+});
+app.get('/api/git/stash/show', async (req) => gitRepos.stashShow(repoPath(req), gitStr(req, 'ref')));
 app.post('/api/git/stash/:action', async (req) => {
   const action = (req.params as { action: string }).action;
   if (action !== 'apply' && action !== 'pop' && action !== 'drop') throw new HttpError(404, 'No such action');
-  return gitRepos.stashAction(repoPath(req), String(((req.body ?? {}) as Record<string, unknown>).ref ?? ''), action);
+  return gitRepos.stashAction(repoPath(req), gitStr(req, 'ref'), action);
 });
 
 // ---- agent setup: MCP servers, skills, plugins, instruction files ------------------------
