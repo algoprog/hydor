@@ -876,7 +876,7 @@ function TourPage(p: {
       >
         {phone ? (
           // The dots over the buttons, so neither moves with the words on them.
-          <div className={cx(column, 'pt-3 pb-[max(12px,var(--safe-bottom))]')}>
+          <div className={cx(column, 'pt-3 pb-[calc(var(--safe-bottom)+20px)]')}>
             <div className="mb-3 flex justify-center">{where}</div>
             <div className="flex items-center gap-2">
               {back}
@@ -884,7 +884,8 @@ function TourPage(p: {
             </div>
           </div>
         ) : (
-          <div className={cx(column, 'relative flex items-center justify-between py-5')}>
+          // Up off the bottom edge, at the same height on every step.
+          <div className={cx(column, 'relative flex items-center justify-between pt-5 pb-[clamp(32px,12vh,140px)]')}>
             {back}
             <span className="absolute left-1/2 -translate-x-1/2">{where}</span>
             {next}
