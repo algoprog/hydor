@@ -47,8 +47,9 @@ interface Step {
   id: string;
   /** Its name in the list of steps beside the pages. */
   label: string;
-  /** The element pointed at: [data-tour="…"]. It stays hidden until its step, so name it in styles.css
-   * ("the tour builds the app up") too. None: the card sits in the middle. */
+  /** The element pointed at: [data-tour="…"]. It stays hidden until its step (or comes with the part it is
+   * one of, as Settings does with the tools), so name it in styles.css ("the tour builds the app up") too.
+   * None: the card sits in the middle. */
   target?: string;
   /** What stays in the light around the target, when that is only a part of it (the whole message box
    * for the row under it): the ring marks the target, the card keeps clear of this. */
@@ -739,6 +740,26 @@ function placeCard(r: DOMRect | null, w: number, h: number, mobile: boolean, sid
 /** A target's box with room around it. */
 const around = (r: DOMRect): Box => ({ x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 });
 
+/** Elements' boxes where they come to rest: whatever is moving them in (their own entrance or one around
+ * them, the sidebar sliding in, the drawer opening) is taken to its end for the reading and put back as it
+ * was. So the light and the card go straight to a part's place, instead of following it there. */
+function settled(els: Element[]): DOMRect[] {
+  const moving = document.getAnimations().flatMap((a) => {
+    const fx = a.effect;
+    if (a.playState !== 'running' || typeof a.currentTime !== 'number' || !(fx instanceof KeyframeEffect) || fx.pseudoElement || !els.some((el) => fx.target?.contains(el))) return [];
+    const { endTime, activeDuration } = fx.getComputedTiming();
+    // A hair short of the end, which looks the same: a transition taken right to it would finish.
+    return typeof endTime === 'number' && Number.isFinite(endTime) && typeof activeDuration === 'number' ? [{ a, now: a.currentTime, end: endTime - activeDuration / 1000 }] : [];
+  });
+  for (const m of moving) m.a.currentTime = m.end;
+  const boxes = els.map((el) => el.getBoundingClientRect());
+  for (const m of moving) m.a.currentTime = m.now;
+  return boxes;
+}
+
+/** How long a step waits for its target to show before its card goes to the middle. */
+const WAIT = 800;
+
 /** A box a step of the way to where it is going, there once close. */
 function glide(cur: Box | null, goal: Box, k: number): Box {
   if (!cur) return goal;
@@ -903,8 +924,14 @@ export function Tour() {
   const [loc] = useLocation();
   const list = useMemo(() => steps(uses, fresh), [uses, fresh]);
   const step = open ? list[Math.min(i, list.length - 1)] : undefined;
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const [waited, setWaited] = useState(false);
+  // The step's target as last looked for: where it comes to rest, or null while it is not there.
+  const [seen, setSeen] = useState<{ id: string; r: DOMRect | null } | null>(null);
+  // The step whose target has been waited for long enough.
+  const [waited, setWaited] = useState<string>();
+  // Where the card is, and whether it glides from there: once it has come in (until then it has no place
+  // to glide from, and its first one moves as it learns its size).
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+  const [glides, setGlides] = useState(false);
   const [inner, setInner] = useState<HTMLDivElement | null>(null);
   const [foot, setFoot] = useState<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ inner: 0, foot: 0 });
@@ -966,29 +993,29 @@ export function Tour() {
   }, [step, mobile, closing]);
 
   // Follow the target (it may appear late, a page or the drawer opening, and move), and glide the hole
-  // after what is in the light (the target, or the whole it is part of) and the ring after the target;
-  // with no target both shut in the middle.
+  // after what is in the light (the target, or the whole it is part of) and the ring after the target,
+  // to where they come to rest; with no target both shut in the middle, and while one is still coming
+  // they stay where they are. The pages have no light: it comes in where the app's first step points.
   useEffect(() => {
     if (!open) return;
-    setRect(null);
-    setWaited(false);
-    const t = setTimeout(() => setWaited(true), 800);
+    const id = step?.id ?? '';
+    const t = setTimeout(() => setWaited(id), WAIT);
     let raf = 0;
     let last = performance.now();
+    const since = last;
     let scrolled = false;
     let painted = '';
     const tick = (now: number) => {
       const dt = Math.min(64, now - last);
       last = now;
       const shut: Box = { x: innerWidth / 2, y: innerHeight / 2, w: 0, h: 0 };
-      let lit = shut;
-      let ringed = shut;
+      let lit: Box | null = shut;
+      let ringed: Box | null = shut;
       if (step?.target && !signIn) {
         const el = document.querySelector(`[data-tour="${step.target}"]`);
-        const r = el?.getBoundingClientRect();
+        const whole = el && step.focus ? document.querySelector(`[data-tour="${step.focus}"]`) : null;
+        const [r, w] = el ? settled(whole ? [el, whole] : [el]) : [];
         if (el && r && r.width > 0 && r.height > 0) {
-          const whole = step.focus ? document.querySelector(`[data-tour="${step.focus}"]`) : null;
-          const w = whole?.getBoundingClientRect();
           const f = whole && w && w.width > 0 && w.height > 0 ? w : r;
           if (!scrolled) {
             (whole ?? el).scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -996,21 +1023,29 @@ export function Tour() {
           }
           lit = around(f);
           ringed = around(r);
-          setRect((p) => (p && p.x === f.x && p.y === f.y && p.width === f.width && p.height === f.height ? p : f));
-        } else setRect(null);
+          setSeen((p) => (p?.id === id && p.r && p.r.x === f.x && p.r.y === f.y && p.r.width === f.width && p.r.height === f.height ? p : { id, r: f }));
+        } else {
+          setSeen((p) => (p?.id === id && !p.r ? p : { id, r: null }));
+          if (now - since < WAIT) lit = ringed = null;
+        }
       }
-      const k = 1 - Math.exp(-dt / 85);
-      const h = (hole.current = glide(hole.current, lit, k));
-      const m = (mark.current = glide(mark.current, ringed, k));
-      const key = [h.x, h.y, h.w, h.h, m.x, m.y, m.w, m.h].map((v) => v.toFixed(1)).join() + `,${innerWidth},${innerHeight}`;
-      if (key !== painted && scrim.current && ring.current) {
-        painted = key;
-        scrim.current.style.clipPath = holePath(h);
-        const s = ring.current.style;
-        s.transform = `translate(${m.x}px, ${m.y}px)`;
-        s.width = `${m.w}px`;
-        s.height = `${m.h}px`;
-        s.opacity = m.w > 8 && m.h > 8 ? '1' : '0';
+      if (!scrim.current || !ring.current) {
+        hole.current = mark.current = null;
+        setSeen(null);
+      } else if (lit && ringed) {
+        const k = 1 - Math.exp(-dt / 85);
+        const h = (hole.current = glide(hole.current, lit, k));
+        const m = (mark.current = glide(mark.current, ringed, k));
+        const key = [h.x, h.y, h.w, h.h, m.x, m.y, m.w, m.h].map((v) => v.toFixed(1)).join() + `,${innerWidth},${innerHeight}`;
+        if (key !== painted) {
+          painted = key;
+          scrim.current.style.clipPath = holePath(h);
+          const s = ring.current.style;
+          s.transform = `translate(${m.x}px, ${m.y}px)`;
+          s.width = `${m.w}px`;
+          s.height = `${m.h}px`;
+          s.opacity = m.w > 8 && m.h > 8 ? '1' : '0';
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -1060,21 +1095,27 @@ export function Tour() {
     return () => window.removeEventListener('keydown', k, true);
   });
 
-  // Enter goes on: the next button takes the focus at each step.
+  // Enter goes on: the next button takes the focus at each step (and as the card comes in).
+  const cardIn = !!at;
   useEffect(() => {
     if (step && !signIn) nextBtn.current?.focus({ preventScroll: true });
-  }, [step?.id, signIn]);
+  }, [step?.id, signIn, cardIn]);
 
   if (!step) return <Burst />;
 
-  const target = step.target ? rect : null;
-  // Wait a moment for a target that is still appearing before falling back to the middle.
-  const pending = !!step.target && !rect && !waited;
+  // The step's target, where it comes to rest, once found.
+  const target = seen?.id === step.id ? seen.r : null;
+  // One still coming: the card stays where it is (out of sight once it is known to be missing) until it is
+  // found, or a moment has gone by and it goes to the middle. It first comes in once it has a place.
+  const coming = !!step.target && !target && waited !== step.id;
+  const missing = coming && seen?.id === step.id;
   const w = mobile ? window.innerWidth - EDGE * 2 : (step.width ?? 360);
   const maxH = window.innerHeight - EDGE * 2;
   const want = size.inner + size.foot + 2;
   const h = size.inner ? Math.min(want, maxH) : 0;
-  const pos = placeCard(target, w, h || 280, mobile, step.sidebar);
+  const place = onPage ? null : coming ? at : placeCard(target, w, h || 280, mobile, step.sidebar);
+  if (place?.left !== at?.left || place?.top !== at?.top) setAt(place);
+  if (!place && glides) setGlides(false);
   const Extra = step.Extra;
   // A new install's password screen was step 1.
   const total = list.length + (fresh ? 1 : 0);
@@ -1087,60 +1128,64 @@ export function Tour() {
           {!onPage && (
             <>
               <div ref={scrim} className={cx('scrim tour-scrim pointer-events-none fixed inset-0', closing && 'opacity-0')} />
-              <div ref={ring} className={cx('tour-ring pointer-events-none fixed top-0 left-0 rounded-[14px]', closing && 'invisible')}>
+              {/* Out of sight until the light first lands. */}
+              <div ref={ring} className={cx('tour-ring pointer-events-none fixed top-0 left-0 rounded-[14px] opacity-0', closing && 'invisible')}>
                 {target && <span key={step.id} className="tour-ping" />}
               </div>
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="tour-title"
-                className={cx('tour-card fixed flex flex-col overflow-hidden rounded-2xl border border-line-2 bg-elevated shadow-lg', closing && 'tour-card-out', pending && 'pointer-events-none opacity-0')}
-                style={{
-                  left: pos.left,
-                  top: pos.top,
-                  width: w,
-                  height: h || undefined,
-                  transition: `left 520ms ${ease}, top 520ms ${ease}, width 420ms ${ease}, height 420ms ${ease}, opacity 200ms ease`,
-                }}
-              >
-                <button
-                  onClick={() => endTour()}
-                  className="absolute top-3 right-3 z-10 rounded-md p-1 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
-                  aria-label="Close the tour"
-                  title="Close the tour (Esc)"
+              {place && (
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="tour-title"
+                  className={cx('tour-card fixed flex flex-col overflow-hidden rounded-2xl border border-line-2 bg-elevated shadow-lg', closing && 'tour-card-out', missing && 'pointer-events-none opacity-0')}
+                  onAnimationEnd={(e) => e.target === e.currentTarget && setGlides(true)}
+                  style={{
+                    left: place.left,
+                    top: place.top,
+                    width: w,
+                    height: h || undefined,
+                    transition: `${glides ? `left 520ms ${ease}, top 520ms ${ease}, ` : ''}width 420ms ${ease}, height 420ms ${ease}, opacity 200ms ease`,
+                  }}
                 >
-                  <X size={15} />
-                </button>
-                <div className="min-h-0 flex-1" style={{ overflowY: want > maxH ? 'auto' : 'hidden' }}>
-                  <div ref={setInner} className="px-5 pt-5 pb-4">
-                    <div key={step.id} className="tour-rise">
-                      <h2 id="tour-title" className="pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 0 } as CSSProperties}>
-                        {step.title}
-                      </h2>
-                      <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 1 } as CSSProperties}>
-                        {step.body}
-                      </div>
-                      {Extra && (
-                        <div className="mt-3.5" style={{ '--i': 2 } as CSSProperties}>
-                          <Extra />
+                  <button
+                    onClick={() => endTour()}
+                    className="absolute top-3 right-3 z-10 rounded-md p-1 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
+                    aria-label="Close the tour"
+                    title="Close the tour (Esc)"
+                  >
+                    <X size={15} />
+                  </button>
+                  <div className="min-h-0 flex-1" style={{ overflowY: want > maxH ? 'auto' : 'hidden' }}>
+                    <div ref={setInner} className="px-5 pt-5 pb-4">
+                      <div key={step.id} className="tour-rise">
+                        <h2 id="tour-title" className="pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 0 } as CSSProperties}>
+                          {step.title}
+                        </h2>
+                        <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 1 } as CSSProperties}>
+                          {step.body}
                         </div>
-                      )}
+                        {Extra && (
+                          <div className="mt-3.5" style={{ '--i': 2 } as CSSProperties}>
+                            <Extra />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  <div ref={setFoot} className="flex shrink-0 items-center gap-2 border-t border-line bg-bg-1 px-4 py-2.5">
+                    <Button size="sm" variant="ghost" onClick={i > 0 ? back : () => endTour()}>
+                      {i > 0 ? 'Back' : 'Skip the tour'}
+                    </Button>
+                    <span className="flex min-w-0 flex-1 justify-center">
+                      <TourProgress at={i + (fresh ? 1 : 0)} total={total} />
+                    </span>
+                    <Button ref={nextBtn} size="sm" variant="primary" className="gap-1.5" onClick={next} disabled={!ready}>
+                      {i >= list.length - 1 ? 'Get started' : 'Next'}
+                      {i < list.length - 1 && <ArrowRight size={14} />}
+                    </Button>
+                  </div>
                 </div>
-                <div ref={setFoot} className="flex shrink-0 items-center gap-2 border-t border-line bg-bg-1 px-4 py-2.5">
-                  <Button size="sm" variant="ghost" onClick={i > 0 ? back : () => endTour()}>
-                    {i > 0 ? 'Back' : 'Skip the tour'}
-                  </Button>
-                  <span className="flex min-w-0 flex-1 justify-center">
-                    <TourProgress at={i + (fresh ? 1 : 0)} total={total} />
-                  </span>
-                  <Button ref={nextBtn} size="sm" variant="primary" className="gap-1.5" onClick={next} disabled={!ready}>
-                    {i >= list.length - 1 ? 'Get started' : 'Next'}
-                    {i < list.length - 1 && <ArrowRight size={14} />}
-                  </Button>
-                </div>
-              </div>
+              )}
             </>
           )}
           {page && (
