@@ -99,7 +99,7 @@ In every mode Custom asks you before risky commands. In Ask, Accept edits and Pl
 
 ### Attach files, point at files, use commands
 
-- **Attach files** (the paperclip), drop files on the message box, or paste pictures and files into it. A message carries up to 25 MB of files. Pictures (PNG, JPEG, GIF, WebP) go to the model as images, up to 8 a message; other files (up to 20) are saved on this computer and listed at the end of your message, so the agent opens them. Remove one with its × before sending.
+- **Attach files** (the paperclip), drop files on the message box, or paste pictures and files into it. A message carries up to 25 MB of files. Pictures (PNG, JPEG, GIF, WebP) go to the model as images, up to 8 a message; other files (up to 20) are saved on this computer and listed at the end of your message, so the agent opens them. Remove one with its × before sending. Files you have attached wait in the box until you send them, even while you go to another page (reloading the page clears them).
 - **Attach a screenshot** (the screen icon, on computers): your browser asks which screen, window or tab, and one picture of it is attached.
 - **@**: type @ and part of a file's name to list matching files in the folder; ↑ ↓ to move, Enter or Tab to insert it, Esc to close.
 - **/**: at the very start of the message, / lists the agent's commands and skills (Claude Code's), with what each does.
@@ -110,6 +110,8 @@ In every mode Custom asks you before risky commands. In Ask, Accept edits and Pl
 The start page opens with what you picked last, on every device: the agent; for each agent its model, effort, permissions and account; the folder, new task folder or space; the worktree switch; the assistant; memory off; and the spending cap. Picking an agent brings back what you last used with it.
 
 A link to the start page can fill it in, for example `/?prompt=Summarize%20my%20notes&agent=codex`; `model=` and `cwd=` (a folder's path) can be added. It only fills the box and the choices; it never starts anything by itself. Invisible characters are removed from a linked message, with a notice.
+
+What you write in the box waits there while you go to other pages: the message, the files you attach, the options for this task alone (**Swarm**, **Deep research**, **Arena**, **Guidelines** for this session) and the folder a link or **New agent session here** opened it in. The box empties when the session starts. The message and those options are kept in this browser, so they are still there after a reload; attached files are not.
 
 ## Follow the work in a session
 

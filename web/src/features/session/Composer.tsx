@@ -9,6 +9,7 @@ import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog
 import { cx, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
 import { confirmResume, takeoverDialog } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
+import { clearDraft, draftFiles, draftText, keepDraftFiles, keepDraftText } from '../../lib/drafts';
 import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
 import { AttachmentList } from '../../components/Attachments';
 import { BlockedApproval } from './BlockedApproval';
@@ -20,8 +21,6 @@ import { GoalBar } from './GoalBar';
 import { LimitBanner } from '../usage/LimitReset';
 import { FeatureComposerButtons } from '../registry';
 import { putText } from '../../lib/featureEvents';
-
-const draftKey = (k: string) => `wa.draft.${k}`;
 
 const HANDOFF_EVENT = 'wa:handoff';
 /** The session menu's "Continue in Codex": session `key`'s message box sets its next message to go to `agent` (`acp`: Custom's "console"). */
@@ -86,14 +85,9 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const locked = !!ext && !takeover;
   const [confirm, confirmNode] = useConfirm();
   const cat = useCatalog(s.agent, s.acpAgent);
-  const [text, setText] = useState(() => {
-    try {
-      return localStorage.getItem(draftKey(key)) ?? '';
-    } catch {
-      return '';
-    }
-  });
-  const [atts, setAtts] = useState<Attachment[]>([]);
+  // What was written and attached here and not sent waits for you (lib/drafts.ts).
+  const [text, setText] = useState(() => draftText(key));
+  const [atts, setAtts] = useState<Attachment[]>(() => draftFiles(key));
   const [busy, setBusy] = useState(false);
   const [cfg, setCfg] = useState<{ model?: string | null; effort?: string | null; mode?: string | null }>({});
   // "Continue in Codex" (or Claude Code, or Custom Agent) was picked: the next message continues the conversation there, in a new session.
@@ -142,20 +136,18 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     .reverse();
 
   useEffect(() => {
-    try {
-      setText(localStorage.getItem(draftKey(key)) ?? '');
-    } catch {}
+    setText(draftText(key));
     setCfg({});
     setMove(null);
-    setAtts((l) => (releaseAttachments(l), []));
+    setAtts(draftFiles(key));
   }, [key]);
 
   useEffect(() => {
-    try {
-      if (text) localStorage.setItem(draftKey(key), text);
-      else localStorage.removeItem(draftKey(key));
-    } catch {}
+    keepDraftText(key, text);
   }, [text, key]);
+  useEffect(() => {
+    keepDraftFiles(key, atts);
+  }, [atts, key]);
 
   // "Quote" on a selected part of a reply: it goes in the box as a quote, the caret after it.
   useEffect(() => {
@@ -217,6 +209,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     try {
       await post(`/api/sessions/${enc(key)}/${takeover ? 'takeover' : queue ? 'queue' : 'message'}`, { text: t, ...attachmentPayload(atts) });
       window.dispatchEvent(new Event('wa:follow'));
+      // Also when the page was left while it went.
+      clearDraft(key);
       setText('');
       releaseAttachments(atts);
       setAtts([]);
@@ -235,6 +229,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     const model = move.model ?? (move.agent === 'codex' ? (moveCat?.models.find((m) => m.isDefault)?.value ?? null) : null);
     try {
       const r = await post<{ key: string }>(`/api/sessions/${enc(key)}/handoff`, { agent: move.agent, acpAgent: move.acp, model, effort: move.effort, mode: move.mode, text: t, ...attachmentPayload(atts) });
+      // The new session opens at once, before this box could empty its draft.
+      clearDraft(key);
       setText('');
       releaseAttachments(atts);
       setAtts([]);

@@ -2,13 +2,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { useSearch } from 'wouter';
 import { ArrowUp, ChevronRight, CircleHelp, GitBranch, MonitorUp, Paperclip, SlidersHorizontal } from 'lucide-react';
 import { startTour } from '../tour/Tour';
-import type { Agent, StartRun } from '@shared/types';
+import type { Agent, StartRun, StartSettings } from '@shared/types';
 import type { SessionExtra } from '@shared/features';
 import { usd } from '@shared/budget';
 import { arenaOf } from '@shared/arena';
 import { api, post } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
+import { keepStartDraft, startDraft } from '../../lib/drafts';
 import { timeAgo } from '../../lib/format';
 import { openSession } from '../../lib/nav';
 import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
@@ -42,6 +43,13 @@ function fromLink(search: string): { prompt?: string; agent?: Agent; model?: str
   return { prompt, agent: agent === 'claude' || agent === 'codex' ? agent : undefined, model: q.get('model') ?? undefined, stripped: !!raw && raw !== prompt };
 }
 
+/** The start options kept as picks for next time (lib/start.ts); the others are this task's alone, kept with what is written. */
+const PICKS = new Set(['assistant', 'connections', 'memory', 'capUsd', 'space']);
+const ownOptions = (x: SessionExtra): SessionExtra => Object.fromEntries(Object.entries(x).filter(([k]) => !PICKS.has(k)));
+
+/** The folder picked last, as one value: its path, a new task folder, the space. */
+const folderOf = (s: StartSettings) => JSON.stringify([s.cwd ?? null, s.task ?? null, s.space ?? null]);
+
 /** The start page's quieter settings, behind one chip that names those changed ("Max effort · Plan"), else "Options". */
 function MoreOptions({ changed, title, children }: { changed: string[]; title: string; children: ReactNode }) {
   const mobile = useIsMobile();
@@ -70,24 +78,35 @@ function MoreOptions({ changed, title, children }: { changed: string[]; title: s
  * The start page's message box. It opens with what was picked here last time (kept on the server, so on
  * any device): the agent with its model, effort and permissions, the folder, the assistant, memory and a
  * spending cap. One row under the box shows who does the work, where and as which assistant; the rest
- * wait under Options, whose chip names any of them set away from the usual.
+ * wait under Options, whose chip names any of them set away from the usual. What is written, attached
+ * and set for this task alone waits in the box while you are on other pages (lib/drafts.ts).
  */
-function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: ReturnType<typeof fromLink> }) {
+function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?: ReturnType<typeof fromLink>; from: string }) {
   const mobile = useIsMobile();
   const [saved] = useState(() => startSettings());
+  // The box as it was left. A link's prompt takes its place, unless it was written from that link.
+  const [{ draft, held }] = useState(() => {
+    const d = startDraft();
+    const ok = !!d && (!link?.prompt || d.from === from);
+    return { draft: ok ? d : null, held: !!d && !ok };
+  });
+  // The folder a link opened the box in (?cwd=), or the draft's from one, while the folder picked last is the one it stood over.
+  const [linkCwd, setLinkCwd] = useState(() => initialCwd ?? (draft?.folder?.over === folderOf(saved) ? draft.folder.cwd : undefined));
+  const [linkOver] = useState(() => (initialCwd ? folderOf(saved) : (draft?.folder?.over ?? '')));
   const [first] = useState(() => (link?.agent ? { agent: link.agent, acp: null } : lastAgent()));
   const [agent, setAgent] = useState<Agent>(first.agent);
   // An ACP agent (Settings → More agents) when agent is 'acp'.
   const [acpId, setAcpId] = useState<string | null>(first.acp);
   const acpList = useApp((s) => s.boot?.acpAgents);
   const cat = useCatalog(agent, acpId ?? undefined);
-  const [cwd, setCwd] = useState(() => initialCwd ?? saved.cwd ?? useUI.getState().explorerRoot ?? useApp.getState().boot?.defaultCwd ?? '');
+  const [cwd, setCwd] = useState(() => linkCwd ?? saved.cwd ?? useUI.getState().explorerRoot ?? useApp.getState().boot?.defaultCwd ?? '');
   // Settings for the new session from the capabilities' start options (an assistant, memory off…).
   const [extra, setExtra] = useState<SessionExtra>(() => ({
+    ...draft?.extra,
     ...(saved.memory === false ? { memory: false } : {}),
     ...(saved.capUsd ? { capUsd: saved.capUsd } : {}),
     // The space picked last, while the folder is still its own.
-    ...(saved.space && !initialCwd ? { space: saved.space } : {}),
+    ...(saved.space && !linkCwd ? { space: saved.space } : {}),
   }));
   // Spaces: picked by name in the folder chip, each with its folder, assistant and guidelines.
   const spaces = useSpaces();
@@ -98,15 +117,27 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     if (spaces && extra.space && !space) setExtra((x) => ({ ...x, space: undefined }));
   }, [spaces, extra.space, space]);
   // A new task folder (Settings → Assistants) or the folder shown: as picked here, else as the assistant prefers (Coder works in projects).
-  const [taskPick, setTaskPick] = useState<boolean | null>(() => (initialCwd ? false : (saved.task ?? null)));
-  const folderPicked = useRef(!!initialCwd);
+  const [taskPick, setTaskPick] = useState<boolean | null>(() => (linkCwd ? false : (saved.task ?? null)));
+  const folderPicked = useRef(!!linkCwd);
   const task = useTaskFolder(typeof extra.assistant === 'string' ? extra.assistant : undefined, taskPick);
-  const [text, setText] = useState(link?.prompt ?? '');
+  const [text, setText] = useState(() => (draft ? draft.text : (link?.prompt ?? '')));
   const [model, setModel] = useState<string | null>(null);
   const [effort, setEffort] = useState<string | null>(null);
   const [mode, setMode] = useState<string | null>(null);
-  const [atts, setAtts] = useState<Attachment[]>([]);
+  const [atts, setAtts] = useState<Attachment[]>(() => draft?.files ?? []);
   const [busy, setBusy] = useState(false);
+
+  // Kept as it changes, until the session starts. A link's prompt doesn't replace a draft written
+  // elsewhere until something here changes.
+  const own = JSON.stringify(ownOptions(extra));
+  const opened = useRef(held ? { text, atts, own, linkCwd } : null);
+  const sent = useRef(false);
+  useEffect(() => {
+    const o = opened.current;
+    if (sent.current || (o && o.text === text && o.atts === atts && o.own === own && o.linkCwd === linkCwd)) return;
+    opened.current = null;
+    keepStartDraft({ text, files: atts, extra: JSON.parse(own), folder: linkCwd ? { cwd: linkCwd, over: linkOver } : undefined, from });
+  }, [text, atts, own, linkCwd]);
   // In a git repository the session can get a worktree of its own: a branch and folder for this task.
   const [repo, setRepo] = useState<{ repo: string; branch: string } | null>(null);
   const [worktree, setWorktree] = useState(!!saved.worktree);
@@ -188,6 +219,11 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     el.style.height = '0px';
     el.style.height = `${Math.min(Math.max(el.scrollHeight, 84), Math.round(window.innerHeight * 0.4))}px`;
   }, [text]);
+  // What waited in the box (or a link's prompt) goes on from its end.
+  useLayoutEffect(() => {
+    const el = ta.current;
+    if (el && document.activeElement === el) el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
 
   const attach = async (files: FileList | File[]) => {
     const list = await readAttachments(files, atts);
@@ -230,6 +266,9 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
       releaseAttachments(atts);
       setAtts([]);
       setText('');
+      // What was written went with the session.
+      sent.current = true;
+      keepStartDraft(null);
       openSession(r.key);
     } catch (e) {
       toastError(e);
@@ -241,6 +280,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   /** A space picked: its folder, its assistant, and its guidelines for the session (the server adds them). */
   const pickSpace = (sp: Space) => {
     folderPicked.current = true;
+    setLinkCwd(undefined);
     setCwd(sp.folder);
     setTaskPick(false);
     setExtra((x) => ({ ...x, space: sp.id, ...(sp.assistant ? { assistant: sp.assistant } : {}) }));
@@ -397,6 +437,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
                 note={!task && repo && worktree ? 'new worktree' : undefined}
                 onFolder={(p) => {
                   folderPicked.current = true;
+                  setLinkCwd(undefined);
                   setCwd(p);
                   setTaskPick(false);
                   setExtra((x) => ({ ...x, space: undefined }));
@@ -404,6 +445,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
                 }}
                 onTask={() => {
                   folderPicked.current = true;
+                  setLinkCwd(undefined);
                   setTaskPick(true);
                   setExtra((x) => ({ ...x, space: undefined }));
                   saveStart({ task: true, space: null });
@@ -514,7 +556,7 @@ export function HomePage() {
           </div>
           <div className="anim-in mt-6 [animation-delay:70ms] sm:mt-8">
             {/* It opens with the last picks, which come with the bootstrap. */}
-            {booted ? <StartComposer key={search} initialCwd={initialCwd} link={link} /> : <div className="h-[200px]" />}
+            {booted ? <StartComposer key={search} initialCwd={initialCwd} link={link} from={search} /> : <div className="h-[200px]" />}
           </div>
           <div className="anim-in mt-5 flex justify-center [animation-delay:140ms] sm:mt-8">
             <div data-tour="today">
