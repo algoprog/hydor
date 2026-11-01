@@ -8,7 +8,6 @@ import {
   DragOverlay,
   MouseSensor,
   pointerWithin,
-  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -32,6 +31,7 @@ import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
 import { ChildNest, nestChildren } from '../children/Nest';
+import { AreaTouchSensor, touchDragArea } from '../../lib/dragTouch';
 
 /**
  * Active sessions keep their places: newest to become active on top, then fixed. Working,
@@ -92,6 +92,11 @@ const orderable = (label: string) => label === 'Active' || label === 'Pinned';
 const PIN_ZONE = 'zone:pin';
 /** A drop ends with a click on the row under the pointer; that click is ignored. */
 let lastDragEnd = 0;
+// Made once: new settings on each render gave every row new drag handlers, so each update of the list
+// (four a second while an agent works) redrew all of its rows.
+const MOUSE = { activationConstraint: { distance: 6 } };
+// Touch: hold a moment to pick a row up, so a swipe still scrolls the list.
+const TOUCH = { activationConstraint: { delay: 250, tolerance: 8 } };
 
 /** Rows you dragged keep their places; ones never dragged come first, in their usual order. */
 function byManualOrder(list: SessionSummary[], usual: (l: SessionSummary[]) => SessionSummary[]): SessionSummary[] {
@@ -270,8 +275,10 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, eager
       className={cx(
         // Rows further down are drawn only as they come near (a long list scrolls without that work);
         // the first ones always are, or they would appear a moment late when the closed drawer opens.
+        // Their stand-in is a row's exact height, so drawing one never changes the list's height (Safari
+        // keeps no scroll anchor: rows above that grew as they were drawn moved what was on screen).
         'cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50',
-        !eager && '[contain-intrinsic-size:auto_56px] [content-visibility:auto]',
+        !eager && '[contain-intrinsic-size:auto_56.25px] [content-visibility:auto]',
         drag.lifted && 'opacity-40',
       )}
     >
@@ -382,17 +389,13 @@ export function SessionList({ query }: { query: string }) {
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overGroup, setOverGroup] = useState<string | null>(null);
   const [confirm, confirmNode] = useConfirm();
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    // Touch: hold a moment to pick a row up, so a swipe still scrolls the list.
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
-  );
+  const sensors = useSensors(useSensor(MouseSensor, MOUSE), useSensor(AreaTouchSensor, TOUCH));
 
   // Child sessions sit under their parent (folded), when it is listed too.
   const nest = useMemo(() => nestChildren(byKey, (s) => !s.archived && (filter === 'all' || s.agent === filter)), [byKey, filter]);
 
   const groups = useMemo(() => {
-    const out: { label: string; items: SessionSummary[] }[] = [];
+    const out: { label: string; items: SessionSummary[]; keys: string[] }[] = [];
     const now = new Date();
     for (const key of order) {
       const s = byKey[key];
@@ -402,7 +405,7 @@ export function SessionList({ query }: { query: string }) {
       // Snoozed ones wait at the bottom until their time (or until they need you).
       const label = s.snoozedUntil && s.snoozedUntil > now.getTime() ? 'Snoozed' : activityOf(s) ? 'Active' : s.pinned ? 'Pinned' : dayGroup(s.updatedAt, now);
       let g = out.find((x) => x.label === label);
-      if (!g) out.push((g = { label, items: [] }));
+      if (!g) out.push((g = { label, items: [], keys: [] }));
       g.items.push(s);
     }
     const rank = (l: string) => (l === 'Active' ? 0 : l === 'Pinned' ? 1 : l === 'Snoozed' ? 3 : 2);
@@ -413,6 +416,7 @@ export function SessionList({ query }: { query: string }) {
     if (act) act.items = byManualOrder(act.items, sortActive);
     const pin = out.find((g) => g.label === 'Pinned');
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
+    for (const g of out) g.keys = g.items.map((s) => s.key);
     return out.sort((a, b) => rank(a.label) - rank(b.label));
   }, [byKey, order, filter, nest]);
 
@@ -421,7 +425,7 @@ export function SessionList({ query }: { query: string }) {
     for (const g of groups) for (const s of g.items) m.set(s.key, orderable(g.label) ? g.label : 'dated');
     return m;
   }, [groups]);
-  const keysOf = (label: string) => groups.find((g) => g.label === label)?.items.map((s) => s.key) ?? [];
+  const keysOf = (label: string) => groups.find((g) => g.label === label)?.keys ?? [];
 
   // Active or Pinned: the nearest row of the same group. A dated row: only a Pinned row or the pin zone right under the pointer.
   const collision: CollisionDetection = (args) => {
@@ -475,17 +479,23 @@ export function SessionList({ query }: { query: string }) {
     [coarse],
   );
 
+  // The open session, read when a delete goes through: a handler that changed with it redrew every row
+  // each time you moved to another session.
+  const openKey = useRef(activeKey);
+  useEffect(() => {
+    openKey.current = activeKey;
+  }, [activeKey]);
   const onDelete = useCallback(
     async (s: SessionSummary) => {
       if (!(await confirm(deleteDialog(s)))) return;
       try {
         await del(`/api/sessions/${enc(s.key)}`);
-        if (s.key === activeKey) go('/');
+        if (s.key === openKey.current) go('/');
       } catch (e) {
         toastError(e);
       }
     },
-    [confirm, activeKey],
+    [confirm],
   );
 
   if (query.trim()) return <SearchResults q={query.trim()} />;
@@ -518,38 +528,41 @@ export function SessionList({ query }: { query: string }) {
       }}
       accessibility={{ screenReaderInstructions: { draggable: 'Drag to move this session. Active and Pinned keep the order you set; drop a session on Pinned to pin it.' } }}
     >
-      {groups.map((g, i) => {
-        const sortable = orderable(g.label);
-        const before = groups.slice(0, i).reduce((n, x) => n + x.items.length, 0);
-        const rows = g.items.map((s, k) => {
-          const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined, eager: before + k < 30 };
-          const row = sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
-          const kids = nest.byParent.get(s.key);
-          if (!kids) return row;
+      {/* Touches that land on the list may pick a row up (lib/dragTouch). */}
+      <div ref={touchDragArea}>
+        {groups.map((g, i) => {
+          const sortable = orderable(g.label);
+          const before = groups.slice(0, i).reduce((n, x) => n + x.items.length, 0);
+          const rows = g.items.map((s, k) => {
+            const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined, eager: before + k < 30 };
+            const row = sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
+            const kids = nest.byParent.get(s.key);
+            if (!kids) return row;
+            return (
+              <Fragment key={s.key}>
+                {row}
+                <ChildNest parent={s.key} kids={kids} activeKey={activeKey} row={(c, active) => <RowBody s={c} active={active} home={home} />} />
+              </Fragment>
+            );
+          });
           return (
-            <Fragment key={s.key}>
-              {row}
-              <ChildNest parent={s.key} kids={kids} activeKey={activeKey} row={(c, active) => <RowBody s={c} active={active} home={home} />} />
+            <Fragment key={g.label}>
+              {i === zoneAt && <PinZone hot={overGroup === 'Pinned'} />}
+              <div className={cx('px-2 pb-3 transition-colors', datedDrag && g.label === 'Pinned' && overGroup === 'Pinned' && 'rounded-xl bg-accent/[0.06]')}>
+                <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
+                {sortable ? (
+                  <SortableContext items={g.keys} strategy={verticalListSortingStrategy}>
+                    {rows}
+                  </SortableContext>
+                ) : (
+                  rows
+                )}
+              </div>
             </Fragment>
           );
-        });
-        return (
-          <Fragment key={g.label}>
-            {i === zoneAt && <PinZone hot={overGroup === 'Pinned'} />}
-            <div className={cx('px-2 pb-3 transition-colors', datedDrag && g.label === 'Pinned' && overGroup === 'Pinned' && 'rounded-xl bg-accent/[0.06]')}>
-              <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
-              {sortable ? (
-                <SortableContext items={g.items.map((s) => s.key)} strategy={verticalListSortingStrategy}>
-                  {rows}
-                </SortableContext>
-              ) : (
-                rows
-              )}
-            </div>
-          </Fragment>
-        );
-      })}
-      {zoneAt === groups.length && <PinZone hot={overGroup === 'Pinned'} />}
+        })}
+        {zoneAt === groups.length && <PinZone hot={overGroup === 'Pinned'} />}
+      </div>
       {confirmNode}
       {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : null}</DragOverlay>, document.body)}
       <Popover anchor={menuAnchor} open={!!menu} onClose={() => (setMenu(null), setSnoozing(false))} width={snoozing ? 240 : 190}>

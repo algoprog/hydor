@@ -1,7 +1,7 @@
 // Messages waiting to go out when the running turn ends. Drag one by its handle to change the
 // order; edit one to change its text or its attachments (take some off, add more).
 import { useEffect, useRef, useState } from 'react';
-import { closestCenter, DndContext, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type Modifier } from '@dnd-kit/core';
+import { closestCenter, DndContext, KeyboardSensor, MouseSensor, useSensor, useSensors, type DragEndEvent, type Modifier } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { CornerDownLeft, FileText, GripVertical, Paperclip, Pencil, Play, Trash2, X } from 'lucide-react';
@@ -13,9 +13,14 @@ import { AttachmentList } from '../../components/Attachments';
 import { openLightbox } from '../../components/Lightbox';
 import { Button, cx } from '../../components/ui';
 import { mu } from '../../lib/machine';
+import { AreaTouchSensor, touchDragArea } from '../../lib/dragTouch';
 
 /** Rows move up and down only. */
 const vertical: Modifier = ({ transform }) => ({ ...transform, x: 0 });
+// Made once: new settings on each render would hand every row new drag handlers.
+const MOUSE = { activationConstraint: { distance: 4 } };
+const TOUCH = { activationConstraint: { delay: 180, tolerance: 6 } };
+const KEYS = { coordinateGetter: sortableKeyboardCoordinates };
 
 const attUrl = (key: string, m: QueuedMessage, a: QueuedAttachment) => mu(`/api/sessions/${enc(key)}/queue/${enc(m.id)}/attachment?ref=${encodeURIComponent(a.ref)}`);
 
@@ -208,11 +213,7 @@ export function QueueList({ s }: { s: SessionSummary }) {
   const [order, setOrder] = useState<string[] | null>(null);
   useEffect(() => setOrder(null), [ids]);
   const [editing, setEditing] = useState<string | null>(null);
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const sensors = useSensors(useSensor(MouseSensor, MOUSE), useSensor(AreaTouchSensor, TOUCH), useSensor(KeyboardSensor, KEYS));
   const list = order ? order.map((id) => server.find((m) => m.id === id)).filter((m): m is QueuedMessage => !!m) : server;
   if (!list.length) return null;
   const onDragEnd = ({ active, over }: DragEndEvent) => {
@@ -226,7 +227,7 @@ export function QueueList({ s }: { s: SessionSummary }) {
     });
   };
   return (
-    <div className="mb-2 space-y-1.5">
+    <div ref={touchDragArea} className="mb-2 space-y-1.5">
       {s.queueHeld && (
         <div className="flex items-center gap-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-1.5 text-[12.5px]">
           <span className="min-w-0 flex-1">The queue is paused (the agent was stopped, or the server restarted).</span>
