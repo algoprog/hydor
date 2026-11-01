@@ -381,7 +381,7 @@ export function FileEditor({
           <Suspense fallback={<div className="flex h-full items-center justify-center text-fg-3"><Throbber size={34} /></div>}>
             <OfficePreview path={path} mtime={file.mtime} />
           </Suspense>
-        ) : media && (file.binary || ext === 'svg') ? (
+        ) : media && (file.binary || file.tooLarge || ext === 'svg') ? (
           <div className={cx('flex h-full items-center justify-center overflow-auto bg-bg-1', media === 'video' ? 'p-0 sm:p-3' : 'p-4')}>
             {media === 'image' && <img src={raw} alt={basename(path)} className="max-h-full max-w-full rounded-lg border border-line bg-[repeating-conic-gradient(var(--bg-2)_0%_25%,var(--bg)_0%_50%)] [background-size:16px_16px] object-contain" />}
             {media === 'pdf' && <iframe src={raw} title={basename(path)} className="h-full w-full rounded-lg border border-line bg-white" />}
