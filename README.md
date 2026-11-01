@@ -38,8 +38,9 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   side, and use the app in English, Chinese or Greek
 - Write your Agent Guidelines once, for every session, a space or one session, and every agent follows them,
   whichever it is
-- Ask any agent how the app works, or have it change a setting or set something up for you (a space, an assistant,
-  a scheduled task): it reads the app's own guide and asks you to confirm each change on a card
+- Ask any agent how the app works, from Help or in any session, or have it change a setting or set something up
+  for you (a space, an assistant, a scheduled task): it reads the app's own guide and asks you to confirm each change
+  on a card
 
 See [all features](docs/features.md), or the [user guide](docs/guide/), which the app also shows under Help.
 

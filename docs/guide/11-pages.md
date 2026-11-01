@@ -2,6 +2,8 @@
 
 Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker, a calculator or a checklist. This topic covers the pages agents show in a conversation and how you answer them, keeping a page in your Pages library (with its versions, the data it keeps and an address of its own for your phone), and publishing a page or a built website at a link others can open.
 
+![A page an agent made: a loan calculator to use again and again](images/pages.webp)
+
 ## Pages in the conversation
 
 When a picture says more than words, an agent shows a page right in the conversation: a report, a chart, a table, a diagram, a mock-up, or options to pick from. Any agent in the app can do this; ask for it in plain words ("show me this as a chart", "compare the three laptops in a table").

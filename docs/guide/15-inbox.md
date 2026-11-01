@@ -2,6 +2,8 @@
 
 Agents work on their own, but now and then they need you: an approval, an answer, a form, a key. This topic covers the inbox, which gathers everything waiting on you from every session and machine so you can answer it in one place, and the notifications that tell you when a session finishes, fails or needs you, in the app, on your computer or on a phone with the app closed.
 
+![The inbox: what waits on you, from every session](images/inbox.webp)
+
 ## Open the inbox
 
 The inbox is the tray button at the top of the sidebar, beside the name Naget Agent. On a phone, open the sidebar with **Menu** (≡) first: the button is at the top of the drawer. You can also type "inbox" in the search box (Ctrl+K, ⌘K on a Mac). [Open the inbox](/inbox).

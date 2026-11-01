@@ -2,6 +2,8 @@
 
 The tools around the agents: browse, open and edit the files on this computer, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the dev servers running here and a live view of the computer (System) are here too, so you can check and finish an agent's work without leaving the app.
 
+![Git: a project’s changes, a message for the commit, and its recent commits](images/files-git.webp)
+
 ## Open the Files page
 
 Click **Files** in the sidebar's tools, or go to [Files](/files). On a computer the page has two parts:

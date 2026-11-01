@@ -26,7 +26,7 @@ import { createSpace } from '../spaces/index.ts';
 import { appApi, forgetAllowed, ruleFor } from './api.ts';
 import { findByWords, guideTopics } from './content.ts';
 import { askForm } from './form.ts';
-import { guide, GUIDE_INSTRUCTIONS } from './index.ts';
+import { guide, GUIDE_INSTRUCTIONS, helpInstructions } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -470,6 +470,46 @@ test('every agent hears of the tools, by name', async () => {
     guide.tools!({} as RunCtx).map((t) => t.name),
     ['app_guide', 'app_api', 'ask_form'],
   );
+});
+
+test('a question asked on Help: its agent answers it from the guide, knowing the topic being read', async () => {
+  const add = await guide.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { help: 'spaces' } }, {} as Deps);
+  assert.equal(add?.instructions?.length, 2);
+  assert.equal(add!.instructions![0], GUIDE_INSTRUCTIONS);
+  assert.match(add!.instructions![1], /Help page, while reading the guide's topic "Spaces and knowledge"/);
+  assert.match(helpInstructions(true)!, /from the guide \(app_guide\)/);
+  assert.doesNotMatch(helpInstructions('no-such-topic')!, /while reading/);
+  assert.equal(helpInstructions(undefined), null);
+});
+
+test('the guide’s pictures: every one it shows is there; the light one when asked for, else the one there is', async () => {
+  const dir = path.join(APP_ROOT, 'docs', 'guide', 'images');
+  const missing: string[] = [];
+  for (const lang of ['en', 'zh', 'el'] as const)
+    for (const t of guideTopics(lang))
+      for (const m of t.body.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
+        const name = /^images\/([a-z0-9-]+\.(?:webp|png|jpg))$/.exec(m[1])?.[1];
+        if (!name || !fs.existsSync(path.join(dir, name))) missing.push(`${lang}/${t.id}: ${m[1]}`);
+      }
+  assert.deepEqual(missing, [], 'pictures the guide shows that are not in docs/guide/images');
+  const app = Fastify();
+  guide.routes!({ app } as unknown as Deps);
+  await app.ready();
+  for (const bad of ['..%2Fsecret.webp', 'Spaces.webp', 'spaces.gif', 'no-such-picture.webp'])
+    assert.equal((await app.inject({ method: 'GET', url: `/api/guide/images/${bad}` })).statusCode, 404, bad);
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  const dark = files.find((f) => /^[a-z0-9-]+\.webp$/.test(f) && !f.endsWith('-light.webp') && files.includes(f.replace(/\.webp$/, '-light.webp')));
+  if (dark) {
+    const get = (q: string) => app.inject({ method: 'GET', url: `/api/guide/images/${dark}${q}` });
+    const plain = await get('');
+    assert.equal(plain.statusCode, 200);
+    assert.equal(plain.headers['content-type'], 'image/webp');
+    assert.ok(plain.rawPayload.equals(fs.readFileSync(path.join(dir, dark))));
+    assert.ok((await get('?theme=light')).rawPayload.equals(fs.readFileSync(path.join(dir, dark.replace(/\.webp$/, '-light.webp')))));
+  }
+  const only = files.find((f) => /^[a-z0-9-]+\.webp$/.test(f) && !f.endsWith('-light.webp') && !files.includes(f.replace(/\.webp$/, '-light.webp')));
+  if (only) assert.ok((await app.inject({ method: 'GET', url: `/api/guide/images/${only}?theme=light` })).rawPayload.equals(fs.readFileSync(path.join(dir, only))));
+  await app.close();
 });
 
 // ---- Agent Guidelines ----------------------------------------------------------------------------------

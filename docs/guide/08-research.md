@@ -2,6 +2,8 @@
 
 When one agent working alone is not enough, the app can put several on the job: a deep research that sends researchers after every part of a question and hands back a cited report, child sessions that take parts of a task off an agent's hands, and a swarm that attacks a hard problem from several angles at once. You can also have another company's model check a turn's work, send one prompt to several models and keep the best answer, and cap what a session may spend so none of this runs away with your money.
 
+![Deep research on the start page: researchers at a time, rounds, searches in all, and the report](images/research.webp)
+
 ## Run a deep research
 
 A deep research is for questions that need many sources: comparing options, checking a claim, surveying a topic, finding what is known about something. The agent you start leads it. It plans the searches, sends researchers after each part of the question, digs into what they leave open, has the key claims checked against two sources, and delivers a report with every source cited.

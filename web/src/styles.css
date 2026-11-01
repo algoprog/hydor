@@ -1224,6 +1224,112 @@ html {
   border-radius: 8px;
 }
 
+/* ---- the guide (Help): room between lines, steps as numbered circles, the app's labels standing out ----- */
+
+.md.guide {
+  font-size: 14.5px;
+  line-height: 1.72;
+  color: var(--fg-2);
+}
+.md.guide-lead {
+  font-size: 15.5px;
+  line-height: 1.65;
+}
+.md.guide p,
+.md.guide ul,
+.md.guide ol,
+.md.guide blockquote,
+.md.guide .md-table {
+  margin: 0.8em 0;
+}
+.md.guide > :first-child {
+  margin-top: 0;
+}
+.md.guide strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.md.guide h3,
+.md.guide h4 {
+  color: var(--fg);
+  font-size: 15px;
+  margin: 1.7em 0 0.5em;
+}
+.md.guide li {
+  margin: 0.45em 0;
+}
+.md.guide ul {
+  list-style: none;
+  padding-left: 1.2em;
+}
+.md.guide ul > li {
+  position: relative;
+}
+.md.guide ul > li::before {
+  content: '';
+  position: absolute;
+  left: -0.95em;
+  top: 0.7em;
+  width: 0.38em;
+  height: 0.38em;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0.75;
+}
+.md.guide ol {
+  list-style: none;
+  padding-left: 0;
+  counter-reset: step;
+}
+.md.guide ol > li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 2.1em;
+  margin: 0.75em 0;
+}
+.md.guide ol > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0.18em;
+  width: 1.8em;
+  height: 1.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.8em;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.md.guide li > ul,
+.md.guide li > ol {
+  margin: 0.35em 0;
+}
+.md.guide blockquote {
+  border-left: 0;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  padding: 0.7em 1em;
+}
+.md.guide a {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  text-underline-offset: 2px;
+}
+.md.guide a:hover {
+  text-decoration-color: var(--accent);
+}
+.md.guide img {
+  display: block;
+  margin: 1.1em 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
 /* ---- code ----------------------------------------------------------------- */
 
 .code-block {

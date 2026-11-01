@@ -2,6 +2,8 @@
 
 Agent Guidelines are what you want every agent here to follow: how you like to work, what to always or never do, how to talk to you. One text works for every agent (Claude Code, Codex, Custom and the agents that speak ACP), and you can write it for every session, for a space, or for one session.
 
+![Settings → Agent Guidelines: what every session follows, and the guidelines of each space](images/guidelines.webp)
+
 ## What guidelines are
 
 Guidelines are plain words the app hands to the agent when a session starts, before your first message: "Answer in plain English and explain any jargon", "Ask before deleting anything", "Keep what you make in ~/Work", "Write British spelling". The agent follows them for the whole session.

@@ -3,12 +3,15 @@
 // session's agent gets three tools: app_guide to answer questions about the app from it, app_api to do in the
 // app what the user could do in its pages (api.ts: with the user's OK on a card), and ask_form to ask for several
 // details at once with a form (form.ts).
+import fs from 'node:fs';
+import path from 'node:path';
 import { AGENT_TOPICS, type GuideResponse, type GuideTopic } from '../../shared/guide.ts';
 import { isLang } from '../../shared/i18n.ts';
+import { HttpError } from '../auth.ts';
 import { userLang } from '../language/index.ts';
 import type { Feature, RunTool } from '../features/types.ts';
 import { appApi } from './api.ts';
-import { findSections, guideTopics } from './content.ts';
+import { findSections, GUIDE_DIR, guideTopics } from './content.ts';
 import { askForm } from './form.ts';
 
 /** Links in the guide are the app's own paths: made whole, so an agent can hand them on. */
@@ -137,6 +140,19 @@ const ASK_FORM: RunTool = {
 export const GUIDE_INSTRUCTIONS =
   'Naget Agent, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask you to change one of its settings or to make, change or remove something in it (a space, an assistant, a scheduled task, a template, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound) change with app_api on /device.';
 
+/** A question asked on the Help page (`extra.help`: true, or the topic open there): the session is about the app. */
+export function helpInstructions(help: unknown): string | null {
+  if (!help) return null;
+  const topic = typeof help === 'string' ? guideTopics().find((t) => t.id === help) : undefined;
+  return [
+    `The user asked this from the app's Help page${topic ? `, while reading the guide's topic "${topic.title}" (${topic.id})` : ''}: their message is about Naget Agent.`,
+    'Answer from the guide (app_guide), not from memory: briefly, in a few short paragraphs or numbered steps, in their language, with the place in the app as a link and the guide section that says more (/guide/<topic>#<section>).',
+    'If they ask you to change a setting or set something up, do it with app_api as usual. Keep to the app: this session works in their home folder only because it needs one.',
+  ].join(' ');
+}
+
+const IMAGE_TYPES: Record<string, string> = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg' };
+
 export const guide: Feature = {
   id: 'guide',
   routes(d) {
@@ -144,7 +160,25 @@ export const guide: Feature = {
       const lang = (req.query as { lang?: string }).lang;
       return { topics: guideTopics(isLang(lang) ? lang : 'en') };
     });
+    // The guide's pictures (docs/guide/images): `theme=light` takes the light one (<name>-light.webp) when there is one.
+    d.app.get('/api/guide/images/:name', async (req, reply) => {
+      const name = (req.params as { name: string }).name;
+      const m = /^([a-z0-9-]+)\.(webp|png|jpg)$/.exec(name);
+      if (!m) throw new HttpError(404, 'No such picture');
+      const dir = path.join(GUIDE_DIR, 'images');
+      const light = `${m[1]}-light.${m[2]}`;
+      const file = (req.query as { theme?: string }).theme === 'light' && fs.existsSync(path.join(dir, light)) ? light : name;
+      const p = path.join(dir, file);
+      if (!fs.existsSync(p)) throw new HttpError(404, 'No such picture');
+      // Its address carries the app's version, so it can be kept until the next one.
+      reply.header('Cache-Control', 'private, max-age=604800');
+      reply.header('Content-Type', IMAGE_TYPES[m[2]]);
+      return reply.send(fs.createReadStream(p));
+    });
   },
   tools: () => [APP_GUIDE, APP_API, ASK_FORM],
-  spawn: () => ({ instructions: [GUIDE_INSTRUCTIONS] }),
+  spawn: (s) => {
+    const help = helpInstructions(s.extra?.help);
+    return { instructions: help ? [GUIDE_INSTRUCTIONS, help] : [GUIDE_INSTRUCTIONS] };
+  },
 };

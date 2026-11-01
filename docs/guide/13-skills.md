@@ -2,6 +2,8 @@
 
 Skills are written methods that agents load when a task calls for them: how to research a question, track down a problem, make a Word document or clean up after a task. This topic covers the skill library that comes with the app, the skills agents learn with your approval, keywords that bring a skill in for Custom, and Claude Code's and Codex's own skills.
 
+![Settings → Skill library: skills agents learned with your approval, and those that come with the app](images/skills.webp)
+
 ## What a skill is
 
 A skill is a short guide an agent follows for one kind of work. Each one is a folder with a file named SKILL.md in it: a name, one line on when to use it, then the steps, the checks and the mistakes to avoid. Some skills also bring files of their own: examples, templates or small scripts the steps use.

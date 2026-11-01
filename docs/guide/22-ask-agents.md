@@ -2,11 +2,13 @@
 
 Every agent here knows this guide and can work the app for you. Ask how something works and it answers from the guide, with a link to the right place. Ask it to change a setting or set something up (a space, an assistant, a scheduled task) and it does it, after you confirm on a card. When it needs details from you, it shows a form to fill in.
 
+![An agent changing a setting for you: the card shows the change before it is made](images/ask-agents.webp)
+
 ## Ask how to do something
 
 In any session, with any agent, ask about the app the way you would ask a person: "How do I share this session with a colleague?", "Where do I turn on notifications on my phone?", "What does Auto mode do?". The agent looks the answer up in this guide, so it describes the app as it is now, and its links open the place it names.
 
-You can also read the guide yourself: **Help** in the sidebar, or search it from the search box (Ctrl+K, ⌘K on a Mac), where its sections show under **Guide**.
+You can also read the guide yourself: **Help** in the sidebar, or search it from the search box (Ctrl+K, ⌘K on a Mac), where its sections show under **Guide**. On Help, a question typed in the box at the top goes to an agent when you press Enter, and the answer shows beside the guide (see [Get help](/guide/start#get-help)).
 
 ## Ask an agent to change a setting or set something up
 

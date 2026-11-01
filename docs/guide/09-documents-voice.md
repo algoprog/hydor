@@ -2,6 +2,8 @@
 
 Agents in Naget Agent read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures, or change yours, with an image model. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
 
+![An agent that read a report and made a one-page Word summary and a spreadsheet with a chart](images/documents-voice.webp)
+
 ## Give an agent a document to read
 
 Every agent the app runs can read documents: Claude Code, Codex, Custom, and the agents that speak ACP and take MCP servers. You don't need to convert anything first. Give it the document in one of these ways:

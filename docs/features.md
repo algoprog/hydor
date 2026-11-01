@@ -207,8 +207,11 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - A short welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter or on this
   computer, other agents) and sets those up, on pages that fill the screen. Then it shows you around as the
   app builds itself up: each part arrives as it is explained, the rest as the tour ends. Help shows it again.
-- Help (in the sidebar): a guide to every part of the app, with its contents, a search, and links that open the
-  place they name; its sections show in the search box too. The same guide is in [docs/guide](guide/).
+- Help (in the sidebar): a guide to every part of the app, its topics grouped on one page, each with a picture of
+  that part of the app and its sections to open one at a time. One box finds sections as you type, or asks an
+  agent on Enter: the answer, from the guide with links that open the place they name, shows in a panel beside
+  it, and the agent can set things up for you there too. Its sections show in the search box as well. The same
+  guide is in [docs/guide](guide/).
 - Starts when the computer starts (on by default; Settings → General), as a service of your user.
 - Several machines: add other machines running Naget Agent, over SSH or by address, and switch between
   them from the sidebar. Notices from all of them reach you wherever you are.

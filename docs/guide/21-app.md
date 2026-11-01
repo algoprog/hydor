@@ -2,6 +2,8 @@
 
 How the app looks and behaves for you, and how it keeps itself up to date: dark or light mode, the built-in themes and your own, the language, what Enter does while an agent works, starting with the computer, updates and release notes. It also covers your password, signing out, and where the app keeps its data.
 
+![Settings → General: the themes](images/app.webp)
+
 ## Pick dark, light or your device's mode
 
 Open [Settings → App → General](/settings?s=general&find=Theme). The **Theme** section has a switch at its top:
@@ -150,7 +152,7 @@ Once after the app updates, a note in the corner says "Updated to Naget Agent �
 
 The welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter, models on this computer, other agents), sets each of those up on pages that fill the screen, then shows you around the app part by part. It opens by itself the first time you use the app.
 
-To take it again: [Settings → App → General → Welcome tour → **Take the tour**](/settings?s=general&find=Take%20the%20tour), **Take the tour** in the search box, or **Help** in the sidebar, which opens this guide, where you can start the tour too. More in [Getting started](/guide/start).
+To take it again: [Settings → App → General → Welcome tour → **Take the tour**](/settings?s=general&find=Take%20the%20tour), **Take the tour** in the search box, or **Take the tour** at the top of **Help** in the sidebar. More in [Getting started](/guide/start).
 
 ## Change your password
 
