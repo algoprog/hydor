@@ -137,7 +137,7 @@ export function BrowserSettingsBody() {
           <Row label="Show a window" hint={st.chrome?.shell ? 'Playwright’s headless shell cannot show one.' : 'Off: the browser runs out of sight and you watch it here. On: a window on this machine’s screen too.'}>
             <Switch on={!s.headless && !st.chrome?.shell} label="Show a window" disabled={!!st.chrome?.shell} onChange={(v) => set({ headless: !v })} />
           </Row>
-          <Row label="Keep pages off this machine and its network" hint="Pages cannot reach localhost or private addresses (routers, printers, this app). A session can still open its own dev server once you allow it.">
+          <Row label="Keep pages off this machine and its network" hint="Pages cannot reach localhost or private addresses (routers, printers, this app), by WebSocket or a name that changes its address either: every connection goes through a checkpoint of the app’s. A session can still open its own dev server once you allow it.">
             <Switch on={s.blockPrivate} label="Keep pages off this machine and its network" onChange={(v) => set({ blockPrivate: v })} />
           </Row>
           <Row label="Screenshots for models that see images" hint="Agents can look at the page with numbered boxes drawn on. Text-only models always get the page as text.">

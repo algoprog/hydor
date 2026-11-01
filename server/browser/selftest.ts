@@ -1,8 +1,9 @@
 // A check of the browser against a small local test site: outline numbers, steps, dialogs, files in
-// and out, the private-network guard, extract (with a stand-in helper), find, payments, tabs, asking
-// the user, taking over, and the live view's frames. Run it with a scratch data folder:
+// and out, the private-network guard (WebSockets too), extract (with a stand-in helper), find, payments,
+// tabs, asking the user, taking over, and the live view's frames. Build it and run it with a scratch data folder:
 //
-//   DATA_DIR=/tmp/naget-browser-test node server/browser/selftest.ts
+//   OUTDIR=dist/dev node scripts/build-server.mjs server/browser/selftest.ts
+//   DATA_DIR=/tmp/naget-browser-test node dist/dev/selftest.js
 //
 // It needs a Chromium (see chrome.ts); it starts its own and closes it at the end.
 import assert from 'node:assert/strict';
@@ -31,6 +32,11 @@ let secretHits = 0;
 const secret = http.createServer((_req, res) => {
   secretHits++;
   res.end('secret');
+});
+// A WebSocket reaching it counts too (CDP's request guard never sees those).
+secret.on('upgrade', (_req, socket) => {
+  secretHits++;
+  socket.end('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n');
 });
 const page = (title: string, body: string) => `<!doctype html><html><head><title>${title}</title><meta name="viewport" content="width=device-width"></head><body style="font:16px sans-serif">${body}</body></html>`;
 let secretPort = 0;
@@ -66,6 +72,8 @@ const site = http.createServer((req, res) => {
       return res.end('the report');
     case '/private':
       return html('Private', `<h1>Reaches inward</h1><img src="http://127.0.0.1:${secretPort}/x.png"><script>fetch('http://localhost:${secretPort}/api').catch(()=>{})</script>`);
+    case '/socket':
+      return html('Socket', `<h1>Sockets inward</h1><p id=s>trying</p><script>for (const h of ['127.0.0.1', 'localhost', '[::1]']) { try { const w = new WebSocket('ws://' + h + ':${secretPort}/'); w.onopen = () => (document.getElementById('s').textContent = 'open ' + h); } catch {} }</script>`);
     case '/pay':
       return html('Checkout', `<h1>Checkout</h1><form action="/paid"><input autocomplete="cc-number" name="card" aria-label="Card number"><input name="cvc" aria-label="CVC"><button type=submit>Place order</button></form>`);
     case '/paid':
@@ -246,6 +254,15 @@ async function main() {
     await new Promise((x) => setTimeout(x, 800));
     assert.equal(secretHits, 0);
     assert.match(r.text, /Blocked \d+ requests? \(.*on this machine or its network/);
+  });
+
+  await check('WebSockets cannot reach this machine’s other servers either', async () => {
+    secretHits = 0;
+    await open(ctx, `${base}/socket`, false, false);
+    await new Promise((x) => setTimeout(x, 1500));
+    assert.equal(secretHits, 0);
+    const r = await read(ctx, 'text', {});
+    assert.match(r.text, /trying/);
   });
 
   await check('opening a local address asks the user, and works once allowed', async () => {

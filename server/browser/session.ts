@@ -11,6 +11,7 @@ import { addNote, notesOf, updateNote } from '../notes.ts';
 import { Cdp, CdpSession } from './cdp.ts';
 import { BROWSER_DIR, launchChrome, pickChrome, plainUserAgent } from './chrome.ts';
 import { refusal, type Policy } from './guard.ts';
+import { BrowserProxy, contextProxy } from './proxy.ts';
 import { browserSettings, profileDir, profiles, sessionOptions } from './settings.ts';
 import { shownUrl } from './outline.ts';
 import { sleep, Tab, type ElRef, type TabOwner } from './tab.ts';
@@ -56,6 +57,7 @@ class Chromium {
     readonly dir: string,
     readonly proc: import('node:child_process').ChildProcess,
     cdp: Cdp,
+    private proxy: BrowserProxy,
   ) {
     this.cdp = cdp;
     cdp.onClose(() => this.gone());
@@ -65,18 +67,50 @@ class Chromium {
   static async start(profile: string, chrome: ChromeInfo, headless: boolean): Promise<Chromium> {
     const dir = profile ? profileDir(profile) : path.join(BROWSER_DIR, 'run', `fresh-${process.pid}`);
     if (!profile) fs.rmSync(dir, { recursive: true, force: true });
-    const { proc, wsUrl } = await launchChrome(chrome, { userDataDir: dir, headless });
+    // Everything outside a session's own context goes through the process's proxy: a named profile's
+    // sessions (they share its context), and the pages the app opens for itself.
+    let self: Chromium | null = null;
+    const proxy = await BrowserProxy.start({
+      appPort: config.port,
+      policy: () => (self ? self.sharedPolicy() : globalPolicy()),
+      refused: (target, why) => self?.sharedRefused(target, why),
+    });
+    let launched: Awaited<ReturnType<typeof launchChrome>>;
+    try {
+      launched = await launchChrome(chrome, { userDataDir: dir, headless, proxy: proxy.port });
+    } catch (e) {
+      proxy.close();
+      throw e;
+    }
+    const { proc, wsUrl } = launched;
     rememberPid(proc.pid, true);
     let cdp: Cdp;
     try {
       cdp = await Cdp.connect(wsUrl);
     } catch (e) {
       proc.kill('SIGKILL');
+      proxy.close();
       throw e;
     }
-    const c = new Chromium(profile, chrome, dir, proc, cdp);
+    const c = (self = new Chromium(profile, chrome, dir, proc, cdp, proxy));
     await c.init();
     return c;
+  }
+
+  /** The sessions in the process's shared context: a named profile's. */
+  private shared(): SessionBrowser[] {
+    return [...browsers.values()].filter((b) => b.chromium === this && !b.closed && !b.context);
+  }
+
+  /** The shared context's rules: the app's settings, and the addresses any of its sessions allowed (each page's requests are still held to its own session's). */
+  sharedPolicy(): Policy {
+    const g = globalPolicy();
+    return { ...g, local: [...new Set(this.shared().flatMap((b) => b.policy().local))] };
+  }
+
+  sharedRefused(target: string, why: string) {
+    const [only, ...more] = this.shared();
+    if (only && !more.length) only.refused(target, why);
   }
 
   private async init() {
@@ -117,10 +151,11 @@ class Chromium {
     return p;
   }
 
-  /** A browser context of its own for a session (a named profile's sessions share its default one). */
+  /** A browser context of its own for a session, with its own proxy (a named profile's sessions share its default one). */
   async context(owner: SessionBrowser): Promise<string | undefined> {
     if (this.profile) return undefined;
-    const { browserContextId } = await this.cdp.send('Target.createBrowserContext', { disposeOnDetach: false });
+    owner.proxy = await BrowserProxy.start({ appPort: config.port, policy: () => owner.policy(), refused: (target, why) => owner.refused(target, why) });
+    const { browserContextId } = await this.cdp.send('Target.createBrowserContext', { disposeOnDetach: false, ...contextProxy(owner.proxy.port) });
     this.contexts.set(browserContextId, owner);
     await this.cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: STAGING, eventsEnabled: true, browserContextId });
     return browserContextId;
@@ -219,10 +254,7 @@ class Chromium {
       why = null;
     }
     if (why) {
-      if (tab) {
-        tab.blocked.push({ url: String(p.request.url).slice(0, 200), why });
-        if (tab.blocked.length > 20) tab.blocked.shift();
-      }
+      if (tab) noteBlocked(tab, String(p.request.url), why);
       await this.cdp.send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'BlockedByClient' }).catch(() => {});
     } else await this.cdp.send('Fetch.continueRequest', { requestId: p.requestId }).catch(() => {});
   }
@@ -315,11 +347,18 @@ class Chromium {
       this.proc.kill('SIGKILL');
     } catch {}
     rememberPid(this.proc.pid, false);
+    this.proxy.close();
     for (const t of [...this.tabs.values()]) this.dropTab(t);
     if (processes.get(this.profile) === this) processes.delete(this.profile);
     if (!this.profile) fs.rmSync(this.dir, { recursive: true, force: true });
     for (const b of [...browsers.values()]) if (b.chromium === this) void b.close('The browser stopped');
   }
+}
+
+/** A request or connection that was refused, for the agent's next look at the page. */
+function noteBlocked(tab: Tab, url: string, why: string) {
+  tab.blocked.push({ url: url.slice(0, 200), why });
+  if (tab.blocked.length > 20) tab.blocked.shift();
 }
 
 /** Process ids of the browsers this server started, to end any a crash left behind. */
@@ -425,6 +464,8 @@ export class SessionBrowser implements TabOwner {
   finishedDownloads: { name: string; path: string | null }[] = [];
   private emitTimer: NodeJS.Timeout | null = null;
   context: string | undefined;
+  /** The proxy its own context's connections go through. */
+  proxy: BrowserProxy | null = null;
 
   constructor(
     readonly key: string,
@@ -445,6 +486,12 @@ export class SessionBrowser implements TabOwner {
     const s = browserSettings(d().db);
     const o = this.ownBrowser ? {} : sessionOptions(d().db, this.key);
     return { blockPrivate: s.blockPrivate, allow: [...s.allow, ...(o.allow ?? [])], block: [...s.block, ...(o.block ?? [])], local: o.local ?? [] };
+  }
+
+  /** Its proxy refused a connection (a WebSocket, or a name that now leads inward): noted on the tab in front. */
+  refused(target: string, why: string) {
+    const t = this.active ?? this.tabs[this.tabs.length - 1];
+    if (t) noteBlocked(t, target, why);
   }
 
   // ---- TabOwner ----
@@ -726,6 +773,8 @@ export class SessionBrowser implements TabOwner {
       if (this.profile && !this.chromium.closed) await this.chromium.closeTab(t).catch(() => {});
     }
     if (this.context && !this.chromium.closed) await this.chromium.disposeContext(this.context);
+    this.proxy?.close();
+    this.proxy = null;
     this.tabs = [];
     this.active = null;
     // Waiting cards end with the browser.
