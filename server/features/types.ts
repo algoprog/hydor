@@ -3,6 +3,7 @@
 // and work after a turn ends. server/features/index.ts lists them; registry.ts calls them.
 import type { FastifyInstance } from 'fastify';
 import type { SessionExtra } from '../../shared/features.ts';
+import type { InboxItem } from '../../shared/inbox.ts';
 import type { Agent, ServerEvent } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
 import type { ModelManager } from '../models/manager.ts';
@@ -121,6 +122,8 @@ export interface Feature {
   event?(e: ServerEvent, d: Deps): void;
   /** Cleans what any of the app's tools return before an agent sees it (known secret values masked). */
   scrub?(text: string): string;
+  /** What waits on the user here (a browser that needs them, a key asked for): for the inbox. */
+  inbox?(d: Deps): InboxItem[];
   /** A message is about to go to a session's agent: throw an HttpError to refuse it. */
   beforeSend?(key: string, d: Deps): void | Promise<void>;
   /** Once, when the server is up. */

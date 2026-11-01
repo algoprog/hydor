@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ClipboardList, ExternalLink, MessageCircleQuestion, ShieldAlert } from 'lucide-react';
 import { formDefaults } from '@shared/forms';
 import type { Agent, ApprovalRequest } from '@shared/types';
-import { enc, post } from '../../lib/api';
+import { api, enc } from '../../lib/api';
 import { toastError } from '../../lib/store';
 import { CodeBlock, Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
@@ -35,7 +35,8 @@ function FileDetail({ detail }: { detail: string }) {
   );
 }
 
-export function ApprovalCard({ a, sessionKey, agent, id }: { a: ApprovalRequest; sessionKey: string; agent: Agent; id?: string }) {
+/** `base`: the machine the session is on, when it is not the one the page shows (the inbox lists them all). */
+export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; sessionKey: string; agent: Agent; id?: string; base?: string; onDone?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [denyOpen, setDenyOpen] = useState(false);
   const [msg, setMsg] = useState('');
@@ -60,12 +61,17 @@ export function ApprovalCard({ a, sessionKey, agent, id }: { a: ApprovalRequest;
       if (a.kind === 'question') {
         for (const q of a.questions ?? []) answers[q.id] = answerOf(q, picks[q.id], agent === 'claude' ? ', ' : '\n');
       }
-      await post(`/api/sessions/${enc(sessionKey)}/approvals/${enc(a.id)}`, {
-        decision,
-        message: !a.form && (decision === 'deny' || decision === 'decline') ? msg : undefined,
-        answers,
-        form: fields.length && decision === 'accept' ? values : undefined,
+      await api(`/api/sessions/${enc(sessionKey)}/approvals/${enc(a.id)}`, {
+        method: 'POST',
+        base,
+        body: {
+          decision,
+          message: !a.form && (decision === 'deny' || decision === 'decline') ? msg : undefined,
+          answers,
+          form: fields.length && decision === 'accept' ? values : undefined,
+        },
       });
+      onDone?.();
     } catch (e) {
       toastError(e);
       setBusy(false);

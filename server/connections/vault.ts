@@ -285,6 +285,11 @@ export function latestRequest(db: DB, key: string, name: string): SecretRequestV
   return r ? requestView(db, r) : null;
 }
 
+/** Every request still waiting for the user, newest first (the inbox). */
+export function pendingRequests(db: DB): SecretRequestView[] {
+  return (db.prepare("select * from conn_requests where state = 'pending' order by created_at desc limit 100").all() as RequestRow[]).map((r) => requestView(db, r));
+}
+
 /** Marks every open request for `name` in the session as answered. */
 export function settleRequests(db: DB, key: string, name: string, state: 'saved' | 'dismissed') {
   db.prepare("update conn_requests set state = ?, done_at = ? where key = ? and name = ? and (state = 'pending' or ? = 'saved')").run(state, Date.now(), key, name, state);

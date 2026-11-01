@@ -1,6 +1,7 @@
 // Calls into the app's capabilities. Kept apart from the list of them (index.ts) so sessions.ts and
 // mcp.ts can call in without importing every capability's code.
 import type { SessionExtra } from '../../shared/features.ts';
+import type { InboxItem } from '../../shared/inbox.ts';
 import type { ServerEvent } from '../../shared/types.ts';
 import type { Deps, Feature, RunCtx, RunTool, SpawnAdditions, SpawnInfo, TurnInfo } from './types.ts';
 
@@ -127,6 +128,19 @@ export function eventSent(e: ServerEvent) {
       } catch (err) {
         warn(f, 'event', err);
       }
+}
+
+/** What waits on the user, from each capability (the inbox). */
+export function inboxItems(): InboxItem[] {
+  if (!deps) return [];
+  return list.flatMap((f) => {
+    try {
+      return f.inbox?.(deps!) ?? [];
+    } catch (e) {
+      warn(f, 'inbox', e);
+      return [];
+    }
+  });
 }
 
 /** Throws (an HttpError) when a capability refuses the message, e.g. a spending cap was reached. */

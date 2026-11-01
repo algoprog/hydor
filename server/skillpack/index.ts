@@ -257,6 +257,22 @@ export const skillpack: Feature = {
     return undefined;
   },
   context: (s, d) => customContext(s, d),
+  // Skills agents proposed, waiting for the user's yes (Settings → Skill library, or the card in the session).
+  inbox: (d) =>
+    pendingProposals(d.db).map((p) => {
+      const s = d.sessions.summary(p.key);
+      return {
+        id: `skill:${p.id}`,
+        kind: 'skill' as const,
+        title: p.kind === 'new' ? `Suggests a new skill: ${p.name}` : `Suggests a change to the ${p.name} skill`,
+        detail: p.reason,
+        key: s ? p.key : undefined,
+        session: s?.title,
+        agent: s?.agent,
+        at: p.createdAt,
+        path: s ? `/s/${encodeURIComponent(p.key)}` : '/settings?s=skillpack',
+      };
+    }),
   start(d) {
     freshView();
     // Every skill an agent loads, once per step, for the library's use counts.

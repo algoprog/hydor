@@ -192,6 +192,7 @@ export const THEMES: [string, 'dark' | 'light'][] = [
 const PAGES: [string, string, string, string, string][] = [
   // id, title, path, other words, what it is
   ['new', 'New session', '/', 'start new chat conversation task claude codex agent', 'Start a session with any agent and model, in any folder'],
+  ['inbox', 'Inbox', '/inbox', 'waiting approvals approve deny questions forms needs you pending to do', 'Everything waiting on you, across sessions, tasks and machines'],
   ['files', 'Files', '/files', 'explorer browse folders documents', 'Browse, open and edit files'],
   ['search-files', 'Search in files', '/search', 'grep find text in files code', 'Find text in every file of a folder'],
   ['git', 'Git', '/git', 'repositories commits branches push pull diff', 'Repositories, changes, branches and history'],

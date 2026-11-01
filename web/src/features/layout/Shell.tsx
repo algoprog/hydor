@@ -9,6 +9,7 @@ import { UploadsPanel } from '../files/Uploads';
 import { FilePeek } from '../files/FilePeek';
 import { GitPage } from '../git/GitPage';
 import { HomePage } from '../home/HomePage';
+import { InboxPage } from '../inbox/InboxPage';
 import { SessionView } from '../session/SessionView';
 import { isSettingsSection, SettingsPage } from '../settings/SettingsPage';
 import { go } from '../../lib/nav';
@@ -70,6 +71,7 @@ function Page() {
     return <FilesPage path={loc === '/file' ? q.get('path') : null} line={Number(q.get('line')) || undefined} search={loc === '/search'} />;
   }
   if (loc === '/terminal') return <TerminalPage />;
+  if (loc === '/inbox') return <InboxPage />;
   if (loc === '/preview') return <PreviewPage />;
   if (loc === '/git') return <GitPage selected={new URLSearchParams(search).get('path')} />;
   if (loc === '/usage' || loc === '/stats') return <UsagePage tab={loc === '/stats' ? 'activity' : 'limits'} />;

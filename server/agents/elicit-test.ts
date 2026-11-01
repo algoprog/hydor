@@ -1,9 +1,11 @@
-// Script tests for forms MCP servers ask for (elicit.ts, shared/forms.ts) and the cards the app shows
-// itself in a session (LiveAdapter.ask):
+// Script tests for forms MCP servers ask for (elicit.ts, shared/forms.ts), the cards the app shows
+// itself in a session (LiveAdapter.ask), and which approvals a notification's buttons can answer:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/agents/elicit-test.ts && node dist/dev/elicit-test.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { formContent, formFields } from '../../shared/forms.ts';
+import { approvalKind, quickAnswer } from '../../shared/inbox.ts';
+import type { ApprovalRequest } from '../../shared/types.ts';
 import { elicitCard, elicitCheck, elicitResult } from './elicit.ts';
 import { LiveAdapter } from './live.ts';
 
@@ -137,6 +139,25 @@ test('the app’s own card ends with no answer when the turn clears the cards, t
   (a.runner as unknown as EventEmitter).emit('exit', { code: 0 });
   assert.equal(await three, null);
   assert.equal(await a.ask(elicitCard('c5', 'X', {})), null);
+});
+
+test('a notification answers a plain yes or no (each agent’s own choices), never a question, a form or a plan', () => {
+  const base = { id: 'a1', title: 'Run a command', createdAt: 1 };
+  const claude: ApprovalRequest = { ...base, kind: 'command', detail: '# Tests\nnpm test', options: [{ id: 'allow', label: 'Allow', style: 'primary' }, { id: 'allow_always', label: 'Always allow npm' }, { id: 'deny', label: 'Deny', style: 'danger' }] };
+  assert.deepEqual(quickAnswer(claude), { id: 'a1', title: 'Run a command', detail: '# Tests', approve: claude.options[0], deny: claude.options[2] });
+  const codex: ApprovalRequest = { ...base, kind: 'file', options: [{ id: 'accept', label: 'Allow' }, { id: 'acceptForSession', label: 'Allow edits this session' }, { id: 'decline', label: 'Deny' }] };
+  assert.equal(quickAnswer(codex)?.approve.id, 'accept');
+  assert.equal(quickAnswer(codex)?.deny.id, 'decline');
+  const acp: ApprovalRequest = { ...base, kind: 'other', options: [{ id: 'proceed_once', label: 'Allow once', style: 'primary' }, { id: 'reject', label: 'Reject', style: 'danger' }] };
+  assert.equal(quickAnswer(acp)?.deny.id, 'reject');
+  assert.equal(quickAnswer({ ...base, kind: 'question', questions: [], options: [{ id: 'answer', label: 'Send answers', style: 'primary' }, { id: 'deny', label: 'Skip' }] }), null);
+  assert.equal(quickAnswer({ ...base, kind: 'plan', options: [{ id: 'allow', label: 'Approve', style: 'primary' }, { id: 'deny', label: 'Keep planning' }] }), null);
+  const form = elicitCard('f9', 'Calendar', { requestedSchema: schema });
+  assert.equal(quickAnswer(form), null);
+  assert.equal(approvalKind(form), 'form');
+  // A connected app asking to go ahead, with nothing to fill in, is a yes or no.
+  assert.equal(quickAnswer(elicitCard('f10', 'Codex', { message: 'Run it?' }))?.approve.label, 'Allow');
+  assert.equal(quickAnswer({ ...base, kind: 'other', options: [{ id: 'ok', label: 'OK' }] }), null);
 });
 
 for (const [name, fn] of tests) {
