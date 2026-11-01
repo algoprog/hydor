@@ -133,6 +133,11 @@ export interface Feature {
   inbox?(d: Deps): InboxItem[];
   /** A message is about to go to a session's agent: throw an HttpError to refuse it. */
   beforeSend?(key: string, d: Deps): void | Promise<void>;
+  /**
+   * What the agent should hear with the user's next message (the user changed a page): it goes ahead of
+   * the message in a <system-reminder>, which the conversation does not show. Asked once per message.
+   */
+  beforeMessage?(key: string, d: Deps): string | null | undefined;
   /** Once, when the server is up. */
   start?(d: Deps): void;
 }

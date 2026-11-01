@@ -28,6 +28,12 @@ export interface PageInfo {
   updatedAt: number;
   /** The session it came from. */
   sessionKey?: string;
+  /** Who made the current version. */
+  by?: PageVersion['by'];
+  /** Its picture in Pages is ready (GET /api/pages/:id/thumb?v=<thumb>). */
+  thumb?: string;
+  /** Published at a link. */
+  published?: boolean;
 }
 
 export interface PageVersion {
@@ -35,8 +41,36 @@ export interface PageVersion {
   title: string;
   bytes: number;
   createdAt: number;
-  /** agent: save_page; user: Keep; restore: an older version brought back. */
-  by: 'agent' | 'user' | 'restore';
+  /** agent: save_page; user: Keep; restore: an older version brought back; edit: changed by the user in the editor; made: a page the user made. */
+  by: 'agent' | 'user' | 'restore' | 'edit' | 'made';
+}
+
+/** One of a page's stored values (window.naget.storage), as the Data view lists them. */
+export interface PageDataEntry {
+  key: string;
+  value: unknown;
+  bytes: number;
+  updatedAt: number;
+}
+
+/**
+ * A page an agent is writing (show_html, save_page, or an HTML file written whole), as its call streams in:
+ * the pages showing the session watch it grow until the call is complete.
+ */
+export interface PageDraft {
+  /** The tool call's id: its item in the conversation. */
+  id: string;
+  tool: 'show_html' | 'save_page' | 'file';
+  title?: string;
+  /** An HTML file's path. */
+  path?: string;
+  /** save_page with an id: the saved page it changes. */
+  pageId?: string;
+  /** The page's HTML so far. */
+  text: string;
+  /** The call is complete (or stopped). */
+  done: boolean;
+  startedAt: number;
 }
 
 export type SiteVisibility = 'private' | 'public';
@@ -75,4 +109,22 @@ export interface PublishRequest {
 }
 
 /** News the server sends the pages ({ t: 'feature', id: 'pages', data }). */
-export type PagesEvent = { what: 'pages' } | { what: 'sites' } | { what: 'request'; request: PublishRequest };
+export type PagesEvent =
+  | { what: 'pages' }
+  | { what: 'sites' }
+  | { what: 'request'; request: PublishRequest }
+  /** A page's picture in Pages is ready. */
+  | { what: 'thumb'; id: string; thumb: string }
+  /** To one session's pages: a draft grew by `text`, which goes at `from` (0 with the whole text so far starts it over). */
+  | { what: 'draft'; draft: Omit<PageDraft, 'text'>; from: number; text: string };
+
+/** What a page-edit note in the conversation holds: the user changed a page, and whether the agent heard of it yet. */
+export interface PageEditNote {
+  /** A saved page, at `version`… */
+  pageId?: string;
+  /** …or an HTML file. */
+  path?: string;
+  title: string;
+  version: number;
+  told: boolean;
+}

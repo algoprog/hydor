@@ -6,7 +6,7 @@ import path from 'node:path';
 import type { ApprovalRequest, ModelOption, TimelineItem, ToolItem } from '../../shared/types.ts';
 import { config } from '../config.ts';
 import { describeClaudeTool, questionsFrom } from '../history/claude.ts';
-import { firstLine, snippetDiff, wholeFileDiff } from '../history/common.ts';
+import { firstLine, snippetDiff, stripWrappers, wholeFileDiff } from '../history/common.ts';
 import type { Runner, RunSpec } from '../runner/client.ts';
 import { approvalTitleFor, LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
 import { splitHandoff } from '../handoff.ts';
@@ -363,6 +363,7 @@ export class ClaudeLive extends LiveAdapter {
           this.toolNames.set(id, b.name);
           const tool = describeClaudeTool(String(b.name), {});
           this.overlayItems.set(id, { kind: 'tool', id, seq: 0, ts, tool: { ...tool, title: tool.title || b.name, status: 'pending' } });
+          this.emit('toolstream', { id, name: String(b.name), at: 'start' });
         }
         break;
       }
@@ -376,6 +377,7 @@ export class ClaudeLive extends LiveAdapter {
         else if (d.type === 'input_json_delta') {
           const acc = (this.toolJson.get(id) ?? '') + (d.partial_json ?? '');
           this.toolJson.set(id, acc);
+          if (d.partial_json) this.emit('toolstream', { id, name: this.toolNames.get(id) ?? '', at: 'delta', delta: d.partial_json });
           if (item?.kind === 'tool') {
             const peek = acc.match(/"(?:command|file_path|pattern|query|url|description)"\s*:\s*"((?:[^"\\]|\\.)*)/);
             if (peek) {
@@ -399,6 +401,7 @@ export class ClaudeLive extends LiveAdapter {
           } catch {}
           (item as ToolItem).tool = { ...describeClaudeTool(this.toolNames.get(id) ?? item.tool.name, input), status: 'running' };
           this.toolJson.delete(id);
+          this.emit('toolstream', { id, name: this.toolNames.get(id) ?? item.tool.name, at: 'end', input });
         }
         break;
       }
@@ -494,8 +497,10 @@ export class ClaudeLive extends LiveAdapter {
       uuid,
       origin: { kind: 'human' },
     });
-    const ho = splitHandoff(text);
-    this.overlayItems.set(uuid, { kind: 'user', id: uuid, seq: 0, ts: Date.now(), text: ho?.request ?? text, images: images.length || undefined, handoff: ho?.handoff });
+    // What the app added for the agent alone (<system-reminder>) is not shown, as in the transcript.
+    const shown = stripWrappers(text).text;
+    const ho = splitHandoff(shown);
+    this.overlayItems.set(uuid, { kind: 'user', id: uuid, seq: 0, ts: Date.now(), text: ho?.request ?? shown, images: images.length || undefined, handoff: ho?.handoff });
     this.setWorking();
     this.state.turnStartedAt = this.state.turnStartedAt ?? Date.now();
     this.touch();

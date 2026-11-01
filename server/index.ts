@@ -45,7 +45,7 @@ import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink 
 import { checkUpdates, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { addAccount, addedAccounts, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
-import { listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
+import { devServerShot, listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
@@ -1472,7 +1472,8 @@ const CSP = [
   // The preview port (server/preview.ts): the Preview page checks the browser can reach it.
   `connect-src 'self' ws: wss:${PREVIEW_PORT ? ` http://*:${PREVIEW_PORT} https://*:${PREVIEW_PORT}` : ''}${PREVIEW_ORIGIN ? ` ${PREVIEW_ORIGIN}` : ''}`,
   "media-src 'self' blob:",
-  "frame-src 'self' blob:",
+  // The preview port too: the Preview page shows a dev server inside it.
+  `frame-src 'self' blob:${PREVIEW_PORT ? ` http://*:${PREVIEW_PORT} https://*:${PREVIEW_PORT}` : ''}${PREVIEW_ORIGIN ? ` ${PREVIEW_ORIGIN}` : ''}`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
@@ -1489,6 +1490,38 @@ app.post('/api/preview/link', async (req) => {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new HttpError(400, 'Pick a port');
   if (!PREVIEW_PORT) throw new HttpError(400, 'Previews are off (PREVIEW_PORT=0)');
   return { token: previewToken(port) };
+});
+/** A dev server's page as a picture (PNG), for browsers that can't reach the preview port, and to save or hand to an agent. */
+const shotArgs = (q: Record<string, unknown>) => {
+  const port = Number(q.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new HttpError(400, 'Pick a port');
+  const at = typeof q.path === 'string' && q.path.startsWith('/') ? q.path.slice(0, 2000) : '/';
+  const device = q.device === 'phone' || q.device === 'tablet' ? q.device : 'desktop';
+  return { port, at, device } as const;
+};
+app.get('/api/preview/shot', async (req, reply) => {
+  const a = shotArgs(req.query as Record<string, unknown>);
+  const png = await devServerShot(a.port, a.at, a.device).catch((e) => {
+    throw new HttpError(502, `No picture of port ${a.port}: ${(e as Error).message}`);
+  });
+  return reply.header('Cache-Control', 'no-store').type('image/png').send(png);
+});
+/** The same picture kept as a file, for a new session to start with (its path). */
+app.post('/api/preview/shot', async (req) => {
+  const a = shotArgs((req.body ?? {}) as Record<string, unknown>);
+  const png = await devServerShot(a.port, a.at, a.device).catch((e) => {
+    throw new HttpError(502, `No picture of port ${a.port}: ${(e as Error).message}`);
+  });
+  const dir = path.join(config.dataDir, 'shots', 'preview');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // Pictures handed to sessions are kept a week.
+  for (const f of fs.readdirSync(dir)) {
+    const at = path.join(dir, f);
+    if (Date.now() - (fs.statSync(at, { throwIfNoEntry: false })?.mtimeMs ?? 0) > 7 * 86_400_000) fs.rmSync(at, { force: true });
+  }
+  const file = path.join(dir, `port-${a.port}-${new Date().toISOString().replace(/[:.]/g, '-')}.png`);
+  fs.writeFileSync(file, png, { mode: 0o600 });
+  return { path: file, size: png.length };
 });
 
 // ---- read-only links for guests ----------------------------------------------------------------

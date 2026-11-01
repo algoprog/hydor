@@ -22,7 +22,7 @@ import { Timeline } from './Timeline';
 import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
 import { FindBar } from './FindBar';
-import { FeatureDock, sessionPaneOf, type SessionPane } from '../registry';
+import { FeatureDock, sessionPaneOf, useSessionSide, type SessionPane } from '../registry';
 import { useSessionShow, type SessionShow } from './show';
 import { LOCALE } from '../../i18n/locale';
 
@@ -526,6 +526,8 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
   const tl = useTimeline((x) => x.byKey[sessionKey]);
   const savedDetails = useUI((x) => x.detailsOpen);
   const wide = useMediaQuery('(min-width: 1280px)');
+  // A page being written or changed shows beside the conversation, in the details' place.
+  const side = useSessionSide(sessionKey);
   const mobile = useIsMobile();
   // Desktop remembers the panel; on a phone it opens only when asked.
   const [phoneDetails, setPhoneDetails] = useState(false);
@@ -604,6 +606,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
   const close = () => setDetails(false);
   const openChanges = (path?: string) => {
     useUI.getState().set({ detailsTab: 'changes', detailsFocus: path ?? null });
+    side?.close(sessionKey);
     setDetails(true);
   };
   const version = tl?.total ?? 0;
@@ -614,7 +617,17 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
     <SessionCtx.Provider value={{ sessionKey, cwd: summary.cwd, openChanges, fork: summary.external ? undefined : (at) => setForking({ at }) }}>
       <div className="flex h-full min-h-0">
         <div className="flex min-w-0 flex-1 flex-col">
-          <Header s={summary} detailsOpen={detailsOpen} onDetails={() => setDetails(!detailsOpen)} onFork={() => setForking({})} />
+          <Header
+            s={summary}
+            detailsOpen={detailsOpen && !side}
+            onDetails={() => {
+              if (side) {
+                side.close(sessionKey);
+                setDetails(true);
+              } else setDetails(!detailsOpen);
+            }}
+            onFork={() => setForking({})}
+          />
           <ForkedFrom s={summary} />
           {pane && <PaneSwitch pane={pane} show={show} onChange={(v) => useSessionShow.getState().show(sessionKey, v)} />}
           <div className="relative flex min-h-0 flex-1 flex-col">
@@ -630,7 +643,10 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
           <Composer s={summary} hint={pane && show === 'pane' ? pane.placeholder : undefined} />
           <ForkDialog s={summary} at={forking} onClose={() => setForking(null)} />
         </div>
-        {detailsOpen &&
+        {side ? (
+          <side.Panel s={summary} />
+        ) : (
+          detailsOpen &&
           (wide ? (
             <aside className="anim-slide-left w-[400px] shrink-0 border-l border-line">
               <Details s={summary} version={version} onClose={close} />
@@ -645,7 +661,8 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
               </div>,
               document.body,
             )
-          ))}
+          ))
+        )}
       </div>
     </SessionCtx.Provider>
   );

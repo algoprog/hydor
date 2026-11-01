@@ -23,6 +23,11 @@ To take a shot from uncommitted changes, apply them to the worktree before build
 pictures somewhere else to compare first; `--serve` starts the demo app alone until Ctrl+C, to look around (port
 8795, password "a demo password").
 
+The demo's home is its own, so the app finds no Chromium for its pictures (each page's in Pages, screenshots,
+Preview's) unless `PLAYWRIGHT_BROWSERS_PATH` says where Playwright's are (`~/.cache/ms-playwright`); run.mjs
+passes it on. Preview is off in the demo unless `PREVIEW_PORT` gives it a port of its own (the usual 8791 may be
+the real app's).
+
 ## How it works
 
 - `run.mjs` makes a folder in `/dev/shm` (not `/tmp`: the Git page leaves out repositories there) with a home

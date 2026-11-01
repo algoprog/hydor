@@ -73,6 +73,10 @@ async function startServer() {
     PORT: String(o.port),
     HOST: '127.0.0.1',
     NAGET_AGENT_ROOT: o.root,
+    // Playwright's browsers, where the app takes pages' pictures with (its home is the demo's).
+    ...(process.env.PLAYWRIGHT_BROWSERS_PATH ? { PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH } : {}),
+    // A preview port of its own (the usual one may be the real app's).
+    PREVIEW_PORT: process.env.PREVIEW_PORT ?? '0',
   };
   const log = fs.openSync(path.join(demo, 'server.log'), 'a');
   server = spawn(process.execPath, [path.join(o.root, 'dist/server/index.js')], { cwd: home, env, stdio: ['ignore', log, log] });

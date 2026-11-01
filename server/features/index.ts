@@ -23,6 +23,7 @@ import { pages } from '../pages/index.ts';
 import { releaseNotes } from '../releases/index.ts';
 import { research } from '../research/index.ts';
 import { search } from '../search/index.ts';
+import { shots } from '../shots/index.ts';
 import { skillpack } from '../skillpack/index.ts';
 import { spaces } from '../spaces/index.ts';
 import { swarm } from '../swarm/index.ts';
@@ -30,4 +31,4 @@ import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
 // The user's guidelines lead what an agent is told.
-export const FEATURES: Feature[] = [guidelines, pages, search, browser, memory, knowledge, spaces, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes];
+export const FEATURES: Feature[] = [guidelines, pages, shots, search, browser, memory, knowledge, spaces, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes];

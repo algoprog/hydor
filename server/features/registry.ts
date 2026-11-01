@@ -162,3 +162,18 @@ export async function beforeSend(key: string) {
   if (!deps) return;
   for (const f of list) await f.beforeSend?.(key, deps);
 }
+
+/** What the capabilities have for the agent with this message, as one block ('' for nothing). */
+export function messageNotes(key: string): string {
+  if (!deps) return '';
+  const parts: string[] = [];
+  for (const f of list) {
+    try {
+      const t = f.beforeMessage?.(key, deps);
+      if (t?.trim()) parts.push(t.trim());
+    } catch (e) {
+      warn(f, 'beforeMessage', e);
+    }
+  }
+  return parts.join('\n\n');
+}

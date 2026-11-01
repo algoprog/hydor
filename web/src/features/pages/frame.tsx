@@ -2,7 +2,7 @@
 // It posts the page with a fresh number each time the frame is ready, and takes only messages from
 // that frame, carrying that number, of a known shape and size: the page's height, a choice or a form
 // to put in the message box, and calls of window.naget.storage, which a store answers.
-import { useLayoutEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { STORAGE_LIMITS } from '@shared/pages';
 import { enc, post } from '../../lib/api';
 import { cx } from '../../components/ui';
@@ -175,5 +175,201 @@ export function PageFrame({
       sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
       className={cx('block h-full w-full border-0 bg-white', className)}
     />
+  );
+}
+
+const SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals';
+const themeNow = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
+/** A page's relative addresses (its pictures, its styles) resolved against `base`: an HTML file's own folder. */
+export function withBase(html: string, base?: string): string {
+  if (!base) return html;
+  const tag = `<base href="${base.replace(/"/g, '&quot;')}" data-n-own>`;
+  const m = /<head[^>]*>/i.exec(html);
+  if (m) return html.slice(0, m.index + m[0].length) + tag + html.slice(m.index + m[0].length);
+  const d = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(html);
+  return d ? d[0] + tag + html.slice(d[0].length) : tag + html;
+}
+
+/**
+ * A page still being written: drawn as far as it goes, its scripts held back, growing in place (what is
+ * there stays) and following its end, at most a few times a second.
+ */
+export function StreamFrame({ html, base, title = 'Page', onHeight, className }: { html: string; base?: string; title?: string; onHeight?: (h: number) => void; className?: string }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const st = useRef({ ready: false, sent: '', n: '', html, base, onHeight, timer: 0 });
+  st.current.html = html;
+  st.current.base = base;
+  st.current.onHeight = onHeight;
+  const push = () => {
+    const s = st.current;
+    const w = ref.current?.contentWindow;
+    if (!s.ready || !w || s.html === s.sent) return;
+    s.sent = s.html;
+    w.postMessage({ type: 'wa-html-stream', html: withBase(s.html, s.base), n: s.n, theme: themeNow() }, '*');
+  };
+  useLayoutEffect(() => {
+    const s = st.current;
+    const onMessage = (e: MessageEvent) => {
+      const w = ref.current?.contentWindow;
+      if (!w || e.source !== w || e.origin !== 'null' || !e.data || typeof e.data !== 'object') return;
+      if (e.data.type === 'wa-html-ready') {
+        s.ready = true;
+        s.n = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join('');
+        s.sent = '';
+        push();
+      } else if (e.data.type === 'wa-html-size' && e.data.n === s.n && typeof e.data.h === 'number' && Number.isFinite(e.data.h)) s.onHeight?.(Math.min(Math.max(e.data.h, 0), 100_000));
+    };
+    window.addEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('message', onMessage);
+      window.clearTimeout(s.timer);
+    };
+  }, []);
+  // A few times a second at most: each draw parses the page so far.
+  useEffect(() => {
+    const s = st.current;
+    if (s.timer) return;
+    s.timer = window.setTimeout(() => {
+      s.timer = 0;
+      push();
+    }, 160);
+  }, [html]);
+  return <iframe ref={ref} src="/htmlframe" title={title} sandbox={SANDBOX} className={cx('block h-full w-full border-0 bg-white', className)} />;
+}
+
+/** What the visual editor says of the part picked (editor.ts `info`). */
+export interface EdSel {
+  path: number[];
+  tag: string;
+  name: string;
+  crumbs: { name: string; tag: string; path: number[] }[];
+  words?: string;
+  wordy: boolean;
+  children: number;
+  attrs: Record<string, string>;
+  computed: Record<string, string>;
+  inline: Record<string, string>;
+  can: { up: boolean; down: boolean; parent: boolean; remove: boolean };
+}
+
+export interface EdState {
+  dirty: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+export interface EditHandle {
+  cmd(cmd: string, arg?: unknown): void;
+  /** The page's HTML with the user's changes. */
+  html(): Promise<string>;
+  /** What it holds is saved: no longer changed. */
+  saved(): void;
+}
+
+/** The page in the visual editor (its scripts held back), and the channel to it. */
+export const EditFrame = forwardRef<
+  EditHandle,
+  {
+    html: string;
+    base?: string;
+    title?: string;
+    labels: Record<string, string>;
+    onSel: (s: EdSel | null) => void;
+    onState: (s: EdState) => void;
+    onPalette?: (colors: string[]) => void;
+    onSave?: () => void;
+    className?: string;
+  }
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, className }, handle) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave };
+  const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>() });
+  const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
+  useImperativeHandle(handle, () => ({
+    cmd: (cmd, arg) => send({ cmd, arg }),
+    html: () =>
+      new Promise<string>((resolve, reject) => {
+        const id = ++ch.current.seq;
+        const t = window.setTimeout(() => {
+          ch.current.waits.delete(id);
+          reject(new Error('The editor did not answer'));
+        }, 8000);
+        ch.current.waits.set(id, (h) => {
+          window.clearTimeout(t);
+          resolve(h);
+        });
+        send({ cmd: 'html', id });
+      }),
+    saved: () => send({ cmd: 'saved' }),
+  }));
+  useLayoutEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      const w = ref.current?.contentWindow;
+      const d = e.data;
+      if (!w || e.source !== w || e.origin !== 'null' || !d || typeof d !== 'object' || typeof d.type !== 'string') return;
+      if (d.type === 'wa-html-ready') {
+        ch.current.n = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+        w.postMessage({ type: 'wa-html-page', mode: 'edit', html: withBase(cb.current.html, cb.current.base), n: ch.current.n, theme: themeNow(), labels: cb.current.labels }, '*');
+        return;
+      }
+      if (d.n !== ch.current.n) return;
+      const c = cb.current;
+      if (d.type === 'wa-ed-sel') c.onSel(d.sel && typeof d.sel === 'object' ? (d.sel as EdSel) : null);
+      else if (d.type === 'wa-ed-state') c.onState({ dirty: !!d.dirty, canUndo: !!d.canUndo, canRedo: !!d.canRedo });
+      else if (d.type === 'wa-ed-palette' || d.type === 'wa-ed-ready') {
+        if (Array.isArray(d.colors)) c.onPalette?.(d.colors.filter((x: unknown) => typeof x === 'string').slice(0, 12));
+      } else if (d.type === 'wa-ed-save') c.onSave?.();
+      else if (d.type === 'wa-ed-html' && typeof d.html === 'string') {
+        const done = ch.current.waits.get(d.id);
+        ch.current.waits.delete(d.id);
+        done?.(d.html);
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+  return <iframe ref={ref} src="/htmlframe" title={title} sandbox={SANDBOX} className={cx('block h-full w-full border-0 bg-white', className)} />;
+});
+
+export type Device = 'desktop' | 'tablet' | 'phone';
+const DEVICE_WIDTH: Record<Device, number> = { desktop: 0, tablet: 820, phone: 390 };
+
+/**
+ * The page at a device's width, centred, scaled down to fit when the space is narrower; the desktop
+ * fills the space. Its child is the frame.
+ */
+export function DeviceStage({ device, children, className }: { device: Device; children: ReactNode; className?: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const want = DEVICE_WIDTH[device];
+  if (!want)
+    return (
+      <div ref={box} className={cx('relative h-full w-full bg-white', className)}>
+        {children}
+      </div>
+    );
+  const pad = 16;
+  const scale = size.w ? Math.min(1, (size.w - pad * 2) / want) : 1;
+  const h = size.h ? (size.h - pad * 2) / scale : 0;
+  return (
+    <div ref={box} className={cx('relative h-full w-full overflow-hidden bg-bg-2', className)}>
+      {size.w > 0 && (
+        <div
+          className="absolute top-4 left-1/2 overflow-hidden rounded-[14px] bg-white shadow-[0_0_0_1px_var(--line-2),0_8px_30px_rgba(0,0,0,.18)]"
+          style={{ width: want, height: h, transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'top center' }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
   );
 }

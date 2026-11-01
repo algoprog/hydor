@@ -2,7 +2,7 @@
 // a size); each page keeps its own small storage (window.naget.storage) and has a link of its own,
 // signed with the app's key, that opens it on any device without the app's sign-in.
 import crypto from 'node:crypto';
-import { STORAGE_LIMITS, VERSION_LIMITS, type PageInfo, type PageVersion } from '../../shared/pages.ts';
+import { STORAGE_LIMITS, VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { signWithKey } from '../links.ts';
@@ -42,6 +42,9 @@ export function initPages(db: DB) {
       primary key (page_id, key)
     );
   `);
+  // Its picture in Pages: which version and data it shows (thumbs.ts).
+  const cols = (db.prepare('pragma table_info(pages)').all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes('thumb')) db.exec('alter table pages add column thumb text');
 }
 
 const newId = () => crypto.randomBytes(5).toString('hex');
@@ -71,13 +74,16 @@ interface Row {
   updated_at: number;
   session_key: string | null;
   link_nonce: string;
+  thumb: string | null;
   versions: number;
   bytes: number;
+  by: PageVersion['by'] | null;
   storage: number;
 }
 
 const SELECT = `select p.*, (select count(*) from page_versions v where v.page_id = p.id) as versions,
   (select bytes from page_versions v where v.page_id = p.id and v.version = p.version) as bytes,
+  (select by from page_versions v where v.page_id = p.id and v.version = p.version) as by,
   (select coalesce(sum(bytes), 0) from page_storage s where s.page_id = p.id) as storage from pages p`;
 
 const toInfo = (r: Row): PageInfo => ({
@@ -90,6 +96,8 @@ const toInfo = (r: Row): PageInfo => ({
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   sessionKey: r.session_key ?? undefined,
+  by: r.by ?? undefined,
+  thumb: r.thumb ?? undefined,
 });
 
 export function listPages(db: DB): PageInfo[] {
@@ -175,6 +183,14 @@ export function restoreVersion(db: DB, id: string, version: number): PageInfo {
   const old = pageHtml(db, id, version);
   if (!old) throw new HttpError(404, 'That version is no longer kept');
   return addVersion(db, id, { title: old.title, html: old.html, by: 'restore' });
+}
+
+/** A copy of a page's current version, as a page of its own (its data stays with the original). */
+export function copyPage(db: DB, id: string): PageInfo {
+  const p = mustPage(db, id);
+  const cur = pageHtml(db, id)!;
+  const title = cleanTitle(`${p.title} (copy)`);
+  return createPage(db, { title, html: cur.html, by: 'made' });
 }
 
 export function renamePage(db: DB, id: string, title: unknown): PageInfo {
@@ -279,6 +295,30 @@ export function putValues(db: DB, id: string, entries: [string, string][]) {
       put.run(id, key, json, bytes, now);
     }
   })();
+}
+
+/** Every value a page keeps, for its Data view. */
+export function storageEntries(db: DB, id: string): PageDataEntry[] {
+  mustPage(db, id);
+  return (db.prepare('select key, value, bytes, updated_at from page_storage where page_id = ? order by key').all(id) as { key: string; value: string; bytes: number; updated_at: number }[]).map(
+    (r) => ({ key: r.key, value: JSON.parse(r.value), bytes: r.bytes, updatedAt: r.updated_at }),
+  );
+}
+
+/** Forgets everything a page keeps. */
+export function clearStorage(db: DB, id: string) {
+  mustPage(db, id);
+  db.prepare('delete from page_storage where page_id = ?').run(id);
+}
+
+/** When a page's data last changed (0: it keeps none). */
+export function dataStamp(db: DB, id: string): number {
+  return (db.prepare('select coalesce(max(updated_at), 0) as t from page_storage where page_id = ?').get(id) as { t: number }).t;
+}
+
+/** Everything a page keeps, as JSON text by key (a picture of the page shows it). */
+export function storageMap(db: DB, id: string): Record<string, string> {
+  return Object.fromEntries(rows(db, id).map((r) => [r.key, r.value]));
 }
 
 /** Everything a page keeps, for an agent to read (cut to `max` characters). */

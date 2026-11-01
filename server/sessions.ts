@@ -23,7 +23,7 @@ import { claudeTranscriptPath, findClaudeTranscript, Timeline } from './timeline
 import { removeSessionScratch } from './tasklog.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
 import { pageServerUrl, runToken } from './mcp.ts';
-import { beforeSend, spawnAdditions, turnEnded } from './features/registry.ts';
+import { beforeSend, messageNotes, spawnAdditions, turnEnded } from './features/registry.ts';
 import { dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
@@ -195,6 +195,16 @@ interface Live {
 function withFiles(text: string, files: string[]): string {
   if (!files.length) return text;
   return `${text ? `${text}\n\n` : ''}Attached files:\n${files.map((f) => `- ${f}`).join('\n')}`;
+}
+
+/**
+ * What the capabilities have for the agent with this message (the user changed a page), ahead of it in a
+ * <system-reminder>, which the conversation does not show. A command ("/goal …") goes as it is.
+ */
+function withNotes(key: string, text: string): string {
+  if (text.trimStart().startsWith('/')) return text;
+  const notes = messageNotes(key);
+  return notes ? `<system-reminder>\n${notes}\n</system-reminder>\n\n${text}` : text;
 }
 
 /** What models take as pictures, by a file's extension. */
@@ -737,6 +747,8 @@ export class SessionManager extends EventEmitter {
       }
     });
     adapter.on('limithit', () => this.limitHits.add(key));
+    // A tool call's input as the model writes it: Pages draws a page while it is being written.
+    adapter.on('toolstream', (e: unknown) => this.emit('toolstream', key, e));
     adapter.on('ratelimit', (info: any) => {
       // Limits belong to the account the session runs as.
       const account = this.lives.get(key)?.account;
@@ -1563,7 +1575,7 @@ export class SessionManager extends EventEmitter {
     });
     if (!this.lives.has(key)) await this.start(key);
     await this.snapshot(key);
-    await this.live(key).adapter.sendMessage(withFiles(m.text, m.files), images);
+    await this.live(key).adapter.sendMessage(withNotes(key, withFiles(m.text, m.files)), images);
     this.touchApp(key);
   }
 
@@ -1689,7 +1701,7 @@ export class SessionManager extends EventEmitter {
     // ACP agents take one message at a time: one sent mid-turn waits in the queue.
     if (l.agent === 'acp' && ['working', 'waiting', 'starting'].includes(l.adapter.state.status)) return this.enqueue(key, text, images, files);
     await this.snapshot(key);
-    await l.adapter.sendMessage(withFiles(text, this.saveFiles(files)), this.saveImages(images));
+    await l.adapter.sendMessage(withNotes(key, withFiles(text, this.saveFiles(files))), this.saveImages(images));
     this.touchApp(key);
   }
 
