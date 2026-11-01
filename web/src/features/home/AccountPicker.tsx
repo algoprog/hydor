@@ -12,7 +12,7 @@ export function AccountPicker({ agent, accounts, value, onChange }: { agent: Age
   return (
     <>
       <SettingChip ref={ref} label="Account" value={current?.name ?? 'Your sign-in'} title="The account this session runs as" open={open} onClick={() => setOpen((o) => !o)} />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={240}>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={240} title="Account">
         <OptionRow label="Your sign-in" hint={`The ${agent === 'claude' ? 'Claude Code' : 'Codex'} CLI's own account`} selected={!current} onClick={() => (onChange(''), setOpen(false))} />
         {accounts.map((a) => (
           <OptionRow key={a.id} label={a.name} selected={a.id === value} onClick={() => (onChange(a.id), setOpen(false))} />

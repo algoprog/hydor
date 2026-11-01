@@ -15,7 +15,7 @@ import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { EffortPicker, findModel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
-import { cx, IconButton, MenuItem, Popover, SettingChip, SettingLayout, Switch, useIsMobile } from '../../components/ui';
+import { cx, IconButton, MenuItem, Popover, SettingChip, SettingLayout, SheetsOnPhone, Switch, useIsMobile } from '../../components/ui';
 import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { NavButton } from '../layout/PageHeader';
 import { ActivityText, folderName, sortActive } from '../sessions/SessionList';
@@ -55,7 +55,7 @@ function MoreOptions({ changed, title, children }: { changed: string[]; title: s
         open={open}
         onClick={() => setOpen((o) => !o)}
       />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={290} align="end">
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={290} align="end" title="Options">
         <SettingLayout.Provider value="row">{children}</SettingLayout.Provider>
         {!mobile && <div className="mx-1.5 mt-1 border-t border-line px-1 pt-2 pb-1 text-[11.5px] text-fg-3">Shift+Tab in the message box switches permissions</div>}
       </Popover>
@@ -357,55 +357,57 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
             </span>
           </button>
         </div>
-        {/* Who does the work, where and as which assistant; the rest under Options. */}
+        {/* Who does the work, where and as which assistant; the rest under Options. Each opens from the bottom on a phone. */}
         <SettingLayout.Provider value="bare">
-          <div data-tour="start-bar" className="flex flex-wrap items-center gap-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
-            <AgentPicker label="Agent" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} />
-            <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} />
-            <WorkFolderChip
-              value={cwd}
-              task={task}
-              note={!task && repo && worktree ? 'new worktree' : undefined}
-              onFolder={(p) => {
-                folderPicked.current = true;
-                setCwd(p);
-                setTaskPick(false);
-                saveStart({ cwd: p, task: false });
-              }}
-              onTask={() => {
-                folderPicked.current = true;
-                setTaskPick(true);
-                saveStart({ task: true });
-              }}
-            >
-              {!task && repo && (
-                <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-bg-2">
-                  <GitBranch size={16} className="shrink-0 text-fg-3" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13.5px] font-medium text-fg">New worktree</span>
-                    <span className="block truncate text-[12px] text-fg-3">A branch and folder of its own, from {repo.branch}</span>
-                  </span>
-                  <Switch on={worktree} label="Work in a new worktree" onChange={(v) => (setWorktree(v), saveStart({ worktree: v }))} />
-                </label>
-              )}
-              {!task && agent !== 'acp' && (
-                <div data-closes>
-                  <MenuItem icon={<FileText size={15} />} onClick={() => setInstructions(true)}>
-                    Edit the {instructionName(agent)} {agentName(agent)} reads here
-                  </MenuItem>
-                </div>
-              )}
-            </WorkFolderChip>
-            <FeatureStartOptions part="lead" value={extra} cwd={cwd} onChange={onExtra} />
-            <span data-tour="pickers" className="ml-auto flex min-w-0">
-              <MoreOptions changed={changed} title={optionsTitle}>
-                <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={model} value={effort} onChange={(v) => (setEffort(v), keepRun({ effort: v }))} />
-                <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (setMode(v), keepRun({ mode: v }))} />
-                {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
-                <FeatureStartOptions part="rest" value={extra} cwd={cwd} onChange={onExtra} />
-              </MoreOptions>
-            </span>
-          </div>
+          <SheetsOnPhone.Provider value>
+            <div data-tour="start-bar" className="flex flex-wrap items-center gap-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
+              <AgentPicker label="Agent" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} />
+              <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} />
+              <WorkFolderChip
+                value={cwd}
+                task={task}
+                note={!task && repo && worktree ? 'new worktree' : undefined}
+                onFolder={(p) => {
+                  folderPicked.current = true;
+                  setCwd(p);
+                  setTaskPick(false);
+                  saveStart({ cwd: p, task: false });
+                }}
+                onTask={() => {
+                  folderPicked.current = true;
+                  setTaskPick(true);
+                  saveStart({ task: true });
+                }}
+              >
+                {!task && repo && (
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-bg-2">
+                    <GitBranch size={16} className="shrink-0 text-fg-3" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-medium text-fg">New worktree</span>
+                      <span className="block truncate text-[12px] text-fg-3">A branch and folder of its own, from {repo.branch}</span>
+                    </span>
+                    <Switch on={worktree} label="Work in a new worktree" onChange={(v) => (setWorktree(v), saveStart({ worktree: v }))} />
+                  </label>
+                )}
+                {!task && agent !== 'acp' && (
+                  <div data-closes>
+                    <MenuItem icon={<FileText size={15} />} onClick={() => setInstructions(true)}>
+                      Edit the {instructionName(agent)} {agentName(agent)} reads here
+                    </MenuItem>
+                  </div>
+                )}
+              </WorkFolderChip>
+              <FeatureStartOptions part="lead" value={extra} cwd={cwd} onChange={onExtra} />
+              <span data-tour="pickers" className="ml-auto flex min-w-0">
+                <MoreOptions changed={changed} title={optionsTitle}>
+                  <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={model} value={effort} onChange={(v) => (setEffort(v), keepRun({ effort: v }))} />
+                  <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (setMode(v), keepRun({ mode: v }))} />
+                  {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
+                  <FeatureStartOptions part="rest" value={extra} cwd={cwd} onChange={onExtra} />
+                </MoreOptions>
+              </span>
+            </div>
+          </SheetsOnPhone.Provider>
         </SettingLayout.Provider>
       </div>
       {!mobile && (

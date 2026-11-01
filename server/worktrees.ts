@@ -13,7 +13,8 @@ import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import { git } from './git.ts';
 
-const ROOT = process.env.WORKTREES_DIR ?? path.join(config.dataDir, 'worktrees');
+/** Where the app makes worktrees for sessions. */
+export const WORKTREES_ROOT = process.env.WORKTREES_DIR ?? path.join(config.dataDir, 'worktrees');
 
 /** The repository a folder is in, and the branch checked out there; null outside git. */
 export async function repoInfo(dir: string): Promise<{ repo: string; branch: string; sub: string } | null> {
@@ -42,7 +43,7 @@ export async function createWorktree(dir: string, hint: string): Promise<{ info:
   if (!r) throw new HttpError(400, 'That folder is not in a git repository');
   const slug = slugFrom(hint);
   const branch = `agent/${slug}`;
-  const wt = path.join(ROOT, path.basename(r.repo), slug);
+  const wt = path.join(WORKTREES_ROOT, path.basename(r.repo), slug);
   fs.mkdirSync(path.dirname(wt), { recursive: true, mode: 0o700 });
   // A detached HEAD starts from that commit; a branch from its tip.
   const base = r.branch === 'HEAD' ? (await git(r.repo, ['rev-parse', 'HEAD'])).out.trim() : r.branch;

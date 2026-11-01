@@ -40,7 +40,7 @@ function StartOption({ value, onChange }: { value: SessionExtra; onChange: (patc
         onClick={() => setOpen((o) => !o)}
         title={off ? 'This session starts without memory: it sees nothing earlier sessions kept, and nothing from it is kept' : 'The agent gets what earlier sessions learned, and keeps what this one learns'}
       />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={290}>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={290} title="Memory">
         <OptionRow label="On" hint="Uses and adds to what agents remember" selected={!off} onClick={() => set(undefined)} />
         <OptionRow label="Off for this session" hint="Starts fresh and keeps nothing from it" selected={off} onClick={() => set(false)} />
         <MenuSep />

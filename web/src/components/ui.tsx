@@ -170,6 +170,37 @@ function usePopoverDismiss(node: RefObject<HTMLElement | null>, anchor: RefObjec
 /** Narrower than this, a `sheet` popover spans the screen. */
 const SHEET_BELOW = 640;
 
+/**
+ * Inside it, a popover opens on a phone as a sheet from the bottom of the screen: across it, under a title,
+ * clear of the keyboard, with the page dimmed behind (the start page's pickers). One opened from a sheet
+ * (a setting under Options) goes over it, and closing it shows the one below again.
+ */
+export const SheetsOnPhone = createContext(false);
+
+/** Whether a popover opened here would be a sheet from the bottom (SheetsOnPhone, on a phone). */
+export function useSheets(): boolean {
+  const sheets = useContext(SheetsOnPhone);
+  return useMediaQuery(`(max-width: ${SHEET_BELOW - 1}px)`) && sheets;
+}
+
+/** Where the keyboard leaves room on a phone: how far a sheet's bottom sits above the screen's, and how tall it may be. */
+function useKeyboardRoom(active: boolean): { bottom: number; height: number } | null {
+  const [room, setRoom] = useState<{ bottom: number; height: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!active || !vv) return;
+    const r = () => setRoom({ bottom: Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)), height: Math.round(vv.height) });
+    r();
+    vv.addEventListener('resize', r);
+    vv.addEventListener('scroll', r);
+    return () => {
+      vv.removeEventListener('resize', r);
+      vv.removeEventListener('scroll', r);
+    };
+  }, [active]);
+  return room;
+}
+
 /** A floating panel anchored to `anchor`; flips above when there is no room below. */
 export function Popover({
   anchor,
@@ -181,6 +212,7 @@ export function Popover({
   className,
   prefer = 'below',
   sheet,
+  title,
 }: {
   anchor: RefObject<HTMLElement | null>;
   open: boolean;
@@ -192,13 +224,17 @@ export function Popover({
   prefer?: 'below' | 'above';
   /** On a phone, as wide as the screen with the page dimmed behind: a picker by the message box, which would otherwise sit off to one side over the conversation. */
   sheet?: boolean;
+  /** What it picks, over a sheet from the bottom (SheetsOnPhone); a popover by its chip says it by where it is. */
+  title?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const bottomSheet = useSheets();
+  const room = useKeyboardRoom(open && bottomSheet);
   const [pos, setPos] = useState<{ top: number; left: number; maxH: number; width?: number } | null>(null);
   const place = useCallback(() => {
     const a = anchor.current?.getBoundingClientRect();
     const el = ref.current;
-    if (!a || !el) return;
+    if (!a || !el || bottomSheet) return;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const full = sheet && vw < SHEET_BELOW;
@@ -212,9 +248,10 @@ export function Popover({
     let left = align === 'end' ? a.right - w : a.left;
     left = Math.max(8, Math.min(left, vw - w - 8));
     setPos({ top, left, maxH, width: full ? w : undefined });
-  }, [anchor, width, align, prefer, sheet]);
+  }, [anchor, width, align, prefer, sheet, bottomSheet]);
   useLayoutEffect(() => {
     if (!open) return setPos(null);
+    if (bottomSheet) return;
     place();
     const r = () => place();
     window.addEventListener('resize', r);
@@ -227,9 +264,31 @@ export function Popover({
       window.removeEventListener('scroll', r, true);
       ro.disconnect();
     };
-  }, [open, place]);
+  }, [open, place, bottomSheet]);
   usePopoverDismiss(ref, anchor as RefObject<HTMLElement | null>, onClose, open);
   if (!open) return null;
+  if (bottomSheet) {
+    // The dimmed page belongs to the sheet: a tap there closes this one, not one it was opened from.
+    const kb = !!room && room.bottom > 0;
+    return createPortal(
+      <div ref={ref} role="dialog" aria-modal className="fixed inset-0 z-50">
+        <div className="anim-overlay absolute inset-0 touch-none bg-black/40" onClick={onClose} aria-hidden />
+        <div
+          style={{ bottom: room?.bottom ?? 0, maxHeight: room ? `calc(${room.height}px - var(--safe-top) - 12px)` : undefined }}
+          className="anim-sheet absolute inset-x-0 flex max-h-[calc(100dvh-var(--safe-top)-12px)] flex-col rounded-t-[20px] border border-b-0 border-line bg-elevated shadow-lg"
+        >
+          <div className="flex shrink-0 items-center gap-2 pt-2.5 pr-2.5 pb-1 pl-4">
+            <div className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight">{title}</div>
+            <IconButton label="Close" onClick={onClose}>
+              <X size={18} />
+            </IconButton>
+          </div>
+          <div className={cx('min-h-0 flex-1 overflow-y-auto overscroll-contain px-2', kb ? 'pb-2' : 'pb-[max(12px,var(--safe-bottom))]', className)}>{children}</div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
   // A tap on the dimmed page closes it, as anywhere outside does.
   const dim = sheet && window.innerWidth < SHEET_BELOW;
   return createPortal(
@@ -351,7 +410,7 @@ export function Picker({
     return (
       <>
         <SettingChip ref={ref} label={label} icon={icon} value={value} title={title} open={open} disabled={disabled} onClick={() => setOpen((o) => !o)} className={className} />
-        <Popover anchor={ref} open={open} onClose={close} width={width}>
+        <Popover anchor={ref} open={open} onClose={close} width={width} title={label}>
           {children(close)}
         </Popover>
       </>
@@ -407,7 +466,7 @@ export const SettingChip = forwardRef<
         onClick={onClick}
         aria-expanded={open}
         className={cx(
-          'flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50',
+          'flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50 max-sm:h-11 max-sm:text-[14.5px]',
           open && 'bg-bg-2',
           className,
         )}

@@ -73,7 +73,7 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
           </span>
         }
       />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(340, window.innerWidth - 16)}>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(340, window.innerWidth - 16)} title="Assistant">
         <MenuLabel>Start as</MenuLabel>
         {st.assistants.filter((a) => a.builtin).map(row)}
         {mine.length > 0 && (

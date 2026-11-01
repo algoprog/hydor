@@ -51,7 +51,7 @@ export function AgentPicker({ agent, acpId, acpList, onPick, label }: { agent: A
           <ChevronDown size={14} className={cx('text-fg-3 transition-transform duration-200', open && 'rotate-180')} />
         </button>
       )}
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300}>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title="Agent">
         <OptionRow icon={<AgentIcon agent="claude" size={15} />} label="Claude Code" hint={HINT.claude} selected={agent === 'claude'} onClick={() => pick('claude')} />
         <OptionRow icon={<AgentIcon agent="codex" size={15} />} label="Codex" hint={HINT.codex} selected={agent === 'codex'} onClick={() => pick('codex')} />
         {acpList.map((a) => (
