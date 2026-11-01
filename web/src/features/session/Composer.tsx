@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowRightLeft, ArrowUp, ChevronDown, ListTodo, MonitorUp, Paperclip, SlidersHorizontal, Square, X } from 'lucide-react';
 import type { Agent, BackgroundTask, SessionSummary } from '@shared/types';
+import { childReplyOf } from '@shared/children';
 import { enc, post } from '../../lib/api';
 import { openSession } from '../../lib/nav';
 import { toast, toastError, useLive, useTimeline } from '../../lib/store';
@@ -131,7 +132,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   // Up in an empty box walks back through this session's prompts; -1 is the draft.
   const [recall, setRecall] = useState(-1);
   const prompts = useTimeline((x) => x.byKey[key]?.items)
-    ?.filter((i) => i.kind === 'user' && !i.meta && !i.peer)
+    ?.filter((i) => i.kind === 'user' && !i.meta && !i.peer && !childReplyOf(i.text))
     .map((i) => (i as { text: string }).text)
     .reverse();
 

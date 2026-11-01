@@ -139,7 +139,7 @@ The conversation reads like a chat. Each turn is your message, the agent's work,
 - **The reply** is what the agent wrote after its last step. Pages the agent showed sit with it.
 - **Files changed**: under the reply, a card lists every file the turn changed, with lines added and removed. Click a file for its diff; **Open file** opens it. More than five fold behind "Show 3 more files".
 
-The agent may also keep a checklist (**Plan** or **To-dos**, with how many are done), which ticks off as it works. Notes from the app follow the turn they are about: what memory kept, a second opinion, a spending cap reached, a child session's card. Messages from other sessions show as "From …", and a scheduled task's run starts with a line naming the task.
+The agent may also keep a checklist (**Plan** or **To-dos**, with how many are done), which ticks off as it works. Notes from the app follow the turn they are about: what memory kept, a second opinion, a spending cap reached, a child session's card. Messages from other sessions show as "From …", a child session's reply as "Reply from …" (click it to read the reply), and a scheduled task's run starts with a line naming the task.
 
 Day lines ("Today", "Yesterday") separate the days. Older messages load as you scroll up, or with **Show earlier messages**. When you scroll up while the agent works, the view stays where you are; **Latest** takes you back to the end.
 

@@ -321,7 +321,7 @@ export function resultMessage(o: { key: string; title: string; label: string; li
 async function summarize(d: Deps, reply: string): Promise<string> {
   try {
     const s = await helper(d.db, {
-      system: 'You summarize a report one AI agent wrote for another. Keep every finding, number, decision, file path and open question; drop the narration. Plain text, at most 200 words.',
+      system: 'You summarize a report one AI agent wrote for another. Keep every finding, number, decision, file path and open question; drop the narration. Plain text, at most 200 words, beginning with the first finding: no title or preamble.',
       prompt: reply.slice(0, 60_000),
       maxTokens: 600,
       timeoutMs: 60_000,

@@ -5,6 +5,7 @@ import { closestCenter, DndContext, KeyboardSensor, MouseSensor, useSensor, useS
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { CornerDownLeft, FileText, GripVertical, Paperclip, Pencil, Play, Trash2, X } from 'lucide-react';
+import { childReplyOf } from '@shared/children';
 import type { QueuedAttachment, QueuedMessage, SessionSummary } from '@shared/types';
 import { enc, post } from '../../lib/api';
 import { attachmentPayload, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
@@ -12,6 +13,7 @@ import { toast, toastError } from '../../lib/store';
 import { AttachmentList } from '../../components/Attachments';
 import { openLightbox } from '../../components/Lightbox';
 import { Button, cx } from '../../components/ui';
+import { ChildReplyLabel } from '../children/ChildReply';
 import { mu } from '../../lib/machine';
 import { AreaTouchSensor, touchDragArea } from '../../lib/dragTouch';
 
@@ -60,6 +62,7 @@ function Chip({ sessionKey, m, a, big, onRemove }: { sessionKey: string; m: Queu
 function QueueRow({ s, m, n, onEdit }: { s: SessionSummary; m: QueuedMessage; n: number; onEdit: () => void }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: m.id });
   const call = (path: string) => post(`/api/sessions/${enc(s.key)}/queue/${enc(m.id)}${path}`).catch(toastError);
+  const reply = childReplyOf(m.text);
   return (
     <div
       ref={setNodeRef}
@@ -81,7 +84,7 @@ function QueueRow({ s, m, n, onEdit }: { s: SessionSummary; m: QueuedMessage; n:
       </button>
       <span className="tnum mt-0.5 w-3 shrink-0 text-[11px] text-fg-3">{n}</span>
       <div className="min-w-0 flex-1">
-        {m.text && <div className="line-clamp-2 text-[13.5px] leading-snug whitespace-pre-wrap text-fg-2">{m.text}</div>}
+        {m.text && <div className="line-clamp-2 text-[13.5px] leading-snug whitespace-pre-wrap text-fg-2">{reply ? <ChildReplyLabel reply={reply} /> : m.text}</div>}
         {m.att && (
           <div className={cx('flex flex-wrap gap-1.5', m.text && 'mt-1.5')}>
             {m.att.map((a) => (

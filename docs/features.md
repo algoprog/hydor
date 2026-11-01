@@ -75,11 +75,12 @@ agents that speak ACP and take MCP servers.
   you partway through (a date, a choice, a page to approve on), its form shows as a card in the session,
   whichever agent is working; Codex's own servers ask the same way.
 - **Child sessions**: an agent hands parts of a job to new sessions, with any agent and model, and gets their
-  results back; they show under it in the sidebar.
+  results back, each a line in its conversation that opens to the reply; they show under it in the sidebar.
 - **Deep research**: one switch under Options. The agent plans the searches a question needs, sends researchers
   (child sessions) after each part, digs into what they leave open, has the key claims checked against two
   sources, and delivers a cited report as a page or a Word document. How many researchers at a time, how many
-  rounds and how many searches in all are yours to set; the session shows the round and the searches used.
+  rounds and how many searches in all are yours to set; a bar in the session says what it is doing and the
+  searches used, and opens the report once it is ready.
 - **Pages and templates**: pages the agents show can answer back (pick an option, fill in a form), stay in a
   library with storage of their own and an address for a phone's home screen, and folders publish at a link.
   Templates are tasks you repeat, each with a form: ready-made or your own, run from the Templates page, the
