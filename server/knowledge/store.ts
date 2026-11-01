@@ -1,6 +1,7 @@
-// Where knowledge bases live: the bases and their sources, each document read from them, its passages (with a
-// full-text index over them, ranked by BM25) and the passages' vectors for search by meaning (4 bits a number,
-// like memory's notes). Files dropped on the page are kept in the data folder, a folder each base.
+// Where knowledge bases live: the bases (shared, or a space's own) and their sources, each document read from
+// them, its passages (with a full-text index over them, ranked by BM25) and the passages' vectors for search by
+// meaning (4 bits a number, like memory's notes). Files dropped on the page are kept in the data folder, a
+// folder each base.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,6 +29,8 @@ export function knowledgeSchema(db: DB) {
     create index if not exists kb_chunks_doc on kb_chunks (doc, seq);
     create table if not exists kb_vectors (chunk integer primary key, model text not null, code blob not null);
   `);
+  // 0.7.0's bases were all shared: the space a base belongs to came after.
+  if (!(db.prepare('pragma table_info(kb_bases)').all() as { name: string }[]).some((c) => c.name === 'space')) db.exec('alter table kb_bases add column space text');
   const has = db.prepare("select 1 from sqlite_master where name = 'kb_fts'").get();
   if (!has)
     db.exec(`
@@ -38,10 +41,12 @@ export function knowledgeSchema(db: DB) {
   ready.add(db);
 }
 
-interface BaseRow {
+export interface BaseRow {
   id: string;
   name: string;
   description: string | null;
+  /** The space it belongs to; null: shared. */
+  space: string | null;
   created_at: number;
   indexed_at: number | null;
 }
@@ -83,6 +88,7 @@ export function baseView(db: DB, r: BaseRow, indexing?: { done: number; total: n
     id: r.id,
     name: r.name,
     description: r.description ?? undefined,
+    space: r.space ?? undefined,
     createdAt: r.created_at,
     sources: sourcesOf(db, r.id),
     filesDir: filesDir(r.id),
@@ -101,25 +107,43 @@ const clean = (s: unknown, max: number) =>
     .trim()
     .slice(0, max);
 
-export function createBase(db: DB, b: { name?: unknown; description?: unknown }): BaseRow {
+/** A space's id as given ("" or null: none, so shared). */
+const spaceId = (v: unknown) => (typeof v === 'string' && /^sp[a-z0-9]+$/.test(v) ? v : null);
+
+export function createBase(db: DB, b: { name?: unknown; description?: unknown; space?: unknown }): BaseRow {
   knowledgeSchema(db);
   const name = clean(b.name, 60) || 'My documents';
   const id = `kb${crypto.randomBytes(5).toString('hex')}`;
-  db.prepare('insert into kb_bases (id, name, description, created_at) values (?, ?, ?, ?)').run(id, name, clean(b.description, 300) || null, Date.now());
+  db.prepare('insert into kb_bases (id, name, description, space, created_at) values (?, ?, ?, ?, ?)').run(id, name, clean(b.description, 300) || null, spaceId(b.space), Date.now());
   // Files dropped on the page are a source of their own from the start.
   fs.mkdirSync(filesDir(id), { recursive: true, mode: 0o700 });
   addSource(db, id, 'files', filesDir(id), 'Files you added');
   return baseRow(db, id);
 }
 
-export function updateBase(db: DB, id: string, b: { name?: unknown; description?: unknown }) {
+/** Renames a base, or moves it into a space (or out of one, to be shared: `space` null). */
+export function updateBase(db: DB, id: string, b: { name?: unknown; description?: unknown; space?: unknown }) {
   baseRow(db, id);
+  if (b.space !== undefined) db.prepare('update kb_bases set space = ? where id = ?').run(spaceId(b.space), id);
   if (b.name !== undefined) {
     const name = clean(b.name, 60);
     if (!name) throw new HttpError(400, 'Give it a name');
     db.prepare('update kb_bases set name = ? where id = ?').run(name, id);
   }
   if (b.description !== undefined) db.prepare('update kb_bases set description = ? where id = ?').run(clean(b.description, 300) || null, id);
+}
+
+/** A space is gone: its bases stay, shared now. */
+export function releaseSpace(db: DB, space: string) {
+  knowledgeSchema(db);
+  db.prepare('update kb_bases set space = null where space = ?').run(space);
+}
+
+/** How many documents each space's own bases hold. */
+export function docsBySpace(db: DB): Map<string, number> {
+  knowledgeSchema(db);
+  const rows = db.prepare("select b.space as space, count(*) as n from kb_docs d join kb_bases b on b.id = d.base where b.space is not null and d.status = 'indexed' group by b.space").all() as { space: string; n: number }[];
+  return new Map(rows.map((r) => [r.space, r.n]));
 }
 
 /** Deletes a base: its passages, vectors and the files dropped into it (folders on this computer stay as they are). */
@@ -191,9 +215,12 @@ export function docById(db: DB, id: number): DocRow | undefined {
   return db.prepare('select * from kb_docs where id = ?').get(id) as DocRow | undefined;
 }
 
-export function docByPath(db: DB, p: string): DocRow | undefined {
+/** A document by its path, in one of the bases `within` when given. */
+export function docByPath(db: DB, p: string, within?: string[]): DocRow | undefined {
   knowledgeSchema(db);
-  return db.prepare('select * from kb_docs where path = ? order by indexed_at desc limit 1').get(path.resolve(p)) as DocRow | undefined;
+  if (within && !within.length) return undefined;
+  const only = within ? ` and base in (${within.map(() => '?').join(',')})` : '';
+  return db.prepare(`select * from kb_docs where path = ?${only} order by indexed_at desc limit 1`).get(path.resolve(p), ...(within ?? [])) as DocRow | undefined;
 }
 
 export function dropDoc(db: DB, id: number) {

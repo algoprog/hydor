@@ -1,6 +1,7 @@
-// Knowledge bases: documents and folders the user adds once (the Knowledge page), which every agent can
-// search with knowledge_search, by words, by meaning (local embeddings) or for exact text, citing each
-// passage's file and page. Folders are read where they are and looked over again every hour.
+// Knowledge bases: documents and folders the user adds once, shared (Spaces → Shared knowledge) or a space's
+// own, which agents search with knowledge_search, by words, by meaning (local embeddings) or for exact text,
+// citing each passage's file and page: a session the shared ones and its space's own (server/knowledge/scope.ts).
+// Folders are read where they are and looked over again every hour.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { KnowledgeState } from '../../shared/knowledge.ts';
@@ -8,6 +9,7 @@ import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { meaningOn } from '../memory/embed.ts';
 import { dropVectorBlocks, fillSoon, onIndexed, progress, scanAll, scanSoon } from './indexer.ts';
+import { basesFor, spaceOfSession } from './scope.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
 import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docById, docsOf, dropDoc, filesDir, removeSource, sourcesOf, toDoc, updateBase } from './store.ts';
 import { knowledgeInstructions, knowledgeTools } from './tools.ts';
@@ -89,21 +91,23 @@ function routes(d: Deps) {
     changed();
     return { ok: true };
   });
-  /** The page's search box: the same search agents get. */
+  /** The page's search box: the same search agents get; with `space` (null: none), what a session there searches. */
   app.post('/api/knowledge/search', async (req) => {
     const b = body(req);
     const mode = ['auto', 'words', 'meaning', 'exact'].includes(String(b.mode)) ? (b.mode as SearchMode) : undefined;
-    return searchKnowledge(db, { query: String(b.query ?? ''), mode, bases: Array.isArray(b.bases) ? b.bases.map(String) : undefined, limit: Math.min(Number(b.limit) || 10, 30) });
+    const within = 'space' in b ? basesFor(db, typeof b.space === 'string' && b.space ? b.space : null).map((x) => x.id) : undefined;
+    return searchKnowledge(db, { query: String(b.query ?? ''), mode, bases: Array.isArray(b.bases) ? b.bases.map(String) : undefined, within, limit: Math.min(Number(b.limit) || 10, 30) });
   });
 }
 
 export const knowledge: Feature = {
   id: 'knowledge',
   routes,
-  // Only once there is a knowledge base: otherwise they are just more tools to wade through.
+  // Only once there is a knowledge base: otherwise they are just more tools to wade through. Each call
+  // searches only the session's own bases (a new session's space may not be saved yet when tools are listed).
   tools: (ctx) => (baseRows(ctx.deps.db).length ? knowledgeTools() : []),
-  spawn: (_s, d) => {
-    const t = knowledgeInstructions(d.db);
+  spawn: (s, d) => {
+    const t = knowledgeInstructions(d.db, spaceOfSession(d.db, s.extra));
     return t ? { instructions: [t] } : undefined;
   },
   event(e, d) {

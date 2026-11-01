@@ -1,5 +1,5 @@
 // Script tests for spaces: a new space gets a folder of its own (or uses one given), its fields are cleaned,
-// its sessions are counted, and a session in it is told its instructions. Build and run with a scratch data folder:
+// its sessions are counted, it can leave the shared knowledge out, and a session in it is told its instructions. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/spaces/spaces-test.ts
 //   DATA_DIR=/tmp/naget-test-spaces node dist/dev/spaces-test.js
 import assert from 'node:assert/strict';
@@ -56,6 +56,16 @@ test('changing a space keeps what was not given; its sessions are counted, the l
   const v = spaceViews(db).find((x) => x.id === a.id)!;
   assert.equal(v.sessions, 3);
   assert.equal(v.lastAt, 3);
+});
+
+test('a space searches the shared knowledge too unless it leaves it out; changing something else keeps that', () => {
+  const g = createSpace(db, { name: 'Garden' });
+  assert.equal(g.sharedKnowledge, undefined);
+  assert.equal(updateSpace(db, g.id, { sharedKnowledge: false }).sharedKnowledge, false);
+  assert.equal(updateSpace(db, g.id, { description: 'Vegetables' }).sharedKnowledge, false);
+  assert.equal(updateSpace(db, g.id, { sharedKnowledge: true }).sharedKnowledge, undefined);
+  assert.equal(spaceViews(db).find((x) => x.id === g.id)!.docs, 0);
+  deleteSpace(db, g.id);
 });
 
 test('a session in a space is told what it is, where its files go, and its instructions', async () => {

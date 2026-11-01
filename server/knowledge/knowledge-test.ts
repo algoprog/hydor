@@ -1,20 +1,25 @@
 // Script tests for knowledge bases: passages that keep their page or heading, reading a folder (and reading it
 // again when it changes), search by words, by meaning (a stand-in embedder) and for exact text, the agent's
-// tools with their citations, and deleting. Build and run with a scratch data folder:
+// tools with their citations, a space's own bases beside the shared ones, and deleting. Build and run with a
+// scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/knowledge/knowledge-test.ts
 //   DATA_DIR=/tmp/naget-test-knowledge node dist/dev/knowledge-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { setSettings } from '../assistants/store.ts';
 import { openDb, kvSet } from '../db.ts';
 import type { RunCtx } from '../features/types.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import { words } from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
+import { setSessionExtra } from '../sessionExtra.ts';
+import { createSpace, deleteSpace, updateSpace } from '../spaces/index.ts';
 import { fillVectors, filesUnder, passages, progress, scanSoon } from './indexer.ts';
+import { basesFor } from './scope.ts';
 import { searchKnowledge } from './search.ts';
-import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docsOf } from './store.ts';
+import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docsOf, filesDir } from './store.ts';
 import { knowledgeInstructions, knowledgeTools } from './tools.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -24,6 +29,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-knowledge-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
+setSettings(db, { taskRoot: path.join(tmp, 'Naget') });
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
 const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
@@ -159,6 +165,42 @@ test('the tools: passages with what to cite, more of a document around one, and 
   assert.match(await run('knowledge_list', {}), /- Handbook: 3 documents, 5 passages; folders: .*Handbook/);
   assert.match(await run('knowledge_list', { base: 'handbook' }), /Handbook: 3 documents\n- .*expenses\.txt \(1 passages\)/);
   await assert.rejects(() => run('knowledge_read', { ref: 'kb:999999' }), /No such passage/);
+});
+
+test('spaces: a space’s own base is searched by its sessions alone, the shared ones by every session unless a space leaves them out', async () => {
+  const thesis = createSpace(db, { name: 'Thesis' });
+  const papers = createBase(db, { name: 'Papers', space: thesis.id });
+  fs.writeFileSync(path.join(filesDir(papers.id), 'notes.md'), '# Notes\n\nThe cohort study followed 412 dairy farmers for six years.');
+  scanSoon(db, papers.id);
+  await settle();
+  const inThesis = 'claude:thesis1';
+  setSessionExtra(db, inThesis, { space: thesis.id });
+  // A child session searches as the session that started it.
+  setSessionExtra(db, 'claude:thesis-child', { parent: inThesis });
+  const search = async (key: string, query: string) => String(await tool('knowledge_search').run({ query, mode: 'words' }, { ...ctx, key }));
+  assert.match(await search(inThesis, 'dairy farmers cohort'), /notes\.md, Notes · Papers · kb:\d+/);
+  assert.match(await search('claude:thesis-child', 'dairy farmers cohort'), /notes\.md, Notes · Papers/);
+  assert.match(await search(inThesis, 'sick leave doctor'), /leave\.md, Leave policy › Sick leave · Handbook/);
+  assert.match(await search('claude:k', 'dairy farmers cohort'), /^Nothing in the knowledge bases matches/);
+  // What agents are told: in the space, whose each base is; elsewhere, the shared ones alone.
+  assert.match(knowledgeInstructions(db, thesis.id) ?? '', /Handbook \(3 documents, shared\), Papers \(1 document, this space’s own\)\./);
+  assert.doesNotMatch(knowledgeInstructions(db) ?? '', /Papers/);
+  // Another session cannot read the space's documents, by passage or by path.
+  const ref = /kb:\d+/.exec(await search(inThesis, 'dairy farmers cohort'))![0];
+  assert.match(String(await tool('knowledge_read').run({ ref }, { ...ctx, key: inThesis })), /The cohort study/);
+  await assert.rejects(async () => tool('knowledge_read').run({ ref }, ctx), /not in a knowledge base this session searches/);
+  await assert.rejects(async () => tool('knowledge_read').run({ path: path.join(filesDir(papers.id), 'notes.md') }, ctx), /not in a knowledge base this session searches/);
+  assert.doesNotMatch(String(await tool('knowledge_list').run({}, ctx)), /Papers/);
+  // The space leaves the shared knowledge out: its sessions search their own alone.
+  updateSpace(db, thesis.id, { sharedKnowledge: false });
+  assert.deepEqual(basesFor(db, thesis.id).map((b) => b.name), ['Papers']);
+  assert.match(await search(inThesis, 'sick leave doctor'), /^Nothing in the knowledge bases matches/);
+  assert.deepEqual(basesFor(db, null).map((b) => b.name), ['Handbook']);
+  // Deleting the space keeps its base, shared now.
+  deleteSpace(db, thesis.id);
+  assert.equal(baseRow(db, papers.id).space, null);
+  assert.match(await search('claude:k', 'dairy farmers cohort'), /notes\.md, Notes · Papers/);
+  deleteBase(db, papers.id);
 });
 
 test('reading again: a changed file is read anew, a deleted one leaves; deleting the base takes everything', async () => {

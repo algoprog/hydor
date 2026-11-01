@@ -43,14 +43,16 @@ agents that speak ACP and take MCP servers.
   Settings → Memory lists every note with when it was written, changed and last needed, and suggests
   removing the ones no agent needed for months. Turn it off for one session or for all. Agents can also look
   up earlier sessions.
-- **Spaces**: a project's sessions, files, memory, instructions and assistant together, like Projects in ChatGPT
-  or Claude. Pick a space by name in the start page's folder menu instead of a folder: its sessions work in its
-  own folder, remember what its earlier sessions learned, get its instructions and start as its assistant. The
-  sidebar's filter shows one space's sessions; the Spaces page keeps them.
-- **Knowledge bases**: drop documents or a folder in once (the Knowledge page), and every agent can search them:
-  by their words (a full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning
-  on) or for exact text, as grep would; each passage cites its file and page. A folder on this computer is read
-  where it is and kept up to date.
+- **Spaces** (in the sidebar): a project's sessions, files, documents, memory, instructions and assistant together,
+  like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a folder:
+  its sessions work in its own folder, remember what its earlier sessions learned, search its documents, get its
+  instructions and start as its assistant. The sidebar's filter shows one space's sessions.
+- **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
+  full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
+  text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
+  kept up to date. Shared knowledge (Spaces → Shared knowledge) is searched by every session; a space's own
+  documents (its Knowledge tab) by its sessions alone, which search the shared knowledge too unless the space
+  turns that off.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
   Images can be made and edited through OpenRouter.

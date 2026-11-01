@@ -116,10 +116,10 @@ export interface SearchResult {
   meaning: boolean;
 }
 
-/** The passages about a question in the bases (all of them when none are named), best first. */
-export async function searchKnowledge(db: DB, o: { query: string; bases?: string[]; mode?: SearchMode; limit?: number; vector?: Float32Array | null }): Promise<SearchResult> {
+/** The passages about a question in the bases (all of them, or all `within`, when none are named), best first. */
+export async function searchKnowledge(db: DB, o: { query: string; bases?: string[]; within?: string[]; mode?: SearchMode; limit?: number; vector?: Float32Array | null }): Promise<SearchResult> {
   knowledgeSchema(db);
-  const all = baseRows(db);
+  const all = baseRows(db).filter((b) => !o.within || o.within.includes(b.id));
   const names = new Map(all.map((b) => [b.id, b.name]));
   const bases = o.bases?.length ? all.filter((b) => o.bases!.includes(b.id) || o.bases!.some((n) => n.toLowerCase() === b.name.toLowerCase())).map((b) => b.id) : all.map((b) => b.id);
   const limit = Math.max(1, Math.min(o.limit ?? 8, 50));

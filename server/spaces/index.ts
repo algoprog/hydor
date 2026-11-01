@@ -1,8 +1,9 @@
-// Spaces: a project's sessions, files, memory, instructions and assistant together, picked by name on the
-// start page in place of a folder. A space's folder holds its files and is where its sessions work, so its
-// project memory is the folder's (server/memory keys a project by its folder); every session started in it
-// (extra.space) is told its instructions, and starts as its assistant. Deleting a space keeps its folder
-// and sessions.
+// Spaces: a project's sessions, files, documents, memory, instructions and assistant together, picked by name
+// on the start page in place of a folder. A space's folder holds its files and is where its sessions work, so
+// its project memory is the folder's (server/memory keys a project by its folder); its knowledge bases are
+// searched by its sessions alone, with the shared ones too unless it leaves them out (server/knowledge/scope.ts);
+// every session started in it (extra.space) is told its instructions, and starts as its assistant. Deleting a
+// space keeps its folder and sessions, and its knowledge bases become shared.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +12,7 @@ import { taskRoot } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
+import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
 
 const made = new WeakSet<DB>();
 function tables(db: DB) {
@@ -30,15 +32,16 @@ export function spaceById(db: DB, id: string): Space | null {
   return r ? JSON.parse(r.data) : null;
 }
 
-/** Spaces with how many sessions each has, and when one last was at work. */
+/** Spaces with how many sessions each has, when one last was at work, and how many documents their knowledge holds. */
 export function spaceViews(db: DB): SpaceView[] {
+  const docs = docsBySpace(db);
   const counts = new Map(
     (db.prepare("select json_extract(extra, '$.space') as space, count(*) as n, max(updated_at) as last from app_sessions where json_extract(extra, '$.space') is not null group by 1").all() as { space: string; n: number; last: number | null }[]).map((r) => [
       r.space,
       r,
     ]),
   );
-  return allSpaces(db).map((s) => ({ ...s, sessions: counts.get(s.id)?.n ?? 0, lastAt: counts.get(s.id)?.last ?? undefined }));
+  return allSpaces(db).map((s) => ({ ...s, sessions: counts.get(s.id)?.n ?? 0, lastAt: counts.get(s.id)?.last ?? undefined, docs: docs.get(s.id) ?? 0 }));
 }
 
 /** A space's sessions, the last at work first. */
@@ -66,12 +69,14 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
   const name = b.name !== undefined ? clean(b.name, 60) : (prev?.name ?? '');
   if (!name) throw new HttpError(400, 'Give the space a name');
   const color = b.color !== undefined ? String(b.color) : (prev?.color ?? nextColor);
+  const shared = b.sharedKnowledge !== undefined ? b.sharedKnowledge !== false : prev?.sharedKnowledge !== false;
   return {
     name,
     color: color in SPACE_COLORS ? color : 'blue',
     description: (b.description !== undefined ? clean(b.description, 300) : prev?.description) || undefined,
     instructions: (b.instructions !== undefined ? clean(b.instructions, MAX_SPACE_INSTRUCTIONS) : prev?.instructions) || undefined,
     assistant: (b.assistant !== undefined ? clean(b.assistant, 80) : prev?.assistant) || undefined,
+    ...(shared ? {} : { sharedKnowledge: false }),
   };
 }
 export function createSpace(db: DB, b: Record<string, unknown>): Space {
@@ -91,7 +96,8 @@ export function createSpace(db: DB, b: Record<string, unknown>): Space {
 export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Space {
   const prev = spaceById(db, id);
   if (!prev) throw new HttpError(404, 'No such space');
-  const next: Space = { ...prev, ...fields(b, prev) };
+  const { sharedKnowledge: _was, ...kept } = prev;
+  const next: Space = { ...kept, ...fields(b, prev) };
   db.prepare('update spaces set data = ? where id = ?').run(JSON.stringify(next), id);
   return next;
 }
@@ -99,6 +105,7 @@ export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Spa
 export function deleteSpace(db: DB, id: string) {
   tables(db);
   db.prepare('delete from spaces where id = ?').run(id);
+  releaseSpace(db, id);
 }
 
 /** What a session in a space is told. */
@@ -136,6 +143,8 @@ export const spaces: Feature = {
     d.app.delete('/api/spaces/:id', async (req) => {
       deleteSpace(d.db, id(req));
       changed();
+      // Its knowledge bases are shared now.
+      d.broadcast({ t: 'feature', id: 'knowledge', data: { changed: true } });
       return { ok: true };
     });
   },
