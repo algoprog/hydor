@@ -811,8 +811,11 @@ function TourPage(p: {
       ro.disconnect();
     };
   }, []);
-  // Each step starts at its top.
-  useEffect(() => scroller.current?.scrollTo({ top: 0 }), [k]);
+  // Each step starts at its top. (In braces: newer browsers return a promise from scrollTo, which React
+  // would take for the effect's cleanup and call.)
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: 0 });
+  }, [k]);
   const Extra = step.Extra;
   const column = 'mx-auto w-full max-w-[760px] px-5 sm:px-10 2xl:max-w-[840px]';
   const where = ready ? <TourProgress at={k + (fresh ? 1 : 0)} total={list.length + (fresh ? 1 : 0)} /> : <span className="text-[12.5px] text-fg-3">Pick one or more</span>;
