@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { Activity, CircleHelp, FolderTree, Gauge, GitBranch, Inbox, LayoutGrid, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
+import { Activity, Boxes, CircleHelp, FolderTree, Gauge, GitBranch, Inbox, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
 import { activityOf } from '../../lib/activity';
 import { useMachines } from '../../lib/machines';
 import { MOD, pct } from '../../lib/format';
@@ -208,7 +208,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
                   </MenuItem>
                 ))}
                 <MenuItem
-                  icon={<LayoutGrid size={14} />}
+                  icon={<Boxes size={14} />}
                   onClick={() => {
                     setFilterOpen(false);
                     nav('/spaces');

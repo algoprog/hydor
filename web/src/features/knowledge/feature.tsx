@@ -1,6 +1,6 @@
-// Knowledge bases: documents and folders the user adds once (the Knowledge page) for every agent to search,
-// and how an agent's search of them shows in the conversation.
-import { Library } from 'lucide-react';
+// Knowledge bases: documents and folders the user adds once for agents to search (shared ones on Spaces →
+// Shared knowledge, a space's own on its Knowledge tab), and how an agent's search of them shows in the
+// conversation.
 import type { WebFeature } from '../registry';
 import { KnowledgePage } from './KnowledgePage';
 import { KnowledgeRow, knowledgeStep } from './views';
@@ -11,5 +11,4 @@ export const knowledgeFeature: WebFeature = {
     knowledge_search: { place: 'work', Row: KnowledgeRow, step: knowledgeStep },
   },
   routes: [{ match: (p) => p === '/knowledge', Page: KnowledgePage }],
-  nav: [{ path: '/knowledge', label: 'Knowledge', icon: <Library size={17} /> }],
 };

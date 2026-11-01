@@ -1,10 +1,26 @@
-// Pieces of spaces used on several pages: a space's coloured mark, and the dialog that makes a new one.
+// Pieces of spaces used on several pages: a space's coloured mark, the tabs over the spaces and the shared
+// knowledge, and the dialog that makes a new space.
 import { useEffect, useState } from 'react';
 import { SPACE_COLORS, spaceColor, type Space } from '@shared/spaces';
-import { Button, cx, Dialog, inputCls } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, Tabs } from '../../components/ui';
 import { post } from '../../lib/api';
+import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { loadSpaces } from './state';
+
+/** Under the Spaces page's title: the spaces, and the documents every session searches. */
+export function SpacesTabs({ tab }: { tab: 'spaces' | 'shared' }) {
+  return (
+    <Tabs
+      value={tab}
+      onChange={(t) => go(t === 'shared' ? '/knowledge' : '/spaces', true)}
+      options={[
+        { value: 'spaces', label: 'All spaces' },
+        { value: 'shared', label: 'Shared knowledge' },
+      ]}
+    />
+  );
+}
 
 /** A space's mark: a rounded square in its colour, with its first letter. */
 export function SpaceMark({ s, size = 15, className }: { s: Pick<Space, 'name' | 'color'>; size?: number; className?: string }) {
@@ -64,7 +80,9 @@ export function NewSpaceDialog({ open, onClose, onMade }: { open: boolean; onClo
       }
     >
       <div className="space-y-3.5">
-        <div className="text-[13px] leading-relaxed text-fg-2">A space keeps a project’s sessions, files and memory together, with instructions every agent in it gets. It gets a folder of its own.</div>
+        <div className="text-[13px] leading-relaxed text-fg-2">
+          A space keeps a project’s sessions, files, documents and memory together, with instructions every agent in it gets. It gets a folder of its own.
+        </div>
         <label className="block">
           <span className="mb-1 block text-[13px] font-medium">Name</span>
           <input autoFocus className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Taxes 2026, The garden, Thesis…" onKeyDown={(e) => e.key === 'Enter' && name.trim() && void make()} />

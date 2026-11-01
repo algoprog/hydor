@@ -1,9 +1,12 @@
-// Spaces: a project's sessions, files, memory, instructions and assistant together. Picked by name in the
-// start page's folder chip (assistants/start.tsx), filtered by in the sidebar, kept on the Spaces page.
+// Spaces: a project's sessions, files, documents, memory, instructions and assistant together. In the sidebar
+// (with the shared knowledge as its second tab), picked by name in the start page's folder chip
+// (assistants/start.tsx), filtered by in the sidebar's session list.
+import { Boxes } from 'lucide-react';
 import type { WebFeature } from '../registry';
 import { SpacesPage } from './SpacesPage';
 
 export const spacesFeature: WebFeature = {
   id: 'spaces',
   routes: [{ match: (p) => p === '/spaces' || p.startsWith('/spaces/'), Page: SpacesPage }],
+  nav: [{ path: '/spaces', label: 'Spaces', icon: <Boxes size={17} />, match: (p) => p === '/spaces' || p.startsWith('/spaces/') || p === '/knowledge' }],
 };

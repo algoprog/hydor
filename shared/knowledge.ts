@@ -1,6 +1,8 @@
-// Knowledge bases: documents and folders the user adds once (the Knowledge page) for every agent to search,
-// by words (the full-text index, ranked by BM25), by meaning (local embeddings, when search by meaning is on)
-// or for exact text, with each passage citing where it came from. What the server and the pages share.
+// Knowledge bases: documents and folders the user adds once for agents to search, by words (the full-text
+// index, ranked by BM25), by meaning (local embeddings, when search by meaning is on) or for exact text, with
+// each passage citing where it came from. A base is shared (every session searches it: Spaces → Shared
+// knowledge) or a space's own (only that space's sessions do; a space can also leave the shared ones out).
+// What the server and the pages share.
 
 export interface KnowledgeSource {
   id: string;
@@ -15,6 +17,8 @@ export interface KnowledgeBase {
   id: string;
   name: string;
   description?: string;
+  /** The space it belongs to, whose sessions alone search it; none: shared, for every session. */
+  space?: string;
   createdAt: number;
   sources: KnowledgeSource[];
   /** Where files dropped on the page go (its own folder in the data folder). */
