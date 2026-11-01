@@ -343,6 +343,17 @@ export const swarm: Feature = {
     }
   },
 
+  start(d) {
+    // News a restart left unsent: a lead with posts it has not read from the last day hears of them in a while.
+    setTimeout(() => {
+      try {
+        tables(d.db);
+        const rows = d.db.prepare('select distinct swarm from swarm_posts where at > ?').all(Date.now() - 24 * 3600_000) as { swarm: string }[];
+        for (const r of rows) if (d.sessions.summary(r.swarm) && unread(d.db, r.swarm, r.swarm).length) schedule(d, r.swarm, false);
+      } catch {}
+    }, 30_000).unref();
+  },
+
   routes(d) {
     const keyOf = (req: { params: unknown }) => {
       const key = (req.params as { key: string }).key;
