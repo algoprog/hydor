@@ -2,7 +2,7 @@
 import crypto from 'node:crypto';
 import type { ApprovalOption, ApprovalRequest, ModelOption, Question, TimelineItem, ToolInfo } from '../../shared/types.ts';
 import { config } from '../config.ts';
-import { clip, firstLine } from '../history/common.ts';
+import { clip, firstLine, stripWrappers } from '../history/common.ts';
 import { codexGoal, commandInfo, fileChanges, unwrapShellString } from '../history/codex.ts';
 import type { Runner, RunSpec } from '../runner/client.ts';
 import { HttpError } from '../auth.ts';
@@ -600,8 +600,10 @@ export class CodexLive extends LiveAdapter {
     if (text) input.push({ type: 'text', text, text_elements: [] });
     for (const img of images) if (img.path) input.push({ type: 'localImage', path: img.path });
     const clientId = crypto.randomUUID();
-    const ho = splitHandoff(text);
-    this.overlayItems.set(`local:${clientId}`, { kind: 'user', id: `local:${clientId}`, seq: 0, ts: Date.now(), text: ho?.request ?? text, images: images.length || undefined, handoff: ho?.handoff });
+    // What the app added for the agent alone (<system-reminder>) is not shown, as in the transcript.
+    const shown = stripWrappers(text).text;
+    const ho = splitHandoff(shown);
+    this.overlayItems.set(`local:${clientId}`, { kind: 'user', id: `local:${clientId}`, seq: 0, ts: Date.now(), text: ho?.request ?? shown, images: images.length || undefined, handoff: ho?.handoff });
     this.touch();
     if (this.turnId) {
       try {

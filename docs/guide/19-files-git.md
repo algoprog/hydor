@@ -1,6 +1,6 @@
 # Files, Git, Terminal and Preview
 
-The tools around the agents: browse, find, open and edit the files on this computer, add them to spaces and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the dev servers running here and a live view of the computer (System) are here too, so you can check and finish an agent's work without leaving the app.
+The tools around the agents: browse, find, open and edit the files on this computer, add them to spaces and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the web apps running here, before and after screenshots of an agent's changes to one, and a live view of the computer (System) are here too, so you can check and finish an agent's work without leaving the app.
 
 ![Git: a project’s changes, a message for the commit, and its recent commits](images/files-git.webp)
 
@@ -478,16 +478,37 @@ The Terminal page adds a row of keys phones lack: **Ctrl** and **Alt** (they app
 
 ## Look at a dev server with Preview
 
-When you or an agent run a web app's dev server here (`npm run dev`, a Python server), Preview opens it in your browser, on this computer or any other device that reaches the app. Click **Preview** in the sidebar, or go to [Preview](/preview).
+When you or an agent run a web app's dev server here (`npm run dev`, a Python server), Preview shows it, on this computer or any other device that reaches the app. Click **Preview** in the sidebar, or go to [Preview](/preview).
 
-- **Running here** lists the servers listening on this computer, each with its port, the program, its folder and its command. Click **Open**.
-- For a server that isn't listed, type its port under **Another port** and click **Open**.
+On the left, **Web apps** lists the servers on this computer that answer with a web page: each with its project's name (its package's, else its folder's), its port, the page's title, what serves it when the app can tell (Vite, Next.js, Python…) and its folder. **Other servers**, folded, lists the rest: APIs, databases and the like. **Another port** opens one that isn't listed. The list refreshes every 5 seconds; the refresh button reads it at once.
 
-The preview opens in a tab of its own, on the app's preview address (port 8791 unless your install set another). That browser stays signed in to the preview for 12 hours, and hot reload works. Your sign-in to the app never reaches the dev server. A browser previews one server at a time: opening another moves the preview address to it. Each **Open** makes a fresh one-time link, so to look on your phone, open Preview there and click **Open**. The list refreshes every 5 seconds; **Refresh** reads it at once.
+Click a web app to show it on the right. On a computer the first one shows at once; on a phone it fills the screen, with **All servers** to go back. Above it:
 
-- If your browser can't reach the preview port, the page says so: on the same network or a VPN such as Tailscale or WireGuard, the port works directly; behind a tunnel or proxy, give the port a hostname of its own and start the app with `PREVIEW_ORIGIN` set to it.
-- "Previews are off" means the app was started with `PREVIEW_PORT=0`.
-- Preview is there only for the machine you opened the app on, not for other machines you switch to.
+- **Back**, **Forward** and **Reload**, and the address bar with the port and the page's path. It follows the links you click inside the app; type another path and press Enter to go there.
+- **Computer**, **Tablet** and **Phone**: the app at that screen's width (a phone's is 390 pixels), scaled down to fit.
+- **More** (⋯): **Open in a tab of its own**, **Ask an agent about this screen** (the start page opens with a picture of the screen attached, set to work in the app's folder, and "About this screen of …" for you to finish), **Save a picture of it**, and **Show it as a picture** or **Show it live**.
+
+### Live, or as pictures
+
+Preview shows a dev server live through the app's preview port (8791 unless your install set another), which keeps the dev server apart from the app: your sign-in never reaches it, and hot reload works. A browser previews one server at a time: showing another moves the preview port to it.
+
+When your browser can't reach the preview port (you reach the app through a tunnel or a proxy with one hostname, say), Preview shows pictures of the page instead, taken on this computer at the size you picked, and a line above says so. **Reload** takes a new picture. Click the line for how to see it live:
+
+- on the same network, or over a VPN such as Tailscale or WireGuard, open the app at this computer's own address: the port works directly;
+- behind a tunnel or a proxy, give the preview port a hostname of its own (preview.example.com → localhost:8791) and start the app with `PREVIEW_ORIGIN` set to it.
+
+Pictures need a Chromium on this computer: the one the browser uses ([Settings → Capabilities → Browser](/settings?s=browser) can download one). "Previews are off" means the app was started with `PREVIEW_PORT=0`. Preview is there only for the machine you opened the app on, not for other machines you switch to.
+
+## Review an agent's changes to a web app
+
+When an agent changes how a web app looks or works (a site or an app with a dev server, or HTML files), it shows you screenshots to review: before its first change, a picture of each screen it will change, and when it is done, the same screens again. It starts the app's dev server first when it isn't running.
+
+- A **Before** card shows the picture as it was. The computer and phone buttons switch between the two sizes when the agent took both.
+- A **Before and after** card shows each screen's pair. Drag the slider (or press ← and →) to sweep between before and after, or pick **Side by side**. **See them large** opens the pictures over the app. **Looks good** and **Change something** put a line about the screen in the message box, for you to finish and send.
+- On a wide screen the review opens beside the conversation, as pages do, and its card in the conversation stays small.
+- An after picture without a before one shows alone, with "No before picture to compare with"; the agent is told to take the before one first next time.
+
+You can also ask for a screenshot any time: "show me the settings page on a phone". The pictures are taken on this computer by a Chromium ([Settings → Capabilities → Browser](/settings?s=browser)) and kept with their session: they go when the session is deleted, and the oldest go first past 500 MB in all.
 
 ## Watch this computer on the System page
 
@@ -523,4 +544,5 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "Have the checks on this session's pull request passed yet?"
 - "Write a reading guide for what this branch changes."
 - "Which dev servers are running on this computer right now?"
+- "Make the checkout page's button bigger, and show me before and after on a phone."
 - "What's using the most memory on this computer?"

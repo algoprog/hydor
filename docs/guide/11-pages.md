@@ -1,23 +1,78 @@
 # Pages and published sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker, a calculator or a checklist. This topic covers the pages agents show in a conversation and how you answer them, keeping a page in your Pages library (with its versions, the data it keeps and an address of its own for your phone), and publishing a page or a built website at a link others can open.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker, a calculator or a checklist. This topic covers watching a page as an agent writes it, changing it yourself (by clicking on it, or in its code) so the agent builds on your version, keeping a page in your Pages library (with its picture, its versions, the data it keeps and an address of its own for your phone), making pages of your own, and publishing a page or a built website at a link others can open.
 
-![A page an agent made: a loan calculator to use again and again](images/pages.webp)
+![A page in the editor: its heading picked, with its words and look beside it](images/pages.webp)
 
 ## Pages in the conversation
 
-When a picture says more than words, an agent shows a page right in the conversation: a report, a chart, a table, a diagram, a mock-up, or options to pick from. Any agent in the app can do this; ask for it in plain words ("show me this as a chart", "compare the three laptops in a table").
+When a picture says more than words, an agent shows a page: a report, a chart, a table, a diagram, a mock-up, or options to pick from. Any agent in the app can do this; ask for it in plain words ("show me this as a chart", "compare the three laptops in a table").
 
-The page sits in the reply, as wide as the conversation, and grows to fit what it holds. A very tall page stops at a set height and shows **See the whole page** at its bottom edge. The bar above the page has:
+On a wide screen the page opens beside the conversation as the agent starts writing it (see [Watch a page as it is written](#watch-a-page-as-it-is-written)), and the conversation keeps a small card for it: its title, what it is ("A page · 24 KB", "Kept in Pages · version 2") and **Open**, or **Beside** for the one shown there. Click a card to show its page beside the conversation.
+
+In a narrower window, on a phone, or with the panel beside the conversation closed, the page sits in the reply, as wide as the conversation, and grows to fit what it holds. A very tall page stops at a set height and shows **See the whole page** at its bottom edge. The bar above the page has:
 
 - the page's title;
 - **Keep**: puts the page in your Pages library (see [Keep a page](#keep-a-page));
+- **Edit** (the pencil): opens it to change (see [Change a page yourself](#change-a-page-yourself));
 - **Save as a file** (the download icon): saves the page as an `.html` file you can open in any browser;
 - **Full screen** (the expand icon): opens the page over the app. Press Escape, tap the close button (✕) or click beside it to close it.
 
 A page runs in a frame of its own, apart from the app: it can't reach the app, your files or your sign-in. It can load charting and other libraries from the web.
 
-If you share the session with a read-only link, the person sees its pages too, but can't keep them, and what they pick on them goes nowhere ([Share a read-only link](/guide/sessions#share-a-read-only-link)).
+If you share the session with a read-only link, the person sees its pages too, but can't keep or change them, and what they pick on them goes nowhere ([Share a read-only link](/guide/sessions#share-a-read-only-link)).
+
+## Watch a page as it is written
+
+While an agent writes a page, you see it grow: headings, then the text, the tables and the cards, as they come. On a wide screen (1,100 pixels or more) it opens by itself in a panel beside the conversation, for the session on screen. The panel's top line says **Writing** with how much has come so far; the code button beside it shows the page's HTML coming in instead, and the eye button goes back to the page. In a narrower window, or on a phone, the page grows in its card in the conversation. Its scripts wait until the page is complete, then it runs.
+
+The panel also opens for an HTML file an agent writes whole (a static site's `index.html`, say), with its pictures and styles from the file's folder.
+
+- Drag the panel's left edge to make it wider or narrower; the app remembers the width on this device.
+- When a conversation has several pages, click the page's title in the panel to switch to another.
+- **More** (⋯) in the panel has **Open in Pages** (a saved page), **Show in Files** (an HTML file), **Save as a file**, and **Open pages here as they are written**: turn it off, and pages wait for you to open them from their cards.
+- ✕ closes the panel. **Details** in the session's header opens the session's details in its place.
+
+## Change a page yourself
+
+Any page an agent shows or saves, any page in your library and any HTML file an agent writes can be changed, in three ways. Pick one with the buttons at the top of the page (in the panel beside the conversation they are icons: the eye, the pencil and the code sign):
+
+- **Use**: the page itself, working: type in its fields, tick its boxes, pick its options.
+- **Edit**: change it by clicking on it. Its scripts are held back while you do, so the page stays still.
+- **Code**: its HTML, with the page beside it (below it in a narrow panel) showing your changes a moment after you type.
+
+Beside them, the screen buttons show the page as on a **Computer**, a **Tablet** or a **Phone** (in the panel and in a narrow window, one button with a menu).
+
+### Edit by clicking
+
+1. Click a part of the page: a heading, a paragraph, a picture, a card, a table. It gets a frame with its name ("Heading 2", "Picture", "Card"), and a small bar beside it.
+2. Click it again (or double-click it) to change its words where they are. Type, then press Enter (or Esc, or click elsewhere). Ctrl+B and Ctrl+I make words bold or italic.
+3. The bar beside it: drag its handle (⠿) to move the part elsewhere on the page; **Pick the part around it** (Esc does the same); **Change the words**; **Move up** and **Move down**; **Duplicate** (Ctrl+D); **Delete** (the Delete key).
+
+The panel under the page (beside it on a wide page) shows what is picked and the parts around it (click one to pick it), then:
+
+- **Content**: its words; for a heading or text, its **Kind** (H1, H2, H3, Text); for a link, where it **Goes to** and whether it opens in a **New tab**; for a picture, its address or **A picture from this device** (made small enough to live in the page) and its **Description**.
+- **Text**: size, **Regular** or **Bold**, alignment and colour (the page's own colours are the swatches; the rainbow one picks any other).
+- **Block**: its **Fill**, **Corners**, **Inside space**, **Space below**, a **Border** and its **Width**.
+- **More**: how its parts sit (**Stacked**, **In a row** or a **Grid**, with the **Gap**), its class and id, and its own style as CSS.
+
+With nothing picked, a click on the page's background picks **The page** itself: its **Background**, **Text colour**, **Font** (**System**, **Serif**, **Rounded** or **Mono**), **Width** (**Narrow**, **Medium** or **Full**) and **Text size**.
+
+**Add** puts a new part after the one picked (at the end of the page with nothing picked): a heading, text, a button, a picture, a list, a card, two columns, a table, a quote, a divider, some space or a section. Its words are ready to type where that fits.
+
+**Undo** (Ctrl+Z) and **Redo** (Ctrl+Shift+Z) step through your changes.
+
+### Save or discard
+
+Once you changed something, a bar at the bottom says **Not saved yet**, with **Discard** and **Save** (Ctrl+S, also from inside the page). Switching between **Use**, **Edit** and **Code** keeps your changes.
+
+- A saved page (in your library) gets a new version: the agent's versions stay, and you can go back to any of them ([Go back to an earlier version](#go-back-to-an-earlier-version)). If the page was saved again while you changed it (by an agent, say), the app asks before putting yours on top; the other stays among the versions.
+- A page shown in the conversation and not kept yet says **Keep with changes**: it goes into Pages, the agent's page as version 1 and yours as version 2.
+- An HTML file is saved in its place. If it changed on disk since you opened it, the app says so instead of writing over it.
+
+### The agent hears of your changes
+
+The agent that showed the page (and, for a saved page, the agent of the session that made it) hears of your changes with your next message to it: which page, its version, and what you changed, so it builds on your version instead of writing its own over it. The conversation shows a note, "You changed “Trip plan” (version 3) · the agent sees it with your next message", which turns to "the agent saw it" once the message went. Click the note to open the page again.
 
 ## Pick an option or fill in a form on a page
 
@@ -37,13 +92,17 @@ A page shown in the conversation lasts as long as the conversation. To come back
 1. Click **Keep** in the bar above the page.
 2. "Kept in Pages" confirms it. The button now reads **Kept**; click it to open the page in Pages.
 
+Changing a shown page and saving it keeps it too (**Keep with changes**, see [Save or discard](#save-or-discard)).
+
 What you entered on the page while it was in the conversation goes with it. Before you keep it, a page remembers what you enter only while it is on screen; once kept, it keeps its data for good (see [The data a page keeps](#the-data-a-page-keeps)).
 
 You can also ask an agent for something to keep from the start: "make me a habit tracker I can use on my phone", "a checklist for moving house". The agent saves it in Pages itself, and a card shows in the conversation with:
 
 - the page's title and **Saved in Pages · version 2** (the version this reply saved);
-- **Open**, which opens it in Pages, and **Full screen**;
+- **Open**, which opens it in Pages, **Edit** (the pencil) and **Full screen**;
 - the page itself, working, with its data, right in the card.
+
+On a wide screen, while pages show beside the conversation, the card stays small and its page opens beside it.
 
 When a newer version is saved later, an older card says **a newer one is there**. It still shows its own version and reads the page's data, but what you change there is not kept. If that version is no longer kept at all, the card says "This version is no longer kept; Open shows the latest". If the page was deleted, the card says so.
 
@@ -51,14 +110,25 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 ## Find your pages
 
-**Pages** in the sidebar ([/pages](/pages)) holds everything you kept and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page by its title in the search box (Ctrl+K, ⌘K on a Mac).
+**Pages** in the sidebar ([/pages](/pages)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page by its title in the search box (Ctrl+K, ⌘K on a Mac).
 
 The page has two tabs, each with a count:
 
-- **Saved**: your pages, the latest changed first. Each shows its first letter in a coloured square, its title, when it last changed, its version and, when it stores data, how much (`keeps 14 KB`). **Open** opens it; **More** (⋯) has **Rename**, **Publish** and **Delete**.
+- **Saved**: your pages, each as a card with a picture of it (the page as it opens, with its data; until the picture is taken, its first letter shows), its title, when it last changed and its version, a globe when it is published and a cylinder when it keeps data. Click a card to open the page. Its **More** (⋯) has **Edit**, **Rename**, **Duplicate** (a copy without its data), **Download** (as an `.html` file) and **Delete**.
 - **Published**: the pages and folders you published, with their links (see [See and unpublish what you published](#see-and-unpublish-what-you-published)). [Open the Published tab](/pages?tab=published).
 
-With nothing kept yet, the Saved tab says "No saved pages yet" and suggests keeping a page or asking an agent for a small tool.
+With more than four pages, **Find a page** above the cards narrows them by title, and the button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
+
+With nothing kept yet, the Saved tab says "No pages yet", with **New page**.
+
+## Make a page
+
+**New page**, at the top right of the Saved tab ([or from the search box](/pages?new=1)), makes a page of your own:
+
+1. Pick where it starts: **Blank page** (a heading and some words, to build on), **Notes** (a page to write in, kept as you type), **Checklist** (things to do, ticked off as you go) or **Tracker** (a number a day, with the last 30 days drawn).
+2. Change **Its name** if you like, and click **Make it**. A blank page opens in **Edit**; the others open ready to use.
+
+Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking") and click **Ask**: the start page opens with your words, for an agent to make the page and keep it in Pages.
 
 ## Open a page
 
@@ -66,12 +136,12 @@ A page opens full screen inside the app, at its own place in Pages. The bar at t
 
 - the back arrow (**All pages**) to the list;
 - the page's title, and under it its version, when it last changed and how much data it keeps. Click the title to rename the page;
-- **Versions**: its earlier versions (see [Go back to an earlier version](#go-back-to-an-earlier-version));
-- **On a phone**: its own address, for your phone (see [Use a page on your phone](#use-a-page-on-your-phone));
-- **Publish**: put it at a link others can open (see [Publish a page](#publish-a-page));
-- **More** (⋯): **Rename**, **Open in a new tab** (opens the page at its own address) and **Delete**.
+- **Use**, **Edit** and **Code**, and the **Computer**, **Tablet** and **Phone** sizes (see [Change a page yourself](#change-a-page-yourself));
+- **Versions** (the clock): its earlier versions (see [Go back to an earlier version](#go-back-to-an-earlier-version));
+- **Share**: its own address for your phone, and publishing it at a link (see [Use a page on your phone](#use-a-page-on-your-phone) and [Publish a page](#publish-a-page));
+- **More** (⋯): **What it keeps** (see [The data a page keeps](#the-data-a-page-keeps)), **Rename**, **Duplicate**, **Download**, **Open in a new tab** (opens the page at its own address) and **Delete**.
 
-On a phone, **Versions**, **On a phone** and **Publish** are icons, without their words.
+On a phone, **Use**, **Edit** and **Code** are icons, **Share** is the share icon, and the sizes are left out (the phone is the size).
 
 Pages made with the app's ready-made look follow the app's light or dark theme.
 
@@ -81,10 +151,10 @@ Click the page's title at the top, or use **More** (⋯) → **Rename** in the p
 
 ## Go back to an earlier version
 
-Every save of a page is a version of its own: the first one (kept by you, or saved by an agent), each change an agent saves, and each older version you bring back. Nothing is lost when a page changes.
+Every save of a page is a version of its own: the first one (kept or made by you, or saved by an agent), each change an agent saves, each change you save in the editor, and each older version you bring back. Nothing is lost when a page changes.
 
 1. Open the page and click **Versions**.
-2. The list shows each version (`v3`), its title (**The latest** for the current one), when it was made, who made it (**by the agent**, **kept by you** or **brought back**) and its size.
+2. The list shows each version (`v3`), its title (**The latest** for the current one), when it was made, who made it (**by the agent**, **kept by you**, **changed by you**, **made by you** or **brought back**) and its size.
 3. Click a version to look at it. A band above the page says "An older version, as it was 2 days ago. What it changes here is not kept." The older version works with the page's data, but anything you change in it is thrown away.
 4. Click **Bring it back** to make it current, or **Back to the latest** to leave it.
 
@@ -102,14 +172,14 @@ A small tool needs to remember things: the workouts you logged, the boxes you ti
 - Agents can read a page's data, to answer questions about it ("how many runs did I log this month?") or to change the page to fit it.
 - A published copy of a page does not keep data (see [Publish a page](#publish-a-page)).
 
-There is no button to clear a page's data; ask an agent to remove what you want gone, or delete the page.
+To see what a page keeps, open it and use **More** (⋯) → **What it keeps**. Each value is listed by its name, with its size and when it changed; click one to read it. Its bin removes that one value; **Download** saves them all as a `.json` file, and **Forget it all** empties the page's data (the page itself stays). Both ask first and can't be undone.
 
 ## Use a page on your phone
 
 Every kept page has an address of its own. It opens just the page, with its data, on any device, without signing in to Naget Agent: handy for a tracker you fill in on your phone.
 
-1. Open the page and click **On a phone**.
-2. The **Its own address** box shows the address. Click the copy button, or **Open** to try it.
+1. Open the page and click **Share**.
+2. **On your phone** shows the address. Click the copy button, or the open button beside it to try it.
 3. Open the address on your phone. To add it to the home screen:
    - **iPhone**: open it in Safari, then **Share** → **Add to Home Screen**.
    - **Android**: open it in Chrome, then **⋮** → **Add to Home screen**.
@@ -122,14 +192,14 @@ Anyone who has the address can open the page and change what it keeps, so share 
 
 If an address went somewhere it shouldn't, replace it:
 
-1. Open the page, click **On a phone**, then **New address**.
+1. Open the page, click **Share**, then **Give it a new address (the old one stops working)**.
 2. Confirm **New address**. The old address stops working at once, also on home screens it was added to. "The page has a new address" confirms it.
 
 Add the new address to your home screen again where you want it.
 
 ## Delete a page
 
-Use **More** (⋯) → **Delete** in the list or in the open page, and confirm. The page goes with all its versions, the data it keeps and any published copy of it. Its address stops working.
+Use **More** (⋯) → **Delete** on its card or in the open page, and confirm. The page goes with all its versions, the data it keeps and any published copy of it. Its address stops working.
 
 Pages holds up to 1,000 pages, and one page's HTML can be up to 2 MB.
 
@@ -137,7 +207,7 @@ Pages holds up to 1,000 pages, and one page's HTML can be up to 2 MB.
 
 Publishing puts a page at a link that people can open without the app's password. Use it to show someone a report or a small tool you made.
 
-1. Open the page and click **Publish**, or use **More** (⋯) → **Publish** in the list.
+1. Open the page, click **Share**, then **Publish at a link others can open**.
 2. Check the **Name** (up to 60 characters).
 3. Pick the kind of link:
    - **Private link**: an unguessable link, so only people you give it to can open it.
@@ -202,6 +272,7 @@ With nothing published, the tab says "Nothing published". **Publish a folder** i
 Agents can read and change your pages for you, with your OK on a card. A few things to try:
 
 - "Make me a workout log I can use on my phone, and keep it in Pages."
+- "I changed the headings on the trip page; now add a map under them."
 - "My budget tracker looked better yesterday: bring back the version from before your last change."
 - "What did I log in my habit tracker this week? Sum it up."
 - "Rename the page 'Untitled checklist' to 'Moving house'."

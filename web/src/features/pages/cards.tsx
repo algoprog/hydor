@@ -2,7 +2,7 @@
 // itself, working (its storage is the page's own), with Open for Pages. publish_site: a card that
 // needs the user, private or public link, Publish or Not now; then the link, or what happened.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppWindow, ChevronRight, Expand, ExternalLink, Globe, GlobeLock } from 'lucide-react';
+import { AppWindow, ChevronRight, Expand, ExternalLink, Globe, GlobeLock, PenLine } from 'lucide-react';
 import type { PublishRequest, SiteVisibility } from '@shared/pages';
 import type { ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
@@ -10,12 +10,12 @@ import { bytes, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError, useApp } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, IconButton, Segmented, Throbber } from '../../components/ui';
-import { usePicks } from '../session/HtmlPage';
+import { Button, cx, IconButton, Segmented, Throbber, useMediaQuery } from '../../components/ui';
+import { editPage, SmallPageCard, useOpensBeside, usePicks } from '../session/HtmlPage';
 import { StepLine, ToolDetail } from '../session/items';
-import { PageFrame, pageStore, previewStore } from './frame';
+import { PageFrame, pageStore, previewStore, StreamFrame } from './frame';
 import { PageOverlay } from './overlay';
-import { absolute, requestRef, savedRef, usePagesStore } from './state';
+import { absolute, CANVAS_MEDIA, requestRef, savedRef, useCanvas, useDrafts, usePagesStore } from './state';
 
 /** A line under a card while a call runs, or when it failed. */
 function Note({ children }: { children: ReactNode }) {
@@ -62,10 +62,14 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
   const ref = savedRef(item.tool.output);
   const pages = usePagesStore((s) => s.pages);
   const info = ref ? pages?.find((p) => p.id === ref.id) : undefined;
+  const draft = useDrafts((x) => x.byKey[sessionKey]?.[item.id]);
   const [page, setPage] = useState<{ title: string; html: string } | 'gone' | null>(null);
   const [height, setHeight] = useState(0);
   const [full, setFull] = useState(false);
   const onPick = usePicks(sessionKey, full);
+  const wide = useMediaQuery(CANVAS_MEDIA);
+  const besideOpen = useCanvas((x) => !!x.open[sessionKey]);
+  useOpensBeside(sessionKey, item);
   useEffect(() => {
     if (!pages) usePagesStore.getState().loadPages().catch(() => {});
   }, []);
@@ -82,8 +86,33 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
   // The version this call saved works with the page's data; an older one shows it without changing it.
   const current = !!info && info.version === ref?.version;
   const store = useMemo(() => (ref ? (current ? pageStore(ref.id) : previewStore(ref.id)) : null), [ref?.id, current]);
+  const writing = !ref && item.tool.status !== 'error' && (!draft || !draft.done || item.tool.status === 'running' || item.tool.status === 'pending');
+  const title = info?.title ?? (page && page !== 'gone' ? page.title : undefined) ?? draft?.title ?? 'Page';
 
   if (item.tool.status === 'error') return <Note>Could not save the page: {failure(item)}</Note>;
+  if (wide && besideOpen) {
+    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : `Saved in Pages · version ${ref?.version ?? 1}${info && !current ? ' · a newer one is there' : ''}`;
+    return <SmallPageCard sessionKey={sessionKey} item={item} title={title} sub={sub} writing={writing} />;
+  }
+  if (writing)
+    return draft?.text ? (
+      <div className="tl-item my-1.5 overflow-hidden rounded-xl border border-line bg-panel">
+        <div className="flex items-center gap-2 border-b border-line px-3 py-1.5 text-[13px]">
+          <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />
+          <span translate="no" className="min-w-0 flex-1 truncate font-medium text-fg-2">
+            {title}
+          </span>
+          <span className="shrink-0 text-[12px] text-fg-3">Writing · {kb(draft.text.length)}</span>
+        </div>
+        <div style={{ height: Math.min(Math.max(height, 120), 560) }} className="relative">
+          <StreamFrame html={draft.text} title={title} onHeight={setHeight} />
+        </div>
+      </div>
+    ) : (
+      <Note>
+        <Throbber /> Saving the page…
+      </Note>
+    );
   if (!ref)
     return (
       <Note>
@@ -91,7 +120,6 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
       </Note>
     );
   if (pages && !info) return <Note>This page was deleted from Pages.</Note>;
-  const title = info?.title ?? (page && page !== 'gone' ? page.title : 'Page');
   const open = () => go(`/pages/${ref.id}`);
   const frameKey = `${ref.id}:${ref.version}:${current}`;
   return (
@@ -102,7 +130,9 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
             <AppWindow size={19} strokeWidth={1.8} />
           </Tile>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13.5px] leading-5 font-medium text-fg">{title}</span>
+            <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
+              {title}
+            </span>
             <span className="block truncate text-[12px] leading-4 text-fg-3">
               Saved in Pages · version {ref.version}
               {info && !current ? ' · a newer one is there' : ''}
@@ -113,6 +143,9 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
           <Button size="sm" variant="subtle" onClick={open} className="h-8 px-2.5">
             Open
           </Button>
+          <IconButton label="Edit" onClick={() => editPage(sessionKey, { kind: 'page', id: ref.id })}>
+            <PenLine size={15} />
+          </IconButton>
           {page && page !== 'gone' && (
             <IconButton label="Full screen" onClick={() => setFull(true)}>
               <Expand size={16} />
@@ -150,6 +183,8 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
     </div>
   );
 }
+
+const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10_240 ? 1 : 0)} KB`);
 
 // ---- publish_site ----------------------------------------------------------------------------------
 

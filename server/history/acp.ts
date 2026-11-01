@@ -13,7 +13,7 @@
 // Custom adds a usage_update after each model call: its running totals for the ACP session (tokens in
 // `_meta.naget`, the cost when it knows it). Another ACP agent may send the cost alone.
 import type { FileChange, GoalInfo, SessionStats, TimelineItem, TodoEntry, ToolCategory, ToolInfo, ToolItem } from '../../shared/types.ts';
-import { ActivityLog, clip, emptyStats, firstLine, snippetDiff, wholeFileDiff, type Chunk } from './common.ts';
+import { ActivityLog, clip, emptyStats, firstLine, snippetDiff, stripWrappers, wholeFileDiff, type Chunk } from './common.ts';
 import { splitHandoff } from '../handoff.ts';
 import type { ParserOptions, SummaryData } from './claude.ts';
 
@@ -229,9 +229,11 @@ export class AcpParser {
           this.upsert({ kind: 'system', id: `goal${this.seq++}`, seq: 0, ts, level: m.note.level === 'warn' ? 'warn' : 'info', text: String(m.note.text), detail: m.note.detail ? String(m.note.detail) : undefined });
         break;
       case 'prompt': {
+        // What the app added for the agent alone (<system-reminder>) is not the user's.
+        const said = stripWrappers(String(m.text ?? '')).text;
         // A conversation carried over from another agent: the request is what follows its context.
-        const ho = splitHandoff(String(m.text ?? ''));
-        const text = ho ? ho.request : String(m.text ?? '');
+        const ho = splitHandoff(said);
+        const text = ho ? ho.request : said;
         const id = String(m.id ?? `u${this.seq++}`);
         this.open = null;
         this.turn = { id, start: ts ?? Date.now(), tools: 0 };
@@ -304,7 +306,7 @@ export class AcpParser {
       }
       case 'user_message_chunk': {
         // Replayed history (session/load): the user's own words.
-        const text = withoutBriefing(acpText(u.content));
+        const text = stripWrappers(withoutBriefing(acpText(u.content))).text;
         if (text) this.upsert({ kind: 'user', id: `ur${this.seq++}`, seq: 0, ts, text });
         this.open = null;
         return;

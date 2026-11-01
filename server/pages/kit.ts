@@ -7,6 +7,7 @@
 //
 // The functions below run in the browser, not here: their source is sent as text (Function#toString),
 // so each uses only its arguments and the browser's own globals.
+import { EDITOR_SRC } from './editor.ts';
 
 /** The ready-made classes. Light by default; body.n-page follows the app's dark theme. */
 export const KIT_CSS = `
@@ -71,6 +72,8 @@ export interface BridgeCfg {
   max: { key: number; value: number };
   /** Only the stand-ins for the browser's storage (a published site's own pages). */
   bare?: boolean;
+  /** Without a parent: what storage starts with (JSON text by key), for a picture of the page with its data. */
+  seed?: Record<string, string>;
 }
 
 /**
@@ -127,7 +130,7 @@ function bridge(cfg: BridgeCfg) {
   }
 
   // window.naget.storage: the app keeps a saved page's values; without the app, this page's memory does.
-  const local = new Map<string, string>();
+  const local = new Map<string, string>(Object.entries(cfg.seed ?? {}));
   const waits = new Map<number, [(v: unknown) => void, (e: Error) => void]>();
   let seq = 0;
   const call = (op: string, key?: string, value?: unknown): Promise<unknown> => {
@@ -265,22 +268,110 @@ export function injectHead(html: string, head: string): string {
 }
 
 /**
- * The frame's own script (/htmlframe): it waits for its parent to post the page, puts the kit at the
- * page's head (as injectHead does) and writes the page in place of itself.
+ * The frame's own script (/htmlframe). It waits for its parent to post the page, then:
+ * - `wa-html-page`: puts the kit at the page's head (as injectHead does) and writes the page in place of
+ *   itself, to run; with mode "edit", writes it with its scripts held back and the visual editor
+ *   (editor.ts) in place of the bridge.
+ * - `wa-html-stream`, again and again: a page still being written, drawn as far as it goes. Its scripts
+ *   are held back, and the page is changed in place (what was there stays), so it grows without
+ *   flashing, following its end unless the reader scrolled up.
  */
-function frame(kit: string, bridgeSrc: string) {
+function frame(kit: string, bridgeSrc: string, editorSrc: string) {
+  const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
+  const nonce = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
+  const theme = (v: unknown) => (v === 'dark' ? 'dark' : 'light');
+  const js = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
+  const DOCTYPE = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i;
+
+  /** Scripts, handlers and redirects of a page held back: kept in the page, but not run. */
+  const holdBack = (doc: Document) => {
+    for (const el of doc.querySelectorAll('script')) {
+      el.setAttribute('data-n-type', el.getAttribute('type') ?? '');
+      el.setAttribute('type', 'text/x-naget-held');
+    }
+    for (const el of doc.querySelectorAll('*'))
+      for (const a of [...el.attributes]) {
+        const name = a.name.toLowerCase();
+        if (name.startsWith('on') || (name === 'http-equiv' && /refresh/i.test(a.value))) {
+          el.removeAttribute(a.name);
+          el.setAttribute(`data-n-x-${a.name}`, a.value);
+        }
+      }
+  };
+
+  /** Makes `to` (a live node) look like `from`, keeping the nodes they share. */
+  const morph = (to: Element, from: Element) => {
+    for (const a of [...to.attributes]) if (!from.hasAttribute(a.name)) to.removeAttribute(a.name);
+    for (const a of [...from.attributes]) if (to.getAttribute(a.name) !== a.value) to.setAttribute(a.name, a.value);
+    let t = to.firstChild;
+    let f = from.firstChild;
+    while (f) {
+      const nextF: ChildNode | null = f.nextSibling;
+      if (!t) {
+        to.appendChild(document.importNode(f, true));
+      } else if (t.nodeType === f.nodeType && (t.nodeType !== 1 || (t as Element).tagName === (f as Element).tagName)) {
+        if (t.nodeType === 1) morph(t as Element, f as Element);
+        else if (t.nodeValue !== f.nodeValue) t.nodeValue = f.nodeValue;
+        t = t.nextSibling;
+      } else {
+        const n = document.importNode(f, true);
+        to.replaceChild(n, t);
+        t = n.nextSibling;
+      }
+      f = nextF;
+    }
+    while (t) {
+      const nextT: ChildNode | null = t.nextSibling;
+      to.removeChild(t);
+      t = nextT;
+    }
+  };
+
+  let streamN = '';
+  let lastH = -1;
+  // Following the end while it grows, until the reader scrolls up from it.
+  let follow = true;
+  addEventListener('scroll', () => {
+    const el = document.scrollingElement ?? document.documentElement;
+    follow = el.scrollTop + innerHeight >= el.scrollHeight - 48;
+  });
+  const stream = (d: { html: string; n?: unknown; theme?: unknown }) => {
+    streamN = nonce(d.n);
+    const doc = new DOMParser().parseFromString(d.html, 'text/html');
+    holdBack(doc);
+    const kitEl = doc.createElement('style');
+    kitEl.id = 'n-kit';
+    kitEl.textContent = kit;
+    doc.head.prepend(kitEl);
+    doc.documentElement.setAttribute('data-n-theme', theme(d.theme));
+    morph(document.documentElement, doc.documentElement);
+    const el = document.scrollingElement ?? document.documentElement;
+    const h = Math.max(el.scrollHeight, document.body ? document.body.scrollHeight : 0);
+    if (h !== lastH) parent.postMessage({ type: 'wa-html-size', h: (lastH = h), n: streamN }, '*');
+    if (follow) el.scrollTop = el.scrollHeight;
+  };
+
   addEventListener('message', (e) => {
     const d = e.data;
-    if (e.source !== parent || !d || d.type !== 'wa-html-page' || typeof d.html !== 'string') return;
-    const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
-    const cfg = {
-      n: typeof d.n === 'string' ? d.n.slice(0, 64) : '',
-      theme: d.theme === 'dark' ? 'dark' : 'light',
-      max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) },
-    };
-    const head = `<style id="n-kit">${kit}</style><script>(${bridgeSrc})(${JSON.stringify(cfg).replace(/</g, '\\u003c')})</script>`;
-    const m = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(d.html);
-    const html = m ? m[0] + head + d.html.slice(m[0].length) : head + d.html;
+    if (e.source !== parent || !d || typeof d.html !== 'string') return;
+    if (d.type === 'wa-html-stream') return stream(d);
+    if (d.type !== 'wa-html-page') return;
+    const m = DOCTYPE.exec(d.html);
+    let head: string;
+    let html = d.html;
+    if (d.mode === 'edit') {
+      const doc = new DOMParser().parseFromString(d.html, 'text/html');
+      holdBack(doc);
+      const labels = d.labels && typeof d.labels === 'object' ? d.labels : {};
+      const cfg = { n: nonce(d.n), theme: theme(d.theme), doctype: m ? m[0].trim() : '', labels };
+      head = `<style id="n-kit" data-n-own>${kit}</style><script data-n-own>(${editorSrc})(${js(cfg)})</script>`;
+      html = (m ? m[0] : '') + doc.documentElement.outerHTML;
+    } else {
+      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) } };
+      head = `<style id="n-kit">${kit}</style><script>(${bridgeSrc})(${js(cfg)})</script>`;
+    }
+    const at = DOCTYPE.exec(html);
+    html = at ? at[0] + head + html.slice(at[0].length) : head + html;
     document.open();
     document.write(html);
     document.close();
@@ -292,4 +383,4 @@ const asJs = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
 
 /** The document of /htmlframe, where every page renders (sandboxed by PAGE_CSP). */
 export const frameHtml = () =>
-  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)})</script></body></html>`;
+  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)})</script></body></html>`;

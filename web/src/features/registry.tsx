@@ -26,6 +26,7 @@ import { opinionFeature } from './opinion/feature';
 import { pagesFeature } from './pages/feature';
 import { researchFeature } from './research/feature';
 import { searchFeature } from './search/feature';
+import { shotsFeature } from './shots/feature';
 import { skillpackFeature } from './skillpack/feature';
 import { spacesFeature } from './spaces/feature';
 import { swarmFeature } from './swarm/feature';
@@ -88,6 +89,8 @@ export interface WebFeature {
   SessionDock?: ComponentType<{ s: SessionSummary }>;
   /** A view of the sessions it started, in place of their conversation until you switch. */
   sessionPane?: SessionPane;
+  /** Beside a session's conversation on a wide screen (a page being written or changed), while `useOpen` says so. */
+  sessionSide?: { useOpen: (key: string) => boolean; close: (key: string) => void; Panel: ComponentType<{ s: SessionSummary }> };
   /** Buttons beside the message box's attach button; `insert` adds text to the message being written. */
   ComposerButtons?: ComponentType<{ s?: SessionSummary; insert: (text: string) => void; disabled?: boolean }>;
   /** On the start page, options for the new session, kept in its settings. */
@@ -99,6 +102,7 @@ let list: WebFeature[] | null = null;
 export const features = (): WebFeature[] =>
   (list ??= [
     pagesFeature,
+    shotsFeature,
     searchFeature,
     browserFeature,
     memoryFeature,
@@ -149,6 +153,18 @@ export const featureSections = (): FeatureSection[] => features().flatMap((f) =>
 export function sessionPaneOf(s: SessionSummary): SessionPane | undefined {
   for (const f of features()) if (f.sessionPane?.match(s)) return f.sessionPane;
   return undefined;
+}
+
+/** What shows beside this session's conversation now, if anything (the first capability that shows something). */
+export function useSessionSide(key: string): NonNullable<WebFeature['sessionSide']> | null {
+  let found: NonNullable<WebFeature['sessionSide']> | null = null;
+  // Each side's hook runs every time, in the same order (the list never changes).
+  for (const f of features())
+    if (f.sessionSide) {
+      const open = f.sessionSide.useOpen(key);
+      if (open && !found) found = f.sessionSide;
+    }
+  return found;
 }
 
 /** Each feature's items in one part of a session's menu. */

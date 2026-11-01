@@ -170,6 +170,8 @@ function isText(s, jsx = false) {
   const bare = t.replace(/\{\d+\}/g, '');
   if (!/[A-Za-z]{2}/.test(bare)) return false;
   if (/^(https?:|\/|\.\/|#|data:|mailto:)/.test(t) || /:\/\//.test(t)) return false;
+  // Markup and stylesheets (a page's HTML, a block the page editor adds) are no text the app shows.
+  if ((/^(?:\{\d+\})*</.test(t) && /<\/?[a-z][\w-]*[\s>]/i.test(t)) || /^[.#]?[a-z][\w-]*\s*\{[^}]*:[^}]*\}/i.test(t)) return false;
   if (/=>|===|!==|&&|\|\||\$\(|\bfunction\b|\breturn\b|^\w+\(|\)\s*\{|@__PURE__|\bjsxs?\(|className:|children:|;\s*(const|let|var|if|for)\b/.test(t)) return false;
   if (/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/.test(t)) return false;
   if (/^(color-mix|translate|rgba?|hsla?|var|calc|url|linear-gradient)\(/.test(t)) return false;

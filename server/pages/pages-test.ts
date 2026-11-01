@@ -11,6 +11,9 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
+import { notesOf } from '../notes.ts';
+import { draftsOf, endDrafts, feedDraft, JsonFields } from './drafts.ts';
+import { takeEdits } from './edits.ts';
 import { pages } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -232,6 +235,85 @@ let privPath = '';
   ok((await get(privPath)).statusCode === 404, 'an unpublished site is gone at once');
   await req('DELETE', `/api/pages/${sid}`);
   ok((await get(ps.path)).statusCode === 404, 'deleting a page unpublishes it');
+}
+
+// ---- a page as an agent writes it ------------------------------------------------------------------------
+{
+  // The JSON of a call's input, cut anywhere (in a key, an escape, a \u sequence): the fields come out whole.
+  const input = { title: 'Trip "plan"', id: 'abc', n: 3, nested: { html: 'not this', list: ['}', '"'] }, html: '<!doctype html>\n<p>Café — “ok” \\ 😀 \u2028</p>' };
+  const json = JSON.stringify(input).replace('Café', 'Caf\\u00e9');
+  for (const size of [1, 2, 3, 5, 7, 64]) {
+    const f = new JsonFields(new Set(['title', 'html', 'id']));
+    for (let i = 0; i < json.length; i += size) f.feed(json.slice(i, i + size));
+    ok(f.fields.get('html') === input.html && f.fields.get('title') === input.title && f.fields.get('id') === 'abc', `a call's fields read whole from pieces of ${size}`);
+  }
+  const f = new JsonFields(new Set(['html']));
+  f.feed('{"html": "<p>Hel');
+  ok(f.fields.get('html') === '<p>Hel', 'a field is there as far as it came');
+  f.feed('lo\\');
+  ok(f.fields.get('html') === '<p>Hello', 'an escape cut off waits for the rest');
+  f.feed('n</p>"}');
+  ok(f.fields.get('html') === '<p>Hello\n</p>', 'and comes in once it is whole');
+
+  const sent: { key: string; data: any }[] = [];
+  const dd = { ...deps, toSubscribers: (key: string, e: { data: unknown }) => void sent.push({ key, data: e.data }) } as unknown as Deps;
+  const name = 'mcp__naget-agent__show_html';
+  const call = JSON.stringify({ title: 'Plan', html: '<!doctype html><h1>Plan</h1><p>Day one</p>' });
+  feedDraft(dd, 'claude:s9', { id: 't1', name, at: 'start' });
+  for (let i = 0; i < call.length; i += 9) feedDraft(dd, 'claude:s9', { id: 't1', name, at: 'delta', delta: call.slice(i, i + 9) });
+  await new Promise((r) => setTimeout(r, 200));
+  const whole = () => sent.filter((x) => x.data.draft.id === 't1').reduce((acc, x) => (x.data.from === 0 ? x.data.text : acc.slice(0, x.data.from) + x.data.text), '');
+  ok(sent.length >= 1 && sent.length < 10 && sent[0].key === 'claude:s9' && sent[0].data.from === 0, 'a page being written goes to its session in a few pieces');
+  ok(whole() === JSON.parse(call).html && sent.at(-1)!.data.draft.title === 'Plan', 'the pieces make the page so far');
+  ok(draftsOf('claude:s9')[0]?.text === JSON.parse(call).html && !draftsOf('claude:s9')[0].done, 'a page opened mid-way gets it whole');
+  feedDraft(dd, 'claude:s9', { id: 't1', name, at: 'end', input: JSON.parse(call) });
+  ok(sent.at(-1)!.data.draft.done && whole() === JSON.parse(call).html, 'the end of the call says it is done');
+  feedDraft(dd, 'claude:s9', { id: 'w1', name: 'Write', at: 'start' });
+  feedDraft(dd, 'claude:s9', { id: 'w1', name: 'Write', at: 'delta', delta: JSON.stringify({ file_path: '/x/notes.md', content: 'not a page' }) });
+  feedDraft(dd, 'claude:s9', { id: 'w2', name: 'Write', at: 'start' });
+  feedDraft(dd, 'claude:s9', { id: 'w2', name: 'Write', at: 'delta', delta: JSON.stringify({ file_path: '/x/site/index.html', content: '<h1>Site</h1>' }) });
+  feedDraft(dd, 'claude:s9', { id: 'b1', name: 'Bash', at: 'start' });
+  await new Promise((r) => setTimeout(r, 200));
+  const ids = draftsOf('claude:s9').map((x) => x.id);
+  ok(ids.includes('w2') && !ids.includes('w1') && !ids.includes('b1'), 'an HTML file written whole is followed; other files and tools are not');
+  feedDraft(dd, 'claude:s9', { id: 't2', name, at: 'start' });
+  feedDraft(dd, 'claude:s9', { id: 't2', name, at: 'delta', delta: '{"html":"<p>cut' });
+  endDrafts(dd, 'claude:s9');
+  ok(draftsOf('claude:s9').find((x) => x.id === 't2')?.done, 'a turn that stops leaves the page where it was, done');
+}
+
+// ---- the user changes a page; the agent hears of it -------------------------------------------------------
+{
+  const id = idOf((await run('save_page', { title: 'Habits', html: '<!doctype html>\n<h1>Habits</h1>\n<p>Walk</p>\n' })).text);
+  let r = await req('POST', `/api/pages/${id}/versions`, { html: '<!doctype html>\n<h1>My habits</h1>\n<p>Walk</p>\n', base: 1, sessionKey: 'claude:s2' });
+  ok(r.json().page.version === 2 && r.json().page.by === 'edit', 'a changed page is saved as a version by the user');
+  ok((await req('POST', `/api/pages/${id}/versions`, { html: '<p>stale</p>', base: 1 })).statusCode === 409, 'a change made to an older version is refused…');
+  ok((await req('POST', `/api/pages/${id}/versions`, { html: '<!doctype html>\n<h1>My habits</h1>\n<p>Walk</p>\n<p>Read</p>\n', base: 1, force: true, sessionKey: 'claude:s2' })).json().page.version === 3, '…unless the user says to save it anyway');
+  const notes = notesOf(db, 'claude:s2', 'page-edit');
+  ok(notes.length === 1 && (notes[0].data as { version: number; told: boolean }).version === 3 && !(notes[0].data as { told: boolean }).told, 'one note in the conversation says the agent will see it');
+  const told = takeEdits(db, 'claude:s2') ?? '';
+  ok(told.includes(`saved page ${id}`) && told.includes('-<h1>Habits</h1>') && told.includes('+<h1>My habits</h1>') && told.includes('+<p>Read</p>'), 'the agent hears what changed, from the version it knew');
+  ok(takeEdits(db, 'claude:s1')?.includes('Habits'), 'the session that made the page hears of it too');
+  ok(takeEdits(db, 'claude:s2') === null, 'and only once');
+  ok((notesOf(db, 'claude:s2', 'page-edit')[0].data as { told: boolean }).told, 'the note then says the agent saw it');
+  ok((await run('get_page', { id })).text?.includes('changed by the user'), 'get_page says the user changed it last');
+  // A page shown in the conversation, kept with the user's changes.
+  r = await req('POST', '/api/pages', { title: 'Options', html: '<!doctype html>\n<h1>A or B</h1>\n', sessionKey: 'claude:s3', item: 'toolu_1', edited: '<!doctype html>\n<h1>A or C</h1>\n' });
+  const kept = r.json().page;
+  ok(kept.version === 2 && kept.by === 'edit', 'a shown page kept with changes has the agent’s version and the user’s');
+  const k = takeEdits(db, 'claude:s3') ?? '';
+  ok(k.includes('a page you showed with show_html') && k.includes('+<h1>A or C</h1>'), 'the agent hears its page was kept and changed');
+  ok((await req('POST', '/api/pages', { title: 'Options', html: '<p>again</p>', sessionKey: 'claude:s3', item: 'toolu_1' })).json().page.id === kept.id, 'keeping it again gives the same page');
+  const made = (await req('POST', '/api/pages', { title: 'Blank', html: '<!doctype html><p>mine</p>' })).json().page;
+  ok(made.by === 'made' && !made.sessionKey, 'a page the user makes is theirs');
+  const copy = (await req('POST', `/api/pages/${id}/copy`)).json().page;
+  ok(copy.id !== id && copy.title === 'Habits (copy)' && copy.version === 1, 'a copy is a page of its own');
+  await req('POST', `/api/pages/${id}/storage`, { op: 'set', key: 'days', value: [1, 2] });
+  const entries = (await req('GET', `/api/pages/${id}/data`)).json().entries;
+  ok(entries.length === 1 && entries[0].key === 'days' && JSON.stringify(entries[0].value) === '[1,2]', 'the Data view lists what a page keeps');
+  await req('DELETE', `/api/pages/${id}/data`);
+  ok((await req('GET', `/api/pages/${id}/data`)).json().entries.length === 0, 'and can clear it');
+  ok((await req('GET', `/api/pages/${id}/thumb`)).statusCode === 404, 'a page has no picture until one is taken');
 }
 
 await app.close();

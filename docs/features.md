@@ -88,7 +88,12 @@ agents that speak ACP and take MCP servers.
   rounds and how many searches in all are yours to set; a bar in the session says what it is doing and the
   searches used, and opens the report once it is ready.
 - **Pages and templates**: pages the agents show can answer back (pick an option, fill in a form), stay in a
-  library with storage of their own and an address for a phone's home screen, and folders publish at a link.
+  library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
+  link. A page shows as the agent writes it (beside the conversation on a wide screen), and you can change it:
+  click a part to rewrite its words, restyle it, move or delete it, add new parts, or edit its HTML with the page
+  beside it, at a computer's, tablet's or phone's width; the agent hears of your changes with your next message.
+  HTML files an agent writes open the same way. Make pages of your own from a blank page, notes, a checklist or
+  a tracker, and see or clear the data a page keeps.
   Templates are tasks you repeat, each with a form: ready-made or your own, run from the Templates page, the
   API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's result, asked on its page
   or in its session, which opens on that result with a switch to the conversation.
@@ -154,7 +159,10 @@ with npm into the app's folder), and the copies the app installed are kept up to
 ## Following along
 - A readable timeline: the agent's messages read like a chat, and its commands fold into small boxes with
   plain-words names ("Run the tests", "Read index.ts"), each a click away from its full output.
-- Agents can answer with a page (a chart, a report, a mock-up), shown in the conversation.
+- Agents can answer with a page (a chart, a report, a mock-up), shown in the conversation as it is written, or
+  beside it on a wide screen.
+- Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
+  from before and after, on a computer's or a phone's screen, to compare with a slider or side by side.
 - Every file a turn changed, with its diff. Screenshots you attach show in the conversation and open full size.
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - Message the agent while it works: your note joins the running turn, or waits in a queue you can reorder and
@@ -186,6 +194,10 @@ with npm into the app's folder), and the copies the app installed are kept up to
   the files, see each diff, have the message drafted from the changes, commit and push in one go), discard a
   file's changes, switch or create branches and delete merged ones, stash and apply, and open any commit to
   see what it changed.
+- Preview: the web apps running on this computer (dev servers, told apart from APIs and databases, with their
+  project, page title and framework), shown inside the app at a computer's, tablet's or phone's width with an
+  address bar, back and forward; as pictures taken on this computer where the browser can't reach the preview
+  port (behind a tunnel); and a screen goes to a new session as a picture, with a question.
 - Terminal: real shells that survive reloads and server restarts, with suggestions as you type (from your
   history, branches, scripts and folders, or written from a plain description) and an extra row of keys on
   phones.
