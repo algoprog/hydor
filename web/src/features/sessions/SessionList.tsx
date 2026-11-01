@@ -196,6 +196,7 @@ const RowBody = memo(function RowBody({
                 onRename?.(s.key);
               }}
               className={cx('min-w-0 flex-1 truncate text-[13.5px]', active || unread ? 'font-medium text-fg' : 'text-fg')}
+              translate="no"
             >
               {s.title}
             </span>
