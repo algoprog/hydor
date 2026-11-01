@@ -76,7 +76,8 @@ export function AskBox({
   const wrap = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   useOutside([wrap], () => setOpen(false), open && !hero);
-  const found = useMemo(() => (topics && q.trim() ? searchGuide(topics, q, hero ? 8 : 6) : []), [topics, q, hero]);
+  // A few, so the list fits under the box: the best four, with asking an agent above them.
+  const found = useMemo(() => (topics && q.trim() ? searchGuide(topics, q, 4) : []), [topics, q]);
   useEffect(() => setSel(0), [q]);
   // A question picked below the box: it shows what the guide has, ready to ask.
   useEffect(() => {
