@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { Activity, CircleHelp, FolderTree, Gauge, GitBranch, Inbox, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
+import { Activity, CircleHelp, FolderTree, Gauge, GitBranch, Inbox, LayoutGrid, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
 import { activityOf } from '../../lib/activity';
 import { useMachines } from '../../lib/machines';
 import { MOD, pct } from '../../lib/format';
@@ -9,7 +9,9 @@ import { useApp, useSessions, useUI, useUsage } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Logo } from '../../components/Logo';
 import { severityColor } from '../../components/charts';
-import { cx, IconButton, Kbd, MenuItem, Popover } from '../../components/ui';
+import { cx, IconButton, Kbd, MenuItem, MenuSep, Popover } from '../../components/ui';
+import { SpaceMark } from '../spaces/parts';
+import { useSpaces } from '../spaces/state';
 import { SessionList } from '../sessions/SessionList';
 import { openPalette } from '../palette/CommandPalette';
 import { startTour } from '../tour/Tour';
@@ -91,6 +93,12 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const [loc] = useLocation();
   const [q, setQ] = useState('');
   const filter = useUI((s) => s.agentFilter);
+  const spaceFilter = useUI((s) => s.spaceFilter);
+  const spaces = useSpaces();
+  // A space deleted while the list showed only its sessions: all of them again.
+  useEffect(() => {
+    if (spaces && spaceFilter && !spaces.some((s) => s.id === spaceFilter)) useUI.getState().set({ spaceFilter: null });
+  }, [spaces, spaceFilter]);
   const connected = useApp((s) => s.connected);
   const updates = useApp((s) => (s.boot?.update?.behind ?? 0) > 0);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -164,8 +172,8 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
                 </button>
               )
             )}
-            <IconButton ref={filterRef} label="Filter by agent" size="sm" active={filter !== 'all'} onClick={() => setFilterOpen((o) => !o)}>
-              <ListFilter size={14} className={cx(filter !== 'all' && 'text-accent')} />
+            <IconButton ref={filterRef} label={spaces?.length ? 'Filter by agent or space' : 'Filter by agent'} size="sm" active={filter !== 'all' || !!spaceFilter} onClick={() => setFilterOpen((o) => !o)}>
+              <ListFilter size={14} className={cx((filter !== 'all' || spaceFilter) && 'text-accent')} />
             </IconButton>
           </span>
           <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={200}>
@@ -188,6 +196,28 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
                 {label}
               </MenuItem>
             ))}
+            {!!spaces?.length && (
+              <>
+                <MenuSep />
+                <MenuItem checked={!spaceFilter} onClick={() => (useUI.getState().set({ spaceFilter: null }), setFilterOpen(false))}>
+                  Every space
+                </MenuItem>
+                {spaces.slice(0, 8).map((sp) => (
+                  <MenuItem key={sp.id} icon={<SpaceMark s={sp} size={14} />} checked={spaceFilter === sp.id} onClick={() => (useUI.getState().set({ spaceFilter: sp.id }), setFilterOpen(false))}>
+                    {sp.name}
+                  </MenuItem>
+                ))}
+                <MenuItem
+                  icon={<LayoutGrid size={14} />}
+                  onClick={() => {
+                    setFilterOpen(false);
+                    nav('/spaces');
+                  }}
+                >
+                  Spaces
+                </MenuItem>
+              </>
+            )}
           </Popover>
         </div>
       </div>

@@ -1,0 +1,41 @@
+// Spaces: a project's sessions, files, memory, instructions and assistant in one place, picked by name on the
+// start page in place of a folder. Each space has a folder of its own (its files, and so its project memory),
+// instructions every session in it gets, and the assistant its sessions start as. What the server and the
+// pages share.
+
+export interface Space {
+  id: string;
+  name: string;
+  /** A name from SPACE_COLORS. */
+  color: string;
+  description?: string;
+  /** Where its sessions work, its files are and its memory is kept. */
+  folder: string;
+  /** What every session in it is told (who it is for, how to work, what to keep in mind). */
+  instructions?: string;
+  /** The assistant its sessions start as (General, Researcher…). */
+  assistant?: string;
+  createdAt: number;
+}
+
+/** A space with how many sessions it has, and when one was last at work. */
+export interface SpaceView extends Space {
+  sessions: number;
+  lastAt?: number;
+}
+
+/** A space's colour, by name (as templates have theirs). */
+export const SPACE_COLORS: Record<string, string> = {
+  amber: '#d99a06',
+  blue: '#3b82f6',
+  green: '#22a55e',
+  pink: '#ec4899',
+  violet: '#8b5cf6',
+  teal: '#14b8a6',
+  orange: '#f97316',
+  slate: '#64748b',
+};
+
+export const spaceColor = (s: Pick<Space, 'color'>) => SPACE_COLORS[s.color] ?? SPACE_COLORS.blue;
+
+export const MAX_SPACE_INSTRUCTIONS = 4000;

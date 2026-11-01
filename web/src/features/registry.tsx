@@ -25,6 +25,7 @@ import { pagesFeature } from './pages/feature';
 import { researchFeature } from './research/feature';
 import { searchFeature } from './search/feature';
 import { skillpackFeature } from './skillpack/feature';
+import { spacesFeature } from './spaces/feature';
 import { swarmFeature } from './swarm/feature';
 import { voiceFeature } from './voice/feature';
 
@@ -100,6 +101,7 @@ export const features = (): WebFeature[] =>
     browserFeature,
     memoryFeature,
     knowledgeFeature,
+    spacesFeature,
     childrenFeature,
     opinionFeature,
     budgetFeature,

@@ -20,8 +20,9 @@ import { releaseNotes } from '../releases/index.ts';
 import { research } from '../research/index.ts';
 import { search } from '../search/index.ts';
 import { skillpack } from '../skillpack/index.ts';
+import { spaces } from '../spaces/index.ts';
 import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, knowledge, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, find, releaseNotes];
+export const FEATURES: Feature[] = [pages, search, browser, memory, knowledge, spaces, children, swarm, research, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, find, releaseNotes];
