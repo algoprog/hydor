@@ -96,6 +96,31 @@ export function FieldInput({ f, value, onChange, file, onFile, disabled, maxMb =
       return <input id={id} className={cx(inputCls, 'max-w-[240px]')} type="date" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} />;
     case 'choice': {
       const opts = f.options ?? [];
+      if (f.multi) {
+        // Several at once (a form an MCP server asks for): the value has one per line.
+        const picked = value.split('\n').filter(Boolean);
+        const flip = (o: string) => onChange((picked.includes(o) ? picked.filter((x) => x !== o) : opts.filter((x) => x === o || picked.includes(x))).join('\n'));
+        return (
+          <div role="group" aria-labelledby={`${id}-label`} className="flex flex-wrap gap-1.5">
+            {opts.map((o) => (
+              <button
+                key={o}
+                type="button"
+                role="checkbox"
+                aria-checked={picked.includes(o)}
+                disabled={disabled}
+                onClick={() => flip(o)}
+                className={cx(
+                  'h-8.5 rounded-full px-3.5 text-[13.5px] ring-1 transition-colors ring-inset',
+                  picked.includes(o) ? 'bg-accent-soft font-medium text-accent ring-accent/40' : 'bg-bg-1 text-fg-2 ring-line-2 hover:bg-bg-2 hover:text-fg',
+                )}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        );
+      }
       // A few short options read best as chips; many as a list.
       if (opts.length <= 5 && opts.join('').length <= 60)
         return (

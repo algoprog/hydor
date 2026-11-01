@@ -80,7 +80,12 @@ export interface HttpReply {
  * One POST to a Streamable HTTP server. The replies to the requests in `body` come back as JSON or on an
  * event stream, which is read until each request has its answer.
  */
-export async function postHttp(url: string, body: Rpc | Rpc[], headers: Record<string, string>, o: { sessionId?: string; protocol?: string; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<HttpReply> {
+export async function postHttp(
+  url: string,
+  body: Rpc | Rpc[],
+  headers: Record<string, string>,
+  o: { sessionId?: string; protocol?: string; signal?: AbortSignal; timeoutMs?: number; onRequest?: (m: Rpc) => Promise<Rpc> } = {},
+): Promise<HttpReply> {
   const list = Array.isArray(body) ? body : [body];
   const want = new Set(list.filter(isRequest).map((m) => String(m.id)));
   const signal = AbortSignal.any([o.signal ?? new AbortController().signal, AbortSignal.timeout(o.timeoutMs ?? 600_000)]);
@@ -109,6 +114,19 @@ export async function postHttp(url: string, body: Rpc | Rpc[], headers: Record<s
   }
   if (type.includes('text/event-stream') && r.body) {
     const replies: Rpc[] = [];
+    // The app asks something of its client while it works (a form for the user): answered by a POST of its own.
+    const answer = (m: Rpc) =>
+      void o.onRequest!(m)
+        .then((reply) =>
+          fetchSigned(url, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'user-agent': UA, ...(sessionId || o.sessionId ? { 'mcp-session-id': (sessionId ?? o.sessionId)! } : {}), ...(o.protocol ? { 'mcp-protocol-version': o.protocol } : {}), ...headers },
+            body: JSON.stringify(reply),
+            signal,
+          }),
+        )
+        .then(({ res }) => res.body?.cancel().catch(() => {}))
+        .catch(() => {});
     for await (const e of events(r.body)) {
       if (e.event !== 'message') continue;
       try {
@@ -117,7 +135,7 @@ export async function postHttp(url: string, body: Rpc | Rpc[], headers: Record<s
           if (isReply(x) && want.has(String(x.id))) {
             replies.push(x);
             want.delete(String(x.id));
-          }
+          } else if (isRequest(x) && o.onRequest) answer(x);
       } catch {}
       if (!want.size) break;
     }
@@ -140,6 +158,8 @@ export class SseLink {
   lastUsed = Date.now();
   /** The initialize request it was opened with (sent again when it has to reopen). */
   init?: Rpc;
+  /** Answers what the app asks of its client (a form for the user); without it, only pings are answered. */
+  onRequest?: (m: Rpc) => Promise<Rpc>;
   private ctl = new AbortController();
   private waiting = new Map<string, (m: Rpc) => void>();
 
@@ -191,8 +211,11 @@ export class SseLink {
       return;
     }
     if (isReply(m)) this.waiting.get(String(m.id))?.(m);
-    // The server asking: answer its pings; nothing else is offered.
-    else if (isRequest(m)) void this.post({ jsonrpc: '2.0', id: m.id, ...(m.method === 'ping' ? { result: {} } : { error: { code: -32601, message: 'Not offered' } }) }, headers).catch(() => {});
+    // The server asking: its pings answered here, the rest by onRequest (or not offered).
+    else if (isRequest(m)) {
+      const reply = m.method === 'ping' || !this.onRequest ? Promise.resolve<Rpc>({ jsonrpc: '2.0', id: m.id, ...(m.method === 'ping' ? { result: {} } : { error: { code: -32601, message: 'Not offered' } }) }) : this.onRequest(m);
+      void reply.then((r) => this.post(r, headers)).then((r) => r.body?.cancel().catch(() => {})).catch(() => {});
+    }
   }
 
   private async post(m: Rpc, headers: Record<string, string>, signal?: AbortSignal): Promise<Response> {

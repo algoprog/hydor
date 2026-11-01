@@ -5,6 +5,8 @@ import { config } from '../config.ts';
 import { clip, firstLine } from '../history/common.ts';
 import { codexGoal, commandInfo, fileChanges, unwrapShellString } from '../history/codex.ts';
 import type { Runner, RunSpec } from '../runner/client.ts';
+import { HttpError } from '../auth.ts';
+import { elicitCard, elicitCheck, elicitResult } from './elicit.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig } from './live.ts';
 import { RpcPeer } from './rpc.ts';
 import { splitHandoff } from '../handoff.ts';
@@ -32,8 +34,10 @@ export interface CodexOpts {
 /** MCP servers in Codex's own config format; the app's tools need no approval. */
 function codexServers(o: CodexOpts): Record<string, unknown> {
   const out: Record<string, Record<string, unknown>> = {};
+  // A connected app may stop partway through a call to ask the user for a form (a card in the session
+  // waits for them): Codex would give up after 60 seconds.
   for (const [name, d] of Object.entries(o.add?.mcpServers ?? {}))
-    out[name] = d.type === 'http' ? { url: d.url, ...(d.headers ? { http_headers: d.headers } : {}) } : { command: d.command, args: d.args ?? [], env: d.env ?? {} };
+    out[name] = { ...(d.type === 'http' ? { url: d.url, ...(d.headers ? { http_headers: d.headers } : {}) } : { command: d.command, args: d.args ?? [], env: d.env ?? {} }), tool_timeout_sec: 600 };
   // Its tools may take minutes (an image model at work): Codex would give up after 60 seconds.
   if (o.pageServer) out[PAGE_SERVER] = { url: o.pageServer, default_tools_approval_mode: 'approve', tool_timeout_sec: 600 };
   // Tools an assistant leaves out ("mcp__naget-agent__web_search"), off on their server.
@@ -512,23 +516,11 @@ export class CodexLive extends LiveAdapter {
         });
         break;
       }
-      case 'mcpServer/elicitation/request': {
-        // A form with nothing to fill in is a yes/no question (Codex asks this way before an MCP tool runs).
-        const fields = p.mode === 'url' ? ['url'] : Object.keys(p.requestedSchema?.properties ?? {});
-        this.approvals.set(id, {
-          id,
-          kind: 'other',
-          title: fields.length ? `${p.serverName ?? 'An MCP server'} asks for input` : `${p.serverName ?? 'An MCP server'} asks to go ahead`,
-          detail: String(p.message ?? JSON.stringify(p, null, 2)),
-          options: [
-            ...(fields.length ? [] : [{ id: 'accept', label: 'Allow', style: 'primary' as const }]),
-            { id: 'decline', label: 'Decline', style: 'danger' },
-            { id: 'cancel', label: 'Cancel' },
-          ],
-          createdAt: now,
-        });
+      case 'mcpServer/elicitation/request':
+        // The same form card as a connected app's; a form with nothing to fill in is a yes/no question
+        // (Codex asks this way before an MCP tool runs).
+        this.approvals.set(id, { ...elicitCard(id, String(p.serverName ?? 'An MCP server'), p), createdAt: now });
         break;
-      }
       default:
         this.serverReqs.delete(id);
         this.rpc.respondError(m.id, -32601, `${m.method} is not supported by this client`);
@@ -630,9 +622,13 @@ export class CodexLive extends LiveAdapter {
         result = { answers };
         break;
       }
-      case 'mcpServer/elicitation/request':
-        result = a.decision === 'accept' ? { action: 'accept', content: {}, _meta: null } : { action: a.decision === 'cancel' ? 'cancel' : 'decline', content: null, _meta: null };
+      case 'mcpServer/elicitation/request': {
+        const wrong = elicitCheck(req.params, a);
+        if (wrong) throw new HttpError(400, wrong);
+        const r = elicitResult(req.params, a);
+        result = { action: r.action, content: r.action === 'accept' ? (r.content ?? {}) : null, _meta: null };
         break;
+      }
       default:
         throw new Error('Unsupported request');
     }

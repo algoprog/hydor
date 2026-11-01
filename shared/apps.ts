@@ -16,6 +16,8 @@ export interface AppField {
   placeholder?: string;
   /** For a choice. */
   options?: string[];
+  /** For a choice: more than one may be picked (the value has one per line). Forms MCP servers ask for. */
+  multi?: boolean;
   /** What the form starts with (and what an API call without it gets). */
   default?: string;
 }

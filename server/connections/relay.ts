@@ -9,6 +9,11 @@
 //                                                JSON out.
 //   GET  /connections/launch/<run token>/<app>   a local app's command and environment, for the bridge
 //                                                (bridge.ts) that starts it for the agent.
+//   POST /connections/elicit/<run token>/<app>   a form a local app asks for mid-call, from the bridge:
+//                                                shown in the session, answered when the user sends it.
+//
+// Forms a remote app asks for (MCP elicitation) come on its answer's event stream and are shown the
+// same way (forms.ts); the agent is never asked.
 //
 // The run token is the session's own signed address (as for the app's MCP server), valid while it runs,
 // and only from this machine.
@@ -22,6 +27,7 @@ import type { Deps } from '../features/types.ts';
 import { runOf } from '../mcp.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { authHeaders, connection, localCommand, onFor, remoteUrl, setStatus, toolFilter, toolOn, type Conn } from './apps.ts';
+import { answerApp, askForm, withForms } from './forms.ts';
 import { isRequest, postHttp, SseLink, Unauthorized, type Rpc } from './upstream.ts';
 import { redact } from './vault.ts';
 
@@ -56,6 +62,8 @@ export function startLaunchSocket(d: Deps) {
     fs.rmSync(file, { force: true });
   } catch {}
   const srv = http.createServer((req, res) => {
+    const f = /^\/elicit\/([^/]+)\/([a-z0-9-]+)$/.exec(req.url ?? '');
+    if (f && req.method === 'POST') return void elicitFromBridge(d, decodeURIComponent(f[1]), f[2], req, res);
     const m = /^\/launch\/([^/]+)\/([a-z0-9-]+)$/.exec(req.url ?? '');
     const r = m && req.method === 'GET' ? launchSpec(d, decodeURIComponent(m[1]), m[2]) : { status: 404, body: { error: 'Not found' } };
     res.writeHead(r.status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
@@ -72,6 +80,38 @@ export function startLaunchSocket(d: Deps) {
     } catch {}
   });
   srv.unref();
+}
+
+/** A form a local app asks for, from its bridge: answered when the user sends it, cancelled if the bridge hangs up. */
+function elicitFromBridge(d: Deps, token: string, app: string, req: http.IncomingMessage, res: http.ServerResponse) {
+  const done = (status: number, body: unknown) => {
+    if (res.writableEnded || res.destroyed) return;
+    res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(body));
+  };
+  let raw = '';
+  req.setEncoding('utf8');
+  req.on('data', (c: string) => {
+    raw += c;
+    if (raw.length > 1024 * 1024) req.destroy();
+  });
+  req.on('end', () => {
+    const runId = runOf(token);
+    const c = connection(d.db, app);
+    if (!runId || !d.sessions.liveByRun(runId) || !c) return done(404, { error: 'No session runs with that address' });
+    let params: any;
+    try {
+      params = JSON.parse(raw);
+    } catch {
+      return done(400, { error: 'Not JSON' });
+    }
+    const ac = new AbortController();
+    res.once('close', () => ac.abort());
+    askForm(d, runId, c.entry.name, params ?? {}, ac.signal).then(
+      (r) => done(200, r),
+      (e) => done(500, { error: (e as Error).message }),
+    );
+  });
 }
 
 /** The session a run token belongs to, if it runs, asked from this machine. */
@@ -114,7 +154,7 @@ async function openLink(d: Deps, c: Conn): Promise<SseLink> {
   }
 }
 
-async function viaSse(d: Deps, c: Conn, run: { runId: string }, req: FastifyRequest, msgs: Rpc[]): Promise<{ status?: undefined; text?: undefined; replies: Rpc[]; sessionId?: string }> {
+async function viaSse(d: Deps, c: Conn, run: { runId: string }, req: FastifyRequest, msgs: Rpc[], signal: AbortSignal): Promise<{ status?: undefined; text?: undefined; replies: Rpc[]; sessionId?: string }> {
   const init = msgs.find((m) => m.method === 'initialize');
   const sid = init ? crypto.randomBytes(12).toString('hex') : String(req.headers['mcp-session-id'] ?? '');
   const k = (s: string) => `${run.runId} ${c.id} ${s}`;
@@ -129,6 +169,8 @@ async function viaSse(d: Deps, c: Conn, run: { runId: string }, req: FastifyRequ
       await link.send({ jsonrpc: '2.0', method: 'notifications/initialized' }, h);
       link.init = was;
     }
+    // What the app asks of its client while it works (a form) goes to the session.
+    link.onRequest = (m) => answerApp(d, run.runId, c.entry.name, m);
     l = { link, runId: run.runId };
     links.set(k(sid), l);
     // Agents that keep no session id find it here.
@@ -137,15 +179,21 @@ async function viaSse(d: Deps, c: Conn, run: { runId: string }, req: FastifyRequ
   if (init) l.link.init = init;
   const replies: Rpc[] = [];
   for (const m of msgs) {
-    const r = await l.link.send(m, await authHeaders(d.db, c));
+    const r = await l.link.send(m, await authHeaders(d.db, c), { signal });
     if (r) replies.push(r);
   }
   return { replies, sessionId: sid || undefined };
 }
 
-async function viaHttp(d: Deps, c: Conn, req: FastifyRequest, msgs: Rpc[]) {
+async function viaHttp(d: Deps, c: Conn, run: { runId: string }, req: FastifyRequest, msgs: Rpc[], signal: AbortSignal) {
   const url = remoteUrl(c);
-  const o = { sessionId: req.headers['mcp-session-id'] ? String(req.headers['mcp-session-id']) : undefined, protocol: req.headers['mcp-protocol-version'] ? String(req.headers['mcp-protocol-version']) : undefined };
+  const o = {
+    sessionId: req.headers['mcp-session-id'] ? String(req.headers['mcp-session-id']) : undefined,
+    protocol: req.headers['mcp-protocol-version'] ? String(req.headers['mcp-protocol-version']) : undefined,
+    signal,
+    // What the app asks of its client while it works (a form) goes to the session; it ends if the agent hangs up.
+    onRequest: (m: Rpc) => answerApp(d, run.runId, c.entry.name, m, signal),
+  };
   const body = msgs.length === 1 ? msgs[0] : msgs;
   try {
     return await postHttp(url, body, await authHeaders(d.db, c), o);
@@ -180,7 +228,10 @@ export function relayRoutes(d: Deps) {
     // Calls to tools that are off are answered here; the rest go to the app.
     const replies: Rpc[] = [];
     const forward: Rpc[] = [];
-    for (const m of list) {
+    // The agent hung up (it gave up on a call, or was stopped): a form waiting for the user ends with it.
+    const ac = new AbortController();
+    reply.raw.once('close', () => ac.abort());
+    for (const m of list.map(withForms)) {
       const tool = String(m.params?.name ?? '');
       // A call to a tool that is off never reaches the app, answered or not (a call without an id is dropped).
       if (m.method === 'tools/call' && !toolOn(c, tool)) {
@@ -190,7 +241,7 @@ export function relayRoutes(d: Deps) {
     let sessionId: string | undefined;
     if (forward.length) {
       try {
-        const r = c.entry.server.transport === 'sse' ? await viaSse(d, c, run, req, forward) : await viaHttp(d, c, req, forward);
+        const r = c.entry.server.transport === 'sse' ? await viaSse(d, c, run, req, forward, ac.signal) : await viaHttp(d, c, run, req, forward, ac.signal);
         if (r.status !== undefined) {
           // The app forgot the session (it restarted): told so, the agent starts a new one.
           if (r.status === 404 && req.headers['mcp-session-id']) return reply.code(404).send({ error: 'No such session' });
@@ -234,6 +285,15 @@ export function relayRoutes(d: Deps) {
   });
 
   // Over HTTP only while the socket is not listening (it could not start).
+  d.app.post('/connections/elicit/:token/:app', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
+    if (socketFile || !runFor(d, req)) return reply.code(404).send({ error: 'No session runs with that address' });
+    const p = req.params as { token: string; app: string };
+    const c = connection(d.db, p.app);
+    if (!c) return reply.code(404).send({ error: 'That app is not connected here' });
+    const ac = new AbortController();
+    reply.raw.once('close', () => ac.abort());
+    return askForm(d, runOf(p.token)!, c.entry.name, (req.body ?? {}) as Record<string, unknown>, ac.signal);
+  });
   d.app.get('/connections/launch/:token/:app', async (req, reply) => {
     if (socketFile || !runFor(d, req)) return reply.code(404).send({ error: 'No session runs with that address' });
     const p = req.params as { token: string; app: string };

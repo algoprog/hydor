@@ -56,7 +56,7 @@ const json = (res: http.ServerResponse, status: number, v: unknown, headers: Rec
 
 // ---- a fake sign-in server, with an MCP server behind it ------------------------------------------------
 
-const as = { calls: [] as string[], keysSeen: [] as string[], forget: false, inits: 0, clients: new Map<string, string[]>(), codes: new Map<string, { client: string; challenge: string; redirect: string; resource: string }>(), access: new Set<string>(), refresh: new Set<string>(), registered: 0, refreshed: 0, refuseRefresh: false, resources: [] as string[], expiresIn: 3600 };
+const as = { calls: [] as string[], keysSeen: [] as string[], forget: false, inits: 0, initCaps: undefined as any, formStream: null as null | { res: http.ServerResponse; id: unknown }, clients: new Map<string, string[]>(), codes: new Map<string, { client: string; challenge: string; redirect: string; resource: string }>(), access: new Set<string>(), refresh: new Set<string>(), registered: 0, refreshed: 0, refuseRefresh: false, resources: [] as string[], expiresIn: 3600 };
 let asBase = '';
 const sse = { streams: new Map<string, { res: http.ServerResponse; initialized: boolean }>(), opened: 0 };
 const issue = () => {
@@ -156,7 +156,24 @@ const fakeAs = http.createServer(async (req, res) => {
     if (req.method !== 'POST') return json(res, 405, {});
     const m = JSON.parse(await body(req));
     if (m.method === 'tools/call') as.calls.push(m.params?.name);
-    if (m.method === 'initialize') as.inits++;
+    if (m.method === 'initialize') {
+      as.inits++;
+      as.initCaps = m.params?.capabilities;
+    }
+    // The client's answer to a form this server asked for, mid-call: the call finishes with it.
+    if (m.id === 'form-1' && !m.method && as.formStream) {
+      const st = as.formStream;
+      as.formStream = null;
+      st.res.end(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: st.id, result: { content: [{ type: 'text', text: `form ${JSON.stringify(m.result)}` }] } })}\n\n`);
+      return (res.writeHead(202), res.end());
+    }
+    if (m.method === 'tools/call' && m.params?.name === 'book_table') {
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'mcp-session-id': 'sess-1' });
+      as.formStream = { res, id: m.id };
+      const requestedSchema = { type: 'object', properties: { guests: { type: 'integer', title: 'Guests', minimum: 1, maximum: 8 }, time: { type: 'string', enum: ['19:00', '20:00'], enumNames: ['7 pm', '8 pm'] }, outside: { type: 'boolean' } }, required: ['guests', 'time'] };
+      res.write(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: 'form-1', method: 'elicitation/create', params: { message: 'How many, and when?', requestedSchema } })}\n\n`);
+      return;
+    }
     // The server forgot its sessions (it restarted).
     if (as.forget && req.headers['mcp-session-id'] === 'sess-1') {
       as.forget = false;
@@ -202,8 +219,20 @@ const delivered: { key: string; text: string }[] = [];
 const events: unknown[] = [];
 const KEY = 'claude:selftest-session';
 const RUN = 'run0selftest';
+/** The cards a connected app's forms showed, and how "the user" answers the next one. */
+const cards: any[] = [];
+let userAnswers: { decision: string; form?: Record<string, string> }[] = [];
+const fakeAdapter = {
+  async ask(card: any, o: { check?: (a: any) => string | null } = {}) {
+    cards.push(card);
+    // The user's first try may be wrong: the card says what to fix and stays, as the real one does.
+    for (const a of userAnswers) if (!o.check?.(a)) return a;
+    return null;
+  },
+};
 const sessions = {
   liveByRun: (id: string) => (id === RUN ? { key: KEY, agent: 'claude', cwd: config.dataDir } : null),
+  adapterByRun: (id: string) => (id === RUN ? fakeAdapter : null),
   deliverOrQueue: async (key: string, text: string) => void delivered.push({ key, text }),
   queueSummary: () => {},
 } as unknown as SessionManager;
@@ -330,7 +359,7 @@ try {
     const m = sp.mcpServers!;
     check(`${acp ? 'Custom' : agent}: the remote app at the relay, over HTTP, no token in it`, m.fakeapp?.type === 'http' && m.fakeapp.url === relayUrl && !JSON.stringify(sp).includes(token) && !JSON.stringify(sp).includes('Bearer'), m.fakeapp);
     check(`${acp ? 'Custom' : agent}: the local app with a key starts through the bridge, its key not in the settings`, m.localtool?.type === 'stdio' && m.localtool.args?.[1] === 'launch' && !JSON.stringify(sp).includes(LOCAL_SECRET), m.localtool);
-    check(`${acp ? 'Custom' : agent}: a local app with nothing secret runs as it is`, m.plaintool?.type === 'stdio' && m.plaintool.command === 'uvx', m.plaintool);
+    check(`${acp ? 'Custom' : agent}: a local app with nothing secret starts through the bridge too (its forms reach the session)`, m.plaintool?.type === 'stdio' && m.plaintool.args?.[1] === 'launch', m.plaintool);
   }
   const gem = await spawnFor('acp', 'gemini');
   check('another ACP agent reaches the remote app through the bridge (stdio relay)', gem.mcpServers!.fakeapp?.type === 'stdio' && (gem.mcpServers!.fakeapp as { args: string[] }).args.slice(1).join(' ') === `relay ${relayUrl}`, gem.mcpServers!.fakeapp);
@@ -366,6 +395,20 @@ try {
   const n1 = as.refreshed;
   const retried = await rpc({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'search', arguments: {} } });
   check('a refused token is renewed and the call tried again', retried.body?.result?.content?.[0]?.text === 'ran search' && as.refreshed === n1 + 1, retried.body);
+  check('the app hears that its client takes forms', !!as.initCaps?.elicitation?.form, as.initCaps);
+  cards.length = 0;
+  // The first try is out of range: the card says so and waits for a right one.
+  userAnswers = [
+    { decision: 'accept', form: { guests: '12', time: '8 pm', outside: 'Yes' } },
+    { decision: 'accept', form: { guests: '2', time: '8 pm', outside: 'Yes' } },
+  ];
+  const booked = await rpc({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'book_table', arguments: {} } }, { 'mcp-session-id': 'sess-1' });
+  const card = cards[0];
+  check('a form the app asks for mid-call shows as a card with its fields', card?.title === 'Fake App asks you to fill in a form' && card.detail === 'How many, and when?' && card.form.fields.map((f: { label: string; type: string }) => `${f.label}:${f.type}`).join() === 'Guests:number,Time:choice,Outside:yesno' && card.form.fields[1].options.join() === '7 pm,8 pm', card);
+  check('the answer goes back in the schema’s own types, and the call finishes', booked.body?.result?.content?.[0]?.text === 'form {"action":"accept","content":{"guests":2,"time":"20:00","outside":true}}', booked.body);
+  userAnswers = [{ decision: 'decline' }];
+  const declined = await rpc({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'book_table', arguments: {} } }, { 'mcp-session-id': 'sess-1' });
+  check('declining is told to the app', declined.body?.result?.content?.[0]?.text === 'form {"action":"decline"}', declined.body);
   setSessionExtra(db, KEY, { connections: { fakeapp: false } });
   const offNow = await rpc({ jsonrpc: '2.0', id: 6, method: 'tools/list' });
   check('turning the app off for the session stops it at once', /turned off for this session/.test(offNow.body?.error?.message ?? ''), offNow.body);
@@ -411,7 +454,7 @@ try {
   section('The bridge');
   fs.writeFileSync(
     path.join(config.dataDir, 'fake-stdio.mjs'),
-    `let b='';process.stdin.on('data',d=>{b+=d;let i;while((i=b.indexOf('\\n'))>=0){const m=JSON.parse(b.slice(0,i));b=b.slice(i+1);if(m.id===undefined)continue;const r=m.method==='initialize'?{protocolVersion:'2025-06-18',capabilities:{},serverInfo:{name:'fake-stdio',version:'1'}}:m.method==='tools/list'?{tools:[{name:'a',inputSchema:{}},{name:'b',inputSchema:{}},{name:'leak',inputSchema:{}}]}:{content:[{type:'text',text:m.params.name==='leak'?'env token '+process.env.FAKE_TOKEN:'ran '+m.params.name}]};process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result:r})+'\\n')}});`,
+    `let b='';let asked=null;let caps=null;const out=o=>process.stdout.write(JSON.stringify(o)+'\\n');process.stdin.on('data',d=>{b+=d;let i;while((i=b.indexOf('\\n'))>=0){const m=JSON.parse(b.slice(0,i));b=b.slice(i+1);if(m.id===undefined)continue;if(m.id==='q1'&&!m.method){out({jsonrpc:'2.0',id:asked,result:{content:[{type:'text',text:'form '+JSON.stringify(m.result)+' caps '+JSON.stringify(caps)}]}});continue}if(m.method==='tools/call'&&m.params.name==='ask'){asked=m.id;out({jsonrpc:'2.0',id:'q1',method:'elicitation/create',params:{message:'Your name?',requestedSchema:{type:'object',properties:{name:{type:'string',title:'Name'}},required:['name']}}});continue}if(m.method==='initialize')caps=m.params.capabilities;const r=m.method==='initialize'?{protocolVersion:'2025-06-18',capabilities:{},serverInfo:{name:'fake-stdio',version:'1'}}:m.method==='tools/list'?{tools:[{name:'a',inputSchema:{}},{name:'b',inputSchema:{}},{name:'leak',inputSchema:{}},{name:'ask',inputSchema:{}}]}:{content:[{type:'text',text:m.params.name==='leak'?'env token '+process.env.FAKE_TOKEN:'ran '+m.params.name}]};out({jsonrpc:'2.0',id:m.id,result:r})}});`,
   );
   patchConnection(db, 'localtool', { tools: { b: false } });
   const sp = await spawnFor('claude');
@@ -445,7 +488,7 @@ try {
   ]);
   const byId = (l: any[], id: number) => l.find((m) => m.id === id);
   check('launch: the local app starts with its key from the app', byId(lo, 1)?.result?.serverInfo?.name === 'fake-stdio', lo);
-  check('launch: only the tools that are on are listed', byId(lo, 2)?.result?.tools?.map((t: { name: string }) => t.name).join() === 'a,leak', byId(lo, 2));
+  check('launch: only the tools that are on are listed', byId(lo, 2)?.result?.tools?.map((t: { name: string }) => t.name).join() === 'a,leak,ask', byId(lo, 2));
   check('launch: a tool that is off is refused', byId(lo, 3)?.result?.isError === true);
   check('launch: the key is masked in what comes back', byId(lo, 4)?.result?.content?.[0]?.text === 'env token [hidden]', byId(lo, 4));
   const batch = await talk(launch.command, launch.args, [
@@ -456,6 +499,15 @@ try {
     ],
   ]);
   check('launch: a batch is filtered item by item', byId(batch, 5)?.result?.isError === true && byId(batch, 6)?.result?.content?.[0]?.text === 'ran a', batch);
+  cards.length = 0;
+  userAnswers = [{ decision: 'accept', form: { name: 'Ada' } }];
+  const formed = await talk(launch.command, launch.args, [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { capabilities: { roots: {} } } },
+    { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'ask' } },
+  ]);
+  const said = String(byId(formed, 7)?.result?.content?.[0]?.text ?? '');
+  check('launch: a form the app asks for is a card in the session, never a message to the agent', cards.length === 1 && cards[0].title === 'Local tool asks you to fill in a form' && cards[0].form?.fields?.[0]?.label === 'Name' && !formed.some((m) => m.method), { cards, formed });
+  check('launch: the answer goes back to the app, which was told forms are taken', said.startsWith('form {"action":"accept","content":{"name":"Ada"}}') && /"elicitation":\{"form":\{\},"url":\{\}\}/.test(said) && /"roots"/.test(said), said);
   const re = await talk(process.execPath, [path.join(APP_ROOT, 'dist/server/connbridge.js'), 'relay', relayUrl], [
     { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} },
     { jsonrpc: '2.0', id: 2, method: 'tools/list' },

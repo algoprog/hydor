@@ -48,7 +48,9 @@ agents that speak ACP and take MCP servers.
   Images can be made and edited through OpenRouter.
 - **Connections**: a marketplace of apps and services (Notion, Linear, GitHub, Google, Stripe and more), signed
   in once for every agent; anyone can add one with a pull request to `catalog/`. Keys live in an encrypted
-  vault: agents ask for one with a card and use it without ever seeing it.
+  vault: agents ask for one with a card and use it without ever seeing it. When an app needs something from
+  you partway through (a date, a choice, a page to approve on), its form shows as a card in the session,
+  whichever agent is working; Codex's own servers ask the same way.
 - **Child sessions**: an agent hands parts of a job to new sessions, with any agent and model, and gets their
   results back; they show under it in the sidebar.
 - **Pages and templates**: pages the agents show can answer back (pick an option, fill in a form), stay in a

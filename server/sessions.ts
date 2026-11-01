@@ -1444,7 +1444,9 @@ export class SessionManager extends EventEmitter {
   }
 
   async answer(key: string, approvalId: string, a: ApprovalAnswer) {
-    await this.live(key).adapter.answer(approvalId, a);
+    const ad = this.live(key).adapter;
+    if (ad.answerAside(approvalId, a)) return;
+    await ad.answer(approvalId, a);
   }
 
   async configure(key: string, cfg: LiveConfig) {
@@ -1498,6 +1500,12 @@ export class SessionManager extends EventEmitter {
     if (flags.pinned !== undefined) this.db.prepare('update app_sessions set pinned = ? where key = ?').run(flags.pinned ? 1 : 0, key);
     if (flags.snoozedUntil !== undefined) this.db.prepare('update app_sessions set snooze_until = ? where key = ?').run(flags.snoozedUntil && flags.snoozedUntil > Date.now() ? Math.round(flags.snoozedUntil) : null, key);
     this.queueSummary(key);
+  }
+
+  /** The agent process's adapter, by its run id: for cards the app shows itself (a connected app's form). */
+  adapterByRun(runId: string): LiveAdapter | null {
+    for (const l of this.lives.values()) if (l.runner.meta.runId === runId) return l.adapter;
+    return null;
   }
 
   /** The live session an agent process belongs to, by the run id it was started with. */
