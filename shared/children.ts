@@ -25,7 +25,11 @@ export interface ChildNote {
 export interface ChildSettings {
   /** How many children of one session may work at the same time. */
   maxRunning: number;
+  /** How many members of a swarm may work at the same time. */
+  swarmSize: number;
 }
 
 export const MAX_RUNNING_DEFAULT = 4;
 export const MAX_RUNNING_LIMIT = 12;
+export const SWARM_SIZE_DEFAULT = 5;
+export const SWARM_SIZE_LIMIT = 16;

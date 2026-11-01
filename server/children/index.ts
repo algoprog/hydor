@@ -5,13 +5,13 @@
 // It is all tools on the app's own MCP server, so any agent can delegate to any other.
 import fs from 'node:fs';
 import path from 'node:path';
-import { MAX_RUNNING_DEFAULT, MAX_RUNNING_LIMIT, type ChildNote, type ChildSettings } from '../../shared/children.ts';
+import { MAX_RUNNING_DEFAULT, MAX_RUNNING_LIMIT, SWARM_SIZE_DEFAULT, SWARM_SIZE_LIMIT, type ChildNote, type ChildSettings } from '../../shared/children.ts';
 import type { Agent, AgentModel, SessionSummary } from '../../shared/types.ts';
 import { acpAgents, CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { capReached, childShare, spending } from '../budget/index.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
-import { parseExtra, setSessionExtra } from '../sessionExtra.ts';
+import { parseExtra, sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import type { Deps, Feature, RunCtx, RunTool, TurnInfo } from '../features/types.ts';
 import { helper } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
@@ -19,16 +19,28 @@ import { addNote } from '../notes.ts';
 import { lastTurn, opensTurn, type Turn } from '../opinion/turns.ts';
 import { childKeys, parentOf } from './family.ts';
 import { childMode, modeFamily } from './modes.ts';
+import { MEMBER_INSTRUCTIONS } from '../swarm/instructions.ts';
+import { roleOf } from '../swarm/roles.ts';
 
 export { childKeys, parentOf } from './family.ts';
 
 const SETTING = 'children.maxRunning';
+const SWARM_SETTING = 'children.swarmSize';
 
 /** How many children of one session may work at the same time (Settings → Child sessions). */
 export function maxRunning(db: DB): number {
   const n = Number(kvGet(db, SETTING));
   return Number.isInteger(n) && n >= 1 ? Math.min(n, MAX_RUNNING_LIMIT) : MAX_RUNNING_DEFAULT;
 }
+
+/** How many members of a swarm may work at the same time (Settings → Child sessions). */
+export function swarmSize(db: DB): number {
+  const n = Number(kvGet(db, SWARM_SETTING));
+  return Number.isInteger(n) && n >= 1 ? Math.min(n, SWARM_SIZE_LIMIT) : SWARM_SIZE_DEFAULT;
+}
+
+/** How many of a session's children may work at once: a swarm's size for a swarm's lead. */
+export const maxFor = (db: DB, ctx: { runId?: string; key: string }): number => (roleOf(db, ctx)?.role === 'lead' ? swarmSize(db) : maxRunning(db));
 
 /** A reply longer than this comes back as a summary, with the way to read it whole. */
 export const LONG_REPLY = 4000;
@@ -164,6 +176,14 @@ function startTool(d: Deps, max: number): RunTool {
       if (!brief) throw new Error('The brief is empty. Write a self-contained brief: the child sees nothing of this conversation.');
       if (parentOf(d.db, ctx.key)) throw new Error(ONE_LEVEL);
       const target = pickAgent(d, ctx, a.agent, a.model);
+      // A swarm's members take on hard problems: they run with the lead's own model and effort unless it names others.
+      const lead = roleOf(d.db, ctx)?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
+      const same = !!lead && target.agent === ctx.agent && target.agent !== 'acp' && !String(a.model ?? '').trim();
+      if (same && lead?.prefs?.model) {
+        target.model = lead.prefs.model;
+        target.label = `${target.label} · ${lead.prefs.model}`;
+      }
+      const effort = same ? lead?.prefs?.effort : undefined;
       const running = childKeys(d.db, ctx.key).filter((k) => busy(d.sessions.summary(k))).length + (starting.get(ctx.key) ?? 0);
       if (running >= max) throw new Error(`${running} of your child sessions are working already, the most at once. Wait for one to finish (its reply comes to you as a message), then start the next; or do this part yourself.`);
       const capUsd = childShare(d.db, ctx.key, max);
@@ -178,8 +198,10 @@ function startTool(d: Deps, max: number): RunTool {
           agent: target.agent,
           acpAgent: target.acpAgent,
           cwd,
-          prompt: target.plain ? `${brief}\n\n(${CHILD_INSTRUCTIONS})` : brief,
+          // An agent that takes no instructions from the app gets them with its brief.
+          prompt: target.plain ? `${brief}\n\n(${CHILD_INSTRUCTIONS})${lead ? `\n\n${MEMBER_INSTRUCTIONS}` : ''}` : brief,
           model: target.model,
+          effort,
           mode,
           worktree: !!a.worktree,
           title,
@@ -362,6 +384,8 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
   if (reported.size > 2000) reported.delete(reported.values().next().value!);
   // Kept with the child, so a restart neither repeats it nor loses it (catchUp).
   setSessionExtra(d.db, t.key, { reported: turn.prompt.id });
+  // A swarm member its lead or the user stopped: nobody needs the turn that was cut short.
+  if (turn.status === 'interrupted' && sessionExtra(d.db, t.key).swarmStopped) return;
   const s = d.sessions.summary(t.key);
   const cap = capReached(d.db, t.key);
   // Custom's models by their names, the others' as the agent gives them.
@@ -387,8 +411,8 @@ export const children: Feature = {
 
   tools(ctx) {
     // A child gets none: one level only.
-    if (parentOf(ctx.deps.db, ctx.key)) return [];
-    return [startTool(ctx.deps, maxRunning(ctx.deps.db)), LIST, MESSAGE];
+    if (parentOf(ctx.deps.db, ctx.key) || roleOf(ctx.deps.db, ctx)?.role === 'member') return [];
+    return [startTool(ctx.deps, maxFor(ctx.deps.db, ctx)), LIST, MESSAGE];
   },
 
   spawn(s) {
@@ -405,12 +429,18 @@ export const children: Feature = {
   },
 
   routes(d) {
-    d.app.get('/api/children/settings', async (): Promise<ChildSettings> => ({ maxRunning: maxRunning(d.db) }));
+    const settings = (): ChildSettings => ({ maxRunning: maxRunning(d.db), swarmSize: swarmSize(d.db) });
+    d.app.get('/api/children/settings', async (): Promise<ChildSettings> => settings());
     d.app.put('/api/children/settings', async (req): Promise<ChildSettings> => {
-      const n = Number((req.body as { maxRunning?: unknown } | undefined)?.maxRunning);
-      if (!Number.isInteger(n) || n < 1 || n > MAX_RUNNING_LIMIT) throw new HttpError(400, `Pick a number from 1 to ${MAX_RUNNING_LIMIT}`);
-      kvSet(d.db, SETTING, String(n));
-      return { maxRunning: n };
+      const b = (req.body ?? {}) as { maxRunning?: unknown; swarmSize?: unknown };
+      const set = (v: unknown, key: string, limit: number) => {
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 1 || n > limit) throw new HttpError(400, `Pick a number from 1 to ${limit}`);
+        kvSet(d.db, key, String(n));
+      };
+      if (b.maxRunning !== undefined) set(b.maxRunning, SETTING, MAX_RUNNING_LIMIT);
+      if (b.swarmSize !== undefined) set(b.swarmSize, SWARM_SETTING, SWARM_SIZE_LIMIT);
+      return settings();
     });
   },
 };

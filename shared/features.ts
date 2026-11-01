@@ -11,6 +11,8 @@ export interface SessionExtra {
   capUsd?: number;
   /** The session that started this one, for a child session. */
   parent?: string;
+  /** Swarm: this session leads a team of agents that attack its task from different angles. */
+  swarm?: boolean;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

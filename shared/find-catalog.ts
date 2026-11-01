@@ -48,7 +48,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['search', 'Search', 'Capabilities', 'How agents search the web: Naget Search and other providers'],
   ['browser', 'Browser', 'Capabilities', 'A web browser agents use, which you can watch and take over'],
   ['memory', 'Memory', 'Capabilities', 'What agents remember about you, your projects and each session, and when it was written'],
-  ['children', 'Child sessions', 'Capabilities', 'Agents handing parts of a job to other agents'],
+  ['children', 'Child sessions', 'Capabilities', 'Agents handing parts of a job to other agents, and swarms for hard problems'],
   ['images', 'Images', 'Capabilities', 'Pictures agents make for you, with an image model through OpenRouter'],
   ['connections', 'Connections', 'Capabilities', 'Apps every agent can use, from a marketplace anyone can add to, and a vault for keys'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
@@ -154,6 +154,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['memory', 'Notes', 'memory notes remembered facts export json markdown', 'Every note kept, by place', 'Memory notes'],
   // Capabilities › Child sessions
   ['children', 'Working at once, per session', 'child sessions parallel subagents concurrency limit', 'How many child sessions one session runs at once'],
+  ['children', 'Swarm size', 'swarm mode team of agents subagents parallel angles hard problems math proof', 'How many agents of a swarm work at once'],
   // Capabilities › Images
   ['images', 'Making images', 'image generation pictures openrouter', 'Let agents make images'],
   ['images', 'Image model', 'image model flux openrouter', 'The model that makes them'],

@@ -22,6 +22,7 @@ import { opinionFeature } from './opinion/feature';
 import { pagesFeature } from './pages/feature';
 import { searchFeature } from './search/feature';
 import { skillpackFeature } from './skillpack/feature';
+import { swarmFeature } from './swarm/feature';
 import { voiceFeature } from './voice/feature';
 
 /** A view of a note in the conversation. One that shows several (`many`) gets the later notes of its kind in that turn as `more`, shown as one note with the first. */
@@ -98,6 +99,7 @@ export const features = (): WebFeature[] =>
     childrenFeature,
     opinionFeature,
     budgetFeature,
+    swarmFeature,
     documentsFeature,
     imagesFeature,
     connectionsFeature,
