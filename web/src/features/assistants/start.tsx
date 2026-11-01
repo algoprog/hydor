@@ -8,8 +8,8 @@ import type { Agent } from '@shared/types';
 import { post } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
 import { useApp } from '../../lib/store';
-import { FolderPicker } from '../../components/FolderPicker';
-import { cx, Popover, SettingChip } from '../../components/ui';
+import { FolderPicker, useRecentFolders } from '../../components/FolderPicker';
+import { cx, Popover, SettingChip, useSheets } from '../../components/ui';
 import { assistantIn, lastAssistant, useAssistantsState } from './state';
 
 /** Makes the new task's folder (Settings → Assistants says where) and returns its path. */
@@ -24,10 +24,30 @@ export function useTaskFolder(assistant: string | undefined, pick: boolean | nul
   return pick ?? (a ? a.folder !== 'project' : false);
 }
 
+/** One choice in the folder menu: an icon, a name, a line under it, and a check when it is the one in use. */
+function FolderRow({ icon, name, sub, on, onClick, mono }: { icon: ReactNode; name: string; sub: string; on: boolean; onClick: () => void; mono?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx('flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-bg-2 max-sm:py-2', on && 'bg-bg-2')}
+    >
+      <span className="shrink-0 text-fg-3">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13.5px] font-medium text-fg max-sm:text-[14.5px]">{name}</span>
+        <span className={cx('block truncate text-fg-3', mono ? 'font-mono text-[11.5px]' : 'text-[12px]')}>{sub}</span>
+      </span>
+      {on && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
+    </button>
+  );
+}
+
 /**
  * "Folder  New task folder", or the folder a new session works in; picking a folder turns the new one
- * off. `children` go at the end of its menu: what goes with a folder of your own (a worktree, the
- * instructions the agent reads there); `note` follows the folder's name ("· new worktree").
+ * off. Its menu starts with the three folders used last, then a new task folder, then any other folder
+ * by its path. `children` go at the end: what goes with a folder of your own (a worktree, the
+ * instructions the agent reads there); `note` follows the folder's name ("· new worktree"). On a phone
+ * it is a sheet from the bottom, and the keyboard waits until the path field is tapped.
  */
 export function WorkFolderChip({ value, task, onFolder, onTask, note, children }: { value: string; task: boolean; onFolder: (path: string) => void; onTask: () => void; note?: string; children?: ReactNode }) {
   const home = useApp((s) => s.boot?.home) ?? '';
@@ -35,11 +55,18 @@ export function WorkFolderChip({ value, task, onFolder, onTask, note, children }
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const phone = useSheets();
+  const recent = (useRecentFolders(open) ?? []).slice(0, 3);
   const root = tildify(st?.taskRoot ?? `${home}/Naget`, home);
   const extras = Children.toArray(children);
+  const nameOf = (p: string) => (p === home ? '~' : basename(p) || '/');
   const use = (p: string) => {
     onFolder(p);
     setOpen(false);
+  };
+  const typed = () => {
+    const v = draft.trim().startsWith('~') ? home + draft.trim().slice(1) : draft.trim();
+    use(v.replace(/\/+$/, '') || '/');
   };
   return (
     <>
@@ -49,44 +76,59 @@ export function WorkFolderChip({ value, task, onFolder, onTask, note, children }
         icon={task ? <FolderPlus size={14} /> : <Folder size={14} />}
         open={open}
         onClick={() => {
-          setDraft(task ? '' : tildify(value, home));
+          // A phone starts with an empty field, so typing starts a path rather than adding to the one in use.
+          setDraft(task || phone ? '' : tildify(value, home));
           setOpen((o) => !o);
         }}
         title={task ? `A new folder for this task, in ${root}` : tildify(value, home)}
-        value={task ? 'New task folder' : `${value === home ? '~' : basename(value) || '/'}${note ? ` · ${note}` : ''}`}
+        value={task ? 'New task folder' : `${nameOf(value)}${note ? ` · ${note}` : ''}`}
       />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(420, window.innerWidth - 16)}>
-        <div className="p-2">
-          <button
-            type="button"
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(420, window.innerWidth - 16)} title="Folder to work in">
+        <div className="p-2 max-sm:px-1 max-sm:pt-0">
+          {recent.length > 0 && (
+            <>
+              <div className="mb-1 px-1 text-[12px] font-medium text-fg-3">Recent</div>
+              {recent.map((p) => (
+                <FolderRow key={p} icon={<Folder size={16} />} name={p === home ? 'Home folder' : nameOf(p)} sub={tildify(p, home)} mono on={!task && p === value} onClick={() => use(p)} />
+              ))}
+              <div className="mx-0.5 my-2 h-px bg-line" />
+            </>
+          )}
+          <FolderRow
+            icon={<FolderPlus size={16} />}
+            name="New task folder"
+            sub={`A fresh folder in ${root}, named for the task`}
+            on={task}
             onClick={() => {
               onTask();
               setOpen(false);
             }}
-            className={cx('flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-bg-2', task && 'bg-bg-2')}
-          >
-            <FolderPlus size={16} className="shrink-0 text-fg-3" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-medium text-fg">New task folder</span>
-              <span className="block truncate text-[12px] text-fg-3">A fresh folder in {root}, named for the task</span>
-            </span>
-            {task && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
-          </button>
+          />
           <div className="mx-0.5 my-2 h-px bg-line" />
-          <div className="mb-2 px-0.5 text-[12.5px] text-fg-3">Or a folder to work in</div>
-          <FolderPicker value={draft} onChange={setDraft} onPick={use} autoFocus={!task} />
-          <div className="mt-2 flex justify-end">
-            <button
-              className="h-8 rounded-lg bg-fg px-3 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40"
-              disabled={!draft.trim()}
-              onClick={() => {
-                const v = draft.startsWith('~') ? home + draft.slice(1) : draft;
-                use(v.replace(/\/+$/, '') || '/');
-              }}
-            >
-              Use this folder
-            </button>
-          </div>
+          <div className="mb-2 px-1 text-[12px] font-medium text-fg-3">{recent.length ? 'Another folder' : 'Or a folder to work in'}</div>
+          {phone ? (
+            <FolderPicker
+              value={draft}
+              onChange={setDraft}
+              onPick={use}
+              inline
+              placeholder="A path, like ~/code"
+              action={
+                <button className="h-11 shrink-0 rounded-[10px] bg-fg px-4 text-[14px] font-medium text-bg disabled:opacity-40" disabled={!draft.trim()} onClick={typed}>
+                  Use
+                </button>
+              }
+            />
+          ) : (
+            <>
+              <FolderPicker value={draft} onChange={setDraft} onPick={use} autoFocus={!task} />
+              <div className="mt-2 flex justify-end">
+                <button className="h-8 rounded-lg bg-fg px-3 text-[13px] font-medium text-bg hover:opacity-90 disabled:opacity-40" disabled={!draft.trim()} onClick={typed}>
+                  Use this folder
+                </button>
+              </div>
+            </>
+          )}
           {extras.length > 0 && (
             <>
               <div className="mx-0.5 my-2 h-px bg-line" />

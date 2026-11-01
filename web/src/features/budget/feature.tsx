@@ -112,7 +112,7 @@ function StartCap({ value, onChange }: { value: SessionExtra; onChange: (patch: 
         }}
         title={cap != null ? `This session stops once it has spent ${usd(cap)} (API prices)` : 'No limit on what this session spends. Click to set the most it may spend'}
       />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={264}>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={264} title="Spending cap">
         <div className="p-2">
           <div className="mb-2 text-[12.5px] leading-snug text-fg-3">The most this session may spend, at API prices. It stops there until you raise the cap.</div>
           <div className="flex gap-1.5">

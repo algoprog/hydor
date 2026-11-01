@@ -28,7 +28,9 @@ import { priceOverrides, setPriceOverrides } from './prices.ts';
 import { Scheduler } from './scheduler.ts';
 import { accountViews, createPr, ghToken, prDescribe, prDraft, prFromUrl, refreshPr, removeAccount, reviewChanges, saveAccount, writeGuide } from './pullrequests.ts';
 import { askCommands, commandHistory, complete, migrateTermHistory, recordCommand } from './termsuggest.ts';
-import { repoInfo } from './worktrees.ts';
+import { repoInfo, WORKTREES_ROOT } from './worktrees.ts';
+import { taskRoot } from './assistants/store.ts';
+import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
 import { createMcpToken, mcpRoutes, mcpTokens, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
@@ -954,7 +956,12 @@ app.get('/api/fs/find', async (req) => {
   return { files: await files.findFiles(q.root, q.q ?? '') };
 });
 app.get('/api/fs/diff', async (req) => ({ diff: await files.gitDiff((req.query as Record<string, string>).path) }));
-app.get('/api/fs/recent', async () => ({ dirs: sessions.recentDirs() }));
+app.get('/api/fs/recent', async (req) => {
+  if ((req.query as Record<string, string>).picked !== '1') return { dirs: sessions.recentDirs() };
+  // The start page's recent folders: those picked, not the ones the app made for a task, an app's run or a worktree.
+  const made = [taskRoot(db), APPS_WORK_DIR, WORKTREES_ROOT].map((r) => r.replace(/\/+$/, '') + '/');
+  return { dirs: sessions.recentDirs(200).filter((d) => !made.some((r) => d.startsWith(r))).slice(0, 12) };
+});
 
 // ---- git -----------------------------------------------------------------------------------
 const repoPath = (req: FastifyRequest) => {
