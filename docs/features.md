@@ -46,7 +46,8 @@ agents that speak ACP and take MCP servers.
 - **Spaces** (in the sidebar): a project's sessions, files, documents, memory, instructions and assistant together,
   like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a folder:
   its sessions work in its own folder, remember what its earlier sessions learned, search its documents, get its
-  instructions and start as its assistant. The sidebar's filter shows one space's sessions.
+  instructions and start as its assistant. A group brings several spaces together: its sessions work with all
+  of them, their folders, documents and instructions. The sidebar's filter shows one space's sessions.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and

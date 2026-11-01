@@ -13,9 +13,9 @@ const MAX_READ = 14_000;
 const NONE = 'There are no knowledge bases for this session yet (the user adds documents in Spaces: shared knowledge for every session, or a space’s own).';
 
 /** The bases with documents in them, as agents are told of them. */
-export function filled(db: DB, bases: (BaseRow & { own?: boolean })[]): { id: string; name: string; own: boolean; docs: number }[] {
+export function filled(db: DB, bases: (BaseRow & { own?: boolean; from?: string })[]): { id: string; name: string; own: boolean; from?: string; docs: number }[] {
   return bases
-    .map((b) => ({ id: b.id, name: b.name, own: !!b.own, docs: (db.prepare("select count(*) as n from kb_docs where base = ? and status = 'indexed'").get(b.id) as { n: number }).n }))
+    .map((b) => ({ id: b.id, name: b.name, own: !!b.own, from: b.from, docs: (db.prepare("select count(*) as n from kb_docs where base = ? and status = 'indexed'").get(b.id) as { n: number }).n }))
     .filter((b) => b.docs > 0);
 }
 
@@ -23,7 +23,7 @@ export function filled(db: DB, bases: (BaseRow & { own?: boolean })[]): { id: st
 export function knowledgeInstructions(db: DB, space: string | null = null): string | null {
   const bases = filled(db, basesFor(db, space));
   if (!bases.length) return null;
-  const whose = (b: { own: boolean }) => (space ? (b.own ? ', this space’s own' : ', shared') : '');
+  const whose = (b: { own: boolean; from?: string }) => (space ? (b.from ? `, from the ${b.from} space` : b.own ? ', this space’s own' : ', shared') : '');
   return [
     `Knowledge bases: the user added their own documents for you to search: ${bases.map((b) => `${b.name} (${b.docs} document${b.docs === 1 ? '' : 's'}${whose(b)})`).join(', ')}.`,
     'When a question may be answered from them, search there first with knowledge_search, before the web or memory, and read more of a document with knowledge_read.',

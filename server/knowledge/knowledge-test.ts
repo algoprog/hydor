@@ -196,6 +196,12 @@ test('spaces: a space’s own base is searched by its sessions alone, the shared
   assert.deepEqual(basesFor(db, thesis.id).map((b) => b.name), ['Papers']);
   assert.match(await search(inThesis, 'sick leave doctor'), /^Nothing in the knowledge bases matches/);
   assert.deepEqual(basesFor(db, null).map((b) => b.name), ['Handbook']);
+  // A group that brings the space in searches its documents too, saying where they come from.
+  const group = createSpace(db, { name: 'Research', members: [thesis.id] });
+  setSessionExtra(db, 'claude:group1', { space: group.id });
+  assert.match(await search('claude:group1', 'dairy farmers cohort'), /notes\.md, Notes · Papers/);
+  assert.match(knowledgeInstructions(db, group.id) ?? '', /Papers \(1 document, from the Thesis space\)/);
+  deleteSpace(db, group.id);
   // Deleting the space keeps its base, shared now.
   deleteSpace(db, thesis.id);
   assert.equal(baseRow(db, papers.id).space, null);

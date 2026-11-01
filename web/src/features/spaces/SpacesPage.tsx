@@ -1,14 +1,14 @@
 // Spaces: each project's sessions, files, documents, memory, instructions and assistant together. The list
 // (beside the shared knowledge, on the page's second tab), and a space's own page: start a session in it, its
 // sessions, its files and memory; its knowledge (documents only its sessions search, with the shared ones too
-// unless it leaves them out); and what every agent in it is told. Picked by name on the start page in place
-// of a folder.
+// unless it leaves them out); and what every agent in it is told. A group brings spaces together: its sessions
+// work with all of them. Picked by name on the start page in place of a folder.
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Boxes, Brain, FolderOpen, FolderPlus, Plus, SquarePen, Trash2 } from 'lucide-react';
+import { ArrowLeft, Boxes, Brain, FolderOpen, FolderPlus, Layers, Plus, SquarePen, Trash2 } from 'lucide-react';
 import type { KnowledgeBase } from '@shared/knowledge';
 import type { Space } from '@shared/spaces';
-import { MAX_SPACE_INSTRUCTIONS, SPACE_COLORS } from '@shared/spaces';
+import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Empty, inputCls, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { api, del, enc, patch, post } from '../../lib/api';
@@ -20,7 +20,7 @@ import type { PickedFile } from '../../lib/upload';
 import { PageHeader } from '../layout/PageHeader';
 import { useAssistantsState } from '../assistants/state';
 import { addFiles, BaseCard, DropFiles, MeaningHint, TrySearch, useKnowledge } from '../knowledge/parts';
-import { NewSpaceDialog, SpaceMark, SpacesTabs } from './parts';
+import { MemberPicker, memberNames, NewSpaceDialog, SpaceMark, SpacesTabs } from './parts';
 import { loadSpaces, useSpaces } from './state';
 
 /** The start page, with this space picked: its folder, its assistant. */
@@ -34,14 +34,15 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 function List() {
   const spaces = useSpaces();
   const home = useApp((s) => s.boot?.home);
-  const [made, setMade] = useState(false);
+  const [made, setMade] = useState<false | 'space' | 'group'>(false);
+  const plain = (spaces ?? []).filter((s) => !isGroup(s)).length;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Spaces"
         sub="Each project’s sessions, documents and instructions, together"
         actions={
-          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMade(true)}>
+          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMade('space')}>
             New space
           </Button>
         }
@@ -66,7 +67,7 @@ function List() {
                   <SpaceMark s={s} size={36} className="rounded-[10px]" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] font-semibold">{s.name}</span>
-                    <span className="block truncate text-[12.5px] text-fg-3">{s.description || tildify(s.folder, home)}</span>
+                    <span className="block truncate text-[12.5px] text-fg-3">{isGroup(s) ? `Brings together ${memberNames(s, spaces)}` : s.description || tildify(s.folder, home)}</span>
                     <span className="mt-0.5 block text-[12px] text-fg-3">
                       <span>
                         {s.sessions} session{s.sessions === 1 ? '' : 's'}
@@ -84,11 +85,26 @@ function List() {
                   </span>
                 </button>
               ))}
+              {plain >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => setMade('group')}
+                  className="flex items-start gap-3 rounded-xl border border-dashed border-line-2 p-3.5 text-left text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-3">
+                    <Layers size={17} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold">Group spaces together</span>
+                    <span className="block text-[12.5px] text-fg-3">Sessions in a group work with all its spaces: their files, documents and instructions</span>
+                  </span>
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
-      <NewSpaceDialog open={made} onClose={() => setMade(false)} onMade={(s) => go(`/spaces/${s.id}`)} />
+      <NewSpaceDialog open={!!made} group={made === 'group'} onClose={() => setMade(false)} onMade={(s) => go(`/spaces/${s.id}`)} />
     </div>
   );
 }
@@ -139,6 +155,7 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
   const own = st?.bases.filter((b) => b.space === s.id) ?? [];
   const sharedDocs = (st?.bases ?? []).filter((b) => !b.space || (spaces && !spaces.some((x) => x.id === b.space))).reduce((n, b) => n + b.docs, 0);
   const useShared = s.sharedKnowledge !== false;
+  const members = (s.members ?? []).map((id) => spaces?.find((x) => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x);
   const setShared = async (on: boolean) => {
     try {
       onSaved(await patch<Space>(`/api/spaces/${enc(s.id)}`, { sharedKnowledge: on }));
@@ -180,6 +197,20 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
         </div>
         <Switch on={useShared} label="Also search the shared knowledge" onChange={(v) => void setShared(v)} />
       </div>
+      {members.length > 0 && (
+        <div className="rounded-xl border border-line bg-panel px-4 py-3">
+          <div className="text-[13.5px] font-medium">Also the documents of the spaces it brings together</div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {members.map((m) => (
+              <button key={m.id} type="button" onClick={() => go(`/spaces/${m.id}/knowledge`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
+                <SpaceMark s={m} size={15} />
+                <span className="min-w-0 truncate">{m.name}</span>
+                <span className="tnum text-fg-3">{m.docs}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {!st ? (
         <div className="flex justify-center py-6 text-fg-3">
           <Throbber size={24} />
@@ -187,8 +218,9 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
       ) : !own.length ? (
         <div className="space-y-4">
           <div className="text-[13.5px] leading-relaxed text-fg-2">
-            Documents only this space’s sessions search: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page
-            they read.
+            {members.length
+              ? 'Documents of the group’s own, beside those of its spaces: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page they read.'
+              : 'Documents only this space’s sessions search: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page they read.'}
           </div>
           <DropFiles big onFiles={(p) => void firstFiles(p)} />
           <div className="text-center">
@@ -218,11 +250,24 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
   const [form, setForm] = useState<Partial<Space>>(s);
   const [confirm, confirmNode] = useConfirm();
   const assistants = useAssistantsState()?.assistants ?? [];
+  const spaces = useSpaces();
+  // A space in a group stays a plain space (groups are one level deep).
+  const inGroups = (spaces ?? []).filter((x) => x.members?.includes(s.id));
   useEffect(() => setForm(s), [s]);
-  const dirty = (['name', 'description', 'instructions', 'assistant', 'color'] as const).some((k) => (form[k] ?? '') !== (s[k] ?? ''));
+  const sameMembers = (form.members ?? []).join() === (s.members ?? []).join();
+  const dirty = !sameMembers || (['name', 'description', 'instructions', 'assistant', 'color'] as const).some((k) => (form[k] ?? '') !== (s[k] ?? ''));
   const save = async () => {
     try {
-      onSaved(await patch<Space>(`/api/spaces/${enc(s.id)}`, { name: form.name, description: form.description ?? '', instructions: form.instructions ?? '', assistant: form.assistant ?? '', color: form.color }));
+      onSaved(
+        await patch<Space>(`/api/spaces/${enc(s.id)}`, {
+          name: form.name,
+          description: form.description ?? '',
+          instructions: form.instructions ?? '',
+          assistant: form.assistant ?? '',
+          color: form.color,
+          ...(sameMembers ? {} : { members: form.members ?? [] }),
+        }),
+      );
       loadSpaces();
     } catch (e) {
       toastError(e);
@@ -261,6 +306,16 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
           placeholder="Who it is for, how to work, what to keep in mind"
         />
       </label>
+      <div>
+        <span className="mb-1.5 block text-[12.5px] text-fg-2">The spaces it brings together</span>
+        {inGroups.length ? (
+          <div className="text-[12.5px] text-fg-3">
+            It is in {inGroups.map((g) => g.name).join(', ')}, so it cannot bring other spaces together itself.
+          </div>
+        ) : (
+          <MemberPicker value={form.members ?? []} onChange={(members) => setForm({ ...form, members })} self={s.id} />
+        )}
+      </div>
       <label className="block">
         <span className="mb-1 block text-[12.5px] text-fg-2">Its sessions start as</span>
         <select className={cx(inputCls, 'pr-8')} value={form.assistant ?? ''} onChange={(e) => setForm({ ...form, assistant: e.target.value })}>
@@ -322,7 +377,7 @@ function Detail({ id, tab }: { id: string; tab: Tab }) {
             {s.name}
           </span>
         }
-        sub={s.description || 'Space'}
+        sub={isGroup(s) ? `Brings together ${memberNames(s, spaces)}` : s.description || 'Space'}
         actions={
           <>
             <Button size="sm" variant="ghost" icon={<ArrowLeft size={14} />} onClick={() => go('/spaces')}>
