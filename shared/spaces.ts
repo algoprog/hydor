@@ -1,7 +1,8 @@
 // Spaces: a project's sessions, files, documents, memory, instructions and assistant in one place, picked by
 // name on the start page in place of a folder. Each space has a folder of its own (its files, and so its project
-// memory), knowledge bases of its own (shared/knowledge.ts) that only its sessions search, instructions every
-// session in it gets, and the assistant its sessions start as. What the server and the pages share.
+// memory), and can work with other folders of yours where they are; knowledge bases of its own
+// (shared/knowledge.ts) that only its sessions search, instructions every session in it gets, and the
+// assistant its sessions start as. What the server and the pages share.
 
 export interface Space {
   id: string;
@@ -11,6 +12,8 @@ export interface Space {
   description?: string;
   /** Where its sessions work, its files are and its memory is kept. */
   folder: string;
+  /** Folders of yours it works with besides, where they are (a project, a folder of papers): its sessions get them too. */
+  folders?: string[];
   /** What every session in it is told (who it is for, how to work, what to keep in mind). */
   instructions?: string;
   /** The assistant its sessions start as (General, Researcher…). */
@@ -50,6 +53,8 @@ export const spaceColor = (s: Pick<Space, 'color'>) => SPACE_COLORS[s.color] ?? 
 export const MAX_SPACE_INSTRUCTIONS = 20_000;
 /** Most spaces a group brings together. */
 export const MAX_GROUP = 12;
+/** Most folders a space works with besides its own. */
+export const MAX_FOLDERS = 12;
 
 /** A space that brings others together. */
 export const isGroup = (s: Pick<Space, 'members'>) => !!s.members?.length;

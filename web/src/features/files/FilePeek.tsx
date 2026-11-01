@@ -1,5 +1,6 @@
 // A file opened from a session (one the agent handed over or changed, a link in its reply) shows in a
-// dialog over the conversation, which stays where it was. The Files page is a click away.
+// dialog over the conversation, which stays where it was. The Files page is a click away, and its ⋯ starts
+// a session with the file or adds it to a space.
 import { useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
@@ -9,6 +10,7 @@ import { showInFiles, useFilePeek } from '../../lib/nav';
 import { Button, IconButton } from '../../components/ui';
 import { useDiscardGuard } from '../settings/Instructions';
 import { FileView } from './FilesPage';
+import { FileMore } from './SpaceMenu';
 
 const shut = () => useFilePeek.setState({ file: null });
 
@@ -51,8 +53,9 @@ export function FilePeek() {
                   {basename(file.path)}
                 </div>
                 <Button size="sm" variant="ghost" icon={<FolderOpen size={14} />} onClick={async () => (await close()) && showInFiles(file.path, file.line)}>
-                  Open in Files
+                  <span className="max-sm:hidden">Open in Files</span>
                 </Button>
+                <FileMore path={file.path} inFiles={false} />
                 <IconButton label="Close" onClick={close}>
                   <X size={17} />
                 </IconButton>

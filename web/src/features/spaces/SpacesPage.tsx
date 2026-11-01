@@ -1,8 +1,9 @@
 // Spaces: each project's sessions, files, documents, memory, guidelines and assistant together. The list
 // (beside the shared knowledge, on the page's second tab), and a space's own page: start a session in it, its
-// sessions, its files and memory; its knowledge (documents only its sessions search, with the shared ones too
-// unless it leaves them out); and what every agent in it is told. A group brings spaces together: its sessions
-// work with all of them. Picked by name on the start page in place of a folder.
+// sessions and memory; its files (its folder and the folders it works with, SpaceFiles); its knowledge
+// (documents only its sessions search, with the shared ones too unless it leaves them out); and what every
+// agent in it is told. A group brings spaces together: its sessions work with all of them. Picked by name on
+// the start page in place of a folder.
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { ArrowLeft, Boxes, Brain, FolderOpen, FolderPlus, Layers, Plus, SquarePen, Trash2 } from 'lucide-react';
@@ -13,7 +14,7 @@ import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Empty, inputCls, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
-import { go, openSession, showInFiles } from '../../lib/nav';
+import { go, openSession } from '../../lib/nav';
 import { saveStart } from '../../lib/start';
 import { toastError, useApp, useSessions } from '../../lib/store';
 import type { PickedFile } from '../../lib/upload';
@@ -21,6 +22,7 @@ import { PageHeader } from '../layout/PageHeader';
 import { useAssistantsState } from '../assistants/state';
 import { addFiles, BaseCard, DropFiles, MeaningHint, TrySearch, useKnowledge } from '../knowledge/parts';
 import { MemberPicker, memberNames, NewSpaceDialog, SpaceMark, SpacesTabs } from './parts';
+import { SpaceFiles } from './SpaceFiles';
 import { loadSpaces, useSpaces } from './state';
 
 /** The start page, with this space picked: its folder, its assistant. */
@@ -109,7 +111,7 @@ function List() {
   );
 }
 
-type Tab = 'sessions' | 'knowledge' | 'settings';
+type Tab = 'sessions' | 'files' | 'knowledge' | 'settings';
 
 /** A space's sessions, with its folder and what its agents remember. */
 function SessionsTab({ s, keys }: { s: Space; keys: string[] }) {
@@ -119,7 +121,7 @@ function SessionsTab({ s, keys }: { s: Space; keys: string[] }) {
   return (
     <div className="space-y-6">
       <section className="flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" icon={<FolderOpen size={14} />} onClick={() => showInFiles(s.folder)}>
+        <Button size="sm" variant="secondary" icon={<FolderOpen size={14} />} onClick={() => go(`/spaces/${s.id}/files`, true)}>
           Its files
         </Button>
         <Button size="sm" variant="secondary" icon={<Brain size={14} />} onClick={() => go('/settings?s=memory')}>
@@ -394,22 +396,32 @@ function Detail({ id, tab }: { id: string; tab: Tab }) {
           onChange={(t) => go(`/spaces/${s.id}${t === 'sessions' ? '' : `/${t}`}`, true)}
           options={[
             { value: 'sessions', label: 'Sessions', count: data.sessions.length },
+            { value: 'files', label: 'Files' },
             { value: 'knowledge', label: 'Knowledge', count: docs },
             { value: 'settings', label: 'Settings' },
           ]}
         />
       </PageHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[880px] px-3 py-5 sm:px-6">
-          {tab === 'knowledge' ? <KnowledgeTab s={s} onSaved={saved} /> : tab === 'settings' ? <SettingsTab s={s} onSaved={saved} /> : <SessionsTab s={s} keys={data.sessions} />}
+      {tab === 'files' ? (
+        // The folder scrolls in its own box, so the page keeps its height.
+        <div className="min-h-0 flex-1">
+          <div className="mx-auto h-full max-w-[1100px] px-3 pt-4 pb-3 sm:px-6">
+            <SpaceFiles s={s} onSaved={saved} />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[880px] px-3 py-5 sm:px-6">
+            {tab === 'knowledge' ? <KnowledgeTab s={s} onSaved={saved} /> : tab === 'settings' ? <SettingsTab s={s} onSaved={saved} /> : <SessionsTab s={s} keys={data.sessions} />}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export function SpacesPage() {
   const [loc] = useLocation();
-  const m = /^\/spaces\/([a-z0-9]+)(?:\/(knowledge|settings))?$/.exec(loc);
+  const m = /^\/spaces\/([a-z0-9]+)(?:\/(files|knowledge|settings))?$/.exec(loc);
   return m ? <Detail id={m[1]} tab={(m[2] as Tab | undefined) ?? 'sessions'} /> : <List />;
 }

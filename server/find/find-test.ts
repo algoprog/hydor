@@ -247,6 +247,8 @@ test('places: each address as the search box lists it', () => {
   assert.equal(placeOf('/pages', '?tab=published', pages), 'go:published');
   assert.equal(placeOf('/pages/p1', '', pages), 'page:p1');
   assert.equal(placeOf('/spaces', '', pages), 'go:spaces');
+  assert.equal(placeOf('/files', '?place=trash', pages), 'go:files-trash');
+  assert.equal(placeOf('/files', '?dir=%2Fhome%2Fa', pages), 'go:files');
   assert.equal(placeOf('/file', '?path=%2Fhome%2Fa.md&line=3', pages), 'f:/home/a.md');
   assert.equal(placeOf('/review/x', '', pages), null);
 });

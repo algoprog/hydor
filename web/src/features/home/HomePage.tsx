@@ -31,6 +31,7 @@ import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } fr
 import { NewSpaceDialog } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
 import type { Space } from '@shared/spaces';
+import { doneStartFiles, waitingStartFiles } from '../../lib/startFiles';
 
 /** Starts a session: pick the agent and folder, type the task, press Enter. */
 /** A prompt link (/?prompt=…&agent=…&model=…&cwd=…) fills the box; it never starts anything by itself. */
@@ -229,6 +230,14 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     const list = await readAttachments(files, atts);
     if (list.length) setAtts((l) => [...l, ...list]);
   };
+  // Files picked for a new session elsewhere (Files, a file's window, an agent's file card) join the box.
+  useEffect(() => {
+    const waiting = waitingStartFiles();
+    if (!waiting.length) return;
+    doneStartFiles();
+    setAtts((l) => [...l, ...waiting.filter((w) => !l.some((a) => a.path === w.path))]);
+    ta.current?.focus();
+  }, []);
 
   const acct = accounts.some((a) => a.id === account) ? account : undefined;
   const start = async () => {

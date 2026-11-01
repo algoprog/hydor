@@ -161,6 +161,8 @@ export interface CreateOpts {
   prompt?: string;
   images?: ImageInput[];
   files?: FileInput[];
+  /** Files and folders already on this computer (picked in Files): named in the message, pictures shown to the model too. */
+  paths?: string[];
   model?: string;
   effort?: string;
   mode?: string;
@@ -193,6 +195,36 @@ interface Live {
 function withFiles(text: string, files: string[]): string {
   if (!files.length) return text;
   return `${text ? `${text}\n\n` : ''}Attached files:\n${files.map((f) => `- ${f}`).join('\n')}`;
+}
+
+/** What models take as pictures, by a file's extension. */
+const PICTURES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
+
+/**
+ * Files and folders on this computer a message names (picked in Files, not uploaded): each by its path, a
+ * folder with a slash at its end, and pictures up to 5 MB shown to the model as well. Those gone are left out.
+ */
+export function onThisComputer(list: unknown): { paths: string[]; images: ImageInput[] } {
+  const out = { paths: [] as string[], images: [] as ImageInput[] };
+  for (const p of (Array.isArray(list) ? list : []).slice(0, 20)) {
+    if (typeof p !== 'string' || !p.trim()) continue;
+    const abs = path.resolve(p.trim().replace(/^~(?=\/|$)/, os.homedir()));
+    let st: fs.Stats;
+    try {
+      st = fs.statSync(abs);
+    } catch {
+      continue;
+    }
+    if (out.paths.includes(abs) || out.paths.includes(`${abs}/`)) continue;
+    out.paths.push(st.isDirectory() ? `${abs}/` : abs);
+    const type = PICTURES[path.extname(abs).slice(1).toLowerCase()];
+    if (type && st.isFile() && st.size <= 5 * 1024 * 1024 && out.images.length < 8) {
+      try {
+        out.images.push({ mediaType: type, data: fs.readFileSync(abs).toString('base64'), name: path.basename(abs) });
+      } catch {}
+    }
+  }
+  return out;
 }
 
 function alive(pid: number): boolean {
@@ -895,11 +927,13 @@ export class SessionManager extends EventEmitter {
     if (o.extra && Object.keys(o.extra).length) setSessionExtra(this.db, l.key, o.extra);
     if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: o.model, effort: o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
-    const prompt = withFiles(o.prompt?.trim() ?? '', this.saveFiles(o.files ?? []));
-    if (prompt || o.images?.length) {
+    const here = onThisComputer(o.paths);
+    const prompt = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
+    const images = [...(o.images ?? []), ...here.images];
+    if (prompt || images.length) {
       await beforeSend(l.key);
       await this.snapshot(l.key);
-      await l.adapter.sendMessage(prompt, this.saveImages(o.images ?? []));
+      await l.adapter.sendMessage(prompt, this.saveImages(images));
     }
     this.queueSummary(l.key);
     return l.key;

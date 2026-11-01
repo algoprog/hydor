@@ -1,12 +1,15 @@
 // Pieces of spaces used on several pages: a space's coloured mark, the tabs over the spaces and the shared
-// knowledge, the dialog that makes a new space (or a group of them), and the picker of a group's spaces.
-import { useEffect, useState } from 'react';
-import { Check } from 'lucide-react';
-import { isGroup, MAX_GROUP, SPACE_COLORS, spaceColor, type Space } from '@shared/spaces';
-import { Button, cx, Dialog, inputCls, Tabs } from '../../components/ui';
+// knowledge, the dialog that makes a new space (or a group of them) with the folders it works in, and the
+// picker of a group's spaces.
+import { useEffect, useRef, useState } from 'react';
+import { Check, Folder, FolderPlus, Plus, X } from 'lucide-react';
+import { isGroup, MAX_FOLDERS, MAX_GROUP, SPACE_COLORS, spaceColor, type Space } from '@shared/spaces';
+import { FolderFinder } from '../../components/FolderPicker';
+import { Button, cx, Dialog, inputCls, Popover, Tabs } from '../../components/ui';
 import { post } from '../../lib/api';
+import { basename, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toastError } from '../../lib/store';
+import { toastError, useApp } from '../../lib/store';
 import { loadSpaces, useSpaces } from './state';
 
 /** Under the Spaces page's title: the spaces, and the documents every session searches. */
@@ -81,8 +84,73 @@ export function MemberPicker({ value, onChange, self }: { value: string[]; onCha
 }
 
 /**
+ * A space's folders, as a list to change: its own (a new one, named for it, or one you have, `own`), then
+ * those it works with besides, where they are (`also`). A folder is found by name or typed as a path.
+ */
+export function FolderList({ own, also, onOwn, onAlso, fixed }: { own: string | null; also: string[]; onOwn?: (p: string | null) => void; onAlso: (list: string[]) => void; fixed?: string }) {
+  const home = useApp((s) => s.boot?.home);
+  const [find, setFind] = useState<false | 'own' | 'also'>(false);
+  const ownRef = useRef<HTMLButtonElement>(null);
+  const alsoRef = useRef<HTMLButtonElement>(null);
+  const row = 'flex h-10 min-w-0 items-center gap-2.5 px-3 text-[13.5px]';
+  const anchor = find === 'own' ? ownRef : alsoRef;
+  return (
+    <div className="divide-y divide-line overflow-hidden rounded-[10px] border border-line-2 bg-bg-1">
+      <div className={row}>
+        {own || fixed ? <Folder size={15} className="shrink-0 text-accent/80" /> : <FolderPlus size={15} className="shrink-0 text-fg-3" />}
+        <span translate={own || fixed ? 'no' : undefined} className={cx('min-w-0 flex-1 truncate', !own && !fixed && 'text-fg-2')} title={own ?? fixed}>
+          {fixed ? tildify(fixed, home) : own ? tildify(own, home) : 'A new folder, named for it'}
+        </span>
+        {onOwn && (
+          <>
+            {own && (
+              <button type="button" aria-label="Make a new folder for it instead" title="Make a new folder for it instead" onClick={() => onOwn(null)} className="rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
+                <X size={13} />
+              </button>
+            )}
+            <button ref={ownRef} type="button" onClick={() => setFind((f) => (f === 'own' ? false : 'own'))} className="shrink-0 text-[12.5px] font-medium text-accent hover:underline">
+              {own ? 'Change' : 'Use one you have'}
+            </button>
+          </>
+        )}
+      </div>
+      {also.map((p) => (
+        <div key={p} className={row}>
+          <Folder size={15} className="shrink-0 text-fg-3" />
+          <span translate="no" className="min-w-0 flex-1 truncate" title={p}>
+            {tildify(p, home)}
+          </span>
+          <button type="button" aria-label={`Leave out ${basename(p)}`} title="Leave it out (the folder stays as it is)" onClick={() => onAlso(also.filter((x) => x !== p))} className="rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+      {also.length < MAX_FOLDERS && (
+        <button ref={alsoRef} type="button" onClick={() => setFind((f) => (f === 'also' ? false : 'also'))} className={cx(row, 'w-full text-left text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg')}>
+          <Plus size={15} className="shrink-0 text-fg-3" />
+          {also.length ? 'Add another folder it works with' : 'Add a folder it works with, where it is'}
+        </button>
+      )}
+      <Popover anchor={anchor} open={!!find} onClose={() => setFind(false)} width={340} align={find === 'own' ? 'end' : 'start'} title={find === 'own' ? 'Its folder' : 'A folder it works with'}>
+        <FolderFinder
+          value={find === 'own' ? own : null}
+          autoFocus
+          anchor={anchor}
+          onPick={(p) => {
+            setFind(false);
+            if (find === 'own') onOwn?.(p);
+            else if (!also.includes(p) && p !== own && p !== fixed) onAlso([...also, p]);
+          }}
+        />
+      </Popover>
+    </div>
+  );
+}
+
+/**
  * A new space: its name, what it is about and anything every session in it should know. Its folder is made for
- * it. With `group`, a group of spaces: the spaces it brings together too.
+ * it, or is one you have; it can work with more of your folders, where they are. With `group`, a group of
+ * spaces: the spaces it brings together too.
  */
 export function NewSpaceDialog({ open, onClose, onMade, group }: { open: boolean; onClose: () => void; onMade?: (s: Space) => void; group?: boolean }) {
   const [name, setName] = useState('');
@@ -90,6 +158,8 @@ export function NewSpaceDialog({ open, onClose, onMade, group }: { open: boolean
   const [instructions, setInstructions] = useState('');
   const [color, setColor] = useState<string | undefined>();
   const [members, setMembers] = useState<string[]>([]);
+  const [own, setOwn] = useState<string | null>(null);
+  const [also, setAlso] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
@@ -98,13 +168,23 @@ export function NewSpaceDialog({ open, onClose, onMade, group }: { open: boolean
     setInstructions('');
     setColor(undefined);
     setMembers([]);
+    setOwn(null);
+    setAlso([]);
   }, [open]);
   const ready = !!name.trim() && !busy && (!group || members.length > 0);
   const make = async () => {
     if (!ready) return;
     setBusy(true);
     try {
-      const s = await post<Space>('/api/spaces', { name, description, instructions, ...(color ? { color } : {}), ...(group ? { members } : {}) });
+      const s = await post<Space>('/api/spaces', {
+        name,
+        description,
+        instructions,
+        ...(color ? { color } : {}),
+        ...(group ? { members } : {}),
+        ...(own ? { folder: own } : {}),
+        ...(also.length ? { folders: also } : {}),
+      });
       loadSpaces();
       onMade?.(s);
       onClose();
@@ -135,7 +215,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group }: { open: boolean
         <div className="text-[13px] leading-relaxed text-fg-2">
           {group
             ? 'A group brings spaces together: sessions in it work with all of them, their files, documents and guidelines. It gets a folder of its own for what is made in it.'
-            : 'A space keeps a project’s sessions, files, documents and memory together, with guidelines every agent in it follows. It gets a folder of its own.'}
+            : 'A space keeps a project’s sessions, files, documents and memory together, with guidelines every agent in it follows. It gets a folder of its own, or works in one you have.'}
         </div>
         <label className="block">
           <span className="mb-1 block text-[13px] font-medium">Name</span>
@@ -158,6 +238,20 @@ export function NewSpaceDialog({ open, onClose, onMade, group }: { open: boolean
           <span className="mb-1 block text-[13px] font-medium">What it is about</span>
           <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
         </label>
+        <div>
+          <span className="mb-1 block text-[13px] font-medium">Its folders</span>
+          <FolderList
+            own={own}
+            also={also}
+            onOwn={(p) => {
+              setOwn(p);
+              // A folder you have names the space, until you name it yourself.
+              if (p && !name.trim()) setName(basename(p));
+            }}
+            onAlso={setAlso}
+          />
+          <span className="mt-1 block text-[12px] text-fg-3">Its sessions work in the first; they work with the others too, where they are.</span>
+        </div>
         <label className="block">
           <span className="mb-1 block text-[13px] font-medium">Agent Guidelines: what every agent in it follows</span>
           <textarea

@@ -281,10 +281,79 @@ export async function renamePath(fromIn: string, toIn: string) {
   return { path: to };
 }
 
-/** Moves to the trash folder in the app's data; returns where it went. */
-export async function deletePath(pIn: string) {
+const taken = (p: string) => !!fs.lstatSync(p, { throwIfNoEntry: false });
+
+/** A name in `dir` for `name` that nothing has yet: itself, else "name copy.ext", "name copy 2.ext"… */
+export function freeName(dir: string, name: string, folder = false): string {
+  if (!taken(path.join(dir, name))) return path.join(dir, name);
+  const dot = folder ? -1 : name.lastIndexOf('.');
+  const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
+  for (let i = 1; i < 10_000; i++) {
+    const p = path.join(dir, `${stem} copy${i > 1 ? ` ${i}` : ''}${ext}`);
+    if (!taken(p)) return p;
+  }
+  throw new HttpError(409, 'No free name for it there');
+}
+
+/**
+ * Copies a file or a folder with all it holds: to `to` (which must be free), or `into` a folder under its own
+ * name (a free one when that is taken). Returns where the copy is.
+ */
+export async function copyPath(fromIn: string, o: { to?: string; into?: string }) {
+  const from = resolvePath(fromIn);
+  const st = await fs.promises.lstat(from).catch(() => null);
+  if (!st) throw new HttpError(404, 'Not found');
+  let to: string;
+  if (o.into) {
+    const into = resolvePath(o.into);
+    if (!(await fs.promises.stat(into).catch(() => null))?.isDirectory()) throw new HttpError(400, `No folder at ${into}`);
+    to = freeName(into, path.basename(from), st.isDirectory());
+  } else {
+    if (!o.to) throw new HttpError(400, 'Where to?');
+    to = resolvePath(o.to);
+    if (taken(to)) throw new HttpError(409, `${path.basename(to)} already exists there`);
+  }
+  if (to.startsWith(from + path.sep)) throw new HttpError(400, 'Cannot copy a folder into itself');
+  await fs.promises.mkdir(path.dirname(to), { recursive: true });
+  await fs.promises.cp(from, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true, verbatimSymlinks: true });
+  invalidateGit(to);
+  return { path: to };
+}
+
+// ---- the trash ------------------------------------------------------------------------
+// Deleting moves a file or folder into the trash folder in the app's data, under a name that starts with when
+// it went. Where each came from is kept beside them (.where.json), so it can be put back.
+
+const WHERE = path.join(TRASH, '.where.json');
+type Where = Record<string, { from: string; at: number }>;
+
+function readWhere(): Where {
+  try {
+    const w = JSON.parse(fs.readFileSync(WHERE, 'utf8'));
+    return w && typeof w === 'object' ? w : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Changes the record at once (read, change and write with nothing in between, so no two changes cross). */
+function noteWhere(change: (w: Where) => void) {
+  const w = readWhere();
+  change(w);
+  fs.mkdirSync(TRASH, { recursive: true });
+  const tmp = `${WHERE}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(w));
+  fs.renameSync(tmp, WHERE);
+}
+
+/**
+ * Moves to the trash folder in the app's data; returns where it went. Something on another disk can't move
+ * there: it is deleted for good only with `forGood` (else 409, so the page can ask first).
+ */
+export async function deletePath(pIn: string, o: { forGood?: boolean } = {}) {
   const p = resolvePath(pIn);
   if (p === '/' || p === os.homedir()) throw new HttpError(400, 'Refusing to delete that');
+  if (p === TRASH || p.startsWith(TRASH + path.sep)) throw new HttpError(400, 'It is in the trash already: delete it for good from Trash instead');
   if (!fs.existsSync(p) && !fs.lstatSync(p, { throwIfNoEntry: false })) throw new HttpError(404, 'Not found');
   await fs.promises.mkdir(TRASH, { recursive: true });
   const dest = path.join(TRASH, `${new Date().toISOString().replace(/[:.]/g, '-')}-${path.basename(p)}`);
@@ -292,12 +361,88 @@ export async function deletePath(pIn: string) {
     await fs.promises.rename(p, dest);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e;
+    if (!o.forGood) throw new HttpError(409, `${path.basename(p)} is on another disk than the trash, so it would be deleted for good`);
     await fs.promises.rm(p, { recursive: true, force: true });
     invalidateGit(p);
     return { trashed: null };
   }
+  noteWhere((w) => void (w[path.basename(dest)] = { from: p, at: Date.now() }));
   invalidateGit(p);
   return { trashed: dest };
+}
+
+export interface TrashItem {
+  /** What it was called. */
+  name: string;
+  /** Where it is now, in the trash folder. */
+  path: string;
+  /** Where it was; unknown for what went to the trash before the app kept that. */
+  from?: string;
+  at: number;
+  dir: boolean;
+  size: number;
+}
+
+/** What is in the trash, the last deleted first. */
+export async function listTrash(): Promise<{ dir: string; items: TrashItem[] }> {
+  const names = await fs.promises.readdir(TRASH).catch(() => [] as string[]);
+  const where = readWhere();
+  const items: TrashItem[] = [];
+  for (const n of names) {
+    if (n.startsWith('.where.json')) continue;
+    const p = path.join(TRASH, n);
+    const st = await fs.promises.lstat(p).catch(() => null);
+    if (!st) continue;
+    const w = where[n];
+    // The name it was given says when it went: 2026-11-01T19-29-14-123Z-notes.md.
+    const m = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z-(.+)$/.exec(n);
+    const at = w?.at ?? (m ? Date.parse(`${m[1]}T${m[2]}:${m[3]}:${m[4]}.${m[5]}Z`) : st.mtimeMs);
+    items.push({ name: w ? path.basename(w.from) : (m?.[6] ?? n), path: p, from: w?.from, at: Math.floor(at), dir: st.isDirectory(), size: st.isDirectory() ? 0 : st.size });
+  }
+  // What is no longer there needs no record.
+  if (Object.keys(where).some((n) => !names.includes(n))) noteWhere((w) => Object.keys(w).forEach((n) => names.includes(n) || delete w[n]));
+  items.sort((a, b) => b.at - a.at);
+  return { dir: TRASH, items };
+}
+
+function inTrash(pIn: string): string {
+  const p = resolvePath(pIn);
+  if (path.dirname(p) !== TRASH || p === WHERE) throw new HttpError(400, 'That is not in the trash');
+  if (!taken(p)) throw new HttpError(404, 'It is no longer in the trash');
+  return p;
+}
+
+/**
+ * Puts something back where it was, or `into` another folder. When its place is taken, it comes back beside
+ * what is there now, as "name copy". Returns where it went.
+ */
+export async function restoreFromTrash(pIn: string, into?: string) {
+  const p = inTrash(pIn);
+  const w = readWhere()[path.basename(p)];
+  const name = w ? path.basename(w.from) : path.basename(p).replace(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-/, '');
+  const dir = into ? resolvePath(into) : w ? path.dirname(w.from) : null;
+  if (!dir) throw new HttpError(400, 'Where it was is not known (it went to the trash before the app kept that): pick a folder to put it in');
+  await fs.promises.mkdir(dir, { recursive: true });
+  const to = freeName(dir, name, (await fs.promises.lstat(p)).isDirectory());
+  await moveAcross(p, to);
+  noteWhere((x) => void delete x[path.basename(p)]);
+  invalidateGit(to);
+  return { path: to };
+}
+
+/** Deletes one thing in the trash for good. */
+export async function deleteForGood(pIn: string) {
+  const p = inTrash(pIn);
+  await fs.promises.rm(p, { recursive: true, force: true });
+  noteWhere((x) => void delete x[path.basename(p)]);
+  return { ok: true };
+}
+
+/** Deletes everything in the trash for good. */
+export async function emptyTrash() {
+  const names = await fs.promises.readdir(TRASH).catch(() => [] as string[]);
+  for (const n of names) await fs.promises.rm(path.join(TRASH, n), { recursive: true, force: true });
+  return { ok: true, deleted: names.filter((n) => !n.startsWith('.where.json')).length };
 }
 
 // ---- search ----------------------------------------------------------------------

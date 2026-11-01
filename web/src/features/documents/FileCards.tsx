@@ -1,6 +1,6 @@
 // The files an agent handed over (present_files), as cards with its reply: an icon by type (a
 // thumbnail for pictures), the name, what it is and its size, the agent's caption, then Open (the
-// app's file viewer, which previews documents) and Download.
+// app's file viewer, which previews documents), Download and ⋯ (a session with it, a space, Files).
 import { useEffect, useState } from 'react';
 import { Download, FileQuestion } from 'lucide-react';
 import { kindLabel, docKind } from '@shared/documents';
@@ -12,6 +12,7 @@ import { openFile } from '../../lib/nav';
 import { useApp, useSessions } from '../../lib/store';
 import { Button, cx, IconButton } from '../../components/ui';
 import { FileIcon, resolveIn } from './fileTypes';
+import { FileMore } from '../files/SpaceMenu';
 
 interface Card {
   path: string;
@@ -76,6 +77,7 @@ function FileCard({ card, stat }: { card: Card; stat: Stat }) {
           <IconButton label={`Download ${name}`} onClick={() => download(card.path)}>
             <Download size={16} />
           </IconButton>
+          <FileMore path={card.path} size={stat?.size} />
         </div>
       )}
     </div>

@@ -181,9 +181,12 @@ export function FolderFinder({
   const folders = text ? found.slice(0, asPath ? 200 : 8).map((f) => f.p) : [...(value && !last.includes(value) ? [value] : []), ...last];
   // As many of `lead` as of the folders used last (the one in use among them), the rest found by name.
   const leadRows = text ? lead.filter((c) => c.name.toLowerCase().includes(text.toLowerCase())) : lead.filter((c, i) => i < count || c.on);
-  const rows = text ? [...leadRows, ...folders.map(folder)] : [...leadRows, ...folders.map(folder), ...more];
+  // A folder shown among `lead` (a space's, a pinned one) isn't listed again.
+  const inLead = new Set(leadRows.map((c) => c.path).filter(Boolean));
+  const folderRows = folders.filter((p) => !inLead.has(p)).map(folder);
+  const rows = text ? [...leadRows, ...folderRows] : [...leadRows, ...folderRows, ...more];
   // A line between the spaces and the folders, and between the folders and a new task folder.
-  const seps = new Set(text ? [] : [leadRows.length, leadRows.length + folders.length].filter((i) => i > 0 && i < rows.length));
+  const seps = new Set(text ? [] : [leadRows.length, leadRows.length + folderRows.length].filter((i) => i > 0 && i < rows.length));
   const hi = Math.min(sel ?? (text ? 0 : rows.findIndex((r) => r.on)), rows.length - 1);
 
   useEffect(() => {

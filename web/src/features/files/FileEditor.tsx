@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, Download, Ellipsis, Eye, FileDiff, RotateCcw, Save, Search, SquareTerminal, WrapText } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, MessageSquarePlus, RotateCcw, Save, Search, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle } from '../../lib/codemirror';
 import { basename, bytes, dirname, tildify } from '../../lib/format';
@@ -11,6 +11,8 @@ import { VideoPlayer } from '../../components/VideoPlayer';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { mu } from '../../lib/machine';
 import { isPreviewable } from '@shared/documents';
+import { copyPaths, goFolder, itemOf, startSession } from './actions';
+import { useSpaceMenu } from './SpaceMenu';
 
 // Word, Excel, PowerPoint and other documents open as a preview (features/documents).
 const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) => ({ default: m.OfficePreview })));
@@ -53,7 +55,8 @@ function isDark() {
 /**
  * `embedded`: shown inside a dialog, so there is no Back button (the dialog closes instead), nor a terminal
  * (it would open behind the dialog). A dialog opens Markdown and HTML straight into editing, unless
- * `preview` shows them as they look first, as the Files page does. `actions` go in the toolbar.
+ * `preview` shows them as they look first, as the Files page does. `actions` go in the toolbar. `fileMenu`
+ * (the Files page): a menu with what else can be done with the file (a session with it, a space, its folder).
  */
 export function FileEditor({
   path,
@@ -63,6 +66,7 @@ export function FileEditor({
   onDirty,
   onSaved,
   actions,
+  fileMenu,
 }: {
   path: string;
   line?: number;
@@ -71,6 +75,7 @@ export function FileEditor({
   onDirty?: (dirty: boolean) => void;
   onSaved?: () => void;
   actions?: ReactNode;
+  fileMenu?: boolean;
 }) {
   const home = useApp((s) => s.boot?.home);
   const mobile = useIsMobile();
@@ -93,6 +98,12 @@ export function FileEditor({
   const [wrap, setWrap] = useState(() => (localStorage.getItem(wrapKey) ?? (mobile ? '1' : '0')) === '1');
   const [menu, setMenu] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
+  const deskRef = useRef<HTMLButtonElement>(null);
+  const [desk, setDesk] = useState(false);
+  const space = useSpaceMenu(
+    () => [itemOf(path, false, file?.size)],
+    () => (setMenu(false), setDesk(false)),
+  );
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<EditorHandle | null>(null);
   const doc = useRef('');
@@ -244,6 +255,26 @@ export function FileEditor({
     f();
   };
   const unsaved = dirty && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />;
+  // What else can be done with the file (the Files page): start a session with it, add it to a space…
+  const shut = (f: () => void) => () => {
+    setMenu(false);
+    setDesk(false);
+    f();
+  };
+  const more = (
+    <>
+      <MenuItem icon={<MessageSquarePlus size={14} />} onClick={shut(() => startSession([itemOf(path, false, file?.size)]))}>
+        Start a session with it
+      </MenuItem>
+      {space.entry}
+      <MenuItem icon={<FolderOpen size={14} />} onClick={shut(() => goFolder(dirname(path), path))}>
+        Show in its folder
+      </MenuItem>
+      <MenuItem icon={<Copy size={14} />} onClick={shut(() => copyPaths([itemOf(path)]))}>
+        Copy path
+      </MenuItem>
+    </>
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -283,34 +314,44 @@ export function FileEditor({
                 {saving ? 'Saving' : 'Save'}
               </Button>
             )}
-            <IconButton ref={moreRef} label="More" active={menu} onClick={() => setMenu((m) => !m)}>
+            <IconButton ref={moreRef} label="More" active={menu} onClick={() => (space.reset(), setMenu((m) => !m))}>
               <Ellipsis size={17} />
             </IconButton>
             <Popover anchor={moreRef} open={menu} onClose={() => setMenu(false)} align="end" width={272}>
-              {text && mode === 'edit' && (
-                <MenuItem icon={<Search size={14} />} onClick={fromMenu(() => editor.current?.find())}>
-                  Find
-                </MenuItem>
-              )}
-              {text && (
+              {space.sub || (
                 <>
-                  <MenuItem icon={<WrapText size={14} />} checked={wrap} onClick={fromMenu(() => setWrap((w) => !w))}>
-                    Word wrap
+                  {text && mode === 'edit' && (
+                    <MenuItem icon={<Search size={14} />} onClick={fromMenu(() => editor.current?.find())}>
+                      Find
+                    </MenuItem>
+                  )}
+                  {text && (
+                    <>
+                      <MenuItem icon={<WrapText size={14} />} checked={wrap} onClick={fromMenu(() => setWrap((w) => !w))}>
+                        Word wrap
+                      </MenuItem>
+                      <MenuItem icon={<FileDiff size={14} />} checked={mode === 'diff'} onClick={fromMenu(toggleDiff)}>
+                        Changes since the last commit
+                      </MenuItem>
+                      <MenuSep />
+                    </>
+                  )}
+                  {!embedded && (
+                    <MenuItem icon={<SquareTerminal size={14} />} onClick={fromMenu(() => openTerminalAt(dirname(path)))}>
+                      Terminal in this folder
+                    </MenuItem>
+                  )}
+                  <MenuItem icon={<Download size={14} />} onClick={fromMenu(download)}>
+                    Download
                   </MenuItem>
-                  <MenuItem icon={<FileDiff size={14} />} checked={mode === 'diff'} onClick={fromMenu(toggleDiff)}>
-                    Changes since the last commit
-                  </MenuItem>
-                  <MenuSep />
+                  {fileMenu && (
+                    <>
+                      <MenuSep />
+                      {more}
+                    </>
+                  )}
                 </>
               )}
-              {!embedded && (
-                <MenuItem icon={<SquareTerminal size={14} />} onClick={fromMenu(() => openTerminalAt(dirname(path)))}>
-                  Terminal in this folder
-                </MenuItem>
-              )}
-              <MenuItem icon={<Download size={14} />} onClick={fromMenu(download)}>
-                Download
-              </MenuItem>
             </Popover>
           </div>
         </div>
@@ -349,6 +390,16 @@ export function FileEditor({
           <IconButton label="Download" size="sm" onClick={download}>
             <Download size={14} />
           </IconButton>
+          {fileMenu && (
+            <>
+              <IconButton ref={deskRef} label="More" size="sm" active={desk} onClick={() => (space.reset(), setDesk((o) => !o))}>
+                <Ellipsis size={15} />
+              </IconButton>
+              <Popover anchor={deskRef} open={desk} onClose={() => setDesk(false)} align="end" width={250}>
+                {space.sub || more}
+              </Popover>
+            </>
+          )}
           {text && (
             <Button size="sm" variant={dirty ? 'primary' : 'ghost'} icon={<Save size={13} />} disabled={!dirty || saving} onClick={() => save()} className="ml-1">
               {saving ? 'Saving' : 'Save'}
@@ -356,6 +407,7 @@ export function FileEditor({
           )}
         </div>
       )}
+      {space.dialog}
       {changedOnDisk && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warn/40 bg-warn/10 px-3 py-1.5 text-[12.5px]">
           <span className="flex-1">The file changed on disk since you opened it.</span>

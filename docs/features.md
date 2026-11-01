@@ -58,9 +58,11 @@ agents that speak ACP and take MCP servers.
   up earlier sessions.
 - **Spaces** (in the sidebar): a project's sessions, files, documents, memory, guidelines and assistant together,
   like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a folder:
-  its sessions work in its own folder, remember what its earlier sessions learned, search its documents, get its
-  guidelines and start as its assistant. A group brings several spaces together: its sessions work with all
-  of them, their folders, documents and guidelines. The sidebar's filter shows one space's sessions.
+  its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
+  with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
+  guidelines and start as its assistant. Its Files tab shows its folders; files come in from Files, a file's
+  window or an agent's file cards with Add to a space. A group brings several spaces together: its sessions work
+  with all of them, their folders, documents and guidelines. The sidebar's filter shows one space's sessions.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
@@ -164,8 +166,14 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Share a session with a read-only link that ends when you want.
 
 ## Around the agents
-- Files: a file browser with git status, an editor, Markdown and HTML preview, diffs, search across files,
-  quick open and uploads. Jupyter notebooks open and run. Videos play in the app's own player (seek with a
+- Files: places to start from (recent files, home, pinned folders, your spaces' folders, the folders sessions
+  worked in, the trash), and each folder as a list with dates, sizes and git status (folders open in place, as a
+  tree) or as tiles with pictures; sort, narrow as you type, pick several, drag to move (Alt copies) or to
+  upload, keys for everything. Each file or folder's menu: start a session with it (named by its path, nothing
+  uploaded), add it to a space (a file is copied into its folder, a folder joins those it works with), rename,
+  duplicate, move or copy to a folder, download (a folder or several as one .zip), delete to a trash with Undo
+  and Put back. One search finds names and text inside files, under a folder you pick, by kind. An editor with
+  Markdown and HTML preview and diffs, quick open, and uploads. Jupyter notebooks open and run. Videos play in the app's own player (seek with a
   preview of the time, speed, loop, picture in picture, full screen, keyboard shortcuts, double-tap to skip on a
   phone), streamed in parts so they start at once and seek anywhere.
 - Git: your repositories with their changes, ahead/behind counts, fetch, pull and push. Commit from the app (pick

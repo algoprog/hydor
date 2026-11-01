@@ -1,6 +1,6 @@
 # Spaces and knowledge
 
-A space keeps one project together: its sessions, a folder for its files, documents of its own, what agents remember about it, the guidelines every agent in it follows and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using spaces and groups of spaces, and adding, searching and managing the documents agents search.
+A space keeps one project together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using spaces and groups of spaces, and adding, searching and managing the documents agents search.
 
 ![The Spaces page: each project’s sessions, documents and guidelines in one place](images/spaces.webp)
 
@@ -8,7 +8,7 @@ A space keeps one project together: its sessions, a folder for its files, docume
 
 A space is a project with everything that belongs to it, like Projects in ChatGPT or Claude. A tax return, a thesis, a garden, a website: each can be a space. On the start page you pick a space by its name instead of a folder, and every session you start in it:
 
-- **works in the space's folder**. The agent is told that this folder holds the space's files, and to keep what it makes for the space there;
+- **works in the space's folder**. The agent is told that this folder holds the space's files, what is in it now (the last changed first), and to keep what it makes for the space there. It also works with the other folders the space works with, where they are: Claude Code works in them as in its own folder, and other agents are told where they are;
 - **follows the space's guidelines**: what every agent in the space should know, such as who the work is for, how to work and what to keep in mind (see [Agent Guidelines](/guide/guidelines));
 - **starts as the space's assistant**, when the space has one (see [Assistants](/guide/assistants));
 - **remembers what earlier sessions in the space learned**: agents keep notes about a project by its folder, so the sessions of a space share them (see [Memory](/guide/memory));
@@ -39,17 +39,18 @@ Click a card to open the space's own page. With no spaces yet, the page says wha
 2. Fill in the window:
    - **Name**: what you call the project, such as "Taxes 2026", "The garden" or "Thesis". Up to 60 characters. It is the only field you must fill in.
    - **What it is about**: an optional line, shown under the name. Up to 300 characters.
+   - **Its folders**: where the space's files are. At first **A new folder, named for it**. To make the space around a folder you already have, such as a project on this computer, click **Use one you have** and find it by name or type its path: picked with the name still empty, its name becomes the space's. ✕ goes back to a new folder. **Add a folder it works with, where it is** adds more folders of yours: its sessions work in the first and with the others too, where they are, and nothing is copied. Up to 12; ✕ leaves one out again.
    - **Agent Guidelines: what every agent in it follows**, in the larger box: optional. What every agent in the space should know, such as who the work is for, how to work and what to keep in mind: "Amounts in EUR. I am self-employed in Greece." Up to 20,000 characters. See [Agent Guidelines](/guide/guidelines).
    - **Colour**: one of eight dots (amber, blue, green, pink, violet, teal, orange, slate). If you pick none, spaces take the colours in turn.
 3. Click **Make the space**, or press Enter in the name field.
 
-The app makes the space a folder of its own, named after it, in a **Spaces** folder where task folders go: "Taxes 2026" gets `~/Naget/Spaces/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/assistants#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Spaces page, the new space's page opens. Made from the start page, the new space is picked for the session you are about to start.
+Unless you picked a folder you have, the app makes the space a folder of its own, named after it, in a **Spaces** folder where task folders go: "Taxes 2026" gets `~/Naget/Spaces/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/assistants#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Spaces page, the new space's page opens. Made from the start page, the new space is picked for the session you are about to start.
 
-Two more things are set on the space's **Settings** tab afterwards: the assistant its sessions start as, and the spaces it brings together. Its documents go on its **Knowledge** tab.
+Two more things are set on the space's **Settings** tab afterwards: the assistant its sessions start as, and the spaces it brings together. Its documents go on its **Knowledge** tab, and more folders on its **Files** tab.
 
 ### A space for a folder you already have
 
-The **New space** window always makes a new folder. To make a space around a folder you already work in, such as a project on this computer, ask an agent: "Make a space called Shop for ~/code/shop". The app's API takes an existing folder for a new space; the window doesn't. A space's folder can't be changed once the space is made.
+In the **New space** window, click **Use one you have** under **Its folders** and pick the folder: the space works in it, and no new folder is made. An agent can do it too: "Make a space called Shop for ~/code/shop". A space's own folder can't be changed once the space is made, but the folders it works with can: see [Files](#files).
 
 ## Start a session in a space
 
@@ -68,16 +69,27 @@ When the space's folder is a Git repository, the end of the menu offers **New wo
 
 ## A space's own page
 
-Click a space on the Spaces page to open it. At the top are its mark and name, what it is about, and two buttons: **All spaces** goes back to the list (on a phone only its arrow shows), and **New session** starts a session in the space. Below them are three tabs: **Sessions** and **Knowledge**, each with a count, and **Settings**.
+Click a space on the Spaces page to open it. At the top are its mark and name, what it is about, and two buttons: **All spaces** goes back to the list (on a phone only its arrow shows), and **New session** starts a session in the space. Below them are four tabs: **Sessions**, **Files**, **Knowledge** and **Settings**; **Sessions** and **Knowledge** have a count.
 
 ### Sessions
 
-- **Its files** opens the space's folder in [Files](/files).
+- **Its files** opens the **Files** tab.
 - **What agents remember** opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the space are listed under its folder.
 - Next to them, the folder's path.
 - Below, the sessions started in the space, the one at work most recently first, each with its agent's icon, its title and how long ago it was at work. Click one to open it.
 
 With no sessions yet, the tab says that **New session** starts one here, with the space's folder, assistant and guidelines.
+
+### Files
+
+The space's folder, and the other folders it works with, as the [Files page](/guide/files-git#browse-a-folder) shows a folder: open, pick several, drag, upload, and each row's menu. A file opens in a window over the page.
+
+- Over the folder, a chip for each: the space's own folder, by the space's name, and each folder it works with, by its name. Click one to show it.
+- **Attach a folder** adds a folder of yours for the space to work with, where it is: find it by name or type its path. Nothing is copied. Up to 12.
+- ✕ on a folder's chip leaves it out of the space; the folder itself stays as it is. The message has **Undo**.
+- **Open in Files** opens the folder on the Files page.
+
+To add files from elsewhere, use **Add to a space** on the Files page, in a file's window or on an agent's file cards: a file is copied into the space's folder, a folder joins those it works with (see [Add files to a space](/guide/files-git#add-files-to-a-space)).
 
 ### Knowledge
 
@@ -105,7 +117,7 @@ Open the space, go to its **Settings** tab, change what you like and click **Sav
 
 Deleting a space keeps everything that was in it:
 
-- **Its folder** and the files in it stay where they are.
+- **Its folder** and the files in it stay where they are, and so do the folders it worked with.
 - **Its sessions** stay, and no longer belong to a space.
 - **Its documents** move to the shared knowledge, so every session can search them from then on. To keep them apart, move their knowledge base into another space (see [Rename, move, read again or delete a knowledge base](#rename-move-read-again-or-delete-a-knowledge-base)).
 - **What agents remember** about its folder stays: notes belong to the folder, not to the space.
@@ -256,6 +268,7 @@ The knowledge tools never bring up another space's documents, not even when an a
 
 - "Make a space called Taxes 2026 for my receipts and tax return. Its sessions should start as the Researcher, and every agent in it should know that amounts are in EUR."
 - "Make a space called Shop for my project in ~/code/shop."
+- "Copy ~/Downloads/contract.pdf into my Taxes 2026 space, and have it work with ~/Documents/Receipts too."
 - "Group my Thesis and Reading notes spaces into one called Everything for the thesis."
 - "Add the folder ~/Documents/Manuals to my shared knowledge."
 - "Move the Contracts knowledge base into the Taxes 2026 space, and stop that space from searching the shared knowledge."

@@ -98,7 +98,7 @@ Everything on the start page is explained in [Start a session](/guide/sessions#s
    - **New task folder**, for a fresh folder named after your task (in `~/Naget` unless you change it in [Settings → Capabilities → Assistants](/settings?s=assistants&find=Task%20folders)).
 
    Most assistants start in a new task folder unless you pick a folder; Coder works in the folder you pick.
-5. Type what you want done in the message box: describe a task, ask a question or paste an error. Add files with the paperclip, or drop them on the box.
+5. Type what you want done in the message box: describe a task, ask a question or paste an error. Add files with the paperclip, or drop them on the box. Files already on this computer come along from the Files page: **Start a session with it** in a file's menu (see [Start a session with files](/guide/files-git#start-a-session-with-files)).
 6. Press Enter, or **Start**. On a phone, tap the round arrow.
 
 The session opens. You see the agent's steps as it works, in plain words, and its reply at the end. When it wants to run a command or change a file that its permissions do not allow on their own, a card asks you to **Allow** or **Deny**. Type in the message box at the bottom to carry on the conversation. Your picks on the start page stay for the next session, on every device.
