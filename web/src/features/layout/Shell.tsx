@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation, useRoute, useSearch } from 'wouter';
 import { activityOf } from '../../lib/activity';
 import { useSessions, useUI } from '../../lib/store';
@@ -114,8 +114,15 @@ function MobileDrawer() {
   // `inert` restyles every row of the drawer (a long session list), which held the slide back by a
   // few frames on phones: it follows once the drawer has come to rest, so the slide starts at once.
   const [rest, setRest] = useState(open);
-  useEffect(() => {
-    const t = setTimeout(() => setRest(open), 300);
+  // The drawer covers the whole screen, so the scrim shows only while it slides (from its first frame:
+  // a layout effect). Hidden the rest of the time, its blur costs nothing, even as the list scrolls.
+  const [sliding, setSliding] = useState(false);
+  useLayoutEffect(() => {
+    setSliding(true);
+    const t = setTimeout(() => {
+      setRest(open);
+      setSliding(false);
+    }, 300);
     return () => clearTimeout(t);
   }, [open]);
   return (
@@ -123,14 +130,15 @@ function MobileDrawer() {
       <div
         aria-hidden
         onPointerDown={() => useUI.getState().set({ drawerOpen: false })}
-        // Hidden once faded, so the blur costs nothing while the drawer is shut.
-        className={cx('scrim fixed inset-0 z-40 transition-[opacity,visibility] duration-200 motion-reduce:transition-none', open ? 'opacity-100' : 'pointer-events-none invisible opacity-0')}
+        className={cx('scrim fixed inset-0 z-40 transition-[opacity,visibility] duration-200 motion-reduce:transition-none', open ? 'opacity-100' : 'pointer-events-none opacity-0', !sliding && 'invisible')}
       />
       <div
         inert={!rest}
+        // Only `translate` changes, which the compositor animates on its own. The shadow stays as it is,
+        // out of sight past the left edge while shut (fading it in repainted the drawer on every frame).
         className={cx(
-          'fixed inset-y-0 left-0 z-40 w-full transition-[translate,box-shadow] duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-[translate] motion-reduce:transition-none',
-          open ? 'translate-x-0 shadow-lg' : '-translate-x-full',
+          'fixed inset-y-0 left-0 z-40 w-full shadow-lg transition-[translate] duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-[translate] motion-reduce:transition-none',
+          open ? 'translate-x-0' : '-translate-x-[calc(100%+64px)]',
         )}
       >
         <Sidebar mobile />

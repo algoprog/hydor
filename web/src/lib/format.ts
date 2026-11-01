@@ -106,6 +106,10 @@ export function joinPath(a: string, b: string): string {
   return `${a.replace(/\/+$/, '')}/${b}`;
 }
 
+// Made once: `toLocaleString` with options builds a new formatter on every call, and the session list
+// asks for hundreds of months on each update (most of its time went there).
+const monthName = new Intl.DateTimeFormat(undefined, { month: 'long' });
+
 export function dayGroup(ts?: number, now = new Date()): string {
   if (!ts) return 'Older';
   const d = new Date(ts);
@@ -113,7 +117,7 @@ export function dayGroup(ts?: number, now = new Date()): string {
   if (ts >= start) return 'Today';
   if (ts >= start - 86400_000) return 'Yesterday';
   if (ts >= start - 6 * 86400_000) return 'This week';
-  if (d.getFullYear() === now.getFullYear()) return d.toLocaleString(undefined, { month: 'long' });
+  if (d.getFullYear() === now.getFullYear()) return monthName.format(d);
   return String(d.getFullYear());
 }
 
