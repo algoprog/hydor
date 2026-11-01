@@ -1,5 +1,6 @@
 // What the app's capabilities (search, browser, memory, assistants…) share between server and pages:
 // the settings a session keeps beyond its agent's own, and the notes the app adds to a conversation.
+import type { ArenaStart } from './arena.ts';
 import type { ResearchSettings } from './research.ts';
 
 /** Settings a session keeps beyond its agent's own. Each capability reads and writes its own fields. */
@@ -16,6 +17,8 @@ export interface SessionExtra {
   swarm?: boolean;
   /** Deep research: this session leads a research, with these settings (shared/research.ts). */
   research?: ResearchSettings;
+  /** The arena: on the start page, the other models to run the same prompt on; on a session, its match's id. */
+  arena?: ArenaStart | string;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

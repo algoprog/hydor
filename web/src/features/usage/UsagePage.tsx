@@ -9,6 +9,7 @@ import { Columns, Meter, severityColor } from '../../components/charts';
 import { Button, cx, Throbber, Tabs } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { StatsBody } from '../stats/StatsPage';
+import { ArenaBoard } from '../arena/ArenaBoard';
 import { LimitBanner, ResetList } from './LimitReset';
 import { RefreshIcon } from '../../components/RefreshIcon';
 
@@ -139,7 +140,9 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
   );
 }
 
-export function UsagePage({ tab }: { tab: 'limits' | 'activity' }) {
+const SUBS = { limits: 'How much of each plan is left, and when it resets', activity: 'Lines changed, tokens and sessions over time', arena: 'Which models win on your own tasks' };
+
+export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
   const { claude, codex, accounts: usageByAccount, loading, refresh } = useUsage();
   const added = useApp((s) => s.boot?.accounts) ?? [];
   useEffect(() => {
@@ -149,7 +152,7 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' }) {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Usage"
-        sub={tab === 'limits' ? 'How much of each plan is left, and when it resets' : 'Lines changed, tokens and sessions over time'}
+        sub={SUBS[tab]}
         actions={
           tab === 'limits' && (
             <Button size="sm" variant="ghost" icon={<RefreshIcon size={14} busy={loading} />} onClick={() => refresh(true)} disabled={loading}>
@@ -160,10 +163,11 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' }) {
       >
         <Tabs
           value={tab}
-          onChange={(t) => go(t === 'activity' ? '/stats' : '/usage', true)}
+          onChange={(t) => go(t === 'activity' ? '/stats' : t === 'arena' ? '/arena' : '/usage', true)}
           options={[
             { value: 'limits', label: 'Limits' },
             { value: 'activity', label: 'Activity' },
+            { value: 'arena', label: 'Arena' },
           ]}
         />
       </PageHeader>
@@ -178,6 +182,8 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' }) {
               ))}
             </div>
           </div>
+        ) : tab === 'arena' ? (
+          <ArenaBoard />
         ) : (
           <StatsBody />
         )}

@@ -8,6 +8,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { SessionExtra, SessionNote } from '@shared/features';
 import type { SessionSummary, ToolCategory, ToolInfo, ToolItem } from '@shared/types';
 import { appsFeature } from './apps/feature';
+import { arenaFeature } from './arena/feature';
 import { assistantsFeature } from './assistants/feature';
 import { automationsFeature } from './automations/feature';
 import { browserFeature } from './browser/feature';
@@ -104,6 +105,7 @@ export const features = (): WebFeature[] =>
     budgetFeature,
     swarmFeature,
     researchFeature,
+    arenaFeature,
     documentsFeature,
     imagesFeature,
     connectionsFeature,

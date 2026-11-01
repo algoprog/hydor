@@ -5,6 +5,7 @@ import { startTour } from '../tour/Tour';
 import type { Agent, StartRun } from '@shared/types';
 import type { SessionExtra } from '@shared/features';
 import { usd } from '@shared/budget';
+import { arenaOf } from '@shared/arena';
 import { api, post } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
@@ -241,7 +242,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   const modeOn = cat && mode && mode !== cat.defaultMode ? (cat.modes.find((m) => m.value === mode)?.label ?? null) : null;
   const acctOn = acct ? (accounts.find((a) => a.id === acct)?.name ?? null) : null;
   const capOn = typeof extra.capUsd === 'number' ? usd(extra.capUsd) : null;
-  const changed = [extra.swarm === true ? 'Swarm' : null, extra.research ? 'Deep research' : null, effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
+  const changed = [extra.swarm === true ? 'Swarm' : null, extra.research ? 'Deep research' : null, arenaOf(extra) ? 'Arena' : null, effortOn && `${effortOn} effort`, modeOn, acctOn, extra.memory === false ? 'No memory' : null, capOn && `${capOn} cap`].filter((x): x is string => !!x);
   const modeNow = cat?.modes.find((m) => m.value === (mode ?? cat.defaultMode))?.label;
   const optionsTitle = [
     agent !== 'acp' && `Effort: ${effortOn ?? 'default'}`,
@@ -251,6 +252,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     `Spending cap: ${capOn ?? 'none'}`,
     `Swarm: ${extra.swarm === true ? 'on' : 'off'}`,
     `Deep research: ${extra.research ? 'on' : 'off'}`,
+    `Arena: ${arenaOf(extra) ? 'on' : 'off'}`,
   ]
     .filter(Boolean)
     .join('\n');

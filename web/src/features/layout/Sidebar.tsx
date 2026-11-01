@@ -209,7 +209,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         {features().flatMap((f) => (f.nav ?? []).map((n) => <NavItem key={n.path} path={n.path} match={n.match ? n.match(loc) : loc === n.path} label={n.label} icon={n.icon} onGo={nav} />))}
         {/* Dev-server previews open on this server's own preview port: its own machine only. */}
         {!machineId && <NavItem path="/preview" match={loc === '/preview'} label="Preview" icon={<MonitorSmartphone size={17} />} onGo={nav} />}
-        <NavItem path="/usage" match={loc === '/usage' || loc === '/stats'} label="Usage" icon={<Gauge size={17} />} extra={<UsageHint />} onGo={nav} anim="ico-grow" />
+        <NavItem path="/usage" match={loc === '/usage' || loc === '/stats' || loc === '/arena'} label="Usage" icon={<Gauge size={17} />} extra={<UsageHint />} onGo={nav} anim="ico-grow" />
         <NavItem path="/system" match={loc === '/system'} label="System" icon={<Activity size={17} />} onGo={nav} anim="ico-beat" />
         <NavItem
           path="/settings"

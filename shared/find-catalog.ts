@@ -204,6 +204,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['published', 'Published pages', '/pages?tab=published', 'published public share link', 'Pages anyone with the link can open'],
   ['preview', 'Preview', '/preview', 'dev server localhost web app browser', 'Look at a dev server running here'],
   ['usage', 'Usage and limits', '/usage', 'usage limits plan quota reset tokens', 'What you have used of each plan, and when it resets'],
+  ['arena', 'Model arena', '/arena', 'arena compare models side by side best answer leaderboard rating which model wins vote', 'Which models win on your own tasks, from the answers you kept'],
   ['stats', 'Activity', '/stats', 'activity stats statistics tokens cost', 'What the agents did, over time'],
   ['system', 'System', '/system', 'system cpu gpu memory ram disk processes', 'This computer: processors, GPUs, memory, disks, the busiest processes'],
   ['settings', 'Settings', '/settings', 'settings preferences options configuration', 'Everything the app can be set to'],
