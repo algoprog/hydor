@@ -1134,7 +1134,7 @@ app.put('/api/claude-retention', async (req) => {
 app.get('/api/stats', async (req) => {
   const q = req.query as Record<string, string>;
   const g = (['day', 'week', 'month', 'year'] as const).find((x) => x === q.granularity) ?? 'day';
-  return computeStats(db, { granularity: g, tz: q.tz, agent: q.agent, count: q.count ? Number(q.count) : undefined });
+  return computeStats(db, { granularity: g, tz: q.tz, agent: q.agent, model: q.model, count: q.count ? Number(q.count) : undefined });
 });
 
 // ---- pull requests --------------------------------------------------------------------------

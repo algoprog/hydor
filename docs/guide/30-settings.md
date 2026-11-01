@@ -21,6 +21,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Sending while an agent works**](/settings?s=general&find=Sending%20while%20an%20agent%20works): Enter joins the running turn, or waits for it to end.
 - [**Terminal suggestions**](/settings?s=general&find=Terminal%20suggestions): Grey completions after the cursor in terminals.
 - [**Resume after usage limits**](/settings?s=general&find=Resume%20after%20usage%20limits): Continues a session a minute after a plan’s limit resets.
+- [**Delete inactive sessions**](/settings?s=general&find=Delete%20inactive%20sessions): Deletes sessions nobody used for a year, or as long as you choose; until then every conversation is kept.
 - [**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts): Starts the app when the computer starts.
 - [**Update automatically**](/settings?s=general&find=Update%20automatically): Updates itself when you have not used it for a while.
 - [**Take the tour**](/settings?s=general&find=Take%20the%20tour): See what each part of the app does.
@@ -233,7 +234,7 @@ You don’t have to know where an option lives: type what you want in the search
 ## Ask an agent
 
 - "Where do I change what Enter does while an agent works?"
-- "Turn on notifications sound."
+- "Turn on the notification sound."
 - "Show me my search settings."
 - "Set the helper model to the cheapest one."
 - "Turn off memory for new sessions."

@@ -10,6 +10,7 @@ import { CodexParser } from '../history/codex.ts';
 import { AcpParser } from '../history/acp.ts';
 import { PARSE_VERSION } from '../history/common.ts';
 import { LineSplitter } from '../runner/frames.ts';
+import { keep, keptPath, restore } from './kept.ts';
 
 interface Opts {
   dbPath: string;
@@ -18,6 +19,8 @@ interface Opts {
   codexHomes: string[];
   /** Transcripts the app writes for ACP agents' sessions. */
   acpDir: string;
+  /** Where the app keeps its own link to every Claude Code and Codex transcript (kept.ts). */
+  keptDir?: string;
 }
 
 const opts = workerData as Opts;
@@ -297,6 +300,16 @@ async function pass(initial: boolean) {
     const namesChanged = refreshCodexNames();
     const files = listFiles();
     const known = new Set(files.map((f) => f.path));
+    // The app keeps its own link to every transcript, whatever the agent's program later deletes.
+    const roots = [...opts.claudeProjectsDirs, ...opts.codexHomes];
+    const keptOf = (p: string) => (opts.keptDir ? keptPath(p, roots, opts.keptDir) : null);
+    for (const f of files) {
+      const k = f.agent === 'acp' ? null : keptOf(f.path);
+      if (k)
+        try {
+          keep(f.path, k);
+        } catch {}
+    }
     // Newest first, so a cold start shows recent sessions right away.
     files.sort((a, b) => (urgent.has(b.path) ? 1 : 0) - (urgent.has(a.path) ? 1 : 0) || b.mtime - a.mtime);
     urgent.clear();
@@ -322,12 +335,17 @@ async function pass(initial: boolean) {
       });
       tx();
     }
-    // Transcripts deleted outside the app (Claude Code prunes its own after about 30 days): the
-    // session leaves the list, but its activity stays for the stats, with its folder and model.
+    // Transcripts deleted outside the app (Claude Code prunes its own after 30 days unless told otherwise) come
+    // back from the app's own link. One the app never kept: the session leaves the list, but its activity stays
+    // for the stats, with its folder and model.
     const rows = db.prepare('select key, path from sessions').all() as { key: string; path: string }[];
-    const gone = rows.filter((r) => !known.has(r.path));
+    const gone = rows.filter((r) => {
+      if (known.has(r.path)) return false;
+      const k = keptOf(r.path);
+      return !(k && restore(r.path, k));
+    });
     if (gone.length && files.length) {
-      const retire = db.prepare('insert or replace into retired (key, cwd, model) select key, cwd, model from sessions where key = ?');
+      const retire = db.prepare('insert or replace into retired (key, cwd, model, acp_agent) select s.key, s.cwd, s.model, a.acp_agent from sessions s left join app_sessions a on a.key = s.key where s.key = ?');
       db.transaction(() => {
         for (const r of gone) {
           retire.run(r.key);

@@ -99,6 +99,18 @@ The choice is kept in this browser. More about the queue in [Sessions](/guide/se
 
 [**Resume after usage limits**](/settings?s=general&find=Resume%20after%20usage%20limits) (off at first): when a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets. It is kept by the app, so it works with no browser open. More in [Usage, limits and costs](/guide/usage).
 
+## Delete inactive sessions
+
+The app keeps every session, whatever the agent's own program does (see [Every session is kept](/guide/usage#every-session-is-kept)), until nobody has used it for a long time. [**Delete inactive sessions**](/settings?s=general&find=Delete%20inactive%20sessions) (on at first) deletes sessions inactive for **1 year**, a few hundred a day at most.
+
+- Pick how long a session may stay inactive in the menu beside the switch: **After 3 months**, **After 6 months**, **After 1 year**, **After 2 years** or **After 5 years**.
+- Turn the switch off to keep every session for good.
+- A session counts as inactive from the last time anything happened in it.
+- Some sessions always stay: pinned ones, and ones that are at work, waiting for you, have messages queued, are snoozed, are due to resume after a limit, run in VS Code or a terminal, or have an open pull request.
+- A deleted session leaves the list and its conversation is gone, but its numbers stay in [Activity](/stats).
+
+It is kept by the app, so it works with no browser open.
+
 ## Start the app when the computer starts
 
 [**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts) brings the app back after the computer restarts, and after a crash. It is on at first: the installer sets the app up as a service, and a copy started by hand from a git clone sets one up the first time it runs. What the switch can do depends on how the app runs, and the line under it says which:
@@ -182,7 +194,7 @@ Some choices belong to the browser you make them in, so each device can differ:
 - files marked **Viewed** when reviewing a branch;
 - whether the "What's new" note was shown.
 
-The rest is kept by the app and is the same on every device: themes you made, **Resume after usage limits**, **Start when this computer starts**, **Update automatically**, and whether the tour was taken.
+The rest is kept by the app and is the same on every device: themes you made, **Resume after usage limits**, **Delete inactive sessions**, **Start when this computer starts**, **Update automatically**, and whether the tour was taken.
 
 ## Ask an agent
 

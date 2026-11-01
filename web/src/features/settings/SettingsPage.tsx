@@ -6,7 +6,7 @@ import { useSearch } from 'wouter';
 import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, ScrollText, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
 import { featureSections } from '../registry';
 import { isLang, LANGS } from '@shared/i18n';
-import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, StartupState, UpdateState } from '@shared/types';
+import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, RetentionSettings, StartupState, UpdateState } from '@shared/types';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -413,6 +413,7 @@ function GeneralSettings() {
             <Switch on={termSuggest} label="Terminal suggestions" onChange={(v) => useUI.getState().set({ termSuggest: v })} />
           </SettingRow>
           <AutoResumeSetting />
+          <DeleteInactiveSetting />
         </div>
       </Section>
       <Section>
@@ -625,6 +626,53 @@ function AutoResumeSetting() {
             put('/api/app-settings', { autoResume: v }).catch((e) => (setOn(!v), toastError(e)));
           }}
         />
+      )}
+    </SettingRow>
+  );
+}
+
+/** How long a session may stay inactive before the app deletes it. */
+const AGES: [number, string][] = [
+  [90, '3 months'],
+  [182, '6 months'],
+  [365, '1 year'],
+  [730, '2 years'],
+  [1825, '5 years'],
+];
+
+/**
+ * Sessions nobody used for a while are deleted, a year by default; their numbers stay in Activity. Until
+ * then the app keeps every conversation, whatever the agent's own program deletes. Kept on the server.
+ */
+function DeleteInactiveSetting() {
+  const [r, setR] = useState<RetentionSettings | null>(null);
+  useEffect(() => {
+    api<RetentionSettings>('/api/retention').then(setR, () => {});
+  }, []);
+  const save = (p: Partial<RetentionSettings>) => {
+    const was = r;
+    setR({ ...r!, ...p });
+    put<RetentionSettings>('/api/retention', p).then(setR, (e) => (setR(was), toastError(e)));
+  };
+  const ages = r && !AGES.some(([d]) => d === r.days) ? [...AGES, [r.days, `${r.days} days`] as [number, string]] : AGES;
+  return (
+    <SettingRow
+      label="Delete inactive sessions"
+      hint="Sessions nobody used for this long are deleted; pinned ones, and ones at work or waiting, stay. Their numbers stay in Activity. Until then every conversation is kept, whatever the agent’s own program deletes."
+    >
+      {!r ? (
+        <Throbber className="text-fg-3" />
+      ) : (
+        <div className="flex items-center gap-2.5">
+          <select aria-label="After how long" disabled={!r.on} value={r.days} onChange={(e) => save({ days: Number(e.target.value) })} className={cx(inputCls, '!h-8 w-auto pr-8 text-[13px] disabled:opacity-50')}>
+            {ages.map(([d, label]) => (
+              <option key={d} value={d}>
+                After {label}
+              </option>
+            ))}
+          </select>
+          <Switch on={r.on} label="Delete inactive sessions" onChange={(v) => save({ on: v })} />
+        </div>
       )}
     </SettingRow>
   );
