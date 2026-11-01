@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { ArrowUp, ChevronRight, CircleHelp, FileText, GitBranch, MonitorUp, Paperclip, SlidersHorizontal } from 'lucide-react';
+import { ArrowUp, ChevronRight, CircleHelp, GitBranch, MonitorUp, Paperclip, SlidersHorizontal } from 'lucide-react';
 import { startTour } from '../tour/Tour';
 import type { Agent, StartRun } from '@shared/types';
 import type { SessionExtra } from '@shared/features';
@@ -13,11 +13,10 @@ import { timeAgo } from '../../lib/format';
 import { openSession } from '../../lib/nav';
 import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
 import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
-import { AgentIcon, agentName } from '../../components/AgentIcon';
+import { AgentIcon } from '../../components/AgentIcon';
 import { EffortPicker, findModel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
-import { cx, IconButton, MenuItem, Popover, SettingChip, SettingLayout, SheetsOnPhone, Switch, useIsMobile } from '../../components/ui';
-import { InstructionsDialog, instructionName } from '../settings/Instructions';
+import { cx, IconButton, Popover, SettingChip, SettingLayout, SheetsOnPhone, Switch, useIsMobile } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
 import { ActivityText, folderName, sortActive } from '../sessions/SessionList';
 import { TodayStrip } from '../stats/StatsPage';
@@ -90,7 +89,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     // The space picked last, while the folder is still its own.
     ...(saved.space && !initialCwd ? { space: saved.space } : {}),
   }));
-  // Spaces: picked by name in the folder chip, each with its folder, assistant and instructions.
+  // Spaces: picked by name in the folder chip, each with its folder, assistant and guidelines.
   const spaces = useSpaces();
   const space = spaces?.find((s) => s.id === extra.space) ?? null;
   const [newSpace, setNewSpace] = useState(false);
@@ -102,7 +101,6 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   const [taskPick, setTaskPick] = useState<boolean | null>(() => (initialCwd ? false : (saved.task ?? null)));
   const folderPicked = useRef(!!initialCwd);
   const task = useTaskFolder(typeof extra.assistant === 'string' ? extra.assistant : undefined, taskPick);
-  const [instructions, setInstructions] = useState(false);
   const [text, setText] = useState(link?.prompt ?? '');
   const [model, setModel] = useState<string | null>(null);
   const [effort, setEffort] = useState<string | null>(null);
@@ -240,7 +238,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     }
   };
 
-  /** A space picked: its folder, its assistant, and its instructions for the session (the server adds them). */
+  /** A space picked: its folder, its assistant, and its guidelines for the session (the server adds them). */
   const pickSpace = (sp: Space) => {
     folderPicked.current = true;
     setCwd(sp.folder);
@@ -287,7 +285,6 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   const iconBtn = 'shrink-0 rounded-lg p-2 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg';
   return (
     <div>
-      {cwd && <InstructionsDialog agent={agent} cwd={cwd} open={instructions} onClose={() => setInstructions(false)} />}
       <NewSpaceDialog open={newSpace} onClose={() => setNewSpace(false)} onMade={pickSpace} />
       <LimitBanner agent={agent} account={acct} className="mb-3" />
       <div
@@ -427,13 +424,6 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
                     </span>
                     <Switch on={worktree} label="Work in a new worktree" onChange={(v) => (setWorktree(v), saveStart({ worktree: v }))} />
                   </label>
-                )}
-                {!task && agent !== 'acp' && (
-                  <div data-closes>
-                    <MenuItem icon={<FileText size={15} />} onClick={() => setInstructions(true)}>
-                      Edit the {instructionName(agent)} {agentName(agent)} reads here
-                    </MenuItem>
-                  </div>
                 )}
               </WorkFolderChip>
               <FeatureStartOptions part="lead" value={extra} cwd={cwd} onChange={onExtra} />

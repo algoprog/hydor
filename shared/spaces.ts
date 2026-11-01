@@ -46,7 +46,8 @@ export const SPACE_COLORS: Record<string, string> = {
 
 export const spaceColor = (s: Pick<Space, 'color'>) => SPACE_COLORS[s.color] ?? SPACE_COLORS.blue;
 
-export const MAX_SPACE_INSTRUCTIONS = 4000;
+/** A space's guidelines (Agent Guidelines), as long as any level's. */
+export const MAX_SPACE_INSTRUCTIONS = 20_000;
 /** Most spaces a group brings together. */
 export const MAX_GROUP = 12;
 

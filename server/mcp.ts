@@ -270,7 +270,10 @@ export function mcpRoutes(app: FastifyInstance, db: DB, sessions: SessionManager
     const runId = runOf((req.params as { token: string }).token);
     const live = runId ? sessions.liveByRun(runId) : null;
     if (!runId || !live) return reply.code(404).send({ error: 'No session runs with that address' });
-    const ctx: RunCtx = { runId, key: live.key, agent: live.agent, acpAgent: live.acpAgent, cwd: live.cwd, deps: featureDeps() };
+    // The agent may give up on a call (a tool's time limit): a card still waiting on the user then goes.
+    const gone = new AbortController();
+    reply.raw.on('close', () => reply.raw.writableFinished || gone.abort());
+    const ctx: RunCtx = { runId, key: live.key, agent: live.agent, acpAgent: live.acpAgent, cwd: live.cwd, deps: featureDeps(), signal: gone.signal };
     const tools: Tool[] = runTools(ctx).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, annotations: t.annotations, run: (a) => t.run(a, ctx) }));
     return serve(req, reply, tools, {});
   });

@@ -3,7 +3,7 @@
 // sections in a menu beside the open one; on phones a list, each section on its own page.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, FileText, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
+import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, ScrollText, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
 import { featureSections } from '../registry';
 import { isLang, LANGS } from '@shared/i18n';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, StartupState, UpdateState } from '@shared/types';
@@ -31,6 +31,7 @@ import { machineId } from '../../lib/machine';
 import { pointAt } from '../../lib/pointAt';
 import { openReleaseNotes } from './Releases';
 import { MachineSettings } from './MachineSettings';
+import { GuidelinesSettings } from '../guidelines/parts';
 
 /** A built-in section, or one of a capability's (registry.tsx) by its id. */
 export type SettingsSection = string;
@@ -62,7 +63,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
       { id: 'accounts', label: 'Accounts', icon: UserRound, sub: 'The Claude Code and Codex sign-ins every session uses' },
       { id: 'agents', label: 'More agents', icon: Bot, sub: 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP' },
       { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM' },
-      { id: 'instructions', label: 'Instructions', icon: FileText, sub: 'CLAUDE.md and AGENTS.md: what the agents read at the start of every session', folder: true },
+      { id: 'guidelines', label: 'Agent Guidelines', icon: ScrollText, sub: 'What every agent follows: in every session, in a space, or in one session' },
       { id: 'mcp', label: 'MCP servers', icon: Plug, sub: 'Tools the agents can call', folder: true },
       { id: 'skills', label: 'Skills', icon: Sparkles, sub: 'Know-how the agents load when a task calls for it', folder: true },
       { id: 'plugins', label: 'Plugins', icon: Blocks, sub: 'Claude Code add-ons that bundle skills, commands, agents and MCP servers' },
@@ -917,7 +918,7 @@ function AddAgentAccount({ open, onClose, onAdded }: { open: boolean; onClose: (
   );
 }
 
-function SectionBody({ id, cwd, agent, onAgent }: { id: SettingsSection; cwd: string; agent: Agent; onAgent: (a: Agent) => void }) {
+function SectionBody({ id, cwd, agent, onAgent, onCwd }: { id: SettingsSection; cwd: string; agent: Agent; onAgent: (a: Agent) => void; onCwd: (c: string) => void }) {
   switch (id) {
     case 'general':
       return <GeneralSettings />;
@@ -937,8 +938,18 @@ function SectionBody({ id, cwd, agent, onAgent }: { id: SettingsSection; cwd: st
       return <AcpSettings />;
     case 'models':
       return <ModelsSettings />;
-    case 'instructions':
-      return <InstructionsSettings cwd={cwd} agent={agent} onAgent={onAgent} />;
+    case 'guidelines':
+      // CLAUDE.md and AGENTS.md, for those who keep them, folded away under the guidelines every agent follows.
+      return (
+        <GuidelinesSettings
+          files={
+            <div className="space-y-3">
+              <FolderScope cwd={cwd} onChange={onCwd} />
+              <InstructionsSettings cwd={cwd} agent={agent} onAgent={onAgent} />
+            </div>
+          }
+        />
+      );
     case 'mcp':
       return <McpSettings cwd={cwd} />;
     case 'skills':
@@ -1060,7 +1071,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   };
   const body = page && (
     <div data-settings-body>
-      <SectionBody id={page.id} cwd={cwd} agent={agent} onAgent={(a) => go(url({ agent: a }), true)} />
+      <SectionBody id={page.id} cwd={cwd} agent={agent} onAgent={(a) => go(url({ agent: a }), true)} onCwd={(c) => go(url({ cwd: c }), true)} />
     </div>
   );
   const folder = page?.folder ? <FolderScope cwd={cwd} onChange={(c) => go(url({ cwd: c }), true)} /> : null;

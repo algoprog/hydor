@@ -37,7 +37,7 @@ export const assistantsFeature: WebFeature = {
       id: 'assistants',
       label: 'Assistants',
       icon: WandSparkles,
-      sub: 'Presets to start sessions as (Researcher, Writer, Tutor…), how the agents talk to you, and where task folders go',
+      sub: 'Presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go',
       Body: AssistantsSettings,
     },
   ],

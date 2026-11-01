@@ -1,4 +1,4 @@
-// Spaces: a project's sessions, files, documents, memory, instructions and assistant together. In the sidebar
+// Spaces: a project's sessions, files, documents, memory, guidelines and assistant together. In the sidebar
 // (with the shared knowledge as its second tab), picked by name in the start page's folder chip
 // (assistants/start.tsx), filtered by in the sidebar's session list.
 import { Boxes } from 'lucide-react';

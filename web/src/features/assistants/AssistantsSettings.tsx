@@ -1,6 +1,6 @@
 // Settings → Assistants: the assistants to start sessions as (the built-ins to duplicate, your own to
-// change or delete, Claude Code agent files to import), how the agents talk to you, and where task
-// folders go.
+// change or delete, Claude Code agent files to import), and where task folders go. How the agents talk to
+// you is part of Agent Guidelines now (features/guidelines).
 import { useEffect, useRef, useState } from 'react';
 import { Copy, FileUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type Assistant, type AssistantsState, type ToolKind } from '@shared/assistants';
@@ -74,52 +74,12 @@ export function AssistantsSettings() {
           ))}
         </div>
       </Section>
-      <ToneSection tone={st.tone} />
       <CleanUpSection on={st.cleanUp} />
       <TaskFolderSection st={st} />
       <EditAssistant value={edit} onClose={() => setEdit(null)} />
       <ImportDialog open={importing} onClose={() => setImporting(false)} />
       {confirmNode}
     </div>
-  );
-}
-
-// ---- how the agents talk to you ---------------------------------------------------------------------
-
-const TONES = ['Plain English, short answers, explain jargon', 'Warm and encouraging: I am new to this', 'Brief and technical'];
-
-function ToneSection({ tone }: { tone: string }) {
-  const [draft, setDraft] = useState(tone);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => setDraft(tone), [tone]);
-  const save = (t: string) => {
-    setBusy(true);
-    put<AssistantsState>('/api/assistants/settings', { tone: t })
-      .then((r) => (saved(r), toast(t.trim() ? 'Every agent gets this from its next session' : 'Agents talk their own way again', 'ok')), toastError)
-      .finally(() => setBusy(false));
-  };
-  return (
-    <Section title="How the agents talk to you" sub="A few words every agent gets, whatever the assistant">
-      <textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        rows={2}
-        maxLength={600}
-        placeholder="For example: plain English, short answers, explain jargon"
-        className={cx(inputCls, 'h-auto resize-y py-2 leading-relaxed')}
-      />
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {TONES.map((t) => (
-          <button key={t} type="button" onClick={() => setDraft(t)} className="h-7 rounded-full bg-bg-2 px-2.5 text-[12px] text-fg-2 transition-colors hover:bg-bg-3 hover:text-fg">
-            {t}
-          </button>
-        ))}
-        <span className="flex-1" />
-        <Button size="sm" variant="primary" disabled={busy || draft.trim() === tone.trim()} onClick={() => save(draft)}>
-          Save
-        </Button>
-      </div>
-    </Section>
   );
 }
 

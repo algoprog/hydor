@@ -51,6 +51,7 @@ const WEIGHT: Record<Group, number> = {
   'Go to': 1,
   Actions: 0.95,
   Sessions: 0.95,
+  Guide: 0.9,
   Templates: 0.9,
   'Scheduled tasks': 0.9,
   Assistants: 0.9,

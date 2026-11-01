@@ -342,7 +342,7 @@ export function ToolDetail({ t, item, sessionKey }: { t: ToolInfo; item: ToolIte
 }
 
 /** A step on one line: what it is, then how it went. A row's button, or a folded box's only line. */
-function ToolLine({ item }: { item: ToolItem }) {
+export function ToolLine({ item }: { item: ToolItem }) {
   const t = shown(item.tool);
   const home = useApp((s) => s.boot?.home);
   const { cwd } = useContext(SessionCtx);

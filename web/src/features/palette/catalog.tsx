@@ -3,24 +3,26 @@
 // (fetched when it opens) apps, scheduled tasks, assistants, skills, pages and connections. Each entry says where
 // it is and goes there: a setting opens its section and points at it by its words (`find=`, lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, AppWindow, ArrowRight, Bot, Cable, CalendarClock, CircleHelp, FileSearch, FolderTree, Gauge, GitBranch, Headphones, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, ScrollText, Settings, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, AppWindow, ArrowRight, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, FolderTree, Gauge, GitBranch, Headphones, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, ScrollText, Settings, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
+import { AGENT_TOPICS, plainText } from '@shared/guide';
 import type { ScheduledTask } from '@shared/automations';
 import type { ConnectionView } from '@shared/connections';
 import type { PageInfo } from '@shared/pages';
 import type { SkillLibrary } from '@shared/skillpack';
 import { api } from '../../lib/api';
-import { go } from '../../lib/nav';
+import { go, goApp } from '../../lib/nav';
 import { useUI } from '../../lib/store';
 import { allThemes, applyTheme, pickTheme } from '../../lib/theme';
 import { appPath, type Gallery } from '../apps/api';
 import { openReleaseNotes } from '../settings/Releases';
 import { settingsSections } from '../settings/SettingsPage';
 import { startTour } from '../tour/Tour';
+import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
 
-export type Group = 'Settings' | 'Go to' | 'Actions' | 'Sessions' | 'In messages' | 'Memory' | 'Templates' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Themes' | 'Files';
+export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Templates' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Themes' | 'Files';
 
 export interface Entry extends Findable {
   id: string;
@@ -57,6 +59,7 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:stats': <TrendingUp size={15} />,
   'go:system': <Activity size={15} />,
   'go:settings': <Settings size={15} />,
+  'go:guide': <CircleHelp size={15} />,
 };
 
 const ACTS: Record<NonNullable<CatalogItem['act']>, { icon: ReactNode; run: () => void; hint?: string }> = {
@@ -162,6 +165,37 @@ export async function liveEntries(): Promise<Entry[]> {
       within: 'sec:connections',
       run: () => go(settingsAt('connections', c.name)),
     });
+  out.push(...(await guideEntries()));
   held = { at: Date.now(), entries: out };
   return out;
+}
+
+/** The guide (Help): each topic and each of its sections, which go there. It changes only with the app. */
+let guide: Entry[] | null = null;
+async function guideEntries(): Promise<Entry[]> {
+  if (guide) return guide;
+  const topics = await loadGuide().catch(() => null);
+  if (!topics) return [];
+  guide = topics
+    .filter((t) => !AGENT_TOPICS.includes(t.id))
+    .flatMap((t): Entry[] => [
+      { id: `guide:${t.id}`, group: 'Guide', icon: <BookOpen size={15} />, title: t.title, keywords: 'help guide how', text: t.summary, where: 'Help', body: t.summary, opens: 'Opens this topic of the guide', run: () => goApp(`/guide/${encodeURIComponent(t.id)}`) },
+      ...t.sections.map((x): Entry => {
+        const text = plainText(x.text);
+        return {
+          id: `guide:${t.id}#${x.id}`,
+          group: 'Guide',
+          icon: <BookOpen size={15} />,
+          title: x.title,
+          keywords: `${t.title} help how`,
+          text: text.slice(0, 300),
+          where: `Help › ${t.title}`,
+          body: text.length > 280 ? `${text.slice(0, 280)}…` : text,
+          opens: 'Opens the guide at this section',
+          within: `guide:${t.id}`,
+          run: () => goApp(`/guide/${encodeURIComponent(t.id)}#${encodeURIComponent(x.id)}`),
+        };
+      }),
+    ]);
+  return guide;
 }

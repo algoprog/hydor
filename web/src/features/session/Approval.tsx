@@ -100,8 +100,10 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
             <Markdown text={a.detail} />
           </div>
         )}
-        {a.detail && a.form && <div className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{a.detail}</div>}
-        {a.detail && !a.form && (a.kind === 'tool' || a.kind === 'permissions' || a.kind === 'other') && (
+        {/* The app's own cards (a change an agent asks to make, its form) say what they do in plain words. */}
+        {a.detail && a.prose && <Markdown text={a.detail} className="!text-[13.5px] !leading-relaxed" />}
+        {a.detail && a.form && !a.prose && <div className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{a.detail}</div>}
+        {a.detail && !a.form && !a.prose && (a.kind === 'tool' || a.kind === 'permissions' || a.kind === 'other') && (
           <pre className="term-out max-h-64 overflow-auto rounded-lg border border-line px-3 py-2">{a.detail}</pre>
         )}
         {link && (

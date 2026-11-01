@@ -11,6 +11,7 @@ import { setSettings } from '../assistants/store.ts';
 import { openDb } from '../db.ts';
 import { registerFeatures, spawnAdditions } from '../features/registry.ts';
 import type { Deps } from '../features/types.ts';
+import { guidelines } from '../guidelines/index.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { createSpace, deleteSpace, sessionsIn, spaceById, spaces, spaceViews, updateSpace } from './index.ts';
 
@@ -22,7 +23,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-spaces-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 setSettings(db, { taskRoot: path.join(tmp, 'Naget') });
-registerFeatures([spaces], { db, app: { get() {}, post() {}, patch() {}, delete() {} } } as unknown as Deps);
+registerFeatures([spaces, guidelines], { db, app: { get() {}, post() {}, put() {}, patch() {}, delete() {} } } as unknown as Deps);
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
 const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
@@ -69,14 +70,14 @@ test('a space searches the shared knowledge too unless it leaves it out; changin
   deleteSpace(db, g.id);
 });
 
-test('a session in a space is told what it is, where its files go, and its instructions', async () => {
+test('a session in a space is told what it is, where its files go, and its guidelines (with the others)', async () => {
   const [a] = spaceViews(db);
   const add = await spawnAdditions({ agent: 'claude', key: 'claude:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } });
   const text = add.instructions.join('\n');
   assert.match(text, /^# Space: Taxes 2026\n/);
   assert.match(text, /\(Receipts and the yearly return\)/);
   assert.ok(text.includes(a.folder));
-  assert.match(text, /Amounts in EUR/);
+  assert.match(text, /# Agent Guidelines\n[\s\S]*## For the space “Taxes 2026”\nAmounts in EUR/);
   assert.deepEqual((await spawnAdditions({ agent: 'claude', key: 'claude:x', cwd: tmp, runId: 'r', resume: false, extra: {} })).instructions, []);
 });
 

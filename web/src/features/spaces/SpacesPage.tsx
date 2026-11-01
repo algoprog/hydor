@@ -1,4 +1,4 @@
-// Spaces: each project's sessions, files, documents, memory, instructions and assistant together. The list
+// Spaces: each project's sessions, files, documents, memory, guidelines and assistant together. The list
 // (beside the shared knowledge, on the page's second tab), and a space's own page: start a session in it, its
 // sessions, its files and memory; its knowledge (documents only its sessions search, with the shared ones too
 // unless it leaves them out); and what every agent in it is told. A group brings spaces together: its sessions
@@ -40,7 +40,7 @@ function List() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Spaces"
-        sub="Each project’s sessions, documents and instructions, together"
+        sub="Each project’s sessions, documents and guidelines, together"
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMade('space')}>
             New space
@@ -57,7 +57,7 @@ function List() {
             </div>
           ) : !spaces.length ? (
             <Empty icon={<Boxes size={22} />} title="No spaces yet">
-              A space keeps one project together: its sessions, its files and documents, and what the agents remember about it, with instructions every agent in it gets. On the
+              A space keeps one project together: its sessions, its files and documents, and what the agents remember about it, with guidelines every agent in it follows. On the
               start page, pick it by name instead of a folder.
             </Empty>
           ) : (
@@ -96,7 +96,7 @@ function List() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[14px] font-semibold">Group spaces together</span>
-                    <span className="block text-[12.5px] text-fg-3">Sessions in a group work with all its spaces: their files, documents and instructions</span>
+                    <span className="block text-[12.5px] text-fg-3">Sessions in a group work with all its spaces: their files, documents and guidelines</span>
                   </span>
                 </button>
               )}
@@ -142,7 +142,7 @@ function SessionsTab({ s, keys }: { s: Space; keys: string[] }) {
           ))}
         </div>
       ) : (
-        <div className="text-[13px] text-fg-3">No sessions yet. New session starts one here, with this space’s folder, assistant and instructions.</div>
+        <div className="text-[13px] text-fg-3">No sessions yet. New session starts one here, with this space’s folder, assistant and guidelines.</div>
       )}
     </div>
   );
@@ -296,7 +296,7 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
         <input className={inputCls} value={form.description ?? ''} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional" />
       </label>
       <label className="block">
-        <span className="mb-1 block text-[12.5px] text-fg-2">What every agent in it should know</span>
+        <span className="mb-1 block text-[12.5px] text-fg-2">Agent Guidelines: what every agent in it follows</span>
         <textarea
           rows={5}
           maxLength={MAX_SPACE_INSTRUCTIONS}

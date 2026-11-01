@@ -2,7 +2,7 @@
 // submenus that open in its place: Folder and code, Session settings and More. Features add their items
 // through the registry, each saying which part they go in.
 import { useState, type ReactNode, type RefObject } from 'react';
-import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FileText, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
+import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
 import type { Agent, SessionSummary } from '@shared/types';
 import { del, enc, post } from '../../lib/api';
 import { activityOf, isBusy } from '../../lib/activity';
@@ -15,7 +15,6 @@ import { MenuBack, MenuItem, MenuSep, Popover, useConfirm } from '../../componen
 import { FeatureMenuItems } from '../registry';
 import { deleteDialog } from '../sessions/SessionList';
 import { SnoozeItems } from '../sessions/SnoozeMenu';
-import { InstructionsDialog, instructionName } from '../settings/Instructions';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { continueIn, handoffName } from './Composer';
 import { GoalDialog } from './GoalBar';
@@ -23,7 +22,7 @@ import { ShareDialog } from './ShareDialog';
 import { WorktreeDialog } from './WorktreeDialog';
 
 type Submenu = 'snooze' | 'code' | 'settings' | 'more';
-type Shown = 'worktree' | 'goal' | 'share' | 'instructions';
+type Shown = 'worktree' | 'goal' | 'share';
 
 interface Actions {
   anchor: RefObject<HTMLElement | null>;
@@ -51,7 +50,6 @@ export function SessionMenu({ s, anchor, open, onClose, onRename, onFork, onPull
       {s.worktree && <WorktreeDialog s={s} open={shown === 'worktree'} onClose={hide} />}
       <GoalDialog s={s} open={shown === 'goal'} onClose={hide} />
       <ShareDialog s={s} open={shown === 'share'} onClose={hide} />
-      {s.cwd && <InstructionsDialog agent={s.agent} cwd={s.cwd} open={shown === 'instructions'} onClose={hide} />}
     </>
   );
 }
@@ -108,11 +106,6 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
             <MenuItem icon={<SquareTerminal size={15} />} onClick={() => (close(), openTerminalAt(s.cwd!))}>
               Open a terminal here
             </MenuItem>
-            {s.agent !== 'acp' && (
-              <MenuItem icon={<FileText size={15} />} onClick={() => (close(), show('instructions'))}>
-                Edit {instructionName(s.agent)}
-              </MenuItem>
-            )}
           </>
         )}
       </>

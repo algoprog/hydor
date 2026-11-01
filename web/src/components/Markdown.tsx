@@ -6,7 +6,7 @@ import remarkMath from 'remark-math';
 import { Check, Copy } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
 import { cx } from './ui';
-import { openFile } from '../lib/nav';
+import { goApp, openFile } from '../lib/nav';
 import { joinPath } from '../lib/format';
 import { machineBase } from '../lib/machine';
 
@@ -114,14 +114,46 @@ function normalizePath(p: string): string {
   return out.join('/') || '/';
 }
 
+/** The app's own pages, which a link to this site's address opens here rather than in a new tab. */
+const APP_PAGE = /^\/(?:$|s\/|guide|settings|spaces|knowledge|apps|pages|inbox|usage|stats|arena|system|files|search|git|terminal|preview|review\/)/;
+
+/** A link to this app itself (an agent's, to /settings?s=memory): its path, else null. */
+function appPath(h: string): string | null {
+  if (!/^https?:\/\//i.test(h)) return null;
+  try {
+    const u = new URL(h);
+    if (u.origin !== location.origin) return null;
+    const p = u.pathname.slice(machineBase.length && u.pathname.startsWith(machineBase) ? machineBase.length : 0) || '/';
+    return APP_PAGE.test(p) ? `${p}${u.search}${u.hash}` : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Links: local paths open in the app's file viewer. In a document (`baseDir` set), relative links are
- * files next to it and `#section` links scroll to that heading.
+ * Links: local paths open in the app's file viewer; links to this app's own pages open here. In a document
+ * (`baseDir` set), relative links are files next to it and `#section` links scroll to that heading. In the
+ * guide (`app`), `/…` links are the app's pages.
  */
-function makeLink(baseDir?: string): Components['a'] {
+function makeLink(baseDir?: string, app?: boolean): Components['a'] {
   return function Link({ href, children }) {
     const h = href ?? '';
-    if (baseDir && h.startsWith('#')) {
+    const own = app && h.startsWith('/') && !h.startsWith('//') ? h : appPath(h);
+    if (own) {
+      return (
+        <a
+          href={`${machineBase}${own}`}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+            e.preventDefault();
+            goApp(own);
+          }}
+        >
+          {children}
+        </a>
+      );
+    }
+    if ((baseDir || app) && h.startsWith('#')) {
       return (
         <a
           href={h}
@@ -288,6 +320,7 @@ export const Markdown = memo(function Markdown({
   rehypeExtra,
   baseDir,
   breaks,
+  app,
 }: {
   text: string;
   className?: string;
@@ -298,6 +331,8 @@ export const Markdown = memo(function Markdown({
   rehypeExtra?: any[];
   baseDir?: string;
   breaks?: boolean;
+  /** The app's own text (the guide): `/…` links are its pages, and headings get ids for `#section` links. */
+  app?: boolean;
 }) {
   const src = useMemo(() => normalizeMath(text, !notebook), [text, notebook]);
   const comps = useMemo<Components>(
@@ -305,7 +340,7 @@ export const Markdown = memo(function Markdown({
       resolveImage
         ? {
             ...components,
-            a: makeLink(baseDir),
+            a: makeLink(baseDir, app),
             img({ src: from, alt, width, height, align }: any) {
               const url = resolveImage(String(from ?? ''));
               // `align="left|right"` (old HTML that READMEs still use) floats the image beside the text.
@@ -318,12 +353,12 @@ export const Markdown = memo(function Markdown({
               );
             },
           }
-        : { ...components, a: makeLink(baseDir) },
-    [resolveImage, baseDir],
+        : { ...components, a: makeLink(baseDir, app) },
+    [resolveImage, baseDir, app],
   );
   const rehype = useMemo(
-    () => [...(rehypeExtra ?? []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir ? [rehypeHeadingIds] : [])],
-    [rehypeExtra, streaming, baseDir],
+    () => [...(rehypeExtra ?? []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir || app ? [rehypeHeadingIds] : [])],
+    [rehypeExtra, streaming, baseDir, app],
   );
   return (
     <div className={cx('md', className)}>

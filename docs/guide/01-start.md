@@ -1,0 +1,216 @@
+# Getting started
+
+This topic shows you around Naget Agent: what it is, what is on the screen, how to start your first session, how to find anything with the search box, and how to use the app on a phone. It ends with every keyboard shortcut in one table.
+
+## What Naget Agent is
+
+Naget Agent runs AI agents on your own computer, and you use them from any browser, at your desk or on your phone. An agent is a program that works on a task for you: it reads and writes files, runs commands, searches the web and tells you what it did. You can use Claude Code and Codex with your own subscriptions, Custom (the app's own agent, which works with any model, including open models on your own computer), and other agents such as Gemini CLI or OpenCode. Each conversation with an agent is a **session**. Sessions keep running when you close the page, so you can start one at your desk and answer it from your phone. Many people use it for code, but it helps with anything: research, writing, documents, planning and everyday tasks.
+
+## Find your way around
+
+The screen has two parts: the **sidebar** on the left, and the page you are on (the start page, a session, Settings…) beside it. On a phone the sidebar is a drawer that slides in (see [Use the app on a phone](#use-the-app-on-a-phone)).
+
+### The top of the sidebar
+
+- **Naget Agent**, with the logo. A crossed-out Wi-Fi icon appears beside the name while the page reconnects to the app.
+- **Inbox** (the tray icon): everything waiting on you, such as approvals, questions and forms, from every session, scheduled task and machine. A number on its corner says how many sessions wait on you right now. See [Inbox and notifications](/guide/inbox).
+- **Hide sidebar** (Ctrl+B). While the sidebar is hidden, the button at the top left of each page shows it again. On a phone this button is **Close menu**.
+- A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
+- **New session** opens the [start page](#the-start-page).
+- **Search sessions** finds sessions by their title, their folder and the words said in them, archived sessions included. Escape clears it. On a computer, the **Ctrl+K** badge at the end of the field opens the search box instead (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
+- The filter button at the end of that field (**Filter by agent or space**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have spaces, **Every space** or one of your spaces (up to eight are listed), with **Spaces** to open the Spaces page. The button takes the accent colour while a filter is on. See [Spaces and knowledge](/guide/spaces).
+
+### The session list
+
+Under the search field is every session, in groups:
+
+- **Active**: sessions whose agent is running now, here or in VS Code or a terminal. They keep their places while they work; drag one to move it.
+- **Pinned**: the sessions you pinned, in the order you drag them into. Drag a session from the groups below onto it to pin it.
+- **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
+- **Snoozed**: at the bottom, until their time comes.
+
+Archived sessions are not listed, but **Search sessions** still finds them. "No sessions yet." shows before your first one.
+
+Each row shows the agent's icon with a status dot, the session's title, and a second line. While the agent runs, the second line says what it is doing ("Working · 2m 10s", "Needs you", "Ready", "Working · 1 in background", "Open in VS Code"). Otherwise it shows the folder, how long ago the session was active, and how many lines it added and removed. Small marks can follow the title:
+
+- a dot in the accent colour: it finished since you last looked (its second line reads "Done · 5m ago"); opening it marks it read on every device;
+- a pull request badge with its state;
+- a target: the session has a goal;
+- a pin: it is pinned.
+
+The status dot says how a session is doing:
+
+| Dot | What it means |
+| --- | --- |
+| Blue, breathing | Working: a turn is running, or background tasks are |
+| Amber | Needs you: an approval, a question or a form is waiting |
+| Green | Ready: the agent is running and waits for your next message |
+| Grey | Open in VS Code or a terminal, and idle there |
+| No dot | Stopped: the agent is not running; your next message starts it again |
+
+The browser tab shows how many sessions wait on you, as in "(2) Naget Agent".
+
+Sessions that an agent started for parts of its job (child sessions) sit folded under it, with a line such as "3 child sessions · 1 needs you · 2 working"; click it to see them. See [Child sessions](/guide/sessions#child-sessions).
+
+On a computer, right-click a session for **Rename**, **Pin** (or **Unpin**), **Snooze**, **Settle** and **Archive**. Double-click a title, or press F2 on a selected row, to rename it. All of these are explained in [Rename, pin, snooze, settle, archive or delete](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
+
+### The tools at the bottom
+
+The bottom of the sidebar holds the app's tools, four to a row:
+
+- **Files**: browse, open and edit files on this computer. See [Files, Git, Terminal and Preview](/guide/files-git).
+- **Git**: your repositories, their changes, branches and history.
+- **Terminal**: shells on this computer that keep running when you leave the page.
+- **Pages**: small tools and pages agents made for you, and the ones you published. See [Pages and published sites](/guide/pages).
+- **Spaces**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Spaces and knowledge](/guide/spaces).
+- **Templates**: tasks you run again and again: fill in a form, and an agent does the job. See [Templates](/guide/templates).
+- **Preview**: look at a web app's development server running on this computer. It shows only on this machine's own pages, not while you look at another machine.
+- **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs. A thin bar under its icon shows the plan limit you have used most, red when you are at a limit. See [Usage, limits and costs](/guide/usage).
+- **System**: this computer's processors, GPUs, memory, disks and busiest processes, live.
+- **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
+- **Search**: opens the search box (the same as Ctrl+K).
+- **Help**: opens this guide. The welcome tour starts from there too.
+
+### The start page
+
+**New session** opens the start page. It asks "What should we work on?" and holds a large message box with a row of choices under it:
+
+- **Agent**: who does the work (Claude Code, Codex, Custom, or another agent you added).
+- **Model**: that agent's model.
+- **Folder**: where the agent works, or a space, or a new folder made for the task.
+- **Assistant**: what the session starts as (General, Researcher, Writer, Coder, Tutor, Planner, Analyst, or one of your own).
+- **Options**: effort, permissions, memory, a spending cap and more. The chip names any of them you set away from the usual.
+
+On a computer, a line under the box reminds you: "Enter to start · Shift+Enter for a new line". Below it, **Today** sums up the day so far (lines changed, tokens, prompts, sessions); click it for the Activity page. When an agent's plan has run out of usage, a banner above the box says so and when it resets. On a phone, **Recent** lists your six latest sessions under the box.
+
+Everything on the start page is explained in [Start a session](/guide/sessions#start-a-session).
+
+## Start your first session
+
+1. Make sure the agent can work. Claude Code and Codex need you signed in: open [Settings → Agents → Accounts](/settings?s=accounts&find=Your%20sign-ins), find **Your sign-ins**, press **Sign in** next to the agent and follow the steps (you open a link, approve, and paste or enter a code). Custom needs a model: add one in [Settings → Agents → Models](/settings?s=models). The welcome tour does this with you the first time. See [Agents, accounts and models](/guide/agents-models).
+2. Press **New session** at the top of the sidebar. The app opens on the start page too.
+3. Press **Agent** under the message box and pick the agent. **Model** beside it picks its model; the one marked "default" is fine to start with.
+4. Press **Folder** and pick where the agent works:
+   - one of the folders you used last, or another one: type its name or its path in **Find a folder, or type its path**;
+   - a space, by its name, to work in that project's folder with its documents and guidelines;
+   - **New task folder**, for a fresh folder named after your task (in `~/Naget` unless you change it in [Settings → Capabilities → Assistants](/settings?s=assistants&find=Task%20folders)).
+
+   Most assistants start in a new task folder unless you pick a folder; Coder works in the folder you pick.
+5. Type what you want done in the message box: describe a task, ask a question or paste an error. Add files with the paperclip, or drop them on the box.
+6. Press Enter, or **Start**. On a phone, tap the round arrow.
+
+The session opens. You see the agent's steps as it works, in plain words, and its reply at the end. When it wants to run a command or change a file that its permissions do not allow on their own, a card asks you to **Allow** or **Deny**. Type in the message box at the bottom to carry on the conversation. Your picks on the start page stay for the next session, on every device.
+
+Next: [Sessions](/guide/sessions) explains everything you can do in a session.
+
+## Search everything with Ctrl+K
+
+The search box finds anything in the app as you type, like Spotlight on a Mac. Open it with Ctrl+K (⌘K on a Mac) from any page, except while you type in a code editor or a terminal. The **Search** tile in the sidebar and the Ctrl+K badge in **Search sessions** open it too. Press Ctrl+K again, or Esc, to close it.
+
+### What it finds
+
+- **Go to**: the app's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Templates, New template, Spaces, Shared knowledge, Pages, Published pages, Preview, Usage and limits, Model arena, Activity, System and Settings.
+- **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Show or hide the terminal panel.
+- **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
+- **Themes**: the built-in themes and your own. Opening one switches to it.
+- **Sessions**: by title, folder, branch and first message (not archived ones). Opening one opens it.
+- **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
+- **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
+- **Templates**, **Scheduled tasks**, **Assistants**, **Skills**, **Pages** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
+- **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
+
+### How the results show
+
+- The **Best match** comes first. Then each kind has its own group of up to four rows; "3 more in Sessions" shows the rest.
+- On a wide screen, a preview beside the list says more about the result you are on, and where opening it goes.
+- ↑ and ↓ move, Enter opens. Esc clears what you typed, and a second Esc closes the box.
+- With nothing typed, it lists **Recent sessions** and **Suggestions**: the places you use most (a few useful ones until it knows).
+- The bottom line says **Words** or **Words and meaning**. With [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) turned on in Settings → Capabilities → Memory, results also match what you mean in other words, and in other languages.
+
+### It learns what you use
+
+- What you pick, with what you typed. Type the same words again and that result comes first, at once.
+- The places you visit, however you got there: pages, Settings sections, sessions, templates, files. Among the results that match, the ones you use come up, more the better they match what you typed, and less as time passes.
+- The app keeps this for you, so your phone and your computer learn together.
+
+The sidebar's **Search sessions** field is a simpler search: it lists only sessions, by title, folder and the words in their messages, archived ones included.
+
+## Use the app on a phone
+
+To reach the app from your phone, it needs an HTTPS address (Tailscale, a Cloudflare tunnel or your own proxy). See [Phones, other machines and sharing](/guide/devices).
+
+### Add it to your home screen
+
+The app installs like an app and opens full screen:
+
+- **iPhone or iPad**: open it in Safari, then Share → **Add to Home Screen**.
+- **Android**: open it in Chrome, then ⋮ → **Add to Home screen** (or **Install app**).
+
+On an iPhone or iPad, notifications work only in the app added to the home screen: open it from there, then turn on [Notify this device](/settings?s=notifications&find=Notify%20this%20device) in Settings → App → Notifications. See [Inbox and notifications](/guide/inbox).
+
+### The sidebar is a drawer
+
+- The **Menu** button at the top left of each page opens it. It fills the screen.
+- Tapping a session or a tool takes you there and closes the drawer. **Close menu** (the ×) closes it too.
+- Hold a session a moment to pick it up, then drag it (to reorder Active or Pinned sessions, or to pin one).
+- A bin at the end of each row deletes the session, after asking.
+- There is no right-click menu: rename, pin, snooze and the rest are in the session's menu (⋯) at the top right of the session.
+
+### Menus open as sheets
+
+On a phone, the choices under the start page's message box (Agent, Model, Folder, Assistant, Options) open as sheets from the bottom of the screen, clear of the keyboard. The folder sheet's find field waits until you tap it, so the keyboard does not cover the list.
+
+### Typing and sending
+
+- The start page lists your six latest sessions under the message box, as **Recent**; **All sessions** opens the drawer.
+- Enter starts a new line. Tap the round arrow to start a session or send a message (with a keyboard attached, Ctrl+Enter or ⌘Enter sends too).
+- In a session, the message box shows one chip with the model (and the effort and permissions when they are not the usual). It opens a sheet with **Model**, **Effort**, **Permissions** and how much of the conversation's room is used, with **Compact**.
+- To quote part of a reply, select it: **Quote** appears just below the selection.
+- **Details** opens over the conversation, only when you ask.
+- The search box fills the screen; **Cancel** closes it.
+- The screenshot button is only on computers.
+
+## Keyboard shortcuts
+
+On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, which stay Ctrl.
+
+| Keys | What it does | Where |
+| --- | --- | --- |
+| Ctrl+K | Opens or closes the search box | Anywhere, except while typing in a code editor or terminal |
+| Ctrl+B | Shows or hides the sidebar | Anywhere on a computer, except in a code editor |
+| Ctrl+` | Shows or hides the terminal panel at the bottom | On a computer |
+| Ctrl+P | Quick open: jump to a file by part of its name, in the folder the Files page shows | Anywhere |
+| Ctrl+Z | Undoes a pin, unpin, archive, unarchive or snooze, within 8 seconds | Outside text fields |
+| Enter | Starts the session, or sends the message | The start page and the message box (on a phone: a new line) |
+| Shift+Enter | A new line | The message box |
+| Ctrl+Enter | While the agent works: the opposite of Enter (queue instead of joining the turn, or the other way round). On a phone: sends | The message box |
+| Shift+Tab | Switches to the next permissions mode | The message box, on the start page or in a session |
+| Esc | Stops the running turn | In a session, with no dialog open |
+| ↑ in an empty box | Brings back your earlier messages in this session, one by one (↓ goes forward again) | The message box in a session |
+| Ctrl+S | Puts the draft aside; in an empty box, brings it back | The message box in a session |
+| @ | Lists files in the session's folder to point at | The message box |
+| / at the start | Lists the agent's commands and skills (Claude Code) | The message box |
+| ↑ ↓, Enter or Tab, Esc | Move through, insert, or close the @ and / lists | The message box |
+| Ctrl+F | Finds text in this session's messages | In a session |
+| Enter, Shift+Enter | Older match, newer match | The find bar |
+| 1 to 9 | Picks an option of the question the agent asked | A question card, while no text field has the keyboard |
+| F2 | Renames the selected session | The sidebar's session list |
+| ↑ ↓, Enter, Esc | Move, open, clear then close | The search box |
+| ↑ ↓, Enter, Tab | Move, pick, list the folders inside | The folder menu on the start page |
+| Ctrl+S | Saves the file | The file editor |
+| Ctrl+Space, → | Lists command suggestions; takes the grey suggestion | A terminal |
+
+## Get help
+
+- **Help** in the sidebar opens this guide, with its contents and a search. Its sections also turn up in the search box (Ctrl+K).
+- The welcome tour shows you around and sets up the agents you want to use. Start it from Help, from [Take the tour](/settings?s=general&find=Take%20the%20tour) in Settings → App → General, or by typing "tour" in the search box.
+- **Release notes** (in Settings → App → General, or from the search box) say what changed in each version. After an update, a "What's new" note shows once.
+- Agents in the app read this guide too: ask any session "how do I…" and it can answer, or do it for you (see [Let agents work the app for you](/guide/ask-agents)).
+
+## Ask an agent
+
+- "Which of my sessions are waiting on me right now, and what does each one need?"
+- "Start a Codex session in ~/code/shop that makes the checkout tests pass."
+- "Find the session where we planned the Lisbon trip and pin it."
+- "Next time I open the start page, have it set to Claude Code with the Researcher assistant."
+- "What is in my inbox?"

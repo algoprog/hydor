@@ -33,6 +33,8 @@ export interface RunCtx {
   acpAgent?: string;
   cwd: string;
   deps: Deps;
+  /** Aborted when the agent gives up on the call (its request closed): a card waiting on the user goes. */
+  signal?: AbortSignal;
 }
 
 /** A tool's answer: text, and images for the agents that take them (a screenshot). */

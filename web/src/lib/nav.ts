@@ -8,6 +8,15 @@ export function go(path: string, replace = false) {
   navigate(machineBase + path, { replace });
 }
 
+/**
+ * Follows a link to one of the app's own pages (the guide's, an agent's): `/settings?s=memory`, or
+ * `/guide/spaces#make-a-space`, whose section the page then scrolls to (it hears `naget:hash`).
+ */
+export function goApp(href: string) {
+  go(href);
+  window.dispatchEvent(new Event('naget:hash'));
+}
+
 /** Opens a page by its full path (as notifications carry it): another machine's pages load afresh. */
 export function goFull(path: string) {
   const t = splitMachinePath(path);

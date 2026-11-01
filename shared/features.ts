@@ -21,6 +21,8 @@ export interface SessionExtra {
   arena?: ArenaStart | string;
   /** The space it belongs to (shared/spaces.ts), by its id. */
   space?: string;
+  /** Agent Guidelines for this session alone (shared/guidelines.ts). */
+  guidelines?: string;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

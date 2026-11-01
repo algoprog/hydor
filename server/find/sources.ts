@@ -2,7 +2,7 @@
 // short text: what ships with the app (the catalog of shared/find-catalog.ts, app templates, built-in assistants
 // and skills), whose vectors are made ahead of time (npm run find:vectors), and what people make (sessions,
 // apps, scheduled tasks, assistants, learned skills, pages, connected apps), whose vectors are made the moment
-// they are made or changed (index.ts).
+// they are made or changed (index.ts). The guide's sections (docs/guide) ship too.
 import { catalogItems, catalogText } from '../../shared/find-catalog.ts';
 import type { SessionSummary } from '../../shared/types.ts';
 import { listApps } from '../apps/store.ts';
@@ -12,6 +12,7 @@ import { allAssistants } from '../assistants/store.ts';
 import { connections, connectionView } from '../connections/apps.ts';
 import type { DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
+import { guideItems } from '../guide/content.ts';
 import { listPages } from '../pages/store.ts';
 import { libraryView } from '../skillpack/proposals.ts';
 
@@ -20,8 +21,8 @@ export interface Item {
   text: string;
 }
 
-export type Kind = 'catalog' | 'sessions' | 'apps' | 'tasks' | 'assistants' | 'skills' | 'pages' | 'connections';
-export const KINDS: Kind[] = ['catalog', 'sessions', 'apps', 'tasks', 'assistants', 'skills', 'pages', 'connections'];
+export type Kind = 'catalog' | 'guide' | 'sessions' | 'apps' | 'tasks' | 'assistants' | 'skills' | 'pages' | 'connections';
+export const KINDS: Kind[] = ['catalog', 'guide', 'sessions', 'apps', 'tasks', 'assistants', 'skills', 'pages', 'connections'];
 
 /** Sessions given vectors: the latest. */
 export const MAX_SESSIONS = 3000;
@@ -47,6 +48,8 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
   switch (kind) {
     case 'catalog':
       return catalog();
+    case 'guide':
+      return guideItems();
     case 'sessions':
       return d.sessions
         .list({ limit: MAX_SESSIONS })
@@ -69,5 +72,5 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
 
 /** What ships with the app: its vectors are made ahead of time and kept in the repository. */
 export function shippedItems(db: DB): Item[] {
-  return [...catalog(), ...templates(), ...BUILTINS.map(assistant), ...libraryView(db).filter((s) => s.source === 'bundled').map(skill)];
+  return [...catalog(), ...guideItems(), ...templates(), ...BUILTINS.map(assistant), ...libraryView(db).filter((s) => s.source === 'bundled').map(skill)];
 }
