@@ -56,7 +56,7 @@ import { SystemMonitor } from './system.ts';
 import { readTaskLog, taskOutputPath } from './tasklog.ts';
 import * as terms from './terminals.ts';
 import { FEATURES } from './features/index.ts';
-import { eventSent, featureContext, registerFeatures, startFeatures } from './features/registry.ts';
+import { eventSent, featureContext, inboxItems, registerFeatures, startFeatures } from './features/registry.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
@@ -1279,13 +1279,14 @@ scheduler.on('changed', () => broadcast({ t: 'tasks' }));
 sessions.on('notify', (n: NotifyEvent) => {
   broadcast({ t: 'notify', n });
   // A notification shows a title and a body: the session's name, then the status and the reply.
-  push.send({ ...n, ...noticeText(n), url: `/s/${encodeURIComponent(n.key)}` }).catch(() => {});
+  push.send({ ...n, ...noticeText(n), url: `/s/${encodeURIComponent(n.key)}`, api: '' }).catch(() => {});
 });
 // Other machines' notices come here too, so one device hears from all of them.
 machines.on('notify', (n: NotifyEvent) => {
   broadcast({ t: 'notify', n });
   const t = noticeText(n);
-  push.send({ ...n, title: t.title, body: `${n.machine!.name} · ${t.body}`, url: `/m/${n.machine!.id}/s/${encodeURIComponent(n.key)}` }).catch(() => {});
+  // Its Approve and Deny go to that machine, through this server.
+  push.send({ ...n, title: t.title, body: `${n.machine!.name} · ${t.body}`, url: `/m/${n.machine!.id}/s/${encodeURIComponent(n.key)}`, api: `/m/${n.machine!.id}` }).catch(() => {});
 });
 machines.on('changed', () => broadcast({ t: 'machines' }));
 /** A sign-in finished: with a session waiting out a limit, the new account's usage says when it continues. */
@@ -1459,6 +1460,9 @@ const publicBase = () => config.allowedOrigins[0] ?? `http://127.0.0.1:${config.
 // ---- the app's capabilities (server/features): search, browser, memory, assistants… ------------------
 
 registerFeatures(FEATURES, { app, db, sessions, scheduler, models, broadcast, toSubscribers, publicBase });
+
+// Everything waiting on the user on this machine, newest first: the inbox (the page asks the other machines too).
+app.get('/api/inbox', async () => ({ items: [...sessions.inbox(), ...inboxItems()].sort((a, b) => b.at - a.at) }));
 
 // Notes the app adds to conversations (memory updates, second opinions…), and each session's settings beyond its agent's own.
 app.get('/api/sessions/:key/notes', async (req) => ({ notes: notesOf(db, (req.params as { key: string }).key) }));

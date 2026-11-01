@@ -1,6 +1,7 @@
 // Types shared by the server and the web client.
 import type { SessionExtra, SessionNote } from './features.ts';
 import type { ApprovalForm } from './forms.ts';
+import type { QuickAnswer } from './inbox.ts';
 import type { AppTheme } from './themes.ts';
 
 /** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
@@ -403,6 +404,8 @@ export interface NotifyEvent {
   at: number;
   /** Set when the session is on another machine (Settings → Machines). */
   machine?: { id: string; name: string };
+  /** Waiting on an approval that is a plain yes or no: a notification's Approve and Deny buttons answer it. */
+  approval?: QuickAnswer;
 }
 
 /** Another machine running Naget Agent that this one uses (Settings → Machines); its token stays on the server. */

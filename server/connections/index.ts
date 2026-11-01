@@ -33,7 +33,7 @@ import { connectPlain, finishOAuth, flowResult, startOAuth, testConnection } fro
 import { revoke } from './oauth.ts';
 import { launchSocket, relayRoutes, startLaunchSocket, sweepLinks } from './relay.ts';
 import { onRequestChange, sessionTools } from './tools.ts';
-import { deleteSecret, getRequest, latestRequest, listSecrets, redact, saveSecret, secretView, settleRequests, useMaskDb, vaultTables } from './vault.ts';
+import { deleteSecret, getRequest, latestRequest, pendingRequests, listSecrets, redact, saveSecret, secretView, settleRequests, useMaskDb, vaultTables } from './vault.ts';
 
 const BRIDGE = path.join(APP_ROOT, 'dist/server/connbridge.js');
 const base = () => `http://127.0.0.1:${config.port}/connections`;
@@ -274,6 +274,12 @@ export const connections: Feature = {
     return { mcpServers, instructions: [instructions(apps.filter((c) => mcpServers[c.id]))] };
   },
   scrub: redact,
+  // Keys agents asked for that the user has not entered yet (in a session still kept).
+  inbox: (d) =>
+    pendingRequests(d.db).flatMap((r) => {
+      const s = d.sessions.summary(r.key);
+      return s ? [{ id: `key:${r.id}`, kind: 'key' as const, title: `Asks for a key: ${r.name}`, detail: r.why, key: r.key, session: s.title, agent: s.agent, at: r.createdAt, path: `/s/${encodeURIComponent(r.key)}` }] : [];
+    }),
   start(d) {
     // Sign-ins renew before they end, even for apps no session is using; quiet SSE links close.
     const tick = () => {

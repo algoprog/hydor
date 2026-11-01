@@ -1,9 +1,11 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { Activity, CircleHelp, FolderTree, Gauge, GitBranch, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
+import { Activity, CircleHelp, FolderTree, Gauge, GitBranch, Inbox, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
+import { activityOf } from '../../lib/activity';
+import { useMachines } from '../../lib/machines';
 import { MOD, pct } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { useApp, useUI, useUsage } from '../../lib/store';
+import { useApp, useSessions, useUI, useUsage } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Logo } from '../../components/Logo';
 import { severityColor } from '../../components/charts';
@@ -30,6 +32,15 @@ function UsageHint() {
       <span className="block h-full rounded-full" style={{ width: `${Math.min(100, top.usedPercent ?? 0)}%`, background: limited ? 'var(--err)' : severityColor(top.usedPercent) }} />
     </span>
   );
+}
+
+/** How many sessions wait on you, here and on the other machines, as a dot with a number on "Inbox". */
+function InboxCount() {
+  const here = useSessions((s) => Object.values(s.byKey).filter((x) => activityOf(x)?.status === 'waiting').length);
+  const there = useMachines((s) => s.list.filter((m) => m.id !== machineId && m.status.state === 'online').reduce((n, m) => n + m.status.waiting, 0));
+  const n = here + there;
+  if (!n) return null;
+  return <span className="tnum absolute top-1.5 left-[calc(50%+5px)] min-w-4 rounded-full bg-warn px-1 text-center text-[10px] leading-4 font-semibold text-bg">{n > 99 ? '99+' : n}</span>;
 }
 
 /** A tool: icon over label, four to a row, so the sessions keep the room (on phones and computers alike). */
@@ -185,6 +196,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
       </div>
 
       <nav data-tour="tools" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
+        <NavItem path="/inbox" match={loc === '/inbox'} label="Inbox" icon={<Inbox size={17} />} extra={<InboxCount />} onGo={nav} />
         <NavItem path="/files" match={loc === '/files' || loc === '/file' || loc === '/search'} label="Files" icon={<FolderTree size={17} />} onGo={nav} />
         <NavItem path="/git" match={loc === '/git'} label="Git" icon={<GitBranch size={17} />} onGo={nav} />
         <NavItem path="/terminal" match={loc === '/terminal'} label="Terminal" icon={<SquareTerminal size={17} />} onGo={nav} anim="ico-nudge" />

@@ -26,6 +26,7 @@ import { beforeSend, spawnAdditions, turnEnded } from './features/registry.ts';
 import { dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
+import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
 import { accountEnv, accountOfPath } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { ensureClaude, ensureCommand } from './clients.ts';
@@ -480,7 +481,15 @@ export class SessionManager extends EventEmitter {
         // A snoozed session that needs you comes back now.
         if (s.snoozedUntil) this.setFlags(s.key, { snoozedUntil: null });
         const ext = s.external;
-        const n: NotifyEvent = { ...base, kind: 'waiting', body: ext ? `Waiting for you in ${ext.client}` : (s.live?.pendingApprovals ?? 0) > 0 ? 'Needs your approval' : 'Has a question for you' };
+        // An approval that is a plain yes or no: the notification's buttons can answer it.
+        const first = ext ? undefined : [...(this.lives.get(s.key)?.adapter.approvals.values() ?? [])][0];
+        const quick = first ? (quickAnswer(first) ?? undefined) : undefined;
+        const n: NotifyEvent = {
+          ...base,
+          kind: 'waiting',
+          body: ext ? `Waiting for you in ${ext.client}` : quick ? `${quick.title}${quick.detail ? `: ${quick.detail}` : ''}` : (s.live?.pendingApprovals ?? 0) > 0 ? 'Needs your approval' : 'Has a question for you',
+          approval: quick,
+        };
         // In VS Code or a terminal you are likely right there: speak up only if it is still waiting a minute later.
         if (!ext) this.notify(n);
         else {
@@ -1502,6 +1511,22 @@ export class SessionManager extends EventEmitter {
     if (flags.pinned !== undefined) this.db.prepare('update app_sessions set pinned = ? where key = ?').run(flags.pinned ? 1 : 0, key);
     if (flags.snoozedUntil !== undefined) this.db.prepare('update app_sessions set snooze_until = ? where key = ?').run(flags.snoozedUntil && flags.snoozedUntil > Date.now() ? Math.round(flags.snoozedUntil) : null, key);
     this.queueSummary(key);
+  }
+
+  /** What waits on the user in the sessions: each approval, question and form, and sessions waiting elsewhere (VS Code, a terminal). */
+  inbox(): InboxItem[] {
+    const out: InboxItem[] = [];
+    for (const l of this.lives.values()) {
+      const s = this.summary(l.key);
+      for (const a of l.adapter.approvals.values())
+        out.push({ id: `approval:${l.key}:${a.id}`, kind: approvalKind(a), title: a.title, key: l.key, session: s?.title, agent: l.agent, at: a.createdAt, path: `/s/${encodeURIComponent(l.key)}`, approval: a });
+    }
+    for (const [key, ext] of this.external.states)
+      if (ext.status === 'waiting') {
+        const s = this.summary(key);
+        out.push({ id: `elsewhere:${key}`, kind: 'elsewhere', title: `Waiting for you in ${ext.client}`, detail: ext.detail, key, session: s?.title, agent: s?.agent, at: ext.since ?? Date.now(), path: `/s/${encodeURIComponent(key)}` });
+      }
+    return out;
   }
 
   /** The agent process's adapter, by its run id: for cards the app shows itself (a connected app's form). */
