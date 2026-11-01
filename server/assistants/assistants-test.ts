@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { agentMode, assistantExtra, toolAllowed, toolKind, type Assistant } from '../../shared/assistants.ts';
+import { AcpLive } from '../agents/acp.ts';
 import { claudeSpec } from '../agents/claude.ts';
 import { CodexLive } from '../agents/codex.ts';
 import { APP_ROOT } from '../config.ts';
@@ -195,6 +196,59 @@ test('Custom: nothing at its start (it reads the context before each turn), the 
   assert.ok(!add.instructions.some((t) => t.includes('# Assistant:')));
   const text = await assistants.context!({ key: 'acp:k1', cwd: tmp, extra: { assistant: 'tutor' } }, deps);
   assert.match(String(text), /^# Assistant: Tutor\n/);
+});
+
+/** Answers like an ACP agent would (initialize, session/new, session/prompt), keeping what was asked. */
+let acpSessions = 0;
+class FakeAcpRunner extends EventEmitter {
+  meta = { runId: 'run-acp' };
+  calls: { method: string; params: any }[] = [];
+  writeLine(o: any) {
+    if (o.id == null || !o.method) return;
+    this.calls.push({ method: o.method, params: o.params });
+    const result = o.method === 'initialize' ? { protocolVersion: 1, agentCapabilities: {} } : o.method === 'session/new' ? { sessionId: `acp-${++acpSessions}` } : o.method === 'session/prompt' ? { stopReason: 'end_turn' } : {};
+    setImmediate(() => this.emit('line', JSON.stringify({ jsonrpc: '2.0', id: o.id, result }), false));
+  }
+}
+
+test('another ACP agent: the instructions go with the first message of each ACP session, not into the transcript', async () => {
+  const add = await spawnAdditions(info('acp', { assistant: 'tutor' }, 'gemini'));
+  assert.ok(add.instructions.some((t) => t.startsWith('# Assistant: Tutor')));
+  const transcript = path.join(tmp, 'acp-brief.jsonl');
+  fs.writeFileSync(transcript, JSON.stringify({ t: 'meta', agent: 'gemini' }) + '\n');
+  const def = { id: 'gemini', name: 'Gemini CLI', command: 'gemini', args: [] };
+  const prompts = (r: FakeAcpRunner) => r.calls.filter((c) => c.method === 'session/prompt').map((c) => c.params.prompt.map((b: any) => b.text));
+  const turn = async (lv: AcpLive, text: string) => {
+    await lv.sendMessage(text, []);
+    for (let i = 0; i < 50 && lv.state.status !== 'idle'; i++) await new Promise((r) => setTimeout(r, 5));
+  };
+  const runner = new FakeAcpRunner();
+  const lv = new AcpLive(runner as any, { cwd: tmp, id: 'acp-brief', def, transcript, add });
+  await lv.boot(false);
+  await turn(lv, 'Hello');
+  await turn(lv, 'And then?');
+  const [first, second] = prompts(runner);
+  assert.equal(first.length, 2);
+  assert.match(first[0], /^<naget-instructions>\n[\s\S]*# Assistant: Tutor[\s\S]*<\/naget-instructions>$/);
+  assert.equal(first[1], 'Hello');
+  assert.deepEqual(second, ['And then?']);
+  // The transcript has the user's words alone.
+  const lines = fs.readFileSync(transcript, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(lines.filter((l) => l.t === 'prompt').map((l) => l.text), ['Hello', 'And then?']);
+  // The app restarted (a new adapter on the same run): the session had them already.
+  const again = new AcpLive(runner as any, { cwd: tmp, id: 'acp-brief', def, transcript, add, acpSession: 'acp-1' });
+  await turn(again, 'Still there?');
+  assert.deepEqual(prompts(runner)[2], ['Still there?']);
+  // A new ACP session (the agent could not reopen the old one) gets them again; Custom never does.
+  const fresh = new AcpLive(new FakeAcpRunner() as any, { cwd: tmp, id: 'acp-brief', def, transcript, add });
+  await fresh.boot(true);
+  await turn(fresh, 'Back again');
+  assert.equal(prompts((fresh as any).runner)[0].length, 2);
+  const customRunner = new FakeAcpRunner();
+  const own = new AcpLive(customRunner as any, { cwd: tmp, id: 'acp-own', def: { ...def, id: 'console', name: 'Custom' }, transcript: path.join(tmp, 'acp-own.jsonl'), add });
+  await own.boot(false);
+  await turn(own, 'Hi');
+  assert.deepEqual(prompts(customRunner)[0], ['Hi']);
 });
 
 // ---- .claude/agents files ---------------------------------------------------------------------------

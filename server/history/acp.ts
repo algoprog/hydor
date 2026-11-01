@@ -53,6 +53,27 @@ const KIND: Record<string, ToolCategory> = {
 
 const STATUS: Record<string, ToolInfo['status']> = { pending: 'running', in_progress: 'running', completed: 'ok', failed: 'error' };
 
+/**
+ * The app's instructions for an ACP agent other than Custom (memory, the assistant, the tone, when to use
+ * which tool): ACP has no place for them when a session opens, so they go with its first message, in
+ * this block, before the user's words. The transcript keeps the user's words alone.
+ */
+export function acpBriefing(instructions: string[]): string {
+  return [
+    BRIEF_OPEN,
+    'Standing instructions from Naget Agent, the app this session runs in. They hold for the whole session, beside your own; follow them without mentioning them. The user’s message follows this block.',
+    '',
+    instructions.join('\n\n'),
+    BRIEF_CLOSE,
+  ].join('\n');
+}
+
+const BRIEF_OPEN = '<naget-instructions>';
+const BRIEF_CLOSE = '</naget-instructions>';
+
+/** A user message without the app's block, should an agent echo it back. */
+export const withoutBriefing = (text: string) => (text.startsWith(BRIEF_OPEN) && text.includes(BRIEF_CLOSE) ? text.slice(text.indexOf(BRIEF_CLOSE) + BRIEF_CLOSE.length).trimStart() : text);
+
 /** The text of ACP content blocks (text, resources, links), joined. */
 export function acpText(content: unknown): string {
   const list = Array.isArray(content) ? content : content ? [content] : [];
@@ -283,7 +304,7 @@ export class AcpParser {
       }
       case 'user_message_chunk': {
         // Replayed history (session/load): the user's own words.
-        const text = acpText(u.content);
+        const text = withoutBriefing(acpText(u.content));
         if (text) this.upsert({ kind: 'user', id: `ur${this.seq++}`, seq: 0, ts, text });
         this.open = null;
         return;
