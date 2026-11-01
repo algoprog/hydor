@@ -3,6 +3,22 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.7.2 · 1 November 2026
+
+Groups of spaces, a search box that learns what you use, and text cut short that scrolls into view.
+
+- **Groups of spaces**: bring several spaces together in one ("Group spaces together" on the Spaces page, or
+  in a space's settings). Sessions started in a group work with all of them: their instructions, their
+  folders and their documents, each cited by the space it comes from, beside the group's own and the shared
+  knowledge. A group's mark is stacked; a space can be in several groups, but a group holds no other groups.
+- **Search learns what you use**: something you picked before for the same words comes first, at once. Among
+  the matches, what you pick and the places you visit (pages, Settings sections, sessions, templates, files)
+  come up, as much as they match what you typed, and less as time passes. With nothing typed, the places you
+  use most are suggested. Your phone and computer learn together.
+- **Text cut short scrolls into view**: rest the mouse on a title or name that ends in "…" and it scrolls
+  slowly to its end, then back, for as long as you stay. Nothing moves on touch screens, or when your device
+  asks for less motion.
+
 ## 0.7.1 · 1 November 2026
 
 Spaces in the sidebar, each with documents of its own, and a tidier message box on phones.
