@@ -615,8 +615,16 @@ html {
     filter: blur(6px);
   }
 }
+/* A step's card comes into focus where it stands: it never moves into its place. */
+@keyframes tour-card-focus {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+    filter: blur(8px);
+  }
+}
 .tour-card {
-  animation: tour-card-in 620ms 90ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: tour-card-focus 620ms 90ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 .tour-card.tour-card-out,
 .auth-card.tour-card-out {
@@ -963,14 +971,15 @@ html {
 :root[data-tour-build~='sidebar'] [data-shell] [data-tour='sidebar'],
 :root[data-tour-build~='sessions'] [data-shell] [data-tour='sessions'],
 :root[data-tour-build~='tools'] [data-shell] [data-tour='tools'],
-:root[data-tour-build~='nav-settings'] [data-shell] [data-tour='nav-settings'] {
+:root[data-tour-build~='tools'] [data-shell] [data-tour='nav-settings'] {
   visibility: visible;
   opacity: 1;
   transition: none;
   animation: tour-part-in 760ms 200ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 /* The sidebar slides in from its edge; the bar under the message box and the tools' grid just show as
-   their tiles come in; Options and Settings pop up, Settings' gear turning. */
+   their tiles come in, Settings among them; Options pops up; and when its own step comes, Settings' gear
+   turns once. */
 :root[data-tour-build~='sidebar'] [data-shell] [data-tour='sidebar'] {
   animation-name: tour-panel-in;
 }
@@ -978,13 +987,17 @@ html {
 :root[data-tour-build~='tools'] [data-shell] [data-tour='tools'] {
   animation: overlay-in 300ms 160ms ease-out backwards;
 }
-:root[data-tour-build~='pickers'] [data-shell] [data-tour='pickers'],
-:root[data-tour-build~='nav-settings'] [data-shell] [data-tour='nav-settings'] {
+:root[data-tour-build~='tools'] [data-shell] [data-tour='nav-settings'] {
+  animation-name: tour-tile-in;
+  animation-duration: 560ms;
+  animation-delay: calc(260ms + (var(--tour-c, 0) + var(--tour-r, 0)) * 55ms);
+}
+:root[data-tour-build~='pickers'] [data-shell] [data-tour='pickers'] {
   animation-name: tour-pop-in;
   animation-duration: 620ms;
 }
 :root[data-tour-build~='nav-settings'] [data-shell] [data-tour='nav-settings'] .ico {
-  animation: tour-turn 1100ms 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: tour-turn 1100ms 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes tour-part-in {
   from {
@@ -1021,9 +1034,10 @@ html {
     filter: blur(0);
   }
 }
+/* From where it rests, round to where it looks the same. */
 @keyframes tour-turn {
-  from {
-    rotate: -150deg;
+  to {
+    rotate: 360deg;
   }
 }
 /* The password and sign-in screens: the card rises in once the mark has drawn. */
