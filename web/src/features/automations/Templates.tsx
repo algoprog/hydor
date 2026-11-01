@@ -147,7 +147,7 @@ function TemplateDialog({ template, onClose, onMore }: { template: Template; onC
 export function TemplateGallery({ onMore }: { onMore: (d: TaskDraft) => void }) {
   const [pick, setPick] = useState<Template | null>(null);
   return (
-    <Section title="Start from a template" sub="A short form each; change anything later.">
+    <Section title="Start from an example" sub="A short form each; change anything later.">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {TEMPLATES.map((t) => (
           <button

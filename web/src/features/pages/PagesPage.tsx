@@ -302,7 +302,7 @@ function Library() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Pages"
-        sub="Pages agents made for you, and what you published"
+        sub="Small tools and pages agents made for you, and what you published"
         actions={
           tab === 'published' && (
             <Button size="sm" variant="secondary" icon={<Upload size={14} />} onClick={() => setPublish(true)}>

@@ -100,7 +100,7 @@ export function ShareTab({ detail, onChange }: { detail: AppDetail; onChange: ()
     <div className="mx-auto max-w-[860px] space-y-4 px-4 py-6 sm:px-6">
       <Section
         title="API"
-        sub="Programs and scripts run the app with a key, and get its answer back."
+        sub="Programs and scripts run the template with a key, and get its answer back."
         actions={
           <Button size="sm" icon={<Plus size={14} />} onClick={() => setNaming(true)}>
             New key
@@ -139,7 +139,7 @@ export function ShareTab({ detail, onChange }: { detail: AppDetail; onChange: ()
             ))}
           </div>
         ) : (
-          !made && <div className="mb-3 text-[13px] text-fg-3">No keys yet. A key opens this app only, nothing else here.</div>
+          !made && <div className="mb-3 text-[13px] text-fg-3">No keys yet. A key opens this template only, nothing else here.</div>
         )}
         <div className="mb-1.5 text-[12.5px] text-fg-3">
           Send the form’s answers; <code className="font-mono">wait</code> is how many seconds to wait for the answer (at most 900). It returns <code className="font-mono">status</code>, <code className="font-mono">result</code>, <code className="font-mono">reply</code> and{' '}
@@ -223,7 +223,7 @@ export function ShareTab({ detail, onChange }: { detail: AppDetail; onChange: ()
           </div>
         </div>
         <p className="mt-3 text-[12px] leading-relaxed text-fg-3">
-          Public runs always use Custom with the model above, with no commands and no files, in a throwaway folder, with memory and connections off. They can use only the answer fields{pub.web ? ' and web search' : ''}. Visitors see their own runs only, never this app’s prompt or settings.
+          Public runs always use Custom with the model above, with no commands and no files, in a throwaway folder, with memory and connections off. They can use only the answer fields{pub.web ? ' and web search' : ''}. Visitors see their own runs only, never this template’s prompt or settings.
         </p>
       </Section>
 

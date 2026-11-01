@@ -1,4 +1,5 @@
-// Apps: reusable tasks with a form, run from a gallery, the API, MCP or a public page.
+// Apps: reusable tasks with a form, run from a gallery, the API, MCP or a public page. People see them
+// as Templates.
 //
 //   /api/apps…                 the gallery, apps and their runs (and follow-ups to them), keys, runs over
 //                              CSV rows (signed in)
@@ -57,7 +58,7 @@ function recipeOf(db: Deps['db'], id: string): { app: AppDef | null; template: A
     return { app: null, template };
   }
   const app = getApp(db, id);
-  if (!app) throw new HttpError(404, 'No such app');
+  if (!app) throw new HttpError(404, 'No such template');
   return { app, template: null };
 }
 
@@ -148,14 +149,14 @@ function routes(d: Deps) {
 
   app.put('/api/apps/:id', async (req) => {
     const prev = getApp(db, P(req).id);
-    if (!prev) throw new HttpError(404, 'No such app');
+    if (!prev) throw new HttpError(404, 'No such template');
     const b = saveInput(req.body, prev);
     return { app: saveApp(db, { ...b, id: prev.id }) };
   });
 
   app.delete('/api/apps/:id', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such app');
+    if (!a) throw new HttpError(404, 'No such template');
     for (const r of listRuns(db, { app: a.id, status: ['queued', 'starting', 'running', 'waiting'] })) await stopRun(r.id);
     deleteApp(db, a.id);
     deleteRuns(db, a.id);
@@ -254,7 +255,7 @@ function routes(d: Deps) {
 
   const own = (req: FastifyRequest) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such app');
+    if (!a) throw new HttpError(404, 'No such template');
     return a;
   };
   app.get('/api/apps/:id/keys', async (req) => ({ keys: listKeys(db, own(req).id) }));
@@ -277,7 +278,7 @@ function routes(d: Deps) {
     const b = (req.body ?? {}) as { rows?: unknown; concurrency?: number; name?: string };
     if (!Array.isArray(b.rows)) throw new HttpError(400, 'Send the rows');
     const max = a.limits.runsPerDay;
-    if (max && usageSince(db, a.id, dayStart()).runs + b.rows.length > max) throw new HttpError(429, `That is more runs than the app’s limit of ${max} a day allows (Limits in its settings)`);
+    if (max && usageSince(db, a.id, dayStart()).runs + b.rows.length > max) throw new HttpError(429, `That is more runs than the template’s limit of ${max} a day allows (Limits in its settings)`);
     return { batch: startBatch(db, { app: a.id, slug: a.slug, recipe: a, rows: b.rows as Record<string, unknown>[], concurrency: b.concurrency, name: b.name }) };
   });
 
@@ -295,8 +296,8 @@ function routes(d: Deps) {
     const first = listRuns(db, { batch: batch.id, limit: 1 })[0];
     const a = getApp(db, batch.app);
     const recipe = first?.recipe ?? a;
-    if (!recipe) throw new HttpError(404, 'The app is gone');
-    const name = `${(a?.slug ?? 'app').replace(/[^\w-]/g, '')}-results.csv`;
+    if (!recipe) throw new HttpError(404, 'The template is gone');
+    const name = `${(a?.slug ?? 'template').replace(/[^\w-]/g, '')}-results.csv`;
     return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Content-Disposition', `attachment; filename="${name}"`).send(`﻿${batchCsv(db, batch.id, recipe, link)}`);
   });
 
@@ -313,12 +314,12 @@ function routes(d: Deps) {
     const bearer = /^Bearer\s+(\S+)$/i.exec(String(req.headers.authorization ?? ''))?.[1];
     if (bearer?.startsWith(KEY_PREFIX)) {
       const k = appOfKey(db, bearer);
-      if (!k || !a || k.app !== a.id) throw new HttpError(401, 'That key does not open this app');
+      if (!k || !a || k.app !== a.id) throw new HttpError(401, 'That key does not open this template');
       if (!keyLimiter.take(k.id, 30, 60_000)) throw new HttpError(429, 'Too many calls with this key: at most 30 a minute');
       return { a, key: k.id };
     }
     // Anything else here passed the sign-in (or a machine's access token) on the way in.
-    if (!a) throw new HttpError(404, 'No such app');
+    if (!a) throw new HttpError(404, 'No such template');
     return { a };
   };
 
@@ -336,7 +337,7 @@ function routes(d: Deps) {
   app.get('/api/apps/:slug/run/:runId', async (req) => {
     const { a } = callable(req);
     const r = getRun(db, P(req).runId);
-    if (!r || r.app !== a.id) throw new HttpError(404, 'No such run of this app');
+    if (!r || r.app !== a.id) throw new HttpError(404, 'No such run of this template');
     const done = await waitFor(r.id, waitSeconds((req.query as Record<string, string>).wait, 0, 900) * 1000);
     return apiAnswer(done ?? r, link);
   });
@@ -356,11 +357,11 @@ function submitTool(ctx: RunCtx): RunTool | null {
   const answer = hit.run.recipe.answer;
   return {
     name: 'submit_result',
-    description: `Hand in the result of this app run ("${hit.run.appName}"): one object with the answer fields. The person sees it as a card or table. Call it when the work is done; if it answers with problems, fix them and call again.`,
+    description: `Hand in the result of this run of the template "${hit.run.appName}": one object with the answer fields. The person sees it as a card or table. Call it when the work is done; if it answers with problems, fix them and call again.`,
     inputSchema: answerSchema(answer),
     async run(args, c) {
       const now = runOfCtx(c);
-      if (!now) return { text: 'This session was not started by an app, so there is nothing to hand in.', isError: true };
+      if (!now) return { text: 'This session was not started from a template, so there is nothing to hand in.', isError: true };
       let raw: unknown = args;
       // Some agents wrap the fields in one more object.
       const ids = new Set(answer.map((f) => f.id));

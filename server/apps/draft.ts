@@ -1,4 +1,4 @@
-// "Save as app": a draft recipe from a session's first request, written by the helper model. The
+// "Save as template": a draft recipe from a session's first request, written by the helper model. The
 // specifics of that request (a city, a file, a date) become form fields, and what the reply was made
 // of becomes answer fields. Without a helper model the draft is the request itself with one field.
 import type { AppRecipe } from '../../shared/apps.ts';
@@ -33,7 +33,7 @@ export async function draftFromSession(d: Deps, key: string): Promise<{ recipe: 
   if (!s) throw new HttpError(404, 'No such session');
   const tl = await d.sessions.timeline(key);
   const request = firstRequest(tl.parser.items);
-  if (!request) throw new HttpError(400, 'This session has no request to make an app from');
+  if (!request) throw new HttpError(400, 'This session has no request to make a template from');
   const reply = lastReply(tl.parser.items);
   const base = {
     agent: s.agent as Agent,
@@ -54,7 +54,7 @@ export async function draftFromSession(d: Deps, key: string): Promise<{ recipe: 
         maxTokens: 3000,
         timeoutMs: 100_000,
       },
-      'an app',
+      'a template',
     );
     const recipe = cleanRecipe({ ...raw, ...base });
     if (!recipe.prompt) throw new Error('no prompt');
@@ -63,7 +63,7 @@ export async function draftFromSession(d: Deps, key: string): Promise<{ recipe: 
     // Plain but usable: the request as it was, its wording in one field to change.
     const recipe = cleanRecipe({
       ...base,
-      name: s.title.slice(0, 60) || 'My app',
+      name: s.title.slice(0, 60) || 'My template',
       description: `Runs “${request.slice(0, 120).replace(/\s+/g, ' ')}${request.length > 120 ? '…' : ''}” again, with your changes.`,
       icon: 'sparkles',
       color: 'blue',

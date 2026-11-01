@@ -141,7 +141,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
               </IconButton>
             ) : (
               !mobile && (
-                <button type="button" onClick={openPalette} title="Search everything: settings, sessions, apps, notes, files" className="rounded">
+                <button type="button" onClick={openPalette} title="Search everything: settings, sessions, templates, notes, files" className="rounded">
                   <Kbd>{MOD}K</Kbd>
                 </button>
               )

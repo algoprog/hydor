@@ -162,7 +162,7 @@ export function AppForm({
   disabled?: boolean;
   maxMb?: number;
 }) {
-  if (!fields.length) return <div className="text-[13.5px] text-fg-3">This app has no questions: press Run.</div>;
+  if (!fields.length) return <div className="text-[13.5px] text-fg-3">No questions to answer: press Run.</div>;
   return (
     <div className="space-y-4.5">
       {fields.map((f) => (

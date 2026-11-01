@@ -51,11 +51,11 @@ agents that speak ACP and take MCP servers.
   vault: agents ask for one with a card and use it without ever seeing it.
 - **Child sessions**: an agent hands parts of a job to new sessions, with any agent and model, and gets their
   results back; they show under it in the sidebar.
-- **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in a library
-  with storage of their own and an address for a phone's home screen, and folders publish at a link. Apps are
-  tasks you repeat, each with a form: from templates or your own, run from the gallery, the API, MCP, a public
-  page, or once for each row of a CSV. Follow-ups refine a run's result, asked on its page or in its session,
-  which opens on that result with a switch to the conversation.
+- **Pages and templates**: pages the agents show can answer back (pick an option, fill in a form), stay in a
+  library with storage of their own and an address for a phone's home screen, and folders publish at a link.
+  Templates are tasks you repeat, each with a form: ready-made or your own, run from the Templates page, the
+  API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's result, asked on its page
+  or in its session, which opens on that result with a switch to the conversation.
 - **Skills**: a library that comes with the app (clarify first, check before saying it is done,
   troubleshooting, research, writing, documents) for every agent. Agents propose new skills or fixes to them,
   saved only when you approve.
@@ -154,7 +154,7 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
-  every setting, sessions and what was said in them, memory notes, apps, scheduled tasks, assistants, skills,
+  every setting, sessions and what was said in them, memory notes, templates, scheduled tasks, assistants, skills,
   pages, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
   page and points at it, a message opens its session at the words. With search by meaning on (Settings →
   Memory) things also match what they mean, in nine languages; what ships with the app has its vectors made

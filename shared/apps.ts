@@ -622,7 +622,7 @@ export function cleanRecipe(raw: any): AppRecipe {
   });
   const agent: Agent = r.agent === 'codex' || r.agent === 'acp' ? r.agent : 'claude';
   return {
-    name: str(r.name, 60) || 'Untitled app',
+    name: str(r.name, 60) || 'Untitled template',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
     color: r.color in APP_COLORS ? r.color : 'blue',
     description: str(r.description, 300),
