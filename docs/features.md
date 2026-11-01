@@ -64,7 +64,7 @@ agents that speak ACP and take MCP servers.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
   on this machine; replies can be read aloud.
 - **A second opinion, and caps**: one click has another company's model check a turn's work against what you
-  asked; a spending cap stops a session, or a scheduled task's run, at its limit.
+  asked; a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
 
 ## Custom: any model
 

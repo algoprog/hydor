@@ -8,7 +8,7 @@ import { config } from '../config.ts';
 import { describeClaudeTool, questionsFrom } from '../history/claude.ts';
 import { firstLine, snippetDiff, wholeFileDiff } from '../history/common.ts';
 import type { Runner, RunSpec } from '../runner/client.ts';
-import { approvalTitleFor, LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig } from './live.ts';
+import { approvalTitleFor, LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
 import { splitHandoff } from '../handoff.ts';
 import type { SpawnAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
@@ -182,6 +182,7 @@ export class ClaudeLive extends LiveAdapter {
         if (!m.parent_tool_use_id) this.onStream(m.event ?? {});
         break;
       case 'assistant':
+        if (!replay) this.callFrom(m);
         if (!m.parent_tool_use_id) this.onAssistant(m);
         break;
       case 'user':
@@ -400,6 +401,15 @@ export class ClaudeLive extends LiveAdapter {
         break;
       }
     }
+  }
+
+  /** What a model call used (a subagent's too): each block of its message repeats it, under the message's id. */
+  private callFrom(m: Json) {
+    const msg = m.message ?? {};
+    const u = msg.usage;
+    if (!u || !msg.id || msg.model === '<synthetic>') return;
+    const call: ModelCall = { id: String(msg.id), model: msg.model, tokens: { in: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), cached: u.cache_read_input_tokens ?? 0, out: u.output_tokens ?? 0 } };
+    this.emit('call', call);
   }
 
   private onAssistant(m: Json) {

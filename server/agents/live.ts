@@ -29,6 +29,19 @@ export interface ApprovalAnswer {
   form?: Record<string, string>;
 }
 
+/**
+ * One model call's use, as an agent reports it while it works (spending caps are checked after each).
+ * A call reported again under the same id replaces what was said of it.
+ */
+export interface ModelCall {
+  id: string;
+  model?: string;
+  /** Fresh input, input read from the cache, output. */
+  tokens?: { in: number; cached: number; out: number };
+  /** Its cost in dollars, when the agent knows it (Custom). */
+  usd?: number;
+}
+
 export interface LiveConfig {
   model?: string | null;
   effort?: string | null;
@@ -41,6 +54,7 @@ export interface LiveConfig {
  *   'activity'   the agent wrote something; re-read the transcript
  *   'identity'   the session id / transcript path became known
  *   'ratelimit'  fresh plan-usage numbers
+ *   'call'       a model call finished: what it used (ModelCall)
  *   'exit'
  */
 export abstract class LiveAdapter extends EventEmitter {

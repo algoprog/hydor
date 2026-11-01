@@ -14,6 +14,10 @@ import path from 'node:path';
 import { parseCap, type BudgetNote, type BudgetState } from '../../shared/budget.ts';
 import type { AgentModel, LiveState, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { chat } from '../agent/llm.ts';
+import { AcpLive } from '../agents/acp.ts';
+import { ClaudeLive } from '../agents/claude.ts';
+import { CodexLive } from '../agents/codex.ts';
+import type { ModelCall } from '../agents/live.ts';
 import { HttpError } from '../auth.ts';
 import { openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
@@ -203,6 +207,91 @@ test('the routes set, raise and clear a cap; a queue held by the cap goes on onc
   assert.equal(cleared.capUsd, undefined);
   const got = (await routes.get('GET /api/budget/:key')!({ params: { key: 'acp:k1' } })) as BudgetState;
   assert.equal(got.reached, true);
+});
+
+// ---- after each model call ---------------------------------------------------------------------------
+
+test('each model call counts at once: the turn stops right after the call that reaches the cap, before the indexer sees it', async () => {
+  budget.start!(deps);
+  appSession('claude:live1', { capUsd: 1 });
+  indexed('claude:live1', { model: 'test-model', tin: 10_000 }); // $0.10 so far
+  sessions.run('claude:live1');
+  const call = (c: ModelCall) => sessions.emit('call', 'claude:live1', c);
+  const tick = () => new Promise((r) => setTimeout(r, 20));
+  call({ id: 'm1', model: 'test-model', tokens: { in: 30_000, cached: 0, out: 0 } });
+  await tick();
+  assert.ok(Math.abs(spending(db, 'claude:live1').spentUsd - 0.4) < 1e-9);
+  // The same call again, with its output: it replaces what was said of it.
+  call({ id: 'm1', model: 'test-model', tokens: { in: 30_000, cached: 0, out: 10_000 } });
+  await tick();
+  assert.ok(Math.abs(spending(db, 'claude:live1').spentUsd - 0.7) < 1e-9);
+  assert.ok(!sessions.interrupted.includes('claude:live1'));
+  call({ id: 'm2', model: 'test-model', tokens: { in: 20_000, cached: 0, out: 5_000 } });
+  await tick();
+  assert.ok(sessions.interrupted.includes('claude:live1'), 'stopped at once');
+  const [n] = notesOf(db, 'claude:live1', 'budget');
+  assert.ok(Math.abs((n.data as BudgetNote).spentUsd - 1.05) < 1e-9);
+  await assert.rejects(Promise.resolve().then(() => budget.beforeSend!('claude:live1', deps)), /spent \$1\.05 of its \$1\.00/);
+  // The indexer catches up: the same calls are not counted twice.
+  indexed('claude:live1', { model: 'test-model', tin: 60_000, tout: 15_000 });
+  assert.ok(Math.abs(spending(db, 'claude:live1').spentUsd - 1.05) < 1e-9);
+  // A session without a cap is not tracked; a call's own figure (Custom's) is taken as it is.
+  appSession('acp:live2', { capUsd: 0.5 });
+  sessions.run('acp:live2');
+  sessions.emit('call', 'acp:live2', { id: 'c1', model: 'openrouter/x', usd: 0.6, tokens: { in: 1, cached: 0, out: 1 } } satisfies ModelCall);
+  await tick();
+  assert.ok(sessions.interrupted.includes('acp:live2'));
+});
+
+/** Lines from an agent's process, as its adapter reads them. */
+class Lines extends EventEmitter {
+  meta = { runId: 'run-calls' };
+  writeLine() {}
+  say(m: unknown, replay = false) {
+    this.emit('line', JSON.stringify(m), replay);
+  }
+}
+
+test('what each agent reports per call: Claude Code’s messages, Codex’s growing totals, an ACP agent’s running totals', () => {
+  const got: ModelCall[] = [];
+  const claudeLines = new Lines();
+  const claude = new ClaudeLive(claudeLines as any, { cwd: tmp, sessionId: 's1' });
+  claude.on('call', (c) => got.push(c));
+  const msg = { type: 'assistant', message: { id: 'msg1', model: 'claude-x', content: [], usage: { input_tokens: 5, cache_creation_input_tokens: 10, cache_read_input_tokens: 100, output_tokens: 7 } } };
+  claudeLines.say(msg);
+  claudeLines.say({ ...msg, parent_tool_use_id: 'toolu_1', message: { ...msg.message, id: 'msg2' } });
+  claudeLines.say({ ...msg, message: { ...msg.message, id: 'msg3' } }, true);
+  assert.deepEqual(got as unknown[], [
+    { id: 'msg1', model: 'claude-x', tokens: { in: 15, cached: 100, out: 7 } },
+    { id: 'msg2', model: 'claude-x', tokens: { in: 15, cached: 100, out: 7 } },
+  ]);
+  got.length = 0;
+  const codexLines = new Lines();
+  const codex = new CodexLive(codexLines as any, { cwd: tmp, model: 'gpt-test' });
+  codex.on('call', (c) => got.push(c));
+  const usage = (total: object, last: object) => ({ method: 'thread/tokenUsage/updated', params: { tokenUsage: { total, last } } });
+  // The first report in a process: the last call's own use (the totals may hold the whole thread's history).
+  codexLines.say(usage({ inputTokens: 9000, cachedInputTokens: 4000, outputTokens: 900 }, { inputTokens: 300, cachedInputTokens: 100, outputTokens: 50 }));
+  codexLines.say(usage({ inputTokens: 9500, cachedInputTokens: 4300, outputTokens: 980 }, { inputTokens: 500, cachedInputTokens: 300, outputTokens: 80 }));
+  assert.deepEqual(got.map((c) => c.tokens), [
+    { in: 200, cached: 100, out: 50 },
+    { in: 200, cached: 300, out: 80 },
+  ]);
+  assert.equal(got[0].model, 'gpt-test');
+  got.length = 0;
+  const transcript = path.join(tmp, 'acp-calls.jsonl');
+  const upd = (tokensIn: number, usd?: number) => ({ sessionUpdate: 'usage_update', used: 1, size: 9, ...(usd !== undefined ? { cost: { amount: usd, currency: 'USD' } } : {}), _meta: { naget: { tokensIn, tokensOut: tokensIn / 10, tokensCached: 0, model: 'openrouter/x' } } });
+  // A reopened session: what its earlier run reported is in the transcript, and not counted again.
+  fs.writeFileSync(transcript, [{ t: 'meta', agent: 'console' }, { t: 'session', acpSession: 'a1' }, { t: 'update', u: upd(1000, 0.5) }].map((l) => JSON.stringify(l)).join('\n') + '\n');
+  const acpLines = new Lines();
+  const acp = new AcpLive(acpLines as any, { cwd: tmp, id: 'calls', def: { id: 'console', name: 'Custom', command: 'x', args: [] }, transcript, acpSession: 'a1' });
+  acp.on('call', (c) => got.push(c));
+  acpLines.say({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'a1', update: upd(1500, 0.6) } });
+  acpLines.say({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'a1', update: upd(1500, 0.6) } });
+  assert.equal(got.length, 1);
+  assert.deepEqual(got[0].tokens, { in: 500, cached: 0, out: 50 });
+  assert.ok(Math.abs((got[0].usd ?? 0) - 0.1) < 1e-9);
+  assert.equal(got[0].model, 'openrouter/x');
 });
 
 // ---- Custom's costs ----------------------------------------------------------------------------------

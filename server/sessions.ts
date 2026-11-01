@@ -8,7 +8,7 @@ import type { Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, Li
 import { ClaudeLive, CLAUDE_MODES, claudeSpec } from './agents/claude.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
 import { ClaudeControl, claudeUsage, CodexControl, mergeCodexSnapshot } from './agents/control.ts';
-import type { ApprovalAnswer, ImageInput, LiveAdapter, LiveConfig } from './agents/live.ts';
+import type { ApprovalAnswer, ImageInput, LiveAdapter, LiveConfig, ModelCall } from './agents/live.ts';
 import { HttpError } from './auth.ts';
 import { config, paths } from './config.ts';
 import type { DB } from './db.ts';
@@ -671,6 +671,8 @@ export class SessionManager extends EventEmitter {
         if (adapter.state.status === 'idle' && (was === 'working' || was === 'waiting')) setTimeout(() => this.dispatchQueued(key), 300);
       }
     });
+    // Each model call, for the spending caps.
+    adapter.on('call', (c: ModelCall) => this.emit('call', key, c));
     adapter.on('activity', () => {
       const tl = this.timelines.get(key);
       if (tl) {

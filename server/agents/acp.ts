@@ -18,7 +18,7 @@ import type { SpawnAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
 import { acpBriefing, acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
-import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig } from './live.ts';
+import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
 import { RpcPeer } from './rpc.ts';
 
 type Json = Record<string, any>;
@@ -126,6 +126,24 @@ function briefedSession(file: string): string | undefined {
   }
 }
 
+/** The running totals an ACP session last reported, from the transcript. */
+function lastUsage(file: string, of: string): { of: string; in: number; out: number; cached: number; usd?: number } | undefined {
+  let session = '';
+  let found: { of: string; in: number; out: number; cached: number; usd?: number } | undefined;
+  try {
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      if (line.includes('"acpSession"') && /^\{"t":"(session|meta)"/.test(line)) session = /"acpSession":"([^"]*)"/.exec(line)?.[1] ?? session;
+      if (session !== of || !line.includes('"usage_update"')) continue;
+      try {
+        const u = JSON.parse(line).u ?? {};
+        const n = u._meta?.naget ?? {};
+        found = { of, in: n.tokensIn ?? found?.in ?? 0, out: n.tokensOut ?? found?.out ?? 0, cached: n.tokensCached ?? found?.cached ?? 0, usd: typeof u.cost?.amount === 'number' ? u.cost.amount : found?.usd };
+      } catch {}
+    }
+  } catch {}
+  return found;
+}
+
 // ---- a running session ----------------------------------------------------------------------------
 
 export interface AcpOpts {
@@ -154,6 +172,9 @@ export class AcpLive extends LiveAdapter {
   private permissions = new Map<string, { rpcId: string | number; options: Json[] }>();
   /** The ACP session has had the app's instructions (they go with its first message), by its id. */
   private briefed?: string;
+  /** The running totals the agent last reported (for its ACP session), to tell what each model call used. */
+  private usage?: { of: string; in: number; out: number; cached: number; usd?: number };
+  private calls = 0;
   /** Lines the agent printed in this run so far; each transcript entry notes how many were handled. */
   private ln = 0;
   private caught: { handled: number; answered: Set<string> } | null = null;
@@ -305,6 +326,7 @@ export class AcpLive extends LiveAdapter {
     if (m.method === 'session/update') {
       const u = m.params?.update;
       if (!u || this.loading) return;
+      if (u.sessionUpdate === 'usage_update') this.callFrom(u);
       this.record({ t: 'update', u });
       if (u.sessionUpdate === 'current_mode_update' && u.currentModeId) {
         this.state.mode = String(u.currentModeId);
@@ -314,6 +336,26 @@ export class AcpLive extends LiveAdapter {
     }
     // The answer to a prompt sent before the server restarted (its call is gone): the turn ended.
     if (m.id != null && m.result && 'stopReason' in m.result && this.prompting) this.turnEnded({ stopReason: m.result.stopReason });
+  }
+
+  /**
+   * A model call's use, from how the agent's running totals grew (Custom sends them after each call, with
+   * the cost when it knows the price; another agent may send the cost alone). The totals before the first
+   * report in this run come from the transcript, so a reopened session's history is not counted again.
+   */
+  private callFrom(u: Json) {
+    const of = this.acpSession ?? '';
+    const n = u._meta?.naget ?? {};
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
+    const usd = num(u.cost?.amount) !== undefined && (u.cost.currency ?? 'USD') === 'USD' ? u.cost.amount : undefined;
+    const was = this.usage?.of === of ? this.usage : lastUsage(this.o.transcript, of);
+    const now = { of, in: num(n.tokensIn) ?? was?.in ?? 0, out: num(n.tokensOut) ?? was?.out ?? 0, cached: num(n.tokensCached) ?? was?.cached ?? 0, usd: usd ?? was?.usd };
+    this.usage = now;
+    const tokens = { in: Math.max(0, now.in - (was?.in ?? 0)), cached: Math.max(0, now.cached - (was?.cached ?? 0)), out: Math.max(0, now.out - (was?.out ?? 0)) };
+    const dUsd = usd !== undefined ? Math.max(0, usd - (was?.usd ?? 0)) : undefined;
+    if (!tokens.in && !tokens.out && !tokens.cached && !dUsd) return;
+    const call: ModelCall = { id: `acp-${this.runner.meta.runId}-${++this.calls}`, model: typeof n.model === 'string' ? n.model : this.state.model, tokens, usd: dUsd };
+    this.emit('call', call);
   }
 
   /** Answers a request from the agent, and notes that it was answered (for a restart). */
