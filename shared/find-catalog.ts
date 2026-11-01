@@ -168,6 +168,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Assistants
   ['assistants', 'New assistant', 'assistant preset create researcher writer tutor', 'A preset to start sessions as'],
   ['assistants', 'How the agents talk to you', 'tone style voice personality', 'The tone every agent takes with you'],
+  ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where an assistant’s new task folders go'],
   // Capabilities › Skill library
   ['skillpack', 'Learned', 'skills learned approved', 'Skills agents learned with your approval', 'Learned skills'],

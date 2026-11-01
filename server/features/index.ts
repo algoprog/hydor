@@ -5,6 +5,7 @@ import { automations } from '../automations/index.ts';
 import { browser } from '../browser/index.ts';
 import { budget } from '../budget/index.ts';
 import { children } from '../children/index.ts';
+import { cleanup } from '../cleanup/index.ts';
 import { connections } from '../connections/index.ts';
 import { custom } from '../custom/index.ts';
 import { documents } from '../documents/index.ts';
@@ -19,4 +20,4 @@ import { skillpack } from '../skillpack/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-export const FEATURES: Feature[] = [pages, search, browser, memory, children, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, custom, find, releaseNotes];
+export const FEATURES: Feature[] = [pages, search, browser, memory, children, opinion, budget, documents, images, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, find, releaseNotes];

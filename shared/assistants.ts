@@ -49,6 +49,8 @@ export interface AssistantsState {
   /** Where new task folders go. */
   taskRoot: string;
   defaultTaskRoot: string;
+  /** Agents clean up after a task: what they made along the way and no longer need. */
+  cleanUp: boolean;
 }
 
 export const DEFAULT_ASSISTANT = 'general';
