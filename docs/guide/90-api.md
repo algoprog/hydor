@@ -312,10 +312,10 @@ Shapes used below. **Run**: `{ id, app — template id or tpl:<id>, appName, key
 - `GET /api/apps/:id/keys` — your template's API keys, never their values. Returns: `{ keys: [{ id, name, hint — first and last characters, createdAt, lastUsed? }] }`.
 - `DELETE /api/apps/:id/keys/:keyId` — revokes a key; programs using it stop at once. Returns: `{ ok: true }`.
 
-## App-wide switch (Settings → General → Resume after usage limits)
+## App-wide switches (Settings → General → Resume after usage limits, Settings → Accounts → Switch accounts at a limit)
 
-- `GET /api/app-settings` — whether sessions stopped by a plan's usage limit continue by themselves a minute after it resets (off by default). Returns: `{ autoResume: boolean }`.
-- `PUT /api/app-settings` — turns that on or off. Body: `{ autoResume?: boolean }` (left as is when absent). Returns: `{ autoResume: boolean }`.
+- `GET /api/app-settings` — whether sessions stopped by a plan's usage limit continue by themselves a minute after it resets, and whether a session whose account runs out of usage moves to another of its agent's accounts with usage left and carries on (both off by default). Returns: `{ autoResume: boolean, autoSwitch: boolean }`.
+- `PUT /api/app-settings` — turns either on or off. Body: `{ autoResume?: boolean, autoSwitch?: boolean }` (each left as is when absent). Returns: `{ autoResume: boolean, autoSwitch: boolean }`.
 
 ## Pages (the library)
 

@@ -28,7 +28,7 @@ import { dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
-import { accountEnv, accountOfPath } from './accounts.ts';
+import { accountById, accountEnv, accountOfPath, accountPool, historyMoves, moveAcross } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
@@ -503,10 +503,14 @@ export class SessionManager extends EventEmitter {
       } else if (st === 'error') {
         this.notify({ ...base, kind: 'failed', body: s.live?.error ? s.live.error.slice(0, 200) : 'Stopped with an error' } satisfies NotifyEvent);
       }
-      // A turn that ended because the plan's usage ran out continues by itself after the reset, if you asked for that.
-      if ((st === 'idle' || st === 'error') && busy(prev.status) && kvGet(this.db, 'auto_resume') === '1' && this.onLimited) {
+      // A turn that ended because the plan's usage ran out: another account with usage left takes the session
+      // over now, or it continues by itself after the reset, as you asked.
+      if ((st === 'idle' || st === 'error') && busy(prev.status) && s.agent !== 'acp' && this.onLimited && !this.resumeLookup?.(s.key)) {
         const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
-        if (lim?.resetsAt && lim.resetsAt > now && !this.resumeLookup?.(s.key)) this.onLimited(s.key, lim.resetsAt + 60_000);
+        if (lim?.resetsAt && lim.resetsAt > now) {
+          if (kvGet(this.db, 'auto_switch') === '1' && !s.external) this.switchAtLimit(s.key, lim.resetsAt).catch((e) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` }));
+          else if (kvGet(this.db, 'auto_resume') === '1') this.onLimited(s.key, lim.resetsAt + 60_000);
+        }
       }
       // The capabilities hear of every ended turn (memory notes, spending, automations), once its last lines are in.
       if ((st === 'idle' || st === 'error') && busy(prev.status)) {
@@ -867,7 +871,16 @@ export class SessionManager extends EventEmitter {
       cwd = made.cwd;
     }
     const mode = o.mode || (o.agent === 'claude' ? 'default' : o.agent === 'codex' ? 'auto' : undefined);
-    const l = await this.spawn(o.agent, cwd, { model: o.model || undefined, effort: o.effort || undefined, mode, account: o.account || undefined, acpAgent: o.acpAgent, extra: o.extra, prompt: (splitHandoff(o.prompt ?? '')?.request ?? o.prompt)?.slice(0, 2000) });
+    let account = o.account || undefined;
+    // The account picked is at its usage limit: with Switch accounts at a limit on, one with usage left starts it.
+    if (o.agent !== 'acp' && kvGet(this.db, 'auto_switch') === '1') {
+      const lim = this.controlFor(o.agent, account).lastUsage?.limited;
+      if (lim?.resetsAt && lim.resetsAt > Date.now()) {
+        const free = await this.freeAccount(o.agent, account);
+        if (free) account = free.id;
+      }
+    }
+    const l = await this.spawn(o.agent, cwd, { model: o.model || undefined, effort: o.effort || undefined, mode, account, acpAgent: o.acpAgent, extra: o.extra, prompt: (splitHandoff(o.prompt ?? '')?.request ?? o.prompt)?.slice(0, 2000) });
     const now = Date.now();
     this.db
       .prepare(
@@ -877,7 +890,7 @@ export class SessionManager extends EventEmitter {
       )
       .run(l.key, o.agent, cwd, (splitHandoff(o.prompt ?? '')?.request ?? o.prompt)?.slice(0, 300) || null, o.title?.trim() || null, o.model ?? null, o.effort ?? null, mode ?? null, now, now);
     if (wt) this.db.prepare('update app_sessions set worktree = ? where key = ?').run(JSON.stringify(wt), l.key);
-    if (o.account) this.db.prepare('update app_sessions set account = ? where key = ?').run(o.account, l.key);
+    if (account) this.db.prepare('update app_sessions set account = ? where key = ?').run(account, l.key);
     if (o.acpAgent) this.db.prepare('update app_sessions set acp_agent = ? where key = ?').run(o.acpAgent, l.key);
     if (o.extra && Object.keys(o.extra).length) setSessionExtra(this.db, l.key, o.extra);
     if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: o.model, effort: o.effort, mode, account: o.account ?? '' });
@@ -1080,9 +1093,164 @@ export class SessionManager extends EventEmitter {
   limitLiftsAt(key: string): number | null | undefined {
     const agent = agentOfKey(key);
     if (agent === 'acp') return undefined;
-    const u = this.controlFor(agent, this.accountOf(key)).lastUsage;
-    if (!u?.ok) return undefined;
-    return u.limited ? (u.limited.resetsAt ?? undefined) : null;
+    const lifts = (account?: string) => {
+      const u = this.controlFor(agent, account).lastUsage;
+      if (!u?.ok) return undefined;
+      return u.limited ? (u.limited.resetsAt ?? undefined) : null;
+    };
+    const own = lifts(this.accountOf(key));
+    if (kvGet(this.db, 'auto_switch') !== '1') return own;
+    // Switching accounts at a limit: the first of them to have usage again.
+    const all = accountPool(this.db, agent).map(lifts);
+    if (all.includes(null)) return null;
+    const times = all.filter((t): t is number => t !== undefined);
+    return times.length ? Math.min(...times) : own;
+  }
+
+  /** An account's usage as it last said, read again when that is older than `fresh` ms. */
+  private async usageOf(agent: 'claude' | 'codex', account: string | undefined, fresh = 120_000): Promise<AgentUsage | undefined> {
+    const ctl = this.controlFor(agent, account);
+    const last = ctl.lastUsage;
+    if (last && Date.now() - last.fetchedAt <= fresh) return last;
+    const u = await (ctl instanceof ClaudeControl ? ctl.usage(this.liveClaudeUsage(account)) : ctl.usage()).catch(() => undefined);
+    if (u) this.emit('usage', account ? { accounts: { [account]: u } } : { [agent]: u });
+    return u ?? last ?? undefined;
+  }
+
+  private static usedUp = (u: AgentUsage | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
+
+  /** Another signed-in account of the agent with usage left, the least used first; null when there is none. */
+  private async freeAccount(agent: 'claude' | 'codex', except: string | undefined): Promise<{ id: string | undefined } | null> {
+    let best: { id: string | undefined; used: number } | null = null;
+    for (const id of accountPool(this.db, agent)) {
+      if (id === except) continue;
+      const u = await this.usageOf(agent, id);
+      if (SessionManager.usedUp(u)) continue;
+      const used = Math.max(0, ...u!.windows.map((w) => w.usedPercent ?? 0));
+      if (!best || used < best.used) best = { id, used };
+    }
+    return best;
+  }
+
+  /** An account as people know it: an added one's name, the CLI's own by its email. */
+  private accountName(agent: 'claude' | 'codex', account: string | undefined): string {
+    if (account) return accountById(this.db, account)?.name ?? 'another account';
+    const email = this.controlFor(agent).lastUsage?.account?.email;
+    return email ? `${email}` : `your main ${agent === 'claude' ? 'Claude' : 'Codex'} account`;
+  }
+
+  /** At a usage limit, with Switch accounts on: another account with usage left takes the session over and it continues; with none, it waits for the first reset (when Resume after usage limits is on). */
+  private async switchAtLimit(key: string, resetsAt: number) {
+    if (this.switching.has(key)) return;
+    this.switching.add(key);
+    try {
+      const agent = agentOfKey(key) as 'claude' | 'codex';
+      const from = this.accountOf(key);
+      const to = await this.freeAccount(agent, from);
+      if (!to) {
+        if (kvGet(this.db, 'auto_resume') === '1') this.onLimited?.(key, (this.limitLiftsAt(key) ?? resetsAt) + 60_000);
+        return;
+      }
+      if (await this.carryOver(key, from, to.id)) return;
+      await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.`);
+    } finally {
+      this.switching.delete(key);
+    }
+  }
+
+  /** Sessions moving to another account right now. */
+  private switching = new Set<string>();
+
+  /**
+   * Before a session continues after a usage limit, with Switch accounts on: when its own account is still at
+   * the limit and another is not, it moves there. True when a goal it carried over already continues it.
+   */
+  async beforeResume(key: string): Promise<boolean> {
+    const agent = agentOfKey(key);
+    if (agent === 'acp' || kvGet(this.db, 'auto_switch') !== '1') return false;
+    const from = this.accountOf(key);
+    if (!SessionManager.usedUp(await this.usageOf(agent, from, 60_000))) return false;
+    const to = await this.freeAccount(agent, from);
+    return to ? this.carryOver(key, from, to.id) : false;
+  }
+
+  /** Moves the session to the account, says so, and brings a Codex goal along. True when that goal continues it by itself. */
+  private async carryOver(key: string, from: string | undefined, to: string | undefined): Promise<boolean> {
+    const agent = agentOfKey(key) as 'claude' | 'codex';
+    const s = this.summary(key);
+    // Codex keeps a thread's goal in its account's own folder: it is set again on the new one.
+    const goal = agent === 'codex' ? s?.goal : undefined;
+    await this.moveToAccount(key, to);
+    this.emit('toast', { level: 'info', text: `${s?.title ?? 'A session'}: ${this.accountName(agent, from)} is at its usage limit, so it continues on ${this.accountName(agent, to)}` });
+    if (!goal) return false;
+    await this.goal(key, 'set', goal.objective);
+    if (goal.status === 'active' || goal.status === 'limited') return true;
+    await this.goal(key, 'pause');
+    return false;
+  }
+
+  /** Waits for a session's agent process to end (it is stopped first). */
+  private async stopAndWait(key: string) {
+    const l = this.lives.get(key);
+    if (!l) return;
+    const exited = new Promise<void>((resolve) => {
+      if (l.adapter.exited) return resolve();
+      l.adapter.once('exit', () => resolve());
+      setTimeout(resolve, 10_000);
+    });
+    l.adapter.stop();
+    await exited;
+    // Its exit handler closes the timeline a moment later; the session starts again after that.
+    await new Promise((r) => setTimeout(r, 600));
+    if (this.lives.get(key) === l) this.lives.delete(key);
+  }
+
+  /**
+   * Moves a Claude Code or Codex session's history into another of the agent's accounts (undefined: the CLI's
+   * own), which it runs as from then on. Its agent process stops first; it is started again when used.
+   */
+  async moveToAccount(key: string, to: string | undefined) {
+    const agent = agentOfKey(key);
+    if (agent === 'acp') throw new HttpError(400, 'Not available for this agent');
+    const from = this.accountOf(key);
+    if ((from ?? '') === (to ?? '')) return;
+    accountEnv(this.db, agent, to);
+    if (this.external.get(key)) throw new HttpError(409, 'This session is running in another program');
+    const st = this.lives.get(key)?.adapter.state.status;
+    if (st === 'working' || st === 'waiting' || st === 'starting') throw new HttpError(409, 'Wait for the turn to end, or stop it');
+    await this.stopAndWait(key);
+    const file = this.transcriptFor(key);
+    const moves = file && fs.existsSync(file) ? historyMoves(this.db, agent, key.slice(key.indexOf(':') + 1), file, from, to) : [];
+    // Codex finds a thread only in its account's folder; a Claude session with no transcript has nothing to move.
+    if (agent === 'codex' && !moves.length) throw new HttpError(409, 'Its history was not found');
+    const taken = moves.find(([, dst]) => fs.existsSync(dst));
+    if (taken) throw new HttpError(409, `The other account already has ${taken[1]}`);
+    // The app's own links to the old place go first, or the indexer could bring the history back there.
+    for (const [src] of moves) {
+      const kept = keptOfTranscript(src);
+      if (kept) fs.rmSync(kept, { recursive: true, force: true });
+    }
+    const done: [string, string][] = [];
+    try {
+      for (const [src, dst] of moves) {
+        moveAcross(src, dst);
+        done.push([src, dst]);
+      }
+    } catch (e) {
+      for (const [src, dst] of done.reverse()) moveAcross(dst, src);
+      throw e;
+    }
+    const rows = this.db.prepare('select key, path from sessions where path = ? or substr(path, 1, ?) = ?');
+    const setPath = this.db.prepare('update sessions set path = ? where key = ?');
+    // The index follows the history to its new place.
+    for (const [src, dst] of moves) for (const r of rows.all(src, src.length + 1, src + path.sep) as { key: string; path: string }[]) setPath.run(dst + r.path.slice(src.length), r.key);
+    this.db.prepare('update app_sessions set account = ? where key = ?').run(to ?? null, key);
+    const moved = moves[0]?.[1];
+    if (moved) {
+      this.timelines.get(key)?.setPath(moved);
+      this.indexer.poke([moved]);
+    }
+    this.queueSummary(key);
   }
 
   private extraControls = new Map<string, ClaudeControl | CodexControl>();

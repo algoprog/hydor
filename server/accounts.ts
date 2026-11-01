@@ -83,6 +83,46 @@ export function claudeProjectsOf(db: DB, id: string | null | undefined): string 
   return a?.agent === 'claude' ? path.join(a.dir, 'projects') : config.claudeProjectsDir;
 }
 
+/** A Codex account's CODEX_HOME. */
+function codexHomeOf(db: DB, id: string | null | undefined): string {
+  const a = accountById(db, id);
+  return a?.agent === 'codex' ? a.dir : config.codexHome;
+}
+
+/** Every account an agent can run as: the CLI's own (undefined), then the added ones. */
+export function accountPool(db: DB, agent: Agent): (string | undefined)[] {
+  return [undefined, ...stored(db).filter((a) => a.agent === agent).map((a) => a.id)];
+}
+
+/**
+ * What moves when a session goes to another account (from → to, sources that exist): a Claude
+ * transcript, its folder (subagents, tool output) and its file checkpoints; a Codex rollout. Both CLIs
+ * find a session by its id in their own folder, so it resumes there with all its history.
+ */
+export function historyMoves(db: DB, agent: Agent, sessionId: string, file: string, from: string | undefined, to: string | undefined): [string, string][] {
+  const [a, b] = agent === 'claude' ? [claudeProjectsOf(db, from), claudeProjectsOf(db, to)] : [codexHomeOf(db, from), codexHomeOf(db, to)];
+  if (!file.startsWith(a + path.sep)) throw new HttpError(409, 'Its history is not in its account’s folder');
+  const rel = path.relative(a, file);
+  const moves: [string, string][] = [[file, path.join(b, rel)]];
+  if (agent === 'claude') {
+    moves.push([file.replace(/\.jsonl$/, ''), path.join(b, rel.replace(/\.jsonl$/, ''))]);
+    moves.push([path.join(path.dirname(a), 'file-history', sessionId), path.join(path.dirname(b), 'file-history', sessionId)]);
+  }
+  return moves.filter(([src]) => fs.existsSync(src));
+}
+
+/** Moves a file or folder, copying when the two places are on different disks. */
+export function moveAcross(src: string, dst: string) {
+  fs.mkdirSync(path.dirname(dst), { recursive: true, mode: 0o700 });
+  try {
+    fs.renameSync(src, dst);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e;
+    fs.cpSync(src, dst, { recursive: true, preserveTimestamps: true });
+    fs.rmSync(src, { recursive: true, force: true });
+  }
+}
+
 export function addAccount(db: DB, agent: Agent, name: string): AgentAccount {
   if (agent !== 'claude' && agent !== 'codex') throw new HttpError(400, 'Pick Claude Code or Codex');
   const n = name.replace(/\s+/g, ' ').trim().slice(0, 40);

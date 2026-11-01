@@ -654,7 +654,9 @@ export class Scheduler extends EventEmitter {
     if (r.resume) {
       // Continuing a session after its usage limit: once, then the task goes.
       try {
-        await this.sessions.deliverOrQueue(r.target!, r.prompt);
+        // Its own account still at the limit: another with usage left takes it (Switch accounts at a limit).
+        const goalGoesOn = await this.sessions.beforeResume(r.target!).catch(() => false);
+        if (!goalGoesOn) await this.sessions.deliverOrQueue(r.target!, r.prompt);
       } finally {
         this.starting.delete(r.id);
         this.db.prepare('delete from tasks where id = ?').run(r.id);
