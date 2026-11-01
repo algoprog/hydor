@@ -8,6 +8,7 @@ import type {
   TimelineItem,
   ToolInfo,
 } from '../../shared/types.ts';
+import { HttpError } from '../auth.ts';
 import type { Runner } from '../runner/client.ts';
 
 export interface ImageInput {
@@ -24,6 +25,8 @@ export interface ApprovalAnswer {
   decision: string;
   message?: string;
   answers?: Record<string, string>;
+  /** A form's values, by field (as the form's controls give them). */
+  form?: Record<string, string>;
 }
 
 export interface LiveConfig {
@@ -52,6 +55,8 @@ export abstract class LiveAdapter extends EventEmitter {
   transcriptPath?: string;
   exited = false;
   lastActivity = Date.now();
+  /** Cards the app asks for itself (a connected app's form), beside the agent's own approvals: answered here. */
+  private asides = new Map<string, { done: (a: ApprovalAnswer | null) => void; check?: (a: ApprovalAnswer) => string | null }>();
 
   constructor(public readonly runner: Runner) {
     super();
@@ -76,6 +81,9 @@ export abstract class LiveAdapter extends EventEmitter {
   protected onExited() {}
 
   protected changed() {
+    // The app's own cards end when the agent's code clears the approvals (the turn ended, it stopped).
+    for (const [id, x] of this.asides) if (!this.approvals.has(id)) x.done(null);
+    if (this.asides.size && this.state.status === 'working') this.state.status = 'waiting';
     this.state.pendingApprovals = this.approvals.size;
     this.state.backgroundTasks = [...this.tasks.values()].filter((t) => t.status === 'running');
     this.emit('change');
@@ -114,6 +122,41 @@ export abstract class LiveAdapter extends EventEmitter {
       }
     }
     if (changed) this.changed();
+  }
+
+  /**
+   * Shows a card of the app's own in the session (a connected app asks for a form) and waits for the
+   * user: their answer, or null when the turn ended, the agent stopped or `signal` aborted first. An
+   * answer `check` finds wrong is refused with what to fix, and the card stays.
+   */
+  ask(req: ApprovalRequest, o: { signal?: AbortSignal; check?: (a: ApprovalAnswer) => string | null } = {}): Promise<ApprovalAnswer | null> {
+    const { signal } = o;
+    return new Promise((resolve) => {
+      if (this.exited || signal?.aborted) return resolve(null);
+      const done = (a: ApprovalAnswer | null) => {
+        if (!this.asides.delete(req.id)) return;
+        signal?.removeEventListener('abort', abort);
+        if (this.approvals.delete(req.id) && this.state.status === 'waiting' && !this.approvals.size) this.state.status = 'working';
+        resolve(a);
+        this.changed();
+      };
+      const abort = () => done(null);
+      signal?.addEventListener('abort', abort, { once: true });
+      this.asides.set(req.id, { done, check: o.check });
+      this.approvals.set(req.id, req);
+      this.state.status = 'waiting';
+      this.changed();
+    });
+  }
+
+  /** Answers one of the app's own cards; false when the card is the agent's. */
+  answerAside(id: string, a: ApprovalAnswer): boolean {
+    const x = this.asides.get(id);
+    if (!x) return false;
+    const wrong = x.check?.(a);
+    if (wrong) throw new HttpError(400, wrong);
+    x.done(a);
+    return true;
   }
 
   abstract sendMessage(text: string, images: ImageInput[]): Promise<void>;

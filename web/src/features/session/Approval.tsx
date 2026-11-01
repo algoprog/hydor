@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { MessageCircleQuestion, ShieldAlert } from 'lucide-react';
+import { ClipboardList, ExternalLink, MessageCircleQuestion, ShieldAlert } from 'lucide-react';
+import { formDefaults } from '@shared/forms';
 import type { Agent, ApprovalRequest } from '@shared/types';
 import { enc, post } from '../../lib/api';
 import { toastError } from '../../lib/store';
 import { CodeBlock, Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
 import { Button } from '../../components/ui';
+import { AppForm, formErrors } from '../apps/Form';
 import { Elapsed } from './items';
 import { allAnswered, answerOf, QuestionForm, type Picks } from './QuestionForm';
 
@@ -38,15 +40,32 @@ export function ApprovalCard({ a, sessionKey, agent, id }: { a: ApprovalRequest;
   const [denyOpen, setDenyOpen] = useState(false);
   const [msg, setMsg] = useState('');
   const [picks, setPicks] = useState<Picks>({});
+  // A form an MCP server asks for: its fields, as a template's form shows them.
+  const fields = a.form?.fields ?? [];
+  const [values, setValues] = useState<Record<string, string>>(() => formDefaults(fields));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const link = a.form?.url;
 
   const respond = async (decision: string) => {
+    if (decision === 'accept' && fields.length) {
+      const wrong = formErrors(fields, values, {});
+      setErrors(wrong);
+      if (Object.keys(wrong).length) return;
+    }
+    // The page the server asks the user to open, opened by their own tap (a pop-up blocker allows it).
+    if (decision === 'accept' && link) window.open(link, '_blank', 'noopener,noreferrer');
     setBusy(true);
     try {
       const answers: Record<string, string> = {};
       if (a.kind === 'question') {
         for (const q of a.questions ?? []) answers[q.id] = answerOf(q, picks[q.id], agent === 'claude' ? ', ' : '\n');
       }
-      await post(`/api/sessions/${enc(sessionKey)}/approvals/${enc(a.id)}`, { decision, message: decision === 'deny' || decision === 'decline' ? msg : undefined, answers });
+      await post(`/api/sessions/${enc(sessionKey)}/approvals/${enc(a.id)}`, {
+        decision,
+        message: !a.form && (decision === 'deny' || decision === 'decline') ? msg : undefined,
+        answers,
+        form: fields.length && decision === 'accept' ? values : undefined,
+      });
     } catch (e) {
       toastError(e);
       setBusy(false);
@@ -55,11 +74,13 @@ export function ApprovalCard({ a, sessionKey, agent, id }: { a: ApprovalRequest;
 
   const question = a.kind === 'question';
   const answeredAll = !question || allAnswered(a.questions ?? [], picks);
+  // Declining a question or a form needs no word to the agent first.
+  const plainDecline = question || !!a.form;
 
   return (
     <div id={id} className="anim-pop my-2 overflow-hidden rounded-xl border border-warn/45 bg-panel shadow-[0_0_0_3px_color-mix(in_srgb,var(--warn)_10%,transparent)]">
       <div className="flex items-center gap-2 border-b border-line bg-warn/8 px-3 py-2">
-        {question ? <MessageCircleQuestion size={15} className="shrink-0 text-warn" /> : <ShieldAlert size={15} className="shrink-0 text-warn" />}
+        {question ? <MessageCircleQuestion size={15} className="shrink-0 text-warn" /> : a.form ? <ClipboardList size={15} className="shrink-0 text-warn" /> : <ShieldAlert size={15} className="shrink-0 text-warn" />}
         <div className="min-w-0 flex-1 truncate text-[13px] font-medium">{a.title}</div>
         <span className="shrink-0 text-[11px] text-fg-3">
           waiting <Elapsed since={a.createdAt} />
@@ -73,8 +94,29 @@ export function ApprovalCard({ a, sessionKey, agent, id }: { a: ApprovalRequest;
             <Markdown text={a.detail} />
           </div>
         )}
-        {a.detail && (a.kind === 'tool' || a.kind === 'permissions' || a.kind === 'other') && (
+        {a.detail && a.form && <div className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{a.detail}</div>}
+        {a.detail && !a.form && (a.kind === 'tool' || a.kind === 'permissions' || a.kind === 'other') && (
           <pre className="term-out max-h-64 overflow-auto rounded-lg border border-line px-3 py-2">{a.detail}</pre>
+        )}
+        {link && (
+          <a href={link} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-1.5 text-[13px] text-accent hover:underline">
+            <ExternalLink size={13} className="shrink-0" />
+            <span className="truncate">{link}</span>
+          </a>
+        )}
+        {fields.length > 0 && (
+          <AppForm
+            fields={fields}
+            values={values}
+            files={{}}
+            onChange={(id, v) => {
+              setValues((x) => ({ ...x, [id]: v }));
+              setErrors((x) => (x[id] ? { ...x, [id]: '' } : x));
+            }}
+            onFile={() => {}}
+            errors={errors}
+            disabled={busy}
+          />
         )}
         {question && <QuestionForm questions={a.questions ?? []} value={picks} onChange={setPicks} disabled={busy} onSubmit={() => answeredAll && !busy && respond('answer')} />}
         {denyOpen && (
@@ -90,7 +132,7 @@ export function ApprovalCard({ a, sessionKey, agent, id }: { a: ApprovalRequest;
         <div className="flex flex-wrap items-center gap-2">
           {a.options.map((o) => {
             const deny = o.id === 'deny' || o.id === 'decline';
-            if (deny && !denyOpen && !question) {
+            if (deny && !denyOpen && !plainDecline) {
               return (
                 <Button key={o.id} size="sm" variant="ghost" disabled={busy} onClick={() => setDenyOpen(true)}>
                   {o.label}…
@@ -101,7 +143,7 @@ export function ApprovalCard({ a, sessionKey, agent, id }: { a: ApprovalRequest;
               <Button
                 key={o.id}
                 size="sm"
-                variant={o.style === 'primary' ? 'primary' : deny ? (question ? 'ghost' : 'danger') : 'secondary'}
+                variant={o.style === 'primary' ? 'primary' : deny ? (plainDecline ? 'ghost' : 'danger') : 'secondary'}
                 disabled={busy || (o.id === 'answer' && !answeredAll)}
                 onClick={() => respond(o.id)}
               >

@@ -20,8 +20,6 @@ import {
   connections as connected,
   connectionView,
   isRemote,
-  localCommand,
-  needsBridge,
   patchConnection,
   readCred,
   removeConnection,
@@ -41,20 +39,18 @@ const BRIDGE = path.join(APP_ROOT, 'dist/server/connbridge.js');
 const base = () => `http://127.0.0.1:${config.port}/connections`;
 
 /** The MCP server an agent gets for one app. */
-export function serverFor(s: Pick<SpawnInfo, 'agent' | 'acpAgent' | 'runId'>, c: Conn, d: Deps): McpServerSpec {
+export function serverFor(s: Pick<SpawnInfo, 'agent' | 'acpAgent' | 'runId'>, c: Conn): McpServerSpec {
   const token = runToken(s.runId);
   if (isRemote(c.entry)) {
     const url = `${base()}/mcp/${token}/${c.id}`;
     // ACP agents other than Custom may not reach an address themselves: a command carries it for them.
     return s.agent === 'acp' && s.acpAgent !== CONSOLE_ID ? { type: 'stdio', command: process.execPath, args: [BRIDGE, 'relay', url] } : { type: 'http', url };
   }
-  // Its keys come over the app's own socket (only this user can open it); over HTTP if that is off.
-  if (needsBridge(c)) {
-    const sock = launchSocket();
-    return { type: 'stdio', command: process.execPath, args: [BRIDGE, 'launch', ...(sock ? [`unix:${sock}`, `/launch/${token}/${c.id}`] : [`${base()}/launch/${token}/${c.id}`])] };
-  }
-  const lc = localCommand(d.db, c);
-  return { type: 'stdio', command: lc.command, args: lc.args, ...(Object.keys(lc.env).length ? { env: lc.env } : {}) };
+  // A local app starts through the bridge, so its keys never sit in the agent's settings and the forms it
+  // asks for reach the session: its command and keys come over the app's own socket (only this user can
+  // open it), over HTTP if that is off.
+  const sock = launchSocket();
+  return { type: 'stdio', command: process.execPath, args: [BRIDGE, 'launch', ...(sock ? [`unix:${sock}`, `/launch/${token}/${c.id}`] : [`${base()}/launch/${token}/${c.id}`])] };
 }
 
 /** What a starting agent is told about its apps and keys. */
@@ -270,7 +266,7 @@ export const connections: Feature = {
     const mcpServers: Record<string, McpServerSpec> = {};
     for (const c of apps) {
       try {
-        mcpServers[c.id] = serverFor(s, c, d);
+        mcpServers[c.id] = serverFor(s, c);
       } catch (e) {
         console.warn(`[connections] ${c.id} left out: ${(e as Error).message}`);
       }

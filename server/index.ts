@@ -599,7 +599,8 @@ app.post('/api/sessions/:key/takeover', async (req) => {
 });
 app.post('/api/sessions/:key/approvals/:id', async (req) => {
   const b = (req.body ?? {}) as any;
-  await sessions.answer(K(req), decodeURIComponent((req.params as { id: string }).id), { decision: String(b.decision ?? ''), message: b.message, answers: b.answers });
+  const form = b.form && typeof b.form === 'object' ? Object.fromEntries(Object.entries(b.form as Record<string, unknown>).map(([k, v]) => [k, String(v ?? '').slice(0, 20_000)])) : undefined;
+  await sessions.answer(K(req), decodeURIComponent((req.params as { id: string }).id), { decision: String(b.decision ?? ''), message: b.message, answers: b.answers, form });
   return { ok: true };
 });
 app.post('/api/sessions/:key/config', async (req) => {

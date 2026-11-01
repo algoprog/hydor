@@ -5,6 +5,8 @@
 //                                 keys among them) on the app's own socket, which only this user can open
 //                                 (or at an http address when that socket is off), runs it, and passes its
 //                                 MCP messages through: only the tools that are on, keys masked in replies.
+//                                 A form the app asks for mid-call (MCP elicitation) goes to Naget Agent,
+//                                 which shows it in the session; the answer goes back to the app.
 //   connbridge relay <address>    MCP over stdin and stdout, for an agent that cannot reach an address
 //                                 itself, carried to Naget Agent's relay for a remote app.
 //
@@ -60,6 +62,26 @@ function getUnix(socket: string, path: string): Promise<{ status: number; body: 
   });
 }
 
+/** POSTs JSON over a Unix socket, however long the answer takes: { status, body }. */
+function postUnix(socket: string, path: string, body: string, signal: AbortSignal): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ socketPath: socket, path, method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }, signal }, (res) => {
+      let b = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => (b += c));
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode ?? 0, body: JSON.parse(b) });
+        } catch {
+          resolve({ status: res.statusCode ?? 0, body: {} });
+        }
+      });
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
 /** Calls `fn` with each message of a line: one, or each of a batch. */
 const each = (v: unknown, fn: (m: Msg) => void) => (Array.isArray(v) ? v : [v]).forEach((m) => m && typeof m === 'object' && fn(m as Msg));
 
@@ -86,10 +108,29 @@ async function launch() {
   // tools/list requests on their way, so their answers can be trimmed to the tools that are on.
   const listing = new Set<string>();
   const off = (m: Msg) => m.method === 'tools/call' && !on(m.params?.name);
+  // Forms the app asks for: to Naget Agent, beside the address the command came from.
+  const asking = new Set<AbortController>();
+  const toApp = (m: Msg) => child.stdin!.write(`${JSON.stringify(m)}\n`);
+  const askUser = async (m: Msg) => {
+    const ac = new AbortController();
+    asking.add(ac);
+    const body = JSON.stringify(m.params ?? {});
+    try {
+      const r = address.startsWith('unix:')
+        ? await postUnix(address.slice(5), (socketPath ?? '').replace(/^\/launch\//, '/elicit/'), body, ac.signal)
+        : await fetch(address.replace('/launch/', '/elicit/'), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: ac.signal }).then(async (x) => ({ status: x.status, body: await x.json().catch(() => ({})) }));
+      toApp({ jsonrpc: '2.0', id: m.id, result: r.status === 200 && r.body?.action ? r.body : { action: 'cancel' } });
+    } catch {
+      toApp({ jsonrpc: '2.0', id: m.id, result: { action: 'cancel' } });
+    } finally {
+      asking.delete(ac);
+    }
+  };
   lines(
     process.stdin,
     (line) => {
-      if (!filtering) return void child.stdin!.write(`${line}\n`);
+      // Only lines that may need a change are read: the introduction, a call given up, calls to tools that are off.
+      if (!filtering && !line.includes('"initialize"') && !line.includes('notifications/cancelled')) return void child.stdin!.write(`${line}\n`);
       let v: unknown;
       try {
         v = JSON.parse(line);
@@ -98,6 +139,10 @@ async function launch() {
       }
       // Calls to tools that are off are answered here (or dropped, without an id), in a batch too.
       each(v, (m) => {
+        // The app may ask for forms: Naget Agent shows them, whatever the agent itself can.
+        if (m.method === 'initialize') m.params = { ...(m.params ?? {}), capabilities: { ...(m.params?.capabilities ?? {}), elicitation: { form: {}, url: {} } } };
+        // The agent gave up on a call: a form it was waiting on ends.
+        if (m.method === 'notifications/cancelled') for (const ac of asking) ac.abort();
         if (off(m) && m.id != null) out({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `${spec.name}'s ${m.params?.name} tool is turned off (Settings → Connections).` }], isError: true } });
         if (m.method === 'tools/list' && m.id != null) listing.add(String(m.id));
       });
@@ -109,6 +154,17 @@ async function launch() {
     () => child.stdin!.end(),
   );
   lines(child.stdout!, (line) => {
+    // A form the app asks for goes to the user, not the agent.
+    if (line.includes('elicitation/create')) {
+      try {
+        const v = JSON.parse(line);
+        const asks = (m: Msg) => m.method === 'elicitation/create' && m.id != null;
+        each(v, (m) => asks(m) && void askUser(m));
+        const rest = Array.isArray(v) ? v.filter((m) => !(m && typeof m === 'object' && asks(m as Msg))) : asks(v) ? null : v;
+        if (!rest || (Array.isArray(rest) && !rest.length)) return;
+        line = JSON.stringify(rest);
+      } catch {}
+    }
     if (filtering && listing.size) {
       try {
         const v = JSON.parse(line);

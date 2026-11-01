@@ -284,9 +284,6 @@ function splitList(template: string, value: string): string[] {
   return [value];
 }
 
-/** Whether a local app has anything an agent's settings must not hold, or tools turned off: it then starts through the bridge. */
-export const needsBridge = (c: Conn) => (c.entry.fields ?? []).some((f) => f.secret) || toolFilter(c) !== null;
-
 const refreshing = new Map<string, Promise<OAuthCred>>();
 
 /** The headers that sign requests to a remote app: its key, or an OAuth token (renewed first when it is about to end). */

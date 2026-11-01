@@ -1,5 +1,6 @@
 // Types shared by the server and the web client.
 import type { SessionExtra, SessionNote } from './features.ts';
+import type { ApprovalForm } from './forms.ts';
 import type { AppTheme } from './themes.ts';
 
 /** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
@@ -66,6 +67,10 @@ export interface ApprovalRequest {
   kind: 'tool' | 'command' | 'file' | 'permissions' | 'question' | 'plan' | 'other';
   options: ApprovalOption[];
   questions?: Question[];
+  /** A form to fill in (an MCP server asks, mid-call): its fields, answered with the "accept" option. */
+  form?: ApprovalForm;
+  /** Asked by a connected app rather than the agent: its name. */
+  from?: string;
   createdAt: number;
 }
 
