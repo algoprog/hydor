@@ -381,11 +381,13 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
                 }}
               >
                 {!task && repo && (
-                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-bg-2">
-                    <GitBranch size={16} className="shrink-0 text-fg-3" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13.5px] font-medium text-fg">New worktree</span>
-                      <span className="block truncate text-[12px] text-fg-3">A branch and folder of its own, from {repo.branch}</span>
+                  <label
+                    title={`A branch and folder of its own, from ${repo.branch}`}
+                    className="flex h-8.5 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 hover:bg-bg-2 max-sm:h-11"
+                  >
+                    <GitBranch size={15} className="shrink-0 text-fg-3" />
+                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-fg">
+                      New worktree <span className="text-[12px] text-fg-3">from {repo.branch}</span>
                     </span>
                     <Switch on={worktree} label="Work in a new worktree" onChange={(v) => (setWorktree(v), saveStart({ worktree: v }))} />
                   </label>
