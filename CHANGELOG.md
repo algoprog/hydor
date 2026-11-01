@@ -3,6 +3,34 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.6.3 · 1 November 2026
+
+Swarm mode for hard problems, agents that clean up after themselves, Templates (what Apps were called), and
+a start page made for phones.
+
+- **Swarm**: turn it on under Options when you start a session, and a lead agent sets a team on the task,
+  each member attacking it from its own angle. Members post what they try and find to a shared board, read
+  each other's posts and message each other; the lead hears how it is going as it goes, starts more members
+  as some finish, has the answer checked and stops the rest. The lead's session shows how many are working
+  and opens the board, and Settings → Child sessions sets how many work at once (5 to start). It costs
+  several times what one agent does: it is meant for a proof, a stubborn bug, a question with many routes.
+- **Agents clean up after a task**: once it is done, they remove what they made along the way and no longer
+  need (scratch and test files, temporary data, extra branches and worktrees, processes they started), keep
+  the work, never touch what they did not make, ask first about anything large or unclear, and say what they
+  removed. A new clean-up skill has the method; Settings → Assistants → When a task is done turns it off.
+- **Templates** is the new name for Apps: a task you run again and again by filling in a form, ready-made or
+  your own (Save as template in a session's menu). Pages are the small tools and pages agents made for you,
+  and connected apps your accounts in other services, so the three no longer run together. Scheduled tasks
+  start from examples. Links, keys and the API work as before.
+- **The start page on a phone**: the agent, model, folder, assistant and Options menus open as sheets from
+  the bottom of the screen, clear of the keyboard, and a setting under Options opens over it. The folder
+  menu starts with the three folders you used last, on any screen; on a phone its path field waits to be
+  tapped, lists subfolders as you type, and no longer adds what you type to the folder in use.
+- **The tour**: its setup pages list the steps beside them, and Back, the dots and Next stay in place on
+  frosted glass. Fixed: the next page going black, and Next blanking the app in newer Chrome.
+- Fixed: without a key, reading a page for a question set Naget Search aside for ten minutes, so searches
+  went to DuckDuckGo meanwhile; now the page's paragraphs are picked by their words.
+
 ## 0.6.2 · 31 October 2026
 
 A welcome tour that builds the app up as it shows you around, model menus that keep to their agent, and
