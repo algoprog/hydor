@@ -75,8 +75,9 @@ export interface FolderChoice {
 }
 
 /**
- * The inside of a folder menu: a field over the folder in use, the ones used last and `more` (a new task
- * folder). A name finds folders among those used lately, in the folder in use and in the home folder; a
+ * The inside of a folder menu: a field over `lead` (the spaces), the folder in use, the ones used last and
+ * `more` (a new task folder). A name finds those of `lead` it names, and folders among those used lately,
+ * in the folder in use and in the home folder; a
  * path (~/code/, or code/ from home) lists the folders there. Either way they take the list's place, so
  * nothing opens over the menu. ↑ ↓ and Enter pick; Tab, or the arrow at a row's end, lists the folders
  * inside one. `footer` ends the menu while nothing is typed.
@@ -85,6 +86,7 @@ export function FolderFinder({
   value,
   onPick,
   autoFocus,
+  lead = [],
   more = [],
   footer,
   recent: count = 3,
@@ -94,6 +96,8 @@ export function FolderFinder({
   value: string | null;
   onPick: (path: string) => void;
   autoFocus?: boolean;
+  /** Choices before the folders (the spaces), found by their names too. */
+  lead?: FolderChoice[];
   more?: FolderChoice[];
   footer?: ReactNode;
   /** How many of the folders used last show while nothing is typed. */
@@ -175,7 +179,11 @@ export function FolderFinder({
   const last = recent.slice(0, count);
   // The folder in use leads while nothing is typed, when it is not among the last used.
   const folders = text ? found.slice(0, asPath ? 200 : 8).map((f) => f.p) : [...(value && !last.includes(value) ? [value] : []), ...last];
-  const rows = text ? folders.map(folder) : [...folders.map(folder), ...more];
+  // As many of `lead` as of the folders used last (the one in use among them), the rest found by name.
+  const leadRows = text ? lead.filter((c) => c.name.toLowerCase().includes(text.toLowerCase())) : lead.filter((c, i) => i < count || c.on);
+  const rows = text ? [...leadRows, ...folders.map(folder)] : [...leadRows, ...folders.map(folder), ...more];
+  // A line between the spaces and the folders, and between the folders and a new task folder.
+  const seps = new Set(text ? [] : [leadRows.length, leadRows.length + folders.length].filter((i) => i > 0 && i < rows.length));
   const hi = Math.min(sel ?? (text ? 0 : rows.findIndex((r) => r.on)), rows.length - 1);
 
   useEffect(() => {
@@ -232,7 +240,7 @@ export function FolderFinder({
       <div ref={list} className={cx('overflow-y-auto overscroll-contain', held ? 'min-h-0 flex-1' : 'max-h-[min(50dvh,300px)]')}>
         {rows.map((r, i) => (
           <Fragment key={r.key}>
-            {!text && i === folders.length && i > 0 && <MenuSep />}
+            {seps.has(i) && <MenuSep />}
             <div
               data-hi={i === hi || undefined}
               onMouseMove={() => i !== hi && setSel(i)}

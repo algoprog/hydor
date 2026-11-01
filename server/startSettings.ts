@@ -39,6 +39,8 @@ function tidy(x: unknown): StartSettings {
   }
   const assistant = text(o.assistant, 100);
   if (assistant) s.assistant = assistant;
+  const space = text(o.space, 40);
+  if (space) s.space = space;
   if (typeof o.task === 'boolean') s.task = o.task;
   const cwd = text(o.cwd, 4096);
   if (cwd?.startsWith('/')) s.cwd = cwd;

@@ -461,6 +461,8 @@ export interface StartSettings {
   runs?: Record<string, StartRun>;
   /** The assistant (General, Researcher…). */
   assistant?: string;
+  /** The space picked last (its folder is `cwd`). */
+  space?: string;
   /** A new task folder, or the folder in `cwd`. */
   task?: boolean;
   /** The folder picked last (also kept while a new task folder is the pick). */

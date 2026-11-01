@@ -43,6 +43,10 @@ agents that speak ACP and take MCP servers.
   Settings → Memory lists every note with when it was written, changed and last needed, and suggests
   removing the ones no agent needed for months. Turn it off for one session or for all. Agents can also look
   up earlier sessions.
+- **Spaces**: a project's sessions, files, memory, instructions and assistant together, like Projects in ChatGPT
+  or Claude. Pick a space by name in the start page's folder menu instead of a folder: its sessions work in its
+  own folder, remember what its earlier sessions learned, get its instructions and start as its assistant. The
+  sidebar's filter shows one space's sessions; the Spaces page keeps them.
 - **Knowledge bases**: drop documents or a folder in once (the Knowledge page), and every agent can search them:
   by their words (a full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning
   on) or for exact text, as grep would; each passage cites its file and page. A folder on this computer is read

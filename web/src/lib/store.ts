@@ -341,6 +341,8 @@ interface UIState {
   showHidden: boolean;
   tabs: OpenTab[];
   agentFilter: 'all' | 'claude' | 'codex';
+  /** The space the sidebar lists the sessions of; all when null. */
+  spaceFilter: string | null;
   set: (p: Partial<Omit<UIState, 'set' | 'openTab' | 'closeTab'>>) => void;
   openTab: (t: OpenTab) => void;
   closeTab: (id: string) => void;
@@ -382,6 +384,7 @@ export const useUI = create<UIState>((set, get) => ({
   showHidden: false,
   tabs: [],
   agentFilter: 'all',
+  spaceFilter: null,
   ...loadUI(),
   set: (p) => set(p),
   openTab: (t) => {

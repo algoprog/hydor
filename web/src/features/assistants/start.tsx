@@ -2,7 +2,8 @@
 // (a fresh folder for the task, the default unless a folder is picked or the assistant works in
 // projects, like Coder), and the agent, model and mode an assistant suggests, set when it is picked.
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Folder, FolderPlus } from 'lucide-react';
+import { Folder, FolderPlus, Plus } from 'lucide-react';
+import type { Space, SpaceView } from '@shared/spaces';
 import { agentMode, type Assistant } from '@shared/assistants';
 import type { Agent } from '@shared/types';
 import { post } from '../../lib/api';
@@ -10,6 +11,7 @@ import { basename, tildify } from '../../lib/format';
 import { useApp } from '../../lib/store';
 import { FolderFinder } from '../../components/FolderPicker';
 import { Popover, SettingChip, useSheets } from '../../components/ui';
+import { SpaceMark } from '../spaces/parts';
 import { assistantIn, lastAssistant, useAssistantsState } from './state';
 
 /** Makes the new task's folder (Settings → Assistants says where) and returns its path. */
@@ -25,13 +27,37 @@ export function useTaskFolder(assistant: string | undefined, pick: boolean | nul
 }
 
 /**
- * "Folder  New task folder", or the folder a new session works in; picking a folder turns the new one
- * off. Its menu is a field to find any folder over the one in use, the three used last and a new task
- * folder, one line each. `children` go at the end: what goes with a folder of your own (a worktree, the
- * instructions the agent reads there); `note` follows the folder's name ("· new worktree"). On a phone
- * it is a sheet from the bottom, and the keyboard waits until the field is tapped.
+ * "Folder  New task folder", the folder a new session works in, or the space it belongs to (its folder,
+ * by the space's name); picking a folder turns the new one off. Its menu is a field to find any folder,
+ * over the spaces, the folder in use, the three used last, a new task folder and a new space, one line
+ * each. `children` go at the end: what goes with a folder of your own (a worktree, the instructions the
+ * agent reads there); `note` follows the folder's name ("· new worktree"). On a phone it is a sheet from
+ * the bottom, and the keyboard waits until the field is tapped.
  */
-export function WorkFolderChip({ value, task, onFolder, onTask, note, children }: { value: string; task: boolean; onFolder: (path: string) => void; onTask: () => void; note?: string; children?: ReactNode }) {
+export function WorkFolderChip({
+  value,
+  task,
+  onFolder,
+  onTask,
+  note,
+  children,
+  space,
+  spaces = [],
+  onSpace,
+  onNewSpace,
+}: {
+  value: string;
+  task: boolean;
+  onFolder: (path: string) => void;
+  onTask: () => void;
+  note?: string;
+  children?: ReactNode;
+  /** The space picked, when one is. */
+  space?: SpaceView | null;
+  spaces?: SpaceView[];
+  onSpace?: (s: Space) => void;
+  onNewSpace?: () => void;
+}) {
   const home = useApp((s) => s.boot?.home) ?? '';
   const st = useAssistantsState();
   const ref = useRef<HTMLButtonElement>(null);
@@ -44,16 +70,28 @@ export function WorkFolderChip({ value, task, onFolder, onTask, note, children }
     <>
       <SettingChip
         ref={ref}
-        label="Folder"
-        icon={task ? <FolderPlus size={14} /> : <Folder size={14} />}
+        label={space ? 'Space' : 'Folder'}
+        icon={space ? <SpaceMark s={space} size={14} /> : task ? <FolderPlus size={14} /> : <Folder size={14} />}
         open={open}
         onClick={() => setOpen((o) => !o)}
-        title={task ? `A new folder for this task, in ${root}` : tildify(value, home)}
-        value={task ? 'New task folder' : `${nameOf(value)}${note ? ` · ${note}` : ''}`}
+        title={space ? `The ${space.name} space: its sessions, files and memory, in ${tildify(space.folder, home)}` : task ? `A new folder for this task, in ${root}` : tildify(value, home)}
+        value={space ? `${space.name}${note ? ` · ${note}` : ''}` : task ? 'New task folder' : `${nameOf(value)}${note ? ` · ${note}` : ''}`}
       />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(380, window.innerWidth - 16)} title="Folder to work in">
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(380, window.innerWidth - 16)} title={spaces.length ? 'Space or folder to work in' : 'Folder to work in'}>
         <FolderFinder
-          value={task ? null : value}
+          value={task || space ? null : value}
+          lead={[...spaces].sort((a, b) => (b.lastAt ?? b.createdAt) - (a.lastAt ?? a.createdAt)).map((sp) => ({
+            key: `space:${sp.id}`,
+            icon: <SpaceMark s={sp} />,
+            name: sp.name,
+            where: sp.description ?? 'space',
+            title: `The ${sp.name} space: its sessions, files and memory`,
+            on: space?.id === sp.id,
+            pick: () => {
+              onSpace?.(sp);
+              setOpen(false);
+            },
+          }))}
           anchor={ref}
           autoFocus={!phone}
           onPick={(p) => {
@@ -73,6 +111,21 @@ export function WorkFolderChip({ value, task, onFolder, onTask, note, children }
                 setOpen(false);
               },
             },
+            ...(onNewSpace
+              ? [
+                  {
+                    key: 'new-space',
+                    icon: <Plus size={15} />,
+                    name: 'New space',
+                    where: 'sessions, files and memory together',
+                    title: 'A space keeps a project’s sessions, files and memory together, picked by name',
+                    pick: () => {
+                      onNewSpace();
+                      setOpen(false);
+                    },
+                  },
+                ]
+              : []),
           ]}
           footer={extras.length > 0 && <div onClick={(e) => (e.target as HTMLElement).closest('[data-closes]') && setOpen(false)}>{extras}</div>}
         />

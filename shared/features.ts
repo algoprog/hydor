@@ -19,6 +19,8 @@ export interface SessionExtra {
   research?: ResearchSettings;
   /** The arena: on the start page, the other models to run the same prompt on; on a session, its match's id. */
   arena?: ArenaStart | string;
+  /** The space it belongs to (shared/spaces.ts), by its id. */
+  space?: string;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

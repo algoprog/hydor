@@ -378,6 +378,7 @@ function SearchResults({ q }: { q: string }) {
 export function SessionList({ query }: { query: string }) {
   const { byKey, order, loaded } = useSessions();
   const filter = useUI((s) => s.agentFilter);
+  const spaceFilter = useUI((s) => s.spaceFilter);
   const home = useApp((s) => s.boot?.home);
   const [, params] = useRoute('/s/:key');
   const activeKey = params?.key ? decodeURIComponent(params.key) : null;
@@ -392,7 +393,8 @@ export function SessionList({ query }: { query: string }) {
   const sensors = useSensors(useSensor(MouseSensor, MOUSE), useSensor(AreaTouchSensor, TOUCH));
 
   // Child sessions sit under their parent (folded), when it is listed too.
-  const nest = useMemo(() => nestChildren(byKey, (s) => !s.archived && (filter === 'all' || s.agent === filter)), [byKey, filter]);
+  const shown = (s: SessionSummary) => (filter === 'all' || s.agent === filter) && (!spaceFilter || s.extra?.space === spaceFilter);
+  const nest = useMemo(() => nestChildren(byKey, (s) => !s.archived && shown(s)), [byKey, filter, spaceFilter]);
 
   const groups = useMemo(() => {
     const out: { label: string; items: SessionSummary[]; keys: string[] }[] = [];
@@ -400,7 +402,7 @@ export function SessionList({ query }: { query: string }) {
     for (const key of order) {
       const s = byKey[key];
       if (!s || s.archived) continue;
-      if (filter !== 'all' && s.agent !== filter) continue;
+      if (!shown(s)) continue;
       if (nest.under.has(key)) continue;
       // Snoozed ones wait at the bottom until their time (or until they need you).
       const label = s.snoozedUntil && s.snoozedUntil > now.getTime() ? 'Snoozed' : activityOf(s) ? 'Active' : s.pinned ? 'Pinned' : dayGroup(s.updatedAt, now);
@@ -418,7 +420,7 @@ export function SessionList({ query }: { query: string }) {
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
     for (const g of out) g.keys = g.items.map((s) => s.key);
     return out.sort((a, b) => rank(a.label) - rank(b.label));
-  }, [byKey, order, filter, nest]);
+  }, [byKey, order, filter, spaceFilter, nest]);
 
   const groupOf = useMemo(() => {
     const m = new Map<string, string>();

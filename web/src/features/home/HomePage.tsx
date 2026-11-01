@@ -28,6 +28,9 @@ import { AgentPicker } from './AgentPicker';
 import { machineId } from '../../lib/machine';
 import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
 import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
+import { NewSpaceDialog } from '../spaces/parts';
+import { useSpaces } from '../spaces/state';
+import type { Space } from '@shared/spaces';
 
 /** Starts a session: pick the agent and folder, type the task, press Enter. */
 /** A prompt link (/?prompt=…&agent=…&model=…&cwd=…) fills the box; it never starts anything by itself. */
@@ -81,7 +84,20 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   const cat = useCatalog(agent, acpId ?? undefined);
   const [cwd, setCwd] = useState(() => initialCwd ?? saved.cwd ?? useUI.getState().explorerRoot ?? useApp.getState().boot?.defaultCwd ?? '');
   // Settings for the new session from the capabilities' start options (an assistant, memory off…).
-  const [extra, setExtra] = useState<SessionExtra>(() => ({ ...(saved.memory === false ? { memory: false } : {}), ...(saved.capUsd ? { capUsd: saved.capUsd } : {}) }));
+  const [extra, setExtra] = useState<SessionExtra>(() => ({
+    ...(saved.memory === false ? { memory: false } : {}),
+    ...(saved.capUsd ? { capUsd: saved.capUsd } : {}),
+    // The space picked last, while the folder is still its own.
+    ...(saved.space && !initialCwd ? { space: saved.space } : {}),
+  }));
+  // Spaces: picked by name in the folder chip, each with its folder, assistant and instructions.
+  const spaces = useSpaces();
+  const space = spaces?.find((s) => s.id === extra.space) ?? null;
+  const [newSpace, setNewSpace] = useState(false);
+  useEffect(() => {
+    // A space deleted since it was picked: the folder stays, the space goes.
+    if (spaces && extra.space && !space) setExtra((x) => ({ ...x, space: undefined }));
+  }, [spaces, extra.space, space]);
   // A new task folder (Settings → Assistants) or the folder shown: as picked here, else as the assistant prefers (Coder works in projects).
   const [taskPick, setTaskPick] = useState<boolean | null>(() => (initialCwd ? false : (saved.task ?? null)));
   const folderPicked = useRef(!!initialCwd);
@@ -192,6 +208,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
         assistant: typeof extra.assistant === 'string' ? extra.assistant : undefined,
         task,
         cwd,
+        space: space?.id ?? null,
         worktree,
         memory: extra.memory === false ? false : null,
         capUsd: typeof extra.capUsd === 'number' ? extra.capUsd : null,
@@ -221,6 +238,15 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
     } finally {
       setBusy(false);
     }
+  };
+
+  /** A space picked: its folder, its assistant, and its instructions for the session (the server adds them). */
+  const pickSpace = (sp: Space) => {
+    folderPicked.current = true;
+    setCwd(sp.folder);
+    setTaskPick(false);
+    setExtra((x) => ({ ...x, space: sp.id, ...(sp.assistant ? { assistant: sp.assistant } : {}) }));
+    saveStart({ cwd: sp.folder, task: false, space: sp.id, ...(sp.assistant ? { assistant: sp.assistant } : {}) });
   };
 
   // A capability's start option changed (the assistant, memory, a spending cap): kept for next time.
@@ -262,6 +288,7 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
   return (
     <div>
       {cwd && <InstructionsDialog agent={agent} cwd={cwd} open={instructions} onClose={() => setInstructions(false)} />}
+      <NewSpaceDialog open={newSpace} onClose={() => setNewSpace(false)} onMade={pickSpace} />
       <LimitBanner agent={agent} account={acct} className="mb-3" />
       <div
         data-tour="composer"
@@ -375,13 +402,19 @@ function StartComposer({ initialCwd, link }: { initialCwd?: string; link?: Retur
                   folderPicked.current = true;
                   setCwd(p);
                   setTaskPick(false);
-                  saveStart({ cwd: p, task: false });
+                  setExtra((x) => ({ ...x, space: undefined }));
+                  saveStart({ cwd: p, task: false, space: null });
                 }}
                 onTask={() => {
                   folderPicked.current = true;
                   setTaskPick(true);
-                  saveStart({ task: true });
+                  setExtra((x) => ({ ...x, space: undefined }));
+                  saveStart({ task: true, space: null });
                 }}
+                space={space}
+                spaces={spaces ?? []}
+                onSpace={pickSpace}
+                onNewSpace={() => setNewSpace(true)}
               >
                 {!task && repo && (
                   <label
