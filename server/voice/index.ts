@@ -8,6 +8,7 @@ import type { VoicePatch, WhisperSize } from '../../shared/voice.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { Feature } from '../features/types.ts';
+import { handsFree } from './handsfree.ts';
 import { MAX_AUDIO, VoiceService } from './service.ts';
 
 let svc: VoiceService | null = null;
@@ -38,6 +39,13 @@ export const voice: Feature = {
     d.app.post('/api/voice/cancel', async () => service().cancel());
     d.app.post('/api/voice/remove', async (req) => service().remove((req.body ?? {}) as { size?: WhisperSize; english?: boolean; all?: boolean }));
     d.app.post('/api/voice/test', async () => service().test());
+    // Hands-free: what the user said (as text), done, and what to say back.
+    d.app.post('/api/voice/command', async (req) => {
+      const b = (req.body ?? {}) as { text?: unknown; focus?: unknown };
+      const text = String(b.text ?? '').trim().slice(0, 4000);
+      if (!text) throw new HttpError(400, 'Nothing was heard');
+      return handsFree(d, text, typeof b.focus === 'string' && b.focus ? b.focus : undefined);
+    });
     // The recording as the body; ?lang= the language spoken, as the browser names it ("de-DE").
     d.app.post('/api/voice/transcribe', async (req) => {
       const audio = await readBody(req.body, MAX_AUDIO);
