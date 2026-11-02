@@ -253,7 +253,8 @@ test('submit_result: only on an app run, checks the fields, saves the result; to
   assert.equal(apps.allowTool!('submit_result', ctx), true);
   assert.equal(apps.allowTool!('read_session', ctx), false);
   assert.equal(apps.allowTool!('read_session', { ...ctx, runId: 'other', key: 'claude:someone-else' }), true);
-  assert.equal(apps.tools!({ ...ctx, runId: 'other', key: 'claude:someone-else' }).length, 0);
+  // Another session hands in nothing: it gets what templates are built with.
+  assert.deepEqual(apps.tools!({ ...ctx, runId: 'other', key: 'claude:someone-else' }).map((t) => t.name), ['app_get', 'app_save', 'app_try', 'app_screen']);
   sessions.end(key, 'Here is the plan.');
   await sleep(2000);
   const done = store.getRun(db, run.id)!;

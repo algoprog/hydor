@@ -14,6 +14,7 @@ import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
+import { builderTools } from './builder.ts';
 import { checkRun, tryExamples } from './examples.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
@@ -211,12 +212,6 @@ function routes(d: Deps) {
     if (!/^(claude|codex|acp):[A-Za-z0-9._-]{4,80}$/.test(key)) throw new HttpError(400, 'Bad session key');
     return draftFromSession(d, key);
   });
-
-  /** Packages a saved template needs start installing at once, so its first run need not wait. */
-  const prepare = (a: AppDef) => {
-    void ensureEnv(a, a.slug).catch(() => {});
-    return a;
-  };
 
   // Screens are pages of the template's own, made and removed by their routes: a new template starts without
   // any (a copy makes its own), and saving a recipe keeps the ones it has, so no page of another becomes one.
@@ -742,6 +737,16 @@ function dataTool(ctx: RunCtx): RunTool | null {
   };
 }
 
+/** Packages a saved template needs start installing at once, so its first run need not wait. */
+function prepare(a: AppDef): AppDef {
+  void ensureEnv(a, a.slug).catch(() => {});
+  return a;
+}
+
+/** What every session that is not a template's run is told of templates and their tools. */
+const BUILDER_NOTE =
+  "Templates (the app's Templates page) are the user's own apps: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save and app_try (try its examples before you hand it over, and say what a run costs), and app_screen for a screen; app_guide's templates topic says what each part does.";
+
 export const apps: Feature = {
   id: 'apps',
   routes,
@@ -752,7 +757,9 @@ export const apps: Feature = {
       return q ? [{ id: `app-ask:${r.id}:${q.step}`, kind: q.fields ? ('form' as const) : ('question' as const), title: q.question.slice(0, 200), detail: r.appName, at: q.since, path: `/apps/runs/${encodeURIComponent(r.id)}` }] : [];
     }),
   tools(ctx) {
-    return [submitTool(ctx), dataTool(ctx)].filter((t): t is RunTool => !!t);
+    // A template's run gets what it hands in with and what it keeps; any other session what templates are built with.
+    if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx)].filter((t): t is RunTool => !!t);
+    return builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare });
   },
   /** An app's run gets the tools its app allows; a public run only the answer and, if allowed, the web. */
   allowTool(name, ctx) {
@@ -765,7 +772,7 @@ export const apps: Feature = {
   },
   spawn(s, d) {
     const mark = markOf(s.extra);
-    if (!mark) return;
+    if (!mark) return { instructions: [BUILDER_NOTE] };
     noteAgentRun(s.runId, mark);
     const hit = runOfCtx({ runId: s.runId, key: s.key ?? '' });
     if (!hit) return;

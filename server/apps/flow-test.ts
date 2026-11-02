@@ -653,6 +653,59 @@ test('examples: saved inputs with checks; trying them runs each as a test, and i
   assert.equal((await ended(tried[0].run.id)).status, 'done');
 });
 
+test('the builder’s tools: app_save makes and changes a template (whole, a patch, one step), checked first; app_get reads it; app_try runs its examples and waits; app_screen gives it a screen', async () => {
+  const ctx: RunCtx = { runId: 'builder-1', key: 'acp:builder-1', agent: 'acp', cwd: os.tmpdir(), deps };
+  const tools = Object.fromEntries(apps.tools!(ctx).map((t) => [t.name, t]));
+  assert.ok(tools.app_save && tools.app_get && tools.app_try && tools.app_screen);
+  assert.ok(!tools.submit_result, 'a session that is not a run hands in nothing');
+  const text = (out: unknown) => (typeof out === 'string' ? out : (out as { text: string }).text);
+  const bad = (await tools.app_save.run({ recipe: { name: 'Broken', flow: { steps: [{ id: 'x', do: 'tool', tool: 'bash' }] } } }, ctx)) as { text: string; isError?: boolean };
+  assert.equal(bad.isError, true);
+  assert.match(bad.text, /Not saved[\s\S]*bash cannot run as a step/);
+  const made = text(
+    await tools.app_save.run(
+      {
+        recipe: {
+          name: 'Built',
+          fields: [{ id: 'topic', label: 'Topic', type: 'text', required: true }],
+          data: { items: { title: 'text' } },
+          answer: [{ id: 'title', label: 'Title', type: 'text', required: true }],
+          flow: { steps: [{ id: 'save', do: 'data', add: 'items', with: { title: '{{topic}}' } }], outputs: { title: '{{save.record.title}}' } },
+          examples: [{ name: 'First', inputs: { topic: 'alpha' }, checks: ['{{answer.title}} = alpha'] }],
+        },
+        why: 'A first version',
+      },
+      ctx,
+    ),
+  );
+  const id = /\(id ([a-z0-9]+)/.exec(made)![1];
+  assert.match(made, /Made “Built”/);
+  const got = JSON.parse(text(await tools.app_get.run({ app: id }, ctx)));
+  assert.equal(got.recipe.flow.steps.length, 1);
+  assert.ok(JSON.parse(text(await tools.app_get.run({}, ctx))).templates.some((t: any) => t.id === id));
+  // One step added after another, then a patch: a new answer field and where it comes from.
+  text(await tools.app_save.run({ app: id, step: { id: 'count', do: 'data', op: 'find', collection: 'items', after: 'save' } }, ctx));
+  const patched = text(await tools.app_save.run({ app: id, patch: { name: 'Built and counted', answer: [{ id: 'title', label: 'Title', type: 'text', required: true }, { id: 'count', label: 'Count', type: 'number' }], flow: { outputs: { count: '{{count.count}}' } } } }, ctx));
+  assert.match(patched, /Saved “Built and counted”.*2 steps/);
+  const saved = store.getApp(db, id)!;
+  assert.deepEqual(saved.flow!.steps.map((s) => s.id), ['save', 'count']);
+  assert.deepEqual(saved.flow!.outputs, { title: '{{save.record.title}}', count: '{{count.count}}' });
+  // Its examples, tried and waited for; then one set of answers.
+  const tried = JSON.parse(text(await tools.app_try.run({ app: id, examples: true, wait: 60 }, ctx)));
+  assert.equal(tried.runs[0].status, 'done');
+  assert.deepEqual(tried.runs[0].checks, [{ rule: '{{answer.title}} = alpha', ok: true }]);
+  assert.deepEqual(tried.runs[0].steps.map((s: any) => s.step), ['save', 'count']);
+  const once = JSON.parse(text(await tools.app_try.run({ app: id, inputs: { topic: 'beta' }, wait: 60 }, ctx)));
+  assert.equal(once.runs[0].status, 'done');
+  assert.ok(once.runs[0].result.count >= 2);
+  assert.match(text(await tools.app_screen.run({ app: id }, ctx)), /the screen “main”, made from its parts/);
+  assert.ok(store.getApp(db, id)!.screens?.main);
+  // A step another one names, removed: saved, with a warning.
+  const removed = text(await tools.app_save.run({ app: id, step: { id: 'count', remove: true } }, ctx));
+  assert.match(removed, /To look at:[\s\S]*count/);
+  assert.ok(store.getApp(db, id)!.screens?.main, 'its screen stays');
+});
+
 test('notify_user: a step tells you something now, and its notice opens the run', async () => {
   const notices: any[] = [];
   const on = (n: unknown) => notices.push(n);
