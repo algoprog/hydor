@@ -15,6 +15,7 @@ import { AppIcon } from './AppIcon';
 import { RunsWith } from './AppPage';
 import { AskBox, FollowUps } from './FollowUps';
 import { RunBody } from './Result';
+import { RunSteps } from './Steps';
 
 function Asked({ d }: { d: RunDetail }) {
   const [open, setOpen] = useState(false);
@@ -54,6 +55,7 @@ export function RunView({ d, statusExtra }: { d: RunDetail; statusExtra?: ReactN
         reply={d.asks.length ? (d.first ?? '') : undefined}
         followUp={d.asks.at(-1) && { updated: d.asks.at(-1)!.updated && d.recipe.answer.length > 0 }}
       />
+      {d.steps && <RunSteps steps={d.steps} />}
       <Asked d={d} />
       <FollowUps d={d} />
       {!isActive(r.status) && (d.slug || r.app.startsWith('tpl:')) && (
@@ -131,7 +133,7 @@ export function RunPage({ id }: { id: string }) {
           </div>
         ) : (
           <div className="mx-auto max-w-[860px] space-y-3 px-4 py-5 sm:px-6">
-            <RunView d={d} statusExtra={<span className="max-sm:hidden"><RunsWith agent={d.recipe.agent} acpAgent={d.recipe.acpAgent} model={d.recipe.model} /></span>} />
+            <RunView d={d} statusExtra={d.steps ? undefined : <span className="max-sm:hidden"><RunsWith agent={d.recipe.agent} acpAgent={d.recipe.acpAgent} model={d.recipe.model} /></span>} />
             {d.noAsks && d.run.key && <p className="pt-1 text-center text-[12.5px] text-fg-3">{d.noAsks}</p>}
           </div>
         )}

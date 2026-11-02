@@ -39,7 +39,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/me\/language$/, 'refuse', 'The language is set on each device: PUT /device with { language }.'],
   ['W', /^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|voice\/(transcribe|command|cancel))$/, 'refuse', 'That is for the app’s pages themselves.'],
   // Changes that change nothing, or only look something up.
-  ['POST', /^\/api\/(update-check|knowledge\/search|models\/inspect|automations\/next|automations\/watch\/test|apps\/draft|automations\/draft)$/, 'free'],
+  ['POST', /^\/api\/(update-check|knowledge\/search|models\/inspect|automations\/next|automations\/watch\/test|apps\/draft|apps\/check|apps\/install\/check|automations\/draft)$/, 'free'],
   ['POST', /^\/api\/(search|push|voice)\/test$|^\/api\/connections\/[^/]+\/test$/, 'free'],
   // Ask every time: risky, costly or hard to undo.
   ['DELETE', /./, 'always'],
@@ -48,6 +48,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(custom|browser)\/settings$/, 'always', 'This changes what agents may do without asking.'],
   ['W', /^\/api\/(update|update\/auto|startup|machines|scm\/accounts|acp-agents|agent-accounts|clients)(\/|$)/, 'always'],
   ['W', /^\/api\/models\/(install|start)$/, 'always', 'This downloads or starts a model on this computer.'],
+  ['POST', /^\/api\/apps\/install$|^\/api\/apps\/[^/]+\/env$/, 'always', 'This installs a template on this computer, with the templates and the Node or Python packages it needs.'],
   ['W', /^\/api\/voice$/, 'confirm'],
   ['POST', /^\/api\/sessions$/, 'always', 'This starts a new session.'],
   ['W', /^\/api\/sessions\/[^/]+\/(message|handoff|fork|rewind|guest-links|pr|worktree|start|compact|goal)/, 'always'],

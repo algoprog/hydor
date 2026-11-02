@@ -1,6 +1,6 @@
 # Templates
 
-A template is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result as a card or a table. This topic covers the ready-made templates, running one and refining its result, making your own, and sharing one through an API key, other agents, a public page or a spreadsheet of rows.
+A template is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result as a card or a table. This topic covers the ready-made templates, running one and refining its result, making your own (with steps, data and memory too), sharing one through an API key, other agents, a public page or a spreadsheet of rows, and passing one on as a file.
 
 ![Templates: your own, and ready-made ones to start from](images/templates.webp)
 
@@ -307,6 +307,50 @@ Before you run a CSV, the app estimates the whole batch: "About $… for … row
 
 To keep costs in hand, set **Most one run may spend (US$)** and **Runs a day (from anywhere)** under the template's **Limits**, and, for a public page, its daily budget. See [Usage, limits and costs](/guide/usage) for what all sessions spend.
 
+## Templates with steps
+
+A template can also do its work in **steps**: an agent does one part, a quick question to a model sorts something out, a tool fetches a page, a rule decides which way to go, the same steps go through each item of a list. Each step hands what it found to the next, and the run gives back the answer fields at the end. Steps make a template cheaper, faster and surer than one agent doing everything, and let it do more: keep data between runs, call your other templates, run parts side by side.
+
+For now, you make a template with steps by asking an agent: "Make a template that reads each link I give it, sums it up with a quick model, and keeps it in a reading list." The agent writes the steps, checks them and tries them. In your template's **Edit**, they show under **What it does**; to change them, ask an agent ("add a step that…"). The rest (the form, the answer, who does it, tools, limits) you change there yourself.
+
+The kinds of steps:
+
+- **Ask an agent**: a session works on its part with its tools and hands in what it found. Each has a session of its own, which you can open from the run's page.
+- **Ask a model**: one quick answer from a model, with no tools: sort, pull out, sum up. It costs little, and nothing with a model on this computer.
+- **Use a tool**: one of the app's own tools with set inputs: search the web, read a page, call an address with a saved key, read a document, make a picture.
+- **Decide**: one way or the other, by a rule ("the price is under 100") or by a question in words that the helper model answers.
+- **Repeat**: its steps once for each item of a list (a few at a time, if you like), or again until something holds.
+- **At the same time**: branches that run side by side; the flow goes on when they have all ended.
+- **Call an app**: another of your templates, as one step.
+- **Keep data**: add, find, change or remove the records the template keeps (see below).
+
+A step can run only when a rule holds, and say what happens when it fails: other steps instead, or carry on without it.
+
+While a run works, its page lists the steps as they go. Once it ends, **Steps** shows each one with how it went, how long it took and what it cost; the session button opens an agent step's conversation. A run with steps takes no follow-ups: change the answers and run it again.
+
+### What a template keeps
+
+A template can keep data between its runs: lists of records, like the links of a reading list or the clients of a small CRM. Its steps add, find and change them, and so do its agents, with a tool of their own. A list can say what each record holds (a title, a score, a date…), and the app then checks what goes in.
+
+What a template keeps stays with it until you delete the template. Runs from its public page never reach it.
+
+### A template that remembers
+
+A template can remember across its runs: its agents keep what later runs should know (a preference you showed, a source that works, a mistake to avoid) in a memory of the template's own, and each run starts with it. [Settings → Memory](/settings?s=memory) lists it as a project, under the template's name.
+
+### What a template needs on this computer
+
+A template can need things on this computer: Node or Python packages its agents use, and commands such as ffmpeg. The packages install in the template's own folder, never for the whole computer, as soon as you install or change the template, and its first run waits for them. On the template's page, a line says while they install or when they could not, with **Show the output** and **Install again**. A command it uses that this computer lacks is named there too: install that one yourself.
+
+## Share a template as a file
+
+A template can travel as one file, to keep or to install on another Naget Agent.
+
+- **To download one**: open your template, then **More** (⋯) → **Download as a file**. The file (`.naget-app`) holds everything it does and needs, and the templates its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here.
+- **To install one**: press **New template** on the Templates page, then **Install a template from a file**, and pick a `.naget-app`, `.zip` or `.json` file. Before anything is made, a card says what it will do here: who does the work, its steps, the tools it may use, the templates that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Press **Install**.
+
+Some things change on the way in, and the card says which: a folder it worked in elsewhere is left out (each run gets one of its own), a mode that allows every step without asking starts as **Auto** instead, and an assistant this computer lacks is dropped. A template that comes with it and is the same as one you have is used again; otherwise it installs beside yours. Its public page starts closed, and it has no API keys.
+
 ## Ask an agent
 
 Agents in the app can make and run templates for you through the app's API, with your OK on a card. For example:
@@ -317,3 +361,6 @@ Agents in the app can make and run templates for you through the app's API, with
 - "Run my Company research template for each of these 20 companies and give me the table."
 - "Open a public page for my Cover letter template, with at most $1 a day."
 - "Stop all runs of my Price check template, and revoke its API keys."
+- "Make a template with steps that reads each link I send, sums it up with a quick model and keeps it in a reading list."
+- "Add a step to my Competitor watch template that tells me only when something changed."
+- "Install the template in reading-list.naget-app from my Downloads folder."

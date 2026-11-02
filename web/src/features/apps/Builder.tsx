@@ -19,6 +19,8 @@ import { appPath, useRunEvents, type RunDetail } from './api';
 import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { RunBody } from './Result';
+import { InstallFromFile } from './Install';
+import { StepsOutline } from './Steps';
 
 const BLANK: AppRecipe = {
   name: '',
@@ -33,9 +35,10 @@ const BLANK: AppRecipe = {
   limits: {},
 };
 
+// Every part of the recipe, so a save keeps what this page does not show yet (its steps, data, memory, needs).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires };
 };
 
 /** A text box that grows with what is written in it. */
@@ -382,7 +385,7 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
 
   const save = async () => {
     if (!recipe.name.trim()) return toast('Give the template a name', 'error');
-    if (!recipe.prompt.trim()) return toast('Write the task: it is what the agent is asked to do', 'error');
+    if (!recipe.prompt.trim() && !recipe.flow) return toast('Write the task: it is what the agent is asked to do', 'error');
     setBusy(true);
     try {
       const body = { recipe: { ...recipe, answer: cleanAnswer(), fields: recipe.fields.map((f) => ({ ...f, options: f.options?.map((o) => o.trim()).filter(Boolean) })) }, ...(template && !saved ? { template } : {}) };
@@ -412,7 +415,7 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
         }
         actions={
           <>
-            <Button size="sm" variant="ghost" icon={<FlaskConical size={14} />} onClick={() => (recipe.prompt.trim() ? setTesting(true) : toast('Write the task first', 'error'))}>
+            <Button size="sm" variant="ghost" icon={<FlaskConical size={14} />} onClick={() => (recipe.prompt.trim() || recipe.flow ? setTesting(true) : toast('Write the task first', 'error'))}>
               <span className="max-sm:hidden">Test run</span>
             </Button>
             <Button size="sm" variant="primary" onClick={save} disabled={busy}>
@@ -424,6 +427,11 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[820px] space-y-4 px-4 py-6 pb-24 sm:px-6">
           {note && <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">{note}</div>}
+          {!saved && !template && !from && (
+            <div className="-mt-1 flex justify-end">
+              <InstallFromFile />
+            </div>
+          )}
           <Section>
             <div className="flex items-start gap-4">
               <IconPick icon={recipe.icon} color={recipe.color} onChange={set} />
@@ -453,6 +461,11 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
             </div>
           </Section>
 
+          {recipe.flow ? (
+            <Section title="What it does" sub="This template works in steps. To change them, ask an agent (“add a step that…”); here you change its form, answer, who does it, tools and limits.">
+              <StepsOutline flow={recipe.flow} />
+            </Section>
+          ) : (
           <Section
             title="The task"
             sub="What the agent is asked to do, with the answers put in."
@@ -495,6 +508,7 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
               {unusedNeeded.length > 0 && <div className="text-warn">{unusedNeeded.map((f) => f.label || f.id).join(', ')} {unusedNeeded.length > 1 ? 'are' : 'is'} never used in the task.</div>}
             </div>
           </Section>
+          )}
 
           <Section title="The answer" sub="Fields the agent fills in when it is done (with submit_result): they show as a card or a table, and come back as JSON to programs. None: the reply is the answer.">
             <div className="space-y-2">

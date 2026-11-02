@@ -1,6 +1,6 @@
 // What programs get back from an app run (the API, MCP), and the daily limit every way of starting
 // a run checks first.
-import type { AppDef, AppRecipe, RunStatus } from '../../shared/apps.ts';
+import type { AppDef, AppRecipe, RunStatus, RunStepView } from '../../shared/apps.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { dayStart, usageSince, type RunRecord } from './store.ts';
@@ -16,9 +16,11 @@ export interface ApiAnswer {
   session: { key: string; url: string } | null;
   error?: string;
   costUsd?: number;
+  /** A run with steps: each step and how it went. */
+  steps?: { step: string; title: string; status: string; error?: string }[];
 }
 
-export function apiAnswer(r: RunRecord, link: (key: string) => string): ApiAnswer {
+export function apiAnswer(r: RunRecord, link: (key: string) => string, steps?: RunStepView[]): ApiAnswer {
   return {
     run: r.id,
     status: r.status,
@@ -27,6 +29,7 @@ export function apiAnswer(r: RunRecord, link: (key: string) => string): ApiAnswe
     session: r.key ? { key: r.key, url: link(r.key) } : null,
     ...(r.error ? { error: r.error } : {}),
     ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}),
+    ...(steps ? { steps: steps.filter((x) => x.kind !== 'round').map((x) => ({ step: x.path, title: x.title, status: x.status, ...(x.error ? { error: x.error } : {}) })) } : {}),
   };
 }
 

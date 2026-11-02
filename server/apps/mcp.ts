@@ -6,7 +6,8 @@ import { isActive } from '../../shared/apps.ts';
 import { featureDeps } from '../features/registry.ts';
 import type { ToolOutput } from '../features/types.ts';
 import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
-import { startRun, waitFor } from './runs.ts';
+import { stepsOf } from './flow.ts';
+import { isFlowRun, startRun, waitFor } from './runs.ts';
 import { getRun, listApps } from './store.ts';
 
 interface ExternalTool {
@@ -35,7 +36,7 @@ function inputSchema(a: AppDef): Record<string, unknown> {
 
 const answerText = (r: NonNullable<ReturnType<typeof getRun>>) => {
   const { publicBase } = featureDeps();
-  const out = apiAnswer(r, (key) => `${publicBase()}/s/${encodeURIComponent(key)}`);
+  const out = apiAnswer(r, (key) => `${publicBase()}/s/${encodeURIComponent(key)}`, isFlowRun(r) ? stepsOf(r.id) : undefined);
   const note = isActive(r.status) ? `\n\nStill running: call app_run_status with run "${r.id}" for the answer.` : '';
   return `${JSON.stringify(out, null, 2)}${note}`;
 };

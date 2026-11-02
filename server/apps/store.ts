@@ -1,8 +1,8 @@
 // Where apps keep things: the apps themselves, every run (with the recipe it followed, so a template
-// or an app changed mid-run still checks the answer it started with), API keys (hashed) and runs over
-// the rows of a CSV.
+// or an app changed mid-run still checks the answer it started with), the steps of runs with steps,
+// API keys (hashed) and runs over the rows of a CSV. What apps keep for themselves is in data.ts.
 import crypto from 'node:crypto';
-import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunSource, RunStatus } from '../../shared/apps.ts';
+import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunSource, RunStatus, StepStatus } from '../../shared/apps.ts';
 import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
 import type { DB } from '../db.ts';
 
@@ -62,7 +62,27 @@ export function ensureTables(db: DB) {
       created_at integer not null,
       ended_at integer
     );
+    create table if not exists app_steps (
+      run_id text not null,
+      path text not null,
+      step_id text not null,
+      kind text not null,
+      title text not null,
+      status text not null,
+      outputs text,
+      child_run text,
+      cost_usd real,
+      error text,
+      started_at integer,
+      ended_at integer,
+      primary key (run_id, path)
+    );
   `);
+  // Runs that are a step of another (an agent step, an app a step called).
+  const cols = new Set((db.prepare('pragma table_info(app_runs)').all() as { name: string }[]).map((c) => c.name));
+  if (!cols.has('parent')) db.exec('alter table app_runs add column parent text');
+  if (!cols.has('step')) db.exec('alter table app_runs add column step text');
+  db.exec('create index if not exists app_runs_parent on app_runs (parent)');
 }
 
 // ---- apps --------------------------------------------------------------------------------------------
@@ -140,6 +160,8 @@ interface RunRow {
   ip: string | null;
   batch_id: string | null;
   row_no: number | null;
+  parent: string | null;
+  step: string | null;
   nudged: number;
   created_at: number;
   started_at: number | null;
@@ -184,6 +206,8 @@ function toRun(r: RunRow): RunRecord {
     ip: r.ip ?? undefined,
     batch: r.batch_id ?? undefined,
     row: r.row_no ?? undefined,
+    parent: r.parent ?? undefined,
+    step: r.step ?? undefined,
     nudged: !!r.nudged,
     createdAt: r.created_at,
     startedAt: r.started_at ?? undefined,
@@ -197,12 +221,12 @@ export function runView(r: RunRecord): AppRun {
   return view;
 }
 
-export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number }): RunRecord {
+export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string }): RunRecord {
   const id = newId(8);
   db.prepare(
-    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, Date.now());
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, Date.now());
   return getRun(db, id)!;
 }
 
@@ -242,9 +266,15 @@ export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: 
   db.prepare(`update app_runs set ${sets.join(', ')} where id = ?`).run(...vals, id);
 }
 
-export function listRuns(db: DB, o: { app?: string; batch?: string; visitor?: string; status?: RunStatus[]; limit?: number; before?: number }): RunRecord[] {
+/**
+ * Runs, newest first (a CSV's rows in order). The runs of a run's agent steps are part of that run, so
+ * they are left out unless `steps` asks for them.
+ */
+export function listRuns(db: DB, o: { app?: string; batch?: string; visitor?: string; status?: RunStatus[]; limit?: number; before?: number; steps?: boolean; parent?: string }): RunRecord[] {
   const where: string[] = [];
   const vals: unknown[] = [];
+  if (!o.steps && !o.parent) where.push("source != 'step'");
+  if (o.parent) (where.push('parent = ?'), vals.push(o.parent));
   if (o.app) (where.push('app_id = ?'), vals.push(o.app));
   if (o.batch) (where.push('batch_id = ?'), vals.push(o.batch));
   if (o.visitor) (where.push('visitor = ?'), vals.push(o.visitor));
@@ -258,14 +288,88 @@ export function listRuns(db: DB, o: { app?: string; batch?: string; visitor?: st
 /** Runs of an app since a moment (all sources, or one), and what they spent. */
 export function usageSince(db: DB, app: string, since: number, source?: RunSource): { runs: number; spent: number } {
   const r = db
-    .prepare(`select count(*) as n, coalesce(sum(cost_usd), 0) as s from app_runs where app_id = ? and created_at >= ? and status != 'queued' ${source ? 'and source = ?' : ''}`)
+    .prepare(`select count(*) as n, coalesce(sum(cost_usd), 0) as s from app_runs where app_id = ? and created_at >= ? and status != 'queued' and source != 'step' ${source ? 'and source = ?' : ''}`)
     .get(...([app, since, source].filter((x) => x !== undefined) as unknown[])) as { n: number; s: number };
   return { runs: r.n, spent: r.s };
 }
 
 export function deleteRuns(db: DB, app: string) {
+  db.prepare('delete from app_steps where run_id in (select id from app_runs where app_id = ?)').run(app);
   db.prepare('delete from app_runs where app_id = ?').run(app);
   db.prepare('delete from app_batches where app_id = ?').run(app);
+}
+
+/** Removes one run, with its steps and the runs of its agent steps (their sessions stay). */
+export function deleteRun(db: DB, id: string) {
+  for (const c of db.prepare("select id from app_runs where parent = ? and source = 'step'").all(id) as { id: string }[]) deleteRun(db, c.id);
+  db.prepare('delete from app_steps where run_id = ?').run(id);
+  db.prepare('delete from app_runs where id = ?').run(id);
+}
+
+// ---- the steps of runs with steps ----------------------------------------------------------------------
+
+/** One step of a run as the server keeps it: how it stands, what it gave, the run behind it. */
+export interface StepRecord {
+  run: string;
+  path: string;
+  id: string;
+  kind: string;
+  title: string;
+  status: StepStatus;
+  outputs?: Record<string, unknown> | null;
+  childRun?: string;
+  costUsd?: number;
+  error?: string;
+  startedAt?: number;
+  endedAt?: number;
+}
+
+interface StepRow {
+  run_id: string;
+  path: string;
+  step_id: string;
+  kind: string;
+  title: string;
+  status: string;
+  outputs: string | null;
+  child_run: string | null;
+  cost_usd: number | null;
+  error: string | null;
+  started_at: number | null;
+  ended_at: number | null;
+}
+
+const toStep = (r: StepRow): StepRecord => ({
+  run: r.run_id,
+  path: r.path,
+  id: r.step_id,
+  kind: r.kind,
+  title: r.title,
+  status: r.status as StepStatus,
+  outputs: r.outputs ? parse<Record<string, unknown> | null>(r.outputs, null) : undefined,
+  childRun: r.child_run ?? undefined,
+  costUsd: r.cost_usd ?? undefined,
+  error: r.error ?? undefined,
+  startedAt: r.started_at ?? undefined,
+  endedAt: r.ended_at ?? undefined,
+});
+
+export function getStep(db: DB, run: string, path: string): StepRecord | null {
+  const r = db.prepare('select * from app_steps where run_id = ? and path = ?').get(run, path) as StepRow | undefined;
+  return r ? toStep(r) : null;
+}
+
+/** Writes a step's whole record (callers start from the one there). */
+export function saveStep(db: DB, s: StepRecord) {
+  db.prepare(
+    `insert or replace into app_steps (run_id, path, step_id, kind, title, status, outputs, child_run, cost_usd, error, started_at, ended_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(s.run, s.path, s.id, s.kind, s.title, s.status, s.outputs === undefined || s.outputs === null ? null : JSON.stringify(s.outputs), s.childRun ?? null, s.costUsd ?? null, s.error ?? null, s.startedAt ?? null, s.endedAt ?? null);
+}
+
+/** A run's steps in the order they started. */
+export function listSteps(db: DB, run: string): StepRecord[] {
+  return (db.prepare('select * from app_steps where run_id = ? order by coalesce(started_at, 0), rowid').all(run) as StepRow[]).map(toStep);
 }
 
 /** The start of today, local time. */

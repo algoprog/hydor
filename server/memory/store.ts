@@ -149,6 +149,8 @@ export function repoRoot(cwd: string): string | null {
   const home = path.resolve(os.homedir());
   if (dir === home || dir === path.parse(dir).root) return null;
   for (let d = dir; d !== home; ) {
+    // A template that remembers marks its folder: its runs, each in a folder of its own under it, share it.
+    if (fs.existsSync(path.join(d, '.naget-memory'))) return d;
     const g = path.join(d, '.git');
     let st: fs.Stats | undefined;
     try {
