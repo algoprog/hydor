@@ -72,6 +72,7 @@
 - [**更多账户**](/settings?s=accounts&find=More%20accounts)：为智能体再添一个订阅。
 - [**达到限额时切换账户**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)：用量耗尽的会话会换另一个账户继续。
 - [**智能体程序**](/settings?s=accounts&find=Agent%20programs)：已安装哪些智能体程序，以及安装其他程序。
+- [**自动更新**](/settings?s=accounts&find=Update%20automatically)：让 Claude Code、Codex 和其他智能体程序保持最新版本。
 
 ### 更多智能体
 

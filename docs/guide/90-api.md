@@ -478,8 +478,11 @@ Agents in a conversation also have their own tools for this: schedule_task and u
 
 ## Agents and their programs
 
-- `GET /api/clients` — the agents' programs on this computer. Returns: `{ clients: [{ id: "claude"|"codex"|"gemini"|"opencode"|"qwen"|"auggie", name, source: "yours"|"app"|"bundled"|"missing", version?, path?, installing? }] }`.
-- `POST /api/clients/:id/install` — installs (or updates) a program with npm into the app's own folder; waits until done (up to 15 min). `:id` as above; 400 for others. Body: none. Returns: `{ clients: […] }` as GET.
+- `GET /api/clients` — the agents' programs on this computer, and keeping them up to date. Returns: `{ clients: [{ id: "claude"|"codex"|"gemini"|"opencode"|"qwen"|"auggie", name, source: "yours"|"app"|"bundled"|"missing", version? — the one the sessions run, path?, installing?, latest? — a newer version out, failed? — a newer version that did not work here (the sessions keep version), yours?: { version?, path } — your own copy when the sessions run another (Codex: the one your terminal runs) }], updates: { auto: boolean — Update automatically, checkedAt? — when it last looked, error? — why that lookup failed, running?: "check"|"update", current? — the program it is updating, last?: { at, auto: boolean — it ran by itself, items: [{ id, name, yours?: boolean, from?, to?, ok: boolean, error?, kept? — the version kept in use because to did not work }] } } }`.
+- `POST /api/clients/check` — Check now: looks up the newest version of each program, in the background (seconds); `updates.running` is `"check"` until it is done. Body: none. Returns: `{ clients, updates }` as GET; 409 while a check or an update runs.
+- `POST /api/clients/update` — Update now: looks up the newest versions and updates every program that is behind: the app's copies with npm, your own with their own updater (`claude update`, `codex update`, `opencode upgrade`; npm for those installed with `npm install -g`). Each new version is checked to work the way the sessions use it, and undone when it does not. Runs in the background (it can take minutes): GET until `updates.running` is gone, then `updates.last` says what changed. Body: none. Returns: `{ clients, updates }` as GET; 409 while a check or an update runs.
+- `PUT /api/clients/auto` — Update automatically (on by default: once a day; off: the daily run only looks). Body: `{ on: boolean }`. Returns: `{ clients, updates }` as GET.
+- `POST /api/clients/:id/install` — installs (or updates) a program with npm into the app's own folder; waits until done (up to 15 min). `:id` as above; 400 for others. Body: none. Returns: `{ clients, updates }` as GET.
 
 ## Accounts (Claude Code and Codex)
 

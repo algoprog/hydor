@@ -72,6 +72,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**More accounts**](/settings?s=accounts&find=More%20accounts): Another subscription for an agent.
 - [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): A session that runs out of usage carries on with another account.
 - [**Agent programs**](/settings?s=accounts&find=Agent%20programs): Which agent programs are installed, and installing the others.
+- [**Update automatically**](/settings?s=accounts&find=Update%20automatically): Keeps Claude Code, Codex and the other agent programs at their newest version.
 
 ### More agents
 

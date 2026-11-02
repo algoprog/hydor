@@ -14,8 +14,9 @@ Everything is optional. Set these in the environment (or in `.env` for Docker Co
 | `IDLE_STOP_HOURS` | `3` | Stop an agent process after this long without activity (`0`: never). History is kept, and it resumes on the next message |
 | `UPLOAD_KEEP_DAYS` | `14` | Delete the app's copies of attachments after this many days |
 | `UPLOAD_MAX_MB` | `2048` | And keep at most this much of them, oldest deleted first |
-| `CLAUDE_BIN` | `~/.local/bin/claude`, else `claude` | The Claude Code executable |
-| `CODEX_BIN` | the Codex installed with the app | The Codex executable |
+| `CLAUDE_BIN` | `~/.local/bin/claude`, else `claude` | The Claude Code executable. One named here is used as it is: the app does not update it |
+| `CODEX_BIN` | the Codex installed with the app | The Codex executable. One named here is used as it is: the app does not update it |
+| `DISABLE_AUTOUPDATER` | unset (`1` in Docker) | Claude Code's own: `1` turns its updates off, and the app's daily update then leaves your Claude Code alone too (**Update now** in Settings → Accounts → Agent programs still updates it) |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | Where Claude Code keeps its data |
 | `CODEX_HOME` | `~/.codex` | Where Codex keeps its data |
 | `NAGET_EMBED_DEVICE` | the GPU with the most free memory, else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`…); Settings → Memory can also keep it on the CPU |
@@ -25,7 +26,7 @@ Everything is optional. Set these in the environment (or in `.env` for Docker Co
 ## What it stores
 
 In `DATA_DIR`: the password hash (`auth.json`), the session index and search database (`naget-agent.db`, `web-agent.db` in older installs),
-logs of running agents (`runs/`), attachments waiting to be sent (`uploads/`), files deleted in the file
+the agents' programs the app installed (`clients/`), logs of running agents (`runs/`), attachments waiting to be sent (`uploads/`), files deleted in the file
 browser (`trash/`), notebook kernels and the terminal server, and, once search by meaning is turned on in
 Settings → Memory, its private Python environment (`memory/venv`). Its model goes to Hugging Face's cache
 (`~/.cache/huggingface`, or `memory/hf` in Docker). Conversations themselves stay where the agents

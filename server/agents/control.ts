@@ -264,6 +264,12 @@ export class CodexControl extends EventEmitter {
   shutdown() {
     this.proc?.kill();
   }
+
+  /** A new Codex: the next call starts it (not while a sign-in waits on this one). */
+  restart() {
+    this.modelsCache = null;
+    if (![...this.flows.values()].some((f) => f.state === 'waiting' || f.state === 'verifying')) this.shutdown();
+  }
 }
 
 export function applyCodexLimits(u: AgentUsage, limits: Json | null) {
@@ -381,6 +387,11 @@ export class ClaudeControl extends EventEmitter {
       proc.stdin.write(JSON.stringify({ type: 'control_request', request_id: 'init', request: { subtype: 'initialize' } }) + '\n');
     });
     return this.inflight;
+  }
+
+  /** A new Claude Code: its models and commands are read again from the next probe. */
+  restart() {
+    this.initCache = null;
   }
 
   /** Slash commands and skills, from the same initialize reply as the models. */

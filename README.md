@@ -20,7 +20,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 
 ## What you can do
 
-- Start Claude Code, Codex or another [ACP](https://agentclientprotocol.com) agent (Gemini CLI, OpenCode…) in any folder
+- Start Claude Code, Codex or another [ACP](https://agentclientprotocol.com) agent (Gemini CLI, OpenCode…) in any folder,
+  their programs installed and kept up to date for you
 - Follow every step in plain words, approve commands and edits, and see each change as a diff
 - Get a notification when a session finishes or needs you (approve right from it), see everything waiting on you
   in one inbox, and carry on from your phone, or talk to it hands-free while you walk

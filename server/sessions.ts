@@ -1370,6 +1370,12 @@ export class SessionManager extends EventEmitter {
     return c;
   }
 
+  /** Claude Code or Codex was updated: the account processes start again with the new version, and read its models afresh. */
+  programsUpdated(ids: string[]) {
+    const all = [this.claude, this.codex, ...this.extraControls.values()];
+    for (const c of all) if ((c instanceof ClaudeControl && ids.includes('claude')) || (c instanceof CodexControl && ids.includes('codex'))) c.restart();
+  }
+
   /** An added account was removed: its control process goes too. */
   dropControl(account: string) {
     const c = this.extraControls.get(account);

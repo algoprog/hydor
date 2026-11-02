@@ -39,7 +39,7 @@ import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
 import { createMcpToken, mcpRoutes, mcpTokens, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
 import { ModelManager } from './models/manager.ts';
-import { clients as agentClients, ensureCommand, install as installClient, updateClients, useNewestCodex } from './clients.ts';
+import { clients as agentClients, clientUpdates, ensureCommand, install as installClient, setClientAutoUpdate, startClientUpdates, watchClients } from './clients.ts';
 import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
@@ -677,15 +677,27 @@ app.get('/api/catalog/:agent', async (req) => {
 
 // ---- the agents' programs: installed when missing, kept current ------------------------------------
 
-useNewestCodex();
-const refreshClients = () =>
-  void updateClients().then((done) => done.length && console.log(`[clients] updated ${done.join(', ')}`), () => {});
-setTimeout(refreshClients, 10 * 60_000).unref();
-setInterval(refreshClients, 24 * 3600_000).unref();
-app.get('/api/clients', async () => ({ clients: agentClients() }));
+// Once a day (and on Update now) each is brought up to its newest version and checked; an updated
+// Claude Code or Codex reaches the account processes too.
+watchClients(db, (ids) => sessions.programsUpdated(ids));
+const clientsState = async () => ({ clients: await agentClients(), updates: clientUpdates() });
+app.get('/api/clients', clientsState);
+/** Looks up the newest versions and updates every program that is behind, in the background; check only looks. */
+app.post('/api/clients/update', async () => {
+  startClientUpdates('now');
+  return clientsState();
+});
+app.post('/api/clients/check', async () => {
+  startClientUpdates('check');
+  return clientsState();
+});
+app.put('/api/clients/auto', async (req) => {
+  setClientAutoUpdate(!!(req.body as { on?: boolean } | undefined)?.on);
+  return clientsState();
+});
 app.post('/api/clients/:id/install', async (req) => {
   await installClient((req.params as { id: string }).id);
-  return { clients: agentClients() };
+  return clientsState();
 });
 
 // ---- models for Console, the app's own agent -------------------------------------------------------
