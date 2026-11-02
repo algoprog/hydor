@@ -19,7 +19,7 @@ import { keptOfTranscript, type Indexer } from './indexer/index.ts';
 import { forget as forgetKept } from './indexer/kept.ts';
 import { Runner, type RunMeta } from './runner/client.ts';
 import { buildHandoff, splitHandoff } from './handoff.ts';
-import { claudeTranscriptPath, findClaudeTranscript, Timeline } from './timeline.ts';
+import { Timeline } from './timeline.ts';
 import { removeSessionScratch } from './tasklog.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
 import { pageServerUrl, runToken } from './mcp.ts';
@@ -28,7 +28,7 @@ import { dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
-import { accountById, accountEnv, accountOfPath, accountPool, historyMoves, moveAcross } from './accounts.ts';
+import { accountById, accountEnv, accountOfPath, accountPool, claudeTranscriptOf, historyMoves, moveAcross } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
@@ -629,9 +629,8 @@ export class SessionManager extends EventEmitter {
     const row = this.db.prepare('select path from sessions where key = ?').get(key) as { path: string } | undefined;
     if (row?.path) return row.path;
     if (key.startsWith('claude:')) {
-      const id = key.slice(7);
-      const cwd = live?.cwd ?? (this.db.prepare('select cwd from app_sessions where key = ?').get(key) as { cwd: string } | undefined)?.cwd;
-      return findClaudeTranscript(id) ?? (cwd ? claudeTranscriptPath(cwd, id) : null);
+      const app = live ? undefined : (this.db.prepare('select cwd, account from app_sessions where key = ?').get(key) as { cwd: string; account: string | null } | undefined);
+      return claudeTranscriptOf(this.db, key.slice(7), live?.cwd ?? app?.cwd, live ? live.account : app?.account);
     }
     // ACP sessions: the app writes their transcripts itself.
     if (key.startsWith('acp:')) return acpTranscriptPath(key.slice(4));
@@ -740,7 +739,7 @@ export class SessionManager extends EventEmitter {
       }
     });
     adapter.on('identity', () => {
-      const p = adapter.agent === 'claude' && adapter.sessionId ? findClaudeTranscript(adapter.sessionId) ?? claudeTranscriptPath(l.cwd, adapter.sessionId) : adapter.transcriptPath;
+      const p = adapter.agent === 'claude' && adapter.sessionId ? claudeTranscriptOf(this.db, adapter.sessionId, l.cwd, l.account) : adapter.transcriptPath;
       if (p) {
         adapter.transcriptPath = p;
         this.timelines.get(key)?.setPath(p);
