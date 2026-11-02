@@ -20,7 +20,8 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
-  and moves them back to their usual group after five quiet minutes. Pinned comes next, then a group for each space and each folder you picked
+  and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
+  after a usage limit stay in Active until that scheduled resume is cleared. Pinned comes next, then a group for each space and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable, with a pen to start a new session
   there, then the rest by day. Snooze one until later, or settle it when you are done for now.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
@@ -221,7 +222,7 @@ agents that speak ACP and take MCP servers.
 
 OpenRouter session costs and token usage show above the message box without a spending cap. Charges come from OpenRouter automatically, with its generation records and catalog prices as fallbacks; its catalog also supplies Usage estimates, so no manual prices are required.
 
-Custom is the app's own agent, for models beyond Claude Code's and Codex's. Its working and starting indicators use the Naget loading animation. It works like them: it reads,
+Custom is the app's own agent, for models beyond Claude Code's and Codex's. Its working and starting indicators use the Naget loading animation, vertically centred beside their text. It works like them: it reads,
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
 Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context. In Auto mode routine steps go ahead and a quick check asks you

@@ -22,10 +22,11 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 
 - Start Claude Code, Codex or another [ACP](https://agentclientprotocol.com) agent (Gemini CLI, OpenCode…) in any folder,
   their programs installed and kept up to date for you
-- Find every session with activity in the last five minutes in the sidebar’s Active group
+- Find every session with activity in the last five minutes in the sidebar’s Active group, plus sessions
+  waiting to resume automatically after a usage limit
 - A rotating ring on the prompt bar’s Stop button makes running sessions easy to spot
 - Follow every step in plain words, approve commands and edits, and see each change as a diff; Custom shows
-  the Naget loading animation while it works
+  the vertically aligned Naget loading animation while it works
 - Get a notification when a session finishes or needs you (approve right from it), see everything waiting on you
   in one inbox, and carry on from your phone, or talk to it hands-free while you walk
 - Open pull requests on GitHub or Gitea, and review a branch file by file

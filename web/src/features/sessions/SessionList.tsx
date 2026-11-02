@@ -479,8 +479,10 @@ export function SessionList({ query }: { query: string }) {
   // Move sessions out of Active even when no new session events arrive.
   useEffect(() => {
     const active = groups.find((g) => g.kind === 'active');
-    if (!active?.items.length) return;
-    const expiresAt = Math.min(...active.items.map((s) => lastActivityAt(s) + ACTIVE_MS));
+    // Scheduled resumes stay Active until the server clears them, even if their reset time passes.
+    const expiring = active?.items.filter((s) => s.resumeAt == null) ?? [];
+    if (!expiring.length) return;
+    const expiresAt = Math.min(...expiring.map((s) => lastActivityAt(s) + ACTIVE_MS));
     const timer = setTimeout(() => setGroupTime(Date.now()), Math.max(1, expiresAt - Date.now()));
     return () => clearTimeout(timer);
   }, [groups]);

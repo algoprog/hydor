@@ -121,6 +121,17 @@ test('Active includes recent finished sessions but excludes stale agents, even w
   assert.equal(expired.some((g) => g.kind === 'active'), false);
 });
 
+test('sessions awaiting auto-resume stay Active beyond five minutes, until the scheduled resume is cleared', () => {
+  const pending = ses(HOME, 2 * H, { resumeAt: now.getTime() + H });
+  const overdue = ses(HOME, 3 * H, { resumeAt: now.getTime() - H, pinned: true });
+  const stopped = ses(HOME, 2 * H, { live: { status: 'exited', startedAt: now.getTime() - 2 * H, pendingApprovals: 0 } });
+  const gs = group([pending, overdue, stopped]);
+  assert.deepEqual(gs.find((g) => g.kind === 'active')?.items.map((s) => s.key), [pending.key, overdue.key]);
+  const cleared = group([{ ...pending, resumeAt: undefined }, { ...overdue, resumeAt: undefined }, stopped]);
+  assert.equal(cleared.some((g) => g.kind === 'active'), false);
+  assert.equal(cleared.find((g) => g.kind === 'pinned')?.items[0].key, overdue.key);
+});
+
 test('recent starts, turns, completions and external activity count; seen sessions do not', () => {
   const ts = now.getTime() - 1000;
   const live = { status: 'idle', startedAt: now.getTime() - H, pendingApprovals: 0 } as const;
