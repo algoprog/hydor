@@ -2,6 +2,7 @@ import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, 
 import { ArrowDown, ChevronRight, FileDiff, FilePen, FilePlus2, FileText, FileX, Info } from 'lucide-react';
 import type { Agent, ApprovalRequest, ExternalState, FileChange, LiveOverlay, LiveState, SystemItem, TimelineItem, ToolItem, TurnItem, UserItem } from '@shared/types';
 import { api, enc } from '../../lib/api';
+import { sentPicturesOf, useSentPictures, type SentPictures } from '../../lib/attachments';
 import { basename, compact, dirname, duration, prettyPath } from '../../lib/format';
 import { openFile } from '../../lib/nav';
 import { useApp, useTimeline } from '../../lib/store';
@@ -34,8 +35,20 @@ export function mergeOverlay(items: TimelineItem[], ov?: LiveOverlay): TimelineI
     }
     return i;
   });
-  const extra = ov.items.filter((i) => !ids.has(i.id)).sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+  // A message the transcript has under an id of its own shows once: the server drops its copy a moment later.
+  const extra = ov.items.filter((i) => !ids.has(i.id) && !savedCopy(items, i)).sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   return extra.length ? [...merged, ...extra] : merged;
+}
+
+/** The transcript's copy of a message the agent was sent, as the server matches them (server/agents/live.ts, prune). */
+function savedCopy(items: TimelineItem[], o: TimelineItem): TimelineItem | undefined {
+  if (o.kind !== 'user') return;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.kind !== 'user') continue;
+    if ((it.ts ?? 0) < (o.ts ?? 0) - 5000) return;
+    if (it.text.trim() === o.text.trim()) return it;
+  }
 }
 
 function blocks(items: TimelineItem[]): Block[] {
@@ -468,6 +481,7 @@ const SegmentView = memo(function SegmentView({
   isNew,
   fresh,
   notes,
+  sent,
 }: {
   seg: Segment;
   sessionKey: string;
@@ -477,6 +491,8 @@ const SegmentView = memo(function SegmentView({
   fresh: (id: string) => boolean;
   /** The session's notes (each shows with the turn of its anchor). */
   notes: SessionNote[];
+  /** The prompt's pictures as sent from this page, while it cannot show its own. */
+  sent?: SentPictures;
 }) {
   const [open, setOpen] = useState<boolean | null>(null);
   const expanded = open ?? !!live;
@@ -507,7 +523,7 @@ const SegmentView = memo(function SegmentView({
 
   return (
     <section className={cx('tl-seg space-y-2', isNew && !seg.prompt && 'anim-in')}>
-      {seg.prompt && <UserBubble item={seg.prompt} arrive={isNew && !seg.prompt.peer} />}
+      {seg.prompt && <UserBubble item={seg.prompt} arrive={isNew && !seg.prompt.peer} sent={sent} />}
       {seg.notice && (
         <div className="flex items-center gap-2 px-2 pt-2 text-[12.5px] text-fg-3">
           <Info size={13} className="shrink-0" />
@@ -661,6 +677,9 @@ export function Timeline({
   const following = () => stick.current;
   const merged = useMemo(() => mergeOverlay(tl?.items ?? [], overlay), [tl?.items, overlay]);
   const segs = useMemo(() => segment(merged), [merged]);
+  // Pictures sent from this page, in their messages until those show their own (lib/attachments.ts).
+  const sentList = useSentPictures((s) => s.byKey[sessionKey]);
+  const sent = useMemo(() => sentPicturesOf(sentList, merged, tl?.items.length ?? 0), [sentList, merged, tl?.items.length]);
   const notes = useSessionNotes(sessionKey);
   const noteIds = useMemo(() => new Set(segs.flatMap((s) => [...segIds(s)])), [segs]);
   const approvals: ApprovalRequest[] = overlay?.approvals ?? [];
@@ -679,6 +698,11 @@ export function Timeline({
     known.current = null;
   }, [sessionKey]);
   if (!known.current && tl && !tl.loading && tl.items.length) known.current = new Set(tl.items.map((i) => i.id));
+  // Nor does a message the transcript now has under another id: its copy was on screen already.
+  for (const o of overlay?.items ?? []) {
+    const copy = known.current && savedCopy(tl?.items ?? [], o);
+    if (copy) known.current!.add(copy.id);
+  }
   const fresh = (id: string) => !!known.current && !known.current.has(id);
 
   // Follow new output while the reader is at the end; anywhere else, keep their place (before the paint).
@@ -893,7 +917,16 @@ export function Timeline({
                     </div>
                   )}
                   <div data-seg={seg.id} data-partial={i === 0 && tl.start > 0 && !seg.prompt ? '1' : undefined}>
-                    <SegmentView seg={seg} sessionKey={sessionKey} agent={agent} live={isLast ? liveInfo : null} isNew={fresh(seg.prompt?.id ?? seg.notice?.id ?? seg.work[0]?.id ?? seg.id)} fresh={fresh} notes={notes} />
+                    <SegmentView
+                      seg={seg}
+                      sessionKey={sessionKey}
+                      agent={agent}
+                      live={isLast ? liveInfo : null}
+                      isNew={fresh(seg.prompt?.id ?? seg.notice?.id ?? seg.work[0]?.id ?? seg.id)}
+                      fresh={fresh}
+                      notes={notes}
+                      sent={seg.prompt && sent.get(seg.prompt.id)}
+                    />
                   </div>
                 </Fragment>
               );
