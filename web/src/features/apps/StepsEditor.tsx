@@ -3,17 +3,17 @@
 // the form and the steps before put in from a short menu, and the flow's checks as you go. Agents change
 // the same steps through the API; shared/app-manifest.ts has the format and the checks.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, CodeXml, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, MessageSquare, Plus, Repeat, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
+import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, CodeXml, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, MessageSquare, Plus, Repeat, Sigma, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
 import type { AnswerField, AppDef, AppField, AppRecipe } from '@shared/apps';
 import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
-import type { DataOp, Flow, Step, StepKind } from '@shared/app-manifest';
-import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf } from '@shared/app-manifest';
+import type { DataOp, Flow, Step, StepKind, ValueOp } from '@shared/app-manifest';
+import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf, VALUE_OPS } from '@shared/app-manifest';
 import { api } from '../../lib/api';
 import { GraphEditor } from './GraphEditor';
 import { childList, editList, listsOf, move, type ListPath } from './paths';
 import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch, useMediaQuery } from '../../components/ui';
 
-const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml };
+const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml, value: Sigma };
 const KIND = Object.fromEntries(STEP_KINDS.map((k) => [k.value, k])) as Record<StepKind, (typeof STEP_KINDS)[number]>;
 const OPS: { value: DataOp; label: string }[] = [
   { value: 'add', label: 'Add a record' },
@@ -63,7 +63,7 @@ function copyOf(s: Step, taken: Set<string>): Step {
   return copy;
 }
 
-const WORD: Record<StepKind, string> = { agent: 'agent', model: 'model', tool: 'tool', decide: 'decide', repeat: 'each', parallel: 'together', app: 'call', data: 'data', ask: 'ask', code: 'code' };
+const WORD: Record<StepKind, string> = { agent: 'agent', model: 'model', tool: 'tool', decide: 'decide', repeat: 'each', parallel: 'together', app: 'call', data: 'data', ask: 'ask', code: 'code', value: 'value' };
 
 function newStep(kind: StepKind, taken: string[], recipe: AppRecipe): Step {
   const id = fieldId(WORD[kind], taken);
@@ -88,8 +88,22 @@ function newStep(kind: StepKind, taken: string[], recipe: AppRecipe): Step {
       return { id, do: 'ask', question: '' };
     case 'code':
       return { id, do: 'code', language: 'javascript', code: CODE_START.javascript };
+    case 'value':
+      return { id, do: 'value', of: '', op: 'count' };
   }
 }
+
+/** What Work out a value asks besides the value, by what it works out: its label, a hint, an example. */
+const VALUE_ARG: Partial<Record<ValueOp, [string, string, string]>> = {
+  pick: ['The field', 'Each item’s field of this name', 'title'],
+  sum: ['Of the field', 'Of this field of each (none: of the items)', 'price'],
+  average: ['Of the field', 'Of this field of each (none: of the items)', 'price'],
+  min: ['Of the field', 'Of this field of each (none: of the items)', 'price'],
+  max: ['Of the field', 'Of this field of each (none: of the items)', 'price'],
+  sort: ['By the field', '-field: highest first (none: the items themselves)', '-price'],
+  join: ['Between them', ', unless set; \\n for a new line', ', '],
+  date: ['Days later', 'Of the date (none: today)', '7'],
+};
 
 /** What a new code step starts with: its input read, its values returned. */
 const CODE_START = {
@@ -685,6 +699,36 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
           </label>
         </>
       );
+    case 'value': {
+      const arg = VALUE_ARG[s.op];
+      return (
+        <>
+          <div>
+            <Label hint="A value of the form, or of a step before it">Of</Label>
+            <RefText mono value={s.of} onChange={(of) => set({ ...s, of })} groups={groups} placeholder="{{find.records}}" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="block">
+              <Label>What it works out</Label>
+              <select className={small} value={s.op} onChange={(e) => set({ ...s, op: e.target.value as ValueOp, arg: undefined })}>
+                {VALUE_OPS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {arg && (
+              <label className="block">
+                <Label hint={arg[1]}>{arg[0]}</Label>
+                <input className={cx(small, 'font-mono text-[12.5px]')} placeholder={arg[2]} value={s.arg ?? ''} onChange={(e) => set({ ...s, arg: e.target.value || undefined })} />
+              </label>
+            )}
+          </div>
+          <div className="text-[12px] text-fg-3">At once and at no cost; its value is {`{{${s.id}.value}}`}.</div>
+        </>
+      );
+    }
     case 'ask': {
       const form = s.fields !== undefined;
       const wait = s.waitHours ?? 168;
@@ -971,7 +1015,13 @@ function summaryOf(s: Step, ctx: Ctx): ReactNode {
     case 'code':
       return (
         <>
-          {s.language === 'python' ? 'Python' : 'JavaScript'} · <span translate="no">{first(s.code)}</span>
+          {s.language === 'python' ? 'Python' : s.language === 'typescript' ? 'TypeScript' : 'JavaScript'} · <span translate="no">{first(s.code)}</span>
+        </>
+      );
+    case 'value':
+      return (
+        <>
+          {VALUE_OPS.find((o) => o.value === s.op)?.label} · <span translate="no">{s.of || '…'}</span>
         </>
       );
   }

@@ -29,6 +29,8 @@ topic says what each part does, and its API topic gives the format.
   - **Repeat** over a list (a few at a time), or until something holds, with a limit.
   - **At the same time** for parts that do not depend on each other.
   - **Keep data** to add, find, search or change the records the template keeps.
+  - **Work out a value** for the first item, a count, a sum or an average, a field of each, a join or a sort: at
+    once and free, no code step needed.
   - **Run code** for exact arithmetic, parsing and formatting: JavaScript, TypeScript or Python, no network. A
     program can also be the flow itself, when its logic is easier written than drawn: ctx.model, ctx.agent,
     ctx.tool, ctx.ask, ctx.data and ctx.app are steps of the run, kept and replayed after a restart (so make the
