@@ -2,7 +2,7 @@
 // filling the prompt from the form, the answer fields (their schema for submit_result and the check
 // of what the agent hands in), and CSV in and out for runs over many rows.
 import type { Agent } from './types.ts';
-import { cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppExample, type AppScreen, type CheckResult, type DataCollection, type Flow, type NamedFlow, type Requires, type Step } from './app-manifest.ts';
+import { allSteps, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppExample, type AppScreen, type CheckResult, type DataCollection, type Flow, type NamedFlow, type Requires, type Step } from './app-manifest.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -112,6 +112,16 @@ export interface AppRecipe {
   screens?: Record<string, AppScreen>;
   /** Saved inputs with checks, to try it and to notice when it gets worse. */
   examples?: AppExample[];
+  /** Where its steps sit in the graph (those not placed are laid out by themselves), and groups of steps with a note. */
+  graph?: AppGraph;
+}
+
+/** The graph's layout, which the editor keeps and agents may leave out. */
+export interface AppGraph {
+  /** A step's place, by its id. */
+  at?: Record<string, { x: number; y: number }>;
+  /** Steps drawn in a frame with a note over them. */
+  groups?: { id: string; note: string; steps: string[] }[];
 }
 
 /** A built-in template: a recipe to run as it is, or to start an app from. */
@@ -729,6 +739,7 @@ export function cleanRecipe(raw: any): AppRecipe {
   const flows = cleanFlows(r.flows).flows;
   const screens = cleanScreens(r.screens);
   const examples = cleanExamples(r.examples).examples;
+  const graph = cleanGraph(r.graph, flow, flows);
   return {
     name: str(r.name, 60) || 'Untitled template',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
@@ -754,7 +765,24 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(flows ? { flows } : {}),
     ...(screens ? { screens } : {}),
     ...(examples ? { examples } : {}),
+    ...(graph ? { graph } : {}),
   };
+}
+
+/** The graph's layout, for the steps there are: places as whole numbers, groups of steps that are there, with short notes. */
+function cleanGraph(raw: any, flow: Flow | undefined, flows: Record<string, NamedFlow> | undefined): AppGraph | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const ids = new Set([...(flow ? allSteps(flow.steps) : []), ...Object.values(flows ?? {}).flatMap((f) => allSteps(f.steps))].map((s) => s.id));
+  const at: Record<string, { x: number; y: number }> = {};
+  if (raw.at && typeof raw.at === 'object')
+    for (const [id, p] of Object.entries(raw.at as Record<string, any>).slice(0, 300))
+      if (ids.has(id) && p && Number.isFinite(p.x) && Number.isFinite(p.y)) at[id] = { x: Math.round(Math.max(-20_000, Math.min(20_000, p.x))), y: Math.round(Math.max(-20_000, Math.min(20_000, p.y))) };
+  const groups = (Array.isArray(raw.groups) ? raw.groups : [])
+    .slice(0, 40)
+    .map((g: any, i: number) => ({ id: str(g?.id, 40) || `g${i + 1}`, note: str(g?.note, 300), steps: (Array.isArray(g?.steps) ? g.steps : []).filter((x: unknown) => typeof x === 'string' && ids.has(x)).slice(0, 60) }))
+    .filter((g: { steps: string[] }) => g.steps.length);
+  const out: AppGraph = { ...(Object.keys(at).length ? { at } : {}), ...(groups.length ? { groups } : {}) };
+  return out.at || out.groups ? out : undefined;
 }
 
 export const DEFAULT_PUBLIC: PublicSettings = { on: false, perIpPerHour: 5, runsPerDay: 50, spendPerDay: 2, web: true };

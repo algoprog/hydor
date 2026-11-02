@@ -114,7 +114,9 @@ agents that speak ACP and take MCP servers.
   repeat over a list or until something holds, branches side by side, another template, its own data, a question
   to you that it waits for, a program in JavaScript or Python in a sandbox), each handing typed values to the
   next, laid out in its Edit (steps added from a short menu, values put in from the form and the steps before,
-  checks shown as you go, and a graph of nodes and wires to look at) or by an agent, shown step by step on the
+  checks shown as you go, and a graph of nodes and wires to build in on a computer: a step's settings beside it,
+  a + on a wire, values wired by dragging from one step to another or into empty space for a new step, nodes
+  placed by hand or laid out by Tidy, groups with notes, full screen) or by an agent, shown step by step on the
   run's page, run again from any step there (the steps before it giving what they gave, also from a test run in
   its Edit) and resumed after a restart; keep records between runs that its steps, its agents and the API share
   (lists named in its Edit, with the fields their records hold); remember across runs in a memory of its own; and

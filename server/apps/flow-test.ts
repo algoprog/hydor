@@ -223,6 +223,10 @@ test('format: a recipe without steps is one agent step; flows, data and memory s
   const one = flowOf(plain).steps[0] as any;
   assert.deepEqual([one.do, one.instructions, one.outputs[0].id], ['agent', 'Do it', 'a']);
   assert.ok(cleanData({ items: { id: 'text' } }).errors.some((e) => /a record's own/.test(e)));
+  // Where its steps sit in the graph: places for steps that are there, groups of them, nothing else.
+  const g = cleanRecipe({ ...r, graph: { at: { one: { x: 10.4, y: -5 }, gone: { x: 1, y: 1 }, bad: { x: 'a' } }, groups: [{ note: 'The start', steps: ['one', 'gone'] }, { note: 'Empty', steps: ['gone'] }] } }).graph;
+  assert.deepEqual(g, { at: { one: { x: 10, y: -5 } }, groups: [{ id: 'g1', note: 'The start', steps: ['one'] }] });
+  assert.equal(cleanRecipe({ ...r, graph: { at: { gone: { x: 1, y: 1 } } } }).graph, undefined);
 });
 
 test('checks: values from later steps, from inside a Repeat, from another branch; rules, tools and what it keeps', () => {
@@ -860,6 +864,11 @@ test('the builder’s tools: app_save makes and changes a template (whole, a pat
   assert.equal(findRecords(db, id, store.getApp(db, id)!.data, 'items').count, 3);
   assert.match(text(await tools.app_data.run({ app: id, op: 'remove', collection: 'items', where: {} }, ctx)), /op is find, search, get, add/);
   assert.match(text(await tools.app_data.run({ app: id, op: 'find', collection: 'nothing' }, ctx)), /keeps no list “nothing”: its lists are items/);
+  // Where its steps sit is the user's: a whole recipe without it keeps theirs.
+  store.saveApp(db, { id, recipe: { ...cleanRecipe(store.getApp(db, id)!), graph: { at: { save: { x: 5, y: 6 } } } } });
+  text(await tools.app_get.run({ app: id }, ctx));
+  text(await tools.app_save.run({ app: id, recipe: { ...cleanRecipe(store.getApp(db, id)!), graph: undefined, name: 'Built again' } }, ctx));
+  assert.deepEqual(store.getApp(db, id)!.graph, { at: { save: { x: 5, y: 6 } } });
   // A step another one names, removed: saved, with a warning.
   const removed = text(await tools.app_save.run({ app: id, step: { id: 'count', remove: true } }, ctx));
   assert.match(removed, /To look at:[\s\S]*count/);
