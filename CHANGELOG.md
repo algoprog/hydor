@@ -3,6 +3,17 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.10.1 · 2 November 2026
+
+Pages that look like part of the app: in its theme, and light or dark as the app is.
+
+- **Pages in the app's theme**: the pages agents make take the theme you use, with its colours (your own themes
+  too), the app's font and chart colours from it, unless you ask for another look. An open page changes with the
+  app when you switch themes.
+- **Light or dark as the app is**: a page with light and dark looks of its own shows the one the app is in, not the
+  one your device is set to: with the app light on a device set to dark, the page is light.
+- **Saved as a file**, a page keeps its ready-made look.
+
 ## 0.10.0 · 2 November 2026
 
 A page editor that works on phones and changes whole pages, sign-ins agents use without seeing them, and a
