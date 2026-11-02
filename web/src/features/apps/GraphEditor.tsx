@@ -30,6 +30,7 @@ import { toast, toastError } from '../../lib/store';
 import { Button, cx, IconButton, inputCls, MenuItem, Popover, Throbber } from '../../components/ui';
 import { money, useRunEvents, type RunDetail } from './api';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
+import { BlockChips } from './Blocks';
 import { childList, listsOf, type ListPath } from './paths';
 import type { Ctx } from './StepsEditor';
 
@@ -894,6 +895,7 @@ function GraphMenu({ menu, anchor, ctx, pos, onClose, onPick }: { menu: Menu; an
               </button>
             );
           })}
+        {menu.kind === 'add' && <BlockChips ctx={ctx} onPick={(b) => (onClose(), void ctx.useBlock(menu.list, menu.at, b).then(onPick, toastError))} />}
         {menu.kind !== 'add' && from && (
           <>
             <div className="px-2 pt-1 pb-1.5 text-[12px] text-fg-3">
@@ -1124,6 +1126,7 @@ function CollapseButton({ ctx, picked, onFlows, done }: { ctx: Ctx; picked: stri
           tools: r.tools,
           limits: r.limits,
           prompt: '',
+          block: true,
           ...c.block,
         },
       });

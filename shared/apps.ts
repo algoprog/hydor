@@ -114,6 +114,8 @@ export interface AppRecipe {
   examples?: AppExample[];
   /** Where its steps sit in the graph (those not placed are laid out by themselves), and groups of steps with a note. */
   graph?: AppGraph;
+  /** A block: made to be a step of other templates (Add a step offers it); its form is what it is given, its answer what it gives. */
+  block?: boolean;
 }
 
 /** The graph's layout, which the editor keeps and agents may leave out. */
@@ -772,6 +774,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(screens ? { screens } : {}),
     ...(examples ? { examples } : {}),
     ...(graph ? { graph } : {}),
+    ...(r.block === true ? { block: true } : {}),
   };
 }
 

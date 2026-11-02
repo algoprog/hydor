@@ -54,8 +54,8 @@ const BLANK: AppRecipe = {
 
 // Every part of the recipe, so a save keeps what this page does not show yet (its data, memory, needs, other flows).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples, graph } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples, graph };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples, graph, block } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples, graph, block };
 };
 
 /** A text box that grows with what is written in it. */
@@ -674,6 +674,13 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               <Button size="sm" variant="subtle" icon={<Plus size={14} />} onClick={addAnswer}>
                 Add an answer field
               </Button>
+              <div className="flex items-center gap-3 border-t border-line pt-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px]">A block</span>
+                  <span className="block text-[12px] text-fg-3">Offered when other templates add a step: its form is what it is given, its answer what it gives.</span>
+                </span>
+                <Switch on={!!recipe.block} label="A block" onChange={(on) => set({ block: on || undefined })} />
+              </div>
             </div>
           </Section>
 

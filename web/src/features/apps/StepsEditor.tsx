@@ -4,11 +4,13 @@
 // the same steps through the API; shared/app-manifest.ts has the format and the checks.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, CodeXml, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, MessageSquare, Plus, Repeat, Sigma, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
-import type { AnswerField, AppDef, AppField, AppRecipe } from '@shared/apps';
+import type { AnswerField, AppDef, AppField, AppRecipe, AppTemplate } from '@shared/apps';
 import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
 import type { DataOp, Flow, Step, StepKind, ValueOp } from '@shared/app-manifest';
 import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf, VALUE_OPS } from '@shared/app-manifest';
-import { api } from '../../lib/api';
+import { api, post } from '../../lib/api';
+import { toastError } from '../../lib/store';
+import { BlockChips } from './Blocks';
 import { GraphEditor } from './GraphEditor';
 import { childList, editList, listsOf, move, type ListPath } from './paths';
 import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch, useMediaQuery } from '../../components/ui';
@@ -519,6 +521,10 @@ export interface Ctx {
   make: (kind: StepKind) => Step;
   /** A template made here (a block), for the steps that call one. */
   addApp: (a: AppDef) => void;
+  /** The blocks Add a step offers: yours (but this one), and the ready-made ones. */
+  blocks: { mine: AppDef[]; ready: AppTemplate[] };
+  /** Puts in a step that calls a block (a ready-made one made yours first); gives its id. */
+  useBlock: (list: ListPath, at: number, b: AppDef | AppTemplate) => Promise<string>;
   edit: (list: ListPath, f: (l: Step[]) => Step[]) => void;
   copy: (list: ListPath, i: number) => void;
   msgs: Map<string, { text: string; error: boolean }[]>;
@@ -1145,7 +1151,7 @@ function StepCard({ s, list, i, last, ctx }: { s: Step; list: ListPath; i: numbe
 }
 
 
-function AddStep({ onPick }: { onPick: (k: StepKind) => void }) {
+function AddStep({ onPick, ctx, list, at }: { onPick: (k: StepKind) => void; ctx: Ctx; list: ListPath; at: number }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   return (
@@ -1167,6 +1173,13 @@ function AddStep({ onPick }: { onPick: (k: StepKind) => void }) {
             );
           })}
         </div>
+        <BlockChips
+          ctx={ctx}
+          onPick={(b) => {
+            setOpen(false);
+            ctx.useBlock(list, at, b).then(() => ctx.setOpen(JSON.stringify([...list, at])), toastError);
+          }}
+        />
       </Popover>
     </>
   );
@@ -1179,7 +1192,7 @@ function StepList({ steps, list, ctx }: { steps: Step[]; list: ListPath; ctx: Ct
         <StepCard key={i} s={s} list={list} i={i} last={steps.length - 1} ctx={ctx} />
       ))}
       <li>
-        <AddStep onPick={(k) => ctx.add(list, k)} />
+        <AddStep onPick={(k) => ctx.add(list, k)} ctx={ctx} list={list} at={steps.length} />
       </li>
     </ol>
   );
@@ -1195,10 +1208,14 @@ export function StepsEditor({ recipe, onChange, onAsk, appId }: { recipe: AppRec
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [models, setModels] = useState<{ id: string; label: string }[]>([]);
   const [apps, setApps] = useState<AppDef[]>([]);
+  const [ready, setReady] = useState<AppTemplate[]>([]);
   useEffect(() => {
     api<{ tools: ToolInfo[] }>('/api/apps/tools').then((r) => setTools(r.tools.filter((t) => t.step)), () => {});
     api<{ models: { id: string; label: string }[] }>('/api/apps/models').then((r) => setModels(r.models), () => {});
-    api<{ apps: AppDef[] }>('/api/apps').then((r) => setApps(r.apps), () => {});
+    api<{ apps: AppDef[]; templates: AppTemplate[] }>('/api/apps').then(
+      (r) => (setApps(r.apps), setReady(r.templates.filter((t) => t.block))),
+      () => {},
+    );
   }, []);
 
   // What must change before it saves, and what may surprise, by the step they are about.
@@ -1237,6 +1254,21 @@ export function StepsEditor({ recipe, onChange, onAsk, appId }: { recipe: AppRec
     },
     make: (kind) => newStep(kind, taken(), recipe),
     addApp: (a) => setApps((x) => [...x.filter((y) => y.id !== a.id), a]),
+    blocks: { mine: apps.filter((a) => a.block && a.id !== appId), ready },
+    useBlock: async (list, at, b) => {
+      let a: AppDef;
+      if ('slug' in b) a = b as AppDef;
+      else {
+        a = (await post<{ app: AppDef }>('/api/apps', { recipe: b, template: b.id })).app;
+        setApps((x) => [...x, a]);
+      }
+      // Its questions the template's own form has by the same name are given; the rest are to fill in.
+      const own = new Set(recipe.fields.map((f) => f.id));
+      const w = Object.fromEntries(a.fields.map((f) => [f.id, own.has(f.id) ? `{{${f.id}}}` : (f.default ?? '')]));
+      const s = { ...newStep('app', taken(), recipe), title: a.name, app: a.slug, ...(a.fields.length ? { with: w } : {}) } as Step;
+      setSteps(editList(flow.steps, list, (l) => [...l.slice(0, at), s, ...l.slice(at)]));
+      return s.id;
+    },
     insert: (list, at, what) => {
       const s = typeof what === 'string' ? newStep(what, taken(), recipe) : what;
       setSteps(editList(flow.steps, list, (l) => [...l.slice(0, at), s, ...l.slice(at)]));

@@ -89,7 +89,7 @@ export function GalleryPage() {
               <h2 className="mb-3 text-[13px] font-medium text-fg-3">Your templates</h2>
               {g.apps.length ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {g.apps.map((a) => (
+                  {g.apps.filter((a) => !a.block).map((a) => (
                     <Card
                       key={a.id}
                       icon={a.icon}
@@ -123,6 +123,20 @@ export function GalleryPage() {
                 </div>
               )}
             </section>
+
+            {g.apps.some((a) => a.block) && (
+              <section>
+                <h2 className="mb-1 text-[13px] font-medium text-fg-3">Your blocks</h2>
+                <p className="mb-3 text-[12.5px] text-fg-3">Templates made to be steps of others: Add a step offers them in every template’s steps.</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {g.apps
+                    .filter((a) => a.block)
+                    .map((a) => (
+                      <Card key={a.id} icon={a.icon} color={a.color} name={a.name} description={a.description} own onClick={() => go(appPath(a.id))} />
+                    ))}
+                </div>
+              </section>
+            )}
 
             {g.recent.length > 0 && (
               <section>
