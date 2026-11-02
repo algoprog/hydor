@@ -4,7 +4,7 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, AppWindow, ArrowRight, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, FolderTree, Gauge, GitBranch, Headphones, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, AppWindow, ArrowRight, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Headphones, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
@@ -82,6 +82,7 @@ const ACTS: Record<NonNullable<CatalogItem['act']>, { icon: ReactNode; run: () =
     },
   },
   sidebar: { icon: <PanelLeft size={15} />, run: () => useUI.getState().set({ sideOpen: !useUI.getState().sideOpen }), hint: 'Ctrl+B' },
+  groups: { icon: <Folders size={15} />, run: () => useUI.getState().set({ groupByFolder: !useUI.getState().groupByFolder }) },
   panel: { icon: <SquareTerminal size={15} />, run: () => useUI.getState().set({ panelOpen: !useUI.getState().panelOpen }), hint: 'Ctrl+`' },
 };
 

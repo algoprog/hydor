@@ -19,7 +19,7 @@ export interface CatalogItem {
   where?: string;
   /** What opening it does: a page, an action, a Settings section (and the words to point at there), a theme. */
   path?: string;
-  act?: 'tour' | 'ask' | 'theme' | 'sidebar' | 'panel' | 'releases' | 'handsfree';
+  act?: 'tour' | 'ask' | 'theme' | 'sidebar' | 'groups' | 'panel' | 'releases' | 'handsfree';
   section?: string;
   find?: string;
   theme?: string;
@@ -235,6 +235,7 @@ const ACTIONS: [CatalogItem['act'] & string, string, string, string][] = [
   ['releases', 'Release notes', 'what is new whats new changelog changes version history updates', 'What changed in each version of the app'],
   ['theme', 'Switch between light and dark', 'theme dark light mode appearance night day', 'Turns the theme to light or dark'],
   ['sidebar', 'Show or hide the sidebar', 'sidebar toggle hide show', 'Ctrl+B'],
+  ['groups', 'Group sessions by folder or space', 'sidebar session list group by folder space project organize sort by date day', 'In the sidebar: a group for each space and each folder you work in, or every session by day'],
   ['panel', 'Show or hide the terminal panel', 'terminal panel toggle bottom', 'Ctrl+`'],
 ];
 

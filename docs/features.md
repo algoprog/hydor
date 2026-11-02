@@ -17,7 +17,9 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
   they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
-  doing right now. Snooze one until later, or settle it when you are done for now.
+  doing right now: the active and pinned ones first, then a group for each space and each folder you picked
+  (task folders, the home folder and temporary ones go by day), foldable, with a pen to start a new session
+  there, then the rest by day. Snooze one until later, or settle it when you are done for now.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
   OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
@@ -69,8 +71,8 @@ agents that speak ACP and take MCP servers.
   Files, a file's window or an agent's file cards with Add to a space. Its Skills tab holds skills only its
   sessions get, with the skill library: written there, copied from the library to change for the space alone, or
   proposed by an agent working in it and kept for the space when you approve. A group brings several spaces
-  together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar's
-  filter shows one space's sessions.
+  together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar
+  groups each space's sessions under its name, and its filter shows one space's sessions.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and

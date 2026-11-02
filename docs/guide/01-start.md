@@ -20,7 +20,7 @@ The screen has two parts: the **sidebar** on the left, and the page you are on (
 - A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
 - **New session** opens the [start page](#the-start-page).
 - **Search sessions** finds sessions by their title, their folder and the words said in them, archived sessions included. Escape clears it. On a computer, the **Ctrl+K** badge at the end of the field opens the search box instead (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
-- The filter button at the end of that field (**Filter by agent or space**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have spaces, **Every space** or one of your spaces (up to eight are listed), with **Spaces** to open the Spaces page. The button takes the accent colour while a filter is on. See [Spaces and knowledge](/guide/spaces).
+- The filter button at the end of that field (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have spaces, **Every space** or one of your spaces (up to eight are listed), with **Spaces** to open the Spaces page. The button takes the accent colour while a filter is on. Its last line, **Group by folder or space**, turns the groups for your spaces and folders on or off (see [The session list](#the-session-list)). See [Spaces and knowledge](/guide/spaces).
 
 ### The session list
 
@@ -28,12 +28,19 @@ Under the search field is every session, in groups:
 
 - **Active**: sessions whose agent is running now, here or in VS Code or a terminal. They keep their places while they work; drag one to move it.
 - **Pinned**: the sessions you pinned, in the order you drag them into. Drag a session from the groups below onto it to pin it.
+- A group for each of your spaces, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
 - **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
 - **Snoozed**: at the bottom, until their time comes.
 
+Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and a session started in a space in the space's group, whatever its folder.
+
+Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. The pen at the end of a heading (on a computer, when you point at the heading) starts a new session in that folder or space.
+
+To list the sessions by day only, as before, untick **Group by folder or space** in the filter button's menu, or find **Group sessions by folder or space** in the search box; it switches back the same way. While the list shows one space, its sessions go by day.
+
 Archived sessions are not listed, but **Search sessions** still finds them. "No sessions yet." shows before your first one.
 
-Each row shows the agent's icon with a status dot, the session's title, and a second line. While the agent runs, the second line says what it is doing ("Working · 2m 10s", "Needs you", "Ready", "Working · 1 in background", "Open in VS Code"). Otherwise it shows the folder, how long ago the session was active, and how many lines it added and removed. Small marks can follow the title:
+Each row shows the agent's icon with a status dot, the session's title, and a second line. While the agent runs, the second line says what it is doing ("Working · 2m 10s", "Needs you", "Ready", "Working · 1 in background", "Open in VS Code"). Otherwise it shows the folder (in a space's or a folder's group, which names it already, the branch of a worktree instead, or nothing), how long ago the session was active, and how many lines it added and removed. Small marks can follow the title:
 
 - a dot in the accent colour: it finished since you last looked (its second line reads "Done · 5m ago"); opening it marks it read on every device;
 - a pull request badge with its state;
@@ -112,7 +119,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 ### What it finds
 
 - **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Spaces, Shared knowledge, Pages, Published pages, Preview, Usage and limits, Model arena, Activity, System and Settings.
-- **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Show or hide the terminal panel.
+- **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or space, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.
 - **Sessions**: by title, folder, branch and first message (not archived ones). Opening one opens it.
@@ -229,6 +236,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "Which of my sessions are waiting on me right now, and what does each one need?"
 - "Start a Codex session in ~/code/shop that makes the checkout tests pass."
 - "Find the session where we planned the Lisbon trip and pin it."
+- "List my sessions in the sidebar by day, without the folder groups."
 - "Next time I open the start page, have it set to Claude Code with the Researcher assistant."
 - "Make my search box look only in my sessions and pages."
 - "What is in my inbox?"

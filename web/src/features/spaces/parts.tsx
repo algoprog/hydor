@@ -9,6 +9,7 @@ import { Button, cx, Dialog, inputCls, Popover, Tabs } from '../../components/ui
 import { post } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
+import { saveStart } from '../../lib/start';
 import { toastError, useApp } from '../../lib/store';
 import { loadSpaces, useSpaces } from './state';
 
@@ -45,6 +46,12 @@ export function SpaceMark({ s, size = 15, className }: { s: Pick<Space, 'name' |
       {[...s.name.trim()][0]?.toUpperCase() ?? 'S'}
     </span>
   );
+}
+
+/** The start page, with this space picked: its folder, its assistant. */
+export function startInSpace(s: Space) {
+  saveStart({ space: s.id, cwd: s.folder, task: false, ...(s.assistant ? { assistant: s.assistant } : {}) }, true);
+  go('/');
 }
 
 /** "Thesis, Taxes 2026 and The garden": a group's spaces, by name. */
