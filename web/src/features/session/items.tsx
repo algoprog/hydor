@@ -848,7 +848,8 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
         {item.images ? <MessageImages item={item} sent={sent} /> : null}
         {(text || files.length > 0 || context) && (
           // Short ones keep to their words; a long one is as wide as the message box, and lines up with it.
-          <div className="max-w-full rounded-[20px] bg-bg-2 px-4 py-2.5">
+          // (The words written on the start page become this as the session opens: lib/motion.ts.)
+          <div data-bubble className="max-w-full rounded-[20px] bg-bg-2 px-4 py-2.5">
             {text && (
               <div
                 ref={body}
