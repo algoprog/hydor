@@ -226,7 +226,7 @@ export function pageMimeFor(file: string): string {
 
 // ---- writing -------------------------------------------------------------------
 
-export async function writeFile(fileIn: string, content: string, o: { expectedMtime?: number; create?: boolean }) {
+export async function writeFile(fileIn: string, content: string | Buffer, o: { expectedMtime?: number; create?: boolean }) {
   const file = resolvePath(fileIn);
   let mode = 0o644;
   let exists = false;
@@ -369,6 +369,19 @@ export async function deletePath(pIn: string, o: { forGood?: boolean } = {}) {
   noteWhere((w) => void (w[path.basename(dest)] = { from: p, at: Date.now() }));
   invalidateGit(p);
   return { trashed: dest };
+}
+
+/**
+ * A copy of a file put in the trash, the file staying where it is: how it was before it is written over (a Word file
+ * saved from an editor that does not keep all of it). Put back, it comes back beside the file, as "name copy".
+ */
+export async function trashCopy(pIn: string): Promise<string> {
+  const p = resolvePath(pIn);
+  await fs.promises.mkdir(TRASH, { recursive: true });
+  const dest = path.join(TRASH, `${new Date().toISOString().replace(/[:.]/g, '-')}-${path.basename(p)}`);
+  await fs.promises.copyFile(p, dest);
+  noteWhere((w) => void (w[path.basename(dest)] = { from: p, at: Date.now() }));
+  return dest;
 }
 
 export interface TrashItem {

@@ -881,6 +881,52 @@ function wordDoc(buf: Buffer): Doc {
   return normalizeDoc({ page: { size: letter ? 'letter' : 'a4', margin }, font, size: ctx.size, blocks: out });
 }
 
+/** The characters of a document's words (its paragraphs, items, tables' cells and captions). */
+function docChars(d: Doc): number {
+  let n = 0;
+  for (const b of d.blocks) {
+    if (b.type === 'p' || b.type === 'li') n += b.runs.reduce((k, r) => k + r.t.length, 0);
+    else if (b.type === 'table') for (const row of b.rows) for (const c of row) n += c.runs.reduce((k, r) => k + r.t.length, 0);
+    else if (b.type === 'image') n += (b.caption ?? '').length;
+  }
+  return n;
+}
+
+/**
+ * What of a Word file a document here does not hold, so that the document editor saving over it would lose it (keys
+ * Files words for the person: "headers" for headers and footers, "footnotes", "comments", "changes" for tracked
+ * changes, which come in as they read, "equations", "charts", "diagrams" for SmartArt, "objects" for embedded files,
+ * "boxes" for text boxes, whose words come in after their paragraph, "columns", "toc" for a table of contents that
+ * updates, "layout" for pages laid out apart, such as a landscape section); and `cut`, whether `doc`, read from it,
+ * came in short of its words (a document longer than one here may be).
+ */
+export function wordLosses(buf: Buffer, doc: Doc): { loses: string[]; cut: boolean } {
+  const zip = new Zip(buf);
+  const mainRel = [...rels(zip, '').values()].find((x) => x.type === 'officeDocument')?.target;
+  const main = mainRel && zip.has(mainRel) ? mainRel : 'word/document.xml';
+  const xml = zip.text(main) ?? '';
+  const r = [...rels(zip, main).values()];
+  const loses = new Set<string>();
+  const words = /<w:t(?:\s[^>]*)?>[^<]*\S/;
+  if (r.some((x) => (x.type === 'header' || x.type === 'footer') && words.test(zip.text(x.target) ?? ''))) loses.add('headers');
+  if (/<w:(?:footnote|endnote)Reference[\s/>]/.test(xml)) loses.add('footnotes');
+  if (/<w:comment(?:Reference|RangeStart)[\s/>]/.test(xml)) loses.add('comments');
+  if (/<w:(?:ins|del|moveFrom|moveTo)\s[^>]*w:author=/.test(xml)) loses.add('changes');
+  if (/<m:oMath[\s>]/.test(xml)) loses.add('equations');
+  if (r.some((x) => x.type === 'chart') || /<c:chart[\s/>]/.test(xml)) loses.add('charts');
+  if (r.some((x) => x.type === 'diagramData')) loses.add('diagrams');
+  if (r.some((x) => x.type === 'oleObject' || x.type === 'package') || /<o:OLEObject[\s/>]/.test(xml)) loses.add('objects');
+  if (/<w:txbxContent[\s>]/.test(xml)) loses.add('boxes');
+  if (/<w:cols\s[^>]*w:num="(?:[2-9]|\d{2,})"/.test(xml)) loses.add('columns');
+  if (/<w:instrText(?:\s[^>]*)?>\s*TOC\b|w:instr="\s*TOC\b/.test(xml)) loses.add('toc');
+  const sizes = new Set([...xml.matchAll(/<w:pgSz\s[^>]*?\/>/g)].map((m) => m[0].replace(/\s+w:code="[^"]*"/, '')));
+  if (sizes.size > 1 || /<w:pgSz\s[^>]*w:orient="landscape"/.test(xml)) loses.add('layout');
+  // Its words, against the document's: a text box's other drawing (Fallback) holds its words twice, and is not read.
+  const chars = [...xml.replace(/<mc:Fallback>[\s\S]*?<\/mc:Fallback>/g, '').matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)].reduce((n, m) => n + m[1].replace(/&[#\w]{1,8};/g, '_').length, 0);
+  const cut = doc.blocks.length >= DOC_LIMITS.blocks || docChars(doc) < chars * 0.98 - 50;
+  return { loses: [...loses], cut };
+}
+
 // ---- the agent's tool ---------------------------------------------------------------------------------------------
 
 const DOC_HELP = [

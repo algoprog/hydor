@@ -6,7 +6,9 @@ import { api, enc, post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 import { uploadPicture } from '../pictures';
 
-export const typeset = (model: TexDoc, base: string | undefined, signal?: AbortSignal) => api<TexCompiled>('/api/pages/tex/compile', { method: 'POST', body: { model, base }, signal });
+/** `folder`: a file's document (opened from Files), typeset among the other files of its folder. */
+export const typeset = (model: TexDoc, base: string | undefined, folder?: string, signal?: AbortSignal) =>
+  api<TexCompiled>('/api/pages/tex/compile', { method: 'POST', body: { model, base, folder }, signal });
 
 let setupOnce: Promise<TexSetup> | null = null;
 /** What this computer has (asked once; again after a failure). */

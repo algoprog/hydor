@@ -5,8 +5,8 @@ import { Check, ChevronDown, ChevronUp, CircleAlert, ScrollText, Sparkles, Trian
 import type { TexCompiled, TexHeading, TexIssue } from '@shared/latex';
 import { Button, cx, Dialog, inputCls } from '../../../components/ui';
 
-/** Where an error or a warning is, in a few characters: "main.tex:12". */
-export const where = (x: TexIssue) => (x.file ? `${x.file}${x.line ? `:${x.line}` : ''}` : x.line ? `line ${x.line}` : '');
+/** Where an error or a warning is, in a few characters: "main.tex:12" (`name`: a file's name as the tabs show it). */
+export const where = (x: TexIssue, name: (file: string) => string = (f) => f) => (x.file ? `${name(x.file)}${x.line ? `:${x.line}` : ''}` : x.line ? `line ${x.line}` : '');
 
 /** A name to give, in a dialog: a new file's, or a new name for one. */
 export function NameDialog({
@@ -74,12 +74,15 @@ export function Problems({
   onGo,
   onLog,
   onAsk,
+  name,
 }: {
   result: TexCompiled | null;
   open: boolean;
   onToggle: () => void;
   onGo: (x: TexIssue) => void;
   onLog: () => void;
+  /** A file's name as the tabs show it. */
+  name?: (file: string) => string;
   onAsk?: () => void;
 }) {
   const errors = result?.errors ?? [];
@@ -135,9 +138,9 @@ export function Problems({
               <button type="button" onClick={() => onGo(x)} disabled={!x.file && !x.line} className="flex w-full items-start gap-2 px-3 py-1.5 text-left transition-colors hover:bg-bg-2 disabled:hover:bg-transparent">
                 {err ? <CircleAlert size={14} className="mt-0.5 shrink-0 text-err" /> : <TriangleAlert size={14} className="mt-0.5 shrink-0 text-warn" />}
                 <span className="min-w-0 flex-1 text-[12.5px] leading-snug">
-                  {where(x) && (
+                  {where(x, name) && (
                     <span translate="no" className="mr-1.5 font-mono text-[11.5px] text-fg-3">
-                      {where(x)}
+                      {where(x, name)}
                     </span>
                   )}
                   <span translate="no" className="text-fg">

@@ -6,7 +6,8 @@
 // so Back goes to the folder you were in.
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { ChevronDown, Clock, FileText, Folder, House, NotebookText, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, Clock, FileText, Folder, House, NotebookText, Search, Sheet, Sigma, Trash2, X } from 'lucide-react';
+import { editorKindOf } from '@shared/documents';
 import { api } from '../../lib/api';
 import { basename } from '../../lib/format';
 import { filePath, go, showInFiles } from '../../lib/nav';
@@ -16,6 +17,7 @@ import { cx, Throbber, IconButton, MenuBack, Popover, SheetsOnPhone, useIsMobile
 import { PageHeader } from '../layout/PageHeader';
 import { goFolder } from './actions';
 import { FileEditor } from './FileEditor';
+import { FileInEditor } from './FileInEditor';
 import { FolderView } from './FolderView';
 import { useFolderLead } from './ItemMenu';
 import { Places, type Place } from './Places';
@@ -25,13 +27,25 @@ import { RecentView, TrashView } from './TrashView';
 
 const NotebookView = lazy(() => import('../notebook/NotebookView'));
 
+/** The editors files open in, by kind: what the button back to one says, and its icon. */
+const IN_EDITOR = {
+  doc: { label: 'Open in the document editor', icon: <FileText size={14} /> },
+  sheet: { label: 'Open in the spreadsheet editor', icon: <Sheet size={14} /> },
+  tex: { label: 'Open in the LaTeX editor', icon: <Sigma size={14} /> },
+};
+
 /**
- * A file: notebooks open as notebooks (with their JSON a click away), everything else in the editor.
- * `embedded`: in a dialog over another page (FilePeek), showing documents as they look first.
+ * A file: notebooks open as notebooks (with their JSON a click away); Word, Excel, CSV and LaTeX files in the editor of
+ * their kind (their text or preview a click away); everything else in the text editor, or as a preview or a picture.
+ * `embedded`: in a dialog over another page (FilePeek), showing documents as they look first. A file opened at a line
+ * (a search's match) shows as text, at that line.
  */
 export function FileView({ path, line, embedded, onDirty }: { path: string; line?: number; embedded?: boolean; onDirty?: (dirty: boolean) => void }) {
   const notebook = path.endsWith('.ipynb');
   const [source, setSource] = useState(false);
+  const kind = editorKindOf(path);
+  const [asText, setAsText] = useState(() => !!line);
+  if (kind && !asText) return <FileInEditor path={path} embedded={embedded} onDirty={onDirty} fileMenu={!embedded} onText={() => setAsText(true)} />;
   if (notebook && !source) {
     return (
       <Suspense
@@ -54,10 +68,16 @@ export function FileView({ path, line, embedded, onDirty }: { path: string; line
       onDirty={onDirty}
       fileMenu={!embedded}
       actions={
-        notebook && (
+        notebook ? (
           <IconButton label="Open as a notebook" size="sm" onClick={() => setSource(false)}>
             <NotebookText size={14} />
           </IconButton>
+        ) : (
+          kind && (
+            <IconButton label={IN_EDITOR[kind].label} size="sm" onClick={() => setAsText(false)}>
+              {IN_EDITOR[kind].icon}
+            </IconButton>
+          )
         )
       }
     />

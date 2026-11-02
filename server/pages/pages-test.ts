@@ -3,8 +3,10 @@
 // served (sandbox policy, no cookies, nothing outside the folder); slide decks (save_slides, their checks,
 // pictures, versions, their own page), documents (save_doc, Word and Markdown in and out), spreadsheets
 // (save_sheet, formulas, Excel and CSV in and out), LaTeX documents
-// (save_latex, typeset when TeX is here, kept in its folder) and the exports (PowerPoint and Word read back,
-// the web page, PDF when a browser is here). Through the routes, with a stand-in for the session manager. Build and run with a scratch folder:
+// (save_latex, typeset when TeX is here, kept in its folder), the exports (PowerPoint and Word read back,
+// the web page, PDF when a browser is here), and files of the computer's opened in the editors and saved back (a CSV
+// to the byte, a Word file with what it loses, a LaTeX project in its folder). Through the routes, with a stand-in
+// for the session manager. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/pages-test.ts
 //   DATA_DIR=/tmp/naget-test-pages-unit node dist/dev/pages-test.js
 import crypto from 'node:crypto';
@@ -19,6 +21,7 @@ import { extractText } from '../documents/extract.ts';
 import { canCapture } from '../capture/index.ts';
 import { normalizeDeck } from '../../shared/slides.ts';
 import { draftsOf, endDrafts, feedDraft, JsonFields } from './drafts.ts';
+import { zipParts } from './ooxml.ts';
 import { takeEdits } from './edits.ts';
 import { pages } from './index.ts';
 
@@ -73,7 +76,7 @@ const ok = (cond: unknown, what: string) => {
     console.log(`FAIL ${what}`);
   }
 };
-const req = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, body?: unknown, headers: Record<string, string> = {}) =>
+const req = (method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, body?: unknown, headers: Record<string, string> = {}) =>
   app.inject({ method, url, payload: body === undefined ? undefined : JSON.stringify(body), headers: { 'content-type': 'application/json', host: 'app.test', ...headers } });
 const run = async (name: string, args: Record<string, unknown>): Promise<{ text?: string; error?: string }> => {
   try {
@@ -577,6 +580,105 @@ let privPath = '';
   } else ok(made.text?.includes('not typeset'), 'without TeX it is kept and says what to install');
   const spawn = (await pages.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { page: id } }, deps)) ?? {};
   ok(spawn.instructions?.some((x) => x.includes(`saved page ${id}`) && x.includes('save_latex')), 'an agent asked from a LaTeX document knows it and how to change it');
+}
+
+// ---- files of this computer in the editors (Files), saved back to them -----------------------------------------
+{
+  const dir = path.join(tmp, 'files');
+  fs.mkdirSync(path.join(dir, 'paper', 'sections'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'paper', 'figures'));
+  const openOf = async (p: string) => req('GET', `/api/pages/file?path=${encodeURIComponent(p)}`);
+
+  // A CSV: saved as it came, the same to the byte; a cell changed changes its own text only.
+  const csv = path.join(dir, 'people.csv');
+  const text = '\ufeffid;name;zip;amount\r\n1;Ada;02134;3,50\r\n2;Alan;00501;1e3\r\n';
+  fs.writeFileSync(csv, text);
+  const c = (await openOf(csv)).json();
+  ok(c.kind === 'sheet' && c.model?.sheets?.length === 1 && !c.cut && c.loses.length === 0, 'a CSV opens in the spreadsheet editor');
+  let put = await req('PUT', '/api/pages/file', { path: csv, model: c.model, mtime: c.mtime });
+  ok(put.statusCode === 200 && fs.readFileSync(csv, 'utf8') === text, 'saved as it came, a CSV is the same to the byte (separator, quotes, line ends, mark)');
+  const m = structuredClone(c.model);
+  m.sheets[0].cells.B3 = { v: 'Alan Turing' };
+  put = await req('PUT', '/api/pages/file', { path: csv, model: m, mtime: put.json().mtime });
+  ok(fs.readFileSync(csv, 'utf8') === text.replace('Alan;', 'Alan Turing;'), 'a cell changed changes its own text, and nothing else');
+  ok((await req('PUT', '/api/pages/file', { path: csv, model: m, mtime: 1 })).statusCode === 409, 'a file changed since it opened is not written over');
+  m.sheets[0].cells.E2 = { f: 'D2*2' };
+  put = await req('PUT', '/api/pages/file', { path: csv, model: m, force: true });
+  ok(put.json().dropped?.includes('formulas') && fs.readFileSync(csv, 'utf8').includes('1;Ada;02134;3,50;7\r\n'), 'a formula goes in as its value, a decimal comma where the file has them');
+
+  // A Word file: what it has that the editor does not keep is said; the first save keeps the old file in the trash.
+  const w = (t: string) => `<w:p><w:r><w:t>${t}</w:t></w:r></w:p>`;
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const word = zipParts([
+    { name: '[Content_Types].xml', data: '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>' },
+    { name: '_rels/.rels', data: '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="r1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>' },
+    { name: 'word/_rels/document.xml.rels', data: '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="h1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/></Relationships>' },
+    { name: 'word/header1.xml', data: `<?xml version="1.0"?><w:hdr ${NS}>${w('ACME Corp')}</w:hdr>` },
+    { name: 'word/document.xml', data: `<?xml version="1.0"?><w:document ${NS}><w:body>${w('Dear Sam,')}<w:p><w:r><w:t>Thanks.</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r></w:p></w:body></w:document>` },
+  ]);
+  const docx = path.join(dir, 'letter.docx');
+  fs.writeFileSync(docx, word);
+  const d = (await openOf(docx)).json();
+  ok(d.kind === 'doc' && d.loses?.includes('headers') && d.loses.includes('footnotes') && !d.cut, 'a Word file opens in the document editor, with what saving would lose');
+  ok(d.model?.blocks?.some((b: { runs?: { t: string }[] }) => b.runs?.some((r) => r.t.includes('Dear Sam'))), 'with its words');
+  d.model.blocks.push({ type: 'p', runs: [{ t: 'Added in Files.' }] });
+  const saved = (await req('PUT', '/api/pages/file', { path: docx, model: d.model, mtime: d.mtime, backup: true })).json();
+  ok(saved.backup && fs.readFileSync(saved.backup).equals(word), 'the first save puts the file as it was in the trash');
+  ok((await openOf(docx)).json().model?.blocks?.some((b: { runs?: { t: string }[] }) => b.runs?.some((r) => r.t === 'Added in Files.')), 'and the file has the change');
+  const copy = (await req('PUT', '/api/pages/file', { path: docx, model: d.model, copy: true })).json();
+  ok(copy.path === path.join(dir, 'letter (edited).docx') && fs.existsSync(copy.path), 'a copy goes beside it');
+
+  // An Excel file: its sheets and formulas come back.
+  const book = { sheets: [{ name: 'Costs', cells: { A1: { v: 'Rent' }, B1: { v: 1200 }, B2: { f: 'B1*2' } } }, { name: 'Notes', cells: { A1: { v: 'x' } } }] };
+  const made = (await req('POST', '/api/pages', { title: 'Budget', kind: 'sheet', model: book })).json();
+  const xlsx = path.join(dir, 'budget.xlsx');
+  fs.writeFileSync(xlsx, (await req('GET', `/api/pages/${made.page.id}/export?format=xlsx`)).rawPayload);
+  const x = (await openOf(xlsx)).json();
+  ok(x.kind === 'sheet' && x.model?.sheets?.length === 2 && x.loses.length === 0, 'an Excel file opens with its sheets');
+  x.model.sheets[0].cells.A2 = { v: 'Food' };
+  await req('PUT', '/api/pages/file', { path: xlsx, model: x.model, mtime: x.mtime });
+  const x2 = (await openOf(xlsx)).json();
+  ok(x2.model.sheets[0].cells.A2?.v === 'Food' && x2.model.sheets[0].cells.B2?.f === 'B1*2', 'saved, it keeps the change and its formulas');
+
+  // A LaTeX file: its chapter opens the document that reads it, with what it reads from the folder.
+  const P = path.join(dir, 'paper');
+  const mainText = '\\documentclass{article}\r\n\\usepackage{graphicx}\r\n\\begin{document}\r\n\\input{sections/intro}\r\n\\includegraphics{figures/dot.png}\r\n\\cite{k}\r\n\\bibliographystyle{plain}\r\n\\bibliography{refs}\r\n\\end{document}\r\n';
+  fs.writeFileSync(path.join(P, 'paper.tex'), mainText);
+  fs.writeFileSync(path.join(P, 'sections', 'intro.tex'), 'Hello from the intro.\n');
+  fs.writeFileSync(path.join(P, 'refs.bib'), '@book{k, author = {A. Writer}, title = {A Book}, year = {2020}, publisher = {P}}\n');
+  fs.writeFileSync(path.join(P, 'figures', 'dot.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+  fs.writeFileSync(path.join(P, 'notes.tex'), 'Nothing reads this.\n');
+  const t = (await openOf(path.join(P, 'sections', 'intro.tex'))).json();
+  ok(t.kind === 'tex' && t.tex?.main === 'paper.tex' && t.tex.open === 'sections/intro.tex' && t.tex.inFolder === true, 'a chapter opens the document that reads it, on its own tab');
+  ok(t.model?.files?.map((f: { name: string }) => f.name).sort().join(',') === 'refs.bib,sections/intro.tex' && t.model.pictures.length === 0, 'with the files it reads (its pictures stay in the folder)');
+  ok((await openOf(path.join(P, 'notes.tex'))).statusCode === 415, 'a .tex that no document reads, and is none, is not one to open');
+  const before = fs.statSync(path.join(P, 'paper.tex')).mtimeMs;
+  t.model.files.find((f: { name: string }) => f.name === 'sections/intro.tex').text = 'Hello again.\n';
+  let ts = (await req('PUT', '/api/pages/file', { path: t.path, model: t.model, tex: t.tex })).json();
+  ok(fs.readFileSync(path.join(P, 'sections', 'intro.tex'), 'utf8') === 'Hello again.\n' && fs.statSync(path.join(P, 'paper.tex')).mtimeMs === before, 'saving writes the files that changed, no others');
+  t.model.main = t.model.main.replace('\\cite{k}', '\\cite{k} and more');
+  ts = (await req('PUT', '/api/pages/file', { path: t.path, model: t.model, tex: { ...t.tex, files: ts.files } })).json();
+  ok(fs.readFileSync(path.join(P, 'paper.tex'), 'utf8') === mainText.replace('\\cite{k}', '\\cite{k} and more'), 'the main file is written as itself, with its own line ends');
+  fs.writeFileSync(path.join(P, 'sections', 'intro.tex'), 'Changed elsewhere.\n');
+  fs.utimesSync(path.join(P, 'sections', 'intro.tex'), new Date(), new Date(Date.now() + 5000));
+  t.model.files.find((f: { name: string }) => f.name === 'sections/intro.tex').text = 'Mine.\n';
+  ok((await req('PUT', '/api/pages/file', { path: t.path, model: t.model, tex: { ...t.tex, files: ts.files } })).statusCode === 409, 'a file of it changed elsewhere is not written over');
+  t.model.files = t.model.files.filter((f: { name: string }) => f.name !== 'refs.bib');
+  t.model.files.find((f: { name: string }) => f.name === 'sections/intro.tex').text = 'Changed elsewhere.\n';
+  const ts2 = await req('PUT', '/api/pages/file', { path: t.path, model: t.model, tex: { ...t.tex, files: ts.files } });
+  ok(ts2.statusCode === 200 && !fs.existsSync(path.join(P, 'refs.bib')), 'a file the editor removed goes to the trash');
+  fs.writeFileSync(path.join(P, 'refs.bib'), '@book{k, author = {A. Writer}, title = {A Book}, year = {2020}, publisher = {P}}\n');
+  const setup = (await req('GET', '/api/pages/tex/setup')).json();
+  if (!setup.missing && setup.engines?.pdflatex) {
+    const again = (await openOf(path.join(P, 'paper.tex'))).json();
+    const inFolder = (await req('POST', '/api/pages/tex/compile', { model: again.model, folder: P })).json();
+    ok(inFolder.ok && inFolder.errors.length === 0, 'it typesets among its folder’s files (its picture, its bibliography)');
+    const alone = (await req('POST', '/api/pages/tex/compile', { model: again.model })).json();
+    ok(!alone.ok && alone.errors.some((e: { message: string }) => e.message.includes('figures/dot.png')), 'and without its folder, its picture is missing');
+    const sneaky = (await req('POST', '/api/pages/tex/compile', { model: { main: '\\documentclass{article}\\begin{document}\\input{../people.csv}\\end{document}' }, folder: P })).json();
+    ok(!sneaky.ok, 'TeX reads nothing outside the folder it is given');
+    ok(fs.readFileSync(path.join(P, 'paper.tex'), 'utf8').includes('and more'), 'typesetting leaves the folder as it was');
+  }
 }
 
 await app.close();

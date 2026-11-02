@@ -160,7 +160,7 @@ With nothing kept yet, the Saved tab says "No pages yet", with **New page** and 
 1. Pick where it starts: **Blank page** (a heading and some words, to build on), **Notes** (a page to write in, kept as you type), **Checklist** (things to do, ticked off as you go) or **Tracker** (a number a day, with the last 30 days drawn).
 2. Change **Its name** if you like, and click **Make it**. A blank page opens in **Edit**; the others open ready to use.
 
-A document, a spreadsheet or a LaTeX document starts empty but for its name (a LaTeX document with a short article to build on), or from a file of yours: **Open a Word or text file** (.docx, .md, .txt or .html), **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv) or **Open a .tex or .zip file** (one LaTeX file, or a whole project in a .zip). The file becomes a page of its kind; the file itself stays as it was.
+A document, a spreadsheet or a LaTeX document starts empty but for its name (a LaTeX document with a short article to build on), or from a file of yours: **Open a Word or text file** (.docx, .md, .txt or .html), **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv) or **Open a .tex or .zip file** (one LaTeX file, or a whole project in a .zip). The file becomes a page of its kind; the file itself stays as it was. To change the file itself, open it in Files: it opens in the same editor and saves back to the file (see [Edit Word, Excel, CSV and LaTeX files](/guide/files-git#edit-word-excel-csv-and-latex-files)).
 
 Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking", "a monthly budget for two") and click **Ask**: the start page opens with your words, for an agent to make it and keep it in Pages.
 

@@ -63,6 +63,52 @@ export const PREVIEW_EXTS = ['docx', 'docm', 'dotx', 'xlsx', 'xlsm', 'xltx', 'pp
 
 export const isPreviewable = (path: string) => PREVIEW_EXTS.includes(path.split('.').pop()?.toLowerCase() ?? '');
 
+/** The editor of Pages a file opens in from Files, to change and save as the same file: the document, spreadsheet or LaTeX editor. */
+export type FileEditorKind = 'doc' | 'sheet' | 'tex';
+
+const EDITOR_KINDS: Record<string, FileEditorKind> = { docx: 'doc', xlsx: 'sheet', csv: 'sheet', tsv: 'sheet', tex: 'tex', ltx: 'tex' };
+
+/** Which editor a file opens in (by its name), or null: it opens as text, a preview or a picture as before. */
+export const editorKindOf = (path: string): FileEditorKind | null => EDITOR_KINDS[path.split('.').pop()?.toLowerCase() ?? ''] ?? null;
+
+/** A file opened in one of those editors (GET /api/pages/file). */
+export interface FileOpened {
+  kind: FileEditorKind;
+  path: string;
+  mtime: number;
+  /** The editor's model: a document, a workbook, a LaTeX project. */
+  model: unknown;
+  /**
+   * What of the file the editor does not hold, so that saving over it loses it: keys Files puts in words (a Word
+   * file's "headers", "footnotes", "comments", "changes"…; an Excel file's "charts", "merged", "pivots"…).
+   */
+  loses: string[];
+  /** It did not come in whole (too long for the editor): it opens to be read only. */
+  cut?: boolean;
+  /** What else was said of it on the way in, in words. */
+  notes: string[];
+  /**
+   * A LaTeX file's project: its folder, its main file there (the file itself, or the document that reads it), the
+   * model's name of the file opened ("main.tex" for the main file), the times of the project's files by their path in
+   * the folder (sent back when it is saved), and whether it is typeset among the folder's files.
+   */
+  tex?: { folder: string; main: string; open: string; files: Record<string, number>; inFolder: boolean };
+}
+
+/** What saving it gives back (PUT /api/pages/file). */
+export interface FileSaved {
+  /** Where it was written (another file for a copy). */
+  path: string;
+  mtime: number;
+  size: number;
+  /** The file as it was, put in the trash first. */
+  backup?: string;
+  /** A LaTeX project's files' times now. */
+  files?: Record<string, number>;
+  /** What the file could not keep of this save: "sheets" (a CSV holds one), "formulas" (saved as their values), "formatting". */
+  dropped: string[];
+}
+
 /** Which kind of document a file is, for its icon and its name in words. */
 export type DocKind = 'word' | 'sheet' | 'slides' | 'pdf' | 'image' | 'text' | 'code' | 'archive' | 'audio' | 'video' | 'book' | 'web' | 'file';
 

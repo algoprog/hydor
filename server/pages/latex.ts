@@ -114,7 +114,7 @@ const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.i
 const fromSession = (cwd: string, p: string) => (p === '~' || p.startsWith('~/') ? path.join(os.homedir(), p.slice(1)) : path.resolve(cwd || config.defaultCwd, p));
 
 /** A text file's bytes as text: UTF-8, or Latin-1 when they are not. */
-function textOf(b: Buffer): string {
+export function textOf(b: Buffer): string {
   const s = b.toString('utf8');
   return s.includes('\ufffd') && !b.includes(Buffer.from([0xef, 0xbf, 0xbd])) ? b.toString('latin1') : s;
 }
@@ -357,8 +357,8 @@ function texEnv(t: Tools, work: string): NodeJS.ProcessEnv {
 }
 
 interface Box {
-  /** bubblewrap's arguments: the system, TeX's trees and fonts read-only, `work` (writable or not), no network. */
-  args: (work: string, writable: boolean) => string[];
+  /** bubblewrap's arguments: the system, TeX's trees and fonts read-only, `read` too, `work` (writable or not), no network. */
+  args: (work: string, writable: boolean, read?: string[]) => string[];
 }
 
 let boxState: { at: number; box: Box | null; why?: string } | null = null;
@@ -404,7 +404,7 @@ function makeBox(bwrap: string, dirs: string[]): Box {
     } catch {}
   }
   return {
-    args: (work, writable) => [
+    args: (work, writable, read = []) => [
       bwrap,
       '--unshare-all',
       '--die-with-parent',
@@ -421,6 +421,8 @@ function makeBox(bwrap: string, dirs: string[]): Box {
       '/proc',
       '--dev',
       '/dev',
+      // After /dev and /proc, which would hide a folder under them (/dev/shm).
+      ...read.flatMap((d) => ['--ro-bind-try', d, d]),
       writable ? '--bind' : '--ro-bind',
       work,
       work,
@@ -505,10 +507,10 @@ function folderBytes(dir: string, depth = 0): number {
  * Runs a program held in: in its own process group (all of it stops at the time limit), with the limits above, shut
  * in by bubblewrap when `box` is given; stopped too when its folder grows past what it may write.
  */
-function runHeld(cmd: string[], o: { cwd: string; env: NodeJS.ProcessEnv; box: Box | null; timeout: number; writable?: boolean }): Promise<Ran> {
+function runHeld(cmd: string[], o: { cwd: string; env: NodeJS.ProcessEnv; box: Box | null; timeout: number; writable?: boolean; read?: string[] }): Promise<Ran> {
   const t0 = Date.now();
   return new Promise((resolve) => {
-    const argv = [...(o.box ? o.box.args(o.cwd, o.writable !== false) : []), ...cmd];
+    const argv = [...(o.box ? o.box.args(o.cwd, o.writable !== false, o.read) : []), ...cmd];
     // Windows has no sh, ulimit or nice: the program alone, stopped by the time limit.
     const win = process.platform === 'win32';
     const child = win
@@ -646,10 +648,14 @@ export function cachedTex(doc: TexDoc): TexResult | null {
 /**
  * Typesets a document (or gives back how it was typeset, kept): its PDF, pages, errors and warnings with their files
  * and lines, and TeX's log. `base`: the key of an earlier typesetting of it, whose cross-references and bibliography
- * start this one (fewer runs). Never fails for what is in the document: its errors are in the result.
+ * start this one (fewer runs). `folder`: a document of a file on this computer (texFolderOk), typeset among the
+ * files of its folder (its figures, styles, data), which TeX may read but not change. Never fails for what is in
+ * the document: its errors are in the result.
  */
-export async function compileTex(db: DB, doc: TexDoc, o: { base?: string; direct?: boolean } = {}): Promise<TexResult> {
-  const key = keyOf(doc);
+export async function compileTex(db: DB, doc: TexDoc, o: { base?: string; direct?: boolean; folder?: string } = {}): Promise<TexResult> {
+  const plan = o.folder ? folderPlan(o.folder) : null;
+  // A folder's files change what comes of it: its listing (names, sizes, times) is part of the key.
+  const key = plan ? crypto.createHash('sha256').update(`${keyOf(doc)}\0${o.folder}\0${plan.sig}`).digest('hex').slice(0, 40) : keyOf(doc);
   const k = keptResult(key);
   if (k) return withPdf(k);
   const t = tools();
@@ -657,7 +663,7 @@ export async function compileTex(db: DB, doc: TexDoc, o: { base?: string; direct
   if (missing) return { key, ok: false, pages: 0, log: '', errors: [], warnings: [], engine: doc.engine, missing };
   const on = running.get(key);
   if (on) return on;
-  const job = slot(() => typeset(db, doc, key, t, o)).finally(() => running.delete(key));
+  const job = slot(() => typeset(db, doc, key, t, { ...o, plan })).finally(() => running.delete(key));
   running.set(key, job);
   return job;
 }
@@ -685,7 +691,7 @@ function inside(dir: string, name: string): string {
   return p;
 }
 
-async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: string; direct?: boolean }): Promise<TexResult> {
+async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: string; direct?: boolean; folder?: string; plan?: FolderPlan | null }): Promise<TexResult> {
   const t0 = Date.now();
   const box = await sandbox(t);
   if (doc.engine === 'lualatex' && !box) return { key, ok: false, pages: 0, log: '', errors: [], warnings: [], engine: doc.engine, missing: LUA_UNSAFE };
@@ -730,6 +736,8 @@ async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: s
     write(p.name, data);
   }
   if (o.base && isKey(o.base) && o.base !== key && keptResult(o.base)?.ok) carry(path.join(ROOT, o.base), dir);
+  // A file's document: the rest of its folder beside it, as links TeX reads through (the folder is read-only to it).
+  const read = o.folder && o.plan ? (mirror(o.folder, dir, o.plan), [o.folder]) : undefined;
 
   const env = texEnv(t, dir);
   const flags = ['-interaction=nonstopmode', '-file-line-error', '-no-shell-escape', '-no-parse-first-line', '-synctex=1'];
@@ -752,7 +760,7 @@ async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: s
         ...flags,
         TEX_MAIN,
       ],
-      { cwd: dir, env, box, timeout: TIME_MS },
+      { cwd: dir, env, box, timeout: TIME_MS, read },
     );
     out = r.out;
     killed = r.killed;
@@ -760,7 +768,7 @@ async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: s
     // Without latexmk: TeX, then BibTeX and makeindex when the document has them, then TeX until the references settle.
     const engine = t[doc.engine]!;
     const pass = async () => {
-      const r = await runHeld([engine, ...flags, ...(lua ? ['--nosocket'] : []), TEX_MAIN], { cwd: dir, env, box, timeout: left() });
+      const r = await runHeld([engine, ...flags, ...(lua ? ['--nosocket'] : []), TEX_MAIN], { cwd: dir, env, box, timeout: left(), read });
       out += r.out;
       killed ??= r.killed;
       return r;
@@ -768,14 +776,14 @@ async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: s
     await pass();
     const aux = fs.existsSync(path.join(dir, 'main.aux')) ? fs.readFileSync(path.join(dir, 'main.aux'), 'utf8') : '';
     let again = false;
-    if (!killed && /\\bibdata\{/.test(aux) && t.bibtex && doc.files.some((f) => f.name.endsWith('.bib'))) {
-      const r = await runHeld([t.bibtex, 'main'], { cwd: dir, env, box, timeout: left() });
+    if (!killed && /\\bibdata\{/.test(aux) && t.bibtex && (doc.files.some((f) => f.name.endsWith('.bib')) || !!o.plan?.entries.some((e) => e.rel.endsWith('.bib')))) {
+      const r = await runHeld([t.bibtex, 'main'], { cwd: dir, env, box, timeout: left(), read });
       out += r.out;
       killed ??= r.killed;
       again = true;
     }
     if (!killed && fs.existsSync(path.join(dir, 'main.idx')) && t.makeindex) {
-      const r = await runHeld([t.makeindex, '-q', 'main.idx'], { cwd: dir, env, box, timeout: left() });
+      const r = await runHeld([t.makeindex, '-q', 'main.idx'], { cwd: dir, env, box, timeout: left(), read });
       out += r.out;
       killed ??= r.killed;
       again = true;
@@ -837,6 +845,82 @@ async function typeset(db: DB, doc: TexDoc, key: string, t: Tools, o: { base?: s
   remember(key, result);
   sweep();
   return withPdf(result);
+}
+
+// ---- a file's document, typeset among the files of its folder --------------------------------------------------------
+
+/**
+ * Whether a document's folder may be read by TeX beside it: a folder of its own, never the root, the home folder or
+ * one holding it, nor the app's data (those stay out of TeX's sight, as texReadDirs keeps them).
+ */
+export function texFolderOk(folder: string): boolean {
+  const home = os.homedir();
+  const holds = (d: string, p: string) => p === d || p.startsWith(d.endsWith(path.sep) ? d : d + path.sep);
+  if (!path.isAbsolute(folder) || folder === path.parse(folder).root || holds(folder, home) || holds(folder, config.dataDir) || holds(config.dataDir, folder)) return false;
+  return !!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory();
+}
+
+/** What TeX writes beside a document (the folder's own typesettings left them): never linked in, so none is written through. */
+const OUTPUTS = /\.(aux|log|out|toc|lof|lot|loa|lol|bbl|blg|bcf|run\.xml|fls|fdb_latexmk|synctex|synctex\.gz|nav|snm|vrb|idx|ind|ilg|glo|gls|glg|acn|acr|alg|xdv|dvi|brf|thm|nlo|nls|maf|ptc|upa|upb)$/i;
+
+interface FolderPlan {
+  /** A hash of its files' names, sizes and times. */
+  sig: string;
+  entries: { rel: string; dir: boolean }[];
+}
+
+const plans = new Map<string, { at: number; plan: FolderPlan }>();
+
+/** A document's folder as TeX finds it beside the document: its folders and files (no hidden ones, none TeX wrote), a few thousand at most. */
+function folderPlan(folder: string): FolderPlan {
+  const hit = plans.get(folder);
+  if (hit && Date.now() - hit.at < 2000) return hit.plan;
+  const entries: FolderPlan['entries'] = [];
+  const h = crypto.createHash('sha256');
+  const walk = (dir: string, rel: string, depth: number) => {
+    let list: fs.Dirent[];
+    try {
+      list = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1));
+    } catch {
+      return;
+    }
+    for (const e of list) {
+      if (entries.length >= 4000) return;
+      if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === '__pycache__') continue;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      const st = fs.statSync(path.join(dir, e.name), { throwIfNoEntry: false });
+      if (st?.isDirectory()) {
+        if (depth >= 6) continue;
+        entries.push({ rel: r, dir: true });
+        walk(path.join(dir, e.name), r, depth + 1);
+      } else if (st?.isFile()) {
+        // The typesetting's own files are main.*: one of the folder's would be written through.
+        if (OUTPUTS.test(e.name) || (!rel && /^main\./i.test(e.name))) continue;
+        entries.push({ rel: r, dir: false });
+        h.update(`${r}\0${st.size}\0${Math.floor(st.mtimeMs)}\0`);
+      }
+    }
+  };
+  walk(folder, '', 0);
+  const plan = { sig: h.digest('hex').slice(0, 40), entries };
+  plans.set(folder, { at: Date.now(), plan });
+  if (plans.size > 20) plans.delete(plans.keys().next().value!);
+  return plan;
+}
+
+/** The folder's files in a typesetting's folder, beside the document's own (which come first and stay): links, in folders of their own. */
+function mirror(folder: string, dir: string, plan: FolderPlan) {
+  for (const e of plan.entries) {
+    const to = path.join(dir, e.rel);
+    if (fs.lstatSync(to, { throwIfNoEntry: false })) continue;
+    try {
+      if (e.dir) fs.mkdirSync(to, { recursive: true });
+      else {
+        fs.mkdirSync(path.dirname(to), { recursive: true });
+        fs.symlinkSync(path.join(folder, e.rel), to);
+      }
+    } catch {}
+  }
 }
 
 /** A picture's bytes: one the app keeps, or one inside the model (an unsaved upload). */
@@ -1716,14 +1800,16 @@ export function texRoutes(app: FastifyInstance, db: DB) {
   const P = (req: { params: unknown }) => req.params as Record<string, string>;
   app.get('/api/pages/tex/setup', async () => texSetup());
   app.post('/api/pages/tex/compile', { bodyLimit: 24 * 1024 * 1024 }, async (req) => {
-    const b = (req.body ?? {}) as { model?: unknown; base?: unknown };
+    const b = (req.body ?? {}) as { model?: unknown; base?: unknown; folder?: unknown };
     let doc: TexDoc;
     try {
       doc = normalizeTex(b.model);
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
     }
-    const r = await compileTex(db, doc, { base: typeof b.base === 'string' ? b.base : undefined });
+    // A file's document (opened from Files): typeset in its folder, when that may be read.
+    const folder = typeof b.folder === 'string' && b.folder ? path.resolve(b.folder) : undefined;
+    const r = await compileTex(db, doc, { base: typeof b.base === 'string' ? b.base : undefined, folder: folder && texFolderOk(folder) ? folder : undefined });
     return forEditor(r);
   });
   app.get('/api/pages/tex/:key/pdf', async (req, reply) => {

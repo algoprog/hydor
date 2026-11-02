@@ -149,7 +149,7 @@ function scopesFor(file: string, cursor: Cursor, heading: TexHeading | null): As
   return out;
 }
 
-export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<TexDoc>) {
+export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, file: onDisk }: ModelEditorProps<TexDoc>) {
   const [model, setModel] = useState<TexDoc | null>(doc?.model ?? null);
   // The model as the latest change left it (changes made before it is drawn again build on it).
   const live = useRef<TexDoc | null>(model);
@@ -159,9 +159,13 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   };
   const [saved, setSaved] = useState<TexDoc | null>(doc?.model ?? null);
   const [saving, setSaving] = useState(false);
-  const [file, setFile] = useState(TEX_MAIN);
+  // A file opened from Files starts on itself (a chapter of the document that reads it).
+  const first = onDisk?.open && (onDisk.open === TEX_MAIN || doc?.model.files.some((f) => f.name === onDisk.open)) ? onDisk.open : TEX_MAIN;
+  const [file, setFile] = useState(first);
   // The files whose editors are open (kept while the editor is, so each keeps its own undo and place).
-  const [opened, setOpened] = useState<string[]>([TEX_MAIN]);
+  const [opened, setOpened] = useState<string[]>([first]);
+  /** A file's name as the tabs show it: main.tex is the document's own file's, for a file opened from Files. */
+  const label = (n: string) => (n === TEX_MAIN && onDisk ? onDisk.main : n);
   const [epoch, setEpoch] = useState(0);
   const [result, setResult] = useState<TexCompiled | null>(null);
   const resultRef = useRef(result);
@@ -368,7 +372,7 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     typesetFor.current = m;
     setBusy(true);
     try {
-      const r = await typeset(m, lastGood.current);
+      const r = await typeset(m, lastGood.current, onDisk?.folder);
       if (!alive.current) return;
       setResult(r);
       if (r.pdf && !r.errors.length) lastGood.current = r.key;
@@ -727,7 +731,7 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       {[TEX_MAIN, ...model.files.map((f) => f.name)].map((n) => (
         <div key={n} className="flex shrink-0 items-center">
           <button type="button" role="tab" aria-selected={file === n} onClick={() => open(n)} className={tabCls(file === n)} translate="no">
-            {n}
+            {label(n)}
             {file === n && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-fg" />}
           </button>
           {file === n && n !== TEX_MAIN && !readOnly && (
@@ -755,7 +759,11 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
       {!model.pictures.length ? (
         <div className="mx-auto max-w-sm py-8 text-center text-[13px] leading-relaxed text-fg-3">
-          <p>No pictures yet. Add PNG, JPEG or PDF pictures, or drop them here; each goes by the name \includegraphics gives it.</p>
+          <p>
+            {onDisk?.folder
+              ? 'The pictures in its folder are typeset as they are. Pictures added here (PNG, JPEG or PDF, or dropped here) go into the folder when you save, by the name \\includegraphics gives them.'
+              : 'No pictures yet. Add PNG, JPEG or PDF pictures, or drop them here; each goes by the name \\includegraphics gives it.'}
+          </p>
           {!readOnly && (
             <Button size="sm" variant="secondary" icon={<ImagePlus size={14} />} onClick={() => void choosePictures()} className="mt-3">
               Add a picture
@@ -842,6 +850,7 @@ export function LatexEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         onGo={(x) => x.file && x.line && goTo(x.file, x.line)}
         onLog={() => setLogOpen(true)}
         onAsk={onAsk && !readOnly ? askFix : undefined}
+        name={label}
       />
     </div>
   );

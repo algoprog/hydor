@@ -80,7 +80,7 @@ const PRESENT: RunTool = {
   annotations: { readOnlyHint: true },
   description: [
     'Hand finished files to the user: they show with your reply as cards (an icon by type, name and size) that open in the app’s file viewer',
-    '(documents, spreadsheets, slides and PDFs as a preview) or download. Call it once, at the end, with the files you made or changed for',
+    '(Word, Excel, CSV and LaTeX files in an editor where they can change and save them, slides and PDFs as a preview) or download. Call it once, at the end, with the files you made or changed for',
     'the user: a report, a spreadsheet, slides, a PDF, images, an archive. Not for scratch files, or for code changes in a project. Give',
     'each a short caption. Then do not repeat their paths or contents in your reply: a sentence on what you made is enough.',
   ].join(' '),

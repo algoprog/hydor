@@ -16,6 +16,7 @@
 //   POST /api/pages/:id/versions, GET /api/pages/:id/versions/:v, POST …/restore, POST /api/pages/:id/copy
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
 //   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/assets, GET /api/pages/assets/:sha
+//   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
 //   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
 //   GET/POST /api/sites, DELETE /api/sites/:id, GET/POST /api/sites/requests/:id
 // Routes whose token is the permission (no sign-in, never the app's cookies at work):
@@ -40,6 +41,7 @@ import { agentDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { agentBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
+import { openFile, saveFile } from './filemodel.ts';
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
 import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage } from './sites.ts';
@@ -515,6 +517,9 @@ function routes(d: Deps) {
     changed(page.id);
     return { page };
   });
+  /** A file of this computer in one of the editors (Files opens Word, Excel, CSV and LaTeX files so), and saved back to it. */
+  app.get('/api/pages/file', async (req) => openFile(db, String((req.query as { path?: string }).path ?? '')));
+  app.put('/api/pages/file', { bodyLimit: 40 * 1024 * 1024 }, async (req) => saveFile(db, B(req)));
   /** The user changed an HTML file in the page editor beside a conversation: its agent hears of it with their next message. */
   app.post('/api/pages/file-edit', { bodyLimit: 12 * 1024 * 1024 }, async (req) => {
     const b = B(req);

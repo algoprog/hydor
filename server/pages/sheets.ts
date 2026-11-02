@@ -498,7 +498,7 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
 // ---- files coming in ------------------------------------------------------------------------------------------------
 
 /** A text file's words: UTF-8 (with its mark or without), UTF-16 with its mark, else Windows' Western encoding. */
-function decodeText(buf: Buffer): string {
+export function decodeText(buf: Buffer): string {
   if (buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) return buf.toString('utf8', 3);
   if (buf[0] === 0xff && buf[1] === 0xfe) return buf.toString('utf16le', 2);
   if (buf[0] === 0xfe && buf[1] === 0xff) {
@@ -512,8 +512,13 @@ function decodeText(buf: Buffer): string {
   }
 }
 
-/** A workbook from a file: CSV or TSV, Excel (.xlsx) or OpenDocument (.ods); and what was left out of it, in plain words. */
-export function importBook(buf: Buffer, name: string): { book: Workbook; notes: string[] } {
+/**
+ * A workbook from a file: CSV or TSV, Excel (.xlsx) or OpenDocument (.ods); and what was left out of it, in plain words.
+ * For a file opened to be saved again (Files): `loses`, what of an Excel file the workbook cannot hold ("charts",
+ * "merged", "formulas", "conditional", "validation", "comments", "pivots", "tables", "links"), and `cut`, whether
+ * some of its cells or sheets did not come in at all.
+ */
+export function importBook(buf: Buffer, name: string): { book: Workbook; notes: string[]; loses?: string[]; cut?: boolean } {
   const ext = path.extname(name).slice(1).toLowerCase();
   const notes: string[] = [];
   if (buf.length > 4 && buf.readUInt32LE(0) === 0x04034b50) {
@@ -532,7 +537,8 @@ export function importBook(buf: Buffer, name: string): { book: Workbook; notes: 
   // Files split by ; mostly come from where a comma marks decimals.
   const cells = cellsFromRows(rows, notes, sep === ';');
   const book = normalizeBook({ sheets: [{ name: path.parse(name).name || 'Sheet 1', base: { cells } }] }, { notes });
-  return { book, notes: [...new Set(notes)] };
+  // What delimited text loses is only ever what did not fit (rows, columns, cells past the limits).
+  return { book, notes: [...new Set(notes)], loses: [], cut: more || notes.length > 0 };
 }
 
 /** A workbook from a file (see importBook), without the notes. */
@@ -674,7 +680,7 @@ function stylesOf(xml: string | null, theme: string[]): { s?: CellStyle; date: b
 }
 
 /** An Excel file's workbook: its sheets' cells (values, formulas, styles), widths, heights and frozen panes. */
-function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[] } {
+function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; loses: string[]; cut: boolean } {
   const main = [...relsOf(z, '').values()].find((r) => r.type.endsWith('/officeDocument'))?.target ?? 'xl/workbook.xml';
   const wbXml = z.text(main);
   if (!wbXml) throw new Error('This Excel file has no workbook in it.');
@@ -700,18 +706,32 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[] } 
   }
   const sheets: Obj[] = [];
   const state = { cells: 0, drawn: false, merged: false, bad: false, cutRows: false, cutCells: false };
-  for (const s of all(kid(wb, 'sheets'), 'sheet')) {
+  // What a workbook here does not hold, for a file to be saved again: their keys (importBook says which).
+  const loses = new Set<string>();
+  let cutSheets = false;
+  const listed = all(kid(wb, 'sheets'), 'sheet');
+  for (const s of listed) {
     const name = att(s, 'name') ?? `Sheet ${sheets.length + 1}`;
     const rel = rels.get(patt(s, 'id') ?? '');
     if (!rel || !rel.type.endsWith('/worksheet')) {
       notes.push(`“${name}” is not a sheet of cells (a chart sheet, say): it was left out.`);
+      loses.add('charts');
       continue;
     }
     const xml = z.text(rel.target, 96 * 1024 * 1024);
     if (!xml) continue;
-    if ([...relsOf(z, rel.target).values()].some((r) => /\/(drawing|chart)$/.test(r.type))) state.drawn = true;
+    const parts = [...relsOf(z, rel.target).values()];
+    if (parts.some((r) => /\/(drawing|chart)$/.test(r.type))) state.drawn = true;
+    if (parts.some((r) => /\/(comments|threadedComment)$/.test(r.type))) loses.add('comments');
+    if (parts.some((r) => /\/pivotTable$/.test(r.type))) loses.add('pivots');
+    if (parts.some((r) => /\/table$/.test(r.type))) loses.add('tables');
+    if (/<(?:\w+:)?conditionalFormatting[\s>]/.test(xml)) loses.add('conditional');
+    if (/<(?:\w+:)?dataValidations?[\s>]/.test(xml)) loses.add('validation');
     sheets.push(readWorksheet(xml, name, shared, styles, date1904, state, names));
-    if (sheets.length >= SHEET_LIMITS.sheets) break;
+    if (sheets.length >= SHEET_LIMITS.sheets) {
+      cutSheets = listed.indexOf(s) < listed.length - 1;
+      break;
+    }
   }
   if (!sheets.length) throw new Error('This Excel file has no sheets of cells in it.');
   if (state.drawn) notes.push('Charts and pictures were left out: a spreadsheet here holds cells.');
@@ -719,7 +739,12 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[] } 
   if (state.bad) notes.push('Some formulas could not be read here (links to other files, tables by name…): their last values were kept instead.');
   if (state.cutRows) notes.push(`Cells past row ${SHEET_LIMITS.rows.toLocaleString('en')} or column ${colName(SHEET_LIMITS.cols - 1)} were left out.`);
   if (state.cutCells) notes.push(`Only the first ${SHEET_LIMITS.cells.toLocaleString('en')} cells were taken in.`);
-  return { book: normalizeBook({ sheets }, { notes }), notes };
+  if (cutSheets) notes.push(`Only the first ${SHEET_LIMITS.sheets} sheets were taken in.`);
+  if (state.drawn) loses.add('charts');
+  if (state.merged) loses.add('merged');
+  if (state.bad) loses.add('formulas');
+  if (z.names().some((n) => n.startsWith('xl/externalLinks/'))) loses.add('links');
+  return { book: normalizeBook({ sheets }, { notes }), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
 }
 
 /** One worksheet's XML, read as it streams by (a big sheet is never held as a tree). */
