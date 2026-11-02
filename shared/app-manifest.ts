@@ -30,7 +30,7 @@ export const STEP_KINDS = [
   { value: 'app', label: 'Call an app', hint: 'Another of your apps, as one step' },
   { value: 'data', label: 'Keep data', hint: 'Add, find, change or remove records the app keeps' },
   { value: 'ask', label: 'Ask a person', hint: 'Waits for your answer: yes or no, or a short form' },
-  { value: 'code', label: 'Run code', hint: 'A short program in JavaScript or Python, in a sandbox' },
+  { value: 'code', label: 'Run code', hint: 'A program in JavaScript, TypeScript or Python, in a sandbox: it can ask models and agents too' },
 ] as const;
 export type StepKind = (typeof STEP_KINDS)[number]['value'];
 
@@ -169,19 +169,24 @@ export interface AskStep extends StepCommon {
 }
 
 /**
- * A short program the flow runs, in JavaScript (Node) or Python, in a sandbox: no network, nothing of this
- * computer's files but its template's packages. It gets the values given as `input` and returns its values
- * (an object's fields, else {{id.result}}); what it prints is {{id.printed}}.
+ * A program the flow runs, in JavaScript or TypeScript (Node) or Python, in a sandbox: no network, nothing of
+ * this computer's files but its template's packages. It gets the values given as `input` and returns its values
+ * (an object's fields, else {{id.result}}); what it prints is {{id.printed}}. It reaches the world outside only
+ * through `ctx` (ctx.model, ctx.agent, ctx.tool, ctx.ask, ctx.data, ctx.app), each call a step of the run that
+ * is kept: after a restart the program runs again, and the calls it made answer with what they gave then, so a
+ * whole flow can be one program.
  */
 export interface CodeStep extends StepCommon {
   do: 'code';
-  language: 'javascript' | 'python';
+  language: 'javascript' | 'typescript' | 'python';
   /** The body of a function of `input` (async in JavaScript): it returns the step's values. */
   code: string;
   /** What `input` holds, by name: values, or text with {{values}}. */
   with?: Record<string, unknown>;
-  /** Most seconds it may take (1 to 120; 20 unless set). */
+  /** Most seconds it may take (1 to 120; 20 unless set), not counting the time its ctx calls take. */
   seconds?: number;
+  /** What it gives: the fields of the object it returns (unset: any). */
+  outputs?: AnswerField[];
 }
 
 export type Step = AgentStep | ModelStep | ToolStep | DecideStep | RepeatStep | ParallelStep | AppStep | DataStep | AskStep | CodeStep;
@@ -821,13 +826,23 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
       return step;
     }
     case 'code': {
-      const language = x.language === 'python' || x.language === 'py' ? 'python' : x.language === undefined || x.language === 'javascript' || x.language === 'js' ? 'javascript' : null;
-      if (!language) t.errors.push(`${where}: its language is javascript or python`);
+      const language =
+        x.language === 'python' || x.language === 'py' ? 'python' : x.language === 'typescript' || x.language === 'ts' ? 'typescript' : x.language === undefined || x.language === 'javascript' || x.language === 'js' ? 'javascript' : null;
+      if (!language) t.errors.push(`${where}: its language is javascript, typescript or python`);
       const code = typeof x.code === 'string' ? x.code.slice(0, 50_000) : '';
       if (!code.trim()) t.errors.push(`${where}: write its program (code)`);
       const w = cleanWith(x.with, t.errors, where);
       const secs = Number(x.seconds);
-      return { ...common, do: 'code', language: language ?? 'javascript', code, ...(w ? { with: w } : {}), ...(Number.isFinite(secs) && secs > 0 ? { seconds: Math.min(120, Math.max(1, Math.round(secs))) } : {}) };
+      const outputs = x.outputs === undefined ? undefined : cleanOutputs(x.outputs, t.errors, where);
+      return {
+        ...common,
+        do: 'code',
+        language: language ?? 'javascript',
+        code,
+        ...(w ? { with: w } : {}),
+        ...(Number.isFinite(secs) && secs > 0 ? { seconds: Math.min(120, Math.max(1, Math.round(secs))) } : {}),
+        ...(outputs?.length ? { outputs } : {}),
+      };
     }
     case 'ask': {
       const question = text(x.question ?? x.ask, 4000);
@@ -1349,7 +1364,7 @@ export function givesOf(s: Step): string[] | null {
     case 'ask':
       return s.fields?.length ? s.fields.map((f) => f.id) : ['yes'];
     case 'code':
-      return null;
+      return s.outputs?.length ? [...s.outputs.map((f) => f.id), 'printed'] : null;
     default:
       return null;
   }

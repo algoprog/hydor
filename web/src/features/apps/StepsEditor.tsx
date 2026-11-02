@@ -94,6 +94,7 @@ function newStep(kind: StepKind, taken: string[], recipe: AppRecipe): Step {
 /** What a new code step starts with: its input read, its values returned. */
 const CODE_START = {
   javascript: "const { text = '' } = input;\nreturn { words: text.split(/\\s+/).filter(Boolean).length };",
+  typescript: "const text: string = String(input.text ?? '');\nreturn { words: text.split(/\\s+/).filter(Boolean).length };",
   python: "text = input.get('text', '')\nreturn {'words': len(text.split())}",
 };
 
@@ -459,7 +460,7 @@ function AskForm({ fields, onChange }: { fields: AppField[]; onChange: (f: AppFi
 }
 
 /** A program's text: monospace, Tab indents (two spaces in JavaScript, four in Python). */
-function CodeBox({ value, onChange, language }: { value: string; onChange: (v: string) => void; language: 'javascript' | 'python' }) {
+function CodeBox({ value, onChange, language }: { value: string; onChange: (v: string) => void; language: 'javascript' | 'typescript' | 'python' }) {
   return (
     <textarea
       className={cx(small, 'block h-auto min-h-[150px] resize-y py-2 font-mono text-[12.5px] leading-relaxed')}
@@ -646,6 +647,7 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
             onChange={(language) => set({ ...s, language, code: s.code.trim() && s.code !== CODE_START[s.language] ? s.code : CODE_START[language] })}
             options={[
               { value: 'javascript', label: 'JavaScript' },
+              { value: 'typescript', label: 'TypeScript' },
               { value: 'python', label: 'Python' },
             ]}
           />
@@ -653,6 +655,18 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
             <Label hint={s.language === 'python' ? 'It reads input; what it gives back is the step’s values' : 'It reads input and may await (await import() for packages); what it gives back is the step’s values'}>The program</Label>
             <CodeBox value={s.code} onChange={(code) => set({ ...s, code })} language={s.language} />
             <div className="mt-1 text-[12px] leading-snug text-fg-3">It runs in a sandbox: no network, and nothing of this computer's files but the packages What it needs installs. What it prints is {`{{${s.id}.printed}}`}.</div>
+            <div className="mt-1 text-[12px] leading-snug text-fg-3">
+              <span>It reaches out through ctx, each call a step of the run, kept (after a restart, a call it made before gives what it gave then):</span>{' '}
+              <code className="text-fg-2" translate="no">
+                {s.language === 'python'
+                  ? "ctx.model('Sum it up: {{text}}', with_={'text': t}) · ctx.agent(…) · ctx.tool('read_page', {'url': u}) · ctx.ask(…) · ctx.data.add('items', {…}) · ctx.app(…)"
+                  : "await ctx.model('Sum it up: {{text}}', { with: { text } }) · ctx.agent(…) · ctx.tool('read_page', { url }) · ctx.ask(…) · ctx.data.add('items', {…}) · ctx.app(…)"}
+              </code>
+            </div>
+          </div>
+          <div>
+            <Label hint={s.outputs?.length ? undefined : 'None: the fields of what it returns, whatever they are'}>What it gives</Label>
+            <FieldChips fields={s.outputs ?? []} onChange={(o) => set({ ...s, outputs: o.length ? o : undefined })} add="Add" />
           </div>
           <div>
             <Label hint="input.name in the program">Its input</Label>

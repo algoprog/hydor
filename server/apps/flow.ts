@@ -18,7 +18,7 @@ import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from 
 import type { NotifyEvent } from '../../shared/types.ts';
 import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step } from '../../shared/app-manifest.ts';
-import { allSteps, asText, evalRule, fillRefs, FLOW_LIMITS, lookup, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
+import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
@@ -29,7 +29,7 @@ import { checkDaily } from './api.ts';
 import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
-import { getApp, getRun, getStep, listSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
+import { getApp, getRun, getStep, listSteps, removeSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
 
 /** Public runs' throwaway folders (as for one-step public runs). */
 const PUBLIC_DIR = path.join(os.tmpdir(), 'naget-public-runs');
@@ -278,7 +278,7 @@ async function body(x: Exec, s: Step, scope: Scope, prefix: string, at: string, 
     case 'ask':
       return askStep(x, s, scope, at, before);
     case 'code':
-      return codeStep(x, s, scope);
+      return codeStep(x, s, scope, at);
     case 'decide':
       return decideStep(x, s, scope, prefix, at, before, cost);
     case 'repeat':
@@ -360,10 +360,69 @@ function syncStatus(x: Exec) {
 }
 
 /** A short program, run in a sandbox of its own with the values given (server/apps/code.ts). */
-async function codeStep(x: Exec, s: CodeStep, scope: Scope): Promise<Record<string, unknown>> {
+async function codeStep(x: Exec, s: CodeStep, scope: Scope, at: string): Promise<Record<string, unknown>> {
   const input = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
-  const out = await runCode({ language: s.language, code: s.code, input, slug: x.slug, requires: x.run.recipe.requires, seconds: s.seconds ?? 20, signal: x.abort.signal });
+  let n = 0;
+  const out = await runCode({
+    language: s.language,
+    code: s.code,
+    input,
+    slug: x.slug,
+    requires: x.run.recipe.requires,
+    seconds: s.seconds ?? 20,
+    signal: x.abort.signal,
+    onCall: (kind, args) => ctxCall(x, scope, at, ++n, kind, args),
+  });
   return out.values;
+}
+
+/** A call through ctx as a step: its kind, and what it is given, in a step's own words (its values by {{name}}). */
+function ctxStep(kind: string, a: Record<string, unknown>, id: string): Step {
+  const first = (t: unknown) => String(t ?? '').split('\n').find((l) => l.trim())?.trim().slice(0, 70) ?? '';
+  const w = a.with && typeof a.with === 'object' && !Array.isArray(a.with) ? (a.with as Record<string, unknown>) : {};
+  // Values given and not named in the words come after them.
+  const told = (text: unknown) => {
+    const named = new Set(refsIn(String(text ?? '')).map((r) => r.split(/[.[]/)[0]));
+    const rest = Object.keys(w).filter((k) => !named.has(k));
+    return `${String(text ?? '')}${rest.length ? `\n\n${rest.map((k) => `${k}:\n{{${k}}}`).join('\n\n')}` : ''}`;
+  };
+  const title = typeof a.title === 'string' && a.title.trim() ? a.title.trim().slice(0, 80) : undefined;
+  let raw: Record<string, unknown>;
+  if (kind === 'model' || kind === 'agent')
+    raw = { do: kind, title: title ?? first(a.instructions), instructions: told(a.instructions), outputs: a.outputs, model: a.model, ...(kind === 'agent' ? { assistant: a.assistant, agent: a.agent, tools: a.tools, capUsd: a.capUsd } : {}) };
+  else if (kind === 'tool') raw = { do: 'tool', title: title ?? String(a.tool ?? ''), tool: a.tool, with: w };
+  else if (kind === 'ask') raw = { do: 'ask', title: title ?? first(a.question), question: told(a.question), fields: a.fields, waitHours: a.waitHours };
+  else if (kind === 'app') raw = { do: 'app', title: title ?? String(a.app ?? ''), app: a.app, with: w };
+  else if (kind === 'data')
+    raw = { do: 'data', title: title ?? `${String(a.op ?? '')} ${String(a.collection ?? '')}`.trim(), op: a.op, collection: a.collection, with: a.with, record: a.record, where: a.where, search: a.search, query: a.query, mode: a.mode, sort: a.sort, limit: a.limit };
+  else throw new Error(`ctx has no “${kind}”: model, agent, tool, ask, data or app`);
+  const { flow, errors } = cleanFlow({ steps: [{ ...raw, id }] });
+  if (errors.length || !flow?.steps[0]) throw new Error(errors.join('; ') || 'That call could not be made');
+  return flow.steps[0];
+}
+
+/**
+ * One call a code step's program made through ctx, run as a step of its own under it ("main/c3"), and kept: a
+ * program that runs again (after a restart) gets what its calls gave then. A call that is not the one made there
+ * before means the program took another way: what was kept from there on is not its now.
+ */
+async function ctxCall(x: Exec, scope: Scope, at: string, n: number, kind: string, a: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (x.stopping) throw new Stopped();
+  const step = ctxStep(kind, a, `c${n}`);
+  const before = getStep(db(), x.run.id, `${at}/c${n}`);
+  if (before && (before.kind !== step.do || before.title !== titleOf(step))) forgetFrom(x.run.id, at, n);
+  const own: Scope = { inputs: (a.with && typeof a.with === 'object' ? a.with : {}) as Record<string, unknown>, steps: {}, vars: scope.vars };
+  await runOne(x, step, own, `${at}/`);
+  return own.steps[step.id] ?? {};
+}
+
+/** What a code step's calls from the n-th on left behind, and the steps inside them. */
+function forgetFrom(run: string, at: string, n: number) {
+  const mine = new RegExp(`^${at.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/c(\\d+)(?:[/#]|$)`);
+  removeSteps(db(), run, (path) => {
+    const m = mine.exec(path);
+    return !!m && Number(m[1]) >= n;
+  });
 }
 
 // ---- Ask a person ------------------------------------------------------------------------------------------

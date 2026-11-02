@@ -310,7 +310,7 @@ for (const f of files(path.join(ROOT, 'server'), /\.ts$/)) {
   const src = fs.readFileSync(f, 'utf8');
   const where = path.relative(ROOT, f);
   for (const m of src.matchAll(/new HttpError\(\s*\d+\s*,\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
-  if (!/(^|\/)(tools|mcp)\.ts$/.test(where)) for (const m of src.matchAll(/new Error\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
+  if (!/(^|\/)(tools|mcp|cli)\.ts$/.test(where)) for (const m of src.matchAll(/new Error\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
 }
 // Whole files whose strings the pages show: the search providers, the helper model's choices, the agents' list, and
 // the sessions' notices (a session finished, needs you, failed) and messages.

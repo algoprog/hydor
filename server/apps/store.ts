@@ -485,6 +485,11 @@ export function reuseSteps(db: DB, from: string, to: string, ids: string[]) {
   }
 }
 
+/** Forgets a run's steps whose paths match (what a code step's program no longer does). */
+export function removeSteps(db: DB, run: string, match: (path: string) => boolean) {
+  for (const { path } of db.prepare('select path from app_steps where run_id = ?').all(run) as { path: string }[]) if (match(path)) db.prepare('delete from app_steps where run_id = ? and path = ?').run(run, path);
+}
+
 /** A run's steps in the order they started. */
 export function listSteps(db: DB, run: string): StepRecord[] {
   return (db.prepare('select * from app_steps where run_id = ? order by coalesce(started_at, 0), rowid').all(run) as StepRow[]).map(toStep);

@@ -30,7 +30,7 @@ export function RunSteps({ steps, onAgain }: { steps: RunStepView[]; onAgain?: (
       {open && (
         <ol className="mt-2 space-y-2">
           {shown.map((s) => (
-            <li key={s.path} className="flex items-start gap-2.5">
+            <li key={s.path} className={cx('flex items-start gap-2.5', s.path.includes('/') && 'pl-5')}>
               <span className="mt-[5px] flex h-2.5 w-2.5 shrink-0 items-center justify-center">{s.status === 'running' ? <Throbber size={11} /> : <span className={cx('h-2.5 w-2.5 rounded-full', DOT[s.status])} />}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">

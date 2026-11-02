@@ -655,6 +655,7 @@ test('a template as a folder: its files written out and read back the same; a ch
       steps: [
         { id: 'say', title: 'Say', do: 'model', model: 'fake', instructions: 'Say {{topic}}\nin two lines', outputs: { line: 'text' } },
         { id: 'count', do: 'code', language: 'javascript', code: 'return { n: String(input.line).length };', with: { line: '{{say.line}}' } },
+        { id: 'typed', do: 'code', language: 'typescript', code: "const said: string = await ctx.model('Again: {{n}}', { with: { n: input.n } }).then((r) => String(r.text));\nreturn { said };", with: { n: '{{count.n}}' } },
       ],
     },
     graph: { at: { say: { x: 3, y: 4 } } },
@@ -667,7 +668,9 @@ test('a template as a folder: its files written out and read back the same; a ch
   assert.equal(json.$schema, './.naget/app.schema.json');
   assert.deepEqual(json.flow.steps[0].instructions, { file: 'instructions/say.md' });
   assert.equal(file('instructions/say.md'), 'Say {{topic}}\nin two lines\n');
-  assert.match(file('steps/count.js'), /export default async function step\(input\) \{\n {2}return \{ n: String\(input\.line\)\.length \};\n\}\n$/);
+  assert.match(file('steps/count.js'), /export default async function step\(input, ctx\) \{\n {2}return \{ n: String\(input\.line\)\.length \};\n\}\n$/);
+  assert.match(file('steps/typed.ts'), /^import type \{ Ctx, StepInput \} from '\.\.\/\.naget\/step';\n\nexport default async function step\(input: StepInput, ctx: Ctx\) \{\n {2}const said: string/m);
+  assert.match(file('.naget/step.d.ts'), /export interface Ctx \{/);
   assert.deepEqual(JSON.parse(file('graph.json')), { at: { say: { x: 3, y: 4 } } });
   assert.ok(fs.existsSync(path.join(dir, '.naget/app.schema.json')) && fs.existsSync(path.join(dir, '.naget/step.d.ts')) && fs.existsSync(path.join(dir, 'README.md')));
   // Read back, it is the same template.
@@ -977,6 +980,81 @@ test('Run code: a program in JavaScript or Python gets its input and returns the
   assert.equal(ps.home.outputs!.home, false);
   assert.equal(ps.slow.status, 'failed');
   assert.match(ps.slow.error ?? '', /past its 2 seconds/);
+});
+
+test('a program as a flow: its ctx calls are steps of the run, kept, and replayed when it runs again after a restart; in JavaScript, TypeScript and Python', async () => {
+  model.answer = (_system, user) => (user.startsWith('Sum up: ') ? JSON.stringify({ line: `S(${user.slice(8)})` }) : '{}');
+  const program = [
+    "const page = await ctx.tool('read_page', { url: input.url });",
+    "const { line } = await ctx.model('Sum up: {{text}}', { with: { text: page.text }, outputs: { line: 'text' } });",
+    "const kept = await ctx.data.add('items', { title: line });",
+    "let failed = '';",
+    "try { await ctx.tool('read_page', { url: 'https://broken.example/x' }); } catch (e) { failed = e.message; }",
+    'return { line, failed, id: kept.id };',
+  ].join('\n');
+  const a = app({
+    name: 'Programmed',
+    fields: [{ id: 'url', label: 'Link', type: 'url', required: true }],
+    data: { items: { title: 'text' } },
+    answer: [{ id: 'line', label: 'Line', type: 'text', required: true }],
+    flow: { steps: [{ id: 'main', do: 'code', language: 'javascript', code: program, with: { url: '{{url}}' }, outputs: { line: 'text', failed: 'text' } }], outputs: { line: '{{main.line}}' } },
+  });
+  assert.deepEqual(checkFlow(a).errors, []);
+  const done = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { url: 'https://example.org/q' } }).id, 60_000);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.line, 'S(The page at https://example.org/q says hello.)');
+  const steps = store.listSteps(db, done.id);
+  assert.deepEqual(
+    steps.map((st) => [st.path, st.kind, st.status]),
+    [
+      ['main', 'code', 'done'],
+      ['main/c1', 'tool', 'done'],
+      ['main/c2', 'model', 'done'],
+      ['main/c3', 'data', 'done'],
+      ['main/c4', 'tool', 'failed'],
+    ],
+  );
+  const main = steps[0].outputs!;
+  assert.match(String(main.failed), /^read_page: That page could not be read/);
+  assert.equal(findRecords(db, a.id, a.data, 'items').records.find((r) => r.id === main.id)?.title, done.result!.line);
+  assert.equal(steps[2].title, 'Sum up: {{text}}');
+  assert.ok((done.costUsd ?? 0) > 0, 'what its model call cost is the run’s');
+  // After a restart it runs again: a call it made before gives what it gave then, the rest runs.
+  const again = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'web', inputs: { url: 'https://example.org/again' }, status: 'running' });
+  store.saveStep(db, { run: again.id, path: 'main', id: 'main', kind: 'code', title: 'Main', status: 'running', startedAt: Date.now() - 5000 });
+  store.saveStep(db, { run: again.id, path: 'main/c1', id: 'c1', kind: 'tool', title: 'read_page', status: 'done', outputs: { text: 'Kept from before the restart' }, startedAt: Date.now() - 4000, endedAt: Date.now() - 3000 });
+  const calls = toolCalls.length;
+  flowRunner.resume(store.getRun(db, again.id)!);
+  const d2 = await ended(again.id, 60_000);
+  assert.equal(d2.status, 'done', d2.error);
+  assert.equal(d2.result!.line, 'S(Kept from before the restart)');
+  assert.ok(!toolCalls.slice(calls).some((c) => c.args.url === 'https://example.org/again'), 'the call made before was not made again');
+  // A call kept from before that is not the one it makes now: what was kept from there on goes, and it runs.
+  const other = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'web', inputs: { url: 'https://example.org/other' }, status: 'running' });
+  store.saveStep(db, { run: other.id, path: 'main', id: 'main', kind: 'code', title: 'Main', status: 'running', startedAt: Date.now() });
+  store.saveStep(db, { run: other.id, path: 'main/c1', id: 'c1', kind: 'model', title: 'Something else', status: 'done', outputs: { text: 'stale' }, startedAt: Date.now(), endedAt: Date.now() });
+  store.saveStep(db, { run: other.id, path: 'main/c2', id: 'c2', kind: 'model', title: 'Sum up: {{text}}', status: 'done', outputs: { line: 'stale too' }, startedAt: Date.now(), endedAt: Date.now() });
+  flowRunner.resume(store.getRun(db, other.id)!);
+  const d3 = await ended(other.id, 60_000);
+  assert.equal(d3.result!.line, 'S(The page at https://example.org/other says hello.)');
+  // TypeScript, as it is; Python, each call waiting for its answer.
+  const typed = app({
+    name: 'Typed',
+    fields: [],
+    answer: [],
+    flow: {
+      steps: [
+        { id: 'ts', do: 'code', language: 'typescript', code: "const n: number = Number(input.n);\nconst r = await ctx.tool('web_search', { query: `about ${n}` });\nreturn { found: (r.data as { results: unknown[] }).results.length, doubled: n * 2 };", with: { n: 21 } },
+        { id: 'py', do: 'code', language: 'python', code: "r = ctx.model('Sum up: {{text}}', with_={'text': 'twice ' + str(input['n'])}, outputs={'line': 'text'})\nreturn {'line': r['line']}", with: { n: '{{ts.doubled}}' } },
+      ],
+    },
+  });
+  const d4 = await ended(startRun({ app: typed.id, slug: typed.slug, recipe: typed, source: 'web', inputs: {} }).id, 60_000);
+  assert.equal(d4.status, 'done', d4.error);
+  const outs = Object.fromEntries(store.listSteps(db, d4.id).map((st) => [st.path, st.outputs]));
+  assert.deepEqual([outs.ts!.found, outs.ts!.doubled], [1, 42]);
+  assert.equal(outs.py!.line, 'S(twice 42)');
+  assert.ok(outs['py/c1'] && outs['ts/c1'], 'their calls are steps of the run');
 });
 
 test('examples: saved inputs with checks; trying them runs each as a test, and its checks are read against what it gave', async () => {

@@ -29,7 +29,10 @@ topic says what each part does, and its API topic gives the format.
   - **Repeat** over a list (a few at a time), or until something holds, with a limit.
   - **At the same time** for parts that do not depend on each other.
   - **Keep data** to add, find, search or change the records the template keeps.
-  - **Run code** for exact arithmetic, parsing and formatting: short JavaScript or Python, no network.
+  - **Run code** for exact arithmetic, parsing and formatting: JavaScript, TypeScript or Python, no network. A
+    program can also be the flow itself, when its logic is easier written than drawn: ctx.model, ctx.agent,
+    ctx.tool, ctx.ask, ctx.data and ctx.app are steps of the run, kept and replayed after a restart (so make the
+    same calls in the same order for the same input). Say what it gives (outputs).
   - **Ask a person** before anything that sends, spends or deletes, and when the choice is the user's.
   - **Ask an agent** for the parts that need judgement and tools, with outputs it hands in.
 - Every step's outputs are what later steps use (`{{step.value}}`); the form's answers are `{{field}}`, a Repeat's
