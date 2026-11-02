@@ -23,6 +23,8 @@ import { setHelperModel } from '../helper.ts';
 import { repoRoot } from '../memory/store.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { findRecords } from './data.ts';
+import { setEmbedderForTests } from '../memory/embed.ts';
+import * as vec from '../memory/vectors.ts';
 import { envDir, envOf, envTesting } from './env.ts';
 import { flowRunner } from './flow.ts';
 import { apps } from './index.ts';
@@ -642,6 +644,113 @@ test('a template with the templates it calls: they come in its file, install fir
   assert.notEqual(beside.bundled[0].slug, helper.slug);
   assert.equal((store.getApp(db, beside.app.id)!.flow!.steps[0] as any).app, beside.bundled[0].slug);
   assert.match(store.getApp(db, beside.bundled[0].slug)!.prompt, /^Help with/);
+});
+
+test('the models a template asks for: said portably in its file, found here by provider and name, or one picked to stand in; a run names a missing one', async () => {
+  const a = app({ name: 'Model user', answer: [], flow: { steps: [{ id: 'think', do: 'model', model: 'fake', instructions: 'Hi' }] } });
+  const pkg = packageOf(db, a, false);
+  assert.deepEqual((pkg.app as any).requires.models, [{ as: 'fake', agent: 'custom', provider: 'endpoint', model: 'fake-1', label: 'Fake' }]);
+  // From another computer: the same model under its own name there, one this computer lacks, and Claude Code's.
+  const theirs = {
+    naget: 'app',
+    format: 1,
+    app: {
+      name: 'Their models',
+      agent: 'claude',
+      model: 'opus',
+      answer: [],
+      requires: { models: [{ as: 'their-fake', agent: 'custom', provider: 'endpoint', model: 'fake-1' }, { as: 'big-one', agent: 'custom', provider: 'openrouter', model: 'example/big-1' }] },
+      flow: { steps: [{ id: 'one', do: 'model', model: 'their-fake', instructions: 'x' }, { id: 'two', do: 'model', model: 'big-one', instructions: 'y' }, { id: 'three', do: 'agent', instructions: 'z' }] },
+    },
+  };
+  const p = (await http.inject({ method: 'POST', url: '/api/apps/install/check', payload: { package: theirs } })).json().preview;
+  const by = Object.fromEntries(p.models.map((m: any) => [`${m.agent}:${m.as}`, m]));
+  assert.deepEqual([by['custom:their-fake'].status, by['custom:their-fake'].use], ['matched', 'fake']);
+  assert.equal(by['custom:big-one'].status, 'missing');
+  assert.deepEqual(by['custom:big-one'].options.map((o: any) => o.value), ['fake']);
+  assert.equal(by['claude:opus'].status, 'missing', 'this stand-in has no catalog for Claude Code');
+  assert.ok(p.warnings.some((w: string) => /example\/big-1 \(OpenRouter\), which is not set up here/.test(w)), p.warnings.join('\n'));
+  const got = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: theirs, models: { 'custom:big-one': 'fake', 'claude:opus': '' } } })).json();
+  const b = store.getApp(db, got.app.id)!;
+  assert.deepEqual(b.flow!.steps.map((s: any) => s.model), ['fake', 'fake', undefined]);
+  assert.equal(b.model, undefined, 'Claude Code with its default model');
+  assert.equal(b.requires, undefined, 'its steps name this computer\'s models now');
+  // A step asking for a model this computer lacks says so.
+  const lost = app({ name: 'Lost model', answer: [], flow: { steps: [{ id: 'q', do: 'model', model: 'nowhere', instructions: 'x' }] } });
+  const r = await ended(startRun({ app: lost.id, slug: lost.slug, recipe: lost, source: 'web', inputs: { topic: 'x' } }).id);
+  assert.equal(r.status, 'failed');
+  assert.match(r.error!, /model “nowhere”, which is not set up here/);
+});
+
+/** A stand-in for the embedding model: each word a direction of its own (words of one meaning share one), a text their sum. */
+const SAME: Record<string, string> = { graphics: 'gpu', cards: 'gpu', gpus: 'gpu', gpu: 'gpu', bread: 'baking', loaf: 'baking', sourdough: 'baking' };
+function direction(c: string): Float32Array {
+  let s = 0;
+  for (const ch of c) s = (s * 31 + ch.charCodeAt(0)) >>> 0;
+  const rnd = (i: number) => {
+    let h = (s ^ Math.imul(i + 1, 0x9e3779b9)) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+    return ((h ^ (h >>> 16)) >>> 0) / 2 ** 32 - 0.5;
+  };
+  return new Float32Array(vec.DIM).map((_, i) => rnd(3 * i) + rnd(3 * i + 1) + rnd(3 * i + 2));
+}
+function fakeVector(text: string): Float32Array {
+  const v = new Float32Array(vec.DIM);
+  for (const w of text.toLowerCase().match(/[a-z0-9]+/g) ?? []) {
+    if (['title', 'body'].includes(w)) continue;
+    const d = direction(SAME[w] ?? w);
+    for (let i = 0; i < vec.DIM; i++) v[i] += d[i];
+  }
+  const n = Math.hypot(...v) || 1;
+  return v.map((x) => x / n);
+}
+
+test('searching what a template keeps: by words and by meaning, best first, the same from a step, its agents and programs', async () => {
+  vec.setCodebookForTests(new Float32Array(vec.DIM * 16).map((_, i) => -0.12 + ((i % 16) * 0.24) / 15));
+  setEmbedderForTests(async (texts) => texts.map(fakeVector));
+  try {
+    const a = app({
+      name: 'Notes kept',
+      data: { notes: { title: 'text', body: 'long' } },
+      answer: [{ id: 'best', label: 'Best', type: 'text', required: true }],
+      flow: { steps: [{ id: 'ask', do: 'data', op: 'search', collection: 'notes', query: '{{topic}}', limit: 2 }], outputs: { best: '{{ask.first.title}}' } },
+    });
+    for (const [title, body] of [
+      ['Serving', 'vllm serves models on gpus with paged attention'],
+      ['Sourdough', 'flour water salt and a long rise'],
+      ['Quantizing', 'int4 weights make models smaller'],
+    ])
+      await http.inject({ method: 'POST', url: `/api/apps/${a.id}/data/notes`, payload: { record: { title, body } } });
+    const vectors = () => (db.prepare('select count(*) as n from app_data_vec where app_id = ?').get(a.id) as { n: number }).n;
+    for (let i = 0; i < 100 && vectors() < 3; i++) await sleep(50);
+    assert.equal(vectors(), 3, 'each record got its vector, a moment after it was kept');
+    const ask = async (q: string, mode = 'auto') => (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/data/notes?ask=${encodeURIComponent(q)}&mode=${mode}` })).json();
+    // Words alone: "flour" is in one record; "graphics cards" is in none.
+    assert.deepEqual((await ask('flour', 'words')).records.map((r: any) => r.title), ['Sourdough']);
+    assert.equal((await ask('graphics cards', 'words')).count, 0);
+    // By meaning, "graphics cards" is about the GPUs record; and both ways at once, it comes first.
+    const m = await ask('graphics cards');
+    assert.equal(m.meaning, true);
+    assert.equal(m.records[0].title, 'Serving');
+    assert.ok(m.records[0].score > 0);
+    // A step asks the same way; so does an agent of the template.
+    const r = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'a loaf of bread' } }).id);
+    assert.equal(r.status, 'done', r.error);
+    assert.equal(r.result!.best, 'Sourdough');
+    // A record changed is found by its new words and meaning.
+    const sour = (await ask('flour', 'words')).records[0];
+    await http.inject({ method: 'PATCH', url: `/api/apps/${a.id}/data/notes/${sour.id}`, payload: { set: { body: 'a croissant needs butter' } } });
+    for (let i = 0; i < 100 && vectors() < 3; i++) await sleep(50);
+    assert.equal((await ask('flour', 'words')).count, 0);
+    assert.deepEqual((await ask('butter', 'words')).records.map((x: any) => x.title), ['Sourdough']);
+    // Removed, it is found no more.
+    await http.inject({ method: 'DELETE', url: `/api/apps/${a.id}/data/notes/${sour.id}` });
+    assert.equal((await ask('butter', 'words')).count, 0);
+    assert.equal(vectors(), 2);
+  } finally {
+    setEmbedderForTests(null);
+  }
 });
 
 test('saving checks a flow: what must change refuses it in words, what may surprise comes back as warnings', async () => {

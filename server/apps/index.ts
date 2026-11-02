@@ -23,10 +23,10 @@ import { AGENT_FILE } from '../models/config.ts';
 import { noteUserMessage } from '../updates.ts';
 import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
 import { batchCsv, MAX_ROWS, startBatch, startBatches, stopBatch } from './batch.ts';
-import { addRecord, clearData, collectionsOf, ensureDataTables, findRecords, removeRecords, updateRecords } from './data.ts';
+import { addRecord, clearData, collectionsOf, embedSoon, ensureDataTables, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { ensureEnv, envLine, envOf, envVars } from './env.ts';
 import { dataChanged, flowRunner, stepsOf } from './flow.ts';
-import { installPackage, packageOf, previewOf, readPackage, zipPackage } from './package.ts';
+import { installPackage, packageOf, previewOf, readPackage, zipPackage, type Catalog } from './package.ts';
 import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
@@ -126,6 +126,8 @@ function routes(d: Deps) {
   const { app, db, sessions } = d;
   ensureTables(db);
   ensureDataTables(db);
+  // Records kept before search by meaning was on (or while it was off) get their vectors when it answers.
+  embedSoon(db, 20_000);
   setDeps(d);
   useFlows(flowRunner);
   const link = (key: string) => `${d.publicBase()}/s/${encodeURIComponent(key)}`;
@@ -181,9 +183,20 @@ function routes(d: Deps) {
 
   // ---- a template from a file ----
 
-  app.post('/api/apps/install/check', { bodyLimit: 30 * 1024 * 1024 }, async (req) => ({ preview: previewOf(db, readPackage((req.body ?? {}) as Record<string, any>)).preview }));
+  /** The models Claude Code and Codex offer here, for matching what a template from a file asks for. */
+  const catalog: Catalog = async (agent) => {
+    try {
+      return ((await sessions.catalog?.(agent))?.models ?? []).map((m) => ({ value: m.value, label: m.label }));
+    } catch {
+      return [];
+    }
+  };
+  app.post('/api/apps/install/check', { bodyLimit: 30 * 1024 * 1024 }, async (req) => ({ preview: (await previewOf(db, readPackage((req.body ?? {}) as Record<string, any>), catalog)).preview }));
 
-  app.post('/api/apps/install', { bodyLimit: 30 * 1024 * 1024 }, async (req) => installPackage(db, readPackage((req.body ?? {}) as Record<string, any>)));
+  app.post('/api/apps/install', { bodyLimit: 30 * 1024 * 1024 }, async (req) => {
+    const b = (req.body ?? {}) as Record<string, any>;
+    return installPackage(db, readPackage(b), { models: b.models && typeof b.models === 'object' ? b.models : undefined, catalog });
+  });
 
   app.get('/api/apps/:id', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
@@ -364,6 +377,8 @@ function routes(d: Deps) {
         throw new HttpError(400, 'where should be JSON, like {"read": false}');
       }
     }
+    // A question: by words and by meaning, best first.
+    if (q.ask) return searchRecords(db, a.id, a.data, P(req).collection, q.ask, { mode: q.mode === 'words' || q.mode === 'meaning' ? q.mode : 'auto', limit: Number(q.limit) || 10 });
     return findRecords(db, a.id, a.data, P(req).collection, { where, search: q.q || undefined, sort: q.sort || undefined, limit: Number(q.limit) || 100 });
   });
   app.post('/api/apps/:id/data/:collection', async (req) => {
@@ -525,11 +540,12 @@ function dataTool(ctx: RunCtx): RunTool | null {
   const said = names.map((n) => `${n}${data![n].fields?.length ? ` (${data![n].fields!.map((f) => `${f.id}: ${f.type}`).join(', ')})` : ' (any fields)'}${data![n].description ? ` — ${data![n].description}` : ''}`).join('; ');
   return {
     name: 'app_data',
-    description: `The records the template "${hit.run.appName}" keeps between its runs. op "find" lists records (where, search, sort, limit), "get" one by its id, "add" one (record), "update" one by id or those that match where (set: the fields to change; null clears one), "remove" one by id or those that match where. Collections: ${said}.`,
+    description: `The records the template "${hit.run.appName}" keeps between its runs. op "find" lists records by their fields (where, search for words, sort, limit), "search" finds those that answer a question best, by words and by meaning (query), "get" one by its id, "add" one (record), "update" one by id or those that match where (set: the fields to change; null clears one), "remove" one by id or those that match where. Collections: ${said}.`,
     inputSchema: {
       type: 'object',
       properties: {
-        op: { type: 'string', enum: ['find', 'get', 'add', 'update', 'remove'] },
+        op: { type: 'string', enum: ['find', 'search', 'get', 'add', 'update', 'remove'] },
+        query: { type: 'string', description: 'search: the question, in words.' },
         collection: { type: 'string', enum: names },
         id: { type: 'string', description: 'One record, by its id (get, update, remove).' },
         record: { type: 'object', description: 'add: the new record’s fields.' },
@@ -550,7 +566,8 @@ function dataTool(ctx: RunCtx): RunTool | null {
       const q = { id: typeof a.id === 'string' && a.id ? a.id : undefined, where: a.where && typeof a.where === 'object' ? a.where : undefined, search: typeof a.search === 'string' ? a.search : undefined, sort: typeof a.sort === 'string' ? a.sort : undefined, limit: Number(a.limit) || undefined };
       try {
         let out: unknown;
-        if (a.op === 'find' || a.op === 'get') {
+        if (a.op === 'search') out = await searchRecords(db, appId, kept, coll, String(a.query ?? ''), { limit: Number(a.limit) || 10 });
+        else if (a.op === 'find' || a.op === 'get') {
           const found = findRecords(db, appId, kept, coll, q);
           out = a.op === 'get' ? (found.records[0] ?? null) : found;
         } else if (a.op === 'add') {
@@ -564,7 +581,7 @@ function dataTool(ctx: RunCtx): RunTool | null {
           const removed = removeRecords(db, appId, kept, coll, q);
           if (removed) dataChanged(appId, coll);
           out = { removed };
-        } else return { text: 'op is find, get, add, update or remove', isError: true };
+        } else return { text: 'op is find, search, get, add, update or remove', isError: true };
         const text = JSON.stringify(out);
         return text.length > 60_000 ? `${text.slice(0, 60_000)}… (cut: ask for fewer with limit, or search)` : text;
       } catch (e) {

@@ -118,12 +118,13 @@ export interface AppStep extends StepCommon {
   with?: Record<string, unknown>;
 }
 
-export type DataOp = 'add' | 'get' | 'find' | 'update' | 'remove';
+export type DataOp = 'add' | 'get' | 'find' | 'search' | 'update' | 'remove';
 
 /**
  * Records the app keeps (its data): add one ({{id.record}}, {{id.id}}), get one by its id ({{id.record}},
- * {{id.found}}), find some ({{id.records}}, {{id.count}}, {{id.first}}), change ({{id.records}}) or remove
- * them ({{id.count}}).
+ * {{id.found}}), find some by their fields ({{id.records}}, {{id.count}}, {{id.first}}), search them for a
+ * question by words and by meaning ({{id.records}}, best first, {{id.count}}, {{id.first}}, {{id.meaning}}),
+ * change ({{id.records}}) or remove them ({{id.count}}).
  */
 export interface DataStep extends StepCommon {
   do: 'data';
@@ -137,6 +138,10 @@ export interface DataStep extends StepCommon {
   where?: Record<string, unknown>;
   /** find: words to look for anywhere in a record. */
   search?: string;
+  /** search: the question, answered by words and by meaning (when search by meaning is on). */
+  query?: string;
+  /** search: by words and meaning (auto), or only one of them. */
+  mode?: 'auto' | 'words' | 'meaning';
   /** find: the field to sort by ("-price": highest first); unset: oldest first. */
   sort?: string;
   /** find: at most this many (100 unless set, 1,000 at most). */
@@ -166,7 +171,26 @@ export interface Requires {
   pythonVersion?: string;
   /** Commands it uses (ffmpeg, pdftotext). */
   commands?: string[];
+  /** The models its steps ask for, so another computer finds them (or another of its own) when it installs the template. */
+  models?: ModelNeed[];
 }
+
+/**
+ * A model a template asks for, as it travels: the name its steps use for it, who runs it, and (for one of
+ * Custom's) where it runs and the provider's own name for it, which say what it is on any computer.
+ */
+export interface ModelNeed {
+  /** The name the template uses: Claude Code's or Codex's model, or the id of one of Custom's where it was made. */
+  as: string;
+  agent: 'claude' | 'codex' | 'custom';
+  /** Custom's: openrouter, ollama, vllm or endpoint. */
+  provider?: string;
+  /** Custom's: the provider's name for it ("anthropic/claude-sonnet-4.5", "Qwen/Qwen3-32B"). */
+  model?: string;
+  label?: string;
+}
+
+export const MODEL_PROVIDERS = ['openrouter', 'ollama', 'vllm', 'endpoint'];
 
 const NPM_NAME = /^(?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]{0,200}$/i;
 // Versions and ranges only: nothing that fetches from a URL, git or a file, nor an option.
@@ -214,7 +238,44 @@ export function cleanRequires(raw: unknown): { requires?: Requires; errors: stri
     });
     if (ok.length) out.commands = [...new Set(ok)];
   }
+  if (r.models !== undefined) {
+    const models: ModelNeed[] = [];
+    for (const x of (Array.isArray(r.models) ? r.models : []).slice(0, 20) as Record<string, unknown>[]) {
+      const as = short(x?.as ?? x?.model, 160);
+      const agent = x?.agent === 'claude' || x?.agent === 'codex' || x?.agent === 'custom' ? x.agent : null;
+      if (!as || !agent) {
+        errors.push('What it needs: each model has "as" (the name its steps use) and "agent" (claude, codex or custom)');
+        continue;
+      }
+      const need: ModelNeed = { as, agent };
+      if (agent === 'custom') {
+        if (typeof x.provider === 'string' && !MODEL_PROVIDERS.includes(x.provider)) errors.push(`What it needs: the model ${as} runs on ${MODEL_PROVIDERS.join(', ')}, not “${x.provider.slice(0, 30)}”`);
+        else if (typeof x.provider === 'string') need.provider = x.provider;
+        if (short(x.model, 200)) need.model = short(x.model, 200);
+      }
+      if (short(x.label, 120)) need.label = short(x.label, 120);
+      if (!models.some((m) => m.as === as && m.agent === agent)) models.push(need);
+    }
+    if (models.length) out.models = models;
+  }
   return { requires: Object.keys(out).length ? out : undefined, errors };
+}
+
+/** The models a recipe asks for, by who runs them: its own, its agent steps', its model steps' (null: the helper model). */
+export function modelsUsed(r: Pick<AppRecipe, 'agent' | 'acpAgent' | 'model' | 'flow'>): { agent: 'claude' | 'codex' | 'custom'; as: string }[] {
+  const out: { agent: 'claude' | 'codex' | 'custom'; as: string }[] = [];
+  const add = (agent: string | undefined, acp: string | undefined, as: string | undefined) => {
+    if (!as) return;
+    const who = agent === 'claude' || agent === 'codex' ? agent : agent === 'acp' && (!acp || acp === 'console') ? 'custom' : null;
+    if (who && !out.some((x) => x.agent === who && x.as === as)) out.push({ agent: who, as });
+  };
+  const steps = r.flow ? allSteps(r.flow.steps) : [];
+  if (!r.flow || steps.some((s) => s.do === 'agent' && !s.agent)) add(r.agent, r.acpAgent, r.model);
+  for (const s of steps) {
+    if (s.do === 'agent') add(s.agent ?? r.agent, s.acpAgent ?? (s.agent ? undefined : r.acpAgent), s.model ?? (s.agent && s.agent !== r.agent ? undefined : r.model));
+    if (s.do === 'model') add('acp', 'console', s.model);
+  }
+  return out;
 }
 /** Names a record has of its own, which no field may take. */
 export const RECORD_KEYS = ['id', 'createdAt', 'updatedAt'];
@@ -512,7 +573,7 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
       return { ...common, do: 'parallel', branches };
     }
     case 'data': {
-      const ops: DataOp[] = ['add', 'get', 'find', 'update', 'remove'];
+      const ops: DataOp[] = ['add', 'get', 'find', 'search', 'update', 'remove'];
       let op = ops.find((o) => o === x.op);
       let collection = short(x.collection, 40);
       // The short way: { "do": "data", "add": "items" }.
@@ -531,7 +592,11 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
         step.where = wh ?? {};
       }
       if (short(x.record, 400)) step.record = short(x.record, 400);
-      if (short(x.search, 400)) step.search = short(x.search, 400);
+      if (short(x.search, 400) && op !== 'search') step.search = short(x.search, 400);
+      const query = text(x.query ?? (op === 'search' ? x.search : undefined), 2000);
+      if (query) step.query = query;
+      if (x.mode === 'words' || x.mode === 'meaning') step.mode = x.mode;
+      if (op === 'search' && !query) t.errors.push(`${where}: give the question to search for (query)`);
       if (short(x.sort, 41)) step.sort = short(x.sort, 41);
       const limit = int(x.limit, 1, DATA_LIMITS.find);
       if (limit) step.limit = limit;
@@ -913,6 +978,11 @@ export interface InstallPreview {
   limits: { runsPerDay?: number; capUsd?: number };
   /** What it installs for itself (Node and Python packages), and commands it needs that are, or are not, on this computer. */
   needs: { node: string[]; python: string[]; commands: string[]; missing: string[] };
+  /**
+   * The models it asks for: here as they are, the same one under another name here, or not here (then
+   * `options` lists what could stand in; `use` is the one picked unless you pick another; "" for the agent's default).
+   */
+  models: { as: string; agent: 'claude' | 'codex' | 'custom'; label: string; status: 'here' | 'matched' | 'missing'; use?: string; options: { value: string; label: string }[] }[];
   /** Templates that come with it (those it calls): each installed first, or the one you have used again. */
   bundled: { name: string; from: string; installs: 'new' | 'reuse' }[];
   /** What changes on the way in (its folder, a mode that skips asking). */
@@ -938,7 +1008,7 @@ function givesOf(s: Step): string[] | null {
     case 'repeat':
       return ['items', 'count', 'last'];
     case 'data':
-      return { add: ['record', 'id'], get: ['record', 'found'], find: ['records', 'count', 'first'], update: ['records', 'count'], remove: ['count'] }[s.op];
+      return { add: ['record', 'id'], get: ['record', 'found'], find: ['records', 'count', 'first'], search: ['records', 'count', 'first', 'meaning'], update: ['records', 'count'], remove: ['count'] }[s.op];
     default:
       return null;
   }
@@ -1031,7 +1101,7 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
             const known = new Set([...c.fields.map((f) => f.id), ...RECORD_KEYS]);
             for (const k of [...Object.keys(s.with ?? {}), ...Object.keys(s.where ?? {})]) if (!known.has(k)) note(errors, `${where}: “${s.collection}” has no field “${k}” (it has ${c.fields.map((f) => f.id).join(', ')})`);
           }
-          checkRefs(where, [s.with, s.where, s.record, s.search], seen, names, siblings);
+          checkRefs(where, [s.with, s.where, s.record, s.search, s.query], seen, names, siblings);
           break;
         }
         case 'decide': {

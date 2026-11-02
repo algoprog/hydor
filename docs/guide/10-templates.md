@@ -332,6 +332,8 @@ While a run works, its page lists the steps as they go. Once it ends, **Steps** 
 
 A template can keep data between its runs: lists of records, like the links of a reading list or the clients of a small CRM. Its steps add, find and change them, and so do its agents, with a tool of their own. A list can say what each record holds (a title, a score, a date…), and the app then checks what goes in.
 
+Steps and agents can also search the records for a question, the way your knowledge bases are searched: by their words, and by what they mean when [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) is on, best first. A step can search your knowledge bases and memory notes too, with the knowledge_search and recall tools.
+
 What a template keeps stays with it until you delete the template. Runs from its public page never reach it.
 
 ### A template that remembers
@@ -347,7 +349,7 @@ A template can need things on this computer: Node or Python packages its agents 
 A template can travel as one file, to keep or to install on another Naget Agent.
 
 - **To download one**: open your template, then **More** (⋯) → **Download as a file**. The file (`.naget-app`) holds everything it does and needs, and the templates its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here.
-- **To install one**: press **New template** on the Templates page, then **Install a template from a file**, and pick a `.naget-app`, `.zip` or `.json` file. Before anything is made, a card says what it will do here: who does the work, its steps, the tools it may use, the templates that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Press **Install**.
+- **To install one**: press **New template** on the Templates page, then **Install a template from a file**, and pick a `.naget-app`, `.zip` or `.json` file. Before anything is made, a card says what it will do here: who does the work, its steps, the tools it may use, the models it uses, the templates that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
 
 Some things change on the way in, and the card says which: a folder it worked in elsewhere is left out (each run gets one of its own), a mode that allows every step without asking starts as **Auto** instead, and an assistant this computer lacks is dropped. A template that comes with it and is the same as one you have is used again; otherwise it installs beside yours. Its public page starts closed, and it has no API keys.
 

@@ -21,10 +21,11 @@ import { allSteps, asText, evalRule, fillRefs, FLOW_LIMITS, lookup, STEP_TOOLS, 
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
+import { AGENT_FILE } from '../models/config.ts';
 import type { RunCtx } from '../features/types.ts';
 import { helper } from '../helper.ts';
 import { checkDaily } from './api.ts';
-import { addRecord, findRecords, removeRecords, updateRecords } from './data.ts';
+import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { fieldLine, finish, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
 import { getApp, getRun, getStep, listSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
 
@@ -370,7 +371,17 @@ const STEP_SYSTEM = 'You do one step of an app that runs on its own (Naget Agent
 /** One answer from the step's model (the public page's, or the helper model); what it cost goes on the step. */
 async function ask(x: Exec, system: string, prompt: string, model: string | undefined, cost: Cost): Promise<string> {
   if (x.stopping) throw new Stopped();
+  if (model && !x.pub && !customModelIds().includes(model)) throw new Error(`It asks for the model “${model}”, which is not set up here: add it in Settings → Models, or pick another for this step`);
   return helper(db(), { system, prompt, model: x.pub ? x.pub.model : model, timeoutMs: 180_000, signal: x.abort.signal, onCost: (usd) => (cost.usd += usd) });
+}
+
+/** The ids of Custom's models on this computer. */
+function customModelIds(): string[] {
+  try {
+    return (JSON.parse(fs.readFileSync(AGENT_FILE, 'utf8')).models ?? []).map((m: { id: string }) => m.id);
+  } catch {
+    return [];
+  }
 }
 
 const firstObject = (t: string): unknown => {
@@ -472,6 +483,10 @@ async function dataStep(x: Exec, s: DataStep, scope: Scope): Promise<Record<stri
     case 'find': {
       const { records, count } = findRecords(db(), app, data, s.collection, q);
       return { records, count, first: records[0] ?? null };
+    }
+    case 'search': {
+      const { records, count, meaning } = await searchRecords(db(), app, data, s.collection, fillRefs(s.query ?? '', scope), { mode: s.mode, limit: s.limit });
+      return { records, count, first: records[0] ?? null, meaning };
     }
     case 'update': {
       const records = updateRecords(db(), app, data, s.collection, q, set);

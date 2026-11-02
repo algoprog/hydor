@@ -4,12 +4,20 @@
 // tidies them to their kinds (numbers, dates, yes or no…); one without keeps any JSON. Each record has an
 // id, and when it was added and last changed. Finding is by fields ({ "read": false }, { "price": { "<":
 // 100 } }), by words anywhere in a record, sorted by a field.
+//
+// Searching is as the app's knowledge bases are searched (server/knowledge/search.ts): by words (a
+// full-text index, ranked by BM25) and by meaning (each record's vector against the question's, when
+// search by meaning is on in Settings → Memory), joined by rank. A record's words are indexed as it is
+// kept; its vector is made a moment later, in the background, and again when it changes.
 import type { AnswerField } from '../../shared/apps.ts';
 import { checkAnswer } from '../../shared/apps.ts';
 import type { DataCollection } from '../../shared/app-manifest.ts';
 import { asText, DATA_LIMITS, isEmpty, order, same } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
+import { embed, queryVector } from '../memory/embed.ts';
+import { anyWords } from '../memory/search.ts';
+import { BYTES, quantize, queryTable, scale, scoreAt, VECTOR_MODEL } from '../memory/vectors.ts';
 import { newId } from './store.ts';
 
 export type DataRecord = Record<string, unknown> & { id: string; createdAt: number; updatedAt: number };
@@ -40,8 +48,138 @@ export function ensureDataTables(db: DB) {
       primary key (app_id, collection, id)
     );
     create index if not exists app_data_order on app_data (app_id, collection, created_at);
+    create table if not exists app_data_vec (
+      app_id text not null,
+      collection text not null,
+      rid text not null,
+      model text not null,
+      code blob not null,
+      primary key (app_id, collection, rid)
+    );
   `);
+  // The records' words, for searching (the fts5 table cannot say "if not exists" of a virtual table's columns).
+  if (!db.prepare("select 1 from sqlite_master where name = 'app_data_fts'").get()) db.exec("create virtual table app_data_fts using fts5(app_id unindexed, collection unindexed, rid unindexed, text, tokenize = 'unicode61 remove_diacritics 2')");
   made.add(db);
+}
+
+/** A record as text, for its words and its vector: each field's value, the field named. */
+export function recordText(rec: Record<string, unknown>): string {
+  return Object.entries(rec)
+    .filter(([k]) => k !== 'id' && k !== 'createdAt' && k !== 'updatedAt')
+    .map(([k, v]) => `${k}: ${asText(v, 2000)}`)
+    .join('\n')
+    .slice(0, 4000);
+}
+
+/** Keeps a record's words in the index, and drops its vector so a new one is made. */
+function indexRecord(db: DB, app: string, collection: string, id: string, values: Record<string, unknown> | null) {
+  db.prepare('delete from app_data_fts where app_id = ? and collection = ? and rid = ?').run(app, collection, id);
+  db.prepare('delete from app_data_vec where app_id = ? and collection = ? and rid = ?').run(app, collection, id);
+  if (values) db.prepare('insert into app_data_fts (app_id, collection, rid, text) values (?, ?, ?, ?)').run(app, collection, id, recordText(values));
+  if (values) embedSoon(db);
+}
+
+let embedTimer: NodeJS.Timeout | undefined;
+let embedding = false;
+
+/** Soon: vectors for the records without one (nothing when search by meaning is off). */
+export function embedSoon(db: DB, ms = 1500) {
+  clearTimeout(embedTimer);
+  embedTimer = setTimeout(() => void embedMissing(db), ms);
+  embedTimer.unref?.();
+}
+
+/** Makes vectors for records that lack one, 64 at a time, until none is left or search by meaning cannot answer. */
+export async function embedMissing(db: DB): Promise<number> {
+  if (embedding) return 0;
+  embedding = true;
+  let made = 0;
+  try {
+    ensureDataTables(db);
+    for (;;) {
+      const rows = db
+        .prepare(
+          `select d.app_id as app, d.collection as collection, d.id as id, d.data as data from app_data d
+           left join app_data_vec v on v.app_id = d.app_id and v.collection = d.collection and v.rid = d.id and v.model = ?
+           where v.rid is null limit 64`,
+        )
+        .all(VECTOR_MODEL) as { app: string; collection: string; id: string; data: string }[];
+      if (!rows.length) break;
+      const vectors = await embed(
+        db,
+        rows.map((r) => recordText(JSON.parse(r.data))),
+        'document',
+      );
+      if (!vectors) break;
+      const put = db.prepare('insert or replace into app_data_vec (app_id, collection, rid, model, code) values (?, ?, ?, ?, ?)');
+      db.transaction(() => rows.forEach((r, i) => put.run(r.app, r.collection, r.id, VECTOR_MODEL, Buffer.from(quantize(vectors[i])))))();
+      made += rows.length;
+    }
+  } finally {
+    embedding = false;
+  }
+  return made;
+}
+
+/** As knowledge search weighs them: words and meaning joined by rank, and how near a record must be to count. */
+const RRF_K = 60;
+const W_WORDS = 0.1;
+const W_MEANING = 1;
+const MIN_SIMILARITY = 0.2;
+
+export type SearchMode = 'auto' | 'words' | 'meaning';
+
+/**
+ * The records that answer a question best: by words and by meaning, joined by rank (or by one of them).
+ * `meaning` says whether meaning took part (it is off, or not ready, otherwise).
+ */
+export async function searchRecords(db: DB, app: string, data: Record<string, DataCollection> | undefined, collection: string, query: string, o: { mode?: SearchMode; limit?: number } = {}): Promise<{ records: (DataRecord & { score: number })[]; count: number; meaning: boolean }> {
+  ensureDataTables(db);
+  collectionOf(data, collection);
+  const limit = Math.max(1, Math.min(o.limit ?? 10, 100));
+  const pool = Math.max(50, limit * 4);
+  const q = query.trim();
+  if (!q) return { records: [], count: 0, meaning: false };
+  const fused = new Map<string, number>();
+  const add = (id: string, rank: number, w: number) => fused.set(id, (fused.get(id) ?? 0) + w / (RRF_K + rank + 1));
+  const mode = o.mode ?? 'auto';
+  if (mode !== 'meaning') {
+    const fts = anyWords(q);
+    if (fts) {
+      try {
+        (db.prepare('select rid from app_data_fts where app_data_fts match ? and app_id = ? and collection = ? order by bm25(app_data_fts) limit ?').all(fts, app, collection, pool) as { rid: string }[]).forEach((r, i) => add(r.rid, i, W_WORDS));
+      } catch {}
+    }
+  }
+  let meaning = false;
+  if (mode !== 'words') {
+    const vec = await queryVector(db, q, { wait: true, timeoutMs: 30_000 });
+    if (vec) {
+      meaning = true;
+      const t = queryTable(vec);
+      const best: { id: string; s: number }[] = [];
+      for (const r of db.prepare('select rid, code from app_data_vec where app_id = ? and collection = ? and model = ?').iterate(app, collection, VECTOR_MODEL) as Iterable<{ rid: string; code: Buffer }>) {
+        if (r.code.length !== BYTES) continue;
+        const code = new Uint8Array(r.code.buffer, r.code.byteOffset, r.code.length);
+        const s = scoreAt(t, code, 0) * scale(code, 0);
+        if (s < MIN_SIMILARITY || (best.length >= pool && s <= best[best.length - 1].s)) continue;
+        best.push({ id: r.rid, s });
+        best.sort((x, y) => y.s - x.s);
+        if (best.length > pool) best.pop();
+      }
+      best.forEach((h, i) => add(h.id, i, W_MEANING));
+      // Records added before their vectors: made now, for the next search.
+      embedSoon(db, 200);
+    }
+  }
+  const ranked = [...fused.entries()].sort((a, b) => b[1] - a[1]);
+  const records: (DataRecord & { score: number })[] = [];
+  const get = db.prepare('select id, data, created_at, updated_at from app_data where app_id = ? and collection = ? and id = ?');
+  for (const [id, score] of ranked.slice(0, limit)) {
+    const r = get.get(app, collection, id) as Row | undefined;
+    if (r) records.push({ ...toRecord(r), score: Math.round(score * 1e5) / 1e5 });
+  }
+  return { records, count: ranked.length, meaning };
 }
 
 interface Row {
@@ -166,6 +304,7 @@ export function addRecord(db: DB, app: string, data: Record<string, DataCollecti
   } catch {
     throw new HttpError(409, `${collection} has a record ${id} already`);
   }
+  indexRecord(db, app, collection, id, v);
   return { ...v, id, createdAt: now, updatedAt: now };
 }
 
@@ -183,6 +322,7 @@ export function updateRecords(db: DB, app: string, data: Record<string, DataColl
     const merged = Object.fromEntries(Object.entries({ ...old, ...set }).filter(([, v]) => v !== null && v !== undefined));
     const v = tidy(c, merged, `${collection} ${id}`);
     write.run(JSON.stringify(v), now, app, collection, id);
+    indexRecord(db, app, collection, id, v);
     out.push({ ...v, id, createdAt, updatedAt: now });
   }
   return out;
@@ -193,11 +333,16 @@ export function removeRecords(db: DB, app: string, data: Record<string, DataColl
   ensureDataTables(db);
   collectionOf(data, collection);
   if (!q.id && !q.where) throw new HttpError(400, 'Say which records to remove: one by its id, or those that match (where; {} for all)');
-  if (q.id && !q.where) return db.prepare('delete from app_data where app_id = ? and collection = ? and id = ?').run(app, collection, q.id).changes;
-  const ids = findRecords(db, app, data, collection, { ...q, limit: DATA_LIMITS.records }).records.map((r) => r.id);
+  const ids = q.id && !q.where ? [q.id] : findRecords(db, app, data, collection, { ...q, limit: DATA_LIMITS.records }).records.map((r) => r.id);
   const del = db.prepare('delete from app_data where app_id = ? and collection = ? and id = ?');
-  db.transaction(() => ids.forEach((id) => del.run(app, collection, id)))();
-  return ids.length;
+  let n = 0;
+  db.transaction(() =>
+    ids.forEach((id) => {
+      n += del.run(app, collection, id).changes;
+      indexRecord(db, app, collection, id, null);
+    }),
+  )();
+  return n;
 }
 
 /** The collections an app keeps, with how many records each has. */
@@ -209,5 +354,6 @@ export function collectionsOf(db: DB, app: string, data: Record<string, DataColl
 /** Forgets what an app keeps (one collection, or all of it). */
 export function clearData(db: DB, app: string, collection?: string): number {
   ensureDataTables(db);
+  for (const t of ['app_data_fts', 'app_data_vec']) (collection ? db.prepare(`delete from ${t} where app_id = ? and collection = ?`).run(app, collection) : db.prepare(`delete from ${t} where app_id = ?`).run(app));
   return (collection ? db.prepare('delete from app_data where app_id = ? and collection = ?').run(app, collection) : db.prepare('delete from app_data where app_id = ?').run(app)).changes;
 }
