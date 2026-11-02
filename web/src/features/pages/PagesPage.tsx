@@ -6,6 +6,8 @@
 // it while you watch.
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import type { AppDef } from '@shared/apps';
+import { appInfo } from '@shared/app-manifest';
 import { useLocation, useSearch } from 'wouter';
 import {
   AppWindow,
@@ -47,7 +49,7 @@ import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, Empty, IconButton, inputCls, MenuItem, MenuLabel, MenuSep, Popover, Segmented, Tabs, Throbber, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { SiteLink, VISIBILITY } from './cards';
-import { pageStore, previewStore } from './frame';
+import { pageStore, previewStore, type AppBridge } from './frame';
 import { absolute, usePagesStore } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { STARTERS } from './templates';
@@ -901,6 +903,17 @@ function PageView({ id }: { id: string }) {
   }, [id]);
   useFeatureEvent('pages', ({ data: e }) => (e as { what?: string })?.what === 'pages' && load());
   const store = useMemo(() => (old ? previewStore(id) : pageStore(id)), [id, old]);
+  // A template's screen works here as on its template's page: window.naget.app, for that template.
+  const [screenOf, setScreenOf] = useState<AppBridge | undefined>();
+  const owner = data?.page.app;
+  useEffect(() => {
+    setScreenOf(undefined);
+    if (!owner) return;
+    api<{ app?: AppDef }>(`/api/apps/${enc(owner)}`).then(
+      (r) => r.app && setScreenOf({ info: appInfo(r.app.id, r.app) }),
+      () => {},
+    );
+  }, [owner]);
   const startMode = new URLSearchParams(search).get('mode');
   const startPresent = new URLSearchParams(search).get('present') === '1';
   const kind = data?.page.kind;
@@ -998,7 +1011,7 @@ function PageView({ id }: { id: string }) {
   }
   const page = data?.page;
   const title = old?.title ?? page?.title ?? 'Page';
-  const doc: StudioDoc | null = data && !kind ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, html: old?.html ?? data.html ?? '', store } : null;
+  const doc: StudioDoc | null = data && !kind ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, html: old?.html ?? data.html ?? '', store, app: screenOf } : null;
   const askOpen = ask.open && !!page;
   const askThis = (text?: string) => {
     if (text !== undefined) setPart(text);

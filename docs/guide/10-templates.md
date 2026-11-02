@@ -1,6 +1,6 @@
 # Templates
 
-A template is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result as a card or a table. This topic covers the ready-made templates, running one and refining its result, making your own (with steps, data and memory too), sharing one through an API key, other agents, a public page or a spreadsheet of rows, and passing one on as a file.
+A template is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result as a card or a table. This topic covers the ready-made templates, running one and refining its result, making your own (with steps, data, memory and a screen of its own too), sharing one through an API key, other agents, a public page or a spreadsheet of rows, and passing one on as a file.
 
 ![Templates: your own, and ready-made ones to start from](images/templates.webp)
 
@@ -344,6 +344,16 @@ A template can remember across its runs: its agents keep what later runs should 
 
 A template can need things on this computer: Node or Python packages its agents use, and commands such as ffmpeg. The packages install in the template's own folder, never for the whole computer, as soon as you install or change the template, and its first run waits for them. On the template's page, a line says while they install or when they could not, with **Show the output** and **Install again**. A command it uses that this computer lacks is named there too: install that one yourself.
 
+## Give a template a screen
+
+A template can have a screen of its own: a page in place of its form, that runs it and shows what it keeps. A reading list can show its links in a table you search and tidy, a small CRM its clients with a button that drafts a follow-up, a tracker a count of what it logged. The screen works live: what you send in its form runs the template, its answer shows when it is ready, and its tables change as its steps and agents change the records.
+
+- **To give it one**: open your template, then **More** (⋯) → **Give it a screen**. The screen is made from its parts: its form, its answer, a table for each list it keeps, and its earlier runs. Its page then opens on the screen.
+- **To change it**: **More** (⋯) → **Edit the screen** opens it in Pages' editor, where you change it as any page ([Change a page yourself](/guide/pages#change-a-page-yourself)): move and restyle its parts, or ask the agent. **Add** has an **App** tab with the template's own parts: **Its form**, **Its answer**, **Its runs**, a form and a button for each of its other flows, and a table and a count for each list it keeps.
+- **Or ask an agent**: "Give my Reading list a screen with the unread links on top and a button that makes this week's digest." Agents write screens with the same parts, and can give a template more flows for a screen's buttons to start.
+
+A screen is a page of the template's own: it does not show in your Pages library, it goes when you delete the template, and it travels in the template's file. To run the template from its form with earlier answers, use **Run again with these answers** on a run's page.
+
 ## Share a template as a file
 
 A template can travel as one file, to keep or to install on another Naget Agent.
@@ -366,3 +376,4 @@ Agents in the app can make and run templates for you through the app's API, with
 - "Make a template with steps that reads each link I send, sums it up with a quick model and keeps it in a reading list."
 - "Add a step to my Competitor watch template that tells me only when something changed."
 - "Install the template in reading-list.naget-app from my Downloads folder."
+- "Give my Reading list a screen with the unread links on top and a button that makes this week's digest."

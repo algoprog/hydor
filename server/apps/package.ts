@@ -22,7 +22,9 @@ import type { DB } from '../db.ts';
 import { Zip } from '../documents/zip.ts';
 import { addRecord, allRecords } from './data.ts';
 import { ensureEnv, hasCommand } from './env.ts';
+import { screensForFile } from './screens.ts';
 import { getApp, saveApp } from './store.ts';
+import { createPage } from '../pages/store.ts';
 
 /** The newest package format this server reads. */
 export const PACKAGE_FORMAT = 1;
@@ -81,6 +83,10 @@ function travelling(a: AppRecipe): Record<string, unknown> {
 /** A template as it travels: its recipe, its records when asked for, and the templates its steps call. */
 export function packageOf(db: DB, a: AppRecipe & { id?: string; slug?: string }, withData: boolean): AppPackage {
   const recipe = travelling(a);
+  // Its screens travel as their HTML: they are pages of its own here.
+  const screens = screensForFile(db, a);
+  if (screens) recipe.screens = screens;
+  else delete recipe.screens;
   const pkg: AppPackage = { naget: 'app', format: PACKAGE_FORMAT, exported: new Date().toISOString(), ...(a.slug ? { slug: a.slug } : {}), app: recipe };
   if (withData && a.id && a.data) pkg.records = Object.fromEntries(Object.keys(a.data).map((name) => [name, allRecords(db, a.id!, name).map(({ createdAt: _a, updatedAt: _b, ...r }) => r)]));
   // The templates it calls, and those they call, once each.
@@ -92,7 +98,11 @@ export function packageOf(db: DB, a: AppRecipe & { id?: string; slug?: string },
       seen.add(s.app);
       const other = getApp(db, s.app);
       if (!other) continue;
-      bundled.push({ naget: 'app', format: PACKAGE_FORMAT, slug: other.slug, app: travelling(other) });
+      const app = travelling(other);
+      const shown = screensForFile(db, other);
+      if (shown) app.screens = shown;
+      else delete app.screens;
+      bundled.push({ naget: 'app', format: PACKAGE_FORMAT, slug: other.slug, app });
       walk(other);
     }
   };
@@ -316,7 +326,8 @@ function remapModels(r: AppRecipe, picked: Map<string, string>) {
 
 /** What a template will do here and what changes on the way in, before anything is made. */
 export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Promise<{ recipe: AppRecipe; bundled: { pkg: AppPackage; recipe: AppRecipe; reuse: AppDef | null }[]; preview: InstallPreview }> {
-  const main = intake(db, pkg.app as Record<string, any>, '');
+  const raw = pkg.app as Record<string, any>;
+  const main = intake(db, raw, '');
   const recipe = main.recipe;
   const problems = [...main.problems];
   const notes = [...main.notes];
@@ -382,12 +393,27 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
     limits: recipe.limits,
     needs,
     models,
+    screens: Object.keys(raw.screens && typeof raw.screens === 'object' ? (raw.screens as Record<string, unknown>) : {}),
     bundled: bundled.map((b) => ({ name: b.recipe.name, from: b.pkg.slug ?? '', installs: b.reuse ? 'reuse' : 'new' })),
     notes,
     warnings: [...new Set(warnings)],
     problems: [...new Set(problems)],
   };
   return { recipe, bundled, preview };
+}
+
+/** A file's screens (name → title and HTML), made into pages of the template installed. */
+function screensFrom(db: DB, app: string, raw: unknown): AppRecipe['screens'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: NonNullable<AppRecipe['screens']> = {};
+  for (const [name, v] of Object.entries(raw as Record<string, { title?: unknown; html?: unknown }>).slice(0, 12)) {
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(name) || typeof v?.html !== 'string' || !v.html.trim()) continue;
+    try {
+      const p = createPage(db, { title: typeof v.title === 'string' && v.title.trim() ? v.title : name, html: v.html, by: 'made', app });
+      out[name] = { page: p.id, ...(typeof v.title === 'string' && v.title.trim() && name !== 'main' ? { title: v.title.trim().slice(0, 80) } : {}) };
+    } catch {}
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Points a recipe's steps that call templates at the addresses those got here. */
@@ -416,7 +442,10 @@ export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Reco
   const out: { name: string; slug: string; reused: boolean }[] = [];
   for (const b of bundled) {
     const app = b.reuse ?? saveApp(db, { recipe: b.recipe });
-    if (!b.reuse) made.push({ app, recipe: b.recipe });
+    if (!b.reuse) {
+      b.recipe.screens = screensFrom(db, app.id, b.pkg.app.screens);
+      made.push({ app, recipe: b.recipe });
+    }
     if (b.pkg.slug) moved.set(b.pkg.slug, app.slug);
     out.push({ name: app.name, slug: app.slug, reused: !!b.reuse });
   }
@@ -426,7 +455,9 @@ export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Reco
     saveApp(db, { id: m.app.id, recipe: m.recipe });
   }
   retarget(recipe, moved);
-  const app = saveApp(db, { recipe });
+  const first = saveApp(db, { recipe });
+  recipe.screens = screensFrom(db, first.id, (pkg.app as Record<string, unknown>).screens);
+  const app = recipe.screens ? saveApp(db, { id: first.id, recipe }) : first;
   let records = 0;
   let skipped = 0;
   for (const [name, list] of Object.entries(pkg.records ?? {})) {

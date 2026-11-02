@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
-import { checkFlow, cleanData, cleanFlow, cleanRequires, allSteps, DATA_LIMITS } from '../../shared/app-manifest.ts';
+import { checkFlow, cleanData, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS } from '../../shared/app-manifest.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -27,6 +27,7 @@ import { addRecord, clearData, collectionsOf, embedSoon, ensureDataTables, findR
 import { ensureEnv, envLine, envOf, envVars } from './env.ts';
 import { dataChanged, flowRunner, stepsOf } from './flow.ts';
 import { installPackage, packageOf, previewOf, readPackage, zipPackage, type Catalog } from './package.ts';
+import { changeScreen, makeScreen, removeScreen, removeScreens, screenHtml, screensOf } from './screens.ts';
 import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
@@ -86,13 +87,13 @@ function customModels(): { id: string; label: string; provider: string }[] {
 function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
   const src = raw && typeof raw === 'object' ? raw : {};
   const recipe = cleanRecipe(src);
-  const errors = [...cleanFlow(src.flow).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors];
+  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors];
   if (!recipe.prompt.trim() && !recipe.flow) errors.push('Write the prompt: it is what the agent is asked to do');
   for (const f of recipe.fields) if (f.type === 'choice' && !f.options?.length) errors.push(`${f.label}: give the choices`);
   const checked = checkFlow(recipe);
   errors.push(...checked.errors);
   const warnings = [...checked.warnings];
-  for (const s of recipe.flow ? allSteps(recipe.flow.steps) : []) if (s.do === 'app' && !getApp(db, s.app)) warnings.push(`Step “${s.id}” calls the template “${s.app}”, which is not here`);
+  for (const f of [recipe.flow, ...Object.values(recipe.flows ?? {})]) for (const s of f ? allSteps(f.steps) : []) if (s.do === 'app' && !getApp(db, s.app)) warnings.push(`Step “${s.id}” calls the template “${s.app}”, which is not here`);
   return { recipe, errors: [...new Set(errors)], warnings };
 }
 
@@ -231,11 +232,27 @@ function routes(d: Deps) {
     const a = getApp(db, P(req).id);
     if (!a) throw new HttpError(404, 'No such template');
     for (const r of listRuns(db, { app: a.id, status: ['queued', 'starting', 'running', 'waiting'], steps: true })) await stopRun(r.id);
+    removeScreens(db, a);
     deleteApp(db, a.id);
     deleteRuns(db, a.id);
     clearData(db, a.id);
     return { ok: true };
   });
+
+  // ---- its screens ----
+
+  app.get('/api/apps/:id/screens', async (req) => ({ screens: screensOf(db, own(req)) }));
+  app.get('/api/apps/:id/screens/:name', async (req) => ({ screen: screenHtml(db, own(req), P(req).name) }));
+  /** A new screen: the HTML given (window.naget.app and the App parts), or one made from the template's parts. */
+  app.post('/api/apps/:id/screens', { bodyLimit: 4 * 1024 * 1024 }, async (req) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    return makeScreen(db, own(req), { name: b.name, title: b.title, html: b.html, by: b.html ? 'agent' : 'made' });
+  });
+  app.put('/api/apps/:id/screens/:name', { bodyLimit: 4 * 1024 * 1024 }, async (req) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    return { screen: changeScreen(db, own(req), P(req).name, { html: b.html, title: b.title }) };
+  });
+  app.delete('/api/apps/:id/screens/:name', async (req) => ({ app: removeScreen(db, own(req), P(req).name) }));
 
   /** A template as one file: .naget-app (a zip, with the records it keeps when data=1) or .json. */
   app.get('/api/apps/:id/export', async (req, reply) => {
@@ -268,9 +285,11 @@ function routes(d: Deps) {
       app: a?.id ?? (template ? `tpl:${template.id}` : 'test'),
       slug: a?.slug ?? template?.id ?? 'test',
       recipe,
-      source: b.source === 'test' ? 'test' : 'web',
+      source: b.source === 'test' ? 'test' : b.source === 'screen' ? 'screen' : 'web',
       inputs: b.inputs && typeof b.inputs === 'object' ? b.inputs : {},
       files: b.files && typeof b.files === 'object' ? b.files : undefined,
+      // Another of its flows, by name (a screen's form or button).
+      flow: typeof b.flow === 'string' && b.flow && b.flow !== 'run' ? b.flow : undefined,
     });
     return { run: runView(r) };
   });
@@ -471,9 +490,9 @@ function routes(d: Deps) {
     const { a } = callable(req);
     const b = (req.body ?? {}) as Record<string, any>;
     // The form's values under "inputs", or at the top level beside "wait".
-    const { wait, files, inputs, ...rest } = b;
+    const { wait, files, inputs, flow, ...rest } = b;
     checkDaily(db, a);
-    const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'api', inputs: inputs && typeof inputs === 'object' ? inputs : rest, files: files && typeof files === 'object' ? files : undefined });
+    const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'api', inputs: inputs && typeof inputs === 'object' ? inputs : rest, files: files && typeof files === 'object' ? files : undefined, flow: typeof flow === 'string' && flow && flow !== 'run' ? flow : undefined });
     const done = await waitFor(r.id, waitSeconds(wait, 0, 900) * 1000);
     const now = done ?? r;
     return apiAnswer(now, link, isFlowRun(now) ? stepsOf(now.id) : undefined);

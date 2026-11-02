@@ -16,13 +16,14 @@ import cookie from '@fastify/cookie';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanFlow, cleanRequires, evalRule, fillRefs, flowOf, readRule, valueOf, type Scope } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
-import { openDb } from '../db.ts';
+import { kvSet, openDb } from '../db.ts';
 import { registerFeatures } from '../features/registry.ts';
 import type { Deps, Feature, RunCtx } from '../features/types.ts';
 import { setHelperModel } from '../helper.ts';
 import { repoRoot } from '../memory/store.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { findRecords } from './data.ts';
+import { initPages, listPages, pageInfo, pageSource } from '../pages/store.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as vec from '../memory/vectors.ts';
 import { envDir, envOf, envTesting } from './env.ts';
@@ -136,6 +137,7 @@ const fakeTools: Feature = {
   ],
 };
 
+initPages(db);
 const sessions = new FakeSessions();
 const http = Fastify();
 await http.register(cookie);
@@ -751,6 +753,74 @@ test('searching what a template keeps: by words and by meaning, best first, the 
   } finally {
     setEmbedderForTests(null);
   }
+});
+
+test('flows beside the main one: a screen’s flow runs with its own inputs and gives back its outputs by name', async () => {
+  const a = app({
+    name: 'Two flows',
+    data: { items: { title: 'text' } },
+    answer: [],
+    flow: { steps: [{ id: 'all', do: 'data', op: 'find', collection: 'items' }] },
+    flows: { add: { title: 'Add one', inputs: [{ id: 'title', label: 'Title', required: true }], steps: [{ id: 'keep', do: 'data', add: 'items', with: { title: '{{inputs.title}}' } }], outputs: { added: '{{keep.record.title}}', id: '{{keep.id}}' } } },
+  });
+  assert.deepEqual(Object.keys(a.flows!), ['add']);
+  const bad = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/runs`, payload: { flow: 'add', inputs: {} } });
+  assert.equal(bad.statusCode, 400);
+  assert.match(bad.json().error, /Title: needed/);
+  const none = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/runs`, payload: { flow: 'nope' } });
+  assert.match(none.json().error, /no flow “nope” \(it has add\)/);
+  const started = (await http.inject({ method: 'POST', url: `/api/apps/${a.id}/runs`, payload: { flow: 'add', inputs: { title: 'From the screen' }, source: 'screen' } })).json().run;
+  assert.equal(started.flow, 'add');
+  assert.equal(started.source, 'screen');
+  const done = await ended(started.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.deepEqual(Object.keys(done.result!), ['added', 'id']);
+  assert.equal(done.result!.added, 'From the screen');
+  // A flow beside the main one is checked like it, in its own words.
+  const wrong = await http.inject({ method: 'POST', url: '/api/apps/check', payload: { recipe: { name: 'W', prompt: 'x', flows: { add: { steps: [{ id: 'a', do: 'model', instructions: '{{inputs.nope}}' }] } } } } });
+  assert.ok(wrong.json().errors.some((e: string) => /Flow “add”: .*no question “nope”/.test(e)), wrong.body);
+});
+
+test('screens: made from its parts or written, pages of the template’s own (not the library’s), changed by agents, carried in its file, gone with it', async () => {
+  const a = app({ name: 'With a screen', prompt: 'Do {{topic}}', data: { notes: {} }, answer: [{ id: 'summary', label: 'Summary', type: 'markdown' }] });
+  const made = (await http.inject({ method: 'POST', url: `/api/apps/${a.id}/screens`, payload: {} })).json();
+  assert.equal(made.screen.name, 'main');
+  const html = pageSource(db, made.screen.page)!.text;
+  for (const part of ['<n-form flow="run">', '<n-result flow="run">', '<n-table data="notes" search remove>', '<n-runs flow="run" limit="5">']) assert.ok(html.includes(part), part);
+  assert.equal(pageInfo(db, made.screen.page)!.app, a.id);
+  assert.ok(!listPages(db).some((p) => p.id === made.screen.page), 'not in the Pages library');
+  assert.equal(store.getApp(db, a.id)!.screens!.main.page, made.screen.page);
+  const again = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/screens`, payload: {} });
+  assert.equal(again.statusCode, 409);
+  // An agent writes another screen, and changes it.
+  const own = (await http.inject({ method: 'POST', url: `/api/apps/${a.id}/screens`, payload: { name: 'board', html: '<!doctype html><h1>Board</h1><n-count data="notes"></n-count>' } })).json();
+  const changed = (await http.inject({ method: 'PUT', url: `/api/apps/${a.id}/screens/board`, payload: { html: '<!doctype html><h1>Board 2</h1>' } })).json().screen;
+  assert.equal(changed.version, 2);
+  assert.match((await http.inject({ method: 'GET', url: `/api/apps/${a.id}/screens/board` })).json().screen.html, /Board 2/);
+  assert.deepEqual((await http.inject({ method: 'GET', url: `/api/apps/${a.id}/screens` })).json().screens.map((x: any) => x.name), ['main', 'board']);
+  // In its file, its screens are their HTML; installed, they are pages of the new template.
+  const pkg = packageOf(db, store.getApp(db, a.id)!, false);
+  assert.match((pkg.app as any).screens.board.html, /Board 2/);
+  const got = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: pkg } })).json();
+  const b = store.getApp(db, got.app.id)!;
+  assert.deepEqual(Object.keys(b.screens!), ['main', 'board']);
+  assert.equal(pageInfo(db, b.screens!.board.page)!.app, b.id);
+  assert.notEqual(b.screens!.main.page, made.screen.page);
+  // A screen made while the app is read in Chinese has its headings in Chinese.
+  kvSet(db, 'ui.language', 'zh');
+  try {
+    const zh = app({ name: '读书清单', prompt: 'Do {{topic}}' });
+    const page = (await http.inject({ method: 'POST', url: `/api/apps/${zh.id}/screens`, payload: {} })).json().screen.page;
+    const text = pageSource(db, page)!.text;
+    for (const part of ['<html lang="zh">', '<h2>答案</h2>', '<h2>之前的运行</h2>']) assert.ok(text.includes(part), part);
+  } finally {
+    kvSet(db, 'ui.language', 'en');
+  }
+  // Removing a screen, and deleting the template, take their pages.
+  await http.inject({ method: 'DELETE', url: `/api/apps/${a.id}/screens/board` });
+  assert.equal(pageInfo(db, own.screen.page), null);
+  await http.inject({ method: 'DELETE', url: `/api/apps/${a.id}` });
+  assert.equal(pageInfo(db, made.screen.page), null);
 });
 
 test('saving checks a flow: what must change refuses it in words, what may surprise comes back as warnings', async () => {

@@ -26,7 +26,7 @@ import type { RunCtx } from '../features/types.ts';
 import { helper } from '../helper.ts';
 import { checkDaily } from './api.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
-import { fieldLine, finish, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
+import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
 import { getApp, getRun, getStep, listSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
 
 /** Public runs' throwaway folders (as for one-step public runs). */
@@ -72,7 +72,7 @@ const safeName = (n: string) => path.basename(String(n || 'file')).replace(/[^\w
 /** The form's values as the steps see them: a file question gives the file's path (a public run: its text). */
 async function inputValues(r: RunRecord, o: FlowStart, folder: string): Promise<Record<string, unknown>> {
   const values: Record<string, unknown> = { ...r.inputs };
-  for (const f of r.recipe.fields) {
+  for (const f of formOf(r.recipe, r.flow)) {
     if (f.type !== 'file' || !r.inputs[f.id]) continue;
     const sent = o.files?.[f.id];
     const file = path.join(folder, 'uploads', safeName(sent?.name ?? r.inputs[f.id]));
@@ -90,7 +90,8 @@ async function inputValues(r: RunRecord, o: FlowStart, folder: string): Promise<
 
 function execOf(r: RunRecord, o: FlowStart): Exec {
   const folder = o.public ? path.join(PUBLIC_DIR, r.id) : runFolder(r, o.slug);
-  return { run: r, flow: r.recipe.flow!, slug: o.slug, folder, pub: o.public, stopping: false, abort: new AbortController(), children: new Set(), waiting: new Set(), ended: [] };
+  const flow = r.flow ? r.recipe.flows![r.flow] : r.recipe.flow!;
+  return { run: r, flow, slug: o.slug, folder, pub: o.public, stopping: false, abort: new AbortController(), children: new Set(), waiting: new Set(), ended: [] };
 }
 
 /** Starts a run's flow in the background; it ends the run itself. */
@@ -646,7 +647,10 @@ async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'st
   execs.delete(x.run.id);
   const recipe: AppRecipe = x.run.recipe;
   let result: Record<string, unknown> | null = null;
-  if (status === 'done' && recipe.answer.length && scope) {
+  if (status === 'done' && x.run.flow && scope) {
+    // A flow beside the main one gives back its outputs, by their own names (or nothing).
+    if (x.flow.outputs) result = Object.fromEntries(Object.entries(x.flow.outputs).map(([k, v]) => [k, valueOf(v, scope)]));
+  } else if (status === 'done' && recipe.answer.length && scope) {
     const raw = x.flow.outputs ? Object.fromEntries(Object.entries(x.flow.outputs).map(([k, v]) => [k, valueOf(v, scope)])) : byName(recipe.answer, x.ended);
     const c = checkAnswer(recipe.answer, raw);
     if (c.ok) result = c.value;

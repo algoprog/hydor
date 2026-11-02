@@ -2,7 +2,7 @@
 // how to reach it from outside (API keys, other agents, the public page). A template runs as it is,
 // with the agent and model picked here, or becomes an app of your own.
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
+import { AppWindow, ArrowLeft, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
 import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
 import { inputsLine } from '@shared/apps';
@@ -21,6 +21,7 @@ import { BatchTab } from './Batch';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { statusBadge } from './Gallery';
 import { DownloadDialog, EnvLine } from './Install';
+import { AppScreen } from './Screen';
 import { ShareTab } from './Share';
 
 type Tab = 'run' | 'runs' | 'rows' | 'share';
@@ -247,6 +248,23 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                   Duplicate
                 </MenuItem>
                 <MenuItem
+                  icon={<AppWindow size={15} />}
+                  onClick={async () => {
+                    setMenu(false);
+                    const page = d?.app?.screens?.main?.page;
+                    if (page) return go(`/pages/${enc(page)}`);
+                    try {
+                      await post(`/api/apps/${enc(id)}/screens`, {});
+                      await load();
+                      setTab('run');
+                    } catch (e) {
+                      toastError(e);
+                    }
+                  }}
+                >
+                  {d?.app?.screens?.main ? 'Edit the screen' : 'Give it a screen'}
+                </MenuItem>
+                <MenuItem
                   icon={<Download size={15} />}
                   onClick={() => {
                     setMenu(false);
@@ -302,8 +320,17 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                 <EnvLine appId={d.app.id} env={d.env} onChange={load} />
               </div>
             )}
-            {recipe.description && (tab === 'run' || template) && <p className={cx('mx-auto max-w-[760px] px-5 pt-5 text-[13.5px] leading-relaxed text-fg-2 sm:px-7')}>{recipe.description}</p>}
-            {(tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} />}
+            {/* Its screen, in place of its form (the form comes back to run again with earlier answers). */}
+            {tab === 'run' && d?.app?.screens?.main && !again ? (
+              <div className="h-full min-h-[420px]">
+                <AppScreen app={d.app} />
+              </div>
+            ) : (
+              <>
+                {recipe.description && (tab === 'run' || template) && <p className={cx('mx-auto max-w-[760px] px-5 pt-5 text-[13.5px] leading-relaxed text-fg-2 sm:px-7')}>{recipe.description}</p>}
+                {(tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} />}
+              </>
+            )}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}
             {tab === 'share' && d?.app && <ShareTab detail={d} onChange={load} />}

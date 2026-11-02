@@ -51,6 +51,8 @@ export function initPages(db: DB) {
   if (!cols.includes('thumb')) db.exec('alter table pages add column thumb text');
   // A slide deck, a document or a spreadsheet (kinds.ts), or a page of HTML (null).
   if (!cols.includes('kind')) db.exec('alter table pages add column kind text');
+  // A template's screen belongs to the template (server/apps): its pages are its own, not the library's.
+  if (!cols.includes('app')) db.exec('alter table pages add column app text');
   initAssets(db);
 }
 
@@ -83,6 +85,7 @@ interface Row {
   link_nonce: string;
   thumb: string | null;
   kind: string | null;
+  app: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -107,10 +110,17 @@ const toInfo = (r: Row): PageInfo => ({
   by: r.by ?? undefined,
   thumb: r.thumb ?? undefined,
   ...(kindOf(r.kind) ? { kind: r.kind as PageKind } : {}),
+  ...(r.app ? { app: r.app } : {}),
 });
 
+/** The library's pages: a template's screens stay with their template. */
 export function listPages(db: DB): PageInfo[] {
-  return (db.prepare(`${SELECT} order by p.updated_at desc`).all() as Row[]).map(toInfo);
+  return (db.prepare(`${SELECT} where p.app is null order by p.updated_at desc`).all() as Row[]).map(toInfo);
+}
+
+/** A template's screens, as pages. */
+export function pagesOfApp(db: DB, app: string): PageInfo[] {
+  return (db.prepare(`${SELECT} where p.app = ? order by p.created_at`).all(app) as Row[]).map(toInfo);
 }
 
 export function pageInfo(db: DB, id: string): PageInfo | null {
@@ -193,7 +203,7 @@ const safeJson = (s: string) => {
 
 const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet' };
 
-export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string }): PageInfo {
+export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string }): PageInfo {
   const kind = p.kind ?? 'page';
   const { text: html, sources } = contentOf(db, kind, p);
   const title = cleanTitle(p.title, DEFAULT_TITLE[kind] ?? 'Page');
@@ -202,7 +212,7 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
   let id = newId();
   while (db.prepare('select 1 from pages where id = ?').get(id)) id = newId();
   db.transaction(() => {
-    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind) values (?, ?, 1, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       title,
       now,
@@ -211,6 +221,7 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
       p.sourceItem ?? null,
       nonce(),
       kind === 'page' ? null : kind,
+      p.app ?? null,
     );
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by) values (?, 1, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by);
     noteRefs(db, id, 1, sources);

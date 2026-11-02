@@ -1,12 +1,81 @@
 // The app's side of a page's frame (/htmlframe, sandboxed; the bridge inside is server/pages/kit.ts).
 // It posts the page with a fresh number each time the frame is ready, and takes only messages from
 // that frame, carrying that number, of a known shape and size: the page's height, a choice or a form
-// to put in the message box, and calls of window.naget.storage, which a store answers.
+// to put in the message box, and calls of window.naget.storage, which a store answers. A template's
+// screen also gets window.naget.app: its calls are answered here, for that template only (its runs,
+// its data), and what changes in them is passed on to it.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
 import { STORAGE_LIMITS } from '@shared/pages';
-import { enc, post } from '../../lib/api';
+import type { AppRun } from '@shared/apps';
+import type { AppInfo } from '@shared/app-manifest';
+import { api, del, enc, patch, post } from '../../lib/api';
+import { onFeatureEvent } from '../../lib/featureEvents';
+import { tr } from '../../i18n/runtime';
 import { cx } from '../../components/ui';
+
+/** A template's screen: what the frame tells it of its template. */
+export interface AppBridge {
+  info: AppInfo;
+}
+
+/** The App parts' words, in the app's language. */
+const appLabels = () => ({
+  run: tr('Run'),
+  working: tr('Working…'),
+  starting: tr('Starting…'),
+  waiting: tr('Waiting'),
+  needsYou: tr('Needs you in the app'),
+  done: tr('Done'),
+  failed: tr('Did not finish'),
+  stopped: tr('Stopped'),
+  noRuns: tr('No runs yet'),
+  empty: tr('Nothing here yet'),
+  nothingFound: tr('Nothing found'),
+  search: tr('Search'),
+  remove: tr('Remove'),
+  yes: tr('Yes'),
+  no: tr('No'),
+  now: tr('just now'),
+  noFlow: tr('This template has no flow'),
+  noData: tr('This template keeps no collection'),
+});
+
+const COLLECTION = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
+
+/** One call of a screen's window.naget.app, for its own template: its flows' runs and its data. */
+function appCall(appId: string, op: string, a: Record<string, unknown>): Promise<unknown> {
+  const id = enc(appId);
+  const col = () => {
+    if (typeof a.collection !== 'string' || !COLLECTION.test(a.collection)) throw new Error('That is not a collection');
+    return enc(a.collection);
+  };
+  const query = (q: Record<string, unknown>) =>
+    new URLSearchParams(Object.entries(q).flatMap(([k, v]) => (v === undefined || v === null || v === '' ? [] : [[k, typeof v === 'object' ? JSON.stringify(v) : String(v)]]))).toString();
+  switch (op) {
+    case 'run':
+      return post<{ run: AppRun }>(`/api/apps/${id}/runs`, { flow: typeof a.flow === 'string' ? a.flow : 'run', inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, source: 'screen' }).then((r) => r.run);
+    case 'get':
+      return api<{ run: AppRun; steps?: unknown[]; progress?: unknown }>(`/api/apps/runs/${enc(String(a.id ?? ''))}`).then((d) => {
+        if (d.run.app !== appId) throw new Error('That is not a run of this template');
+        return { run: d.run, steps: d.steps ?? [], progress: d.progress };
+      });
+    case 'runs':
+      return api<{ runs: AppRun[] }>(`/api/apps/${id}/runs`).then((r) => r.runs.filter((x) => !a.flow || (x.flow ?? 'run') === a.flow).slice(0, Math.max(1, Math.min(Number(a.limit) || 10, 50))));
+    case 'find':
+      return api(`/api/apps/${id}/data/${col()}?${query({ where: a.where, q: a.search, sort: a.sort, limit: a.limit })}`);
+    case 'search':
+      return api(`/api/apps/${id}/data/${col()}?${query({ ask: a.query, mode: a.mode, limit: a.limit })}`);
+    case 'add':
+      return post<{ record: unknown }>(`/api/apps/${id}/data/${col()}`, { record: a.record }).then((r) => r.record);
+    case 'update':
+      return patch<{ record: unknown }>(`/api/apps/${id}/data/${col()}/${enc(String(a.id ?? ''))}`, { set: a.set }).then((r) => r.record);
+    case 'remove':
+      return del(`/api/apps/${id}/data/${col()}/${enc(String(a.id ?? ''))}`);
+    default:
+      return Promise.reject(new Error('That is not something a screen can do'));
+  }
+}
 
 export interface StoreCall {
   op: 'get' | 'set' | 'remove' | 'keys';
@@ -136,7 +205,24 @@ export function themeCss(): string {
   if (/^[#\w(),.%\s/-]{1,80}$/.test(accent)) colours.push(['--n-accent-soft', `color-mix(in srgb, ${accent} 14%, transparent)`]);
   const font = (k: string) => v(k).replace(/[;{}<>]/g, '');
   const fonts = [font('font-sans') && `--n-font:${font('font-sans')}`, font('font-mono') && `--n-mono:${font('font-mono')}`].filter(Boolean).join(';');
-  return `${fontFaces()}:root{${fonts}}${themeNow() === 'dark' ? 'html[data-n-theme] .n-page' : ':root'}{${colours.map(([n, x]) => `${n}:${x}`).join(';')}}`;
+  return `${fontFaces()}:root{${fonts}}${themeNow() === 'dark' ? 'html[data-n-theme] .n-page' : ':root'}{${colours.map(([n, x]) => `${n}:${x}`).join(';')}}${partWords()}`;
+}
+
+/** What a template's parts say where they stand unrun (in the editor), in the app's language: the words before and after the part's name. */
+function partWords(): string {
+  const str = (s: string) => `"${s.replace(/[\\"]/g, '\\$&').replace(/[\n\r<]/g, ' ')}"`;
+  const words: [string, string][] = [
+    ['form', tr('Form: {0}')],
+    ['answer', tr('Answer: {0}')],
+    ['table', tr('Table: {0}')],
+    ['runs', tr('Runs: {0}')],
+    ['count', tr('Count: {0}')],
+  ];
+  const vars = words.map(([k, w]) => {
+    const [a, b = ''] = w.split('{0}');
+    return `--n-w-${k}-a:${str(a)};--n-w-${k}-b:${str(b)}`;
+  });
+  return `:root{${vars.join(';')}}`;
 }
 
 /** The app's theme changed (lib/theme.ts): `f` tells the page. */
@@ -191,6 +277,7 @@ export function PageFrame({
   title = 'Page',
   className,
   fill,
+  app,
 }: {
   html: string;
   store: Store;
@@ -200,16 +287,33 @@ export function PageFrame({
   className?: string;
   /** The frame fills a space of its own (over everything), rather than growing with the page. */
   fill?: boolean;
+  /** A template's screen: window.naget.app, for that template. */
+  app?: AppBridge;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const cb = useRef({ html, store, onHeight, onPick, fill });
-  cb.current = { html, store, onHeight, onPick, fill };
+  const cb = useRef({ html, store, onHeight, onPick, fill, app });
+  cb.current = { html, store, onHeight, onPick, fill, app };
   const nRef = useRef('');
+  // What changes in the template's runs and data reaches its screen.
+  const appId = app?.info.id;
+  useEffect(() => {
+    if (!appId) return;
+    return onFeatureEvent('apps', (e) => {
+      const w = ref.current?.contentWindow;
+      const n = nRef.current;
+      const d = e.data as { run?: AppRun; data?: { app: string; collection: string } } | null;
+      if (!w || !n || !d) return;
+      if (d.run?.app === appId) w.postMessage({ type: 'wa-app-event', n, kind: 'run', run: d.run }, '*');
+      const changed = d.data;
+      if (changed?.app === appId) w.postMessage({ type: 'wa-app-event', n, kind: 'data', collection: changed.collection }, '*');
+    });
+  }, [appId]);
   useThemeChange(() => nRef.current && ref.current?.contentWindow?.postMessage({ type: 'wa-html-theme', n: nRef.current, theme: themeNow(), css: themeCss() }, '*'));
   // Before the frame can load (it posts "ready" as soon as it does).
   useLayoutEffect(() => {
     let n = '';
     let busy = 0;
+    let appBusy = 0;
     let picks: number[] = [];
     const onMessage = (e: MessageEvent) => {
       const w = ref.current?.contentWindow;
@@ -220,7 +324,8 @@ export function PageFrame({
       if (d.type === 'wa-html-ready') {
         n = nonce();
         nRef.current = n;
-        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill }, '*');
+        const appInfo = cb.current.app ? { info: cb.current.app.info, labels: appLabels() } : undefined;
+        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, app: appInfo }, '*');
         return;
       }
       const { store, onHeight, onPick } = cb.current;
@@ -246,6 +351,19 @@ export function PageFrame({
           picks.push(now);
           onPick({ group: `form:${d.name}`, text: formText(d.name, d.fields) });
         }
+      } else if (d.type === 'wa-app') {
+        const app = cb.current.app;
+        if (!app || !Number.isInteger(d.id) || d.id < 1 || typeof d.op !== 'string') return;
+        const reply = (m: { value?: unknown; error?: string }) => w.postMessage({ type: 'wa-app-reply', id: d.id, ...m }, '*');
+        if (appBusy >= 16) return reply({ error: 'Too many calls at once' });
+        appBusy++;
+        Promise.resolve()
+          .then(() => appCall(app.info.id, d.op, d.args && typeof d.args === 'object' && !Array.isArray(d.args) ? d.args : {}))
+          .then(
+            (value) => reply({ value: value ?? null }),
+            (err) => reply({ error: String((err as Error)?.message ?? err) }),
+          )
+          .finally(() => appBusy--);
       } else if (d.type === 'wa-store') {
         if (!Number.isInteger(d.id) || d.id < 1) return;
         const reply = (m: { value?: unknown; error?: string }) => w.postMessage({ type: 'wa-store-reply', id: d.id, ...m }, '*');

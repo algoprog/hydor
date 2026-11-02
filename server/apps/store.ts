@@ -82,6 +82,8 @@ export function ensureTables(db: DB) {
   const cols = new Set((db.prepare('pragma table_info(app_runs)').all() as { name: string }[]).map((c) => c.name));
   if (!cols.has('parent')) db.exec('alter table app_runs add column parent text');
   if (!cols.has('step')) db.exec('alter table app_runs add column step text');
+  // Which of its flows a run ran, when not the main one.
+  if (!cols.has('flow')) db.exec('alter table app_runs add column flow text');
   db.exec('create index if not exists app_runs_parent on app_runs (parent)');
 }
 
@@ -162,6 +164,7 @@ interface RunRow {
   row_no: number | null;
   parent: string | null;
   step: string | null;
+  flow: string | null;
   nudged: number;
   created_at: number;
   started_at: number | null;
@@ -208,6 +211,7 @@ function toRun(r: RunRow): RunRecord {
     row: r.row_no ?? undefined,
     parent: r.parent ?? undefined,
     step: r.step ?? undefined,
+    flow: r.flow ?? undefined,
     nudged: !!r.nudged,
     createdAt: r.created_at,
     startedAt: r.started_at ?? undefined,
@@ -221,12 +225,12 @@ export function runView(r: RunRecord): AppRun {
   return view;
 }
 
-export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string }): RunRecord {
+export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string }): RunRecord {
   const id = newId(8);
   db.prepare(
-    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, Date.now());
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, Date.now());
   return getRun(db, id)!;
 }
 
