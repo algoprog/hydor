@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
-import { checkFlow, cleanData, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS } from '../../shared/app-manifest.ts';
+import { checkFlow, cleanData, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -123,6 +123,18 @@ function estimate(db: Deps['db'], appId: string, recipe: AppRecipe, rows: number
   return { rows, perRun, basis, total: perRun === null ? null : perRun * rows, cap: cap ?? null, most: cap ? cap * rows : null, from: costs.length };
 }
 
+/** A tool's inputs as the steps editor shows them: each name, its kind, whether it is needed, and its first sentence. */
+function inputsOf(schema: Record<string, unknown>): { name: string; type?: string; required?: true; description?: string }[] {
+  const props = (schema.properties ?? {}) as Record<string, { type?: unknown; description?: unknown }>;
+  const needed = Array.isArray(schema.required) ? schema.required : [];
+  return Object.entries(props).map(([name, p]) => ({
+    name,
+    ...(typeof p?.type === 'string' ? { type: p.type } : {}),
+    ...(needed.includes(name) ? { required: true as const } : {}),
+    ...(typeof p?.description === 'string' && p.description ? { description: p.description.split(/(?<=\.)\s/)[0].slice(0, 160) } : {}),
+  }));
+}
+
 function routes(d: Deps) {
   const { app, db, sessions } = d;
   ensureTables(db);
@@ -152,7 +164,7 @@ function routes(d: Deps) {
     const seen = new Set<string>();
     const tools = runTools(ctx)
       .filter((t) => t.name !== 'submit_result' && !seen.has(t.name) && seen.add(t.name))
-      .map((t) => ({ name: t.name, description: t.description.split(/(?<=\.)\s/)[0].slice(0, 200), web: PUBLIC_WEB_TOOLS.includes(t.name) }));
+      .map((t) => ({ name: t.name, description: t.description.split(/(?<=\.)\s/)[0].slice(0, 200), web: PUBLIC_WEB_TOOLS.includes(t.name), ...(STEP_TOOLS.includes(t.name) ? { step: true, inputs: inputsOf(t.inputSchema) } : {}) }));
     return { tools };
   });
 

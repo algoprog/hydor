@@ -1,11 +1,13 @@
-// Making or changing an app: its face, the questions of its form, the task with the answers put in,
-// the answer fields of its result, who does it (agent, model, mode, assistant, folder), which tools it
-// may use, its limits, and a test run of what is on screen before saving. "Save as template" in a
-// session's menu opens it with a draft from that session.
+// Making or changing an app: its face, the questions of its form, the task with the answers put in (or
+// its steps, once it works in steps), the answer fields of its result, what it keeps between runs, who
+// does it (agent, model, mode, assistant, folder), which tools it may use, its limits, and a test run of
+// what is on screen before saving. "Save as template" in a session's menu opens it with a draft from that
+// session.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, FlaskConical, Plus, Trash2, X } from 'lucide-react';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
+import type { Flow } from '@shared/app-manifest';
 import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders } from '@shared/apps';
 import { api, enc, post, put } from '../../lib/api';
 import { go } from '../../lib/nav';
@@ -20,7 +22,15 @@ import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { RunBody } from './Result';
 import { InstallFromFile } from './Install';
-import { StepsOutline } from './Steps';
+import { KeepsEditor } from './Keeps';
+import { RunSteps } from './Steps';
+import { StepsEditor } from './StepsEditor';
+
+/** A flow that is only the task (one agent step, as Work in steps makes it): its instructions, to go back to one task. */
+const oneTask = (flow: Flow): string | null => {
+  const [s, ...rest] = flow.steps;
+  return !rest.length && s?.do === 'agent' && !s.if && !s.failed && !flow.outputs ? s.instructions : null;
+};
 
 const BLANK: AppRecipe = {
   name: '',
@@ -216,12 +226,12 @@ function AnswerRow({ f, onChange, ...nav }: { f: AnswerField; onChange: (f: Answ
 function TestRun({ recipe, appId, open, onClose }: { recipe: AppRecipe; appId: string | null; open: boolean; onClose: () => void }) {
   const [values, setValues] = useState<FormValues>({});
   const [files, setFiles] = useState<FormFiles>({});
-  const [run, setRun] = useState<{ run: AppRun; progress?: RunProgress } | null>(null);
+  const [run, setRun] = useState<{ run: AppRun; progress?: RunProgress; steps?: RunDetail['steps'] } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (open) (setValues(initialValues(recipe.fields)), setFiles({}), setRun(null));
   }, [open]);
-  const refresh = (id: string) => api<RunDetail>(`/api/apps/runs/${enc(id)}`).then((d) => setRun({ run: d.run, progress: d.progress }), () => {});
+  const refresh = (id: string) => api<RunDetail>(`/api/apps/runs/${enc(id)}`).then((d) => setRun({ run: d.run, progress: d.progress, steps: d.steps }), () => {});
   useRunEvents((r) => run && r.id === run.run.id && refresh(r.id));
   useEffect(() => {
     if (!run || !isActive(run.run.status)) return;
@@ -272,7 +282,10 @@ function TestRun({ recipe, appId, open, onClose }: { recipe: AppRecipe; appId: s
       }
     >
       {run ? (
-        <RunBody run={run.run} progress={run.progress} answer={recipe.answer} name={recipe.name} />
+        <div className="space-y-3">
+          {run.steps && <RunSteps steps={run.steps} />}
+          <RunBody run={run.run} progress={run.progress} answer={recipe.answer} name={recipe.name} />
+        </div>
       ) : (
         <AppForm
           fields={recipe.fields}
@@ -399,6 +412,9 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
     }
   };
 
+  // The task as a first step: an agent that does it and hands in the answer fields, for steps to go before and after.
+  const inSteps = () => set({ flow: { steps: [{ id: 'task', title: 'Do the task', do: 'agent', instructions: recipe.prompt, ...(recipe.answer.length ? { outputs: cleanAnswer() } : {}) }] }, prompt: '' });
+
   const sample = Object.fromEntries(recipe.fields.map((f) => [f.id, f.default || `[${f.label || f.id}]`]));
   const back = saved ? appPath(saved.id) : template ? appPath(`tpl:${template}`) : '/apps';
 
@@ -462,17 +478,32 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
           </Section>
 
           {recipe.flow ? (
-            <Section title="What it does" sub="This template works in steps. To change them, ask an agent (“add a step that…”); here you change its form, answer, who does it, tools and limits.">
-              <StepsOutline flow={recipe.flow} />
+            <Section
+              title="What it does"
+              sub="Its steps, in order: each can use the form’s answers and what the steps before it gave."
+              actions={
+                oneTask(recipe.flow) && (
+                  <button type="button" onClick={() => set({ prompt: oneTask(recipe.flow!)!, flow: undefined })} className="text-[12.5px] text-fg-3 hover:text-fg">
+                    Back to one task
+                  </button>
+                )
+              }
+            >
+              <StepsEditor recipe={{ ...recipe, flow: recipe.flow }} onChange={set} />
             </Section>
           ) : (
           <Section
             title="The task"
             sub="What the agent is asked to do, with the answers put in."
             actions={
-              <button type="button" onClick={() => setPreview((p) => !p)} className="text-[12.5px] text-fg-3 hover:text-fg">
-                {preview ? 'Edit' : 'Preview'}
-              </button>
+              <span className="flex items-center gap-3">
+                <button type="button" onClick={() => setPreview((p) => !p)} className="text-[12.5px] text-fg-3 hover:text-fg">
+                  {preview ? 'Edit' : 'Preview'}
+                </button>
+                <button type="button" onClick={inSteps} className="text-[12.5px] text-fg-3 hover:text-fg">
+                  Work in steps
+                </button>
+              </span>
             }
           >
             {recipe.fields.length > 0 && (
@@ -510,7 +541,7 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
           </Section>
           )}
 
-          <Section title="The answer" sub="Fields the agent fills in when it is done (with submit_result): they show as a card or a table, and come back as JSON to programs. None: the reply is the answer.">
+          <Section title="The answer" sub={recipe.flow ? 'What a run gives back: it shows as a card or a table, and comes back as JSON to programs. What it does says where each comes from.' : 'Fields the agent fills in when it is done (with submit_result): they show as a card or a table, and come back as JSON to programs. None: the reply is the answer.'}>
             <div className="space-y-2">
               {recipe.answer.map((a, i) => (
                 <AnswerRow
@@ -526,6 +557,10 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
                 Add an answer field
               </Button>
             </div>
+          </Section>
+
+          <Section title="What it keeps" sub="Lists of records it keeps between runs, which its steps, its agents and its screen share, and a memory of its own.">
+            <KeepsEditor recipe={recipe} onChange={set} />
           </Section>
 
           <Section title="Who does it" sub="The agent, its model and mode. Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits).">

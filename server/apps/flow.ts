@@ -651,7 +651,8 @@ async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'st
     // A flow beside the main one gives back its outputs, by their own names (or nothing).
     if (x.flow.outputs) result = Object.fromEntries(Object.entries(x.flow.outputs).map(([k, v]) => [k, valueOf(v, scope)]));
   } else if (status === 'done' && recipe.answer.length && scope) {
-    const raw = x.flow.outputs ? Object.fromEntries(Object.entries(x.flow.outputs).map(([k, v]) => [k, valueOf(v, scope)])) : byName(recipe.answer, x.ended);
+    // Its outputs say where answer fields come from; the rest come by name, from the last step that gave one.
+    const raw = { ...byName(recipe.answer, x.ended), ...Object.fromEntries(Object.entries(x.flow.outputs ?? {}).map(([k, v]) => [k, valueOf(v, scope)])) };
     const c = checkAnswer(recipe.answer, raw);
     if (c.ok) result = c.value;
     else {

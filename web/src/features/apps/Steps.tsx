@@ -1,61 +1,12 @@
-// A template's steps as the pages show them: an outline of what it does (the builder, until the steps
-// editor), and a run's steps with how each went (the run's page), each agent step with its session.
+// A run's steps as its page shows them: how each went, how long it took and what it cost, why it did not
+// finish, and each agent step's session. The builder changes them (StepsEditor.tsx).
 import { useState } from 'react';
 import { ChevronRight, MessageSquareText } from 'lucide-react';
 import type { RunStepView } from '@shared/apps';
-import type { Flow, Step } from '@shared/app-manifest';
-import { STEP_KINDS, titleOf } from '@shared/app-manifest';
 import { openSession } from '../../lib/nav';
 import { cx, Throbber } from '../../components/ui';
 import { useSessionShow } from '../session/show';
 import { money } from './api';
-
-const kindOf = (k: string) => STEP_KINDS.find((x) => x.value === k)?.label ?? k;
-
-/** The lists inside a step, each with what to call it. */
-function inner(s: Step): { label: string; steps: Step[] }[] {
-  const out: { label: string; steps: Step[] }[] = [];
-  if (s.do === 'decide') {
-    out.push({ label: 'Then', steps: s.then });
-    if (s.else?.length) out.push({ label: 'Else', steps: s.else });
-  } else if (s.do === 'repeat') out.push({ label: s.over ? 'For each item' : 'Until it holds', steps: s.steps });
-  else if (s.do === 'parallel') s.branches.forEach((b, i) => out.push({ label: `Branch ${i + 1}`, steps: b }));
-  if (Array.isArray(s.failed)) out.push({ label: 'If it fails', steps: s.failed });
-  return out;
-}
-
-function OutlineList({ steps, depth }: { steps: Step[]; depth: number }) {
-  return (
-    <ol className={cx('space-y-1.5', depth > 0 && 'mt-1.5 border-l-2 border-line pl-3')}>
-      {steps.map((s) => (
-        <li key={s.id}>
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-[13.5px] font-medium" translate="no">
-              {titleOf(s)}
-            </span>
-            <span className="text-[12px] text-fg-3">{kindOf(s.do)}</span>
-            {s.if && <span className="font-mono text-[11.5px] text-fg-3">if {s.if}</span>}
-          </div>
-          {inner(s).map((b) => (
-            <div key={b.label} className="mt-1">
-              <div className="text-[11.5px] font-medium tracking-wide text-fg-3 uppercase">{b.label}</div>
-              <OutlineList steps={b.steps} depth={depth + 1} />
-            </div>
-          ))}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-/** What a template does, step by step, to look at. */
-export function StepsOutline({ flow }: { flow: Flow }) {
-  return (
-    <div className="rounded-[10px] border border-line-2 bg-bg-1 px-3 py-2.5">
-      <OutlineList steps={flow.steps} depth={0} />
-    </div>
-  );
-}
 
 const DOT: Record<RunStepView['status'], string> = { done: 'bg-ok', failed: 'bg-err', skipped: 'bg-line', stopped: 'bg-fg-3', running: '', waiting: 'bg-warn' };
 const SAID: Record<RunStepView['status'], string> = { done: 'Done', failed: 'Did not finish', skipped: 'Skipped', stopped: 'Stopped', running: 'Working', waiting: 'Needs you' };

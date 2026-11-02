@@ -411,6 +411,27 @@ test('Keep data: steps add, find, change and remove records; fields are checked;
   assert.equal((await http.inject({ method: 'GET', url: `/api/apps/${a.id}/data/things` })).statusCode, 404);
 });
 
+test('the answer: fields its outputs name come from there, the rest by name, from the last step that gave one', async () => {
+  const a = app({
+    name: 'Half mapped',
+    data: { items: { title: 'text' } },
+    answer: [
+      { id: 'title', label: 'Title', type: 'text', required: true },
+      { id: 'count', label: 'Count', type: 'number', required: true },
+    ],
+    flow: {
+      steps: [
+        { id: 'save', do: 'data', add: 'items', with: { title: '{{topic}}' } },
+        { id: 'all', do: 'data', op: 'find', collection: 'items' },
+      ],
+      outputs: { title: '{{save.record.title}}' },
+    },
+  });
+  const done = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'Mapped' } }).id);
+  assert.equal(done.status, 'done', done.error);
+  assert.deepEqual(done.result, { title: 'Mapped', count: 1 });
+});
+
 test('app_data: the agents of a template that keeps data find and add its records; a public run gets no such tool', async () => {
   const a = app({ name: 'Keeper', prompt: 'Keep {{topic}}', data: { notes: {} }, answer: [] });
   const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'this' } });
