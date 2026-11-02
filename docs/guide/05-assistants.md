@@ -99,12 +99,12 @@ For a big question that needs many searches, see deep research in [Deep research
 
 ### App builder
 
-"Makes templates: small apps with a form, steps, data and a screen" (see [Templates](/guide/templates)).
+"Makes your own apps: a form, steps, data and a screen" (see [Apps](/guide/apps)).
 
 - It pins down what goes in, what comes out and what a good run looks like, asks only what changes the design, and says what it assumed.
-- It builds the template with tools of its own, picking the cheapest step for each part (a tool, a quick model answer, a rule, code) and an agent where judgement is needed.
-- It gives the template two to four examples with checks, tries them, and fixes what fails before handing it over, saying what a run costs and how long it takes.
-- When you change the template yourself, it builds on your change.
+- It builds the app with tools of its own, picking the cheapest step for each part (a tool, a quick model answer, a rule, code) and an agent where judgement is needed.
+- It gives the app two to four examples with checks, tries them, and fixes what fails before handing it over, saying what a run costs and how long it takes.
+- When you change the app yourself, it builds on your change.
 - It uses the app-builder skill.
 
 ## Start a session as an assistant
@@ -285,7 +285,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 ## Where else assistants come in
 
 - **Spaces**: a space can say which assistant its sessions start as ("Its sessions start as"); picking the space on the start page picks it. See [Spaces](/guide/spaces).
-- **Templates**: a template can name an **Assistant**, and its runs start as it (runs from a public page don't). See [Templates](/guide/templates).
+- **Apps**: an app can name an **Assistant**, and its runs start as it (runs from a public page don't). See [Apps](/guide/apps).
 - **Scheduled tasks**: a task an agent sets up for you from a session runs as that session does, with its assistant. See [Scheduled tasks](/guide/tasks).
 - **Hands-free voice**: sessions you start by voice start as the assistant picked last on the start page.
 

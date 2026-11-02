@@ -20,7 +20,7 @@ Agents can do in the app what you could do in its pages. Some examples of what y
 - "Add to my guidelines that answers should be short."
 - "Use Brave Search before DuckDuckGo."
 - "Delete the memory notes about my old job."
-- "Which templates do I have? Run the trip planner for a long weekend in Lisbon."
+- "Which apps do I have? Run the trip planner for a long weekend in Lisbon."
 - "Switch this device to the light theme."
 
 The agent first reads how things are now, then asks you to confirm the change on a card in the conversation. Reading never asks: an agent can always look at your settings, spaces, tasks and the rest to answer you.
@@ -45,7 +45,7 @@ A card waits about nine minutes. If you don't answer by then, it goes away and t
 
 ## When an agent needs details: forms
 
-When an agent needs several things from you, it can show a form in the conversation instead of a list of questions: a trip's dates and budget, a new template's name and fields. Fill it in and click the button (**Send**, or what the agent called it); **Not now** closes it, and the agent carries on without it or asks in words.
+When an agent needs several things from you, it can show a form in the conversation instead of a list of questions: a trip's dates and budget, a new app's name and fields. Fill it in and click the button (**Send**, or what the agent called it); **Not now** closes it, and the agent carries on without it or asks in words.
 
 A card for a change can carry a form too: "Make a space" can show the name, description and guidelines the agent guessed, for you to correct before you click **Save**.
 
@@ -55,7 +55,7 @@ Some things stay yours. An agent that tries gets told where you do it:
 
 - your password and signing in and out ([Settings → Password](/settings?s=security), [Accounts](/settings?s=accounts));
 - the values of keys and sign-ins: an agent asks for them with a card where you type them into the vault, and never sees them ([Connections, keys and tools](/guide/connections));
-- making access tokens for other machines or agents, and a template's API keys;
+- making access tokens for other machines or agents, and an app's API keys;
 - answering approval cards, its own or another session's, and deciding on cards that ask you (a proposed skill, a scheduled task, publishing);
 - a session's permissions and its spending cap;
 - files, commands, terminals and git through the app: agents use their own tools for those, which ask you as the session's permissions say.

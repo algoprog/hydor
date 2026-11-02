@@ -752,7 +752,7 @@ export function cleanRecipe(raw: any): AppRecipe {
   const examples = cleanExamples(r.examples).examples;
   const graph = cleanGraph(r.graph, flow, flows);
   return {
-    name: str(r.name, 60) || 'Untitled template',
+    name: str(r.name, 60) || 'Untitled app',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
     color: r.color in APP_COLORS ? r.color : 'blue',
     description: str(r.description, 300),

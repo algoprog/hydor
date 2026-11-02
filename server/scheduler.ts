@@ -94,7 +94,7 @@ const appInputs = (app: TaskApp, change = '') => Object.fromEntries(Object.entri
 function cleanApp(raw: unknown): TaskApp | undefined {
   if (raw === undefined || raw === null) return undefined;
   const a = raw as { id?: unknown; inputs?: unknown };
-  if (typeof a !== 'object' || typeof a.id !== 'string' || !a.id.trim()) throw new HttpError(400, 'A task’s template is { id, inputs }');
+  if (typeof a !== 'object' || typeof a.id !== 'string' || !a.id.trim()) throw new HttpError(400, 'A task’s template (the app it runs) is { id, inputs }');
   const inputs = a.inputs && typeof a.inputs === 'object' && !Array.isArray(a.inputs) ? Object.entries(a.inputs as Record<string, unknown>) : [];
   return {
     id: a.id.trim().slice(0, 80),
@@ -315,7 +315,7 @@ export class Scheduler extends EventEmitter {
     const app = cleanApp(input.app);
     if (app) {
       const id = this.apps?.id(app.id);
-      if (!id) throw new HttpError(400, 'There is no such template');
+      if (!id) throw new HttpError(400, 'There is no such app');
       app.id = id;
     }
     const agent = input.agent === 'claude' || input.agent === 'codex' || input.agent === 'acp' ? input.agent : app ? 'claude' : null;
@@ -774,7 +774,7 @@ export class Scheduler extends EventEmitter {
     let error: string | undefined;
     try {
       if (app && answers) {
-        if (!this.apps) throw new Error('Templates are not on here');
+        if (!this.apps) throw new Error('Apps are not on here');
         // Its run ends when the template's does (appRunEnded); it has no session of its own to watch.
         const started = this.apps.start({ app: app.id, inputs: answers, test });
         setRun(this.db, runId, { app_run: started.id });
@@ -864,7 +864,7 @@ export class Scheduler extends EventEmitter {
       // A template's run: how it stands (its end may have gone unseen over a restart).
       if (run.app_run) {
         const e = this.apps?.ended(run.app_run);
-        if (e === undefined) finishRun(this.db, run.id, { status: 'error', summary: 'Its template run is gone', error: 'Its template run is gone' });
+        if (e === undefined) finishRun(this.db, run.id, { status: 'error', summary: 'Its app run is gone', error: 'Its app run is gone' });
         else if (e) this.appRunEnded(run.app_run, e);
         continue;
       }

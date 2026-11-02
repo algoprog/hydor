@@ -70,11 +70,11 @@ export function GalleryPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
-        title="Templates"
+        title="Apps"
         sub="Tasks you run again and again: fill in a form, and an agent does the job"
         actions={
           <Button size="sm" variant="primary" icon={<Plus size={15} />} onClick={() => go('/apps/new')}>
-            New template
+            New app
           </Button>
         }
       />
@@ -86,7 +86,7 @@ export function GalleryPage() {
         ) : (
           <div className="mx-auto max-w-[1080px] space-y-8 px-4 py-6 sm:px-6">
             <section>
-              <h2 className="mb-3 text-[13px] font-medium text-fg-3">Your templates</h2>
+              <h2 className="mb-3 text-[13px] font-medium text-fg-3">Your apps</h2>
               {g.apps.length ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {g.apps.filter((a) => !a.block).map((a) => (
@@ -117,8 +117,8 @@ export function GalleryPage() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-line-2 px-5 py-6 text-center">
-                  <Empty icon={<LayoutGrid size={20} />} title="Make a template from any task you repeat">
-                    Start from a ready-made one below and save it as your own, build one from scratch, or choose More → Save as template in a session’s menu.
+                  <Empty icon={<LayoutGrid size={20} />} title="Make an app from any task you repeat">
+                    Start from a ready-made one below and save it as your own, build one from scratch, or choose More → Save as an app in a session’s menu.
                   </Empty>
                 </div>
               )}
@@ -127,7 +127,7 @@ export function GalleryPage() {
             {g.apps.some((a) => a.block) && (
               <section>
                 <h2 className="mb-1 text-[13px] font-medium text-fg-3">Your blocks</h2>
-                <p className="mb-3 text-[12.5px] text-fg-3">Templates made to be steps of others: Add a step offers them in every template’s steps.</p>
+                <p className="mb-3 text-[12.5px] text-fg-3">Apps made to be steps of others: Add a step offers them in every app’s steps.</p>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {g.apps
                     .filter((a) => a.block)

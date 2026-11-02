@@ -1510,7 +1510,7 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
           break;
         case 'data': {
           const c = r.data?.[s.collection];
-          if (!c) note(errors, `${where}: the template keeps no collection “${s.collection}”${r.data ? ` (it keeps ${Object.keys(r.data).join(', ')})` : ': add it under What it keeps (data)'}`);
+          if (!c) note(errors, `${where}: the app keeps no collection “${s.collection}”${r.data ? ` (it keeps ${Object.keys(r.data).join(', ')})` : ': add it under What it keeps (data)'}`);
           else if (c.fields) {
             const known = new Set([...c.fields.map((f) => f.id), ...RECORD_KEYS]);
             for (const k of [...Object.keys(s.with ?? {}), ...Object.keys(s.where ?? {})]) if (!known.has(k)) note(errors, `${where}: “${s.collection}” has no field “${k}” (it has ${c.fields.map((f) => f.id).join(', ')})`);

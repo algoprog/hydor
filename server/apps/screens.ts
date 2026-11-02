@@ -69,7 +69,7 @@ export function makeScreen(db: DB, a: AppDef, o: { name?: unknown; title?: unkno
   const name = typeof o.name === 'string' && o.name.trim() ? o.name.trim() : 'main';
   if (!NAME.test(name)) throw new HttpError(400, 'A screen’s name is a letter, then letters, digits, - or _ (“main” opens first)');
   if (a.screens?.[name] && pageInfo(db, a.screens[name].page)) throw new HttpError(409, `It has a screen “${name}” already: change it, or remove it first`);
-  if (Object.keys(a.screens ?? {}).length >= 12) throw new HttpError(409, 'A template has at most 12 screens');
+  if (Object.keys(a.screens ?? {}).length >= 12) throw new HttpError(409, 'An app has at most 12 screens');
   const html = o.html === undefined || o.html === null || o.html === '' ? defaultScreen(a, appWords(db), userLang(db)) : checkHtml(o.html);
   const title = typeof o.title === 'string' && o.title.trim() ? o.title.trim().slice(0, 120) : name === 'main' ? a.name : `${a.name} · ${labelOf(name)}`;
   const page = createPage(db, { title, html, by: o.by, app: a.id });

@@ -92,7 +92,7 @@ export function takeAppEdits(db: DB, key: string): string | null {
   db.prepare('delete from app_edits where key = ?').run(key);
   const parts = rows.map((r) => {
     const lines = changesOf(JSON.parse(r.before) as AppRecipe, JSON.parse(r.after) as AppRecipe);
-    return `- “${r.name}” (template ${r.app_id}): ${lines.length ? lines.join(' ') : 'saved again, nothing in it changed.'}`;
+    return `- “${r.name}” (app ${r.app_id}): ${lines.length ? lines.join(' ') : 'saved again, nothing in it changed.'}`;
   });
-  return ['The user changed a template you built, in its editor, since your last turn. Build on their version: app_get gives it as it is now, and app_save keeps what you do not change.', ...parts].join('\n');
+  return ['The user changed an app you built, in its editor, since your last turn. Build on their version: app_get gives it as it is now, and app_save keeps what you do not change.', ...parts].join('\n');
 }

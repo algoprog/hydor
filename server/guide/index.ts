@@ -85,7 +85,7 @@ const APP_GUIDE: RunTool = {
 const APP_API: RunTool = {
   name: 'app_api',
   description: [
-    'Do in Naget Agent what the user could do in its pages: read its state, change a setting, or make, change and delete things (spaces, assistants, scheduled tasks, templates, pages, memory notes, connections, guidelines…), through the app’s own API as the signed-in user.',
+    'Do in Naget Agent what the user could do in its pages: read its state, change a setting, or make, change and delete things (spaces, assistants, scheduled tasks, apps, pages, memory notes, connections, guidelines…), through the app’s own API as the signed-in user.',
     'app_guide topic "api" lists the endpoints and their bodies; read the current state (GET) before changing it.',
     'Reading runs at once. A change shows the user a card with what changes (before → after) and waits for their answer, up to about nine minutes; give summary, the change in a few plain words, as its title.',
     'To have the user fill in or check details on that card, give form: fields as a JSON schema’s properties, each named by its address in body ("name", "settings.results") and filled in from body; their answers go into body.',
@@ -138,7 +138,7 @@ const ASK_FORM: RunTool = {
 
 /** Every agent hears of the tools: Claude Code sees an MCP tool's name only until it looks it up. */
 export const GUIDE_INSTRUCTIONS =
-  'Naget Agent, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask you to change one of its settings or to make, change or remove something in it (a space, an assistant, a scheduled task, a template, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound) change with app_api on /device.';
+  'Naget Agent, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask you to change one of its settings or to make, change or remove something in it (a space, an assistant, a scheduled task, an app, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound) change with app_api on /device.';
 
 /** A question asked on the Help page (`extra.help`: true, or the topic open there): the session is about the app. */
 export function helpInstructions(help: unknown): string | null {

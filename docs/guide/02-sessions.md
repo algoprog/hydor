@@ -380,7 +380,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - **More** (a submenu):
   - **Open a browser** / **Show the browser**: the agents' browser for this session, which you can watch and take over. See [Search and the browser](/guide/web).
   - **Make this an automation**: the helper model reads the session and drafts a scheduled task from it; change anything, try it with a test run, then save. See [Scheduled tasks](/guide/tasks).
-  - **Save as template**: starts a new template from this session. See [Templates](/guide/templates).
+  - **Save as an app**: starts a new app from this session. See [Apps](/guide/apps).
   - **Compact the conversation** (Claude Code and Codex).
   - **Copy the CLI resume command**: the command to continue this session in a terminal.
   - **Stop the agent process** (while the agent runs and no turn is under way).

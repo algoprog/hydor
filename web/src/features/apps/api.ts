@@ -136,4 +136,4 @@ export function useRunDetail(id: string) {
 
 export const money = (n?: number | null) => (n == null ? '' : n === 0 ? '$0' : n < 0.01 ? '<$0.01' : `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`);
 
-export const SOURCE_LABEL: Record<AppRun['source'], string> = { web: 'From the form', test: 'Test run', api: 'From the API', mcp: 'From another agent', public: 'Public page', batch: 'Row', step: 'A step of another run', app: 'From another template', screen: 'From its screen', task: 'From a scheduled task', chat: 'A conversation on its screen' };
+export const SOURCE_LABEL: Record<AppRun['source'], string> = { web: 'From the form', test: 'Test run', api: 'From the API', mcp: 'From another agent', public: 'Public page', batch: 'Row', step: 'A step of another run', app: 'From another app', screen: 'From its screen', task: 'From a scheduled task', chat: 'A conversation on its screen' };

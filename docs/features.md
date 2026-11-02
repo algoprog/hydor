@@ -30,7 +30,7 @@ Every agent here gets the same help from the app, whatever its model: Claude Cod
 agents that speak ACP and take MCP servers.
 
 - **Assistants**: start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or App builder (it makes
-  templates), or one of your own (its instructions, model, tools and connected apps; import Claude Code's agent
+  apps), or one of your own (its instructions, model, tools and connected apps; import Claude Code's agent
   files), and switch to another in the session's message box when the work changes. A task without a folder gets
   one of its own (`~/Naget/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
@@ -94,7 +94,7 @@ agents that speak ACP and take MCP servers.
   sources, and delivers a cited report as a page or a Word document. How many researchers at a time, how many
   rounds and how many searches in all are yours to set; a bar in the session says what it is doing and the
   searches used, and opens the report once it is ready.
-- **Pages and templates**: pages the agents show can answer back (pick an option, fill in a form), stay in a
+- **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in a
   library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
   link. A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
@@ -107,13 +107,13 @@ agents that speak ACP and take MCP servers.
   a tracker, and see or clear the data a page keeps. Export a page as a PDF, a Word document (headings, lists,
   tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
-  watch it change as it saves. Templates are tasks you repeat, each with a form: ready-made or your own, run from
-  the Templates page, the API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's
+  watch it change as it saves. Apps are tasks you repeat, each with a form: ready-made or your own, run from
+  the Apps page, the API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's
   result, asked on its page or in its session, which opens on that result with a switch to the conversation.
-  A template can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
-  repeat over a list or until something holds, branches side by side, another template, its own data, a question
+  An app can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
+  repeat over a list or until something holds, branches side by side, another app, its own data, a question
   to you that it waits for, a program in JavaScript, TypeScript or Python in a sandbox, which can be the whole
-  flow: its ctx calls to models, agents, tools, people, its data and other templates are steps of the run, kept
+  flow: its ctx calls to models, agents, tools, people, its data and other apps are steps of the run, kept
   and replayed after a restart, and values worked out at once and at no cost: the first, a count, a sum, a field
   of each, a join, a sort), each handing typed values to the next, laid out in its Edit (steps added from a short
   menu, values put in from the form and the steps before, checks shown as you go, and a graph of nodes and wires
@@ -121,8 +121,8 @@ agents that speak ACP and take MCP servers.
   to another or into empty space for a new step, nodes placed by hand or laid out by Tidy, value wires bent where
   you double-click, groups with notes, full screen, and Try it there: steps lighting up as a test run goes, what
   each value's wire carried, pausing before a step to go on or take one step, and frozen steps that give what
-  they gave in the last try; and Collapse to a block, steps that follow one another made a template of their own,
-  called in their place, which other templates can call too; Add a step offers these blocks, yours and ready-made
+  they gave in the last try; and Collapse to a block, steps that follow one another made an app of their own,
+  called in their place, which other apps can call too; Add a step offers these blocks, yours and ready-made
   ones to sum up a page, translate, answer from the web, sort into kinds or pull out facts) or by an agent, shown
   step by step on the run's page, run again from any step there (the steps before it giving what they gave, also
   from a test run in its Edit) and resumed after a restart; keep records between runs that its steps, its agents
@@ -130,26 +130,26 @@ agents that speak ACP and take MCP servers.
   memory of its own; and install the Node and Python packages it needs in a folder of its own. Examples (answers
   with checks on what a run gives) try it as it is on screen, each saying how its last try went. Each save that
   changes it is a version (who saved it, what changed, how its examples went with it), any of which can be
-  brought back, and each run keeps the version it ran. A template can live as a folder of files too (app.json,
+  brought back, and each run keeps the version it ran. An app can live as a folder of files too (app.json,
   each step's instructions, code steps as functions, its screens, with a schema for editors), changed in any
   editor or by a coding agent, each saved change coming back as a version. The command line's app commands make a
-  template and its folder, try its examples as you save, and export and import it. Describe one on the New
-  template page and the App builder assistant makes it. Save as template turns a session that went well into one,
+  app and its folder, try its examples as you save, and export and import it. Describe one on the New
+  app page and the App builder assistant makes it. Save as an app turns a session that went well into one,
   with steps drafted from the tools it called (read a page, search the web) when they check out. Agents build
-  templates with tools of their own: app_get, app_save (checked first; whole, a patch or one step), app_try (its
+  apps with tools of their own: app_get, app_save (checked first; whole, a patch or one step), app_try (its
   examples or a set of answers, waited for), app_screen and app_data (the records it keeps: read, or added to). A
-  template an agent saves opens beside its conversation, where what you change and save reaches the agent with
+  app an agent saves opens beside its conversation, where what you change and save reaches the agent with
   your next message (its next save reads your version first). A tool, model, code, data or app step that fails
   can have an agent do its work, so the run goes on; Edit shows the steps that had to, with Ask an agent to fix
   it, and offers Firm it up for an agent step that did the same in each of its last runs: fixed steps in its
   place (the tools it called, with the values it called them with, then a model step), tried on its examples
   first, with what a run takes and costs either way. Beside a conversation, a step's menu has Ask the agent about
   it. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases are
-  searched. A template can have a screen of its own in place of its form: a page made from its parts (its form,
+  searched. An app can have a screen of its own in place of its form: a page made from its parts (its form,
   its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
   edited in Pages' editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
   flows and a conversation with its agent, who finds and changes its records and runs its flows for you (the
-  latest conversation shows on return; earlier ones a click away). Templates travel as one file (.naget-app or .json, with their records, screens and the templates they
+  latest conversation shows on return; earlier ones a click away). Apps travel as one file (.naget-app or .json, with their records, screens and the apps they
   call), installed after a card that says what they will do here and offers one of your models for any it asks
   for that is not set up here.
 - **Slides**: decks kept in Pages, made by an agent (save_slides, from layouts or parts placed by position) or
@@ -179,7 +179,7 @@ agents that speak ACP and take MCP servers.
   own, with no shell escape and, where bubblewrap is installed, in its sandbox. They export as the PDF, the main
   .tex file or the whole project as a .zip.
 - **Skills**: a library that comes with the app (clarify first, check before saying it is done, troubleshooting,
-  research, writing, documents, building templates) for every agent, and skills of a space's own for its
+  research, writing, documents, building apps) for every agent, and skills of a space's own for its
   sessions. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a
   space, for the space alone.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
@@ -252,7 +252,7 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Message the agent while it works: your note joins the running turn, or waits in a queue you can reorder and
   edit, attachments included. Quote any part of a reply into your next message.
 - Notifications when a session finishes, fails or needs you: in the app, as a system notification, or as a push
-  notification on your phone with the app closed; agents and templates' steps can also send you one themselves
+  notification on your phone with the app closed; agents and apps' steps can also send you one themselves
   (notify_user) for what cannot wait. A plain yes-or-no approval has Approve and Deny right on the notification
   (where the browser shows buttons), and the Inbox lists everything waiting on you across sessions, scheduled
   tasks and machines, with approvals, questions and forms answered right there.
@@ -295,10 +295,10 @@ with npm into the app's folder), and the copies the app installed are kept up to
   every few minutes, once, by a cron expression, when a webhook is called, or when a watcher sees a change (new
   items in a feed, a page or a value in JSON changing, new files in a folder, a command's output): watchers check
   without a model and wake the agent only then. Ask in any conversation ("remind me Friday at 9", "every Monday
-  summarize…") and confirm the task in a card; or start from a template, or turn a session that worked into one.
-  A task can also run one of your templates, with the answers you set (a webhook's call or what a watcher saw
-  filling them in), made from the template's Runs. Each run reports how it went: its history keeps the outcome, a
-  summary, the cost and the session (or the template's run), and runs again with the same input. Runs with
+  summarize…") and confirm the task in a card; or start from an example, or turn a session that worked into one.
+  A task can also run one of your apps, with the answers you set (a webhook's call or what a watcher saw
+  filling them in), made from the app's Runs. Each run reports how it went: its history keeps the outcome, a
+  summary, the cost and the session (or the app's run), and runs again with the same input. Runs with
   nothing to report stay quiet, failures always tell you, and failures in a row pause the task. Webhooks can
   require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
   Sessions stopped by a usage limit can continue by themselves when it resets.
@@ -318,7 +318,7 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
-  every setting, sessions and what was said in them, memory notes, spaces, templates, scheduled tasks, assistants,
+  every setting, sessions and what was said in them, memory notes, spaces, apps, scheduled tasks, assistants,
   skills, pages, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
   page and points at it, a message opens its session at the words. With search by meaning on (Settings →
   Memory) things also match what they mean, in nine languages; what ships with the app has its vectors made

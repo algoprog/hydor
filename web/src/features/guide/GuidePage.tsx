@@ -22,6 +22,33 @@ import { TopicPage } from './TopicPage';
 /** The topic a path shows: /guide/<topic>. */
 const topicOf = (loc: string) => (loc.startsWith('/guide/') ? decodeURIComponent(loc.slice(7).split('/')[0]) : null);
 
+/** Topics renamed since links to them were made: an old address opens the new one, at the same section. */
+const MOVED: Record<string, { to: string; sections: Record<string, string> }> = {
+  // Templates became Apps (2 November 2026).
+  templates: {
+    to: 'apps',
+    sections: {
+      'what-a-template-is': 'what-an-app-is',
+      'find-your-way-around-the-templates-page': 'find-your-way-around-the-apps-page',
+      'use-a-ready-made-template': 'use-a-ready-made-app',
+      'run-a-template': 'run-an-app',
+      'see-all-runs-of-a-template': 'see-all-runs-of-an-app',
+      'make-your-own-template': 'make-your-own-app',
+      'change-copy-or-delete-a-template': 'change-copy-or-delete-an-app',
+      'call-a-template-from-your-own-programs': 'call-an-app-from-your-own-programs',
+      'let-other-agents-run-a-template-as-a-tool': 'let-other-agents-run-an-app-as-a-tool',
+      'run-a-template-once-for-each-row-of-a-csv': 'run-an-app-once-for-each-row-of-a-csv',
+      'run-a-template-by-itself': 'run-an-app-by-itself',
+      'templates-with-steps': 'apps-with-steps',
+      'what-a-template-keeps': 'what-an-app-keeps',
+      'a-template-that-remembers': 'an-app-that-remembers',
+      'what-a-template-needs-on-this-computer': 'what-an-app-needs-on-this-computer',
+      'give-a-template-a-screen': 'give-an-app-a-screen',
+      'share-a-template-as-a-file': 'share-an-app-as-a-file',
+    },
+  },
+};
+
 export function GuidePage() {
   const [loc] = useLocation();
   const mobile = useIsMobile();
@@ -34,6 +61,15 @@ export function GuidePage() {
   }, []);
   const id = topicOf(loc);
   const topic = topics?.find((t) => t.id === id) ?? null;
+
+  // A renamed topic's old address: the new one, in its place in the history.
+  useEffect(() => {
+    const m = MOVED[id ?? ''];
+    if (!m) return;
+    const h = decodeURIComponent(location.hash.slice(1));
+    go(`/guide/${m.to}${h ? `#${m.sections[h] ?? h}` : ''}`, true);
+    window.dispatchEvent(new Event('naget:hash'));
+  }, [id]);
 
   // Another page opens at its top; one with a section in its address scrolls to it by itself.
   useLayoutEffect(() => {

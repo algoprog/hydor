@@ -170,7 +170,7 @@ export function zipPackage(pkg: AppPackage): Buffer {
   const files = [{ name: 'app.json', data: Buffer.from(`${JSON.stringify(rest, null, 2)}\n`) }];
   for (const [name, list] of Object.entries(records ?? {})) files.push({ name: `data/${name}.json`, data: Buffer.from(`${JSON.stringify(list, null, 1)}\n`) });
   (apps ?? []).forEach((p, i) => files.push({ name: `apps/${(p.slug ?? `app-${i + 1}`).replace(/[^\w-]/g, '')}.json`, data: Buffer.from(`${JSON.stringify(p, null, 2)}\n`) }));
-  files.push({ name: 'README.txt', data: Buffer.from(`A template for Naget Agent: “${String(rest.app.name ?? 'Template')}”.\nInstall it in Naget Agent: Templates → New template → Install from a file.\n`) });
+  files.push({ name: 'README.txt', data: Buffer.from(`An app for Naget Agent: “${String(rest.app.name ?? 'App')}”.\nInstall it in Naget Agent: Apps → New app → Install from a file.\n`) });
   return zipOf(files);
 }
 
@@ -184,7 +184,7 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
   if (input.package && typeof input.package === 'object') pkg = input.package;
   else if (typeof input.file?.data === 'string') {
     const buf = Buffer.from(input.file.data, 'base64');
-    if (buf.length > MAX_PACKAGE) throw new HttpError(413, `A template file is at most ${MAX_PACKAGE >> 20} MB`);
+    if (buf.length > MAX_PACKAGE) throw new HttpError(413, `An app file is at most ${MAX_PACKAGE >> 20} MB`);
     if (buf[0] === 0x50 && buf[1] === 0x4b) {
       let zip: Zip;
       try {
@@ -197,7 +197,7 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
         .names()
         .filter((n) => /(^|\/)app\.json$/i.test(n) && n.split('/').length <= 2)
         .sort((a, b) => a.length - b.length)[0];
-      if (!main) throw new HttpError(400, 'This zip holds no app.json: it is not a Naget Agent template');
+      if (!main) throw new HttpError(400, 'This zip holds no app.json: it is not a Naget Agent app');
       const base = escape(main.slice(0, main.length - 'app.json'.length));
       const json = (n: string) => {
         try {
@@ -207,7 +207,7 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
         }
       };
       pkg = json(main);
-      if (!pkg || typeof pkg !== 'object') throw new HttpError(400, 'Its app.json is not a template');
+      if (!pkg || typeof pkg !== 'object') throw new HttpError(400, 'Its app.json is not an app');
       const records: Record<string, unknown[]> = {};
       const apps: unknown[] = [];
       for (const n of zip.names()) {
@@ -223,10 +223,10 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
       try {
         pkg = JSON.parse(buf.toString('utf8').replace(/^﻿/, ''));
       } catch {
-        throw new HttpError(400, 'This file is neither a template (.json) nor a packaged template (.naget-app or .zip)');
+        throw new HttpError(400, 'This file is neither an app (.json) nor a packaged app (.naget-app or .zip)');
       }
     }
-  } else throw new HttpError(400, 'Send the template: a .json or .naget-app file');
+  } else throw new HttpError(400, 'Send the app: a .json or .naget-app file');
   return asPackage(pkg);
 }
 
@@ -234,8 +234,8 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
 function asPackage(pkg: any, depth = 0): AppPackage {
   if (pkg && typeof pkg === 'object' && !pkg.naget && pkg.app && typeof pkg.app === 'object') pkg = { naget: 'app', format: 1, slug: pkg.app.slug, app: pkg.app, records: pkg.records, apps: pkg.apps };
   else if (pkg && typeof pkg === 'object' && !pkg.app && ('prompt' in pkg || 'flow' in pkg || 'fields' in pkg)) pkg = { naget: 'app', format: 1, slug: pkg.slug, app: pkg };
-  if (!pkg || typeof pkg !== 'object' || !pkg.app || typeof pkg.app !== 'object' || Array.isArray(pkg.app)) throw new HttpError(400, 'This is not a Naget Agent template');
-  if (Number(pkg.format) > PACKAGE_FORMAT) throw new HttpError(400, 'This template was made by a newer Naget Agent: update to install it');
+  if (!pkg || typeof pkg !== 'object' || !pkg.app || typeof pkg.app !== 'object' || Array.isArray(pkg.app)) throw new HttpError(400, 'This is not a Naget Agent app');
+  if (Number(pkg.format) > PACKAGE_FORMAT) throw new HttpError(400, 'This app was made by a newer Naget Agent: update to install it');
   const apps = depth === 0 && Array.isArray(pkg.apps) ? pkg.apps.slice(0, MAX_BUNDLED).map((p: unknown) => asPackage(p, 1)) : undefined;
   return { naget: 'app', format: Number(pkg.format) || 1, ...(typeof pkg.slug === 'string' ? { slug: pkg.slug } : {}), app: pkg.app, ...(pkg.records ? { records: pkg.records } : {}), ...(apps?.length ? { apps } : {}) };
 }
@@ -337,7 +337,7 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
   const warnings: string[] = [];
   // The templates that come with it: installed first, or the one you have when it is the same.
   const bundled = (pkg.apps ?? []).map((p) => {
-    const b = intake(db, p.app as Record<string, any>, `${String(p.app.name ?? p.slug ?? 'A template it calls')}: `);
+    const b = intake(db, p.app as Record<string, any>, `${String(p.app.name ?? p.slug ?? 'An app it calls')}: `);
     problems.push(...b.problems);
     notes.push(...b.notes);
     return { pkg: p, recipe: b.recipe, reuse: sameAs(db, p.slug, b.recipe) };
@@ -361,7 +361,7 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
   // The templates its steps call: with it, here already, or missing.
   const comes = new Set(bundled.map((b) => b.pkg.slug).filter(Boolean));
   const calls = [...new Set(all.flatMap((r) => (r.flow ? allSteps(r.flow.steps) : []).flatMap((s) => (s.do === 'app' ? [s.app] : []))))];
-  for (const c of calls) if (!comes.has(c) && !getApp(db, c)) warnings.push(`It calls the template “${c}”, which is neither here nor in the file: that step fails until you install it`);
+  for (const c of calls) if (!comes.has(c) && !getApp(db, c)) warnings.push(`It calls the app “${c}”, which is neither here nor in the file: that step fails until you install it`);
   for (const r of [recipe, ...bundled.filter((b) => !b.reuse).map((b) => b.recipe)]) {
     const c = checkFlow(r);
     problems.push(...c.errors);
@@ -379,7 +379,7 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
   const data = Object.keys(recipe.data ?? {}).map((name) => ({ name, records: Array.isArray(pkg.records?.[name]) ? Math.min(pkg.records![name].length, DATA_LIMITS.records) : 0 }));
   for (const name of Object.keys(pkg.records ?? {})) if (!recipe.data?.[name]) warnings.push(`Its file holds records for “${name}”, a collection it does not keep: they are left out`);
   const taken = getApp(db, slugify(recipe.name)) ? recipe.name : undefined;
-  if (taken) notes.push(`You have a template called “${taken}” already: this one installs beside it, at an address of its own`);
+  if (taken) notes.push(`You have an app called “${taken}” already: this one installs beside it, at an address of its own`);
   const models = await modelsHere([recipe, ...bundled.filter((b) => !b.reuse).map((b) => b.recipe)], catalog);
   for (const m of models) if (m.status === 'missing') warnings.push(m.options.length ? `It asks for ${m.label}, which is not set up here: pick another to stand in, or its agent's default is used` : m.agent === 'custom' ? `It asks for ${m.label}, and Custom has no models here: add one in Settings → Models first` : `It asks for ${m.label}, and ${AGENT_NAME[m.agent]} is not set up here`);
   const preview: InstallPreview = {
@@ -430,7 +430,7 @@ function retarget(r: AppRecipe, moved: Map<string, string>) {
  */
 export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Record<string, unknown>; catalog?: Catalog } = {}): Promise<{ app: AppDef; notes: string[]; records: number; skipped: number; bundled: { name: string; slug: string; reused: boolean }[] }> {
   const { recipe, bundled, preview } = await previewOf(db, pkg, o.catalog);
-  if (preview.problems.length) throw new HttpError(400, `This template cannot be installed: ${preview.problems.join('; ')}`);
+  if (preview.problems.length) throw new HttpError(400, `This app cannot be installed: ${preview.problems.join('; ')}`);
   // Each model as picked on the card, else as the preview found it.
   const picked = new Map<string, string>();
   for (const m of preview.models) {

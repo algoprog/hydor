@@ -80,7 +80,7 @@ With memory off, a session "neither reads nor writes notes":
 - Its agent gets no notes and no memory tools, and nothing from the session is saved.
 - Agents in other sessions can't find it when they search past conversations, and can't read it.
 
-A scheduled task's editor has the same Memory chip, so its runs can work without memory (see [Scheduled tasks](/guide/tasks)). Runs started from a template's public page always have memory off (see [Templates](/guide/templates)).
+A scheduled task's editor has the same Memory chip, so its runs can work without memory (see [Scheduled tasks](/guide/tasks)). Runs started from an app's public page always have memory off (see [Apps](/guide/apps)).
 
 ## Turn memory off for all sessions
 
@@ -105,7 +105,7 @@ Everything about memory is in [Settings → Capabilities → Memory](/settings?s
 - Agents start with the notes that bear on your request even when the notes use other words than you did.
 - Agents looking notes up, and the search field in the Notes list, find them by meaning as well as by words.
 - A note that says the same as one already kept, in other words, isn't saved again, and the tidy-up groups notes by meaning.
-- The search box (Ctrl+K) finds pages, settings, sessions, templates and more by what they mean, and knowledge bases are searched by meaning too (see [Spaces and knowledge](/guide/spaces)).
+- The search box (Ctrl+K) finds pages, settings, sessions, apps and more by what they mean, and knowledge bases are searched by meaning too (see [Spaces and knowledge](/guide/spaces)).
 
 **Turn it on**:
 

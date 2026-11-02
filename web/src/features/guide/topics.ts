@@ -64,7 +64,7 @@ const LOOKS: Record<string, TopicLook> = {
   research: { icon: Telescope, group: 'abilities', blurb: 'Deep research, second opinions and teams of agents' },
   'documents-voice': { icon: FileText, group: 'abilities', blurb: 'Documents and pictures in and out, and talking' },
   pages: { icon: AppWindow, group: 'abilities', blurb: 'Pages, slides, documents and spreadsheets agents make' },
-  templates: { icon: LayoutGrid, group: 'abilities', blurb: 'Fill in a short form, and an agent does the job' },
+  apps: { icon: LayoutGrid, group: 'abilities', blurb: 'Fill in a short form, and an agent does the job' },
   tasks: { icon: CalendarClock, group: 'abilities', blurb: 'Work that starts by itself, when you say' },
   'agents-models': { icon: Cpu, group: 'setup', blurb: 'Claude Code, Codex and others, their accounts and models' },
   custom: { icon: Bot, group: 'setup', blurb: 'The app’s own agent, for any model, local ones too' },

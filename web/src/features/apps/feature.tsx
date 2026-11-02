@@ -73,7 +73,7 @@ function SubmitRow({ item, sessionKey }: { item: ToolItem; sessionKey: string })
 export const appsFeature: WebFeature = {
   id: 'apps',
   routes: [{ match: (p) => p === '/apps' || p.startsWith('/apps/'), Page: AppsRoutes }],
-  nav: [{ path: '/apps', label: 'Templates', icon: <LayoutGrid size={17} />, match: (p) => p === '/apps' || p.startsWith('/apps/') }],
+  nav: [{ path: '/apps', label: 'Apps', icon: <LayoutGrid size={17} />, match: (p) => p === '/apps' || p.startsWith('/apps/') }],
   toolViews: { submit_result: { place: 'answer', Row: SubmitRow }, ...BUILDER_VIEWS },
   // A template an agent builds, beside its conversation while it is new.
   sessionSide: { useOpen: useAppSideOpen, close: closeAppSide, Panel: AppSide },
@@ -86,7 +86,7 @@ export const appsFeature: WebFeature = {
         go(`/apps/new?from=${enc(s.key)}`);
       }}
     >
-      Save as template
+      Save as an app
     </MenuItem>
   ),
   sessionMenuPart: 'more',

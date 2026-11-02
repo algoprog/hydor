@@ -264,10 +264,10 @@ Click **Raise** on the bar or **Raise the cap…** on the note (or use the sessi
 
 Each new child session gets a cap of its own: an equal share of what is left of the parent's cap, kept for the parent and as many children as may work at once. The parent's cap still covers them all, so when it is reached, all of them stop. When nothing is left of it, the agent cannot start more children and is told to finish with what it has.
 
-### Caps on scheduled tasks and templates
+### Caps on scheduled tasks and apps
 
 - **Scheduled tasks**: a task's editor ([Settings → Scheduled tasks](/settings?s=tasks), **New task**, or a task's menu → **Edit**) has the start page's **Spending cap** in its row of settings, and **Stops past $** under **Each run** sets the same cap; leave it empty for no cap. Each run's session stops at it. It applies to runs that start a new session; a run that posts into an existing session works within that session's own cap. A task an agent sets up for you from a conversation starts each run with that conversation's settings, its cap included. See [Scheduled tasks](/guide/tasks).
-- **Templates**: a template's **Limits** have **Most one run may spend (US$)**. See [Templates](/guide/templates).
+- **Apps**: an app's **Limits** have **Most one run may spend (US$)**. See [Apps](/guide/apps).
 
 ## Ask an agent
 

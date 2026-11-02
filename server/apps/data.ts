@@ -200,7 +200,7 @@ const toRecord = (r: Row): DataRecord => {
 /** The collection, or an error naming those the app keeps. */
 function collectionOf(data: Record<string, DataCollection> | undefined, name: string): DataCollection {
   const c = data?.[name];
-  if (!c) throw new HttpError(404, data && Object.keys(data).length ? `The template keeps no collection “${name}” (it keeps ${Object.keys(data).join(', ')})` : 'The template keeps no data: add a collection under What it keeps');
+  if (!c) throw new HttpError(404, data && Object.keys(data).length ? `The app keeps no collection “${name}” (it keeps ${Object.keys(data).join(', ')})` : 'The app keeps no data: add a collection under What it keeps');
   return c;
 }
 
@@ -295,7 +295,7 @@ export function countRecords(db: DB, app: string, collection?: string): number {
 export function addRecord(db: DB, app: string, data: Record<string, DataCollection> | undefined, collection: string, values: Record<string, unknown>): DataRecord {
   ensureDataTables(db);
   const c = collectionOf(data, collection);
-  if (countRecords(db, app) >= DATA_LIMITS.records) throw new HttpError(413, `The template keeps ${DATA_LIMITS.records.toLocaleString('en-US')} records already, its most: remove some first`);
+  if (countRecords(db, app) >= DATA_LIMITS.records) throw new HttpError(413, `The app keeps ${DATA_LIMITS.records.toLocaleString('en-US')} records already, its most: remove some first`);
   const v = tidy(c, values, collection);
   const id = typeof values?.id === 'string' && /^[\w-]{1,64}$/.test(values.id) ? values.id : newId(5);
   const now = Date.now();

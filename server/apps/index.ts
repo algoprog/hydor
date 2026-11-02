@@ -76,11 +76,11 @@ const keyLimiter = new Limiter();
 function recipeOf(db: Deps['db'], id: string): { app: AppDef | null; template: AppTemplate | null } {
   if (id.startsWith('tpl:')) {
     const template = templateById(id.slice(4));
-    if (!template) throw new HttpError(404, 'No such template');
+    if (!template) throw new HttpError(404, 'No such app');
     return { app: null, template };
   }
   const app = getApp(db, id);
-  if (!app) throw new HttpError(404, 'No such template');
+  if (!app) throw new HttpError(404, 'No such app');
   return { app, template: null };
 }
 
@@ -106,7 +106,7 @@ function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: stri
   const checked = checkFlow(recipe);
   errors.push(...checked.errors);
   const warnings = [...checked.warnings];
-  for (const f of [recipe.flow, ...Object.values(recipe.flows ?? {})]) for (const s of f ? allSteps(f.steps) : []) if (s.do === 'app' && !getApp(db, s.app)) warnings.push(`Step “${s.id}” calls the template “${s.app}”, which is not here`);
+  for (const f of [recipe.flow, ...Object.values(recipe.flows ?? {})]) for (const s of f ? allSteps(f.steps) : []) if (s.do === 'app' && !getApp(db, s.app)) warnings.push(`Step “${s.id}” calls the app “${s.app}”, which is not here`);
   return { recipe, errors: [...new Set(errors)], warnings };
 }
 
@@ -181,7 +181,7 @@ function routes(d: Deps) {
     name: (id) => getApp(db, id)?.name,
     start: ({ app: id, inputs, test }) => {
       const a = getApp(db, id);
-      if (!a) throw new HttpError(404, 'Its template is gone');
+      if (!a) throw new HttpError(404, 'Its app is gone');
       if (!test) checkDaily(db, a);
       const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'task', inputs });
       return { id: r.id, ...(r.key ? { key: r.key } : {}) };
@@ -205,9 +205,15 @@ function routes(d: Deps) {
 
   // ---- the gallery and apps ----
 
+  /** A day's usage as its pages show it: its runs, not its conversations (which count toward its limit all the same). */
+  const usageShown = (id: string, since: number) => {
+    const u = usageSince(db, id, since);
+    return { ...u, runs: u.runs - usageSince(db, id, since, 'chat').runs };
+  };
+
   app.get('/api/apps', async () => {
     const today = dayStart();
-    const apps = listApps(db).map((a) => ({ ...a, usage: usageSince(db, a.id, today) }));
+    const apps = listApps(db).map((a) => ({ ...a, usage: usageShown(a.id, today) }));
     const recent = listRuns(db, { limit: 12 })
       .filter((r) => r.source !== 'batch' && r.source !== 'public')
       .slice(0, 6)
@@ -268,12 +274,12 @@ function routes(d: Deps) {
     const { app: a, template } = recipeOf(db, P(req).id);
     if (template) return { template };
     const today = dayStart();
-    return { app: a, keys: listKeys(db, a!.id), usage: usageSince(db, a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug) };
+    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug) };
   });
 
   app.put('/api/apps/:id', async (req) => {
     const prev = getApp(db, P(req).id);
-    if (!prev) throw new HttpError(404, 'No such template');
+    if (!prev) throw new HttpError(404, 'No such app');
     const { warnings, ...b } = saveInput(db, req.body, prev);
     const saved = prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: prev.screens }, id: prev.id, by: isInternal(req) ? 'agent' : 'you' }));
     // A change made in its editor (not an agent's, through the API): the agents that built it hear of it.
@@ -285,21 +291,21 @@ function routes(d: Deps) {
   /** What a template needs on this computer: how its packages stand, and the commands that are missing. */
   app.get('/api/apps/:id/env', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     return { env: envOf(a, a.slug), requires: a.requires ?? null };
   });
 
   /** Installs a template's packages again (after a failure, or to start afresh). */
   app.post('/api/apps/:id/env', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     void ensureEnv(a, a.slug, { force: true }).catch(() => {});
     return { env: envOf(a, a.slug) };
   });
 
   app.delete('/api/apps/:id', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     for (const r of listRuns(db, { app: a.id, status: ['queued', 'starting', 'running', 'waiting'], steps: true })) await stopRun(r.id);
     removeScreens(db, a);
     unwatch(a.id);
@@ -416,7 +422,7 @@ function routes(d: Deps) {
   app.post('/api/apps/:id/examples/run', async (req) => {
     const id = P(req).id;
     const a = id === 'test' ? null : getApp(db, id);
-    if (!a && id !== 'test') throw new HttpError(404, 'No such template');
+    if (!a && id !== 'test') throw new HttpError(404, 'No such app');
     const b = (req.body ?? {}) as { recipe?: unknown; only?: unknown; trial?: unknown };
     let recipe: AppRecipe | null = a;
     if (b.recipe && typeof b.recipe === 'object') {
@@ -437,14 +443,14 @@ function routes(d: Deps) {
   /** Its folder of files, if it has one (and the mistake in it), and where one would go. */
   app.get('/api/apps/:id/folder', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     return { folder: folderOf(a), suggested: defaultFolder(a.slug) };
   });
 
   /** Makes its folder (written out, then kept in step with it): an empty folder, or one of its own. */
   app.post('/api/apps/:id/folder', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     const want = (req.body as { path?: unknown } | undefined)?.path;
     try {
       const saved = linkFolder(db, a, typeof want === 'string' && want.trim() ? want.trim() : defaultFolder(a.slug));
@@ -457,14 +463,14 @@ function routes(d: Deps) {
   /** Stops keeping it and its folder in step; the files stay. */
   app.delete('/api/apps/:id/folder', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     return { app: unlinkFolder(db, a) };
   });
 
   /** Its versions, newest first: each save that changed what it is, who saved it and what changed, and how its examples went with it. */
   app.get('/api/apps/:id/versions', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     const tried = examplesByVersion(db, a.id);
     return { versions: listVersions(db, a.id).map((v) => ({ ...v, ...(tried.get(v.n) ? { examples: tried.get(v.n) } : {}) })) };
   });
@@ -481,14 +487,14 @@ function routes(d: Deps) {
   /** What its latest runs say about its steps: those an agent had to do the work of, and agent steps that fixed steps could do (Firm it up). */
   app.get('/api/apps/:id/advice', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     return adviceOf(d, a);
   });
 
   /** A saved template's examples, each with its last run: how it went, its checks, what it cost and how long it took. */
   app.get('/api/apps/:id/examples', async (req) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     const last = lastExampleRuns(db, a.id);
     return { examples: (a.examples ?? []).map((e) => ({ ...e, ...(last.has(e.id) ? { last: runView(last.get(e.id)!) } : {}) })) };
   });
@@ -581,7 +587,7 @@ function routes(d: Deps) {
 
   const own = (req: FastifyRequest) => {
     const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     return a;
   };
   app.get('/api/apps/:id/keys', async (req) => ({ keys: listKeys(db, own(req).id) }));
@@ -614,7 +620,7 @@ function routes(d: Deps) {
 
   const kept = (req: FastifyRequest) => {
     const a = own(req);
-    if (!a.data?.[P(req).collection] && P(req).collection) throw new HttpError(404, `The template keeps no collection “${P(req).collection}”`);
+    if (!a.data?.[P(req).collection] && P(req).collection) throw new HttpError(404, `The app keeps no collection “${P(req).collection}”`);
     return a;
   };
   app.get('/api/apps/:id/data', async (req) => {
@@ -677,7 +683,7 @@ function routes(d: Deps) {
     const b = (req.body ?? {}) as { rows?: unknown; concurrency?: number; name?: string };
     if (!Array.isArray(b.rows)) throw new HttpError(400, 'Send the rows');
     const max = a.limits.runsPerDay;
-    if (max && usageSince(db, a.id, dayStart()).runs + b.rows.length > max) throw new HttpError(429, `That is more runs than the template’s limit of ${max} a day allows (Limits in its settings)`);
+    if (max && usageSince(db, a.id, dayStart()).runs + b.rows.length > max) throw new HttpError(429, `That is more runs than the app’s limit of ${max} a day allows (Limits in its settings)`);
     return { batch: startBatch(db, { app: a.id, slug: a.slug, recipe: a, rows: b.rows as Record<string, unknown>[], concurrency: b.concurrency, name: b.name }) };
   });
 
@@ -695,8 +701,8 @@ function routes(d: Deps) {
     const first = listRuns(db, { batch: batch.id, limit: 1 })[0];
     const a = getApp(db, batch.app);
     const recipe = first?.recipe ?? a;
-    if (!recipe) throw new HttpError(404, 'The template is gone');
-    const name = `${(a?.slug ?? 'template').replace(/[^\w-]/g, '')}-results.csv`;
+    if (!recipe) throw new HttpError(404, 'The app is gone');
+    const name = `${(a?.slug ?? 'app').replace(/[^\w-]/g, '')}-results.csv`;
     return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Content-Disposition', `attachment; filename="${name}"`).send(`﻿${batchCsv(db, batch.id, recipe, link)}`);
   });
 
@@ -713,12 +719,12 @@ function routes(d: Deps) {
     const bearer = /^Bearer\s+(\S+)$/i.exec(String(req.headers.authorization ?? ''))?.[1];
     if (bearer?.startsWith(KEY_PREFIX)) {
       const k = appOfKey(db, bearer);
-      if (!k || !a || k.app !== a.id) throw new HttpError(401, 'That key does not open this template');
+      if (!k || !a || k.app !== a.id) throw new HttpError(401, 'That key does not open this app');
       if (!keyLimiter.take(k.id, 30, 60_000)) throw new HttpError(429, 'Too many calls with this key: at most 30 a minute');
       return { a, key: k.id };
     }
     // Anything else here passed the sign-in (or a machine's access token) on the way in.
-    if (!a) throw new HttpError(404, 'No such template');
+    if (!a) throw new HttpError(404, 'No such app');
     return { a };
   };
 
@@ -737,7 +743,7 @@ function routes(d: Deps) {
   app.get('/api/apps/:slug/run/:runId', async (req) => {
     const { a } = callable(req);
     const r = getRun(db, P(req).runId);
-    if (!r || r.app !== a.id) throw new HttpError(404, 'No such run of this template');
+    if (!r || r.app !== a.id) throw new HttpError(404, 'No such run of this app');
     const done = await waitFor(r.id, waitSeconds((req.query as Record<string, string>).wait, 0, 900) * 1000);
     const now = done ?? r;
     return apiAnswer(now, link, isFlowRun(now) ? stepsOf(now.id) : undefined);
@@ -758,11 +764,11 @@ function submitTool(ctx: RunCtx): RunTool | null {
   const answer = hit.run.recipe.answer;
   return {
     name: 'submit_result',
-    description: `Hand in the result of this run of the template "${hit.run.appName}": one object with the answer fields. The person sees it as a card or table. Call it when the work is done; if it answers with problems, fix them and call again.`,
+    description: `Hand in the result of this run of the app "${hit.run.appName}": one object with the answer fields. The person sees it as a card or table. Call it when the work is done; if it answers with problems, fix them and call again.`,
     inputSchema: answerSchema(answer),
     async run(args, c) {
       const now = runOfCtx(c);
-      if (!now) return { text: 'This session was not started from a template, so there is nothing to hand in.', isError: true };
+      if (!now) return { text: 'This session was not started from an app, so there is nothing to hand in.', isError: true };
       let raw: unknown = args;
       // Some agents wrap the fields in one more object.
       const ids = new Set(answer.map((f) => f.id));
@@ -795,7 +801,7 @@ function dataTool(ctx: RunCtx): RunTool | null {
   const said = names.map((n) => `${n}${data![n].fields?.length ? ` (${data![n].fields!.map((f) => `${f.id}: ${f.type}`).join(', ')})` : ' (any fields)'}${data![n].description ? ` — ${data![n].description}` : ''}`).join('; ');
   return {
     name: 'app_data',
-    description: `The records the template "${hit.run.appName}" keeps between its runs. op "find" lists records by their fields (where, search for words, sort, limit), "search" finds those that answer a question best, by words and by meaning (query), "get" one by its id, "add" one (record), "update" one by id or those that match where (set: the fields to change; null clears one), "remove" one by id or those that match where. Collections: ${said}.`,
+    description: `The records the app "${hit.run.appName}" keeps between its runs. op "find" lists records by their fields (where, search for words, sort, limit), "search" finds those that answer a question best, by words and by meaning (query), "get" one by its id, "add" one (record), "update" one by id or those that match where (set: the fields to change; null clears one), "remove" one by id or those that match where. Collections: ${said}.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -814,7 +820,7 @@ function dataTool(ctx: RunCtx): RunTool | null {
     },
     async run(a, c) {
       const now = runOfCtx(c);
-      if (!now) return { text: 'This session was not started from a template, so it keeps no data.', isError: true };
+      if (!now) return { text: 'This session was not started from an app, so it keeps no data.', isError: true };
       const appId = now.run.parent ? (getRun(db, now.run.parent)?.app ?? now.run.app) : now.run.app;
       return dataOp(db, appId, appOfRun(db, now.run).data, a, ['find', 'search', 'get', 'add', 'update', 'remove'], (coll) => dataChanged(appId, coll));
     },
@@ -868,7 +874,7 @@ function flowTool(ctx: RunCtx): RunTool | null {
   if (!flows.length) return null;
   return {
     name: 'app_run',
-    description: `Runs one of the flows of the template "${a.name}" and waits for what it gives (at most wait seconds, 120 unless set): ${flows.map((f) => `${f.id} (${f.title}; inputs: ${f.inputs.map((i) => `${i.id}${i.required ? '' : '?'}: ${i.type}`).join(', ') || 'none'})`).join('; ')}.`,
+    description: `Runs one of the flows of the app "${a.name}" and waits for what it gives (at most wait seconds, 120 unless set): ${flows.map((f) => `${f.id} (${f.title}; inputs: ${f.inputs.map((i) => `${i.id}${i.required ? '' : '?'}: ${i.type}`).join(', ') || 'none'})`).join('; ')}.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -879,7 +885,7 @@ function flowTool(ctx: RunCtx): RunTool | null {
     },
     async run(args) {
       const now = getApp(db, a.id);
-      if (!now) return { text: 'The template is gone.', isError: true };
+      if (!now) return { text: 'The app is gone.', isError: true };
       const flow = typeof args.flow === 'string' && args.flow && args.flow !== 'run' ? args.flow : undefined;
       try {
         checkDaily(db, now);
@@ -901,7 +907,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Templates (the app's Templates page) are the user's own apps: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's templates topic says what each part does.";
+  "Apps (the Apps page in Naget Agent) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does.";
 
 export const apps: Feature = {
   id: 'apps',

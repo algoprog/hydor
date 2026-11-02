@@ -205,21 +205,21 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
   const template = id.startsWith('tpl:');
   const recipe = d?.app ?? d?.template;
   const setTab = (t: Tab) => go(`${appPath(id)}${t === 'run' ? '' : `?tab=${t}`}`, true);
-  if (err) return <Empty title="This template could not be opened">{err}</Empty>;
+  if (err) return <Empty title="This app could not be opened">{err}</Empty>;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={
           recipe ? (
             <span className="flex min-w-0 items-center gap-2.5">
-              <IconButton label="All templates" size="sm" onClick={() => go('/apps')} className="-ml-1">
+              <IconButton label="All apps" size="sm" onClick={() => go('/apps')} className="-ml-1">
                 <ArrowLeft size={17} />
               </IconButton>
               <AppIcon icon={recipe.icon} color={recipe.color} size={26} />
               <span className="truncate">{recipe.name}</span>
             </span>
           ) : (
-            'Template'
+            'App'
           )
         }
         actions={

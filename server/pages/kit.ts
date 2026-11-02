@@ -482,7 +482,7 @@ function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
       connectedCallback() {
         if (this.querySelector('form.n-app-form')) return;
         const f = flowOf(this.getAttribute('flow'));
-        if (!f) return void (this.textContent = `${L('noFlow', 'This template has no flow')}: ${this.getAttribute('flow')}`);
+        if (!f) return void (this.textContent = `${L('noFlow', 'This app has no flow')}: ${this.getAttribute('flow')}`);
         const status = h('span', { class: 'n-app-status', role: 'status' });
         const button = h('button', { class: 'n-btn n-primary', type: 'submit' }, this.getAttribute('submit') || (f.id === 'run' ? L('run', 'Run') : f.title));
         const form = h('form', { class: 'n-app-form' }, ...f.inputs.filter((x: any) => x.type !== 'file').map(fieldEl), h('div', { class: 'n-row' }, button, status));
@@ -511,7 +511,7 @@ function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
         const status = h('span', { class: 'n-app-status', role: 'status' });
         const button = h('button', { class: `n-btn${this.hasAttribute('plain') ? '' : ' n-primary'}`, type: 'button' }, words);
         button.addEventListener('click', () => {
-          if (!f) return void (status.textContent = `${L('noFlow', 'This template has no flow')}: ${this.getAttribute('flow')}`);
+          if (!f) return void (status.textContent = `${L('noFlow', 'This app has no flow')}: ${this.getAttribute('flow')}`);
           void runIt(this, f.id, json(this.getAttribute('inputs')) ?? {}, status, (on) => (button.disabled = on));
         });
         this.replaceChildren(h('span', { class: 'n-row' }, button, status));
@@ -591,7 +591,7 @@ function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
       connectedCallback() {
         const name = this.getAttribute('data') || '';
         const c = cfg.info.data.find((x: any) => x.name === name);
-        if (!c) return void (this.textContent = `${L('noData', 'This template keeps no collection')}: ${name}`);
+        if (!c) return void (this.textContent = `${L('noData', 'This app keeps no collection')}: ${name}`);
         const store = data(name);
         const limit = Math.max(1, Math.min(Number(this.getAttribute('limit')) || 100, 1000));
         const edit = (this.getAttribute('edit') || '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -769,7 +769,7 @@ function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
       off: (() => void) | null = null;
       connectedCallback() {
         const name = this.getAttribute('data') || '';
-        if (!cfg.info.data.some((x: any) => x.name === name)) return void (this.textContent = `${L('noData', 'This template keeps no collection')}: ${name}`);
+        if (!cfg.info.data.some((x: any) => x.name === name)) return void (this.textContent = `${L('noData', 'This app keeps no collection')}: ${name}`);
         const store = data(name);
         const where = json(this.getAttribute('where'));
         const n = h('div', { class: 'n-app-count' }, '…');

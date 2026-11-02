@@ -152,5 +152,5 @@ if (cmd === 'set-password') {
   service status      is it running
   service logs        its recent log
   update              pull the latest version, build it, restart the service
-  app …               your templates: list, new, folder, dev, try, export, import (app help says more)`);
+  app …               your apps: list, new, folder, dev, try, export, import (app help says more)`);
 }

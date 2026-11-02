@@ -67,7 +67,7 @@ export function appSchema(): Record<string, unknown> {
       collect: str('repeat: the step whose values make each round’s record'),
       steps: { type: 'array', items: { $ref: '#/$defs/step' } },
       branches: { type: 'array', items: { type: 'array', items: { $ref: '#/$defs/step' } } },
-      app: str('app: another template’s address'),
+      app: str('app: another app’s address'),
       collection: str('data: the list (one its data names)'),
       record: str('data: one record’s id'),
       where: values('data: which records: { field: value }, or { field: { "<": 10 } }'),
@@ -94,7 +94,7 @@ export function appSchema(): Record<string, unknown> {
   };
   return {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
-    title: 'A Naget Agent template (app.json)',
+    title: 'A Naget Agent app (app.json)',
     type: 'object',
     $defs: { step, field, answerField, flow },
     properties: {
@@ -103,7 +103,7 @@ export function appSchema(): Record<string, unknown> {
       description: str('What it does, in a sentence'),
       icon: { enum: [...APP_ICONS] },
       color: { enum: Object.keys(APP_COLORS) },
-      category: str('Its group on the Templates page'),
+      category: str('Its group on the Apps page'),
       assistant: str('An assistant’s id, which its agents work as'),
       agent: { enum: ['claude', 'codex', 'acp'], description: 'Who does the work: Claude Code, Codex, or Custom (acp)' },
       acpAgent: str('acp: which one ("console" = Custom)'),
@@ -111,7 +111,7 @@ export function appSchema(): Record<string, unknown> {
       effort: str('Its agent’s effort'),
       mode: str('Its agent’s mode (runs go ahead without asking unless set)'),
       cwd: str('The folder every run works in (unset: a new one per run)'),
-      prompt: textOrFile('The task for one agent, with {{field}} where each answer goes (a template without steps)'),
+      prompt: textOrFile('The task for one agent, with {{field}} where each answer goes (an app without steps)'),
       fields: { type: 'array', items: { $ref: '#/$defs/field' }, description: 'Its form' },
       answer: { type: 'array', items: { $ref: '#/$defs/answerField' }, description: 'What a run gives back' },
       tools: { type: ['array', 'null'], items: { type: 'string' }, description: 'The app’s own tools its runs may use (null: all)' },
@@ -129,8 +129,8 @@ export function appSchema(): Record<string, unknown> {
 }
 
 /** The types of a code step, for an editor to check its file with. */
-export const STEP_TYPES = `// A code step of a Naget Agent template. It runs in a sandbox: no network, none of this computer's files but
-// the template's own packages (requires.node / requires.python in app.json), and a time limit (not counting
+export const STEP_TYPES = `// A code step of a Naget Agent app. It runs in a sandbox: no network, none of this computer's files but
+// the app's own packages (requires.node / requires.python in app.json), and a time limit (not counting
 // the time its ctx calls take). It reaches the world outside only through ctx: each call is a step of the run,
 // kept, so when the run starts again after a restart, the program runs again and a call it made before gives
 // what it gave then. Make the same calls in the same order for the same input, so they can.
@@ -155,9 +155,9 @@ export interface Ctx {
   tool(tool: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<{ text: string; data?: unknown }>;
   /** Waits for the person: { yes }, or its fields' answers. */
   ask(question: string, o?: Said & { fields?: { id: string; label: string; type?: string; required?: boolean; options?: string[] }[]; waitHours?: number }): Promise<Record<string, any>>;
-  /** Another of the user's templates, by its address: its answer fields, and { reply }. */
+  /** Another of the user's apps, by its address: its answer fields, and { reply }. */
   app(app: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<Record<string, any>>;
-  /** The records the template keeps (the lists its data names). */
+  /** The records the app keeps (the lists its data names). */
   data: {
     add(collection: string, record: Record<string, unknown>): Promise<{ record: Record<string, any>; id: string }>;
     get(collection: string, id: string): Promise<{ record: Record<string, any> | null; found: boolean }>;
