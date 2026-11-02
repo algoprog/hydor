@@ -7,7 +7,7 @@ import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, CodeXml, Columns2, Copy, Da
 import type { AnswerField, AppDef, AppField, AppRecipe, AppTemplate } from '@shared/apps';
 import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
 import type { DataOp, Flow, Step, StepKind, ValueOp } from '@shared/app-manifest';
-import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf, VALUE_OPS } from '@shared/app-manifest';
+import { allSteps, BUILTIN_VALUES, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf, VALUE_OPS } from '@shared/app-manifest';
 import { api, post } from '../../lib/api';
 import { toastError } from '../../lib/store';
 import { BlockChips } from './Blocks';
@@ -154,7 +154,7 @@ function valuesAt(flow: Flow, list: ListPath, i: number, fields: AppField[]): Va
     { label: 'The form', vals: fields.map((f) => ({ ref: f.id, label: f.label || f.id })) },
     { label: 'Steps before', vals: before },
     { label: 'Here', vals: here },
-    { label: 'Other', vals: [{ ref: 'today', label: 'Today' }] },
+    { label: 'Built in', vals: BUILTIN_VALUES.map((b) => ({ ref: b.ref, label: b.label })) },
   ].filter((g) => g.vals.length);
 }
 
@@ -198,7 +198,7 @@ function ValuesMenu({ anchor, open, onClose, groups, onPick }: { anchor: RefObje
 
 /** The values a check on a run can read: the form's answers, what the steps gave, the answer fields and the reply. */
 export function checkValues(recipe: AppRecipe): ValGroup[] {
-  const groups = recipe.flow ? valuesAt(recipe.flow, [], recipe.flow.steps.length, recipe.fields).filter((g) => g.label !== 'Other') : [{ label: 'The form', vals: recipe.fields.map((f) => ({ ref: f.id, label: f.label || f.id })) }];
+  const groups = recipe.flow ? valuesAt(recipe.flow, [], recipe.flow.steps.length, recipe.fields).filter((g) => g.label !== 'Built in') : [{ label: 'The form', vals: recipe.fields.map((f) => ({ ref: f.id, label: f.label || f.id })) }];
   groups.push({ label: 'Its answer', vals: recipe.answer.map((a) => ({ ref: `answer.${a.id}`, label: a.label || a.id })) }, { label: 'Other', vals: [{ ref: 'reply', label: 'Its reply' }] });
   return groups.filter((g) => g.vals.length);
 }
@@ -1199,10 +1199,12 @@ function StepList({ steps, list, ctx }: { steps: Step[]; list: ListPath; ctx: Ct
 }
 
 /** The builder's What it does, for a template with steps: the steps, where its answer comes from, and the checks. */
-export function StepsEditor({ recipe, onChange, onAsk, appId }: { recipe: AppRecipe & { flow: Flow }; onChange: (p: Partial<AppRecipe>) => void; onAsk?: (s: Step) => void; appId?: string | null }) {
+export function StepsEditor({ recipe, onChange, onAsk, appId, view: given, onPart }: { recipe: AppRecipe & { flow: Flow }; onChange: (p: Partial<AppRecipe>) => void; onAsk?: (s: Step) => void; appId?: string | null; view?: 'list' | 'graph'; onPart?: (p: 'form' | 'answer') => void }) {
   const flow = recipe.flow;
   const [open, setOpen] = useState<string | null>(null);
-  const [view, setView] = useState<'list' | 'graph'>('list');
+  const [own, setView] = useState<'list' | 'graph'>('list');
+  // The builder says which, when it shows its own switch.
+  const view = given ?? own;
   // The graph wants room: phones keep the list.
   const wide = useMediaQuery('(min-width: 1000px)');
   const [tools, setTools] = useState<ToolInfo[]>([]);
@@ -1306,7 +1308,7 @@ export function StepsEditor({ recipe, onChange, onAsk, appId }: { recipe: AppRec
 
   return (
     <div className="space-y-4">
-      {wide && (
+      {wide && !given && (
         <div className="-mt-1 flex justify-end">
           <Segmented
             size="sm"
@@ -1320,7 +1322,7 @@ export function StepsEditor({ recipe, onChange, onAsk, appId }: { recipe: AppRec
         </div>
       )}
       {view === 'graph' && wide ? (
-        <GraphEditor ctx={ctx} appId={appId} graph={recipe.graph} onGraph={(graph) => onChange({ graph })} onFlows={(f) => onChange(f)} Body={StepBody} Actions={StepActions} />
+        <GraphEditor ctx={ctx} appId={appId} graph={recipe.graph} onGraph={(graph) => onChange({ graph })} onFlows={(f) => onChange(f)} Body={StepBody} Actions={StepActions} onPart={onPart} />
       ) : (
         <StepList steps={flow.steps} list={[]} ctx={ctx} />
       )}

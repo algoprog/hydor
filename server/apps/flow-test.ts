@@ -14,6 +14,7 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
+import { formatSearch } from '../../shared/search.ts';
 import { checkFlow, cleanData, cleanFlow, cleanRequires, collapseSteps, evalRule, fillRefs, flowOf, readRule, valueOf, type Collapsed, type Scope } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
 import { automations } from '../automations/index.ts';
@@ -38,6 +39,7 @@ import { packageOf, zipPackage } from './package.ts';
 import { defaultScreen } from './screens.ts';
 import { MEMORY_MARK, runFolder, saveResult, startRun, startRuns, stopRun, waitFor, WORK_DIR } from './runs.ts';
 import * as store from './store.ts';
+import { templateById } from './templates.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || !process.env.NAGET_APPS_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… and NAGET_APPS_DIR=/tmp/… so nothing touches real data.');
@@ -118,8 +120,9 @@ await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
 fs.mkdirSync(path.dirname(AGENT_FILE), { recursive: true });
 fs.writeFileSync(AGENT_FILE, JSON.stringify({ models: [{ id: 'fake', label: 'Fake', provider: 'endpoint', baseUrl: `http://127.0.0.1:${(srv.address() as { port: number }).port}/v1`, model: 'fake-1', tools: 'native' }] }));
 
-/** Two of the app's own tools: a search that answers JSON, and a page reader that cannot read "broken" pages. */
+/** Two of the app's own tools: a search that answers JSON (or what `searchAs` gives, for a test), and a page reader that cannot read "broken" pages. */
 const toolCalls: { tool: string; args: any }[] = [];
+let searchAs: ((a: any) => string) | null = null;
 const fakeTools: Feature = {
   id: 'fake-tools',
   tools: () => [
@@ -129,6 +132,7 @@ const fakeTools: Feature = {
       inputSchema: { type: 'object' },
       async run(a) {
         toolCalls.push({ tool: 'web_search', args: a });
+        if (searchAs) return searchAs(a);
         return JSON.stringify({ results: [{ title: `About ${a.query}`, url: 'https://example.com/1' }] });
       },
     },
@@ -231,6 +235,46 @@ test('format: a recipe without steps is one agent step; flows, data and memory s
   assert.equal(cleanRecipe({ ...r, graph: { at: { gone: { x: 1, y: 1 } } } }).graph, undefined);
   // Bends of a value's wire, by its ends: kept for steps that are there.
   assert.deepEqual(cleanRecipe({ ...r, graph: { bends: { 'one>one': { x: 4.6, y: 5 }, 'one>gone': { x: 1, y: 1 }, bad: { x: 1, y: 1 } } } }).graph, { bends: { 'one>one': { x: 5, y: 5 } } });
+});
+
+test('checks: a round of Repeat until sees the last round; one path of a Decide sees its own steps; the built-in values', () => {
+  const fields = [{ id: 'topic', label: 'Topic', type: 'text' as const }];
+  const loop = checkFlow({
+    fields,
+    answer: [],
+    flow: {
+      steps: [
+        {
+          id: 'again',
+          do: 'repeat',
+          until: '{{check.ok}} = yes',
+          max: 3,
+          steps: [
+            { id: 'draft', do: 'model', instructions: 'Write about {{topic}}. Fix: {{check.issues}}', outputs: [{ id: 'text', label: 'Text', type: 'markdown' }] },
+            { id: 'check', do: 'model', instructions: 'Check {{draft.text}}', outputs: [{ id: 'ok', label: 'OK', type: 'yesno' }, { id: 'issues', label: 'Issues', type: 'markdown' }] },
+          ],
+        },
+      ],
+    },
+  });
+  assert.deepEqual(loop.errors, []);
+  assert.match(loop.warnings.join('\n'), /empty when it is the first round of “again”/);
+  // Going through a list, each round is on its own: a later step's value is not there yet.
+  const each = checkFlow({ fields, answer: [], flow: { steps: [{ id: 'each', do: 'repeat', over: '{{topic}}', steps: [{ id: 'x', do: 'model', instructions: '{{y.text}}' }, { id: 'y', do: 'model', instructions: 'y' }] }] } });
+  assert.match(each.errors.join('\n'), /“y” comes later in the flow/);
+  const path = checkFlow({
+    fields,
+    answer: [],
+    flow: {
+      steps: [
+        { id: 'd', do: 'decide', rule: '{{topic}} = x', then: [{ id: 'a', do: 'model', instructions: 'A', outputs: [{ id: 'line', label: 'Line', type: 'text' }] }, { id: 'b', do: 'model', instructions: 'B {{a.line}}' }] },
+        { id: 'after', do: 'model', instructions: 'After {{a.line}} on {{weekday}}, {{now}} ({{timezone}}), from {{run.source}}' },
+      ],
+    },
+  });
+  assert.deepEqual(path.errors, []);
+  assert.deepEqual(path.warnings, ['Step “after” uses {{a.line}}, which is empty when the decision “d” goes the other way']);
+  assert.match(checkFlow({ fields, answer: [], flow: { steps: [{ id: 's', do: 'model', instructions: '{{run.nope}}' }] } }).errors.join('\n'), /a run gives id and source/);
 });
 
 test('checks: values from later steps, from inside a Repeat, from another branch; rules, tools and what it keeps', () => {
@@ -1117,6 +1161,147 @@ test('blocks: templates made to be steps of others; the ready-made ones check ou
   const get = Object.fromEntries(apps.tools!(ctx).map((x) => [x.name, x])).app_get;
   const list = JSON.parse(String(await get.run({}, ctx))).apps;
   assert.equal(list.find((x: { id: string }) => x.id === made.id).block, true);
+});
+
+test('Deep research, as it comes: its questions planned, searched three at a time, the results ranked and read four at a time, a question short of sources searched again, the report written by its agent and its citations numbered', async () => {
+  // The search answers as the real one does, a numbered list. Question 3's best page cannot be read; its search in other words finds another.
+  searchAs = (a) => {
+    const q = String(a.query);
+    const n = /\d/.exec(q)?.[0] ?? '0';
+    const hits = q.startsWith('other')
+      ? [{ title: `Found again ${n}`, url: `https://www.iea.org/report-${n}`, date: '2026-05-01', snippet: 'More on it.' }]
+      : [
+          { title: `Study ${n}`, url: n === '3' ? 'https://www.site3.gov/broken' : `https://www.site${n}.gov/study`, date: '2025-03-01', snippet: 'A study.' },
+          { title: `Report ${n}`, url: `https://news${n}.example/report?utm_source=feed`, date: '2026-02-01', snippet: 'A report.' },
+        ];
+    return formatSearch({ query: q, provider: 'Test', hits });
+  };
+  model.answer = (_system, user) => {
+    if (user.startsWith('Plan web research')) return JSON.stringify({ questions: [1, 2, 3].map((n) => ({ question: `Question ${n}?`, query: `query ${n}`, other: `other ${n}` })) });
+    if (user.startsWith('Pull out of the page')) return JSON.stringify({ facts: [`What ${/^The page: .*?, (https:\S+)/m.exec(user)![1]} says`], publisher: 'Pub', date: '2026', useful: true });
+    return '{}';
+  };
+  try {
+    const calls = toolCalls.length;
+    const res = await http.inject({ method: 'POST', url: '/api/apps/tpl:deep-research/runs', payload: { inputs: { topic: 'Heat pumps in the cold', depth: 'Quick overview' } } });
+    assert.equal(res.statusCode, 200, res.body);
+    const runId = res.json().run.id;
+    // Its writer gets the evidence, each fact under its question with its source's number, and the sources in a list.
+    const write = await agentAnswers(runId, 'write', {
+      summary: 'They work [4].',
+      key_findings: ['Cold is fine [4]', 'Costs vary [2]'],
+      report: 'Intro [2]. More [4][1]. Mine [5]. A slip [9].',
+      confidence: 'Medium: few sources',
+      extra_sources: [{ title: 'Own find', publisher: 'Me', date: '2026', url: 'https://own.example/x' }],
+    });
+    const prompt = sessions.made.find((m) => m.key === write.key)!.o.prompt as string;
+    assert.match(prompt, /### 1\. Question 1\?\n- What https:\/\/www\.site1\.gov\/study says \[1\]\n- What https:\/\/news1\.example\/report\?utm_source=feed says \[3\]/);
+    assert.match(prompt, /### 3\. Question 3\?\n- What https:\/\/www\.iea\.org\/report-3 says \[4\]/);
+    assert.match(prompt, /\[4\] Found again 3 \(Pub, 2026\) https:\/\/www\.iea\.org\/report-3/);
+    assert.match(prompt, /Length: about 400 words/);
+    const done = await ended(runId, 60_000);
+    assert.equal(done.status, 'done', done.error);
+    // The sources it cites, numbered as it first cites them (the one it found itself too); a number that names none goes.
+    const result = done.result as any;
+    assert.deepEqual(result.sources.map((s: any) => s.url), ['https://www.site2.gov/study', 'https://www.iea.org/report-3', 'https://www.site1.gov/study', 'https://own.example/x']);
+    assert.match(result.report, /^Intro \[1\]\. More \[2\]\[3\]\. Mine \[4\]\. A slip\.\n\n## Sources\n\n1\. Study 2, Pub, 2026 — https:\/\/www\.site2\.gov\/study\n2\. Found again 3/);
+    assert.equal(result.summary, 'They work [2].');
+    assert.deepEqual(result.key_findings, ['Cold is fine [2]', 'Costs vary [1]']);
+    assert.equal(result.confidence, 'Medium: few sources');
+    // Each search at its depth, and each page read for its question; the one that cannot be read is gone without.
+    const made = toolCalls.slice(calls);
+    assert.deepEqual(made.filter((c) => c.tool === 'web_search').map((c) => [c.args.query, c.args.k]).sort(), [['other 3', 6], ['query 1', 6], ['query 2', 6], ['query 3', 6]]);
+    assert.deepEqual(
+      made.filter((c) => c.tool === 'read_page').map((c) => [c.args.url, c.args.question]).sort(),
+      [
+        ['https://news1.example/report?utm_source=feed', 'Question 1?'],
+        ['https://www.iea.org/report-3', 'Question 3?'],
+        ['https://www.site1.gov/study', 'Question 1?'],
+        ['https://www.site2.gov/study', 'Question 2?'],
+        ['https://www.site3.gov/broken', 'Question 3?'],
+      ],
+    );
+    const st = Object.fromEntries(store.listSteps(db, runId).map((s) => [s.path, s.status]));
+    assert.equal(st.check_plan, 'skipped', 'nobody asked to check the questions');
+    assert.deepEqual(['search#1', 'search#2', 'search#3', 'read#1', 'read#2', 'read#3', 'read#4'].map((p) => st[p]), Array(7).fill('done'));
+    assert.deepEqual([st['read#3/page'], st['read#3/facts']], ['failed', 'skipped'], 'a page that cannot be read is gone without');
+    assert.deepEqual([st.more, st['search_more#1/find_more'], st.pick_more, st['read_more#1/facts_more']], ['done', 'done', 'done', 'done'], 'the question short of sources was searched again');
+    for (const id of ['budget', 'queries', 'rank', 'coverage', 'evidence', 'finish']) assert.equal(st[id], 'done', `its program ${id} ran`);
+    assert.ok((done.costUsd ?? 0) > 0, 'its model steps cost');
+  } finally {
+    searchAs = null;
+  }
+});
+
+test('Trip planner, as it comes: its dates worked out, four branches of research side by side (the forecast only for a trip that is near), the plan on the trip’s own dates and its budget added up; it asks what you would like only when you are there', async () => {
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  model.answer = (_system, user) => {
+    if (user.startsWith('From the search results below, list what is on')) return JSON.stringify({ events: [{ name: 'Jazz festival', date: 'Saturday', where: 'Belém', note: '' }], holidays: [], closures: ['The castle closes on Mondays'] });
+    if (user.startsWith('Say what weather to expect')) return JSON.stringify({ summary: user.includes('The forecast:') ? 'Sunny, by the forecast' : 'Mild, as usual then', temperatures: '14–20 °C', rain: 'Some', pack: ['A light jacket'] });
+    if (user.startsWith('From the search results below, pick the areas')) return JSON.stringify({ areas: [{ area: 'Alfama', why: 'The old town', good_for: 'Walkers' }], sights: [{ name: 'Castle', area: 'Alfama', hours: '9–21', book: 'A day ahead' }] });
+    if (user.startsWith('From the search results below, say how visitors get')) return JSON.stringify({ arrival: 'The metro from the airport', around: 'A Viva Viagem card', currency: 'EUR' });
+    return '{}';
+  };
+  const plan = {
+    overview: 'Three easy days.',
+    itinerary: [
+      { day: 2, area: 'Alfama', morning: 'Castle', afternoon: 'Tram 28', evening: 'Fado' },
+      { day: 1, area: 'Baixa', morning: 'Arrive', afternoon: 'A walk', evening: 'Dinner' },
+      { day: 3, area: 'Belém', morning: 'The tower', afternoon: 'Jazz festival', evening: 'Pastéis' },
+    ],
+    book_ahead: ['The castle, a day ahead'],
+    costs: [
+      { item: 'Hotel, 2 nights', low: 300, high: 450 },
+      { item: 'Food', low: 150, high: 200, note: 'two people' },
+    ],
+    currency: 'EUR',
+    tips: ['Get a Viva Viagem card'],
+  };
+  const tpl = templateById('trip-planner')!;
+  // From the API, nobody is there to answer: it does not ask, even when its form says to.
+  const r = startRun({ app: 'tpl:trip-planner', slug: 'trip-planner', recipe: tpl, source: 'api', inputs: { destination: 'Lisbon', start: day(5), days: '3', choose: 'Yes' } });
+  const agent = await agentAnswers(r.id, 'plan', plan);
+  const prompt = sessions.made.find((m) => m.key === agent.key)!.o.prompt as string;
+  assert.match(prompt, new RegExp(`\\| 1 \\| ${day(5)} \\| \\w+day \\|`), 'it plans on the days, each with its weekday');
+  assert.match(prompt, /Weather: Sunny, by the forecast/, 'a trip five days off has a forecast');
+  assert.match(prompt, /Jazz festival/);
+  assert.doesNotMatch(prompt, /Where they want to stay/);
+  const done = await ended(r.id, 60_000);
+  assert.equal(done.status, 'done', done.error);
+  const result = done.result as any;
+  assert.deepEqual(result.days.map((d: any) => [d.day, d.date, d.area]), [[1, day(5), 'Baixa'], [2, day(6), 'Alfama'], [3, day(7), 'Belém']]);
+  assert.deepEqual(result.budget, [
+    { item: 'Hotel, 2 nights', estimate: '300–450 EUR' },
+    { item: 'Food', estimate: '150–200 EUR (two people)' },
+    { item: 'Total', estimate: '450–650 EUR' },
+  ]);
+  assert.equal(result.overview, 'Three easy days.');
+  const st = store.listSteps(db, r.id);
+  const status = Object.fromEntries(st.map((s) => [s.path, s.status]));
+  assert.equal(status.choices, 'skipped', 'not asked: the run came from the API');
+  for (const id of ['calendar', 'research', 'events_search', 'holidays_search', 'whats_on', 'climate_search', 'soon', 'forecast_search', 'weather', 'sights_search', 'areas_search', 'places', 'transport_search', 'transport', 'plan', 'assemble']) assert.equal(status[id], 'done', id);
+  const at = Object.fromEntries(st.map((s) => [s.id, s]));
+  const started = Math.max(...['events_search', 'climate_search', 'sights_search', 'transport_search'].map((id) => at[id].startedAt!));
+  const ended1 = Math.min(...['whats_on', 'weather', 'places', 'transport'].map((id) => at[id].endedAt!));
+  assert.ok(started <= ended1, 'the four branches ran side by side');
+  // From its form, when the form says so, it asks; the plan follows the answer. A trip weeks off has no forecast.
+  const w = startRun({ app: 'tpl:trip-planner', slug: 'trip-planner', recipe: tpl, source: 'web', inputs: { destination: 'Lisbon', start: day(40), days: '3', choose: 'Yes' } });
+  let view: any = {};
+  for (let i = 0; i < 400 && !view.question; i++) {
+    view = (await http.inject({ method: 'GET', url: `/api/apps/runs/${w.id}` })).json();
+    if (!view.question) await sleep(25);
+  }
+  assert.equal(view.question?.step, 'choices');
+  assert.match(view.question.question, /Areas to stay in:[\s\S]*Alfama[\s\S]*Weather: Mild, as usual then/);
+  assert.deepEqual(view.question.fields.map((f: any) => f.id), ['stay', 'must', 'skip']);
+  assert.equal((await http.inject({ method: 'POST', url: `/api/apps/runs/${w.id}/answer`, payload: { values: { stay: 'Near the river' } } })).statusCode, 200);
+  const agent2 = await agentAnswers(w.id, 'plan', plan);
+  assert.match(sessions.made.find((m) => m.key === agent2.key)!.o.prompt, /Where they want to stay: Near the river/);
+  const done2 = await ended(w.id, 60_000);
+  assert.equal(done2.status, 'done', done2.error);
+  const status2 = Object.fromEntries(store.listSteps(db, w.id).map((s) => [s.path, s.status]));
+  assert.equal(status2.choices, 'done');
+  assert.equal(status2.forecast_search, undefined, 'no forecast for a trip weeks off');
 });
 
 test('examples: saved inputs with checks; trying them runs each as a test, and its checks are read against what it gave', async () => {

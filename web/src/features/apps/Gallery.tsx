@@ -1,17 +1,22 @@
-// The Templates page (/apps): your own templates, the latest runs, and the ready-made ones by kind of task.
+// The Apps page (/apps): a box to describe a new one, your own apps, the latest runs, and the ready-made ones by
+// kind of task. Each card says what it is made of: its steps and what they do (side by side, code, a question for
+// you), what it keeps, its screen.
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Globe, LayoutGrid, Plus } from 'lucide-react';
-import type { AppRun } from '@shared/apps';
+import { AppWindow, ChevronRight, CodeXml, Columns2, Database, Globe, LayoutGrid, MessageCircleQuestion, Plus, Sparkles } from 'lucide-react';
+import type { AppRecipe, AppRun } from '@shared/apps';
 import { isActive } from '@shared/apps';
-import { api } from '../../lib/api';
+import { allSteps } from '@shared/app-manifest';
+import { tr } from '../../i18n/runtime';
+import { api, enc } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { Badge, Button, cx, Empty, Throbber } from '../../components/ui';
+import { Badge, Button, cx, Empty, inputCls, Throbber } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { appPath, runPath, useRunEvents, type Gallery } from './api';
 import { AppIcon } from './AppIcon';
+import { InstallFromFile } from './Install';
 
 /** `own`: one of yours, whose name and description stay as you wrote them in every language. */
 function Card({ icon, color, name, description, meta, own, onClick }: { icon: string; color: string; name: string; description: string; meta?: React.ReactNode; own?: boolean; onClick: () => void }) {
@@ -34,6 +39,63 @@ function Card({ icon, color, name, description, meta, own, onClick }: { icon: st
       </div>
       {meta && <div className="flex w-full min-w-0 items-center gap-2 text-[12px] text-fg-3">{meta}</div>}
     </button>
+  );
+}
+
+/** What an app is made of, in a few words: its steps and what they do, what it keeps, its screen. */
+function Traits({ r }: { r: Pick<AppRecipe, 'flow' | 'flows' | 'data' | 'screens' | 'fields'> }) {
+  const steps = [...allSteps(r.flow?.steps ?? []), ...Object.values(r.flows ?? {}).flatMap((f) => allSteps(f.steps))];
+  const side = steps.some((s) => s.do === 'parallel' || (s.do === 'repeat' && (s.atOnce ?? 1) > 1));
+  const bits: { key: string; icon?: React.ReactNode; text: string }[] = [
+    { key: 'n', text: steps.length ? tr(`${steps.length} step${steps.length === 1 ? '' : 's'}`) : tr(`${r.fields.length} question${r.fields.length === 1 ? '' : 's'}`) },
+    ...(side ? [{ key: 'p', icon: <Columns2 size={13} />, text: tr('side by side') }] : []),
+    ...(steps.some((s) => s.do === 'code') ? [{ key: 'c', icon: <CodeXml size={13} />, text: tr('code') }] : []),
+    ...(steps.some((s) => s.do === 'ask') ? [{ key: 'a', icon: <MessageCircleQuestion size={13} />, text: tr('asks you') }] : []),
+    ...(Object.keys(r.data ?? {}).length ? [{ key: 'd', icon: <Database size={13} />, text: tr('keeps data') }] : []),
+    ...(r.screens?.main ? [{ key: 's', icon: <AppWindow size={13} />, text: tr('a screen') }] : []),
+  ];
+  // The count in words, the rest as icons that say what they are when pointed at: short enough for a card.
+  const [count, ...flags] = bits;
+  return (
+    <span className="flex min-w-0 shrink-0 items-center gap-2">
+      <span className="shrink-0">{count.text}</span>
+      {flags.map((b) => (
+        <span key={b.key} title={b.text} aria-label={b.text} className="flex shrink-0 items-center text-fg-3">
+          {b.icon}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** A new app: described in a few words for the App builder to make, or from scratch, or from a file. */
+function MakeBox() {
+  const [ask, setAsk] = useState('');
+  return (
+    <form
+      className="rounded-2xl border border-line bg-panel p-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ask.trim()) go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me an app: ')}${ask.trim()}`)}`);
+      }}
+    >
+      <div className="mb-2 flex items-center gap-1.5 text-[13px] font-medium">
+        <Sparkles size={14} className="text-accent" />
+        Describe an app, and an agent makes it
+      </div>
+      <div className="flex gap-2">
+        <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Every Monday, read my saved links, sum each up, and send me the three worth reading" className={cx(inputCls, 'min-w-0 flex-1')} />
+        <Button type="submit" variant="primary" disabled={!ask.trim()}>
+          Make it
+        </Button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-fg-3">
+        <button type="button" onClick={() => go('/apps/new')} className="flex items-center gap-1 hover:text-fg">
+          <Plus size={13} /> Start from scratch
+        </button>
+        <InstallFromFile />
+      </div>
+    </form>
   );
 }
 
@@ -85,6 +147,7 @@ export function GalleryPage() {
           </div>
         ) : (
           <div className="mx-auto max-w-[1080px] space-y-8 px-4 py-6 sm:px-6">
+            <MakeBox />
             <section>
               <h2 className="mb-3 text-[13px] font-medium text-fg-3">Your apps</h2>
               {g.apps.length ? (
@@ -100,8 +163,14 @@ export function GalleryPage() {
                       onClick={() => go(appPath(a.id))}
                       meta={
                         <>
-                          <AgentIcon agent={a.agent} size={13} />
-                          <span className="truncate">{agentName(a.agent, a.agent === 'acp' ? (a.acpAgent === 'console' ? 'Custom' : a.acpAgent) : undefined)}</span>
+                          {a.flow ? (
+                            <Traits r={a} />
+                          ) : (
+                            <>
+                              <AgentIcon agent={a.agent} size={13} />
+                              <span className="truncate">{agentName(a.agent, a.agent === 'acp' ? (a.acpAgent === 'console' ? 'Custom' : a.acpAgent) : undefined)}</span>
+                            </>
+                          )}
                           <span className="flex-1" />
                           {a.public.on && (
                             <Badge tone="info">
@@ -190,11 +259,9 @@ export function GalleryPage() {
                       onClick={() => go(appPath(`tpl:${t.id}`))}
                       meta={
                         <>
-                          <span>{t.category}</span>
+                          <span className="shrink-0">{t.category}</span>
                           <span className="flex-1" />
-                          <span className="shrink-0">
-                            {t.fields.length} question{t.fields.length === 1 ? '' : 's'}
-                          </span>
+                          <Traits r={t} />
                         </>
                       }
                     />

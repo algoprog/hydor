@@ -5,6 +5,7 @@
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/apps/apps-test.ts
 //   DATA_DIR=/tmp/naget-test-apps-unit node dist/dev/apps-test.js
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,7 +14,7 @@ import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import type { AppRecipe } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, fillTemplate, parseCsv, placeholders, toCsv } from '../../shared/apps.ts';
-import { checkFlow, refsIn } from '../../shared/app-manifest.ts';
+import { allSteps, checkFlow, givesOf, refsIn } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
@@ -171,7 +172,7 @@ test('form: defaults, numbers, dates, choices, yes/no and what to fix', () => {
   assert.match(checkInputs(fields, { n: 1, t: 'x'.repeat(3000) }).errors.join(), /Name: too long/);
 });
 
-test('templates: ten tasks, each prompt fills with no leftover field placeholders and uses its needed fields; five blocks, whose steps check out and use theirs', () => {
+test('templates: ten tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
   const tasks = TEMPLATES.filter((t) => !t.block);
   assert.equal(tasks.length, 10);
   const blocks = TEMPLATES.filter((t) => t.block);
@@ -183,14 +184,47 @@ test('templates: ten tasks, each prompt fills with no leftover field placeholder
     assert.ok(t.answer.length >= 1 && t.description.length > 30, `${t.id}: written out`);
     assert.deepEqual(cleanRecipe(t).fields, t.fields, `${t.id}: tidy as written`);
   }
+  const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+  const python = spawnSync('python3', ['--version']).status === 0;
   for (const t of tasks) {
-    const values = Object.fromEntries(t.fields.map((f) => [f.id, f.type === 'yesno' ? 'Yes' : `[${f.id}]`]));
-    const out = fillTemplate(t.prompt, values, { known: t.fields.map((f) => f.id) });
-    for (const f of t.fields) assert.ok(!out.includes(`{{${f.id}}}`), `${t.id}: {{${f.id}}} left over`);
-    for (const f of t.fields.filter((x) => x.required)) assert.ok(placeholders(t.prompt).includes(f.id), `${t.id}: ${f.id} unused`);
-    assert.ok(t.answer.length >= 2, `${t.id}: answer fields`);
-    assert.ok(t.description.length > 30 && t.prompt.length > 300, `${t.id}: written out`);
-    assert.deepEqual(cleanRecipe(t).fields, t.fields, `${t.id}: tidy as written`);
+    assert.ok(t.flow && !t.prompt, `${t.id}: works in steps, not one agent's task`);
+    assert.deepEqual(cleanRecipe(t).fields, t.fields, `${t.id}: its form tidy as written`);
+    assert.deepEqual(cleanRecipe(t).flow, t.flow, `${t.id}: its steps tidy as written`);
+    assert.ok(t.answer.length >= 2 && t.description.length > 30, `${t.id}: written out`);
+    // As a save checks it: nothing to fix; what may surprise is only a value that can be empty (a step skipped or failed, a path not taken), which the steps after it allow for.
+    const checked = (await http.inject({ method: 'POST', url: '/api/apps/check', payload: { recipe: t } })).json();
+    assert.deepEqual(checked.errors, [], `${t.id}: its steps check out`);
+    assert.deepEqual(checked.warnings.filter((w: string) => !/, which is empty when /.test(w)), [], `${t.id}: nothing it uses is missing`);
+    const steps = allSteps(t.flow!.steps);
+    const used = new Set(refsIn(t.flow).map((r) => r.split(/[.[]/)[0]));
+    for (const f of t.fields.filter((x) => x.required)) assert.ok(used.has(f.id), `${t.id}: ${f.id} unused`);
+    // Every answer field comes from a step that gives it, so the result shows the same card as before.
+    for (const f of t.answer) {
+      const ref = /^\{\{\s*(\w+)\.(\w+)\s*\}\}$/.exec(t.flow!.outputs?.[f.id] ?? '');
+      assert.ok(ref, `${t.id}: ${f.id} comes from one value of a step`);
+      const from = steps.find((s) => s.id === ref[1]);
+      assert.ok(from && (givesOf(from) ?? []).includes(ref[2]), `${t.id}: ${f.id} comes from {{${ref[1]}.${ref[2]}}}, which that step gives`);
+    }
+    assert.ok(new Set(steps.map((s) => s.do)).size >= 4, `${t.id}: several kinds of step`);
+    assert.ok(steps.every((s) => s.title), `${t.id}: each step says what it does`);
+    // A person is asked only when the form says so and the run comes from the form (or a test): never the API, rows or a schedule; nobody answering does not stop it.
+    for (const s of steps.filter((x) => x.do === 'ask')) {
+      assert.match(s.if ?? '', /^\{\{(\w+)\}\} and \{\{run\.source\}\} = web or \{\{\1\}\} and \{\{run\.source\}\} = test$/, `${t.id}: ${s.id} asks only when someone is there`);
+      const field = t.fields.find((f) => f.id === /^\{\{(\w+)\}\}/.exec(s.if!)![1]);
+      assert.equal(field?.type, 'yesno', `${t.id}: ${s.id} asks when a yes/no on the form says so`);
+      assert.equal(s.failed, 'skip', `${t.id}: ${s.id} goes on when nobody answers`);
+    }
+    for (const s of steps) {
+      if (s.do !== 'code') continue;
+      if (s.language === 'python') {
+        if (!python) continue;
+        const program = `def main(input, ctx):\n${s.code.split('\n').map((l) => `    ${l}`).join('\n')}\n    return None\n`;
+        const p = spawnSync('python3', ['-I', '-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: program });
+        assert.equal(p.status, 0, `${t.id}: ${s.id} reads as Python: ${p.stderr}`);
+      } else assert.doesNotThrow(() => new AsyncFunction('input', 'ctx', s.code), `${t.id}: ${s.id} reads as JavaScript`);
+      // Where the sandbox cannot run, an agent does a program's work (one inside a round may go without instead).
+      assert.ok(s.failed === 'agent' || (s.failed === 'skip' && steps.some((r) => r.do === 'repeat' && allSteps(r.steps).includes(s))), `${t.id}: ${s.id} says what happens when it cannot run`);
+    }
   }
 });
 

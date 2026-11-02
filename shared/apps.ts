@@ -382,23 +382,24 @@ const given = (v: string | undefined) => !!v && !!v.trim() && v.trim().toLowerCa
  * the field was answered (and not with No), {{^id}}…{{/id}} only when it was not; {{today}} is today's
  * date. Placeholders that name no field stay as they are (a web app's own {{braces}}).
  */
-export function fillTemplate(tpl: string, values: Record<string, string>, o: { today?: string; known?: string[] } = {}): string {
+export function fillTemplate(tpl: string, values: Record<string, string>, o: { today?: string; moment?: Partial<Record<'today' | 'now' | 'weekday' | 'timezone', string>>; known?: string[] } = {}): string {
   const known = new Set(o.known ?? Object.keys(values));
-  const today = o.today ?? new Date().toISOString().slice(0, 10);
-  const value = (id: string) => (id === 'today' && !known.has('today') ? today : (values[id] ?? ''));
+  const moment: Record<string, string> = { today: o.today ?? o.moment?.today ?? new Date().toISOString().slice(0, 10), ...(o.moment?.now ? { now: o.moment.now } : {}), ...(o.moment?.weekday ? { weekday: o.moment.weekday } : {}), ...(o.moment?.timezone ? { timezone: o.moment.timezone } : {}) };
+  const builtIn = (id: string) => !known.has(id) && id in moment;
+  const value = (id: string) => (builtIn(id) ? moment[id] : (values[id] ?? ''));
   let out = String(tpl ?? '');
   // Sections, innermost first, until none are left.
   const section = /\{\{([#^])\s*([\w-]+)\s*\}\}((?:(?!\{\{[#^]\s*\2\s*\}\})[\s\S])*?)\{\{\/\s*\2\s*\}\}/g;
   for (let i = 0; i < 20; i++) {
     const next = out.replace(section, (all, kind: string, id: string, body: string) => {
-      if (!known.has(id) && id !== 'today') return all;
+      if (!known.has(id) && !builtIn(id)) return all;
       const yes = given(value(id));
       return (kind === '#') === yes ? body : '';
     });
     if (next === out) break;
     out = next;
   }
-  out = out.replace(/\{\{\s*([\w-]+)\s*\}\}/g, (all, id: string) => (known.has(id) || id === 'today' ? value(id) : all));
+  out = out.replace(/\{\{\s*([\w-]+)\s*\}\}/g, (all, id: string) => (known.has(id) || builtIn(id) ? value(id) : all));
   return out
     .replace(/[ \t]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')

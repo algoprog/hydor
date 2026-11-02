@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { AnswerField, AppRecipe, AppRun, RunAsk, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
 import { ACTIVE, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
+import { momentOf } from '../../shared/app-manifest.ts';
 import type { Agent, AgentModel, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
@@ -23,6 +24,7 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { costOf, rateFor } from '../prices.ts';
 import { sessionExtra } from '../sessionExtra.ts';
+import { userTimezone } from '../userPrefs.ts';
 import { ensureEnv } from './env.ts';
 import { getRun, insertRun, listRuns, reuseSteps, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
 
@@ -365,7 +367,7 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
         docs.push(`<document name="${safeName(f.name)}">\n${text ? text.slice(0, 60_000) : '(This file could not be read as text.)'}\n</document>`);
       } else values[id] = file;
     }
-    let prompt = fillTemplate(recipe.prompt, values, { known: recipe.fields.map((f) => f.id) });
+    let prompt = fillTemplate(recipe.prompt, values, { known: recipe.fields.map((f) => f.id), moment: momentOf(userTimezone(d().db)) });
     // Custom on a public run hears nothing from the capabilities: what it needs to know comes with the message.
     if (o.public) prompt = `${prompt}\n\n---\n${runInstructions(r)}${docs.length ? `\n\n${docs.join('\n\n')}` : ''}`;
     const mark: AppMark = { id: r.app, run: r.id, name: recipe.name, ...(o.public ? { public: true, web: o.public.web } : {}) };
