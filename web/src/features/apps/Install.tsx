@@ -21,8 +21,11 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
+/** The model each one it asks for becomes here: its own name, another model of yours, or "" for the default. */
+type Picks = Record<string, string>;
+
 /** What a template from a file will do here, before it is installed. */
-function PreviewCard({ p }: { p: InstallPreview }) {
+function PreviewCard({ p, picks, onPick }: { p: InstallPreview; picks: Picks; onPick: (key: string, value: string) => void }) {
   const needs = [...p.needs.node.map((n) => `${n} (Node)`), ...p.needs.python.map((n) => `${n} (Python)`)];
   return (
     <div className="space-y-3">
@@ -53,6 +56,33 @@ function PreviewCard({ p }: { p: InstallPreview }) {
         <Line label="Who does the work">{p.agents.join(', ') || '—'}</Line>
         <Line label="What it does">{p.steps ? `${p.steps} steps` : 'One agent does the task'}</Line>
         <Line label="Tools it may use">{p.tools === null ? 'All of the app’s tools' : p.tools.length ? p.tools.join(', ') : 'None of the app’s tools'}</Line>
+        {p.models.length > 0 && (
+          <Line label="Models it uses">
+            {p.models.map((m) => {
+              const key = `${m.agent}:${m.as}`;
+              return (
+                <div key={key} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
+                  <span translate="no">{m.label}</span>
+                  {m.status === 'here' ? (
+                    <span className="text-fg-3">· set up here</span>
+                  ) : (
+                    <>
+                      <span className={m.status === 'missing' ? 'text-warn' : 'text-fg-3'}>{m.status === 'missing' ? '· not set up here; use' : '· here as'}</span>
+                      <select className="rounded-md border border-line bg-bg-1 px-1.5 py-0.5 text-[12.5px]" value={picks[key] ?? m.use ?? ''} onChange={(e) => onPick(key, e.target.value)}>
+                        <option value="">{m.agent === 'custom' ? 'The default model' : 'Its default model'}</option>
+                        {m.options.map((o) => (
+                          <option key={o.value} value={o.value} translate="no">
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </Line>
+        )}
         {p.bundled.length > 0 && (
           <Line label="Comes with">
             {p.bundled.map((b) => (
@@ -121,6 +151,7 @@ export function InstallFromFile() {
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<{ name: string; data: string } | null>(null);
   const [preview, setPreview] = useState<InstallPreview | null>(null);
+  const [picks, setPicks] = useState<Picks>({});
   const [busy, setBusy] = useState(false);
   const pick = async (f: File | undefined) => {
     if (!f) return;
@@ -129,6 +160,7 @@ export function InstallFromFile() {
       const sent = { name: f.name, data: await fileToBase64(f) };
       const r = await post<{ preview: InstallPreview }>('/api/apps/install/check', { file: sent });
       setFile(sent);
+      setPicks({});
       setPreview(r.preview);
     } catch (e) {
       toastError(e);
@@ -138,7 +170,7 @@ export function InstallFromFile() {
     if (!file) return;
     setBusy(true);
     try {
-      const r = await post<{ app: AppDef }>('/api/apps/install', { file });
+      const r = await post<{ app: AppDef }>('/api/apps/install', { file, models: picks });
       const needs = preview && preview.needs.node.length + preview.needs.python.length > 0;
       toast(needs ? 'Installed. What it needs is installing; its first run waits for it.' : 'Installed', 'ok');
       go(appPath(r.app.id));
@@ -181,7 +213,7 @@ export function InstallFromFile() {
           </>
         }
       >
-        {preview && <PreviewCard p={preview} />}
+        {preview && <PreviewCard p={preview} picks={picks} onPick={(k, v) => setPicks((x) => ({ ...x, [k]: v }))} />}
       </Dialog>
     </>
   );

@@ -8,11 +8,14 @@
 // the one you have, when it is the same), and its steps call them at the addresses they got here. The
 // zip is read with the documents' reader, which stops a zip bomb at its caps; the one written here is
 // small and made in memory.
+import fs from 'node:fs';
 import zlib from 'node:zlib';
 import type { AppDef, AppRecipe } from '../../shared/apps.ts';
 import { cleanRecipe, slugify } from '../../shared/apps.ts';
-import type { InstallPreview } from '../../shared/app-manifest.ts';
-import { allSteps, checkFlow, cleanData, cleanFlow, cleanRequires, DATA_LIMITS } from '../../shared/app-manifest.ts';
+import type { InstallPreview, ModelNeed } from '../../shared/app-manifest.ts';
+import { allSteps, checkFlow, cleanData, cleanFlow, cleanRequires, DATA_LIMITS, modelsUsed } from '../../shared/app-manifest.ts';
+import type { AgentModel } from '../../shared/types.ts';
+import { AGENT_FILE } from '../models/config.ts';
 import { findAssistant } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -47,10 +50,32 @@ const SKIP_ASKING = new Set(['bypassPermissions', 'full', 'danger-full-access', 
 
 // ---- out ---------------------------------------------------------------------------------------------------
 
-/** What travels of a recipe: everything but its folder and what is this computer's own. */
+/** Custom's models on this computer, with where each runs and the provider's name for it. */
+function customModels(): AgentModel[] {
+  try {
+    return JSON.parse(fs.readFileSync(AGENT_FILE, 'utf8')).models ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** The models a recipe asks for, said so another computer can find them: Custom's with where they run and their provider's name. */
+function modelNeeds(r: AppRecipe): ModelNeed[] {
+  const own = customModels();
+  const out = [...(r.requires?.models ?? [])];
+  for (const u of modelsUsed(r)) {
+    if (out.some((n) => n.agent === u.agent && n.as === u.as)) continue;
+    const m = u.agent === 'custom' ? own.find((x) => x.id === u.as) : undefined;
+    out.push(m ? { as: u.as, agent: 'custom', provider: m.provider, model: m.model, label: m.label } : { as: u.as, agent: u.agent });
+  }
+  return out;
+}
+
+/** What travels of a recipe: everything but its folder and what is this computer's own; its models said portably. */
 function travelling(a: AppRecipe): Record<string, unknown> {
   const { id: _i, slug: _s, mcp: _m, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = a as AppDef;
-  return recipe as unknown as Record<string, unknown>;
+  const models = modelNeeds(a);
+  return { ...recipe, ...(models.length ? { requires: { ...(recipe.requires ?? {}), models } } : {}) } as unknown as Record<string, unknown>;
 }
 
 /** A template as it travels: its recipe, its records when asked for, and the templates its steps call. */
@@ -237,8 +262,60 @@ function intake(db: DB, raw: Record<string, any>, named: string) {
   return { recipe, problems, notes };
 }
 
+/** The models an agent offers here (Claude Code's, Codex's), as its catalog lists them; empty when it cannot say. */
+export type Catalog = (agent: 'claude' | 'codex') => Promise<{ value: string; label: string }[]>;
+
+const PROVIDER: Record<string, string> = { openrouter: 'OpenRouter', ollama: 'Ollama', vllm: 'vLLM', endpoint: 'an endpoint' };
+
+/** Each model the templates ask for, found here as it is, under another name, or not at all (with what could stand in). */
+async function modelsHere(recipes: AppRecipe[], catalog?: Catalog): Promise<InstallPreview['models']> {
+  const own = customModels();
+  const needs: ModelNeed[] = [];
+  for (const r of recipes) for (const n of modelNeeds(r)) if (!needs.some((x) => x.agent === n.agent && x.as === n.as)) needs.push(n);
+  const lists = new Map<string, { value: string; label: string }[]>();
+  const listOf = async (agent: 'claude' | 'codex') => {
+    if (!lists.has(agent)) lists.set(agent, catalog ? await Promise.race([catalog(agent).catch(() => []), new Promise<{ value: string; label: string }[]>((r) => setTimeout(() => r([]), 4000))]) : []);
+    return lists.get(agent)!;
+  };
+  const out: InstallPreview['models'] = [];
+  for (const n of needs) {
+    if (n.agent === 'custom') {
+      const label = n.label ?? `${n.model ?? n.as}${n.provider ? ` (${PROVIDER[n.provider] ?? n.provider})` : ''}`;
+      const options = own.map((m) => ({ value: m.id, label: m.label }));
+      const exact = own.find((m) => m.id === n.as && (!n.provider || m.provider === n.provider) && (!n.model || m.model === n.model));
+      const same = !exact && n.model ? own.find((m) => m.model === n.model && (!n.provider || m.provider === n.provider)) : undefined;
+      out.push({ as: n.as, agent: 'custom', label, status: exact ? 'here' : same ? 'matched' : 'missing', use: exact ? n.as : same ? same.id : '', options });
+    } else {
+      const options = await listOf(n.agent);
+      const here = options.some((o) => o.value === n.as);
+      out.push({ as: n.as, agent: n.agent, label: `${AGENT_NAME[n.agent]} · ${n.label ?? n.as}`, status: here ? 'here' : 'missing', use: here ? n.as : '', options });
+    }
+  }
+  return out;
+}
+
+/** Points a recipe's models at the ones picked here ("" or none: the agent's default; its helper model for a model step). */
+function remapModels(r: AppRecipe, picked: Map<string, string>) {
+  const who = (agent?: string, acp?: string) => (agent === 'claude' || agent === 'codex' ? agent : agent === 'acp' && (!acp || acp === 'console') ? 'custom' : null);
+  const swap = (agent: string | undefined, acp: string | undefined, as: string | undefined) => {
+    const w = who(agent, acp);
+    if (!w || !as || !picked.has(`${w}:${as}`)) return as;
+    return picked.get(`${w}:${as}`) || undefined;
+  };
+  r.model = swap(r.agent, r.acpAgent, r.model);
+  for (const s of r.flow ? allSteps(r.flow.steps) : []) {
+    if (s.do === 'agent' && s.model) s.model = swap(s.agent ?? r.agent, s.acpAgent ?? (s.agent ? undefined : r.acpAgent), s.model);
+    else if (s.do === 'model' && s.model) s.model = swap('acp', 'console', s.model);
+  }
+  // What it needs says where it came from; here, its steps name this computer's models.
+  if (r.requires?.models) {
+    delete r.requires.models;
+    if (!Object.keys(r.requires).length) delete r.requires;
+  }
+}
+
 /** What a template will do here and what changes on the way in, before anything is made. */
-export function previewOf(db: DB, pkg: AppPackage): { recipe: AppRecipe; bundled: { pkg: AppPackage; recipe: AppRecipe; reuse: AppDef | null }[]; preview: InstallPreview } {
+export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Promise<{ recipe: AppRecipe; bundled: { pkg: AppPackage; recipe: AppRecipe; reuse: AppDef | null }[]; preview: InstallPreview }> {
   const main = intake(db, pkg.app as Record<string, any>, '');
   const recipe = main.recipe;
   const problems = [...main.problems];
@@ -289,6 +366,8 @@ export function previewOf(db: DB, pkg: AppPackage): { recipe: AppRecipe; bundled
   for (const name of Object.keys(pkg.records ?? {})) if (!recipe.data?.[name]) warnings.push(`Its file holds records for “${name}”, a collection it does not keep: they are left out`);
   const taken = getApp(db, slugify(recipe.name)) ? recipe.name : undefined;
   if (taken) notes.push(`You have a template called “${taken}” already: this one installs beside it, at an address of its own`);
+  const models = await modelsHere([recipe, ...bundled.filter((b) => !b.reuse).map((b) => b.recipe)], catalog);
+  for (const m of models) if (m.status === 'missing') warnings.push(m.options.length ? `It asks for ${m.label}, which is not set up here: pick another to stand in, or its agent's default is used` : m.agent === 'custom' ? `It asks for ${m.label}, and Custom has no models here: add one in Settings → Models first` : `It asks for ${m.label}, and ${AGENT_NAME[m.agent]} is not set up here`);
   const preview: InstallPreview = {
     name: recipe.name,
     description: recipe.description,
@@ -302,6 +381,7 @@ export function previewOf(db: DB, pkg: AppPackage): { recipe: AppRecipe; bundled
     memory: !!recipe.memory,
     limits: recipe.limits,
     needs,
+    models,
     bundled: bundled.map((b) => ({ name: b.recipe.name, from: b.pkg.slug ?? '', installs: b.reuse ? 'reuse' : 'new' })),
     notes,
     warnings: [...new Set(warnings)],
@@ -319,9 +399,18 @@ function retarget(r: AppRecipe, moved: Map<string, string>) {
  * Installs a template as previewOf showed: the templates that come with it first (or the ones you have),
  * then it, its records added, its public page closed and no keys; the packages it needs start installing.
  */
-export function installPackage(db: DB, pkg: AppPackage): { app: AppDef; notes: string[]; records: number; skipped: number; bundled: { name: string; slug: string; reused: boolean }[] } {
-  const { recipe, bundled, preview } = previewOf(db, pkg);
+export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Record<string, unknown>; catalog?: Catalog } = {}): Promise<{ app: AppDef; notes: string[]; records: number; skipped: number; bundled: { name: string; slug: string; reused: boolean }[] }> {
+  const { recipe, bundled, preview } = await previewOf(db, pkg, o.catalog);
   if (preview.problems.length) throw new HttpError(400, `This template cannot be installed: ${preview.problems.join('; ')}`);
+  // Each model as picked on the card, else as the preview found it.
+  const picked = new Map<string, string>();
+  for (const m of preview.models) {
+    const k = `${m.agent}:${m.as}`;
+    const want = o.models?.[k];
+    picked.set(k, typeof want === 'string' && (want === '' || m.options.some((x) => x.value === want) || want === m.as) ? want : (m.use ?? ''));
+  }
+  remapModels(recipe, picked);
+  for (const b of bundled) if (!b.reuse) remapModels(b.recipe, picked);
   const moved = new Map<string, string>();
   const made: { app: AppDef; recipe: AppRecipe }[] = [];
   const out: { name: string; slug: string; reused: boolean }[] = [];
