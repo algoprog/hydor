@@ -63,6 +63,7 @@ Under **Built in** ([open it](/settings?s=skillpack&find=Built%20in)) are the sk
 
 The app comes with these skills:
 
+- **app-builder**: for making or changing a template, a small app of yours. The agent pins down what goes in and comes out, picks the cheapest step for each part, gives the template examples with checks and tries them before handing it over, saying what a run costs.
 - **clarify-first**: for a big or open-ended request (a website, a trip, a renovation, a talk, a business plan). The agent first reads what is already there, asks one question at a time and says why, plays back what it understood, offers two or three ways to do it, and writes a short brief for you to approve before it builds anything.
 - **clean-up**: at the end of a task. The agent lists what it made along the way, removes what is no longer needed (scratch files, test data, temporary folders, merged or abandoned branches, worktrees, processes it started), never removes what it didn't make, asks first about anything big or shared, and says in a line what it removed and what it left. While **Clean up after a task** is on in [Settings → Assistants](/settings?s=assistants&find=Clean%20up%20after%20a%20task) (it is unless you turn it off), every agent is told to do this at the end of a task.
 - **decisions-log**: for work without you at hand (a goal, a scheduled task, "don't wait for me"). The agent settles ordinary questions itself, writes each decision down with why and what it costs if wrong, and carries on. It stops only before steps that can't be undone (sending, paying, deleting, publishing), anything touching passwords or access, or anything outside the work; its final message lists every decision it made.
@@ -213,7 +214,7 @@ When keywords bring a skill in, a pill shows in the conversation under your mess
 - A skill brought in stays for that message and the next two, so a process like asking first or researching can run over several turns. A newer message's skills take the place of older ones.
 - A long skill is cut to fit what the model can take; the agent is told to load the rest itself.
 
-The built-in skills with keywords are clarify-first ("plan a trip", "business plan", "renovat*"…), clean-up ("clean up after", "leftover files"…), decisions-log ("while I'm away", "overnight"…), evidence-before-done ("double-check", "verify"…), research ("research", "find sources", "fact-check"…), troubleshooting ("not working", "keeps crashing", "debug*"…) and writing ("draft a", "proofread", "cover letter"…). The document skills have none: Custom loads them when a task fits. You see each skill's keywords on its row and on its page.
+The built-in skills with keywords are app-builder ("make a template", "make an app", "automate"…), clarify-first ("plan a trip", "business plan", "renovat*"…), clean-up ("clean up after", "leftover files"…), decisions-log ("while I'm away", "overnight"…), evidence-before-done ("double-check", "verify"…), research ("research", "find sources", "fact-check"…), troubleshooting ("not working", "keeps crashing", "debug*"…) and writing ("draft a", "proofread", "cover letter"…). The document skills have none: Custom loads them when a task fits. You see each skill's keywords on its row and on its page.
 
 ### Give a skill keywords
 

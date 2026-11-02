@@ -4,7 +4,8 @@
 // what is on screen before saving. "Save as template" in a session's menu opens it with a draft from that
 // session.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, FlaskConical, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, FlaskConical, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { tr } from '../../i18n/runtime';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
 import type { Flow } from '@shared/app-manifest';
@@ -220,6 +221,32 @@ function AnswerRow({ f, onChange, ...nav }: { f: AnswerField; onChange: (f: Answ
         </div>
       )}
     </Row>
+  );
+}
+
+/** A new template in words: the App builder makes it, in a session of its own. */
+function Describe() {
+  const [ask, setAsk] = useState('');
+  return (
+    <form
+      className="min-w-[min(100%,320px)] flex-1 space-y-1.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!ask.trim()) return;
+        go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me a template: ')}${ask.trim()}`)}`);
+      }}
+    >
+      <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2">
+        <Sparkles size={13} className="text-accent" />
+        Or describe the template, and an agent makes it
+      </span>
+      <div className="flex gap-2">
+        <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Keeps the links I send, sums each up, and lists the unread ones" className={cx(inputCls, 'min-w-0 flex-1')} />
+        <Button type="submit" variant="secondary" disabled={!ask.trim()}>
+          Ask
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -469,7 +496,8 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
         <div className="mx-auto max-w-[820px] space-y-4 px-4 py-6 pb-24 sm:px-6">
           {note && <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">{note}</div>}
           {!saved && !template && !from && (
-            <div className="-mt-1 flex justify-end">
+            <div className="-mt-1 flex flex-wrap items-end gap-x-4 gap-y-2">
+              <Describe />
               <InstallFromFile />
             </div>
           )}

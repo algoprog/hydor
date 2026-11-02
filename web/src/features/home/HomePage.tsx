@@ -36,13 +36,15 @@ import { doneStartFiles, waitingStartFiles } from '../../lib/startFiles';
 
 /** Starts a session: pick the agent and folder, type the task, press Enter. */
 /** A prompt link (/?prompt=…&agent=…&model=…&cwd=…) fills the box; it never starts anything by itself. */
-function fromLink(search: string): { prompt?: string; agent?: Agent; model?: string; stripped: boolean } {
+function fromLink(search: string): { prompt?: string; agent?: Agent; model?: string; assistant?: string; stripped: boolean } {
   const q = new URLSearchParams(search);
   const raw = q.get('prompt') ?? undefined;
   // Zero-width and direction-control characters can hide text from you but not from the agent.
   const prompt = raw?.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g, '');
   const agent = q.get('agent');
-  return { prompt, agent: agent === 'claude' || agent === 'codex' ? agent : undefined, model: q.get('model') ?? undefined, stripped: !!raw && raw !== prompt };
+  // An assistant to start as, by its id (the App builder, for Describe it on the New template page).
+  const assistant = q.get('assistant');
+  return { prompt, agent: agent === 'claude' || agent === 'codex' ? agent : undefined, model: q.get('model') ?? undefined, ...(assistant && /^[\w-]{1,80}$/.test(assistant) ? { assistant } : {}), stripped: !!raw && raw !== prompt };
 }
 
 /** The start options kept as picks for next time (lib/start.ts); the others are this task's alone, kept with what is written. */
@@ -109,6 +111,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     ...(saved.capUsd ? { capUsd: saved.capUsd } : {}),
     // The space picked last, while the folder is still its own.
     ...(saved.space && !linkCwd ? { space: saved.space } : {}),
+    ...(link?.assistant ? { assistant: link.assistant } : {}),
   }));
   // Spaces: picked by name in the folder chip, each with its folder, assistant and guidelines.
   const spaces = useSpaces();

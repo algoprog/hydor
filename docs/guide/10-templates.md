@@ -146,9 +146,10 @@ Ready-made templates have no Runs tab: find their runs under **Latest runs** on 
 
 ## Make your own template
 
-There are three ways to start:
+There are four ways to start:
 
 - **From scratch**: **New template** on the Templates page, or go to [/apps/new](/apps/new).
+- **By describing it**: on the New template page, write what it should do under **Or describe the template, and an agent makes it** and press **Ask**. A session starts as the **App builder** ([Assistants](/guide/assistants)), which makes the template, tries it and hands it over.
 - **From a ready-made template**: open it and press **Make it mine** (on a phone, **Edit**).
 - **From a session that went well**: in the session's menu (⋯), choose **More** → **Save as template**. The page says "Drafting a template from the session…" while the helper model turns the session's first request into a form, a task and answer fields, from what you asked and what the agent replied. The parts that would change from one use to the next become questions. The draft keeps the session's agent, model, effort, mode and assistant. If the helper model can't draft it, you get the request as it was, in one **Request** question, with a note saying why; the helper model is set in [Settings → Agents → Models](/settings?s=models&find=Helper%20model).
 

@@ -44,7 +44,7 @@ Whether a session gets a new task folder by default depends on the assistant: mo
 
 ### Pick an assistant
 
-**Assistant** sets what the session starts as: **General** (the first time), **Researcher**, **Writer**, **Coder**, **Tutor**, **Planner**, **Analyst**, or one of yours under **Yours**. Point at one to read what it does and which agent and model it uses. Picking one can also set the agent, model and permissions it suggests, and turn on its connected apps. **Make or change assistants** opens [Settings → Assistants](/settings?s=assistants). See [Assistants](/guide/assistants).
+**Assistant** sets what the session starts as: **General** (the first time), **Researcher**, **Writer**, **Coder**, **Tutor**, **Planner**, **Analyst**, **App builder**, or one of yours under **Yours**. Point at one to read what it does and which agent and model it uses. Picking one can also set the agent, model and permissions it suggests, and turn on its connected apps. **Make or change assistants** opens [Settings → Assistants](/settings?s=assistants). See [Assistants](/guide/assistants).
 
 ### Options: effort, permissions and more
 

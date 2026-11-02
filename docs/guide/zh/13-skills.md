@@ -63,6 +63,7 @@ Custom 按以下顺序从多个文件夹读取技能：项目自己的技能（�
 
 应用自带以下技能：
 
+- **app-builder**：用于制作或修改模板，也就是你自己的小应用。智能体先弄清楚输入什么、输出什么，为每个部分选最省的步骤，给模板配上带检查的示例，并在交给你之前试运行，说明一次运行要花多少钱。
 - **clarify-first**：用于规模大或开放式的请求（一个网站、一次旅行、一次装修、一场演讲、一份商业计划）。智能体先阅读已有的内容，一次只问一个问题并说明为什么问，复述它的理解，给出两三种做法，并在动手之前写一份简短的说明供你批准。
 - **clean-up**：在任务结束时使用。智能体列出它在过程中创建的东西，删除不再需要的（草稿文件、测试数据、临时文件夹、已合并或已放弃的分支、工作树、它启动的进程），从不删除不是它创建的东西，涉及大的或共享的东西时会先问你，最后用一句话说明删了什么、留下了什么。只要[设置 → 助手](/settings?s=assistants&find=Clean%20up%20after%20a%20task)中的**任务完成后清理**是开启的（除非你关闭，否则默认开启），每个智能体都会被要求在任务结束时这样做。
 - **decisions-log**：用于你不在场时的工作（一个目标、一个定时任务、“不用等我”）。智能体自己解决一般的问题，把每个决定连同理由以及万一错了的代价记下来，然后继续工作。它只在以下情况前停下：无法撤销的步骤（发送、付款、删除、发布）、任何涉及密码或访问权限的事，或者任何超出工作范围的事；它的最后一条消息会列出它做的每个决定。
@@ -213,7 +214,7 @@ Custom 从下一轮起就能使用这个技能；Claude Code 和 Codex 则从下
 - 引入的技能会在那条消息和接下来的两条消息中保持有效，这样像“先问清楚”或“做研究”这样的过程就能跨越几轮进行。较新消息引入的技能会取代较旧的。
 - 较长的技能会被截短，以适应模型能接收的长度；智能体会被告知自己去加载其余部分。
 
-带有关键词的内置技能有：clarify-first（“plan a trip”、“business plan”、“renovat*”…）、clean-up（“clean up after”、“leftover files”…）、decisions-log（“while I'm away”、“overnight”…）、evidence-before-done（“double-check”、“verify”…）、research（“research”、“find sources”、“fact-check”…）、troubleshooting（“not working”、“keeps crashing”、“debug*”…）和 writing（“draft a”、“proofread”、“cover letter”…）。文档类技能没有关键词：Custom 会在任务适合时加载它们。你可以在每个技能所在的行和它的页面上看到它的关键词。
+带有关键词的内置技能有：app-builder（“make a template”、“make an app”、“automate”…）、clarify-first（“plan a trip”、“business plan”、“renovat*”…）、clean-up（“clean up after”、“leftover files”…）、decisions-log（“while I'm away”、“overnight”…）、evidence-before-done（“double-check”、“verify”…）、research（“research”、“find sources”、“fact-check”…）、troubleshooting（“not working”、“keeps crashing”、“debug*”…）和 writing（“draft a”、“proofread”、“cover letter”…）。文档类技能没有关键词：Custom 会在任务适合时加载它们。你可以在每个技能所在的行和它的页面上看到它的关键词。
 
 ### 给技能设置关键词
 

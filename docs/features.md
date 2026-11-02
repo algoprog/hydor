@@ -29,10 +29,10 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
 Every agent here gets the same help from the app, whatever its model: Claude Code, Codex, Custom, and the
 agents that speak ACP and take MCP servers.
 
-- **Assistants**: start as a Researcher, Writer, Tutor, Planner, Analyst or Coder, or one of your own (its
-  instructions, model, tools and connected apps; import Claude Code's agent files), and switch to another in the
-  session's message box when the work changes. A task without a folder gets one of its own
-  (`~/Naget/<date>-<task>`).
+- **Assistants**: start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or App builder (it makes
+  templates), or one of your own (its instructions, model, tools and connected apps; import Claude Code's agent
+  files), and switch to another in the session's message box when the work changes. A task without a folder gets
+  one of its own (`~/Naget/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
   how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,
   Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a space, and
@@ -119,15 +119,16 @@ agents that speak ACP and take MCP servers.
   its Edit) and resumed after a restart; keep records between runs that its steps, its agents and the API share
   (lists named in its Edit, with the fields their records hold); remember across runs in a memory of its own; and
   install the Node and Python packages it needs in a folder of its own. Examples (answers with checks on what a
-  run gives) try it as it is on screen, each saying how its last try went. Agents build templates with tools of
-  their own: app_get, app_save (checked first; whole, a patch or one step), app_try (its examples or a set of
-  answers, waited for) and app_screen. Its steps, its agents and programs search its records by words and by
-  meaning, as knowledge bases are searched. A template can have a screen of its own in place of its form: a page
-  made from its parts (its form, its answer, a table for each list it keeps, its earlier runs) that runs it and
-  changes as its records do, edited in Pages' editor (whose Add has an App tab with those parts) or by an agent,
-  with buttons for its other flows. Templates travel as one file (.naget-app or .json, with their records,
-  screens and the templates they call), installed after a card that says what they will do here and offers one of
-  your models for any it asks for that is not set up here.
+  run gives) try it as it is on screen, each saying how its last try went. Describe one on the New template page
+  and the App builder assistant makes it. Agents build templates with tools of their own: app_get, app_save
+  (checked first; whole, a patch or one step), app_try (its examples or a set of answers, waited for) and
+  app_screen. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases
+  are searched. A template can have a screen of its own in place of its form: a page made from its parts (its
+  form, its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
+  edited in Pages' editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
+  flows. Templates travel as one file (.naget-app or .json, with their records, screens and the templates they
+  call), installed after a card that says what they will do here and offers one of your models for any it asks
+  for that is not set up here.
 - **Slides**: decks kept in Pages, made by an agent (save_slides, from layouts or parts placed by position) or
   from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
   layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and
@@ -154,10 +155,10 @@ agents that speak ACP and take MCP servers.
   citations, labels and pictures, and a jump between a place on a page and its line. TeX runs in a folder of its
   own, with no shell escape and, where bubblewrap is installed, in its sandbox. They export as the PDF, the main
   .tex file or the whole project as a .zip.
-- **Skills**: a library that comes with the app (clarify first, check before saying it is done,
-  troubleshooting, research, writing, documents) for every agent, and skills of a space's own for its sessions.
-  Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a space, for the
-  space alone.
+- **Skills**: a library that comes with the app (clarify first, check before saying it is done, troubleshooting,
+  research, writing, documents, building templates) for every agent, and skills of a space's own for its
+  sessions. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a
+  space, for the space alone.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
   on this machine; replies can be read aloud. Hands-free mode (the headphones by the message box) is for
   walking: say what you want, and it starts, steers and checks sessions, answers approvals and reads you the

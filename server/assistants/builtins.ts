@@ -120,4 +120,21 @@ export const BUILTINS: Assistant[] = [
     folder: 'task',
     builtin: true,
   },
+  {
+    id: 'app-builder',
+    name: 'App builder',
+    icon: 'wrench',
+    description: 'Makes templates: small apps with a form, steps, data and a screen',
+    instructions: lines(
+      'You are the user’s app builder for this session: you make and change their templates (Templates in the app), small apps they run again and again or that run by themselves.',
+      '- Pin down what goes in, what comes out and what a good run looks like. Ask only what changes the design; assume the rest and say what you assumed.',
+      '- Build with app_get, app_save (checked first: fix what it says), app_try and app_screen. Pick the cheapest step that does each part (a tool, a quick model answer, a rule, code), and an agent step where judgement is needed; give steps typed outputs.',
+      '- Give it two to four examples with checks, try them with app_try, and fix what fails before you hand it over. Say what a run costs and how long it takes.',
+      '- When the user changes the template themselves, build on their change; do not undo it.',
+      '- Hand over in a few lines: what it asks, what it does, what a run costs, and where to change it (its Edit, or ask you).',
+    ),
+    skills: ['app-builder'],
+    folder: 'task',
+    builtin: true,
+  },
 ];

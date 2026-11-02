@@ -1,0 +1,55 @@
+---
+name: app-builder
+description: Use when making or changing one of the user's templates (their own small apps, with a form, steps, data, screens and examples), or when they want a tool they will run again and again, or work that runs by itself.
+triggers: [make a template, build a template, make an app, build an app, an app that, a tool that, every time I, automate, workflow]
+---
+
+# Building templates
+
+A template is a small app: what it asks (a form), what it does (one agent's task, or steps), what it gives back
+(answer fields), what it keeps (lists of records, a memory), how it looks (a screen), when it runs (its form, a
+schedule, a webhook, a watcher) and examples to try it with. Build them with app_get, app_save, app_try and
+app_screen; app_guide's templates topic says what each part does, and its API topic gives the format.
+
+## 1. Pin down the job
+
+- What goes in: the form's questions, few, each of the kind that fits (number, date, choice, yes or no, file).
+- What comes out: answer fields with types (a table when there are rows, a list for short items).
+- What makes a run good: the checks you will write. Ask only what changes the design; assume the rest and say so.
+
+## 2. Pick the steps: the cheapest that works
+
+- One agent with a task, when the work is open-ended (research, writing, changing code). Start here when unsure,
+  and firm it up later.
+- Steps, when parts of the work are fixed:
+  - **Use a tool** for one exact call: read a page, search the web, call an address with a saved key, read a document.
+  - **Ask a model** for one quick answer with no tools: sort, pull out, sum up, classify. Cheap; give it outputs.
+  - **Decide** by a rule when a value settles it (`{{price}} < 100`), by a question in words otherwise.
+  - **Repeat** over a list (a few at a time), or until something holds, with a limit.
+  - **At the same time** for parts that do not depend on each other.
+  - **Keep data** to add, find, search or change the records the template keeps.
+  - **Run code** for exact arithmetic, parsing and formatting: short JavaScript or Python, no network.
+  - **Ask a person** before anything that sends, spends or deletes, and when the choice is the user's.
+  - **Ask an agent** for the parts that need judgement and tools, with outputs it hands in.
+- Every step's outputs are what later steps use (`{{step.value}}`); the form's answers are `{{field}}`, a Repeat's
+  item `{{item}}`. Fill the answer fields from the steps (`flow.outputs`), or let them come by name.
+
+## 3. Examples, then try
+
+- Write two to four examples with checks (rules on `{{answer.field}}`, `{{step.value}}`, `{{reply}}`) before you
+  hand the template over: the usual case, an edge, and one that should be refused or come back empty.
+- Try them with app_try and fix what fails. Say what a run costs and how long it takes.
+- To change a late step, save the change and run again from that step (its run page, or a test run in its Edit):
+  the steps before it give what they gave, at no cost.
+
+## 4. Safe and cheap
+
+- Limits: runs a day and the most a run may spend. Tools: only those it needs.
+- A step that may fail says what happens then (If it fails…: go on without it, other steps, or ask the user).
+- Nothing reaches outside data and private data and sends things out in one step without an Ask a person first.
+
+## 5. Hand it over
+
+- A screen (app_screen) when it will be used often or keeps data: start from the one made from its parts.
+- When it should run by itself, propose a scheduled task that runs it (schedule_task with template).
+- Say in a few lines what it asks, what it does, what a run costs, and how to change it (Edit, or ask you).
