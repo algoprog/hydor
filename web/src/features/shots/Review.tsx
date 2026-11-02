@@ -321,7 +321,7 @@ export function ShotCard({ item, sessionKey, more }: { item: ToolItem; sessionKe
   const title = phases.has('after') ? PHASE.after : phases.size === 1 && phases.has('before') ? PHASE.before : all.length > 1 ? 'Screenshots' : PHASE.check;
   const one = all.length === 1;
   return (
-    <div className={cx('tl-item my-1.5 rounded-xl border border-line bg-panel p-2', one && 'max-w-[22rem]')}>
+    <div className={cx('tl-item my-1.5 rounded-xl border border-line bg-panel p-2', one && 'sm:max-w-[22rem]')}>
       <div className="flex items-center gap-2 px-1 pb-2">
         {phases.has('after') ? <ArrowLeftRight size={14} className="shrink-0 text-accent" /> : <ImageIcon size={14} className="shrink-0 text-fg-3" />}
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-fg-2">
