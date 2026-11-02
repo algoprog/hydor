@@ -57,8 +57,8 @@ class FakeSessions extends EventEmitter {
   made: { key: string; o: any }[] = [];
   status = new Map<string, string>();
   replies = new Map<string, string[]>();
-  /** The tools each session called, as its transcript shows them. */
-  tools = new Map<string, unknown[]>();
+  /** What each session's transcript shows before its replies: the user's message, the tools it called. */
+  items = new Map<string, unknown[]>();
   archived = new Set<string>();
   interrupted: string[] = [];
   async create(o: any) {
@@ -76,7 +76,7 @@ class FakeSessions extends EventEmitter {
   }
   async timeline(key: string) {
     const said = this.replies.get(key) ?? [];
-    return { parser: { items: [...(this.tools.get(key) ?? []), ...said.map((text, i) => ({ kind: 'assistant', id: `a${i}`, seq: i, text }))] }, readMore: async () => {} } as any;
+    return { parser: { items: [...(this.items.get(key) ?? []), ...said.map((text, i) => ({ kind: 'assistant', id: `a${i}`, seq: i, text }))] }, readMore: async () => {} } as any;
   }
   liveSnapshot() {
     return { live: null, overlay: { items: [], patches: {}, approvals: [] } };
@@ -407,7 +407,7 @@ test('advice: a step an agent had to do the work of, and an agent step that did 
     const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { url } });
     let child: store.RunRecord | undefined;
     for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: r.id }).find((x) => x.key)); i++) await sleep(25);
-    sessions.tools.set(child!.key!, [called('ToolSearch', { query: 'select:read_page' }), called(url.includes('c.') ? 'WebFetch' : 'mcp__naget-agent__read_page', { url }), called('mcp__naget-agent__submit_result', {})]);
+    sessions.items.set(child!.key!, [called('ToolSearch', { query: 'select:read_page' }), called(url.includes('c.') ? 'WebFetch' : 'mcp__naget-agent__read_page', { url }), called('mcp__naget-agent__submit_result', {})]);
     await agentAnswers(r.id, 'sum', { summary: `About ${url}` });
     assert.equal((await ended(r.id)).status, 'done');
   }
@@ -440,7 +440,7 @@ test('advice: a step an agent had to do the work of, and an agent step that did 
     const rb = startRun({ app: b.id, slug: b.slug, recipe: b, source: 'web', inputs: { topic } });
     let child: store.RunRecord | undefined;
     for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: rb.id }).find((x) => x.key)); i++) await sleep(25);
-    sessions.tools.set(child!.key!, [called('Bash', { command: `ls ${topic}` })]);
+    sessions.items.set(child!.key!, [called('Bash', { command: `ls ${topic}` })]);
     await agentAnswers(rb.id, 'look', null);
     await ended(rb.id);
   }
@@ -460,6 +460,50 @@ test('advice: a step an agent had to do the work of, and an agent step that did 
   await sleep(50);
   assert.deepEqual(store.getRun(db, t.id)!.checks, [{ rule: '{{answer.summary}} = Short.', ok: true }]);
   assert.equal(store.lastExampleRuns(db, e.id).get('one'), undefined);
+});
+
+test('Save as template drafts steps from the tools the session called; steps that do not check out are left out, the task for one agent staying', async () => {
+  const key = await sessions.create({});
+  sessions.items.set(key, [{ kind: 'user', id: 'u1', seq: 0, text: 'Read https://example.org/solar and sum it up in three lines.' }, called('Bash', { command: 'date' }), called('mcp__naget-agent__read_page', { url: 'https://example.org/solar' })]);
+  sessions.end(key, 'Solar roofs last longer than promised.');
+  const draft = {
+    name: 'Page summary',
+    description: 'Sums up a page.',
+    icon: 'sparkles',
+    color: 'blue',
+    fields: [{ id: 'url', label: 'Link', type: 'url', required: true }],
+    prompt: 'Read {{url}} and sum it up in three lines.',
+    answer: [{ id: 'summary', label: 'Summary', type: 'markdown', required: true }],
+    flow: {
+      steps: [
+        { id: 'read', title: 'Read the page', do: 'tool', tool: 'read_page', with: { url: '{{url}}' } },
+        { id: 'sum', title: 'Sum it up', do: 'model', instructions: 'Sum up in three lines:\n{{read.text}}', outputs: { summary: 'long' } },
+      ],
+    },
+  };
+  model.calls = [];
+  model.answer = () => JSON.stringify(draft);
+  const r = (await http.inject({ method: 'POST', url: '/api/apps/draft', payload: { key } })).json();
+  const asked = model.calls.at(-1)!;
+  assert.match(asked.user, /<calls>\n1\. read_page \{"url":"https:\/\/example\.org\/solar"\}\n<\/calls>\nIt also used: Bash \(1\)\./);
+  assert.match(asked.system, /"do": "tool", "tool": one of web_search, read_page/);
+  assert.deepEqual(r.recipe.flow.steps.map((x: any) => [x.id, x.do]), [['read', 'tool'], ['sum', 'model']]);
+  assert.equal(r.recipe.prompt, 'Read {{url}} and sum it up in three lines.');
+  assert.match(r.note, /^Its steps come from the tools the session called/);
+  // Steps that do not check out: the task for one agent, and why.
+  model.answer = () => JSON.stringify({ ...draft, flow: { steps: [draft.flow.steps[1], { ...draft.flow.steps[1] }] } });
+  const r2 = (await http.inject({ method: 'POST', url: '/api/apps/draft', payload: { key } })).json();
+  assert.equal(r2.recipe.flow, undefined);
+  assert.equal(r2.recipe.prompt, 'Read {{url}} and sum it up in three lines.');
+  assert.match(r2.note, /^Its steps could not be drafted \(Two steps are called “sum”/);
+  // A session that called no tool a step can: no steps asked for, none kept.
+  const plain = await sessions.create({});
+  sessions.items.set(plain, [{ kind: 'user', id: 'u2', seq: 0, text: 'Write a haiku about rain.' }]);
+  sessions.end(plain, 'Rain on the roof.');
+  const r3 = (await http.inject({ method: 'POST', url: '/api/apps/draft', payload: { key: plain } })).json();
+  assert.doesNotMatch(model.calls.at(-1)!.system, /"flow"/);
+  assert.equal(r3.recipe.flow, undefined);
+  assert.equal(r3.note, undefined);
 });
 
 test('At the same time, and Repeat until: branches meet after the join; rounds go on until the rule holds, seeing the last round', async () => {

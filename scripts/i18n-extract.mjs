@@ -322,7 +322,7 @@ for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) =
 const NAMED = ['assistants/builtins', 'apps/templates', 'apps/draft', 'apps/screens', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api'];
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
-  for (const m of src.matchAll(/\b(name|label|description|detail|placeholder|help|title|category)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
+  for (const m of src.matchAll(/\b(name|label|description|detail|placeholder|help|title|category|note)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
 }
 for (const f of fs.readdirSync(path.join(ROOT, 'catalog/connections')).filter((x) => x.endsWith('.json'))) {
   const e = JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog/connections', f), 'utf8'));

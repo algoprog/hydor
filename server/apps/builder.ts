@@ -181,7 +181,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         // The user changed it since this agent last saw it: it reads their version first, rather than write over it.
         const seen = prev ? seenBy(db, prev.id, ctx.key) : undefined;
         const edited = prev ? userEditAt(db, prev.id) : undefined;
-        if (prev && seen !== undefined && edited !== undefined && edited >= seen && !a.force) return { text: `The user changed “${prev.name}” in its editor since you last saved or read it: read it with app_get and build on their version (force: true writes over their changes).`, isError: true };
+        if (prev && seen !== undefined && edited !== undefined && edited > seen && !a.force) return { text: `The user changed “${prev.name}” in its editor since you last saved or read it: read it with app_get and build on their version (force: true writes over their changes).`, isError: true };
         let raw: Record<string, any> = (a.recipe && typeof a.recipe === 'object' ? a.recipe : prev ? cleanRecipe(prev) : {}) as Record<string, any>;
         if (a.patch && typeof a.patch === 'object') raw = mergePatch(raw, a.patch) as Record<string, any>;
         if (a.step && typeof a.step === 'object') raw = withStep(raw, a.step as Record<string, unknown>);
@@ -189,7 +189,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         const { recipe, errors, warnings } = help.problemsOf(raw);
         if (errors.length) return { text: `Not saved. Fix these first:\n- ${errors.join('\n- ')}`, isError: true };
         const saved = help.prepare(saveApp(db, { id: prev?.id, recipe: { ...recipe, screens: prev?.screens } }));
-        noteBuilder(db, saved.id, ctx.key, Date.now() + 1);
+        noteBuilder(db, saved.id, ctx.key);
         appChanged(saved, 'agent');
         if (a.force) dropEdits(db, saved.id, ctx.key);
         const steps = saved.flow ? allSteps(saved.flow.steps).length : 0;
