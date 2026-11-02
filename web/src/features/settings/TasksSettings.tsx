@@ -65,7 +65,7 @@ export function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTas
             {scheduleText(t.schedule, undefined, LOCALE)} ·{' '}
             {t.app ? (
               <>
-                runs <span translate="no">{t.appName ?? 'a template that is gone'}</span>
+                runs <span translate="no">{t.appName ?? 'an app that is gone'}</span>
               </>
             ) : t.target ? (
               'posts into a session'
@@ -223,7 +223,7 @@ function TestStrip({ run }: { run: TaskRun }) {
             )
           )}
         </div>
-        <p className="mt-0.5 line-clamp-3 text-[12.5px] leading-snug text-fg-2">{run.summary ?? (run.status === 'running' ? (run.appRun ? 'It runs like a real run of the template; this updates when it ends.' : 'It runs like a real run, in a session of its own; this updates when it ends.') : '')}</p>
+        <p className="mt-0.5 line-clamp-3 text-[12.5px] leading-snug text-fg-2">{run.summary ?? (run.status === 'running' ? (run.appRun ? 'It runs like a real run of the app; this updates when it ends.' : 'It runs like a real run, in a session of its own; this updates when it ends.') : '')}</p>
       </div>
     </div>
   );
@@ -239,7 +239,7 @@ function AppAnswers({ app, schedule, onChange }: { app: TaskApp; schedule: TaskS
     );
   }, [app.id]);
   if (def === undefined) return <Throbber className="text-fg-3" />;
-  if (def === null) return <p className="text-[12.5px] text-err">Its template is gone: remove the task, or make it again from another template.</p>;
+  if (def === null) return <p className="text-[12.5px] text-err">Its app is gone: remove the task, or make it again from another app.</p>;
   const put = (id: string, v: string) => {
     const inputs = { ...app.inputs };
     if (v) inputs[id] = v;

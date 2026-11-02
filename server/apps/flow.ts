@@ -592,9 +592,9 @@ function stepTask(s: Step, scope: Scope): string {
     case 'code':
       return `It runs this ${s.language === 'python' ? 'Python' : 'JavaScript'} program (the body of a function of input, which returns its values), with input:\n${vals(s.with)}\n\n\`\`\`\n${s.code.slice(0, 20_000)}\n\`\`\``;
     case 'data':
-      return `It ${{ add: 'adds a record to', get: 'gets a record of', find: 'finds records of', search: 'searches', update: 'changes records of', remove: 'removes records of' }[s.op]} the template's list “${s.collection}”, with: ${vals({ with: s.with, record: s.record, where: s.where, search: s.search, query: s.query, sort: s.sort, limit: s.limit })}\nUse the tools you have for the template's lists.`;
+      return `It ${{ add: 'adds a record to', get: 'gets a record of', find: 'finds records of', search: 'searches', update: 'changes records of', remove: 'removes records of' }[s.op]} the app's list “${s.collection}”, with: ${vals({ with: s.with, record: s.record, where: s.where, search: s.search, query: s.query, sort: s.sort, limit: s.limit })}\nUse the tools you have for the app's lists.`;
     case 'app':
-      return `It runs the template “${s.app}” with:\n${vals(s.with)}`;
+      return `It runs the app “${s.app}” with:\n${vals(s.with)}`;
     default:
       return '';
   }
@@ -609,7 +609,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
   if (!childId) {
     const recipe = x.run.recipe;
     const prompt = [
-      `A step of the template “${recipe.name}” failed. Do its work in its place, so that the run can go on.`,
+      `A step of the app “${recipe.name}” failed. Do its work in its place, so that the run can go on.`,
       '',
       `The step: “${titleOf(s)}”. ${stepTask(s, scope)}`,
       '',
@@ -679,7 +679,7 @@ async function appStep(x: Exec, s: Extract<Step, { do: 'app' }>, scope: Scope, a
   let childId = before?.childRun && getRun(db(), before.childRun) ? before.childRun : undefined;
   if (!childId) {
     const target = getApp(db(), s.app);
-    if (!target) throw new Error(`There is no template “${s.app}”`);
+    if (!target) throw new Error(`There is no app “${s.app}”`);
     if (depthOf(x.run) >= 3) throw new Error('Apps call each other too deep here (three levels at most)');
     checkDaily(db(), target);
     const given = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
@@ -766,10 +766,10 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope)
   if (!STEP_TOOLS.includes(s.tool)) throw new Error(`${s.tool} cannot run as a step on its own: use it in an Ask an agent step`);
   if (x.pub && !(x.pub.web && PUBLIC_WEB_TOOLS.includes(s.tool))) throw new Error(`A run from a public page cannot use ${s.tool}`);
   const allowed = x.run.recipe.tools;
-  if (allowed && !allowed.includes(s.tool)) throw new Error(`The template does not let its runs use ${s.tool} (Tools, in its settings)`);
+  if (allowed && !allowed.includes(s.tool)) throw new Error(`The app does not let its runs use ${s.tool} (Tools, in its settings)`);
   const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal, notice: { url: `/apps/runs/${encodeURIComponent(x.run.id)}`, title: x.run.appName } };
   const tool = runTools(ctx).find((t) => t.name === s.tool);
-  if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of the app turned on?`);
+  if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Naget Agent turned on?`);
   const out = await tool.run(valueOf(s.with ?? {}, scope) as Record<string, unknown>, ctx);
   const text = typeof out === 'string' ? out : out.text;
   if (typeof out === 'object' && out.isError) throw new Error(text.slice(0, 800) || 'The tool failed');
@@ -791,7 +791,7 @@ function dataOf(r: RunRecord) {
 
 async function dataStep(x: Exec, s: DataStep, scope: Scope): Promise<Record<string, unknown>> {
   // What a public page's visitors run never reaches the owner's data.
-  if (x.pub) throw new Error('A run from a public page cannot use the data the template keeps');
+  if (x.pub) throw new Error('A run from a public page cannot use the data the app keeps');
   const data = dataOf(x.run);
   const app = x.run.app;
   const id = s.record ? asText(valueOf(s.record, scope)).trim() : undefined;
@@ -986,7 +986,7 @@ async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'st
     if (c.ok) result = c.value;
     else {
       status = 'failed';
-      error = `The steps ended without what the template gives back: ${c.errors.join('; ')}`;
+      error = `The steps ended without what the app gives back: ${c.errors.join('; ')}`;
     }
   }
   const costUsd = Math.round(spentSoFar(x) * 10000) / 10000;

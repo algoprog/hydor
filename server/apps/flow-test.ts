@@ -715,7 +715,7 @@ test('a template as a folder: its files written out and read back the same; a ch
   await sleep(700);
   assert.equal(step(0).instructions, 'Say {{topic}} warmly');
   // The schema an editor checks app.json with.
-  assert.equal((await http.inject({ method: 'GET', url: '/api/apps/schema.json' })).json().title, 'A Naget Agent template (app.json)');
+  assert.equal((await http.inject({ method: 'GET', url: '/api/apps/schema.json' })).json().title, 'A Naget Agent app (app.json)');
   fs.rmSync(dir, { recursive: true, force: true });
   fs.rmSync(busy, { recursive: true, force: true });
 });
@@ -810,7 +810,7 @@ test('scheduled tasks run a template: its answers set or filled from a webhook c
     answer: [{ id: 'count', label: 'Count', type: 'number', required: true }],
     flow: { steps: [{ id: 'save', do: 'data', add: 'items', with: { title: '{{topic}}' } }, { id: 'all', do: 'data', op: 'find', collection: 'items' }], outputs: { count: '{{all.count}}' } },
   });
-  assert.throws(() => scheduler.save({ name: 'Nope', schedule: { kind: 'daily', time: '09:00' }, app: { id: 'nope', inputs: {} } } as any), /no such template/);
+  assert.throws(() => scheduler.save({ name: 'Nope', schedule: { kind: 'daily', time: '09:00' }, app: { id: 'nope', inputs: {} } } as any), /no such app/);
   const t = scheduler.save({ name: 'Log it', schedule: { kind: 'daily', time: '09:00' }, app: { id: a.id, inputs: { topic: 'From the timer', empty: '' } } } as any);
   assert.equal(t.appName, 'Logged');
   assert.deepEqual(t.app, { id: a.id, inputs: { topic: 'From the timer' } });
@@ -1115,7 +1115,7 @@ test('blocks: templates made to be steps of others; the ready-made ones check ou
   // Agents see which of their templates are blocks.
   const ctx: RunCtx = { runId: 'blocks-1', key: 'acp:blocks-1', agent: 'acp', cwd: os.tmpdir(), deps };
   const get = Object.fromEntries(apps.tools!(ctx).map((x) => [x.name, x])).app_get;
-  const list = JSON.parse(String(await get.run({}, ctx))).templates;
+  const list = JSON.parse(String(await get.run({}, ctx))).apps;
   assert.equal(list.find((x: { id: string }) => x.id === made.id).block, true);
 });
 
@@ -1182,7 +1182,7 @@ test('the builder’s tools: app_save makes and changes a template (whole, a pat
   assert.match(made, /Made “Built”/);
   const got = JSON.parse(text(await tools.app_get.run({ app: id }, ctx)));
   assert.equal(got.recipe.flow.steps.length, 1);
-  assert.ok(JSON.parse(text(await tools.app_get.run({}, ctx))).templates.some((t: any) => t.id === id));
+  assert.ok(JSON.parse(text(await tools.app_get.run({}, ctx))).apps.some((t: any) => t.id === id));
   // One step added after another, then a patch: a new answer field and where it comes from.
   text(await tools.app_save.run({ app: id, step: { id: 'count', do: 'data', op: 'find', collection: 'items', after: 'save' } }, ctx));
   const patched = text(await tools.app_save.run({ app: id, patch: { name: 'Built and counted', answer: [{ id: 'title', label: 'Title', type: 'text', required: true }, { id: 'count', label: 'Count', type: 'number' }], flow: { outputs: { count: '{{count.count}}' } } } }, ctx));
@@ -1231,7 +1231,7 @@ test('the user’s changes reach the agent that built a template: told once with
   const put = await http.inject({ method: 'PUT', url: `/api/apps/${id}`, payload: { recipe: { ...app, name: 'Shared by two', fields: [...app.fields, { id: 'budget', label: 'Budget', type: 'number' }] } } });
   assert.equal(put.statusCode, 200, put.body);
   const told = await apps.beforeMessage!('acp:builder-2', deps);
-  assert.match(String(told), /changed a template you built/);
+  assert.match(String(told), /changed an app you built/);
   assert.match(String(told), /Its name: “Shared” → “Shared by two”/);
   assert.match(String(told), /The form: added “Budget” \(budget\)/);
   assert.equal(await apps.beforeMessage!('acp:builder-2', deps), null, 'told once');
@@ -1418,7 +1418,7 @@ test('a template as a file: .naget-app and .json round trips with its records; i
   assert.equal(back.statusCode, 200);
   const junk = await http.inject({ method: 'POST', url: '/api/apps/install', payload: { file: { name: 'x.json', data: Buffer.from('hello').toString('base64') } } });
   assert.equal(junk.statusCode, 400);
-  assert.match(junk.json().error, /neither a template/);
+  assert.match(junk.json().error, /neither an app/);
   const newer = await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: { naget: 'app', format: 99, app: { name: 'N', prompt: 'x' } } } });
   assert.match(newer.json().error, /newer Naget Agent/);
   const broken = await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: { naget: 'app', format: 1, app: { name: 'B', flow: { steps: [{ id: 'a', do: 'model', instructions: '{{b.text}}' }, { id: 'b', do: 'model', instructions: 'x' }] } } } } });
@@ -1652,7 +1652,7 @@ test('a conversation on its screen: a message starts one with the template’s a
   assert.match(made.o.prompt, /What do you keep\?/);
   // Told it is a conversation, with nothing to hand in; it gets the template's records and flows.
   const add = await apps.spawn!({ agent: 'claude', key, cwd: tmp, runId: 'agent-chat-1', resume: false, extra: { app: made.o.extra.app } }, deps);
-  assert.match(add!.instructions![0], /a conversation on the screen of the template "Notes keeper"/);
+  assert.match(add!.instructions![0], /a conversation on the screen of the app "Notes keeper"/);
   assert.doesNotMatch(add!.instructions![0], /submit_result|Your last reply is the result/);
   const ctx: RunCtx = { runId: 'agent-chat-1', key, agent: 'claude', cwd: tmp, deps };
   assert.deepEqual(apps.tools!(ctx).map((t) => t.name), ['app_data', 'app_run']);

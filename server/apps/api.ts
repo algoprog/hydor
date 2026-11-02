@@ -36,7 +36,7 @@ export function apiAnswer(r: RunRecord, link: (key: string) => string, steps?: R
 /** Refuses a run past the app's runs for the day. */
 export function checkDaily(db: DB, app: { id: string; limits: AppRecipe['limits'] } | AppDef) {
   const max = app.limits.runsPerDay;
-  if (max && usageSince(db, app.id, dayStart()).runs >= max) throw new HttpError(429, `This template has run ${max} time${max > 1 ? 's' : ''} today, its limit (Limits in its settings).`);
+  if (max && usageSince(db, app.id, dayStart()).runs >= max) throw new HttpError(429, `This app has run ${max} time${max > 1 ? 's' : ''} today, its limit (Limits in its settings).`);
 }
 
 /** Seconds to wait, as asked (within bounds). */

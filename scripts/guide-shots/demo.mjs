@@ -1,5 +1,5 @@
 // The made-up world the guide's screenshots show: Alex's folders and a small git repository, sessions as Claude
-// Code transcripts, and what the app's own API keeps (spaces, guidelines, memory, tasks, pages, templates).
+// Code transcripts, and what the app's own API keeps (spaces, guidelines, memory, tasks, pages, apps).
 // Nothing here comes from a real account. What can't be made through the app (an agent waiting on a card, plan
 // limits, the inbox) is answered to the page instead (`overrides`).
 import { execFileSync } from 'node:child_process';
@@ -377,7 +377,7 @@ table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e4dc
 <table><tr><th>Month</th><th>Payment</th><th>Interest</th><th>Left to pay</th></tr><tr><td>December</td><td>$164.32</td><td>$12.44</td><td>$1,738.12</td></tr><tr><td>January</td><td>$164.32</td><td>$11.44</td><td>$1,585.24</td></tr><tr><td>February</td><td>$164.32</td><td>$10.44</td><td>$1,431.36</td></tr><tr><td>March</td><td>$164.32</td><td>$9.42</td><td>$1,276.46</td></tr></table>
 </div></body></html>`;
 
-/** Spaces, guidelines, memory, scheduled tasks, pages, templates and the start page's picks. */
+/** Spaces, guidelines, memory, scheduled tasks, pages, apps and the start page's picks. */
 export async function seedApi(api, home, now, s) {
   await api('POST', '/api/tour', { version: 999 });
   await api('PUT', '/api/me/timezone', { tz: 'America/New_York' });

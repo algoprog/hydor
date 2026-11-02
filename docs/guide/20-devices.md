@@ -139,7 +139,7 @@ The **Tokens** list shows each token's name, when it was made and when it was la
 - **send_message**: steer a session. If its agent is busy, the message waits in the session's queue until the turn ends.
 - **list_models**: the models a new session can use.
 
-Templates you offer to other agents (the template's **Offer to other agents** switch, see [Templates](/guide/templates)) come as tools too, and run the template with its form's fields.
+Apps you offer to other agents (the app's **Offer to other agents** switch, see [Apps](/guide/apps)) come as tools too, and run the app with its form's fields.
 
 Sessions started in this app need none of this. The section shows only on the machine you opened the app on, not on other machines' pages.
 

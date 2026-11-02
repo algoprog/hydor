@@ -102,20 +102,20 @@ own, its `systemctl enable` does.
 If you missed the setup link, `node dist/server/cli.js setup-token` prints the token, to use as
 `/setup?token=<token>`.
 
-## Templates from the command line
+## Apps from the command line
 
-With the app running, the `app` commands work on your templates through its API, with a key of their own
+With Naget Agent running, the `app` commands work on your apps through its API, with a key of their own
 (Settings → Machines lists it as “This computer’s command line”):
 
 ```bash
-node dist/server/cli.js app new "Reading list"   # a template, and its folder of files to write in any editor
+node dist/server/cli.js app new "Reading list"   # an app, and its folder of files to write in any editor
 node dist/server/cli.js app dev reading-list     # each change saved in its folder, tried on its examples
 node dist/server/cli.js app try reading-list     # try its examples once (exit 1 when a check fails)
 node dist/server/cli.js app export reading-list  # one file (.naget-app) to carry to another computer
 node dist/server/cli.js app import reading-list.naget-app   # says what it will do, then installs it
 ```
 
-`app help` lists them all. `PORT`, or `NAGET_URL`, says where the app is.
+`app help` lists them all. `PORT`, or `NAGET_URL`, says where Naget Agent is.
 
 ## Updates
 

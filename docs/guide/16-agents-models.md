@@ -188,7 +188,7 @@ The helper model does small jobs beside your sessions, outside any conversation:
 - answering one question about a web page the browser has open;
 - describing pictures for a Custom model that can't see them;
 - summing up a long reply from a child session;
-- drafting a template or a scheduled task from a session;
+- drafting an app or a scheduled task from a session;
 - hands-free voice mode.
 
 Open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and click the menu next to **Helper model**:

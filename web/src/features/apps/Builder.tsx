@@ -238,12 +238,12 @@ function Describe() {
       onSubmit={(e) => {
         e.preventDefault();
         if (!ask.trim()) return;
-        go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me a template: ')}${ask.trim()}`)}`);
+        go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me an app: ')}${ask.trim()}`)}`);
       }}
     >
       <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2">
         <Sparkles size={13} className="text-accent" />
-        Or describe the template, and an agent makes it
+        Or describe the app, and an agent makes it
       </span>
       <div className="flex gap-2">
         <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Keeps the links I send, sums each up, and lists the unread ones" className={cx(inputCls, 'min-w-0 flex-1')} />
@@ -288,7 +288,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
     <Dialog
       open={open}
       onClose={onClose}
-      title={`Test run · ${recipe.name || 'Untitled template'}`}
+      title={`Test run · ${recipe.name || 'Untitled app'}`}
       width={640}
       footer={
         run ? (
@@ -431,7 +431,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-fg-3">
         <Throbber size={28} />
-        {from && <div className="text-[13px]">Drafting a template from the session…</div>}
+        {from && <div className="text-[13px]">Drafting an app from the session…</div>}
       </div>
     );
 
@@ -482,7 +482,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   };
 
   const save = async () => {
-    if (!recipe.name.trim()) return toast('Give the template a name', 'error');
+    if (!recipe.name.trim()) return toast('Give the app a name', 'error');
     if (!recipe.prompt.trim() && !recipe.flow) return toast('Write the task: it is what the agent is asked to do', 'error');
     setBusy(true);
     try {
@@ -520,7 +520,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 <ArrowLeft size={17} />
               </IconButton>
             )}
-            <span className="truncate">{saved ? `Edit ${saved.name}` : 'New template'}</span>
+            <span className="truncate">{saved ? `Edit ${saved.name}` : 'New app'}</span>
           </span>
         }
         actions={
@@ -605,7 +605,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                   recipe={{ ...recipe, flow: recipe.flow }}
                   appId={saved?.id ?? null}
                   onChange={set}
-                  onAsk={session ? (st) => composeInsert(tr(`About the step “${titleOf(st)}” (${st.id}) of the template: `), session) : undefined}
+                  onAsk={session ? (st) => composeInsert(tr(`About the step “${titleOf(st)}” (${st.id}) of the app: `), session) : undefined}
                 />
               </div>
             </Section>
@@ -677,7 +677,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               <div className="flex items-center gap-3 border-t border-line pt-3">
                 <span className="min-w-0 flex-1">
                   <span className="block text-[13.5px]">A block</span>
-                  <span className="block text-[12px] text-fg-3">Offered when other templates add a step: its form is what it is given, its answer what it gives.</span>
+                  <span className="block text-[12px] text-fg-3">Offered when other apps add a step: its form is what it is given, its answer what it gives.</span>
                 </span>
                 <Switch on={!!recipe.block} label="A block" onChange={(on) => set({ block: on || undefined })} />
               </div>
@@ -742,7 +742,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             </div>
           </Section>
 
-          <Section title="Tools" sub="What the runs may use from the app’s own tools (web search, pages, memory…). The agent’s own files and commands follow its mode.">
+          <Section title="Tools" sub="What the runs may use from Naget Agent’s own tools (web search, pages, memory…). The agent’s own files and commands follow its mode.">
             <div className="flex items-center gap-3">
               <span className="min-w-0 flex-1 text-[13.5px]">{recipe.tools === null ? 'All of them' : `${recipe.tools.length} picked`}</span>
               <label className="flex items-center gap-2 text-[12.5px] text-fg-2">

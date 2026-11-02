@@ -24,7 +24,7 @@ import { coreOf, getApp, listApps, saveApp } from './store.ts';
 export const APP_FILE = 'app.json';
 
 /** Where a template's folder goes unless another is picked. */
-export const defaultFolder = (slug: string) => path.join(config.home, 'Naget', 'Templates', slug);
+export const defaultFolder = (slug: string) => path.join(config.home, 'Naget', 'Apps', slug);
 
 type Files = Record<string, string>;
 type FileRef = { file: string };
@@ -44,7 +44,7 @@ const dedent = (t: string, by: number) =>
 
 /** A code step as a file: the body of its function, inside the function an editor can check (with ctx's types). */
 function codeFile(s: Extract<Step, { do: 'code' }>, app: string): string {
-  const head = `“${titleOf(s)}”, a step of the template “${app}”: it gets input (the values it is given) and returns the step's values; ctx (.naget/step.d.ts) asks models, agents, tools and people, each call a step of the run.`;
+  const head = `“${titleOf(s)}”, a step of the app “${app}”: it gets input (the values it is given) and returns the step's values; ctx (.naget/step.d.ts) asks models, agents, tools and people, each call a step of the run.`;
   if (s.language === 'python') return `# ${head}\ndef step(input, ctx):\n${indent(s.code, '    ')}\n`;
   if (s.language === 'typescript') return `// ${head}\nimport type { Ctx, StepInput } from '../.naget/step';\n\nexport default async function step(input: StepInput, ctx: Ctx) {\n${indent(s.code, '  ')}\n}\n`;
   return `// ${head}\n// @ts-check\n/** @param {import('../.naget/step').StepInput} input @param {import('../.naget/step').Ctx} ctx */\nexport default async function step(input, ctx) {\n${indent(s.code, '  ')}\n}\n`;
@@ -62,12 +62,12 @@ function codeOf(text: string, python: boolean): string | null {
 
 const README = (name: string) => `# ${name}
 
-This folder is the template “${name}” of Naget Agent. Change its files in any editor, or ask a coding agent to:
-each change you save comes to the app as a new version of the template, and a mistake is said there in words.
+This folder is the app “${name}” of Naget Agent. Change its files in any editor, or ask a coding agent to:
+each change you save comes to Naget Agent as a new version of it, and a mistake is said there in words.
 
 - app.json: what it asks (fields), what it does (prompt, or flow: its steps), what it gives back (answer),
   what it keeps (data), its examples and the rest. .naget/app.schema.json describes each part.
-- instructions/: each step's instructions (and the task of a template without steps), in Markdown.
+- instructions/: each step's instructions (and the task of an app without steps), in Markdown.
 - steps/: each code step, as the function it runs (.naget/step.d.ts says what it gets and gives).
 - screens/: its screens, as pages that use naget.app.
 - graph.json: where its steps sit in the graph (leave it out, and they are laid out by themselves).
@@ -202,9 +202,9 @@ export function writeFolder(db: DB, a: AppDef, dir: string) {
 /** Makes a template's folder (written out, then watched); the folder must be empty, or one of this template's. */
 export function linkFolder(db: DB, a: AppDef, dir: string): AppDef {
   const abs = path.resolve(dir.replace(/^~(?=\/|$)/, config.home));
-  if (fs.existsSync(abs) && fs.readdirSync(abs).length && !fs.existsSync(path.join(abs, APP_FILE))) throw new Error('That folder has other files in it: pick an empty one, or one of this template');
+  if (fs.existsSync(abs) && fs.readdirSync(abs).length && !fs.existsSync(path.join(abs, APP_FILE))) throw new Error('That folder has other files in it: pick an empty one, or one of this app');
   const other = listApps(db).find((x) => x.folder === abs && x.id !== a.id);
-  if (other) throw new Error(`That folder is the template “${other.name}”'s`);
+  if (other) throw new Error(`That folder is the app “${other.name}”'s`);
   fs.mkdirSync(abs, { recursive: true });
   unwatch(a.id);
   const saved = saveApp(db, { id: a.id, recipe: a, folder: abs });

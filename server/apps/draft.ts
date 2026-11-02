@@ -69,7 +69,7 @@ export async function draftFromSession(d: Deps, key: string): Promise<{ recipe: 
   if (!s) throw new HttpError(404, 'No such session');
   const tl = await d.sessions.timeline(key);
   const request = firstRequest(tl.parser.items);
-  if (!request) throw new HttpError(400, 'This session has no request to make a template from');
+  if (!request) throw new HttpError(400, 'This session has no request to make an app from');
   const reply = lastReply(tl.parser.items);
   const calls = callsOf(tl.parser.items);
   const said = calls.steps.length
@@ -97,7 +97,7 @@ export async function draftFromSession(d: Deps, key: string): Promise<{ recipe: 
         maxTokens: said ? 5000 : 3000,
         timeoutMs: 100_000,
       },
-      'a template',
+      'an app',
     );
     const recipe = cleanRecipe({ ...raw, ...base });
     if (!recipe.prompt) throw new Error('no prompt');
@@ -110,7 +110,7 @@ export async function draftFromSession(d: Deps, key: string): Promise<{ recipe: 
     // Plain but usable: the request as it was, its wording in one field to change.
     const recipe = cleanRecipe({
       ...base,
-      name: s.title.slice(0, 60) || 'My template',
+      name: s.title.slice(0, 60) || 'My app',
       description: `Runs “${request.slice(0, 120).replace(/\s+/g, ' ')}${request.length > 120 ? '…' : ''}” again, with your changes.`,
       icon: 'sparkles',
       color: 'blue',

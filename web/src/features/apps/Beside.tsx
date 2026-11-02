@@ -76,7 +76,7 @@ function SavedRow({ item, sessionKey }: { item: ToolItem; sessionKey: string }) 
     if (!useAppSide.getState().open[sessionKey]) openTemplate(sessionKey, m[3]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m?.[3]]);
-  if (running) return <Line icon={<Throbber className="h-3.5" />} text="Saving the template…" />;
+  if (running) return <Line icon={<Throbber className="h-3.5" />} text="Saving the app…" />;
   if (!m)
     return (
       <div className="my-2 rounded-xl bg-bg-2 px-3 py-2 text-[12.5px] whitespace-pre-wrap text-fg-2" translate="no">
@@ -93,7 +93,7 @@ function SavedRow({ item, sessionKey }: { item: ToolItem; sessionKey: string }) 
           {m[2]}
         </span>
         <span className="block truncate text-[12px] text-fg-3">
-          <span>{m[1] === 'Made' ? 'A new template' : 'Changed'}</span>
+          <span>{m[1] === 'Made' ? 'A new app' : 'Changed'}</span>
           {why && <span translate="no"> · {why}</span>}
         </span>
       </span>
@@ -129,7 +129,7 @@ interface Tried {
 /** app_try in the conversation: how each try went. */
 function TriedRow({ item }: { item: ToolItem; sessionKey: string }) {
   const t = item.tool;
-  if (t.status === 'running' || t.status === 'pending') return <Line icon={<Throbber className="h-3.5" />} text="Trying the template…" />;
+  if (t.status === 'running' || t.status === 'pending') return <Line icon={<Throbber className="h-3.5" />} text="Trying the app…" />;
   let runs: Tried[] = [];
   try {
     runs = (JSON.parse(t.output ?? '') as { runs?: Tried[] }).runs ?? [];

@@ -54,7 +54,7 @@ export function appMcpTools(): ExternalTool[] {
   if (!list.length) return [];
   const tools: ExternalTool[] = list.map((a) => ({
     name: toolName(a.slug),
-    description: `${a.name}: ${a.description || 'a template in Naget Agent'} (Runs the template “${a.name}” in Naget Agent and returns its answer${a.answer.length ? `, with a result object of ${a.answer.map((f) => f.id).join(', ')}` : ''}.)`,
+    description: `${a.name}: ${a.description || 'an app in Naget Agent'} (Runs the app “${a.name}” in Naget Agent and returns its answer${a.answer.length ? `, with a result object of ${a.answer.map((f) => f.id).join(', ')}` : ''}.)`,
     inputSchema: inputSchema(a),
     async run(args) {
       const { wait, ...inputs } = args ?? {};
@@ -66,8 +66,8 @@ export function appMcpTools(): ExternalTool[] {
   }));
   tools.push({
     name: 'app_run_status',
-    description: 'How a template run started from here is going, or its answer once done: waits up to `wait` seconds for it to finish.',
-    inputSchema: { type: 'object', properties: { run: { type: 'string', description: 'The run id a template’s tool returned.' }, wait: { type: 'number', description: 'Seconds to wait (default 60, at most 600).' } }, required: ['run'] },
+    description: 'How an app run started from here is going, or its answer once done: waits up to `wait` seconds for it to finish.',
+    inputSchema: { type: 'object', properties: { run: { type: 'string', description: 'The run id an app’s tool returned.' }, wait: { type: 'number', description: 'Seconds to wait (default 60, at most 600).' } }, required: ['run'] },
     async run(args) {
       const r = getRun(db, String(args.run ?? ''));
       if (!r || r.source !== 'mcp') throw new Error('No run with that id was started from here');

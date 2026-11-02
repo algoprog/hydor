@@ -239,7 +239,7 @@ Some work needs a password or a token in a program on this computer: pushing to 
 
 Some apps need something from you partway through a task: a date, a choice, a yes or no, or a page to open. Whichever agent is working, the request shows as a card in the session, beside the agent's own approvals, and in the [Inbox](/guide/inbox). The card's title says what the app wants:
 
-- **…asks you to fill in a form**: the app's message, then its fields, shown like a template's form. There are text boxes, longer text, numbers, dates, a switch for yes or no, and chips or a list to pick from (chips you can pick several of, when the app allows more than one). Click **Send**. Empty fields it needs ("Needed") and numbers that aren't numbers are marked before anything goes. An answer the app can't take (too long, not an email address, too few picked) is refused with what to fix, and the card stays.
+- **…asks you to fill in a form**: the app's message, then its fields, as a form. There are text boxes, longer text, numbers, dates, a switch for yes or no, and chips or a list to pick from (chips you can pick several of, when the app allows more than one). Click **Send**. Empty fields it needs ("Needed") and numbers that aren't numbers are marked before anything goes. An answer the app can't take (too long, not an email address, too few picked) is refused with what to fix, and the card stays.
 - **…asks you to open a page**: a link. **Open it** opens the page in a new tab (to approve something or sign in there) and tells the app you did.
 - **…asks to go ahead**: a plain yes or no. **Allow** says yes.
 

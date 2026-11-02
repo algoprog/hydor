@@ -168,5 +168,5 @@ export function envLine(recipe: Pick<AppRecipe, 'requires'>, slug: string): stri
   const parts: string[] = [];
   if (r!.python?.length) parts.push(`Python packages (${r!.python.join(', ')}) in ${path.join(dir, '.venv')}: its python is first on PATH`);
   if (r!.node && Object.keys(r!.node).length) parts.push(`Node packages (${Object.keys(r!.node).join(', ')}) in ${path.join(dir, 'node_modules')} (NODE_PATH)`);
-  return `The template's own packages are installed for you: ${parts.join('; ')}. Use them rather than installing others.`;
+  return `The app's own packages are installed for you: ${parts.join('; ')}. Use them rather than installing others.`;
 }

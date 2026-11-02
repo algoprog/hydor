@@ -114,24 +114,24 @@ async function waited(db: RunCtx['deps']['db'], ids: string[], ms: number): Prom
   return ids.map((id) => getRun(db, id)).filter((r): r is RunRecord => !!r);
 }
 
-const APP = { type: 'string', description: 'The template: its id or its address.' };
+const APP = { type: 'string', description: 'The app: its id or its address.' };
 
 export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
   const { db } = ctx.deps;
   const find = (v: unknown): AppDef => {
     const a = typeof v === 'string' && v.trim() ? getApp(db, v.trim()) : null;
-    if (!a) throw new Error(`There is no template “${String(v ?? '')}”: app_get lists them`);
+    if (!a) throw new Error(`There is no app “${String(v ?? '')}”: app_get lists them`);
     return a;
   };
   return [
     {
       name: 'app_get',
       description:
-        "The user's templates (Templates in the app: a form, a task or steps, an answer, data, screens, examples). Without app: each one in a line. With app: the whole template as app_save takes it (its format: app_guide's templates and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
+        "The user's apps (Apps in Naget Agent: a form, a task or steps, an answer, data, screens, examples). Without app: each one in a line. With app: the whole app as app_save takes it (its format: app_guide's apps and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
       inputSchema: { type: 'object', properties: { app: APP, version: { type: 'number', description: 'One of its versions, whole (its recipe as it was then).' } } },
       annotations: { readOnlyHint: true },
       async run(a) {
-        if (!a.app) return JSON.stringify({ templates: listApps(db).map(lineOf) }, null, 1);
+        if (!a.app) return JSON.stringify({ apps: listApps(db).map(lineOf) }, null, 1);
         const app = find(a.app);
         if (a.version !== undefined) {
           const v = getVersion(db, app.id, Number(a.version));
@@ -173,13 +173,13 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_save',
       description:
-        'Makes one of the user\'s templates, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its screens stay as they are (app_screen changes them). Say why in a few words.',
+        'Makes one of the user\'s apps, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its screens stay as they are (app_screen changes them). Say why in a few words.',
       inputSchema: {
         type: 'object',
         properties: {
-          app: { ...APP, description: 'The template to change; none: a new one.' },
-          recipe: { type: 'object', description: 'The whole template: name, description, icon, color, fields (its form), prompt (a task for one agent) or flow (its steps), answer, data, memory, requires, flows, examples, tools, limits, agent, model, mode…' },
-          patch: { type: 'object', description: 'Merged into the template as saved (or into recipe).' },
+          app: { ...APP, description: 'The app to change; none: a new one.' },
+          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form), prompt (a task for one agent) or flow (its steps), answer, data, memory, requires, flows, examples, tools, limits, agent, model, mode…' },
+          patch: { type: 'object', description: 'Merged into the app as saved (or into recipe).' },
           step: { type: 'object', description: 'One step: { id, …its fields } changes it; { id, remove: true } removes it; a new id adds it (after: the step it follows; none: at the end).' },
           why: { type: 'string', description: 'What changed, in a few words ("Added a step that checks prices").' },
           force: { type: 'boolean', description: 'Write over changes the user made since you last saved or read it.' },
@@ -196,7 +196,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         if (prev?.graph && raw.graph === undefined) raw = { ...raw, graph: prev.graph };
         if (a.patch && typeof a.patch === 'object') raw = mergePatch(raw, a.patch) as Record<string, any>;
         if (a.step && typeof a.step === 'object') raw = withStep(raw, a.step as Record<string, unknown>);
-        if (!prev && !a.recipe && !a.patch) return { text: 'Give the template to make (recipe), or the one to change (app)', isError: true };
+        if (!prev && !a.recipe && !a.patch) return { text: 'Give the app to make (recipe), or the one to change (app)', isError: true };
         const { recipe, errors, warnings } = help.problemsOf(raw);
         if (errors.length) return { text: `Not saved. Fix these first:\n- ${errors.join('\n- ')}`, isError: true };
         const saved = help.prepare(saveApp(db, { id: prev?.id, recipe: { ...recipe, screens: prev?.screens }, by: 'agent', why: typeof a.why === 'string' ? a.why : undefined }));
@@ -216,7 +216,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_try',
       description:
-        "Tries a template as a test run and waits for it (at most wait seconds): its examples (examples: true, or their ids), or one set of answers (inputs). recipe tries a version that is not saved. Gives each run's status, answer, steps with their values, checks, cost and time; runs not done when the wait ends can be read again with runs.",
+        "Tries an app as a test run and waits for it (at most wait seconds): its examples (examples: true, or their ids), or one set of answers (inputs). recipe tries a version that is not saved. Gives each run's status, answer, steps with their values, checks, cost and time; runs not done when the wait ends can be read again with runs.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -242,7 +242,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
           if (errors.length) return { text: `It cannot run yet:\n- ${errors.join('\n- ')}`, isError: true };
           recipe = r;
         }
-        if (!recipe) return { text: 'Name the template (app), or give the recipe to try', isError: true };
+        if (!recipe) return { text: 'Name the app (app), or give the recipe to try', isError: true };
         const slug = app?.slug ?? 'test';
         let ids: string[];
         const problems: string[] = [];
@@ -264,7 +264,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_screen',
       description:
-        "Gives a template a screen (a page of its own that its page shows in place of its form), or changes one. Without html: one made from its parts (its form, its answer, a table for each list it keeps and a conversation with its agent, its runs). With html: a page that uses the App parts (<n-form flow>, <n-result>, <n-runs>, <n-table data>, <n-count data>, <n-button flow>, <n-chat>: a conversation with its agent, who can change its records and run its flows) and window.naget.app (app_guide's API topic, Templates: screens).",
+        "Gives an app a screen (a page of its own that its page shows in place of its form), or changes one. Without html: one made from its parts (its form, its answer, a table for each list it keeps and a conversation with its agent, its runs). With html: a page that uses the App parts (<n-form flow>, <n-result>, <n-runs>, <n-table data>, <n-count data>, <n-button flow>, <n-chat>: a conversation with its agent, who can change its records and run its flows) and window.naget.app (app_guide's API topic, Apps: screens).",
       inputSchema: {
         type: 'object',
         properties: {
@@ -293,7 +293,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_data',
       description:
-        'The records one of the user\'s templates keeps (the lists its data names): op "lists" names them, with their fields and how many records each has; "find" lists records by their fields (where, search for words, sort, limit); "search" finds those that answer a question best, by words and by meaning (query); "get" one by its id; "add" one (record), to start a template off with records or try it with some. Changing or removing the user\'s records is done on its screen, or with app_api, which asks the user.',
+        'The records one of the user\'s apps keeps (the lists its data names): op "lists" names them, with their fields and how many records each has; "find" lists records by their fields (where, search for words, sort, limit); "search" finds those that answer a question best, by words and by meaning (query); "get" one by its id; "add" one (record), to start an app off with records or try it with some. Changing or removing the user\'s records is done on its screen, or with app_api, which asks the user.',
       inputSchema: {
         type: 'object',
         properties: {

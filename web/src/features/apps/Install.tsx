@@ -160,7 +160,7 @@ export function InstallFromFile() {
   const [busy, setBusy] = useState(false);
   const pick = async (f: File | undefined) => {
     if (!f) return;
-    if (f.size > 20 << 20) return toast('A template file is at most 20 MB', 'error');
+    if (f.size > 20 << 20) return toast('An app file is at most 20 MB', 'error');
     try {
       const sent = { name: f.name, data: await fileToBase64(f) };
       const r = await post<{ preview: InstallPreview }>('/api/apps/install/check', { file: sent });
@@ -190,7 +190,7 @@ export function InstallFromFile() {
     <>
       <button type="button" onClick={() => input.current?.click()} className="inline-flex items-center gap-1.5 text-[13px] text-fg-3 hover:text-fg">
         <FileUp size={14} />
-        Install a template from a file
+        Install an app from a file
       </button>
       <input
         ref={input}
@@ -205,7 +205,7 @@ export function InstallFromFile() {
       <Dialog
         open={!!preview}
         onClose={close}
-        title="Install this template?"
+        title="Install this app?"
         width={560}
         footer={
           <>
@@ -254,7 +254,7 @@ export function DownloadDialog({ app, open, onClose }: { app: AppDef; open: bool
       }
     >
       <div className="space-y-3 text-[13.5px]">
-        <p className="text-fg-2">One file with everything it does and needs, and the templates its steps call, to keep or to install on another Naget Agent. Its folder, keys and public page stay here.</p>
+        <p className="text-fg-2">One file with everything it does and needs, and the apps its steps call, to keep or to install on another Naget Agent. Its folder, keys and public page stay here.</p>
         {app.data && (
           <label className="flex items-center justify-between gap-3">
             <span>Include the records it keeps</span>

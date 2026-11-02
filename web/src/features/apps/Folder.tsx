@@ -78,7 +78,7 @@ export function FolderBox({ app }: { app: AppDef }) {
           <span translate="no">{state.folder.error}</span>
         </div>
       ) : (
-        <div className="text-[12.5px] text-fg-3">Each change saved there comes here as a version; a save here writes it there. app.json is the template, with a schema for your editor in .naget/.</div>
+        <div className="text-[12.5px] text-fg-3">Each change saved there comes here as a version; a save here writes it there. app.json is the app, with a schema for your editor in .naget/.</div>
       )}
     </div>
   );

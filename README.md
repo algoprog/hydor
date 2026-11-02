@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/media/naget-agent-intro.mp4"><img src="docs/media/naget-agent-intro.webp" width="720" alt="A 90-second tour of Naget Agent: pick any agent and any model, even one on your own GPU, start it in a folder, follow its steps, approve a command and see the diff; start a Researcher that searches and reads the web, take over its browser to sign in, and get a spreadsheet with its sources and a memory note; carry on from a phone and turn a follow-up into a scheduled task, see child sessions and other machines, search everything at once, and the Git, models, templates, pages, connections and skills around them" /></a>
+  <a href="docs/media/naget-agent-intro.mp4"><img src="docs/media/naget-agent-intro.webp" width="720" alt="A 90-second tour of Naget Agent: pick any agent and any model, even one on your own GPU, start it in a folder, follow its steps, approve a command and see the diff; start a Researcher that searches and reads the web, take over its browser to sign in, and get a spreadsheet with its sources and a memory note; carry on from a phone and turn a follow-up into a scheduled task, see child sessions and other machines, search everything at once, and the Git, models, apps, pages, connections and skills around them" /></a>
 </p>
 
 Naget Agent is a self-hosted agent harness. It works on top of the coding agents you already use,
@@ -36,7 +36,7 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   out, small tools and pages you keep (watch them being written and change them yourself, in a visual editor that
   works on phones too, or in their code), slides to edit and present as in PowerPoint or Google Slides, documents,
   spreadsheets and LaTeX to edit as in Word, Excel and Overleaf (or opened from your files), PDF, Word, PowerPoint,
-  Excel and LaTeX exports, an agent that changes what you have open, and templates for tasks you repeat: one
+  Excel and LaTeX exports, an agent that changes what you have open, and apps for tasks you repeat: one
   agent, or steps with data, a memory and a screen of their own, shared as one file
 - Give every agent memory of you and your projects, your documents (knowledge bases it searches and cites),
   your apps and services (connected once), keys and sign-ins it uses without ever seeing them, skills, child

@@ -112,7 +112,7 @@ export const SHOTS = [
     },
   },
   {
-    id: 'templates',
+    id: 'apps',
     async take(p, ctx) {
       await ctx.go('/apps', { settle: 1500 });
       await p.park();

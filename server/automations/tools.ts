@@ -303,7 +303,7 @@ function scheduleTask(tz: string): RunTool {
       `The user sees a card with the schedule in their time zone (${tz}) and confirms or declines it there. Nothing is saved until then, and their answer comes back to you as a message, so do not ask them to confirm in text.`,
       'Each run gets the prompt in a new session (or in this conversation, with where "here"), so write it as complete instructions that make sense on their own, without this conversation.',
       'For a reminder, the prompt can simply ask the agent to tell the user the reminder.',
-      'To run one of the user\'s templates each time instead (Templates; app_api GET /api/apps lists them), give template in place of prompt: each run is a run of it, with the answers given.',
+      'To run one of the user\'s apps each time instead (Apps; app_api GET /api/apps lists them), give template (the app and its answers) in place of prompt: each run is a run of it, with the answers given.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -317,8 +317,8 @@ function scheduleTask(tz: string): RunTool {
         cwd: { type: 'string', description: 'The folder runs work in; default: this conversation’s.' },
         template: {
           type: 'object',
-          description: 'Instead of prompt: one of the user\'s templates to run each time. Its answers are text: from a webhook call {{body.path}}, {{headers.name}}, {{query.name}}; from a watcher {{change}}, what it saw.',
-          properties: { id: { type: 'string', description: 'The template\'s id or address.' }, inputs: { type: 'object', description: 'Its form\'s answers, by field id.' } },
+          description: 'Instead of prompt: one of the user\'s apps to run each time. Its answers are text: from a webhook call {{body.path}}, {{headers.name}}, {{query.name}}; from a watcher {{change}}, what it saw.',
+          properties: { id: { type: 'string', description: 'The app\'s id or address.' }, inputs: { type: 'object', description: 'Its form\'s answers, by field id.' } },
           required: ['id'],
         },
       },
@@ -328,13 +328,13 @@ function scheduleTask(tz: string): RunTool {
       const d = ctx.deps;
       if (inRun(d, ctx)) throw new Error('A scheduled run cannot schedule more tasks. If another task would help, say so in your summary and the user can set it up.');
       const draft = draftFrom(d, ctx, a, tz);
-      if (!draft.prompt && !draft.app) throw new Error('Give the prompt each run gets (or a template to run)');
+      if (!draft.prompt && !draft.app) throw new Error('Give the prompt each run gets (or an app to run)');
       Object.assign(draft, strip(d.scheduler.normalize(draft)));
       if (draft.app) draft.appName = d.scheduler.templateName(draft.app.id);
       if (d.scheduler.list().length >= 100) throw new Error('There are 100 scheduled tasks already: the user should remove some first.');
       const p = addProposal(d.db, { key: ctx.key, action: 'create', task: draft });
       const first = p.next[0] ? `, first run ${localText(p.next[0], tz)}` : '';
-      return `The user is now looking at a card to confirm “${draft.name}”: ${p.when}${first} (${tz}), ${draft.app ? `running the template “${draft.appName}”` : `run by ${agentLabel(d.db, draft)}`}. Nothing is saved until they confirm, and their answer will come to you as a message. (proposal ${p.id})`;
+      return `The user is now looking at a card to confirm “${draft.name}”: ${p.when}${first} (${tz}), ${draft.app ? `running the app “${draft.appName}”` : `run by ${agentLabel(d.db, draft)}`}. Nothing is saved until they confirm, and their answer will come to you as a message. (proposal ${p.id})`;
     },
   };
 }
@@ -478,7 +478,7 @@ const NOTIFY_USER: RunTool = {
     type: 'object',
     properties: {
       message: { type: 'string', description: 'What to tell them, in a sentence or two.' },
-      title: { type: 'string', description: 'A few words above it; default: the session’s or the template’s name.' },
+      title: { type: 'string', description: 'A few words above it; default: the session’s or the app’s name.' },
     },
     required: ['message'],
   },

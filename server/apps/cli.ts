@@ -15,15 +15,15 @@ import { accessOk, createAccessToken } from '../machines.ts';
 
 const USAGE = `usage: node dist/server/cli.js app <command>
 
-  list                          your templates: address, name, folder
-  new <name> [folder]           make a template and its folder of files, to write in any editor
-  folder <template> [folder]    make a template's folder (it then keeps in step with the template)
-  dev <template> [folder]       its folder, and each change you save there tried on its examples
-  try <template> [answers]      try its examples, or one set of answers ('{"topic": "GPUs"}'); waits
-  export <template> [file]      save it as one file (.naget-app), with what it calls and its screens
-  import <file>                 say what installing a template file will do, then install it
+  list                          your apps: address, name, folder
+  new <name> [folder]           make an app and its folder of files, to write in any editor
+  folder <app> [folder]         make an app's folder (it then keeps in step with the app)
+  dev <app> [folder]            its folder, and each change you save there tried on its examples
+  try <app> [answers]           try its examples, or one set of answers ('{"topic": "GPUs"}'); waits
+  export <app> [file]           save it as one file (.naget-app), with what it calls and its screens
+  import <file>                 say what installing an app file will do, then install it
 
-A template is its address or id. The app must be running (PORT, or NAGET_URL, says where).`;
+An app is its address or id. Naget Agent must be running (PORT, or NAGET_URL, says where).`;
 
 type Call = <T = any>(method: string, p: string, body?: unknown) => Promise<T>;
 
@@ -132,16 +132,16 @@ export async function appCommand(args: string[]): Promise<number> {
   if (!sub || sub === 'help' || sub === '--help') return (console.log(USAGE), 0);
   const { call, raw } = client();
   const find = async (which: string | undefined) => {
-    if (!which) throw new Error('Say which template: its address or id (app list shows them)');
+    if (!which) throw new Error('Say which app: its address or id (app list shows them)');
     const r = await call<{ app?: AppDef }>('GET', `/api/apps/${encodeURIComponent(which)}`);
-    if (!r.app) throw new Error(`“${which}” is a ready-made template: make it yours in the app first`);
+    if (!r.app) throw new Error(`“${which}” is a ready-made app: make it yours in Naget Agent first`);
     return r.app;
   };
   switch (sub) {
     case 'list': {
       const { apps } = await call<{ apps: AppDef[] }>('GET', '/api/apps');
       for (const a of apps) console.log(`${a.slug.padEnd(28)} ${a.name}${a.folder ? `   ${a.folder}` : ''}`);
-      if (!apps.length) console.log('No templates yet: app new <name> makes one.');
+      if (!apps.length) console.log('No apps yet: app new <name> makes one.');
       return 0;
     }
     case 'new': {
@@ -150,7 +150,7 @@ export async function appCommand(args: string[]): Promise<number> {
         recipe: { name: first, prompt: 'Say what it does here, with {{topic}} where the answer to its question goes.', fields: [{ id: 'topic', label: 'Topic', type: 'text', required: true }], answer: [] },
       });
       const r = await call<{ folder: { path: string } }>('POST', `/api/apps/${app.id}/folder`, second ? { path: path.resolve(second) } : {});
-      console.log(`Made “${app.name}” (its address: ${app.slug}), in ${r.folder.path}\nOpen that folder in your editor: app.json is the template, and each change you save comes to the app as a version.`);
+      console.log(`Made “${app.name}” (its address: ${app.slug}), in ${r.folder.path}\nOpen that folder in your editor: app.json is the app, and each change you save comes to Naget Agent as a version.`);
       return 0;
     }
     case 'folder': {
@@ -196,7 +196,7 @@ export async function appCommand(args: string[]): Promise<number> {
       const a = await find(first);
       const file = path.resolve(second ?? `${a.slug}.naget-app`);
       fs.writeFileSync(file, await raw(`/api/apps/${a.id}/export`));
-      console.log(`Saved “${a.name}” as ${file}: import it on another computer (app import, or Install from a file on the Templates page).`);
+      console.log(`Saved “${a.name}” as ${file}: import it on another computer (app import, or Install from a file on the Apps page).`);
       return 0;
     }
     case 'import': {
@@ -208,7 +208,7 @@ export async function appCommand(args: string[]): Promise<number> {
         p.steps ? `${p.steps} steps` : 'One agent does its task',
         p.agents.length ? `Who works: ${p.agents.join(', ')}` : '',
         `Tools: ${p.tools === null ? 'all of the app’s own' : p.tools.join(', ') || 'none'}`,
-        p.apps.length ? `Templates it calls: ${p.apps.join(', ')}` : '',
+        p.apps.length ? `Apps it calls: ${p.apps.join(', ')}` : '',
         p.data.length ? `What it keeps: ${p.data.map((d) => `${d.name}${d.records ? ` (${d.records} records)` : ''}`).join(', ')}` : '',
         p.needs.node.length || p.needs.python.length ? `It installs: ${[...p.needs.node, ...p.needs.python].join(', ')}` : '',
         p.needs.missing.length ? `Commands missing here: ${p.needs.missing.join(', ')}` : '',

@@ -48,7 +48,7 @@ export function Advice({ app, recipe, onChange, session }: { app: AppDef; recipe
   const firm = advice.firm.filter((f) => steps.get(f.step)?.do === 'agent');
   if (!rescued.length && !firm.length) return null;
   const fix = (x: RescuedStep) => {
-    const text = tr(`Fix the step “${x.title}” (${x.step}) of my template “${app.name}” (${app.id}): it failed in ${x.runs} of its last ${x.of} runs, and an agent did its work instead. The last time (run ${x.run}) it said: ${x.error}`);
+    const text = tr(`Fix the step “${x.title}” (${x.step}) of my app “${app.name}” (${app.id}): it failed in ${x.runs} of its last ${x.of} runs, and an agent did its work instead. The last time (run ${x.run}) it said: ${x.error}`);
     if (session) composeInsert(text, session);
     else go(`/?assistant=app-builder&prompt=${enc(text)}`);
   };
@@ -103,7 +103,7 @@ export function Advice({ app, recipe, onChange, session }: { app: AppDef; recipe
           onUse={() => {
             onChange(swapStep(recipe, firming.step, firming.steps));
             setFirming(null);
-            toast(tr('The steps are in its place: save the template to keep them'));
+            toast(tr('The steps are in its place: save the app to keep them'));
           }}
         />
       )}
@@ -219,7 +219,7 @@ function FirmUpDialog({ app, recipe, firm, onClose, onUse }: { app: AppDef; reci
       <div className="space-y-4 text-[13px]">
         <p className="text-fg-2">
           <span>{`Its agent did the same in each of its last ${firm.runs} runs. These steps do it without an agent: a tool step for each call it made, with the values it made them with, then a model step with its instructions and what the tools gave.`}</span>
-          {!examples.length && <span> The template has no examples, so they are tried with the answers of those runs.</span>}
+          {!examples.length && <span> The app has no examples, so they are tried with the answers of those runs.</span>}
         </p>
         <ol className="divide-y divide-line rounded-xl border border-line px-3">
           {firm.steps.map((s) => (
@@ -254,7 +254,7 @@ function FirmUpDialog({ app, recipe, firm, onClose, onUse }: { app: AppDef; reci
             })}
           </ul>
         )}
-        {ended && tries!.some((t) => !good(t)) && <p className="text-[12.5px] text-err">Not every try went well: look at their runs in the template's runs before you use these steps.</p>}
+        {ended && tries!.some((t) => !good(t)) && <p className="text-[12.5px] text-err">Not every try went well: look at their runs in the app's runs before you use these steps.</p>}
       </div>
     </Dialog>
   );

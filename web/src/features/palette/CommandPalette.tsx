@@ -56,7 +56,7 @@ const WEIGHT: Record<Group, number> = {
   Sessions: 0.95,
   Spaces: 0.9,
   Guide: 0.9,
-  Templates: 0.9,
+  Apps: 0.9,
   'Scheduled tasks': 0.9,
   Assistants: 0.9,
   Skills: 0.85,
@@ -80,7 +80,7 @@ const PLACES: Record<FindPlace, { label: string; icon: ReactNode; groups: Group[
   messages: { label: 'Messages', icon: <MessageSquareText size={15} />, groups: ['In messages'] },
   spaces: { label: 'Spaces', icon: <Boxes size={15} />, groups: ['Spaces'] },
   pages: { label: 'Pages', icon: <AppWindow size={15} />, groups: ['Pages'] },
-  templates: { label: 'Templates', icon: <LayoutGrid size={15} />, groups: ['Templates'] },
+  templates: { label: 'Apps', icon: <LayoutGrid size={15} />, groups: ['Apps'] },
   files: { label: 'Files', icon: <FileText size={15} />, groups: ['Files'] },
   memory: { label: 'Memory', icon: <Brain size={15} />, groups: ['Memory'] },
   tasks: { label: 'Scheduled tasks', icon: <CalendarClock size={15} />, groups: ['Scheduled tasks'] },
@@ -451,7 +451,7 @@ export function CommandPalette() {
                 pick(sel);
               }
             }}
-            placeholder={places.length ? 'Search…' : 'Search settings, sessions, templates, notes, files…'}
+            placeholder={places.length ? 'Search…' : 'Search settings, sessions, apps, notes, files…'}
             enterKeyHint="go"
             className="h-14 min-w-0 flex-1 bg-transparent text-[17px] outline-none placeholder:text-fg-3"
           />
@@ -642,7 +642,7 @@ function PlaceRow({ icon, label, on, onClick }: { icon: ReactNode; label: string
 
 /** More about the one picked: where it is, what it says, and where opening it goes. */
 function Preview({ hit, q }: { hit: Hit | null; q: string }) {
-  if (!hit) return <div className="hidden w-[45%] items-center justify-center p-6 text-center text-[13px] text-fg-3 md:flex">{q.trim() ? '' : 'Settings, sessions, templates, notes and files, all in one place'}</div>;
+  if (!hit) return <div className="hidden w-[45%] items-center justify-center p-6 text-center text-[13px] text-fg-3 md:flex">{q.trim() ? '' : 'Settings, sessions, apps, notes and files, all in one place'}</div>;
   const e = hit.entry;
   const facts = (e.facts ?? []).filter(([, v]) => v);
   return (

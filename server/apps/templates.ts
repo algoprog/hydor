@@ -503,7 +503,7 @@ Work in steps: plan the screens and the data, build it, then check it: open the 
     color: 'teal',
     category: 'Blocks',
     block: true,
-    description: 'Reads the page at a link and sums it up: a step for other templates, or on its own.',
+    description: 'Reads the page at a link and sums it up: a step for other apps, or on its own.',
     fields: [
       { id: 'url', label: 'Link', type: 'text', required: true, placeholder: 'https://…' },
       { id: 'length', label: 'How long', type: 'choice', options: ['A line', 'A paragraph', 'Key points'], default: 'A paragraph' },

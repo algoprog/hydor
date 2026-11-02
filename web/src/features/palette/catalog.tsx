@@ -27,7 +27,7 @@ import { openAsk } from '../guide/ask';
 import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
 
-export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Spaces' | 'Templates' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Themes' | 'Files';
+export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Spaces' | 'Apps' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Themes' | 'Files';
 
 export interface Entry extends Findable {
   id: string;
@@ -156,9 +156,9 @@ export async function liveEntries(): Promise<Entry[]> {
       run: () => go(`/spaces/${encodeURIComponent(s.id)}`),
     });
   for (const a of apps?.apps ?? [])
-    out.push({ id: `app:${a.id}`, group: 'Templates', icon: <LayoutGrid size={15} />, title: a.name, keywords: 'template', text: a.description, where: 'Templates', body: a.description, opens: 'Opens the template', run: () => go(appPath(a.id)) });
+    out.push({ id: `app:${a.id}`, group: 'Apps', icon: <LayoutGrid size={15} />, title: a.name, keywords: 'template', text: a.description, where: 'Apps', body: a.description, opens: 'Opens the app', run: () => go(appPath(a.id)) });
   for (const t of apps?.templates ?? [])
-    out.push({ id: `app:tpl:${t.id}`, group: 'Templates', icon: <LayoutGrid size={15} />, title: t.name, keywords: 'template', text: t.description, where: 'Templates › Ready-made', body: t.description, opens: 'Opens the template', run: () => go(appPath(`tpl:${t.id}`)) });
+    out.push({ id: `app:tpl:${t.id}`, group: 'Apps', icon: <LayoutGrid size={15} />, title: t.name, keywords: 'template', text: t.description, where: 'Apps › Ready-made', body: t.description, opens: 'Opens the app', run: () => go(appPath(`tpl:${t.id}`)) });
   for (const t of tasks?.tasks ?? [])
     out.push({
       id: `task:${t.id}`,

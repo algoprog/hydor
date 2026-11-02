@@ -773,7 +773,7 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
       return (
         <>
           <label className="block">
-            <Label>The template</Label>
+            <Label>The app</Label>
             <select className={small} value={s.app} onChange={(e) => set({ ...s, app: e.target.value, with: undefined })}>
               <option value="">Pick one</option>
               {ctx.apps.map((a) => (
@@ -833,7 +833,7 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
               </select>
             </label>
           </div>
-          {!lists.length && <div className="text-[12.5px] text-warn">The template keeps no lists yet: add one under What it keeps.</div>}
+          {!lists.length && <div className="text-[12.5px] text-warn">The app keeps no lists yet: add one under What it keeps.</div>}
           {s.op === 'add' && (
             <div>
               <Label>The record</Label>
@@ -1009,7 +1009,7 @@ function summaryOf(s: Step, ctx: Ctx): ReactNode {
     case 'parallel':
       return `${s.branches.length} branches`;
     case 'app':
-      return s.app ? <span translate="no">{ctx.apps.find((a) => a.slug === s.app)?.name ?? s.app}</span> : 'No template picked';
+      return s.app ? <span translate="no">{ctx.apps.find((a) => a.slug === s.app)?.name ?? s.app}</span> : 'No app picked';
     case 'data':
       return (
         <>

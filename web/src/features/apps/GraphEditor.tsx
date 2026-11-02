@@ -1098,7 +1098,7 @@ function TryPanel({ recipe, t, pause, frozen, titleOf: name, onClose }: { recipe
         </IconButton>
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-        <p className="text-[12.5px] text-fg-3">A test run of the template as it is on screen: each step lights up as it goes.</p>
+        <p className="text-[12.5px] text-fg-3">A test run of the app as it is on screen: each step lights up as it goes.</p>
         <AppForm fields={recipe.fields} values={values} files={files} onChange={(k, v) => setValues((x) => ({ ...x, [k]: v }))} onFile={(k, f) => setFiles((x) => (f ? { ...x, [k]: f } : Object.fromEntries(Object.entries(x).filter(([j]) => j !== k))))} disabled={t.active} />
         {(pause.length > 0 || frozen.length > 0) && (
           <ul className="space-y-0.5 text-[12.5px] text-fg-2">
@@ -1160,7 +1160,7 @@ function CollapseButton({ ctx, picked, onFlows, done }: { ctx: Ctx; picked: stri
     const title = name.trim() || 'A block';
     // Steps that keep data stay with the data they keep: a block keeps its own.
     const steps = allSteps([...(r.flow?.steps ?? []), ...Object.values(r.flows ?? {}).flatMap((f) => f.steps)]).filter((x) => picked.includes(x.id));
-    if (allSteps(steps).some((x) => x.do === 'data')) return toast('Steps that keep data stay in the template: a block would keep data of its own', 'error');
+    if (allSteps(steps).some((x) => x.do === 'data')) return toast('Steps that keep data stay in the app: a block would keep data of its own', 'error');
     const c = collapseSteps(r, picked, { title, app: '' });
     if ('error' in c) return toast(c.error, 'error');
     setBusy(true);
@@ -1189,7 +1189,7 @@ function CollapseButton({ ctx, picked, onFlows, done }: { ctx: Ctx; picked: stri
       onFlows(c.flows);
       setOpen(false);
       done(c.call.id);
-      toast(c.asText.length ? tr(`“${title}” is a template of its own now, called in their place (lists and tables reach it as text: ${c.asText.join(', ')}). Save this one to keep the change.`) : tr(`“${title}” is a template of its own now, called in their place. Save this one to keep the change.`));
+      toast(c.asText.length ? tr(`“${title}” is an app of its own now, called in their place (lists and tables reach it as text: ${c.asText.join(', ')}). Save this one to keep the change.`) : tr(`“${title}” is an app of its own now, called in their place. Save this one to keep the change.`));
     } catch (e) {
       toastError(e);
     } finally {
@@ -1209,7 +1209,7 @@ function CollapseButton({ ctx, picked, onFlows, done }: { ctx: Ctx; picked: stri
             void collapse();
           }}
         >
-          <p className="text-[12.5px] text-fg-2">These steps become a template of their own, which a Call an app step runs in their place. Other templates can call it too.</p>
+          <p className="text-[12.5px] text-fg-2">These steps become an app of their own, which a Call an app step runs in their place. Other apps can call it too.</p>
           <input autoFocus className={cx(inputCls, 'h-8.5 text-[13.5px]')} placeholder="Its name" value={name} onChange={(e) => setName(e.target.value)} />
           <div className="flex justify-end">
             <Button size="sm" variant="primary" type="submit" disabled={busy} icon={busy ? <Throbber /> : undefined}>

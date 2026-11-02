@@ -37,8 +37,8 @@ const appLabels = () => ({
   yes: tr('Yes'),
   no: tr('No'),
   now: tr('just now'),
-  noFlow: tr('This template has no flow'),
-  noData: tr('This template keeps no collection'),
+  noFlow: tr('This app has no flow'),
+  noData: tr('This app keeps no collection'),
   message: tr('Write a message…'),
   send: tr('Send'),
   newChat: tr('New conversation'),
@@ -58,7 +58,7 @@ interface ChatDetail {
 
 /** A conversation as a screen sees it: its messages in order, and whether its agent is at work on a reply. */
 function chatOf(appId: string, d: ChatDetail) {
-  if (d.run.app !== appId || d.run.source !== 'chat') throw new Error('That is not a conversation of this template');
+  if (d.run.app !== appId || d.run.source !== 'chat') throw new Error('That is not a conversation of this app');
   const msgs: { from: 'you' | 'agent'; text: string; queued?: boolean }[] = [{ from: 'you', text: String(d.run.inputs.message ?? '') }];
   if (d.first) msgs.push({ from: 'agent', text: d.first });
   for (const x of d.asks ?? []) {
@@ -84,7 +84,7 @@ function appCall(appId: string, op: string, a: Record<string, unknown>): Promise
       return post<{ run: AppRun }>(`/api/apps/${id}/runs`, { flow: typeof a.flow === 'string' ? a.flow : 'run', inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, source: 'screen' }).then((r) => r.run);
     case 'get':
       return api<{ run: AppRun; steps?: unknown[]; progress?: unknown }>(`/api/apps/runs/${enc(String(a.id ?? ''))}`).then((d) => {
-        if (d.run.app !== appId) throw new Error('That is not a run of this template');
+        if (d.run.app !== appId) throw new Error('That is not a run of this app');
         return { run: d.run, steps: d.steps ?? [], progress: d.progress };
       });
     case 'runs':

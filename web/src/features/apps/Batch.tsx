@@ -301,7 +301,7 @@ export function BatchTab({ app }: { app: AppDef }) {
               ) : (
                 <>
                   <span className="text-fg-2">{body.length} runs</span>
-                  <div className="text-[12px] text-fg-3">{est?.most ? `At most ${money(est.most)} with the cap of ${money(est.cap)} a run. ` : ''}Run the template once to see what a run costs.</div>
+                  <div className="text-[12px] text-fg-3">{est?.most ? `At most ${money(est.most)} with the cap of ${money(est.cap)} a run. ` : ''}Run the app once to see what a run costs.</div>
                 </>
               )}
             </div>

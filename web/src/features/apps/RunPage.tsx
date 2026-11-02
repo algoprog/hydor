@@ -149,7 +149,7 @@ export function RunPage({ id }: { id: string }) {
       <PageHeader
         title={
           <span className="flex min-w-0 items-center gap-2.5">
-            <IconButton label="Back to the template" size="sm" onClick={() => go(back)} className="-ml-1">
+            <IconButton label="Back to the app" size="sm" onClick={() => go(back)} className="-ml-1">
               <ArrowLeft size={17} />
             </IconButton>
             {d && <AppIcon icon={d.recipe.icon} color={d.recipe.color} size={26} />}
@@ -182,7 +182,7 @@ export function RunPage({ id }: { id: string }) {
                 <IconButton
                   label="Remove from the list"
                   onClick={async () => {
-                    if (!(await ask({ title: 'Remove this run?', body: 'It leaves the template’s list of runs. The session stays.', confirm: 'Remove', danger: true }))) return;
+                    if (!(await ask({ title: 'Remove this run?', body: 'It leaves the app’s list of runs. The session stays.', confirm: 'Remove', danger: true }))) return;
                     del(`/api/apps/runs/${enc(id)}`).then(() => go(back), toastError);
                   }}
                 >

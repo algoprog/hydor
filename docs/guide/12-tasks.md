@@ -16,7 +16,7 @@ A task can start:
 - **Watch**: when a watcher sees a change in a feed, a web page, a value in JSON, a folder or a command's output. A watcher looks without a model, so its checks cost no tokens; the agent wakes only when something changed.
 - **Webhook**: when another service (GitHub, Gitea, a form, a script of yours) calls the task's own address.
 
-A task can also run one of your templates in place of a prompt: each time its trigger fires, the template runs with the answers you set, and the task's history links to that run (see [Run a template by itself](/guide/templates#run-a-template-by-itself)).
+A task can also run one of your apps in place of a prompt: each time its trigger fires, the app runs with the answers you set, and the task's history links to that run (see [Run an app by itself](/guide/apps#run-an-app-by-itself)).
 
 Times are in your time zone, which the app takes from your browser. A run that could not start at its time, because the computer was off or the app was not running, runs at the next chance.
 
@@ -26,7 +26,7 @@ Your tasks are in [Settings → Scheduled tasks](/settings?s=tasks) (**Settings 
 - **Start from an example**: a short form for a common task.
 - Asking an agent in any conversation ("remind me Friday at 9"): it shows a card you confirm.
 - **Make this an automation** in a session's menu: it drafts a task from a session that worked.
-- **Add a schedule** on a template's **Runs**: a task that runs that template.
+- **Add a schedule** on an app's **Runs**: a task that runs that app.
 
 Continuing a session by itself once a plan's usage limit resets is a separate switch: [Settings → General → Resume after usage limits](/settings?s=general&find=Resume%20after%20usage%20limits) (see [Usage, limits and costs](/guide/usage)).
 
@@ -206,7 +206,7 @@ A run tells you how it went with its session's usual notification, titled with t
 - A task that pauses itself sends a notice saying why.
 - A run that posts into one of your conversations leaves that conversation's notices as they are.
 
-An agent can also send you a notification while it works (its notify_user tool), for something that cannot wait for the run's end; so can any agent, and a template's step.
+An agent can also send you a notification while it works (its notify_user tool), for something that cannot wait for the run's end; so can any agent, and an app's step.
 
 ## Pause, turn on, edit, duplicate or delete a task
 
@@ -271,4 +271,4 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "Which of my scheduled tasks failed this week, and why?"
 - "Pause my Morning brief", or "Run the weekly report now."
 - "Make this conversation a task that runs every Monday at 9."
-- "Run my Reading list template whenever this feed has a new post, with the post's link."
+- "Run my Reading list app whenever this feed has a new post, with the post's link."

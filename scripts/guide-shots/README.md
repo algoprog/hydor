@@ -38,7 +38,7 @@ the real app's).
 - `demo.mjs` is the made-up world: folders and a git repository with history, a remote beside the home that lacks
   its last commit, and one change not committed, sessions written as Claude Code transcripts (steps, a web
   search, files handed over), and what the app's own API keeps (spaces, guidelines, memory notes, scheduled tasks
-  at times well away from now, pages, templates, learned skills). What only a running agent or a real account has
+  at times well away from now, pages, apps, learned skills). What only a running agent or a real account has
   is answered to the page instead (`overrides`): two sessions waiting on a card, Claude Code's model list, the
   plans' usage, the inbox and Settings → Models.
 - `shots.mjs` lists the shots: the page, what to open on it (a menu, a folded group of steps) and the part to
