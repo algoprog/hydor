@@ -268,7 +268,9 @@ html {
   display: inline-block;
   width: 1em;
   height: 1em;
-  vertical-align: -0.14em;
+  /* Centre on the surrounding text inline, and in rows that do not set align-items. */
+  vertical-align: middle;
+  align-self: center;
   flex-shrink: 0;
   overflow: visible;
 }
