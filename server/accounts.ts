@@ -9,6 +9,7 @@ import type { Agent, AgentAccount } from '../shared/types.ts';
 import { HttpError } from './auth.ts';
 import { agentRoots, config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
+import { claudeTranscriptPath, findClaudeTranscript } from './timeline.ts';
 
 interface Stored {
   id: string;
@@ -81,6 +82,14 @@ export function accountOfPath(db: DB, file: string | null | undefined): string |
 export function claudeProjectsOf(db: DB, id: string | null | undefined): string {
   const a = accountById(db, id);
   return a?.agent === 'claude' ? path.join(a.dir, 'projects') : config.claudeProjectsDir;
+}
+
+/**
+ * A Claude session's transcript: where it is, or, before the CLI has written it (a session just started),
+ * where it will be, in the folder of the account the session runs as.
+ */
+export function claudeTranscriptOf(db: DB, sessionId: string, cwd: string | undefined, account: string | null | undefined): string | null {
+  return findClaudeTranscript(sessionId) ?? (cwd ? claudeTranscriptPath(cwd, sessionId, claudeProjectsOf(db, account)) : null);
 }
 
 /** A Codex account's CODEX_HOME. */
