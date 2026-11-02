@@ -3,6 +3,39 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.11.0 · 2 November 2026
+
+Slides, documents, spreadsheets and LaTeX in Pages, each with its own editor and an agent to ask; assistants you
+switch mid-session; and a search box you can tell where to look.
+
+- **Slides**: decks you edit as in PowerPoint or Google Slides, with 15 layouts, text, shapes, pictures, lines,
+  tables and charts, animations and transitions, themes and speaker notes, and present full screen or with a
+  presenter's view (your notes, the next slide, a timer and a window for the audience). They save as PowerPoint
+  files you can still edit, as PDFs, or as a web page that presents itself.
+- **Documents**: written and edited as in Word or Google Docs, on a page the size of their paper, with headings,
+  fonts, colours, lists and checklists, tables, pictures and page breaks; what you paste from Word or Google Docs
+  keeps its formatting. Open a Word, Markdown or text file as one, and save it as Word, PDF or Markdown.
+- **Spreadsheets**: as in Excel or Google Sheets, with about two hundred of Excel's functions, number formats,
+  frozen rows, sorting, several sheets, and copy and paste with Excel. Open an Excel, ODS or CSV file as one, and
+  save it as Excel, CSV or PDF.
+- **LaTeX documents**: the source beside its typeset pages, as in Overleaf, typeset again as you type, with each
+  error at its line. Open a .tex file or a project's .zip, and save the PDF, the .tex or the whole project. TeX
+  runs on the computer the app runs on, shut in a folder of its own.
+- **Ask about what you have open**: Ask, on a page, slides, a document, a spreadsheet or a LaTeX document, has an
+  agent change it while you watch: this slide or every slide, a section, the words, cells or lines you picked, or
+  all of it. Each change is a version you can go back from.
+- **Pages as PDF and Word**: a page an agent made saves as a PDF or a Word document too.
+- **Switch the assistant mid-session**: the message box shows the assistant a session works as (General,
+  Researcher, Planner…); pick another, and it takes over from your next message, with its own instructions,
+  connected apps and permissions.
+- **Search in**: beside the search box, choose where it looks: everywhere, or only the places you tick (sessions,
+  messages, spaces, pages, files, settings and more), the same on every device. Spaces are found too.
+- **Starting a session flows into it**: what you wrote on the start page becomes your first message right where
+  you wrote it, and the message box glides to its place, with no spinner in between.
+- **Memory settings on a phone**: each switch says what it does, you can add notes of your own, each note keeps its
+  actions in one menu, and notes no agent has needed for months come up to review.
+- **The sidebar on phones** slides in smoothly, even while agents work.
+
 ## 0.10.1 · 2 November 2026
 
 Pages that look like part of the app: in its theme, and light or dark as the app is.
