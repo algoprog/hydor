@@ -10,7 +10,7 @@ import { toastError } from '../../lib/store';
 import { Button, cx, Empty, IconButton, Throbber, useConfirm } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { useSessionShow } from '../session/show';
-import { appPath, SOURCE_LABEL, useRunDetail, type RunDetail } from './api';
+import { appPath, runPath, SOURCE_LABEL, useRunDetail, type RunDetail } from './api';
 import { AppIcon } from './AppIcon';
 import { RunsWith } from './AppPage';
 import { AskBox, FollowUps } from './FollowUps';
@@ -55,7 +55,20 @@ export function RunView({ d, statusExtra }: { d: RunDetail; statusExtra?: ReactN
         reply={d.asks.length ? (d.first ?? '') : undefined}
         followUp={d.asks.at(-1) && { updated: d.asks.at(-1)!.updated && d.recipe.answer.length > 0 }}
       />
-      {d.steps && <RunSteps steps={d.steps} />}
+      {d.steps && (
+        <RunSteps
+          steps={d.steps}
+          onAgain={
+            !isActive(r.status) && r.source !== 'public' && r.source !== 'step' && r.source !== 'app'
+              ? (step) =>
+                  post<{ run: { id: string } }>(`/api/apps/runs/${enc(r.id)}/again`, { from: step }).then(
+                    (x) => go(runPath(x.run.id)),
+                    toastError,
+                  )
+              : undefined
+          }
+        />
+      )}
       <Asked d={d} />
       <FollowUps d={d} />
       {!isActive(r.status) && (d.slug || r.app.startsWith('tpl:')) && (

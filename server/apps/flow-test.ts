@@ -31,7 +31,7 @@ import { createPage, initPages, listPages, pageInfo, pageSource } from '../pages
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as vec from '../memory/vectors.ts';
 import { envDir, envOf, envTesting } from './env.ts';
-import { flowRunner } from './flow.ts';
+import { flowRunner, stepsOf as flowSteps } from './flow.ts';
 import { apps } from './index.ts';
 import { packageOf, zipPackage } from './package.ts';
 import { MEMORY_MARK, runFolder, saveResult, startRun, startRuns, stopRun, waitFor, WORK_DIR } from './runs.ts';
@@ -484,6 +484,44 @@ test('scheduled tasks run a template: its answers set or filled from a webhook c
   assert.equal(fail.task.status, 'failed');
   assert.ok(fail.task.summary);
   for (const x of [t, h, b]) scheduler.remove(x.id);
+});
+
+test('run again from a step: the steps before it give what they gave, the rest run as the template is now (or as the builder sends it)', async () => {
+  const flow = (prefix: string) => ({
+    steps: [
+      { id: 'search', do: 'tool', tool: 'web_search', with: { query: '{{topic}}' } },
+      { id: 'keep', do: 'data', op: 'add', collection: 'items', with: { title: `${prefix}{{search.data.results[0].title}}` } },
+    ],
+    outputs: { note: '{{keep.record.title}}' },
+  });
+  const a = app({ name: 'Again', data: { items: { title: 'text' } }, answer: [{ id: 'note', label: 'Note', type: 'text', required: true }], flow: flow('') });
+  const calls = () => toolCalls.filter((c) => c.tool === 'web_search').length;
+  const first = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'tides' } }).id);
+  assert.equal(first.status, 'done', first.error);
+  assert.equal(first.result!.note, 'About tides');
+  const searched = calls();
+  const again = async (body: Record<string, unknown>) => {
+    const res = await http.inject({ method: 'POST', url: `/api/apps/runs/${first.id}/again`, payload: body });
+    assert.equal(res.statusCode, 200, res.body);
+    return ended(res.json().run.id);
+  };
+  const second = await again({ from: 'keep' });
+  assert.equal(second.status, 'done', second.error);
+  assert.equal(second.result!.note, 'About tides');
+  assert.equal(calls(), searched, 'the search was not run again');
+  const views = Object.fromEntries(flowSteps(second.id).map((s) => [s.id, s]));
+  assert.equal(views.search.reused, true);
+  assert.equal(views.keep.reused, undefined);
+  // From the builder: the recipe on screen, tried with the first step as it was.
+  const tried = await again({ from: 'keep', recipe: { ...a, flow: flow('Edited: ') } });
+  assert.equal(tried.source, 'test');
+  assert.equal(tried.result!.note, 'Edited: About tides');
+  assert.equal(calls(), searched);
+  // From the start: everything runs again.
+  await again({});
+  assert.equal(calls(), searched + 1);
+  const missing = await http.inject({ method: 'POST', url: `/api/apps/runs/${first.id}/again`, payload: { from: 'nope' } });
+  assert.equal(missing.statusCode, 400);
 });
 
 test('notify_user: a step tells you something now, and its notice opens the run', async () => {

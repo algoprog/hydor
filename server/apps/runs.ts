@@ -24,7 +24,7 @@ import { AGENT_FILE } from '../models/config.ts';
 import { costOf, rateFor } from '../prices.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { ensureEnv } from './env.ts';
-import { getRun, insertRun, listRuns, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
+import { getRun, insertRun, listRuns, reuseSteps, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
 
 /** Where an app's runs keep their files when the app names no folder: outside the app's data, which Custom treats as private. */
 export const WORK_DIR = process.env.NAGET_APPS_DIR || path.join(config.home, 'naget-apps');
@@ -166,6 +166,8 @@ export interface StartInput {
   step?: string;
   /** Another of its flows than the main one, by name (a screen's form or button). */
   flow?: string;
+  /** Run again from a step: these steps (by id) give what they gave in that run, without running again. */
+  reuse?: { run: string; steps: string[] };
 }
 
 /** The questions a run answers: the template's form, or the inputs of the flow it runs. */
@@ -192,6 +194,8 @@ export function startRun(o: StartInput): RunRecord {
     if (f.data.length * 0.75 > maxFile) throw new HttpError(413, `${f.name} is too big (at most ${maxFile >> 20} MB)`);
   }
   const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow });
+  // Its first steps replay that run's (before it starts, so its flow finds them).
+  if (o.reuse?.steps.length) reuseSteps(d().db, o.reuse.run, r.id, o.reuse.steps);
   if (!o.queued) go(r, o);
   changed(r);
   return r;

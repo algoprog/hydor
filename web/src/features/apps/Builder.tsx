@@ -283,7 +283,20 @@ function TestRun({ recipe, appId, open, onClose }: { recipe: AppRecipe; appId: s
     >
       {run ? (
         <div className="space-y-3">
-          {run.steps && <RunSteps steps={run.steps} />}
+          {run.steps && (
+            <RunSteps
+              steps={run.steps}
+              onAgain={
+                isActive(run.run.status)
+                  ? undefined
+                  : (step) =>
+                      post<{ run: AppRun }>(`/api/apps/runs/${enc(run.run.id)}/again`, { from: step, recipe }).then(
+                        (x) => setRun({ run: x.run }),
+                        toastError,
+                      )
+              }
+            />
+          )}
           <RunBody run={run.run} progress={run.progress} answer={recipe.answer} name={recipe.name} />
         </div>
       ) : (
