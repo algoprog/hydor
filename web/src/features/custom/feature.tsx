@@ -33,7 +33,7 @@ function CustomSettings() {
         <p className="text-[12.5px] leading-relaxed text-fg-3">
           Routine steps go ahead without asking: reading and editing in the session’s folder, and running the project’s tests, builds and linters. A quick check decides about the rest. Steps
           that delete or overwrite files outside the folder, use sudo, run a script straight from the internet, force-push, change permissions of a whole folder, send or post through a
-          connected app, or spend money always ask you first. The check sees only your own messages, the folder and the step, never what the agent read, so a web page or a file cannot talk
+          connected account, or spend money always ask you first. The check sees only your own messages, the folder and the step, never what the agent read, so a web page or a file cannot talk
           it into anything. The helper model in Settings → Models does it.
         </p>
       </Section>

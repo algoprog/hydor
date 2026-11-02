@@ -59,10 +59,10 @@ function instructions(apps: Conn[]): string {
   const lines: string[] = [];
   if (apps.length)
     lines.push(
-      `Connected apps (the user's own accounts, set up in Settings → Connections), each an MCP server of that name: ${apps.map((c) => `${c.id} (${c.entry.name})`).join(', ')}. Use them when a task involves those apps.`,
+      `Connected accounts (the user's own, in other services, set up in Settings → Connections), each an MCP server of that name: ${apps.map((c) => `${c.id} (${c.entry.name})`).join(', ')}. Use them when a task involves those services.`,
     );
   lines.push(
-    'Keys and sign-ins: never ask the user to type a password, token, API key or other secret into the chat, and never print one you come across. When a task needs one, use what is set up already (list_connections shows the vault and the connected apps; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).',
+    'Keys and sign-ins: never ask the user to type a password, token, API key or other secret into the chat, and never print one you come across. When a task needs one, use what is set up already (list_connections shows the vault and the connected accounts; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).',
   );
   return lines.join('\n');
 }
@@ -79,13 +79,13 @@ function originOf(d: Deps, h: Record<string, unknown>): string {
 
 const entryOr404 = (id: string): CatalogApp => {
   const a = catalogApp(id) ?? null;
-  if (!a) throw new HttpError(404, 'There is no such app in the catalog');
+  if (!a) throw new HttpError(404, 'There is no such service in the catalog');
   return a;
 };
 
 const connOr404 = (d: Deps, id: string): Conn => {
   const c = connection(d.db, id);
-  if (!c) throw new HttpError(404, 'That app is not connected');
+  if (!c) throw new HttpError(404, 'That service is not connected');
   return c;
 };
 

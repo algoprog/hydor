@@ -158,12 +158,12 @@ If the address leaked, or a service should stop calling it: the task's menu (⋯
 
 Below the list, [**Start from an example**](/settings?s=tasks&find=Start%20from%20an%20example) ("A short form each; change anything later.") holds ready-made tasks. Select one to open its short form, fill it in, pick who runs it under **Run by**, and select **Create task**. **More options…** opens the full task form with everything filled in instead. Fields marked (optional) can stay empty; the others are needed.
 
-- [**Morning brief**](/settings?s=tasks&find=Morning%20brief): the weather, news on what you follow, and your day, each morning. You give the time (07:30 to start with), the days, the city for the weather and the topics for the news; it adds today's events and urgent mail when a calendar or mail app is connected.
+- [**Morning brief**](/settings?s=tasks&find=Morning%20brief): the weather, news on what you follow, and your day, each morning. You give the time (07:30 to start with), the days, the city for the weather and the topics for the news; it adds today's events and urgent mail when a calendar or mail account is connected.
 - [**News on a topic**](/settings?s=tasks&find=News%20on%20a%20topic): what is genuinely new about a subject, with sources, at the time and on the days you pick (every day at 09:00 to start with); quiet when nothing is.
 - [**Price watch**](/settings?s=tasks&find=Price%20watch): watches a product page every 60 minutes (only near a text such as "Price", if you give one) and tells you when the price changes, or when it is at or below the target you give.
 - [**Page change alert**](/settings?s=tasks&find=Page%20change%20alert): watches a page, or the part near a text, every 30 minutes, and says what changed and whether it matters; trivial changes stay quiet.
 - [**Weekly report from a folder**](/settings?s=tasks&find=Weekly%20report%20from%20a%20folder): on a day of the week (Friday at 16:00 to start with), what changed in a folder or repository in the last seven days and what looks unfinished, with three suggestions for next week. It changes no files.
-- [**Inbox digest**](/settings?s=tasks&find=Inbox%20digest): what came into your mail since the last run, the messages that need you first. It only reads, and it needs a connected mail app (see [Connections, keys and tools](/guide/connections)).
+- [**Inbox digest**](/settings?s=tasks&find=Inbox%20digest): what came into your mail since the last run, the messages that need you first. It only reads, and it needs a connected mail account (see [Connections, keys and tools](/guide/connections)).
 - [**Habit check-in**](/settings?s=tasks&find=Habit%20check-in): a friendly question about a habit at the time you pick (every day at 20:00 to start with), keeping your streak in the task's notes.
 - [**New releases**](/settings?s=tasks&find=New%20releases): watches a GitHub repository's releases (owner/name) every 6 hours and sums up what is new and what could break.
 - [**Site up check**](/settings?s=tasks&find=Site%20up%20check): checks an address every 10 minutes. When the site goes down, the agent finds out why (DNS, certificate, HTTP status, time-out); when it comes back, it says so in a line.
@@ -234,7 +234,7 @@ Then choose:
 
 The agent hears your answer as a message, including any parts you changed, so you need not tell it. The card stays in the conversation with the outcome ("Scheduled", "Next run …", a link to **Scheduled tasks**), and shows the same on your other devices.
 
-Unless you ask for something else, the task runs with the conversation's agent, model, permissions and folder, and each run's session starts with the conversation's settings: its assistant, memory, spending cap, connected apps and space. Ask for the runs to post here, and each one posts into this conversation instead of starting a new session.
+Unless you ask for something else, the task runs with the conversation's agent, model, permissions and folder, and each run's session starts with the conversation's settings: its assistant, memory, spending cap, connected accounts and space. Ask for the runs to post here, and each one posts into this conversation instead of starting a new session.
 
 Agents can also change, pause, turn back on or delete your tasks, always with a card first: **Change this task?** (the parts that change, the old value struck through above the new), **Pause this task?**, **Turn this task back on?** or **Delete this task?**, each with its own yes and no (**Change it** or **Keep it as is**, **Pause it** or **Keep it running**, **Turn it on** or **Keep it paused**, **Delete it** or **Keep it**). They can also list your tasks with when each runs next and how the last run went.
 

@@ -54,7 +54,7 @@ export const TEMPLATES: Template[] = [
         'Write my morning brief for today. Look things up on the web.',
         v.city ? `- The weather in ${v.city} today, in a line or two.` : '',
         v.topics ? `- What is new on ${v.topics} since yesterday: the few things worth knowing, each in a line with its source.` : '- The main news since yesterday, each in a line with its source.',
-        '- If a calendar or mail app is connected, today’s events and anything urgent in my inbox.',
+        '- If a calendar or mail account is connected, today’s events and anything urgent in my inbox.',
         'Keep it short and easy to skim. Use your task notes to avoid repeating what you reported before.',
       ]
         .filter(Boolean)
@@ -121,13 +121,13 @@ export const TEMPLATES: Template[] = [
     icon: Inbox,
     title: 'Inbox digest',
     blurb: 'What came in, the messages that need you first. Reads only.',
-    needs: 'a connected mail app',
+    needs: 'a connected mail account',
     fields: [time('08:00'), days()],
     build: (v) => ({
       name: 'Inbox digest',
       schedule: daily(v.time, v.days),
       prompt:
-        'Using the connected mail app, go through the messages that arrived since your last run (your task notes say when that was). Write a digest: first the ones that need a reply or an action from me, each with who, what and by when; then the rest, one line each. Do not send, move or delete anything. Keep the time of the newest message you covered in your task notes.',
+        'Using the connected mail account, go through the messages that arrived since your last run (your task notes say when that was). Write a digest: first the ones that need a reply or an action from me, each with who, what and by when; then the rest, one line each. Do not send, move or delete anything. Keep the time of the newest message you covered in your task notes.',
     }),
   },
   {

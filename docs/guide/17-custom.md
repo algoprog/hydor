@@ -103,7 +103,7 @@ Each step that would ask goes through these checks in order:
 
 1. **Fixed rules** that need no model:
    - Go ahead: edits inside the session's folder; new scratch files in the temporary folder; commands that only read inside the folder; the project's own tests, builds, linters and type checks.
-   - Ask you: overwriting a file outside the folder; anything on the [always-ask list](#commands-that-always-ask); force-pushing with git; writing, moving or deleting files outside the folder; commands that call a payment service; tools of a connected app or MCP server that send or post something, or spend money.
+   - Ask you: overwriting a file outside the folder; anything on the [always-ask list](#commands-that-always-ask); force-pushing with git; writing, moving or deleting files outside the folder; commands that call a payment service; tools of a connected account or MCP server that send or post something, or spend money.
 2. **A quick check** for everything else, by the [helper model](/guide/agents-models#choose-the-helper-model). It answers one of three ways:
    - **allow**: it plainly serves what you asked, stays in your folder (or only reads), and is easy to undo;
    - **ask**: it could do lasting harm or reaches further (deleting data, installing software for the whole system, changing settings, using passwords or keys, sending or publishing anything, spending money, or something you didn't ask for);

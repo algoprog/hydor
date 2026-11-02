@@ -212,7 +212,7 @@ export function setTested(db: DB, id: string, tools: { name: string; description
 
 export function patchConnection(db: DB, id: string, p: { enabled?: boolean; tools?: Record<string, boolean> }) {
   const c = connection(db, id);
-  if (!c) throw new HttpError(404, 'That app is not connected');
+  if (!c) throw new HttpError(404, 'That service is not connected');
   if (p.enabled !== undefined) db.prepare('update conn_apps set enabled = ? where id = ?').run(p.enabled ? 1 : 0, id);
   if (p.tools) {
     const prefs = { ...c.prefs };
@@ -250,14 +250,14 @@ export const sessionList = (db: DB, extra: SessionExtra): SessionConnection[] =>
 
 /** A remote app's address, its fields filled in. */
 export function remoteUrl(c: Conn): string {
-  if (c.entry.server.transport === 'stdio') throw new Error('Not a remote app');
+  if (c.entry.server.transport === 'stdio') throw new Error('Not a remote service');
   return fill(c.entry.server.url, c.fields);
 }
 
 /** A local app's command, arguments and environment (its secret fields from the vault). */
 export function localCommand(db: DB, c: Conn): { command: string; args: string[]; env: Record<string, string>; secrets: string[] } {
   const s = c.entry.server;
-  if (s.transport !== 'stdio') throw new Error('Not a local app');
+  if (s.transport !== 'stdio') throw new Error('Not a local service');
   const secrets = readCred(db, c.id).secrets ?? {};
   const values: Record<string, string> = {};
   for (const f of c.entry.fields ?? []) values[f.name] = (f.secret ? secrets[f.name] : c.fields[f.name]) ?? f.default ?? '';

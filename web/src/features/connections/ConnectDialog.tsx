@@ -259,7 +259,7 @@ export function ConnectDialog({ app, open, onClose, onConnected }: { app: Catalo
         {oauth && (
           <div className="rounded-xl border border-line">
             <button type="button" onClick={() => setOwn((o) => !o)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] text-fg-2">
-              <span className="flex-1">{a.auth.type === 'oauth' && a.auth.help ? 'Your own client ID (this app needs one)' : 'Use your own client ID (optional)'}</span>
+              <span className="flex-1">{a.auth.type === 'oauth' && a.auth.help ? 'Your own client ID (this service needs one)' : 'Use your own client ID (optional)'}</span>
               <ChevronDown size={15} className={cx('text-fg-3 transition-transform', own && 'rotate-180')} />
             </button>
             {own && (
