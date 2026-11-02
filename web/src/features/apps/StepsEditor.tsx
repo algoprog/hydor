@@ -9,8 +9,9 @@ import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
 import type { DataOp, Flow, Step, StepKind } from '@shared/app-manifest';
 import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf } from '@shared/app-manifest';
 import { api } from '../../lib/api';
-import { FlowGraph } from './FlowGraph';
-import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch } from '../../components/ui';
+import { GraphEditor } from './GraphEditor';
+import { childList, editList, listsOf, move, type ListPath } from './paths';
+import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch, useMediaQuery } from '../../components/ui';
 
 const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml };
 const KIND = Object.fromEntries(STEP_KINDS.map((k) => [k.value, k])) as Record<StepKind, (typeof STEP_KINDS)[number]>;
@@ -31,56 +32,6 @@ interface ToolInfo {
   description: string;
   step?: boolean;
   inputs?: { name: string; type?: string; required?: boolean; description?: string }[];
-}
-
-// ---- where steps are ----------------------------------------------------------------------------------------
-
-/** Where a list of steps is: [] the flow's own; [i, key, …] a list inside the step at i (then, else, steps, failed, b0, b1… for branches). */
-type ListPath = (number | string)[];
-
-function childList(s: Step, key: string): Step[] {
-  if (key === 'failed') return Array.isArray(s.failed) ? s.failed : [];
-  if (s.do === 'decide') return key === 'then' ? s.then : key === 'else' ? (s.else ?? []) : [];
-  if (s.do === 'repeat') return key === 'steps' ? s.steps : [];
-  if (s.do === 'parallel' && key.startsWith('b')) return s.branches[Number(key.slice(1))] ?? [];
-  return [];
-}
-
-function withChild(s: Step, key: string, list: Step[]): Step {
-  if (key === 'failed') return { ...s, failed: list };
-  if (s.do === 'decide') return key === 'then' ? { ...s, then: list } : { ...s, else: list };
-  if (s.do === 'repeat') return { ...s, steps: list };
-  if (s.do === 'parallel') return { ...s, branches: s.branches.map((b, n) => (`b${n}` === key ? list : b)) };
-  return s;
-}
-
-function editList(steps: Step[], path: ListPath, f: (list: Step[]) => Step[]): Step[] {
-  if (!path.length) return f(steps);
-  const [i, key, ...rest] = path as [number, string, ...ListPath];
-  return steps.map((s, j) => (j === i ? withChild(s, key, editList(childList(s, key), rest, f)) : s));
-}
-
-/** The lists inside a step, each with what to call it. */
-function listsOf(s: Step): { key: string; label: string }[] {
-  const out: { key: string; label: string }[] = [];
-  if (s.do === 'decide') out.push({ key: 'then', label: 'Then' }, { key: 'else', label: 'Otherwise' });
-  if (s.do === 'repeat') out.push({ key: 'steps', label: s.over !== undefined ? 'For each item' : 'Each round' });
-  if (s.do === 'parallel') s.branches.forEach((_, n) => out.push({ key: `b${n}`, label: `Branch ${n + 1}` }));
-  if (Array.isArray(s.failed)) out.push({ key: 'failed', label: 'If it fails, instead' });
-  return out;
-}
-
-/** Where a step is in the flow, as the list's open card names it (null: not there). */
-function keyOf(steps: Step[], id: string, list: ListPath = []): string | null {
-  for (let i = 0; i < steps.length; i++) {
-    const s = steps[i];
-    if (s.id === id) return JSON.stringify([...list, i]);
-    for (const { key } of listsOf(s)) {
-      const k = keyOf(childList(s, key), id, [...list, i, key]);
-      if (k) return k;
-    }
-  }
-  return null;
 }
 
 const refRe = (id: string) => new RegExp(`(\\{\\{\\s*[#^/]?\\s*)${id}(?=[.\\[}\\s])`, 'g');
@@ -539,7 +490,7 @@ const WAITS: [number, string][] = [
 
 // ---- each kind's settings --------------------------------------------------------------------------------------
 
-interface Ctx {
+export interface Ctx {
   recipe: AppRecipe;
   flow: Flow;
   open: string | null;
@@ -547,6 +498,10 @@ interface Ctx {
   update: (list: ListPath, i: number, s: Step) => void;
   rename: (from: string, to: string) => boolean;
   add: (list: ListPath, kind: StepKind) => void;
+  /** Puts a step (a new one of a kind, or one made already) in a list at a place; gives its id. */
+  insert: (list: ListPath, at: number, s: StepKind | Step) => string;
+  /** A new step of a kind, with a name of its own (not put anywhere yet). */
+  make: (kind: StepKind) => Step;
   edit: (list: ListPath, f: (l: Step[]) => Step[]) => void;
   copy: (list: ListPath, i: number) => void;
   msgs: Map<string, { text: string; error: boolean }[]>;
@@ -1006,6 +961,57 @@ function summaryOf(s: Step, ctx: Ctx): ReactNode {
   }
 }
 
+/** A step's settings: those of its kind, its name, its rule and what happens when it fails, and what needs fixing in it. */
+export function StepBody({ s, list, i, ctx }: { s: Step; list: ListPath; i: number; ctx: Ctx }) {
+  const msgs = ctx.msgs.get(s.id) ?? [];
+  const set = (next: Step) => ctx.update(list, i, next);
+  const groups = useMemo(() => valuesAt(ctx.flow, list, i, ctx.recipe.fields), [ctx.flow, ctx.recipe.fields, JSON.stringify([...list, i])]);
+  return (
+    <div className="space-y-3">
+      <KindFields s={s} set={set} groups={groups} ctx={ctx} />
+      <CommonFields s={s} set={set} groups={groups} ctx={ctx} />
+      {msgs.length > 0 && (
+        <ul className="space-y-0.5 text-[12.5px] leading-snug">
+          {msgs.map((m) => (
+            <li key={m.text} className={m.error ? 'text-err' : 'text-warn'}>
+              {m.text}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** What can be done with a step: move it, copy it, ask the agent about it (beside a conversation), remove it. */
+export function StepActions({ s, list, i, last, ctx, done }: { s: Step; list: ListPath; i: number; last: number; ctx: Ctx; done: () => void }) {
+  const act = (f: () => void) => () => {
+    done();
+    f();
+  };
+  return (
+    <div className="p-1">
+      <MenuItem icon={<ArrowUp size={14} />} disabled={i === 0} onClick={act(() => ctx.edit(list, (l) => move(l, i, -1)))}>
+        Move up
+      </MenuItem>
+      <MenuItem icon={<ArrowDown size={14} />} disabled={i === last} onClick={act(() => ctx.edit(list, (l) => move(l, i, 1)))}>
+        Move down
+      </MenuItem>
+      <MenuItem icon={<Copy size={14} />} onClick={act(() => ctx.copy(list, i))}>
+        Duplicate
+      </MenuItem>
+      {ctx.ask && (
+        <MenuItem icon={<MessageSquare size={14} />} onClick={act(() => ctx.ask!(s))}>
+          Ask the agent about it
+        </MenuItem>
+      )}
+      <MenuItem icon={<Trash2 size={14} />} danger onClick={act(() => ctx.edit(list, (l) => l.filter((_, j) => j !== i)))}>
+        Remove
+      </MenuItem>
+    </div>
+  );
+}
+
 function StepCard({ s, list, i, last, ctx }: { s: Step; list: ListPath; i: number; last: number; ctx: Ctx }) {
   const key = JSON.stringify([...list, i]);
   const open = ctx.open === key;
@@ -1014,11 +1020,6 @@ function StepCard({ s, list, i, last, ctx }: { s: Step; list: ListPath; i: numbe
   const Icon = ICON[s.do];
   const msgs = ctx.msgs.get(s.id) ?? [];
   const set = (next: Step) => ctx.update(list, i, next);
-  const groups = useMemo(() => valuesAt(ctx.flow, list, i, ctx.recipe.fields), [ctx.flow, ctx.recipe.fields, key]);
-  const act = (f: () => void) => () => {
-    setMenu(false);
-    f();
-  };
   return (
     <li>
       <div className={cx('rounded-xl border bg-bg-1', open ? 'border-line-2' : 'border-line')}>
@@ -1042,40 +1043,12 @@ function StepCard({ s, list, i, last, ctx }: { s: Step; list: ListPath; i: numbe
             <Ellipsis size={15} />
           </IconButton>
           <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={200}>
-            <div className="p-1">
-              <MenuItem icon={<ArrowUp size={14} />} disabled={i === 0} onClick={act(() => ctx.edit(list, (l) => move(l, i, -1)))}>
-                Move up
-              </MenuItem>
-              <MenuItem icon={<ArrowDown size={14} />} disabled={i === last} onClick={act(() => ctx.edit(list, (l) => move(l, i, 1)))}>
-                Move down
-              </MenuItem>
-              <MenuItem icon={<Copy size={14} />} onClick={act(() => ctx.copy(list, i))}>
-                Duplicate
-              </MenuItem>
-              {ctx.ask && (
-                <MenuItem icon={<MessageSquare size={14} />} onClick={act(() => ctx.ask!(s))}>
-                  Ask the agent about it
-                </MenuItem>
-              )}
-              <MenuItem icon={<Trash2 size={14} />} danger onClick={act(() => ctx.edit(list, (l) => l.filter((_, j) => j !== i)))}>
-                Remove
-              </MenuItem>
-            </div>
+            <StepActions s={s} list={list} i={i} last={last} ctx={ctx} done={() => setMenu(false)} />
           </Popover>
         </div>
         {open && (
-          <div className="space-y-3 border-t border-line px-3 pt-3 pb-3">
-            <KindFields s={s} set={set} groups={groups} ctx={ctx} />
-            <CommonFields s={s} set={set} groups={groups} ctx={ctx} />
-            {msgs.length > 0 && (
-              <ul className="space-y-0.5 text-[12.5px] leading-snug">
-                {msgs.map((m) => (
-                  <li key={m.text} className={m.error ? 'text-err' : 'text-warn'}>
-                    {m.text}
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="border-t border-line px-3 pt-3 pb-3">
+            <StepBody s={s} list={list} i={i} ctx={ctx} />
           </div>
         )}
       </div>
@@ -1105,12 +1078,6 @@ function StepCard({ s, list, i, last, ctx }: { s: Step; list: ListPath; i: numbe
   );
 }
 
-const move = <T,>(list: T[], i: number, by: number) => {
-  const next = [...list];
-  const [x] = next.splice(i, 1);
-  next.splice(i + by, 0, x);
-  return next;
-};
 
 function AddStep({ onPick }: { onPick: (k: StepKind) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
@@ -1157,6 +1124,8 @@ export function StepsEditor({ recipe, onChange, onAsk }: { recipe: AppRecipe & {
   const flow = recipe.flow;
   const [open, setOpen] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'graph'>('list');
+  // The graph wants room: phones keep the list.
+  const wide = useMediaQuery('(min-width: 1000px)');
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [models, setModels] = useState<{ id: string; label: string }[]>([]);
   const [apps, setApps] = useState<AppDef[]>([]);
@@ -1200,6 +1169,12 @@ export function StepsEditor({ recipe, onChange, onAsk }: { recipe: AppRecipe & {
       setOpen(null);
       setSteps(editList(flow.steps, list, f));
     },
+    make: (kind) => newStep(kind, taken(), recipe),
+    insert: (list, at, what) => {
+      const s = typeof what === 'string' ? newStep(what, taken(), recipe) : what;
+      setSteps(editList(flow.steps, list, (l) => [...l.slice(0, at), s, ...l.slice(at)]));
+      return s.id;
+    },
     add: (list, kind) => {
       const s = newStep(kind, taken(), recipe);
       const at = editList(flow.steps, list, (l) => [...l, s]);
@@ -1232,7 +1207,7 @@ export function StepsEditor({ recipe, onChange, onAsk }: { recipe: AppRecipe & {
 
   return (
     <div className="space-y-4">
-      {flow.steps.length > 1 && (
+      {wide && (
         <div className="-mt-1 flex justify-end">
           <Segmented
             size="sm"
@@ -1245,14 +1220,8 @@ export function StepsEditor({ recipe, onChange, onAsk }: { recipe: AppRecipe & {
           />
         </div>
       )}
-      {view === 'graph' && flow.steps.length > 1 ? (
-        <FlowGraph
-          flow={flow}
-          onPick={(id) => {
-            setView('list');
-            setOpen(keyOf(flow.steps, id));
-          }}
-        />
+      {view === 'graph' && wide ? (
+        <GraphEditor ctx={ctx} graph={recipe.graph} onGraph={(graph) => onChange({ graph })} Body={StepBody} Actions={StepActions} />
       ) : (
         <StepList steps={flow.steps} list={[]} ctx={ctx} />
       )}

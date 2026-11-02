@@ -185,6 +185,8 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         const edited = prev ? userEditAt(db, prev.id) : undefined;
         if (prev && seen !== undefined && edited !== undefined && edited > seen && !a.force) return { text: `The user changed “${prev.name}” in its editor since you last saved or read it: read it with app_get and build on their version (force: true writes over their changes).`, isError: true };
         let raw: Record<string, any> = (a.recipe && typeof a.recipe === 'object' ? a.recipe : prev ? cleanRecipe(prev) : {}) as Record<string, any>;
+        // Where its steps sit in the graph is the user's: a whole recipe without it keeps theirs.
+        if (prev?.graph && raw.graph === undefined) raw = { ...raw, graph: prev.graph };
         if (a.patch && typeof a.patch === 'object') raw = mergePatch(raw, a.patch) as Record<string, any>;
         if (a.step && typeof a.step === 'object') raw = withStep(raw, a.step as Record<string, unknown>);
         if (!prev && !a.recipe && !a.patch) return { text: 'Give the template to make (recipe), or the one to change (app)', isError: true };
