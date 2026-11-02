@@ -20,15 +20,15 @@ import { CodexLive } from '../agents/codex.ts';
 import { APP_ROOT } from '../config.ts';
 import { openDb } from '../db.ts';
 import { pages } from '../pages/index.ts';
-import { registerFeatures, spawnAdditions } from '../features/registry.ts';
+import { beforeSend, messageNotes, registerFeatures, spawnAdditions } from '../features/registry.ts';
 import type { Deps, Feature, SpawnInfo } from '../features/types.ts';
 import { runToken } from '../mcp.ts';
 import type { SessionManager } from '../sessions.ts';
-import { setSessionExtra } from '../sessionExtra.ts';
+import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { BUILTINS } from './builtins.ts';
 import { assistants, assistantById, assistantStart, listAssistants } from './index.ts';
 import { findAgentFiles, parseAgentFile, parseFrontmatter } from './importer.ts';
-import { instructionsFor, spawnFor } from './instructions.ts';
+import { instructionsFor, spawnFor, switchNote } from './instructions.ts';
 import { cleanAssistant, cleanUpOn, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
 import { cleanup } from '../cleanup/index.ts';
 import { dayIn, makeTaskFolder, slugOf, taskFolderName } from './taskFolder.ts';
@@ -477,6 +477,109 @@ test('routes: the list, a task folder, an import, and Custom’s runtime questio
   assert.deepEqual((await fakeApp.inject({ method: 'GET', url: `/agent/run/${runToken('run-custom')}/assistant` })).json(), { tools: null });
   const forged = await fakeApp.inject({ method: 'GET', url: '/agent/run/run-custom.forged/assistant' });
   assert.equal(forged.statusCode, 403);
+});
+
+// ---- switching a session's assistant ---------------------------------------------------------------------
+
+test('the note after a switch: the switch alone when the agent has the new instructions, else the new block too', () => {
+  const writer = BUILTINS.find((a) => a.id === 'writer')!;
+  assert.equal(
+    switchNote(researcher, writer, claude, true),
+    'The user switched this session\'s assistant from Researcher to Writer. Its instructions ("# Assistant: Writer") are now in yours: work that way from here on.',
+  );
+  const full = switchNote(researcher, writer, claude, false);
+  assert.match(full, /^The user switched this session's assistant from Researcher to Writer\. From here on, work as below; this takes the place of the assistant instructions you had before\.\n\n# Assistant: Writer\nThe user picked this assistant for this session\./);
+  assert.ok(full.includes(writer.instructions));
+  assert.match(switchNote(null, offline, codex, false), /^The user picked the Offline assistant for this session\. From here on, work as below\.\n\n# Assistant: Offline\n[\s\S]*Limits: in this session do not/);
+});
+
+test('switching a session’s assistant: its settings, connections, model and mode; a fresh agent before the next message; the note once', async () => {
+  const key = 'claude:switch-1';
+  const calls = { configure: [] as unknown[], recycled: [] as string[], summaries: [] as string[] };
+  const run = new Map<string, string>();
+  const state = { status: 'idle' } as { status: string; goal?: unknown; backgroundTasks?: unknown[] };
+  Object.assign(deps.sessions, {
+    summary: (k: string) => (k === key ? { key, agent: 'claude' } : k === 'acp:switch-2' ? { key: k, agent: 'acp', acpAgent: 'console' } : null),
+    configure: async (k: string, cfg: unknown) => void calls.configure.push([k, cfg]),
+    queueSummary: (k: string) => void calls.summaries.push(k),
+    runOf: (k: string) => run.get(k),
+    adapterByRun: () => ({ state }),
+    recycle: async (k: string) => void calls.recycled.push(k),
+  });
+  /** The agent's process started (or started afresh) with the session's assistant as it is now. */
+  const started = async (runId: string) => {
+    run.set(key, runId);
+    live.set(runId, { key, agent: 'claude', cwd: tmp });
+    await spawnAdditions({ agent: 'claude', key, cwd: tmp, runId, resume: true, extra: sessionExtra(db, key) });
+  };
+  const put = (id: string, k = key) => fakeApp.inject({ method: 'PUT', url: `/api/assistants/session/${encodeURIComponent(k)}`, payload: { id } });
+  const mailer = saveAssistant(db, { name: 'Mailer', icon: 'mail', description: 'Answers mail', instructions: 'Answer the mail.', connections: ['gmail'], mode: 'plan', agent: 'claude', model: 'sonnet' });
+  setSessionExtra(db, key, { assistant: 'researcher', connections: { slack: false } });
+  await started('run-s1');
+
+  // To Mailer: its connections on beside the session's own choices, its model and mode set on the session.
+  const r = await put(mailer.id);
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.json(), { extra: { assistant: mailer.id, connections: { slack: false, gmail: true } }, model: 'sonnet', mode: 'plan' });
+  assert.deepEqual(sessionExtra(db, key), { assistant: mailer.id, connections: { slack: false, gmail: true } });
+  assert.deepEqual(calls.configure, [[key, { mode: 'plan', model: 'sonnet' }]]);
+  assert.deepEqual(calls.summaries, [key]);
+
+  // A message mid-turn: nothing starts afresh, so the note carries Mailer's block; it is said once.
+  state.status = 'working';
+  await beforeSend(key);
+  assert.deepEqual(calls.recycled, []);
+  const note = messageNotes(key);
+  assert.match(note, /^The user switched this session's assistant from Researcher to Mailer\. From here on, work as below[\s\S]*# Assistant: Mailer\n[\s\S]*Answer the mail\./);
+  assert.equal(messageNotes(key), '');
+  // Idle, the agent still has Researcher's instructions: it starts afresh before the next message.
+  state.status = 'idle';
+  await beforeSend(key);
+  assert.deepEqual(calls.recycled, [key]);
+  await started('run-s2');
+  // Once it has Mailer's, nothing more starts afresh.
+  calls.recycled.length = 0;
+  await beforeSend(key);
+  assert.deepEqual(calls.recycled, []);
+
+  // To Writer while idle: started afresh first, so the note is the switch alone. Mailer's connection goes; the session's own stays.
+  assert.deepEqual((await put('writer')).json(), { extra: { assistant: 'writer', connections: { slack: false } } });
+  assert.equal(calls.configure.length, 1, 'Writer suggests no model or mode');
+  state.goal = { objective: 'x' };
+  await beforeSend(key);
+  assert.deepEqual(calls.recycled, [], 'not with a goal');
+  state.goal = undefined;
+  state.backgroundTasks = [{ id: 't1' }];
+  await beforeSend(key);
+  assert.deepEqual(calls.recycled, [], 'not with work in the background');
+  state.backgroundTasks = [];
+  await beforeSend(key);
+  assert.deepEqual(calls.recycled, [key]);
+  await started('run-s3');
+  assert.equal(messageNotes(key), 'The user switched this session\'s assistant from Mailer to Writer. Its instructions ("# Assistant: Writer") are now in yours: work that way from here on.');
+
+  // Away and back before a message: nothing to say, nothing to start afresh.
+  await put('tutor');
+  await put('writer');
+  calls.recycled.length = 0;
+  await beforeSend(key);
+  assert.deepEqual(calls.recycled, []);
+  assert.equal(messageNotes(key), '');
+
+  // Custom reads its instructions before each turn: never started afresh, and the switch alone.
+  const custom = 'acp:switch-2';
+  setSessionExtra(db, custom, { assistant: 'general' });
+  run.set(custom, 'run-c1');
+  live.set('run-c1', { key: custom, agent: 'acp', cwd: tmp, acpAgent: 'console' });
+  await put('planner', custom);
+  await beforeSend(custom);
+  assert.deepEqual(calls.recycled, []);
+  assert.match(messageNotes(custom), /^The user switched this session's assistant from General to Planner\. Its instructions/);
+
+  // No such assistant, no such session.
+  assert.equal((await put('nobody')).statusCode, 404);
+  assert.equal((await put('writer', 'claude:nowhere')).statusCode, 404);
+  assert.equal(sessionExtra(db, 'claude:nowhere').assistant, undefined);
 });
 
 // ---- Custom's tool limits -------------------------------------------------------------------------------

@@ -209,9 +209,9 @@ Queued messages wait above the message box, numbered in the order they go out. O
 - **Remove** (the bin): takes it off the queue; its attachments are deleted.
 - When you stop the agent, or the app restarts, the queue pauses: "The queue is paused (the agent was stopped, or the server restarted)." **Resume** lets the messages go out again as the agent becomes free. A spending cap that is reached holds the queue too; raising the cap lets it go on.
 
-## Change the model, effort or permissions
+## Change the assistant, model, effort or permissions
 
-The message box of a session has the same three choices as the start page: **Model**, **Effort** and **Permissions**, side by side in a wide box, or in one chip (it opens **Options**) in a narrow one or on a phone. A change applies to the running agent at once and stays with the session. Shift+Tab moves to the next permissions mode. The model menu lists only this agent's models; to move the conversation to another agent, use [Continue in another agent](#continue-in-another-agent).
+The message box of a session has the start page's **Assistant** and its three choices **Model**, **Effort** and **Permissions**: side by side in a wide box, or in one chip (it opens **Options**) in a narrow one or on a phone, which names the assistant and the model, and the effort and permissions when they are not the usual. Another assistant applies from your next message (see [Switch assistants in a session](/guide/assistants#switch-assistants-in-a-session)). A change of model, effort or permissions applies to the running agent at once and stays with the session. Shift+Tab moves to the next permissions mode. The model menu lists only this agent's models; to move the conversation to another agent, use [Continue in another agent](#continue-in-another-agent).
 
 ## Quote part of a reply
 
@@ -376,7 +376,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
   - **Memory**, with **On** or **Off** beside it: turns memory on or off for this session ("Off for all" when memory is off in Settings). See [Memory](/guide/memory).
   - **Spending cap**, with the cap beside it: set, change or raise it. See [Usage, limits and costs](/guide/usage).
   - **Connected apps**: turn each connected app on or off for this session only. See [Connections, keys and tools](/guide/connections).
-  - **Assistant**, with its name beside it: opens Settings → Assistants (sessions started as an assistant).
+  - **Assistant**, with its name beside it: opens Settings → Assistants (sessions with an assistant). The message box switches it.
 - **More** (a submenu):
   - **Open a browser** / **Show the browser**: the agents' browser for this session, which you can watch and take over. See [Search and the browser](/guide/web).
   - **Make this an automation**: the helper model reads the session and drafts a scheduled task from it; change anything, try it with a test run, then save. See [Scheduled tasks](/guide/tasks).
