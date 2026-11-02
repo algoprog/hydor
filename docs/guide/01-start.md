@@ -118,15 +118,25 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - **Sessions**: by title, folder, branch and first message (not archived ones). Opening one opens it.
 - **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
 - **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
+- **Spaces**: your spaces, by name and description. Opening one opens the space.
 - **Templates**, **Scheduled tasks**, **Assistants**, **Skills**, **Pages** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
 - **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
+
+### Choose where it looks
+
+**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Spaces**, **Pages**, **Templates**, **Files**, **Memory**, **Scheduled tasks**, **Assistants**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions) and **Guide**.
+
+- Tick one or more, and the box looks only there. The button names them ("Sessions, Pages", or "3 places") in the accent colour. Click a place again to take it out, or **Everywhere** to look in all of them again.
+- With nothing typed, it lists what the places you picked hold, the ones you use most first: your recent sessions, spaces and pages, the sections of Settings, the topics of the guide. Messages, memory notes and files wait for your words.
+- What you pick is kept on every device until you change it. When nothing is found, **Search everywhere** under the message looks in every place again.
+- On a phone, **Search in** is the filter icon beside **Cancel** (it names the places once you pick some), and its list opens from the bottom of the screen.
 
 ### How the results show
 
 - The **Best match** comes first. Then each kind has its own group of up to four rows; "3 more in Sessions" shows the rest.
 - On a wide screen, a preview beside the list says more about the result you are on, and where opening it goes.
-- ↑ and ↓ move, Enter opens. Esc clears what you typed, and a second Esc closes the box.
-- With nothing typed, it lists **Recent sessions** and **Suggestions**: the places you use most (a few useful ones until it knows).
+- ↑ and ↓ move, Enter opens. Esc clears what you typed, and a second Esc closes the box (with the **Search in** list open, Esc closes the list first).
+- With nothing typed, it lists **Recent sessions** and **Suggestions**: the places you use most (a few useful ones until it knows). With places picked in **Search in**, it lists what they hold instead.
 - The bottom line says **Words** or **Words and meaning**. With [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) turned on in Settings → Capabilities → Memory, results also match what you mean in other words, and in other languages.
 
 ### It learns what you use
@@ -220,4 +230,5 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "Start a Codex session in ~/code/shop that makes the checkout tests pass."
 - "Find the session where we planned the Lisbon trip and pin it."
 - "Next time I open the start page, have it set to Claude Code with the Researcher assistant."
+- "Make my search box look only in my sessions and pages."
 - "What is in my inbox?"

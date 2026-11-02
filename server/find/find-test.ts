@@ -2,15 +2,16 @@
 // catalog of what ships with the app (shared/find-catalog.ts) against the Settings pages, and its vectors made
 // ahead of time (shipped-vectors.json: npm run find:vectors when this fails); and what the server adds
 // (index.ts): what ships, found by meaning, sessions and tasks given their vectors the moment the pages hear of
-// them, messages and memory notes; with a made-up embedder in place of the model; and what use adds (usage.ts):
-// picks and visits that age, and how they lift what matches. Build and run:
+// them, messages and memory notes; with a made-up embedder in place of the model; a search in some places only
+// (Search in), and the places kept; and what use adds (usage.ts): picks and visits that age, and how they lift
+// what matches. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/find/find-test.ts
 //   DATA_DIR=/tmp/naget-test-find node dist/dev/find-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { matchItem, matchStrength, placeOf, queryAffinity, queryWords, usageBoost } from '../../shared/find.ts';
+import { FIND_PLACES, findPlaces, matchItem, matchStrength, placeOf, queryAffinity, queryWords, usageBoost } from '../../shared/find.ts';
 import { catalogItems, catalogText, OPTIONS, SECTIONS } from '../../shared/find-catalog.ts';
 import type { ScheduledTask } from '../../shared/automations.ts';
 import type { SessionSummary } from '../../shared/types.ts';
@@ -19,7 +20,8 @@ import { kvSet, openDb } from '../db.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as store from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
-import { dropLists, findAll, hashOf, makeWaiting, onEvent, setShippedForTests, shippedVectors } from './index.ts';
+import { createSpace } from '../spaces/index.ts';
+import { dropLists, findAll, findScope, hashOf, makeWaiting, onEvent, setFindScope, setShippedForTests, shippedVectors } from './index.ts';
 import { shippedItems } from './sources.ts';
 import { findUsage, noteUsage } from './usage.ts';
 
@@ -157,6 +159,27 @@ test('without search by meaning: messages and notes by words, nothing waits', as
   assert.equal((await findAll(d, '   ')).messages.length, 0);
 });
 
+test('places: a search looks only where it was asked to, and the places picked are kept', async () => {
+  assert.deepEqual(findPlaces('pages,sessions,nope,pages'), ['sessions', 'pages'], 'known ones once, in the menu’s order');
+  assert.deepEqual(findPlaces([...FIND_PLACES]), [], 'all of them is everywhere');
+  assert.deepEqual(findPlaces(undefined), []);
+  // The session, its message and the note of the test before.
+  assert.equal((await findAll(d, 'fado evening', ['sessions'])).messages.length, 0, 'no messages unless they are looked in');
+  assert.equal((await findAll(d, 'fado evening', ['messages'])).messages[0]?.key, 'claude:lisbon');
+  assert.equal((await findAll(d, 'Lisbon', ['messages', 'memory'])).sessions.length, 0, 'no sessions unless they are looked in');
+  assert.equal((await findAll(d, 'Lisbon', ['sessions'])).sessions[0]?.key, 'claude:lisbon');
+  assert.equal((await findAll(d, 'window seats', ['sessions', 'pages'])).notes.length, 0, 'no notes unless memory is looked in');
+  assert.equal((await findAll(d, 'window seats', ['memory'])).notes.length, 1);
+  // Kept for every device; a place it does not know is refused, not dropped unseen.
+  assert.deepEqual(findScope(db), []);
+  assert.deepEqual(setFindScope(db, ['pages', 'sessions']), ['sessions', 'pages']);
+  assert.deepEqual(findScope(db), ['sessions', 'pages']);
+  assert.throws(() => setFindScope(db, ['sessions', 'inbox']), /inbox/);
+  assert.throws(() => setFindScope(db, 'sessions'), /a list of places/);
+  assert.deepEqual(findScope(db), ['sessions', 'pages'], 'a refused change changes nothing');
+  assert.deepEqual(setFindScope(db, [...FIND_PLACES]), [], 'every place is everywhere');
+});
+
 test('with search by meaning: what ships found in other words; sessions and tasks get vectors as the pages hear of them', async () => {
   kvSet(db, 'memory.meaning', '1');
   setEmbedderForTests(async (texts) => texts.map(fake));
@@ -187,6 +210,16 @@ test('with search by meaning: what ships found in other words; sessions and task
   await sleep(400);
   await makeWaiting(db);
   assert.ok((await findAll(d, 'food')).alike.some((a) => a.id === 'task:k1'));
+  // A space made: the same; found only when spaces are looked in.
+  const garden = createSpace(db, { name: 'The garden', description: 'Beds, seeds and the greenhouse', folder: tmp });
+  onEvent({ t: 'feature', id: 'spaces', data: { changed: true } } as never, d);
+  await sleep(400);
+  await makeWaiting(db);
+  assert.ok((await findAll(d, 'greenhouse seeds')).alike.some((a) => a.id === `space:${garden.id}`));
+  assert.ok(!(await findAll(d, 'greenhouse seeds', ['pages', 'settings'])).alike.some((a) => a.id === `space:${garden.id}`), 'not when spaces are not looked in');
+  const only = (await findAll(d, 'greenhouse seeds', ['spaces'])).alike;
+  assert.ok(only.length > 0 && only.every((a) => a.id.startsWith('space:')), 'only spaces, when only they are looked in');
+  assert.equal((await findAll(d, 'holiday plans', ['spaces'])).sessions.length, 0, 'no sessions by meaning unless they are looked in');
   // Gone from the list: no longer found.
   onEvent({ t: 'sessions', upsert: [], remove: ['claude:lisbon'] }, d);
   assert.ok(!(await findAll(d, 'holiday plans')).sessions.some((x) => x.meaning));
@@ -247,6 +280,8 @@ test('places: each address as the search box lists it', () => {
   assert.equal(placeOf('/pages', '?tab=published', pages), 'go:published');
   assert.equal(placeOf('/pages/p1', '', pages), 'page:p1');
   assert.equal(placeOf('/spaces', '', pages), 'go:spaces');
+  assert.equal(placeOf('/spaces/sp1a2b', '', pages), 'space:sp1a2b');
+  assert.equal(placeOf('/spaces/sp1a2b/files', '', pages), 'space:sp1a2b', 'a space’s tab is the space');
   assert.equal(placeOf('/files', '?place=trash', pages), 'go:files-trash');
   assert.equal(placeOf('/files', '?dir=%2Fhome%2Fa', pages), 'go:files');
   assert.equal(placeOf('/file', '?path=%2Fhome%2Fa.md&line=3', pages), 'f:/home/a.md');

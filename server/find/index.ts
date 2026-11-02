@@ -1,25 +1,27 @@
 // Search everything (the search box, Ctrl+K): what it asks the server. By words the server finds sessions by
 // title, messages that hold the words and memory notes. By meaning (memory's search by meaning, when it is on)
-// it finds everything else too: the app's own pages, settings and actions, and sessions, apps, scheduled tasks,
-// assistants, skills, pages and connected apps (sources.ts). Their vectors come from two places. What ships with
-// the app has them in shipped-vectors.json, made ahead of time (npm run find:vectors), so no one computes them.
-// What people make gets its vector the moment it is made or changed, as the pages are told (event, below), and
-// keeps it in find_vectors by the hash of its text, 4 bits a number like memory's notes. What you pick from the
-// box and the places you visit are kept too (usage.ts), and lift what matches.
+// it finds everything else too: the app's own pages, settings and actions, and sessions, spaces, apps, scheduled
+// tasks, assistants, skills, pages and connected apps (sources.ts). Their vectors come from two places. What ships
+// with the app has them in shipped-vectors.json, made ahead of time (npm run find:vectors), so no one computes
+// them. What people make gets its vector the moment it is made or changed, as the pages are told (event, below),
+// and keeps it in find_vectors by the hash of its text, 4 bits a number like memory's notes. A search can look in
+// some places only (the box's Search in, kept here for every device: scope). What you pick from the box and the
+// places you visit are kept too (usage.ts), and lift what matches.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { FindResponse, FoundNote, FoundSession } from '../../shared/find.ts';
+import { FIND_PLACES, findPlaces, type FindPlace, type FindResponse, type FoundNote, type FoundSession } from '../../shared/find.ts';
 import type { SearchHit, ServerEvent } from '../../shared/types.ts';
+import { HttpError } from '../auth.ts';
 import { APP_ROOT } from '../config.ts';
-import type { DB } from '../db.ts';
+import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { searchSessions } from '../indexer/index.ts';
 import { embed, meaningOn, meaningReady, queryVector } from '../memory/embed.ts';
 import { findNotes } from '../memory/search.ts';
 import { memoryOn } from '../memory/store.ts';
 import { BYTES, quantize, queryTable, scale, scoreAt, VECTOR_MODEL } from '../memory/vectors.ts';
-import { itemsOf, KINDS, MAX_SESSIONS, sessionItem, type Item, type Kind } from './sources.ts';
+import { itemsOf, KIND_PLACES, KINDS, MAX_SESSIONS, sessionItem, type Item, type Kind } from './sources.ts';
 import { findUsage, noteUsage } from './usage.ts';
 
 /**
@@ -149,7 +151,7 @@ function soon(d: D, kind: Kind) {
 }
 
 /** The pages hear of each feature's list changing by its id. */
-const FEATURE_KIND: Record<string, Kind> = { apps: 'apps', assistants: 'assistants', skillpack: 'skills', pages: 'pages', connections: 'connections' };
+const FEATURE_KIND: Record<string, Kind> = { apps: 'apps', assistants: 'assistants', skillpack: 'skills', pages: 'pages', connections: 'connections', spaces: 'spaces' };
 let wasOn: boolean | null = null;
 
 /** An event went to the pages: what it changed gets its vector now. */
@@ -190,39 +192,43 @@ function alike(db: DB, items: (Item & { hash: string })[], q: Float32Array, limi
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
-/** What a search finds on the server. */
-export async function findAll(d: D, query: string): Promise<FindResponse> {
+/** What a search finds on the server: everywhere, or in the places given (FIND_PLACES; none is everywhere). */
+export async function findAll(d: D, query: string, places: FindPlace[] = []): Promise<FindResponse> {
   const { db } = d;
   const q = query.trim().slice(0, 300);
   const out: FindResponse = { meaning: false, alike: [], sessions: [], messages: [], notes: [] };
   if (!q) return out;
+  const wants = (p: FindPlace) => !places.length || places.includes(p);
+  const kinds = KINDS.filter((k) => KIND_PLACES[k].some(wants));
   // By words: sessions by title, and messages that hold the words.
-  const hits: SearchHit[] = searchSessions(db, q, 30);
+  const hits: SearchHit[] = wants('sessions') || wants('messages') ? searchSessions(db, q, 30) : [];
   const sessions = new Map<string, FoundSession>();
-  hits
-    .filter((h) => h.kind === 'title')
-    .forEach((h, i) => sessions.set(h.key, { key: h.key, agent: h.agent, title: h.title, cwd: h.cwd, updatedAt: h.updatedAt, score: 1 / (61 + i) }));
-  out.messages = hits.filter((h) => h.kind !== 'title' && h.snippet).slice(0, 10);
+  if (wants('sessions'))
+    hits
+      .filter((h) => h.kind === 'title')
+      .forEach((h, i) => sessions.set(h.key, { key: h.key, agent: h.agent, title: h.title, cwd: h.cwd, updatedAt: h.updatedAt, score: 1 / (61 + i) }));
+  if (wants('messages')) out.messages = hits.filter((h) => h.kind !== 'title' && h.snippet).slice(0, 10);
   // By meaning, when it answers now (otherwise it starts, for the next search).
   const v = meaningOn(db) && q.length >= 3 ? await queryVector(db, q, { wait: false }) : null;
   if (v) {
     out.meaning = true;
-    for (const kind of KINDS) if (kind !== 'sessions') out.alike.push(...alike(db, listOf(d, kind), v, 12));
+    for (const kind of kinds) if (kind !== 'sessions') out.alike.push(...alike(db, listOf(d, kind), v, 12));
     out.alike.sort((a, b) => b.score - a.score);
-    alike(db, listOf(d, 'sessions'), v, 12).forEach((h, i) => {
-      const key = h.id.slice(2);
-      const s = sessions.get(key);
-      if (s) {
-        s.score += 1 / (61 + i);
-        s.meaning = h.score;
-      } else {
-        const sum = d.sessions.summary(key);
-        if (sum && !sum.archived) sessions.set(key, { key, agent: sum.agent, acpName: sum.acpName, title: sum.title, firstPrompt: sum.firstPrompt, cwd: sum.cwd, updatedAt: sum.updatedAt, meaning: h.score, score: 1 / (61 + i) });
-      }
-    });
+    if (kinds.includes('sessions'))
+      alike(db, listOf(d, 'sessions'), v, 12).forEach((h, i) => {
+        const key = h.id.slice(2);
+        const s = sessions.get(key);
+        if (s) {
+          s.score += 1 / (61 + i);
+          s.meaning = h.score;
+        } else {
+          const sum = d.sessions.summary(key);
+          if (sum && !sum.archived) sessions.set(key, { key, agent: sum.agent, acpName: sum.acpName, title: sum.title, firstPrompt: sum.firstPrompt, cwd: sum.cwd, updatedAt: sum.updatedAt, meaning: h.score, score: 1 / (61 + i) });
+        }
+      });
   } else if (meaningOn(db) && !meaningReady()) for (const kind of KINDS) listOf(d, kind);
   out.sessions = [...sessions.values()].sort((a, b) => b.score - a.score).slice(0, 10);
-  if (memoryOn(db))
+  if (wants('memory') && memoryOn(db))
     out.notes = (await findNotes(db, { places: 'all', query: q, limit: 6, vector: v })).map(
       (f): FoundNote => ({ id: f.entry.id, scope: f.entry.scope, scopeKey: f.entry.scopeKey, kind: f.entry.kind, text: f.entry.text, updatedAt: f.entry.updatedAt, meaning: f.meaning }),
     );
@@ -232,10 +238,41 @@ export async function findAll(d: D, query: string): Promise<FindResponse> {
 /** For tests: forget the lists read (the next search reads them again). */
 export const dropLists = () => lists.clear();
 
+// ---- where the search box looks ---------------------------------------------------------------------
+
+/** The places the search box looks in, as picked last on any device (none: everywhere). */
+export function findScope(db: DB): FindPlace[] {
+  try {
+    return findPlaces(JSON.parse(kvGet(db, 'find.scope') ?? '[]'));
+  } catch {
+    return [];
+  }
+}
+
+/** Keeps the places picked; a name it does not know is refused, so a mistyped one is not dropped unseen. */
+export function setFindScope(db: DB, v: unknown): FindPlace[] {
+  if (!Array.isArray(v)) throw new HttpError(400, `in: a list of places (none for everywhere): ${FIND_PLACES.join(', ')}`);
+  const unknown = v.filter((p) => !(FIND_PLACES as readonly unknown[]).includes(p));
+  if (unknown.length) throw new HttpError(400, `Not a place the search box looks in: ${unknown.map(String).join(', ')}. The places: ${FIND_PLACES.join(', ')}`);
+  const places = findPlaces(v);
+  kvSet(db, 'find.scope', JSON.stringify(places));
+  return places;
+}
+
 export const find: Feature = {
   id: 'find',
   routes(d) {
-    d.app.get('/api/find', async (req) => findAll(d, String((req.query as { q?: string }).q ?? '')));
+    d.app.get('/api/find', async (req) => {
+      const q = req.query as { q?: string; in?: string };
+      return findAll(d, String(q.q ?? ''), findPlaces(q.in));
+    });
+    // Where the search box looks (its Search in menu): every device opens it so, and open ones change at once.
+    d.app.get('/api/find/scope', async () => ({ in: findScope(d.db) }));
+    d.app.put('/api/find/scope', async (req) => {
+      const places = setFindScope(d.db, (req.body as { in?: unknown } | undefined)?.in);
+      d.broadcast({ t: 'feature', id: 'find', data: { in: places } });
+      return { in: places };
+    });
     // What the search box learns from use (usage.ts): what was picked from it, and the places visited.
     d.app.get('/api/find/usage', async () => findUsage(d.db));
     d.app.post('/api/find/usage', async (req) => {

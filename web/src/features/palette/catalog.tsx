@@ -1,7 +1,8 @@
 // What the search box knows by itself, before the server answers: what ships with the app (its pages and actions,
 // every Settings section and the options in them, the themes: shared/find-catalog.ts), your own themes, and
-// (fetched when it opens) apps, scheduled tasks, assistants, skills, pages and connections. Each entry says where
-// it is and goes there: a setting opens its section and points at it by its words (`find=`, lib/pointAt.ts).
+// (fetched when it opens) spaces, apps, scheduled tasks, assistants, skills, pages and connections. Each entry
+// says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
+// lib/pointAt.ts).
 import type { ReactNode } from 'react';
 import { Activity, AppWindow, ArrowRight, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, FolderTree, Gauge, GitBranch, Headphones, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
@@ -11,24 +12,29 @@ import type { ScheduledTask } from '@shared/automations';
 import type { ConnectionView } from '@shared/connections';
 import type { PageInfo } from '@shared/pages';
 import type { SkillLibrary } from '@shared/skillpack';
+import { isGroup, type SpaceView } from '@shared/spaces';
 import { api } from '../../lib/api';
+import { timeAgo } from '../../lib/format';
 import { go, goApp } from '../../lib/nav';
 import { useUI } from '../../lib/store';
 import { allThemes, applyTheme, pickTheme } from '../../lib/theme';
 import { appPath, type Gallery } from '../apps/api';
 import { openReleaseNotes } from '../settings/Releases';
 import { settingsSections } from '../settings/SettingsPage';
+import { SpaceMark } from '../spaces/parts';
 import { startTour } from '../tour/Tour';
 import { openAsk } from '../guide/ask';
 import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
 
-export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Templates' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Themes' | 'Files';
+export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Spaces' | 'Templates' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Themes' | 'Files';
 
 export interface Entry extends Findable {
   id: string;
   group: Group;
   icon: ReactNode;
+  /** The icon at the preview's size, when it does not grow by itself (a space's mark). */
+  mark?: ReactNode;
   /** Where it is, as names ("Settings › Capabilities › Memory"). */
   where?: string;
   /** Shown beside it in the list (a shortcut, a time). */
@@ -120,15 +126,35 @@ let held: { at: number; entries: Entry[] } | null = null;
 export async function liveEntries(): Promise<Entry[]> {
   if (held && Date.now() - held.at < 60_000) return held.entries;
   const get = <T,>(path: string) => api<T>(path).catch(() => null);
-  const [apps, tasks, assistants, lib, pages, conns] = await Promise.all([
+  const [apps, tasks, assistants, lib, pages, conns, spaces] = await Promise.all([
     get<Gallery>('/api/apps'),
     get<{ tasks: ScheduledTask[] }>('/api/tasks'),
     get<{ assistants?: { id: string; name: string; description?: string }[] }>('/api/assistants'),
     get<SkillLibrary>('/api/skillpack'),
     get<{ pages: PageInfo[] }>('/api/pages'),
     get<{ connections: ConnectionView[] }>('/api/connections'),
+    get<{ spaces: SpaceView[] }>('/api/spaces'),
   ]);
   const out: Entry[] = [];
+  for (const s of spaces?.spaces ?? [])
+    out.push({
+      id: `space:${s.id}`,
+      group: 'Spaces',
+      icon: <SpaceMark s={s} />,
+      mark: <SpaceMark s={s} size={22} />,
+      title: s.name,
+      keywords: isGroup(s) ? 'space group project' : 'space project',
+      text: s.description,
+      where: 'Spaces',
+      body: s.description,
+      facts: [
+        ['Folder', s.folder],
+        ['Sessions', String(s.sessions)],
+        ['Last active', s.lastAt ? timeAgo(s.lastAt) : ''],
+      ],
+      opens: 'Opens the space',
+      run: () => go(`/spaces/${encodeURIComponent(s.id)}`),
+    });
   for (const a of apps?.apps ?? [])
     out.push({ id: `app:${a.id}`, group: 'Templates', icon: <LayoutGrid size={15} />, title: a.name, keywords: 'template', text: a.description, where: 'Templates', body: a.description, opens: 'Opens the template', run: () => go(appPath(a.id)) });
   for (const t of apps?.templates ?? [])

@@ -4,7 +4,7 @@
 // other names for it, then its description. Words like "how" or "the" do not count, and items holding more
 // of the query's words come first. Among what matches, what you use comes up: what you picked from the box
 // before (most when you typed the same), and the places you visit. What the search box gets from the server
-// is typed here too.
+// is typed here too, and the places it can look in.
 import type { MemoryKind, MemoryScope } from './memory.ts';
 import type { Agent, SearchHit } from './types.ts';
 
@@ -167,11 +167,28 @@ export interface FindResponse {
   /** Search by meaning answered this time. */
   meaning: boolean;
   /** What else is alike in meaning, best first: the app's own pages, settings and actions, apps, tasks, assistants,
-   * skills, pages and connections, by the ids the search box gives them. */
+   * skills, pages, connections and spaces, by the ids the search box gives them. */
   alike: { id: string; score: number }[];
   sessions: FoundSession[];
   messages: SearchHit[];
   notes: FoundNote[];
+}
+
+// ---- where it looks -------------------------------------------------------------------------------
+
+/**
+ * The places the search box can look in, as its Search in menu lists them: `actions` is the app's own pages
+ * and actions (Go to, Actions), `settings` holds the themes too, `guide` is Help. None picked is everywhere.
+ * The places picked are kept for every device (server/find), and go with each search (`/api/find?in=`).
+ */
+export const FIND_PLACES = ['sessions', 'messages', 'spaces', 'pages', 'templates', 'files', 'memory', 'tasks', 'assistants', 'skills', 'connections', 'settings', 'actions', 'guide'] as const;
+export type FindPlace = (typeof FIND_PLACES)[number];
+
+/** Places as given (a list, or "a,b" as an address has them), tidied: known ones once, in the menu's order; all of them is everywhere, []. */
+export function findPlaces(v: unknown): FindPlace[] {
+  const given = new Set(typeof v === 'string' ? v.split(',') : Array.isArray(v) ? v.map(String) : []);
+  const out = FIND_PLACES.filter((p) => given.has(p));
+  return out.length === FIND_PLACES.length ? [] : out;
 }
 
 // ---- what you use ---------------------------------------------------------------------------------
@@ -180,7 +197,8 @@ export interface FindResponse {
  * How the search box knows what you use (server/find/usage.ts keeps it, for every device). Each count is
  * worth less as it ages (a visit halves in two weeks, a pick in a month), so what you use now counts most.
  * Picks and visits are keyed by the ids the search box gives things; a place is a page (go:usage), a Settings
- * section (sec:memory), a session (s:<key>), a template (app:<id>), a page (page:<id>) or a file (f:<path>).
+ * section (sec:memory), a session (s:<key>), a template (app:<id>), a page (page:<id>), a space (space:<id>) or a
+ * file (f:<path>).
  */
 export interface FindUsage {
   /** Things picked from the search box. */
@@ -245,6 +263,9 @@ export function placeOf(pathname: string, search: string, pagePaths: Record<stri
   if (a && a[1] !== 'new') return `app:${decodeURIComponent(a[1])}`;
   const pg = /^\/pages\/([^/]+)$/.exec(pathname);
   if (pg) return `page:${decodeURIComponent(pg[1])}`;
+  // A space, on any of its tabs (its files, knowledge, skills, settings).
+  const sp = /^\/spaces\/([^/]+)/.exec(pathname);
+  if (sp) return `space:${decodeURIComponent(sp[1])}`;
   // A page's tab (Published pages), or a place on the Files page (its trash, the recent files).
   const full = `${pathname}${q.get('tab') ? `?tab=${q.get('tab')}` : q.get('place') ? `?place=${q.get('place')}` : ''}`;
   return pagePaths[full] ?? pagePaths[pathname] ?? null;
