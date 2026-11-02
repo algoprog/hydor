@@ -13,7 +13,8 @@ import { EDITOR_SRC } from './editor.ts';
 export const KIT_CSS = `
 :root{--n-bg:#fff;--n-card:#fff;--n-fg:#1d1b17;--n-muted:#675f52;--n-line:#e2ddd2;--n-soft:#f5f3ee;--n-accent:#8a6100;--n-accent-fg:#fff;--n-accent-soft:rgba(176,124,0,.13);--n-ok:#17733a;--n-err:#be2b2b;--n-radius:12px}
 html[data-n-theme=dark] .n-page{--n-bg:#151412;--n-card:#1d1b18;--n-fg:#f2eee7;--n-muted:#a39b8e;--n-line:#36322b;--n-soft:#24211d;--n-accent:#d4b158;--n-accent-fg:#1a1306;--n-accent-soft:rgba(212,177,88,.16);--n-ok:#6dbb84;--n-err:#e57373;color-scheme:dark}
-.n-page{margin:0;padding:20px;background:var(--n-bg);color:var(--n-fg);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+html[data-n-theme=dark]:has(>body.n-page){color-scheme:dark}
+.n-page{margin:0 auto;padding:20px;background:var(--n-bg);color:var(--n-fg);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
 @media (max-width:480px){.n-page{padding:14px}}
 .n-page h1{font-size:22px;line-height:1.25;margin:0 0 6px;letter-spacing:-.01em}
 .n-page h2{font-size:17px;line-height:1.3;margin:22px 0 8px}
@@ -117,15 +118,39 @@ function bridge(cfg: BridgeCfg) {
   const dark = cfg.theme === 'dark' || (cfg.theme === 'auto' && !!window.matchMedia?.('(prefers-color-scheme: dark)').matches);
   root.setAttribute('data-n-theme', dark ? 'dark' : 'light');
 
-  // The page's height, so the frame in the conversation fits it.
+  // The page's height, so the frame in the conversation fits it, and its colour, which the frame shows where
+  // the page paints nothing (before it is drawn, when it bounces at an end): white for a page of no colour.
   if (P) {
     let last = -1;
+    let lastBg = '';
+    const clear = (c: string) => !c || c === 'transparent' || /^rgba\([^)]*,\s*0\)$/.test(c);
+    const bgOf = () => {
+      for (const el of [root, document.body]) {
+        if (!el) continue;
+        const cs = getComputedStyle(el);
+        if (!clear(cs.backgroundColor)) return cs.backgroundColor;
+        if (cs.backgroundImage !== 'none') return '';
+      }
+      return '#fff';
+    };
     const size = () => {
       const h = Math.max(root.scrollHeight, document.body ? document.body.scrollHeight : 0);
-      if (h !== last) post({ type: 'wa-html-size', h: (last = h) });
+      const bg = bgOf();
+      if (h !== last || bg !== lastBg) post({ type: 'wa-html-size', h: (last = h), bg: (lastBg = bg) });
+    };
+    // A page narrower than its frame (written for a column of some width) sits in the middle of it, not at its left.
+    const centre = () => {
+      const b = document.body;
+      if (!b) return;
+      const cs = getComputedStyle(b);
+      const l = parseFloat(cs.marginLeft);
+      if (cs.maxWidth === 'none' || l !== parseFloat(cs.marginRight) || l > 16 || b.getBoundingClientRect().width >= root.clientWidth - 1) return;
+      b.style.marginLeft = 'auto';
+      b.style.marginRight = 'auto';
     };
     new ResizeObserver(size).observe(root);
-    addEventListener('load', size);
+    addEventListener('DOMContentLoaded', centre);
+    addEventListener('load', () => (centre(), size()));
     setTimeout(size, 300);
   }
 
@@ -329,6 +354,7 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string) {
 
   let streamN = '';
   let lastH = -1;
+  let lastBg = '';
   // Following the end while it grows, until the reader scrolls up from it.
   let follow = true;
   addEventListener('scroll', () => {
@@ -347,7 +373,16 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string) {
     morph(document.documentElement, doc.documentElement);
     const el = document.scrollingElement ?? document.documentElement;
     const h = Math.max(el.scrollHeight, document.body ? document.body.scrollHeight : 0);
-    if (h !== lastH) parent.postMessage({ type: 'wa-html-size', h: (lastH = h), n: streamN }, '*');
+    // Its colour too, once it has one (until then the frame keeps the app's).
+    let bg = '';
+    for (const x of [document.documentElement, document.body]) {
+      const c = x ? getComputedStyle(x).backgroundColor : '';
+      if (c && c !== 'transparent' && !/^rgba\([^)]*,\s*0\)$/.test(c)) {
+        bg = c;
+        break;
+      }
+    }
+    if (h !== lastH || bg !== lastBg) parent.postMessage({ type: 'wa-html-size', h: (lastH = h), bg: (lastBg = bg), n: streamN }, '*');
     if (follow) el.scrollTop = el.scrollHeight;
   };
 

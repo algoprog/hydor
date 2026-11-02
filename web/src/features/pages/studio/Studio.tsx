@@ -2,15 +2,22 @@
 // at a page's own place in Pages. Three ways to look at it: the page itself (it runs), Edit (pick a part
 // and change it: words, look, place; scripts held back meanwhile) and Code (its HTML, with the page beside
 // it as you type). While an agent writes it, it shows as far as it came, growing. Changes stay unsaved
-// until Save; Discard drops them.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Code2, Eye, Monitor, PenLine, Plus, Redo2, Smartphone, Tablet, Undo2 } from 'lucide-react';
-import { toastError } from '../../../lib/store';
+// until Save; Discard drops them. It shows pages as wide as there is room for; a tablet's or a phone's
+// width is a choice for a while, not kept.
+//
+// Edit has an inspector with three tabs: Part (the part picked), Layers (the page's parts as a tree) and
+// Page (the whole page's look). Beside the page when there is room, else a drawer under it that folds.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronUp, Code2, Eye, Monitor, PenLine, Plus, Redo2, Smartphone, Tablet, Undo2 } from 'lucide-react';
+import { toast, toastError } from '../../../lib/store';
 import { Button, cx, IconButton, MenuItem, Popover, Segmented, Throbber, useConfirm, useMediaQuery } from '../../../components/ui';
 import type { EditorHandle } from '../../../lib/codemirror';
-import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type Device, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
-import { BLOCKS, editorLabels } from './blocks';
-import { Inspector } from './Inspector';
+import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type Device, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
+import { AddPanel } from './AddPanel';
+import { editorLabels } from './blocks';
+import { PartPanel, type Ctx, type Media } from './Inspector';
+import { LayersPanel } from './Layers';
+import { PagePanel } from './PagePanel';
 
 export type StudioMode = 'view' | 'edit' | 'code';
 
@@ -31,7 +38,31 @@ const DEVICES: { value: Device; label: string; icon: ReactNode }[] = [
   { value: 'tablet', label: 'Tablet', icon: <Tablet size={14} /> },
   { value: 'phone', label: 'Phone', icon: <Smartphone size={14} /> },
 ];
-const DEVICE_KEY = 'wa.studio.device';
+const MEDIA_OF: Record<Device, Media> = { desktop: '', tablet: 'tablet', phone: 'phone' };
+type Tab = 'part' | 'layers' | 'page';
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'part', label: 'Part' },
+  { value: 'layers', label: 'Layers' },
+  { value: 'page', label: 'Page' },
+];
+
+/** A part copied in the editor, to paste here or in another page while the app is open. */
+let clipboard: { html: string; name: string } | null = null;
+
+/** How wide an element is, as it changes. */
+function useWidthOf<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [w, setW] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setW(el.clientWidth));
+    ro.observe(el);
+    setW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w] as const;
+}
 
 /** The HTML, with the editor's colours and keys: it saves on Ctrl+S. */
 function CodePane({ html, onChange, onSave, className }: { html: string; onChange: (v: string) => void; onSave: () => void; className?: string }) {
@@ -107,6 +138,7 @@ export function Studio({
   savedNote,
   onDirty,
   initialMode,
+  onAsk,
 }: {
   doc: StudioDoc | null;
   /** An agent is writing it: what came so far. */
@@ -128,9 +160,11 @@ export function Studio({
   onDirty?: (dirty: boolean) => void;
   /** How it opens: Edit for a blank page just made, say. */
   initialMode?: StudioMode;
+  /** Puts a note on the part picked in the message box: the editor's "Ask the agent". */
+  onAsk?: (text: string) => void;
 }) {
   const [mode, setMode] = useState<StudioMode>(initialMode ?? 'view');
-  const [device, setDevice] = useState<Device>(() => (localStorage.getItem(DEVICE_KEY) as Device) || 'desktop');
+  const [device, setDevice] = useState<Device>('desktop');
   // Changed HTML not saved yet (from Code, or the editor's when it was left); null: the page as it is.
   const [pending, setPending] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -138,6 +172,16 @@ export function Studio({
   const [ed, setEd] = useState<EdState>({ dirty: false, canUndo: false, canRedo: false });
   const [sel, setSel] = useState<EdSel | null>(null);
   const [palette, setPalette] = useState<string[]>([]);
+  const [tab, setTab] = useState<Tab>('part');
+  const [ctx, setCtx] = useState<Ctx>({ scope: 'self', state: '' });
+  const [layers, setLayers] = useState<EdLayer | null>(null);
+  const [page, setPage] = useState<EdPage | null>(null);
+  const [clip, setClip] = useState(clipboard);
+  const [wordsOn, setWordsOn] = useState(false);
+  // The drawer under the page (where there is no room beside it): folded at first, open once a part is picked, until folded again.
+  const [drawer, setDrawer] = useState<'open' | 'closed' | null>(null);
+  const [shell, shellWidth] = useWidthOf<HTMLDivElement>();
+  const beside = shellWidth >= 760;
   const [epoch, setEpoch] = useState(0);
   const [saving, setSaving] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -175,7 +219,19 @@ export function Studio({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docKey]);
-  useEffect(() => localStorage.setItem(DEVICE_KEY, device), [device]);
+  const media = MEDIA_OF[device];
+  // Where the inspector's changes go; another part picked starts at the part itself again.
+  const selKey = sel ? sel.path.join('.') : '';
+  useEffect(() => setCtx({ scope: 'self', state: '' }), [selKey]);
+  useEffect(() => {
+    if (mode === 'edit') editRef.current?.cmd('ctx', { ...ctx, media });
+  }, [ctx, media, mode]);
+  useEffect(() => {
+    if (mode === 'edit') editRef.current?.cmd('layers', tab === 'layers');
+  }, [tab, mode]);
+  useEffect(() => {
+    if (sel && drawer === null) setDrawer('open');
+  }, [!!sel]);
 
   /** What is being changed now, as HTML. */
   const current = async (): Promise<string> => {
@@ -195,14 +251,16 @@ export function Studio({
         setCodeView((v) => v + 1);
       }
       setSel(null);
+      setPage(null);
+      setLayers(null);
       setMode(m);
     } catch (e) {
       toastError(e);
     }
   };
 
-  const save = async () => {
-    if (!doc || !onSave || saving) return;
+  const save = async (): Promise<boolean> => {
+    if (!doc || !onSave || saving) return false;
     setSaving(true);
     try {
       const h = await current();
@@ -212,13 +270,16 @@ export function Studio({
         if (mode === 'code') setCode(h);
         editRef.current?.saved();
         setEd((s) => ({ ...s, dirty: false }));
-      } else savedRef.current = null;
+        return true;
+      }
+      savedRef.current = null;
     } catch (e) {
       savedRef.current = null;
       toastError(e);
     } finally {
       setSaving(false);
     }
+    return false;
   };
   const saveRef = useRef(save);
   saveRef.current = save;
@@ -230,6 +291,8 @@ export function Studio({
     setCodeView((v) => v + 1);
     setEd({ dirty: false, canUndo: false, canRedo: false });
     setSel(null);
+    setPage(null);
+    setLayers(null);
     setEpoch((e) => e + 1);
   };
 
@@ -243,6 +306,15 @@ export function Studio({
 
   const cmd = (c: string, arg?: unknown) => editRef.current?.cmd(c, arg);
   const side = layout === 'page';
+
+  /** The agent is told which part is meant, in the message box; changes not saved yet are saved first, so it sees them. */
+  const ask = async () => {
+    if (!onAsk || !sel || !doc) return;
+    if (dirty && !(await save())) return;
+    const words = sel.snippet ? ` “${sel.snippet}”` : '';
+    onAsk(`On the page “${doc.title}”, the ${sel.name.toLowerCase()}${words} (\`${sel.selector}\`): `);
+    toast('In your message box: say what to change', 'ok');
+  };
 
   let body: ReactNode;
   if (writing || (!doc && draft)) {
@@ -260,8 +332,50 @@ export function Studio({
       </div>
     );
   } else if (mode === 'edit') {
+    const crumbs = tab === 'part' && sel && (
+      <div className="flex min-h-8 shrink-0 items-center gap-1 overflow-x-auto px-2 [&::-webkit-scrollbar]:hidden">
+        {sel.crumbs.slice(-4).map((c, i, all) => (
+          <span key={c.path.join('.')} className="flex shrink-0 items-center gap-1">
+            {i > 0 && <span className="text-fg-3">›</span>}
+            <button
+              type="button"
+              onClick={() => cmd('select', c.path)}
+              className={cx('rounded-md px-1.5 py-0.5 text-[12px] transition-colors hover:bg-bg-2', i === all.length - 1 ? 'font-semibold text-fg' : 'text-fg-3')}
+            >
+              {c.name}
+            </button>
+          </span>
+        ))}
+      </div>
+    );
+    const panel =
+      tab === 'layers' ? (
+        <LayersPanel tree={layers} sel={sel} cmd={cmd} />
+      ) : tab === 'page' ? (
+        <PagePanel page={page} palette={palette} cmd={cmd} media={media} />
+      ) : sel ? (
+        <PartPanel
+          sel={sel}
+          palette={palette}
+          fonts={page?.fonts ?? []}
+          cmd={cmd}
+          ctx={ctx}
+          onCtx={setCtx}
+          media={media}
+          clip={clip}
+          onAsk={onAsk ? () => void ask() : undefined}
+          onError={toastError}
+          onPageTab={() => setTab('page')}
+        />
+      ) : (
+        <p className="px-3 py-2 text-[12.5px] leading-relaxed text-fg-3">
+          Click a part of the page to change it, and click it again to change its words. Drag it by its handle to move it, or by its edges to size it.
+        </p>
+      );
+    // Folded, only the tabs show; a tab opens it. While words are changed in the page, it makes room.
+    const folded = !beside && (drawer !== 'open' || wordsOn);
     body = (
-      <div className={cx('flex h-full min-h-0', side ? 'flex-row' : 'flex-col')}>
+      <div className={cx('flex h-full min-h-0', beside ? 'flex-row' : 'flex-col')}>
         <div className="relative min-h-0 min-w-0 flex-1">
           <DeviceStage device={device}>
             <EditFrame
@@ -275,26 +389,55 @@ export function Studio({
               onState={setEd}
               onPalette={setPalette}
               onSave={() => void saveRef.current()}
+              onReady={() => {
+                editRef.current?.cmd('ctx', { ...ctx, media });
+                editRef.current?.cmd('layers', tab === 'layers');
+                if (clipboard) editRef.current?.cmd('clip', { html: clipboard.html });
+              }}
+              onLayers={setLayers}
+              onPage={setPage}
+              onCopied={(c) => {
+                clipboard = c;
+                setClip(c);
+                toast(c.name ? `${c.name} copied` : 'Copied', 'ok');
+              }}
+              onEditing={setWordsOn}
             />
           </DeviceStage>
         </div>
-        <aside className={cx('flex min-h-0 shrink-0 flex-col bg-panel', side ? 'w-[300px] border-l border-line' : 'h-[42%] max-h-[340px] min-h-[180px] border-t border-line')}>
-          <div className="flex min-h-9 shrink-0 items-center gap-1 overflow-x-auto px-2 pt-1.5 [&::-webkit-scrollbar]:hidden">
-            {(sel?.crumbs ?? []).slice(-4).map((c, i, all) => (
-              <span key={c.path.join('.')} className="flex shrink-0 items-center gap-1">
-                {i > 0 && <span className="text-fg-3">›</span>}
+        <aside className={cx('flex min-h-0 shrink-0 flex-col bg-panel', beside ? 'w-[320px] border-l border-line' : cx('border-t border-line', folded ? 'pb-[var(--safe-bottom)]' : 'h-[min(48%,440px)] min-h-[200px]'))}>
+          <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">
+            <div role="tablist" className="flex min-w-0 flex-1 items-center gap-0.5">
+              {TABS.map((t) => (
                 <button
+                  key={t.value}
                   type="button"
-                  onClick={() => cmd('select', c.path)}
-                  className={cx('rounded-md px-1.5 py-0.5 text-[12px] transition-colors hover:bg-bg-2', i === all.length - 1 ? 'font-semibold text-fg' : 'text-fg-3')}
+                  role="tab"
+                  aria-selected={tab === t.value}
+                  onClick={() => {
+                    setTab(t.value);
+                    if (folded) setDrawer('open');
+                  }}
+                  className={cx('relative h-10 px-2.5 text-[13px] font-medium transition-colors', tab === t.value ? 'text-fg' : 'text-fg-3 hover:text-fg-2')}
                 >
-                  {c.name}
+                  {t.label}
+                  {tab === t.value && !folded && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-fg" />}
                 </button>
-              </span>
-            ))}
-            {!sel && <span className="px-1.5 text-[12px] font-semibold text-fg-2">Nothing picked</span>}
+              ))}
+            </div>
+            {tab === 'part' && sel && folded && <span className="min-w-0 truncate text-[12.5px] font-medium text-fg-2">{sel.name}</span>}
+            {!beside && (
+              <IconButton label={folded ? 'Open the inspector' : 'Fold the inspector'} size="sm" onClick={() => setDrawer(folded ? 'open' : 'closed')}>
+                {folded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </IconButton>
+            )}
           </div>
-          <Inspector sel={sel} palette={palette} cmd={cmd} onError={toastError} className="flex-1" />
+          {!folded && (
+            <>
+              {crumbs}
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1">{panel}</div>
+            </>
+          )}
         </aside>
       </div>
     );
@@ -318,7 +461,7 @@ export function Studio({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg">
+    <div ref={shell} className="flex h-full min-h-0 flex-col bg-bg">
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">{lead}</div>
         {writing && layout !== 'panel' ? (
@@ -383,25 +526,18 @@ export function Studio({
           <IconButton label="Redo (Ctrl+Shift+Z)" size="sm" disabled={!ed.canRedo} onClick={() => cmd('redo')}>
             <Redo2 size={14} />
           </IconButton>
-          <span className="ml-1 truncate text-[12px] text-fg-3">{sel ? (sel.wordy ? 'Click it again to change its words' : 'Drag the handle to move it') : 'Click a part of the page'}</span>
-          <Popover anchor={addRef} open={adding} onClose={() => setAdding(false)} width={252}>
-            <div className="grid grid-cols-2 gap-1 p-1">
-              {BLOCKS.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => {
-                    setAdding(false);
-                    cmd('insert', { html: b.html, edit: b.edit });
-                  }}
-                  className="rounded-lg px-2.5 py-1.5 text-left text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
-                >
-                  {b.label}
-                </button>
-              ))}
-            </div>
-            <div className="border-t border-line px-2.5 py-1.5 text-[11.5px] text-fg-3">After the part picked, or at the end</div>
-          </Popover>
+          {media && (
+            <span
+              className="ml-1 shrink-0 rounded-md bg-accent-soft px-1.5 py-0.5 text-[11.5px] font-medium text-accent"
+              title={media === 'phone' ? 'Changes are for screens 600 px wide or narrower' : 'Changes are for screens 900 px wide or narrower'}
+            >
+              {media === 'phone' ? 'For phones' : 'For tablets'}
+            </span>
+          )}
+          <span className="ml-1 truncate text-[12px] text-fg-3 max-sm:hidden">
+            {sel ? (sel.wordy ? 'Click it again to change its words' : 'Drag the handle to move it, the edges to size it') : 'Click a part of the page'}
+          </span>
+          <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} />
         </div>
       )}
       <div className="relative min-h-0 flex-1">{body}</div>

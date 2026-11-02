@@ -205,7 +205,7 @@ export function ShotCard({ item, sessionKey }: { item: ToolItem; sessionKey: str
       <button
         type="button"
         onClick={() => useCanvas.getState().show(sessionKey, { kind: 'review', id: item.id })}
-        className={cx('tl-item my-1 flex w-full max-w-[34rem] items-center gap-3 rounded-xl border bg-panel py-2 pr-3 pl-2.5 text-left transition-colors', here ? 'border-accent/50 shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-line hover:border-line-2')}
+        className={cx('tl-item my-1 flex w-full items-center gap-3 rounded-xl border bg-panel py-2 pr-3 pl-2.5 text-left transition-colors', here ? 'border-accent/50 shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-line hover:border-line-2')}
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-accent-soft text-accent">
           <ArrowLeftRight size={17} />

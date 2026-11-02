@@ -41,26 +41,53 @@ Any page an agent shows or saves, any page in your library and any HTML file an 
 - **Edit**: change it by clicking on it. Its scripts are held back while you do, so the page stays still.
 - **Code**: its HTML, with the page beside it (below it in a narrow panel) showing your changes a moment after you type.
 
-Beside them, the screen buttons show the page as on a **Computer**, a **Tablet** or a **Phone** (in the panel and in a narrow window, one button with a menu).
+Beside them, the screen buttons show the page as on a **Computer**, a **Tablet** or a **Phone** (in the panel and in a narrow window, one button with a menu). A page opens as wide as there is room for; a tablet's or a phone's width lasts while the page is open. In **Edit**, what you change with a tablet or a phone picked is for that size of screen ([Change it for phones and tablets](#change-it-for-phones-and-tablets)).
 
 ### Edit by clicking
 
 1. Click a part of the page: a heading, a paragraph, a picture, a card, a table. It gets a frame with its name ("Heading 2", "Picture", "Card"), and a small bar beside it.
-2. Click it again (or double-click it) to change its words where they are. Type, then press Enter (or Esc, or click elsewhere). Ctrl+B and Ctrl+I make words bold or italic.
-3. The bar beside it: drag its handle (⠿) to move the part elsewhere on the page; **Pick the part around it** (Esc does the same); **Change the words**; **Move up** and **Move down**; **Duplicate** (Ctrl+D); **Delete** (the Delete key).
+2. Click it again (or double-click it) to change its words where they are. A bar over the words has **Bold**, **Italic**, **Underline**, **Strike through**, **Make it a link** (Ctrl+K), **Not a link**, **Plain words** and **Done**. Enter starts a new line in a paragraph and finishes a heading; Esc finishes.
+3. The bar beside a picked part: drag its handle (⠿) to move the part elsewhere on the page; **Pick the part around it** (Esc does the same); **Change the words**; **Move up** and **Move down**; **Duplicate** (Ctrl+D); **Delete** (the Delete key). Drag the small handles on its right edge, bottom edge and corner to make it wider or taller.
 
-The panel under the page (beside it on a wide page) shows what is picked and the parts around it (click one to pick it), then:
+The keys work as in other editors: Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the part picked (into another page too, while the app is open); Ctrl+G wraps it in a block and Ctrl+Shift+G takes out what is in it; the arrow keys pick the part above, below, around it or in it; Alt+↑ and Alt+↓ move it.
 
-- **Content**: its words; for a heading or text, its **Kind** (H1, H2, H3, Text); for a link, where it **Goes to** and whether it opens in a **New tab**; for a picture, its address or **A picture from this device** (made small enough to live in the page) and its **Description**.
-- **Text**: size, **Regular** or **Bold**, alignment and colour (the page's own colours are the swatches; the rainbow one picks any other).
-- **Block**: its **Fill**, **Corners**, **Inside space**, **Space below**, a **Border** and its **Width**.
-- **More**: how its parts sit (**Stacked**, **In a row** or a **Grid**, with the **Gap**), its class and id, and its own style as CSS.
+On a phone, tap a part to pick it and tap it again to change its words. The tabs below the page (**Part**, **Layers**, **Page**) open a drawer with what you can change; the arrow folds it, and it folds by itself while you type.
 
-With nothing picked, a click on the page's background picks **The page** itself: its **Background**, **Text colour**, **Font** (**System**, **Serif**, **Rounded** or **Mono**), **Width** (**Narrow**, **Medium** or **Full**) and **Text size**.
-
-**Add** puts a new part after the one picked (at the end of the page with nothing picked): a heading, text, a button, a picture, a list, a card, two columns, a table, a quote, a divider, some space or a section. Its words are ready to type where that fits.
+**Add** puts a new part after the one picked, inside it, or at the end of the page (pick where with **Put it**): **Basics** (a heading, text, a button, a link, a picture, a list, a quote, a divider, some empty space), **Layout** (a section, two or three columns, a card, cards, a table, numbers, a fold-out, a field) and ready-made **Sections** (an introduction, features, prices, steps, questions, praise, a call to act, a contact form, a footer). Its words are ready to type where that fits.
 
 **Undo** (Ctrl+Z) and **Redo** (Ctrl+Shift+Z) step through your changes.
+
+### Part, Layers and Page
+
+Beside the page (under it in a narrow panel or on a phone), three tabs show what you can change.
+
+**Part** is the part picked, with the parts around it above (click one to pick it). At the top: **Ask the agent** (in a conversation: it puts a note in your message box saying which part you mean, so you only say what to change; changes not saved yet are saved first, so the agent sees them), **Copy**, **Paste**, and **More** (⋯) with **Cut**, **Paste inside it**, **Wrap in a block**, **Take out what is in it**, **Duplicate**, **Show it on the page** and **Delete**. Under them, which parts the changes are for: **This part**, every part of its kind ("Every Heading 2") or every part with one of its classes ("Every .card"); and **Normal** or **Hover**, the look while the pointer is over it (the page shows that look while you change it). Then its groups, which fold:
+
+- **Content**: its words; for a heading or text, its **Kind** (H1, H2, H3, Text, quote); for a link, where it **Goes to** and whether it opens in a **New tab**; for a picture, its address or **A picture from this device** (made small enough to live in the page) and its **Description**.
+- **Text**: **Font**, size and weight, **Spacing** (the height of its lines, the space between its letters), **Colour**, **Align** and **Style** (italic, underlined, struck through, capitals).
+- **Fill and border**: **Fill**, a **Picture** behind it, **See-through**, **Corners**, **Border** and **Shadow**.
+- **Space**: the space **Outside** its border and **Inside** it, side by side as the part has them. Type a number, or drag one up or down.
+- **Size**: its **Width** and how wide it may be at most, its **Height** and how tall at least, and how a picture **Fit**s its size.
+- **Layout**: how the parts in it **Show** (one under another, in a row, in a column, in a grid, or hidden), how they line up and spread out, the gap between them, and its **Place**: where it falls, moved from there, on its block, on the screen, or stuck while the page scrolls.
+- **Class, name and CSS**: its classes, its id, and what is set for it as CSS.
+
+The name of a setting turns gold when something is set there; the ✕ beside it clears it. Drag a number's letter sideways to change it, or use the arrow keys (with Shift, by ten). The swatches are the page's own colours; the rainbow one picks any other.
+
+**Layers** shows the page's parts as a tree, as they sit inside each other. Point at one to see it in the page; click it to pick it, even a part too small or too covered to click in the page.
+
+**Page** is the whole page:
+
+- **The page**: its **Title** (the name in a browser's tab), **Background**, **Width** (how wide its content runs on a big screen, in the middle: **Full**, **Wide**, **Medium** or **Narrow**), **Inside space** and **Language**.
+- **Colours**: the colours the page names (its CSS variables; for a page made with the app's ready-made look, its **Background**, **Cards**, **Text**, **Accent** and the rest). Change one and everything that uses it changes with it.
+- **Fonts**: the font of its **Text** and of its **Headings**: the device's own, or one of Google's, which the page then loads.
+- **Text styles**: how **Text**, **Heading 1** to **Heading 3**, **Links** and **Buttons** look everywhere in the page. A part you changed on its own keeps its change.
+- **Your CSS**: rules of your own for the whole page, kept in it as they are.
+
+### Change it for phones and tablets
+
+Pick **Tablet** or **Phone** at the top and the page shows at that width, with **For tablets** or **For phones** in the bar above it. What you change then is for screens that wide or narrower (900 pixels for tablets, 600 for phones), and the page stays as it was on a computer: a smaller heading on phones, two columns that sit one under another, a part hidden on phones (**Layout** → **Show** → **Hidden**). Pick **Computer** again to change it for every screen.
+
+Changes on hover, for a size of screen and for every part of a kind go in a stylesheet the editor keeps in the page; a change to one part as it is goes in that part's own style. Either way it is part of the page you save, and an agent that changes the page later sees it.
 
 ### Save or discard
 
@@ -278,3 +305,4 @@ Agents can read and change your pages for you, with your OK on a card. A few thi
 - "Rename the page 'Untitled checklist' to 'Moving house'."
 - "I sent my packing list's address to the wrong person: give it a new address."
 - "Publish the trip plan at a private link", or "unpublish the site we made last week."
+- "Make the headings on my landing page smaller on phones, and its buttons rounder."

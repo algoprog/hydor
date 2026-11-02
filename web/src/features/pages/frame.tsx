@@ -75,6 +75,17 @@ export function formText(name: string, fields: [string, string][]): string {
 }
 
 const nonce = () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+/**
+ * A frame before its page is drawn shows the app's colour (no white flash in the dark), and has the light
+ * scheme pages are written for: of another scheme than its page, the browser would paint a backdrop of its
+ * own (white) behind it, which shows wherever the page paints nothing.
+ */
+const FRAME_CLS = 'block h-full w-full border-0 bg-white [color-scheme:light] dark:bg-[#151412]';
+/** The page's own colour, which the frame says once it is drawn: shown where it bounces at an end. */
+const paintBg = (f: HTMLIFrameElement | null, bg: unknown) => {
+  if (f && typeof bg === 'string' && bg.length < 80) f.style.backgroundColor = bg;
+};
 const isStr = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
 const OPS = new Set(['get', 'set', 'remove', 'keys']);
 
@@ -127,6 +138,7 @@ export function PageFrame({
       // The height alone may come without the number (a frame from before the bridge had one).
       if (d.type === 'wa-html-size' && (d.n === n || d.n === undefined)) {
         if (typeof d.h === 'number' && Number.isFinite(d.h) && d.h >= 0) onHeight?.(Math.min(d.h, 100_000));
+        if (d.n === n) paintBg(ref.current, d.bg);
         return;
       }
       if (!n || d.n !== n) return;
@@ -173,7 +185,7 @@ export function PageFrame({
       src="/htmlframe"
       title={title}
       sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
-      className={cx('block h-full w-full border-0 bg-white', className)}
+      className={cx(FRAME_CLS, className)}
     />
   );
 }
@@ -218,7 +230,10 @@ export function StreamFrame({ html, base, title = 'Page', onHeight, className }:
         s.n = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join('');
         s.sent = '';
         push();
-      } else if (e.data.type === 'wa-html-size' && e.data.n === s.n && typeof e.data.h === 'number' && Number.isFinite(e.data.h)) s.onHeight?.(Math.min(Math.max(e.data.h, 0), 100_000));
+      } else if (e.data.type === 'wa-html-size' && e.data.n === s.n && typeof e.data.h === 'number' && Number.isFinite(e.data.h)) {
+        s.onHeight?.(Math.min(Math.max(e.data.h, 0), 100_000));
+        if (e.data.bg) paintBg(ref.current, e.data.bg);
+      }
     };
     window.addEventListener('message', onMessage);
     return () => {
@@ -235,7 +250,7 @@ export function StreamFrame({ html, base, title = 'Page', onHeight, className }:
       push();
     }, 160);
   }, [html]);
-  return <iframe ref={ref} src="/htmlframe" title={title} sandbox={SANDBOX} className={cx('block h-full w-full border-0 bg-white', className)} />;
+  return <iframe ref={ref} src="/htmlframe" title={title} sandbox={SANDBOX} className={cx(FRAME_CLS, className)} />;
 }
 
 /** What the visual editor says of the part picked (editor.ts `info`). */
@@ -247,10 +262,48 @@ export interface EdSel {
   words?: string;
   wordy: boolean;
   children: number;
+  /** It can hold other parts (Add can put one inside it). */
+  holds: boolean;
   attrs: Record<string, string>;
+  /** Its classes (not the editor's own). */
+  classes: string[];
+  /** How many parts there are of its kind ("tag") and with each of its classes (".card"). */
+  counts: Record<string, number>;
   computed: Record<string, string>;
   inline: Record<string, string>;
+  /** What is set for it where changes go now (this part, its kind or a class; on hover; at a size). */
+  declared: Record<string, string>;
+  /** A CSS selector that finds it, and a few of its words: what an agent is told of it. */
+  selector: string;
+  snippet: string;
   can: { up: boolean; down: boolean; parent: boolean; remove: boolean };
+}
+
+/** A part in the editor's Layers: where it is, its name, its tag, a few of its words, the parts in it. */
+export interface EdLayer {
+  p: number[];
+  n: string;
+  t: string;
+  x: string;
+  c: EdLayer[];
+}
+
+/** Text styles of a kind of part across the page: what the editor's stylesheet sets, and how the first one looks. */
+export interface EdKind {
+  declared: Record<string, string>;
+  computed: Record<string, string>;
+}
+
+/** The page's own look, as the editor reads it (editor.ts `pageInfo`). */
+export interface EdPage {
+  vars: { name: string; value: string }[];
+  fonts: string[];
+  title: string;
+  lang: string;
+  css: string;
+  kinds: Record<string, EdKind>;
+  media: '' | 'tablet' | 'phone';
+  bg: string;
 }
 
 export interface EdState {
@@ -279,12 +332,20 @@ export const EditFrame = forwardRef<
     onState: (s: EdState) => void;
     onPalette?: (colors: string[]) => void;
     onSave?: () => void;
+    /** The editor is ready for commands (send it what it should know: where changes go, say). */
+    onReady?: () => void;
+    onLayers?: (tree: EdLayer) => void;
+    onPage?: (page: EdPage) => void;
+    /** A part was copied (or cut): its HTML, to paste here or in another page. */
+    onCopied?: (c: { html: string; name: string }) => void;
+    /** Words are being changed in the page (a phone's keyboard is up). */
+    onEditing?: (on: boolean) => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave };
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useImperativeHandle(handle, () => ({
@@ -320,7 +381,17 @@ export const EditFrame = forwardRef<
       else if (d.type === 'wa-ed-state') c.onState({ dirty: !!d.dirty, canUndo: !!d.canUndo, canRedo: !!d.canRedo });
       else if (d.type === 'wa-ed-palette' || d.type === 'wa-ed-ready') {
         if (Array.isArray(d.colors)) c.onPalette?.(d.colors.filter((x: unknown) => typeof x === 'string').slice(0, 12));
-      } else if (d.type === 'wa-ed-save') c.onSave?.();
+        if (d.type === 'wa-ed-ready') {
+          paintBg(ref.current, d.bg);
+          c.onReady?.();
+        }
+      } else if (d.type === 'wa-ed-page' && d.page && typeof d.page === 'object') {
+        paintBg(ref.current, d.page.bg);
+        c.onPage?.(d.page as EdPage);
+      } else if (d.type === 'wa-ed-layers' && d.tree && typeof d.tree === 'object') c.onLayers?.(d.tree as EdLayer);
+      else if (d.type === 'wa-ed-copied' && typeof d.html === 'string' && d.html.length < 2_000_000) c.onCopied?.({ html: d.html, name: typeof d.name === 'string' ? d.name : '' });
+      else if (d.type === 'wa-ed-editing') c.onEditing?.(!!d.on);
+      else if (d.type === 'wa-ed-save') c.onSave?.();
       else if (d.type === 'wa-ed-html' && typeof d.html === 'string') {
         const done = ch.current.waits.get(d.id);
         ch.current.waits.delete(d.id);
@@ -330,7 +401,7 @@ export const EditFrame = forwardRef<
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, []);
-  return <iframe ref={ref} src="/htmlframe" title={title} sandbox={SANDBOX} className={cx('block h-full w-full border-0 bg-white', className)} />;
+  return <iframe ref={ref} src="/htmlframe" title={title} sandbox={SANDBOX} className={cx(FRAME_CLS, className)} />;
 });
 
 export type Device = 'desktop' | 'tablet' | 'phone';
@@ -353,7 +424,7 @@ export function DeviceStage({ device, children, className }: { device: Device; c
   const want = DEVICE_WIDTH[device];
   if (!want)
     return (
-      <div ref={box} className={cx('relative h-full w-full bg-white', className)}>
+      <div ref={box} className={cx('relative h-full w-full bg-white dark:bg-[#151412]', className)}>
         {children}
       </div>
     );
@@ -364,7 +435,7 @@ export function DeviceStage({ device, children, className }: { device: Device; c
     <div ref={box} className={cx('relative h-full w-full overflow-hidden bg-bg-2', className)}>
       {size.w > 0 && (
         <div
-          className="absolute top-4 left-1/2 overflow-hidden rounded-[14px] bg-white shadow-[0_0_0_1px_var(--line-2),0_8px_30px_rgba(0,0,0,.18)]"
+          className="absolute top-4 left-1/2 overflow-hidden rounded-[14px] bg-white shadow-[0_0_0_1px_var(--line-2),0_8px_30px_rgba(0,0,0,.18)] dark:bg-[#151412]"
           style={{ width: want, height: h, transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'top center' }}
         >
           {children}

@@ -10,6 +10,7 @@ import { AppWindow, ChevronDown, Download, Ellipsis, ExternalLink, FileCode2, Fo
 import type { PageInfo } from '@shared/pages';
 import type { SessionSummary, TimelineItem, ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post, put } from '../../lib/api';
+import { composeInsert } from '../../lib/featureEvents';
 import { basename, tildify } from '../../lib/format';
 import { go, showInFiles } from '../../lib/nav';
 import { toast, toastError, useApp, useLive, useTimeline } from '../../lib/store';
@@ -354,6 +355,11 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
       initialMode={target.edit ? 'edit' : undefined}
       saveLabel={kind === 'show_html' && !loaded?.pageId ? 'Keep with changes' : 'Save'}
       savedNote="the agent sees your changes with your next message"
+      onAsk={(text) => {
+        composeInsert(text, key);
+        // Over everything on a phone: the message box is under it.
+        if (layout === 'sheet') onClose();
+      }}
     />
     </>
   );

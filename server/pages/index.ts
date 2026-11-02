@@ -71,8 +71,9 @@ const SHOW_HTML: RunTool = {
   annotations: { readOnlyHint: true },
   description: [
     'Show the user an HTML page inside the conversation: a report, a chart, a table, a diagram, a mock-up, options to pick from.',
-    'Use it when a visual is clearer than text, or when asked for one. The page renders in a sandboxed frame on a white background,',
-    'as wide as the chat column (about 760px on a computer, 360px on a phone: make it fit both), and grows to its content height. Write a complete, self-contained page: inline CSS and',
+    'Use it when a visual is clearer than text, or when asked for one. The page renders in a sandboxed frame: in the conversation, beside it or',
+    'full screen, from a phone’s 360px to a whole screen wide, and grows to its content height. Make it fill whatever width it gets: no max-width or',
+    'fixed width on the body or a wrapper; fluid layouts (grids with auto-fit columns, percentages, wrapping rows). A page that sets no background of its own shows on white. Write a complete, self-contained page: inline CSS and',
     'JavaScript; scripts may load from CDNs (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com). It cannot reach this app or the',
     'user’s files, so embed the data; localStorage keeps nothing. The user sees the page itself; do not repeat its contents in your reply.',
     CHOICES,

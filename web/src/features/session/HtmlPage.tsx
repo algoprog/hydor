@@ -73,7 +73,7 @@ export function SmallPageCard({ sessionKey, item, title, sub, writing, icon }: {
       type="button"
       onClick={() => useCanvas.getState().show(sessionKey, { kind: 'item', id: item.id })}
       className={cx(
-        'tl-item my-1 flex w-full max-w-[34rem] items-center gap-3 rounded-xl border bg-panel py-2 pr-3 pl-2.5 text-left transition-colors',
+        'tl-item my-1 flex w-full items-center gap-3 rounded-xl border bg-panel py-2 pr-3 pl-2.5 text-left transition-colors',
         here ? 'border-accent/50 shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-line hover:border-line-2',
       )}
     >
