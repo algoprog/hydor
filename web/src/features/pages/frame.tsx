@@ -39,9 +39,36 @@ const appLabels = () => ({
   now: tr('just now'),
   noFlow: tr('This template has no flow'),
   noData: tr('This template keeps no collection'),
+  message: tr('Write a message…'),
+  send: tr('Send'),
+  newChat: tr('New conversation'),
+  earlier: tr('Earlier conversations'),
+  chatHint: tr('Ask its agent about what it keeps, or to run it for you.'),
+  queued: tr('Waiting its turn'),
 });
 
 const COLLECTION = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
+
+interface ChatDetail {
+  run: AppRun;
+  first?: string;
+  asks?: { text: string; at?: number; reply?: string }[];
+  queued?: { text: string; at: number }[];
+}
+
+/** A conversation as a screen sees it: its messages in order, and whether its agent is at work on a reply. */
+function chatOf(appId: string, d: ChatDetail) {
+  if (d.run.app !== appId || d.run.source !== 'chat') throw new Error('That is not a conversation of this template');
+  const msgs: { from: 'you' | 'agent'; text: string; queued?: boolean }[] = [{ from: 'you', text: String(d.run.inputs.message ?? '') }];
+  if (d.first) msgs.push({ from: 'agent', text: d.first });
+  for (const x of d.asks ?? []) {
+    msgs.push({ from: 'you', text: x.text });
+    if (x.reply) msgs.push({ from: 'agent', text: x.reply });
+  }
+  for (const q of d.queued ?? []) msgs.push({ from: 'you', text: q.text, queued: true });
+  const busy = d.run.status === 'queued' || d.run.status === 'starting' || d.run.status === 'running';
+  return { id: d.run.id, status: d.run.status, working: busy, messages: msgs, ...(d.run.error ? { error: d.run.error } : {}) };
+}
 
 /** One call of a screen's window.naget.app, for its own template: its flows' runs and its data. */
 function appCall(appId: string, op: string, a: Record<string, unknown>): Promise<unknown> {
@@ -72,6 +99,16 @@ function appCall(appId: string, op: string, a: Record<string, unknown>): Promise
       return patch<{ record: unknown }>(`/api/apps/${id}/data/${col()}/${enc(String(a.id ?? ''))}`, { set: a.set }).then((r) => r.record);
     case 'remove':
       return del(`/api/apps/${id}/data/${col()}/${enc(String(a.id ?? ''))}`);
+    // A conversation with its agent: a message starts one, or goes on with the one named.
+    case 'chat': {
+      const text = String(a.text ?? '').trim();
+      if (!a.id) return post<{ run: AppRun }>(`/api/apps/${id}/chats`, { text }).then((r) => chatOf(appId, { run: r.run }));
+      return post<{ run: AppRun }>(`/api/apps/runs/${enc(String(a.id))}/ask`, { text }).then(() => appCall(appId, 'chat-get', { id: a.id }));
+    }
+    case 'chat-get':
+      return api<ChatDetail>(`/api/apps/runs/${enc(String(a.id ?? ''))}`).then((d) => chatOf(appId, d));
+    case 'chats':
+      return api<{ chats: unknown[] }>(`/api/apps/${id}/chats`).then((r) => r.chats);
     default:
       return Promise.reject(new Error('That is not something a screen can do'));
   }
@@ -217,6 +254,7 @@ function partWords(): string {
     ['table', tr('Table: {0}')],
     ['runs', tr('Runs: {0}')],
     ['count', tr('Count: {0}')],
+    ['chat', tr('A conversation with its agent')],
   ];
   const vars = words.map(([k, w]) => {
     const [a, b = ''] = w.split('{0}');

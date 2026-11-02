@@ -35,6 +35,7 @@ import { envDir, envOf, envTesting } from './env.ts';
 import { flowRunner, stepsOf as flowSteps } from './flow.ts';
 import { apps } from './index.ts';
 import { packageOf, zipPackage } from './package.ts';
+import { defaultScreen } from './screens.ts';
 import { MEMORY_MARK, runFolder, saveResult, startRun, startRuns, stopRun, waitFor, WORK_DIR } from './runs.ts';
 import * as store from './store.ts';
 
@@ -1631,6 +1632,71 @@ test('flows beside the main one: a screen’s flow runs with its own inputs and 
   // A flow beside the main one is checked like it, in its own words.
   const wrong = await http.inject({ method: 'POST', url: '/api/apps/check', payload: { recipe: { name: 'W', prompt: 'x', flows: { add: { steps: [{ id: 'a', do: 'model', instructions: '{{inputs.nope}}' }] } } } } });
   assert.ok(wrong.json().errors.some((e: string) => /Flow “add”: .*no question “nope”/.test(e)), wrong.body);
+});
+
+test('a conversation on its screen: a message starts one with the template’s agent and later ones go on with it; its agent runs the template’s flows and waits for what they give', async () => {
+  const a = app({
+    name: 'Notes keeper',
+    data: { notes: { title: 'text' } },
+    answer: [],
+    flow: { steps: [{ id: 'all', do: 'data', op: 'find', collection: 'notes' }] },
+    flows: { add: { title: 'Add one', inputs: [{ id: 'title', label: 'Title', required: true }], steps: [{ id: 'keep', do: 'data', add: 'notes', with: { title: '{{inputs.title}}' } }], outputs: { added: '{{keep.record.title}}' } } },
+  });
+  assert.equal((await http.inject({ method: 'POST', url: `/api/apps/${a.id}/chats`, payload: { text: '  ' } })).statusCode, 400);
+  const started = (await http.inject({ method: 'POST', url: `/api/apps/${a.id}/chats`, payload: { text: 'What do you keep?' } })).json().run;
+  assert.equal(started.source, 'chat');
+  assert.equal(started.inputs.message, 'What do you keep?');
+  await sleep(100);
+  const key = store.getRun(db, started.id)!.key!;
+  const made = sessions.made.find((m) => m.key === key)!;
+  assert.match(made.o.prompt, /What do you keep\?/);
+  // Told it is a conversation, with nothing to hand in; it gets the template's records and flows.
+  const add = await apps.spawn!({ agent: 'claude', key, cwd: tmp, runId: 'agent-chat-1', resume: false, extra: { app: made.o.extra.app } }, deps);
+  assert.match(add!.instructions![0], /a conversation on the screen of the template "Notes keeper"/);
+  assert.doesNotMatch(add!.instructions![0], /submit_result|Your last reply is the result/);
+  const ctx: RunCtx = { runId: 'agent-chat-1', key, agent: 'claude', cwd: tmp, deps };
+  assert.deepEqual(apps.tools!(ctx).map((t) => t.name), ['app_data', 'app_run']);
+  assert.equal(apps.allowTool!('app_run', ctx), true);
+  const runTool = apps.tools!(ctx).find((t) => t.name === 'app_run')!;
+  assert.match(runTool.description, /run \(its main flow; inputs: topic: text, names\?: long\); add \(Add one; inputs: title: text\)/);
+  const out = JSON.parse(String(await runTool.run({ flow: 'add', inputs: { title: 'Milk' }, wait: 20 }, ctx)));
+  assert.equal(out.status, 'done', out.error);
+  assert.equal(out.result.added, 'Milk');
+  assert.equal(out.link, `/apps/runs/${out.run}`);
+  const wrong = (await runTool.run({ flow: 'nope' }, ctx)) as { text: string; isError?: boolean };
+  assert.ok(wrong.isError);
+  assert.match(wrong.text, /no flow “nope”/);
+  // Its turn ends: the conversation waits for the next message (done), listed among its conversations, not its runs.
+  sessions.items.set(key, [{ kind: 'user', id: 'u1', seq: 0, text: 'What do you keep?' }]);
+  sessions.end(key, 'I keep notes: one so far, Milk.');
+  assert.equal((await ended(started.id)).status, 'done');
+  const chats = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/chats` })).json().chats;
+  assert.deepEqual([chats.length, chats[0].id, chats[0].first], [1, started.id, 'What do you keep?']);
+  const runs = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/runs` })).json().runs;
+  assert.ok(!runs.some((x: { id: string }) => x.id === started.id), 'a conversation is not one of its runs');
+  assert.ok(runs.some((x: { source: string; flow?: string }) => x.source === 'screen' && x.flow === 'add'), 'the flow its agent ran is');
+  const page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${started.id}` })).json();
+  assert.equal(page.first, 'I keep notes: one so far, Milk.');
+  assert.equal(page.noAsks, undefined);
+  // A later message goes on with it.
+  const more = await http.inject({ method: 'POST', url: `/api/apps/runs/${started.id}/ask`, payload: { text: 'Thanks' } });
+  assert.equal(more.statusCode, 200, more.body);
+  assert.equal(more.json().run.status, 'running');
+  sessions.end(key, 'You are welcome.');
+  assert.equal((await ended(started.id)).status, 'done');
+  // Only a conversation's agent runs flows: a run from the form gets no app_run.
+  const r = startRun({ app: a.id, slug: a.slug, recipe: { ...a, prompt: 'Do {{topic}}', flow: undefined }, source: 'web', inputs: { topic: 'x' } });
+  await sleep(100);
+  const key2 = store.getRun(db, r.id)!.key!;
+  await apps.spawn!({ agent: 'claude', key: key2, cwd: tmp, runId: 'agent-chat-2', resume: false, extra: { app: sessions.made.find((m) => m.key === key2)!.o.extra.app } }, deps);
+  const ctx2: RunCtx = { runId: 'agent-chat-2', key: key2, agent: 'claude', cwd: tmp, deps };
+  assert.ok(!apps.tools!(ctx2).some((t) => t.name === 'app_run'));
+  assert.equal(apps.allowTool!('app_run', ctx2), false);
+  sessions.end(key2, 'Done.');
+  await ended(r.id);
+  // A screen made from its parts has a conversation when it keeps data.
+  assert.match(defaultScreen(a), /<h2>Ask its agent<\/h2>\n  <n-chat><\/n-chat>/);
+  assert.doesNotMatch(defaultScreen({ ...a, data: undefined }), /n-chat/);
 });
 
 test('screens: made from its parts or written, pages of the template’s own (not the library’s), changed by agents, carried in its file, gone with it', async () => {

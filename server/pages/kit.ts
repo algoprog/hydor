@@ -295,8 +295,8 @@ function bridge(cfg: BridgeCfg) {
 /**
  * A template's screen (server/apps/screens.ts): window.naget.app, its flows and its data through the app
  * (pages/frame.tsx answers each call for the template the screen belongs to, never another), and the App
- * parts written on it: <n-form flow>, <n-result flow>, <n-table data>, <n-runs flow>, <n-button flow> and
- * <n-count data>. Runs after the bridge, in the page; like it, uses only its argument and the browser.
+ * parts written on it: <n-form flow>, <n-result flow>, <n-table data>, <n-runs flow>, <n-button flow>,
+ * <n-count data> and <n-chat>. Runs after the bridge, in the page; like it, uses only its argument and the browser.
  */
 function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
   const P = window.parent;
@@ -386,6 +386,10 @@ function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
     runs: (o: { flow?: string; limit?: number } = {}) => call('runs', o),
     data,
     on,
+    // Conversations with its agent: a message starts one (or goes on with the one named); each comes back with its messages.
+    chat: (text: string, id?: string) => call('chat', { text, id }),
+    conversation: (id: string) => call('chat-get', { id }),
+    chats: () => call('chats'),
   });
   const W = window as any;
   Object.defineProperty(window, 'naget', { value: Object.freeze({ ...(W.naget ?? {}), app: api }), enumerable: true, configurable: true });
@@ -646,6 +650,115 @@ function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
       }
       disconnectedCallback() {
         this.off?.();
+      }
+    },
+  );
+
+  define(
+    'n-chat',
+    class extends HTMLElement {
+      off: (() => void) | null = null;
+      timer: any = 0;
+      connectedCallback() {
+        if (this.querySelector('.n-chat-msgs')) return;
+        let cur: any = null;
+        let busy = false;
+        const log = h('div', { class: 'n-chat-msgs', role: 'log' });
+        const status = h('span', { class: 'n-app-status', role: 'status' });
+        const words = L('message', 'Write a message…');
+        const box = h('textarea', { class: 'n-chat-box', rows: 2, placeholder: this.getAttribute('placeholder') || words, 'aria-label': words });
+        const send = h('button', { class: 'n-btn n-primary', type: 'submit' }, L('send', 'Send'));
+        const fresh = h('button', { class: 'n-chat-link', type: 'button', hidden: true }, L('newChat', 'New conversation'));
+        const earlier = h('button', { class: 'n-chat-link', type: 'button', 'aria-expanded': 'false' }, L('earlier', 'Earlier conversations'));
+        const menu = h('ul', { class: 'n-chat-menu', hidden: true });
+        const form = h('form', { class: 'n-chat-form' }, box, h('div', { class: 'n-row' }, send, status, h('span', { class: 'n-chat-more' }, fresh, earlier)), menu);
+        const draw = () => {
+          const msgs: any[] = cur?.messages ?? [];
+          log.replaceChildren(
+            ...(msgs.length
+              ? msgs.map((m) => h('div', { class: `n-chat-msg ${m.from === 'you' ? 'n-chat-you' : 'n-chat-agent'}${m.queued ? ' n-chat-queued' : ''}`, title: m.queued ? L('queued', 'Waiting its turn') : undefined }, m.text))
+              : [h('div', { class: 'n-app-empty' }, this.getAttribute('hint') || L('chatHint', 'Ask its agent about what it keeps, or to run it for you.'))]),
+          );
+          log.scrollTop = log.scrollHeight;
+          status.className = `n-app-status${cur?.status === 'failed' ? ' n-app-err' : ''}`;
+          status.textContent = cur?.working || busy ? L('working', 'Working…') : cur?.status === 'failed' || cur?.status === 'stopped' ? `${statusOf(cur)}${cur.error ? `: ${cur.error}` : ''}` : '';
+          // Before its agent has started, a message has nowhere to go yet.
+          send.disabled = busy || cur?.status === 'queued' || cur?.status === 'starting';
+          fresh.hidden = !cur;
+          clearTimeout(this.timer);
+          if (cur?.working) this.timer = setTimeout(load, 4000);
+        };
+        const load = () => cur && call('chat-get', { id: cur.id }).then((c: any) => (cur?.id === c.id ? ((cur = c), draw()) : undefined), () => {});
+        const open = (id: string) => call('chat-get', { id }).then((c: any) => ((cur = c), draw()), () => {});
+        form.addEventListener('submit', async (e: Event) => {
+          e.preventDefault();
+          const words2 = box.value.trim();
+          if (!words2 || busy) return;
+          busy = true;
+          draw();
+          try {
+            cur = await api.chat(words2, cur?.id);
+            box.value = '';
+          } catch (err) {
+            status.className = 'n-app-status n-app-err';
+            status.textContent = (err as Error).message;
+            busy = false;
+            send.disabled = false;
+            return;
+          }
+          busy = false;
+          draw();
+        });
+        box.addEventListener('keydown', (e: KeyboardEvent) => {
+          if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+            e.preventDefault();
+            form.requestSubmit();
+          }
+        });
+        fresh.addEventListener('click', () => {
+          cur = null;
+          menu.hidden = true;
+          draw();
+          box.focus();
+        });
+        earlier.addEventListener('click', async () => {
+          if (!menu.hidden) return void ((menu.hidden = true), earlier.setAttribute('aria-expanded', 'false'));
+          const list: any[] = await api.chats().catch(() => []);
+          menu.replaceChildren(
+            ...(list.length
+              ? list.slice(0, 8).map((c) =>
+                  h(
+                    'li',
+                    {},
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        onclick: () => {
+                          menu.hidden = true;
+                          earlier.setAttribute('aria-expanded', 'false');
+                          void open(c.id);
+                        },
+                      },
+                      h('span', { class: 'n-chat-first' }, c.first),
+                      h('span', { class: 'n-muted' }, ago(c.at)),
+                    ),
+                  ),
+                )
+              : [h('li', { class: 'n-app-empty' }, L('empty', 'Nothing here yet'))]),
+          );
+          menu.hidden = false;
+          earlier.setAttribute('aria-expanded', 'true');
+        });
+        this.replaceChildren(log, form);
+        this.off = on('run', (r: any) => r && cur && r.id === cur.id && load());
+        draw();
+        // The latest conversation, unless the part starts each visit afresh.
+        if (!this.hasAttribute('fresh')) void api.chats().then((list: any[]) => !cur && list[0] && open(list[0].id), () => {});
+      }
+      disconnectedCallback() {
+        this.off?.();
+        clearTimeout(this.timer);
       }
     },
   );
