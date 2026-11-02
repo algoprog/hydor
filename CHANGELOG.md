@@ -3,6 +3,31 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.10.0 · 2 November 2026
+
+A page editor that works on phones and changes whole pages, sign-ins agents use without seeing them, and a
+conversation where answers, pictures and screenshots are easier to follow.
+
+- **The page editor, on phones too**: tap a part to pick it and tap it again to type, with a drawer that folds away
+  while you write. Make words bold, italic or a link where they are, size a part by its edges, copy, paste and
+  wrap parts, and pick them from a tree of layers. Change one part, every part of its kind or class, its look on
+  hover, or how it looks on tablets and phones only. The Page tab sets the whole page's colours, fonts and width
+  and how its text, headings, links and buttons look; Add has ready-made sections; and Ask the agent tells the
+  agent which part you mean.
+- **Pages fill their space**: a page opens as wide as there is room for, sits in the middle when it is narrower,
+  and shows its own colour behind it in the dark theme, so nothing flashes white. Agents are asked for pages that
+  fill the width they get, and a page's card in the conversation is as wide as the message box.
+- **Sign-ins agents use without seeing them**: when a task needs a sign-in that isn't saved, the agent asks for all
+  of it on one card (an email and a password, a database's address, user and password), then uses it by name:
+  typed into a site's sign-in page on its own hosts, put into a web request, or given to a command on this
+  computer that you allow, with what comes back hidden.
+- **Screenshots, compact**: a reply's screenshots show as one card of small pictures, a screen's before and after
+  split down the middle. A picture opens its review, with arrows to the reply's other screens.
+- **Pictures you attach show at once**, in your message and in the queue while it waits, and a message sent while
+  the agent works no longer shows twice.
+- **Answers from their start**: your message moves up as you send it, and a new answer stays where it begins while
+  it grows, so you read it from its first line.
+
 ## 0.9.0 · 1 November 2026
 
 Pages you watch being written and change yourself, with the agent building on your version; before and after
