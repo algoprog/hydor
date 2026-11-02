@@ -59,7 +59,7 @@ html[data-n-theme=dark]:has(>body.n-page){color-scheme:dark}
 .n-field input:focus,.n-field select:focus,.n-field textarea:focus{border-color:var(--n-accent);box-shadow:0 0 0 3px var(--n-accent-soft)}
 .n-row>.n-field{margin:0}
 .n-tag{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--n-soft);color:var(--n-muted);font-size:12px;font-weight:500;line-height:1.6}
-n-form,n-result,n-table,n-runs,n-count{display:block}
+n-form,n-result,n-table,n-runs,n-count,n-chat{display:block}
 n-button{display:inline-block}
 .n-app-form{display:grid;gap:12px}
 .n-app-form .n-field{margin:0}
@@ -89,12 +89,31 @@ n-button{display:inline-block}
 .n-app-runs .n-app-ok{color:var(--n-ok)}
 .n-app-runs .n-app-err{color:var(--n-err)}
 .n-app-count{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
-n-form:not(:defined),n-result:not(:defined),n-table:not(:defined),n-runs:not(:defined),n-count:not(:defined),n-button:not(:defined){display:block;padding:14px;border:1px dashed var(--n-line);border-radius:var(--n-radius);color:var(--n-muted);font-size:13px}
+.n-chat-msgs{display:flex;flex-direction:column;gap:8px;max-height:460px;overflow-y:auto;padding:12px;border:1px solid var(--n-line);border-radius:var(--n-radius);background:var(--n-card)}
+.n-chat-msgs>.n-app-empty{padding:2px 0}
+.n-chat-msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:14.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.n-chat-you{align-self:flex-end;background:var(--n-accent-soft)}
+.n-chat-agent{align-self:flex-start;background:var(--n-soft)}
+.n-chat-queued{opacity:.6}
+.n-chat-form{display:grid;gap:8px;margin-top:10px}
+.n-chat-box{box-sizing:border-box;width:100%;padding:8px 10px;border:1px solid var(--n-line);border-radius:10px;background:var(--n-card);color:var(--n-fg);font:inherit;font-size:16px;resize:vertical;outline:none}
+.n-chat-box:focus{border-color:var(--n-accent);box-shadow:0 0 0 3px var(--n-accent-soft)}
+.n-chat-more{display:flex;gap:12px;margin-left:auto}
+.n-chat-link{border:0;padding:0;background:none;color:var(--n-muted);font:inherit;font-size:13px;cursor:pointer}
+.n-chat-link:hover{color:var(--n-accent)}
+.n-chat-menu{list-style:none;margin:0;padding:0;border:1px solid var(--n-line);border-radius:var(--n-radius);background:var(--n-card)}
+.n-chat-menu button{display:flex;gap:10px;width:100%;padding:8px 12px;border:0;border-bottom:1px solid var(--n-line);background:none;color:inherit;font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.n-chat-menu li:last-child button{border-bottom:0}
+.n-chat-menu button:hover{background:var(--n-soft)}
+.n-chat-first{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.n-chat-menu .n-muted{flex:none}
+n-form:not(:defined),n-result:not(:defined),n-table:not(:defined),n-runs:not(:defined),n-count:not(:defined),n-chat:not(:defined),n-button:not(:defined){display:block;padding:14px;border:1px dashed var(--n-line);border-radius:var(--n-radius);color:var(--n-muted);font-size:13px}
 n-form:not(:defined)::before{content:var(--n-w-form-a,"Form: ") attr(flow) var(--n-w-form-b,"")}
 n-result:not(:defined)::before{content:var(--n-w-answer-a,"Answer: ") attr(flow) var(--n-w-answer-b,"")}
 n-table:not(:defined)::before{content:var(--n-w-table-a,"Table: ") attr(data) var(--n-w-table-b,"")}
 n-runs:not(:defined)::before{content:var(--n-w-runs-a,"Runs: ") attr(flow) var(--n-w-runs-b,"")}
 n-count:not(:defined)::before{content:var(--n-w-count-a,"Count: ") attr(data) var(--n-w-count-b,"")}
+n-chat:not(:defined)::before{content:var(--n-w-chat-a,"A conversation with its agent") var(--n-w-chat-b,"")}
 `
   .trim()
   .replace(/\n/g, '');

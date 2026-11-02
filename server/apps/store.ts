@@ -371,10 +371,12 @@ export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: 
  * Runs, newest first (a CSV's rows in order). The runs of a run's agent steps are part of that run, so
  * they are left out unless `steps` asks for them.
  */
-export function listRuns(db: DB, o: { app?: string; batch?: string; visitor?: string; status?: RunStatus[]; limit?: number; before?: number; steps?: boolean; parent?: string }): RunRecord[] {
+export function listRuns(db: DB, o: { app?: string; batch?: string; visitor?: string; status?: RunStatus[]; limit?: number; before?: number; steps?: boolean; parent?: string; source?: RunSource }): RunRecord[] {
   const where: string[] = [];
   const vals: unknown[] = [];
-  if (!o.steps && !o.parent) where.push("source != 'step'");
+  // A template's runs are its tasks: not its steps' runs, nor its conversations (unless those are asked for).
+  if (o.source) (where.push('source = ?'), vals.push(o.source));
+  else if (!o.steps && !o.parent) where.push("source not in ('step', 'chat')");
   if (o.parent) (where.push('parent = ?'), vals.push(o.parent));
   if (o.app) (where.push('app_id = ?'), vals.push(o.app));
   if (o.batch) (where.push('batch_id = ?'), vals.push(o.batch));

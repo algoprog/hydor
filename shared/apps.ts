@@ -148,7 +148,8 @@ export interface AppDef extends AppRecipe {
   updatedAt: number;
 }
 
-export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app' | 'screen' | 'task';
+/** Where a run came from; 'chat': a conversation with the template's agent on its screen (its messages are its follow-ups). */
+export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app' | 'screen' | 'task' | 'chat';
 export type RunStatus = 'queued' | 'starting' | 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
 
 export interface AppRun {

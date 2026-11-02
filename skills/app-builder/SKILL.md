@@ -68,6 +68,7 @@ topic says what each part does, and its API topic gives the format.
 
 ## 6. Hand it over
 
-- A screen (app_screen) when it will be used often or keeps data: start from the one made from its parts.
+- A screen (app_screen) when it will be used often or keeps data: start from the one made from its parts. Its
+  `<n-chat>` part lets people ask the template's agent about its records, or to change them or run its flows.
 - When it should run by itself, propose a scheduled task that runs it (schedule_task with template).
 - Say in a few lines what it asks, what it does, what a run costs, and how to change it (Edit, or ask you).

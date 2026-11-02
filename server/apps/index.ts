@@ -591,6 +591,25 @@ function routes(d: Deps) {
     return { ok: true };
   });
 
+  // ---- conversations on its screen ----
+
+  /** A template's conversations with its agent (its screen's chat), newest first. */
+  app.get('/api/apps/:id/chats', async (req) => {
+    const a = own(req);
+    return { chats: listRuns(db, { app: a.id, source: 'chat', limit: 20 }).map((r) => ({ id: r.id, at: r.createdAt, first: String(r.inputs.message ?? '').slice(0, 200), status: r.status })) };
+  });
+
+  /** Starts a conversation with the template's agent: a run of its own, whose later messages are its follow-ups. */
+  app.post('/api/apps/:id/chats', async (req) => {
+    const a = own(req);
+    const text = String((req.body as { text?: unknown })?.text ?? '').trim();
+    if (!text) throw new HttpError(400, 'Write a message');
+    if (text.length > 20_000) throw new HttpError(413, 'That is too long (at most 20,000 characters)');
+    checkDaily(db, a);
+    noteUserMessage();
+    return { run: runView(startRun({ app: a.id, slug: a.slug, recipe: chatRecipe(a), source: 'chat', inputs: { message: text } })) };
+  });
+
   // ---- what an app keeps ----
 
   const kept = (req: FastifyRequest) => {
@@ -811,6 +830,69 @@ function triedIn(db: Deps['db'], b: Record<string, any>, app: string): { pause?:
   return { ...(pause.length ? { pause } : {}), ...(from && from.app === app ? { reuse: { run: from.id, steps: frozen } } : {}) };
 }
 
+/** What a conversation with a template's agent runs: its agent and settings, the first message as its task, nothing to hand in. */
+function chatRecipe(a: AppDef): AppRecipe {
+  return cleanRecipe({
+    name: a.name,
+    icon: a.icon,
+    color: a.color,
+    description: '',
+    agent: a.agent,
+    acpAgent: a.acpAgent,
+    model: a.model,
+    effort: a.effort,
+    mode: a.mode,
+    assistant: a.assistant,
+    tools: a.tools,
+    limits: a.limits,
+    requires: a.requires,
+    ...(a.memory ? { memory: true } : {}),
+    ...(a.data ? { data: a.data } : {}),
+    fields: [{ id: 'message', label: 'Message', type: 'long', required: true }],
+    prompt: '{{message}}',
+    answer: [],
+  });
+}
+
+/** A conversation's agent runs the template's flows, and waits for what they give. */
+function flowTool(ctx: RunCtx): RunTool | null {
+  const hit = runOfCtx(ctx);
+  if (!hit || hit.run.source !== 'chat') return null;
+  const { db } = ctx.deps;
+  const a = getApp(db, hit.run.app);
+  if (!a) return null;
+  const flows = [
+    ...(a.flow || a.prompt.trim() ? [{ id: 'run', title: 'its main flow', inputs: a.fields }] : []),
+    ...Object.entries(a.flows ?? {}).map(([id, f]) => ({ id, title: f.title ?? id, inputs: f.inputs ?? [] })),
+  ];
+  if (!flows.length) return null;
+  return {
+    name: 'app_run',
+    description: `Runs one of the flows of the template "${a.name}" and waits for what it gives (at most wait seconds, 120 unless set): ${flows.map((f) => `${f.id} (${f.title}; inputs: ${f.inputs.map((i) => `${i.id}${i.required ? '' : '?'}: ${i.type}`).join(', ') || 'none'})`).join('; ')}.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flow: { type: 'string', description: 'Which flow ("run": the main one).' },
+        inputs: { type: 'object', description: 'Its inputs, by name.' },
+        wait: { type: 'number', description: 'Most seconds to wait for it (1 to 600).' },
+      },
+    },
+    async run(args) {
+      const now = getApp(db, a.id);
+      if (!now) return { text: 'The template is gone.', isError: true };
+      const flow = typeof args.flow === 'string' && args.flow && args.flow !== 'run' ? args.flow : undefined;
+      try {
+        checkDaily(db, now);
+        const r = startRun({ app: now.id, slug: now.slug, recipe: now, source: 'screen', inputs: (args.inputs && typeof args.inputs === 'object' ? args.inputs : {}) as Record<string, string>, ...(flow ? { flow } : {}) });
+        const done = (await waitFor(r.id, Math.max(1, Math.min(Number(args.wait) || 120, 600)) * 1000)) ?? r;
+        return JSON.stringify({ run: done.id, status: done.status, ...(done.result ? { result: done.result } : {}), ...(done.reply ? { reply: done.reply.slice(0, 4000) } : {}), ...(done.error ? { error: done.error } : {}), link: `/apps/runs/${done.id}` });
+      } catch (e) {
+        return { text: (e as Error).message, isError: true };
+      }
+    },
+  };
+}
+
 /** Packages a saved template needs start installing at once, so its first run need not wait. */
 function prepare(a: AppDef): AppDef {
   void ensureEnv(a, a.slug).catch(() => {});
@@ -832,7 +914,7 @@ export const apps: Feature = {
     }),
   tools(ctx) {
     // A template's run gets what it hands in with and what it keeps; any other session what templates are built with.
-    if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx)].filter((t): t is RunTool => !!t);
+    if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx), flowTool(ctx)].filter((t): t is RunTool => !!t);
     return builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare });
   },
   /** An app's run gets the tools its app allows; a public run only the answer and, if allowed, the web. */
@@ -840,6 +922,7 @@ export const apps: Feature = {
     const hit = runOfCtx(ctx);
     if (!hit) return true;
     if (name === 'submit_result' || name === 'app_data') return true;
+    if (name === 'app_run') return hit.run.source === 'chat';
     if (hit.mark.public || hit.run.source === 'public') return !!hit.mark.web && PUBLIC_WEB_TOOLS.includes(name);
     const allowed = hit.run.recipe.tools;
     return allowed === null || allowed.includes(name);

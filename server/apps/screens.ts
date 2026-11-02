@@ -1,8 +1,8 @@
 // A template's screens: pages of its own (Pages keeps them, with versions and the visual editor; the
 // library leaves them out), shown on the template's page in place of its form, with window.naget.app to
 // run its flows and keep its data (server/pages/kit.ts), and the App parts written on it. A screen made
-// for a template is a page of App parts: its form, its answer, a table for each collection it keeps,
-// its earlier runs. Agents make and change screens with these routes (through app_api); people in
+// for a template is a page of App parts: its form, its answer, a table for each collection it keeps (and
+// a conversation with its agent about them), its earlier runs. Agents make and change screens with these routes (through app_api); people in
 // Pages' editor.
 import type { AppDef, AppRecipe } from '../../shared/apps.ts';
 import { labelOf } from '../../shared/app-manifest.ts';
@@ -15,14 +15,18 @@ import { saveApp } from './store.ts';
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /** The headings a screen made from a template's parts writes (in the language the app is read in). */
-const HEADINGS = { answer: { title: 'The answer' }, runs: { title: 'Earlier runs' } };
+const HEADINGS = { answer: { title: 'The answer' }, runs: { title: 'Earlier runs' }, chat: { title: 'Ask its agent' } };
 
-/** A screen made from a template's parts: its form and answer, a table for each collection it keeps, its earlier runs. */
+/**
+ * A screen made from a template's parts: its form and answer, a table for each collection it keeps, a
+ * conversation with its agent about them, its earlier runs.
+ */
 export function defaultScreen(r: Pick<AppRecipe, 'name' | 'description' | 'fields' | 'answer' | 'data' | 'flow' | 'prompt'>, tr: (s: string) => string = (s) => s, lang = 'en'): string {
   const parts: string[] = [`<h1>${esc(r.name)}</h1>`];
   if (r.description) parts.push(`<p class="n-muted">${esc(r.description)}</p>`);
   if (r.prompt.trim() || r.flow) parts.push('<section>\n  <n-form flow="run"></n-form>\n</section>', `<section>\n  <h2>${esc(tr(HEADINGS.answer.title))}</h2>\n  <n-result flow="run"></n-result>\n</section>`);
   for (const name of Object.keys(r.data ?? {})) parts.push(`<section>\n  <h2>${esc(labelOf(name))}</h2>\n  <n-table data="${esc(name)}" search remove></n-table>\n</section>`);
+  if (Object.keys(r.data ?? {}).length) parts.push(`<section>\n  <h2>${esc(tr(HEADINGS.chat.title))}</h2>\n  <n-chat></n-chat>\n</section>`);
   if (r.prompt.trim() || r.flow) parts.push(`<section>\n  <h2>${esc(tr(HEADINGS.runs.title))}</h2>\n  <n-runs flow="run" limit="5"></n-runs>\n</section>`);
   return `<!doctype html>
 <html lang="${esc(lang)}">

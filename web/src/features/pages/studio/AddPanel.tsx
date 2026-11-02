@@ -1,7 +1,8 @@
 // The visual editor's Add: parts to put in the page (words, pictures, buttons), blocks to lay them out
 // (columns, cards, a table), and ready-made sections (an opening, features, prices, questions, a footer),
 // after the part picked, inside it, or at the end of the page. A template's screen also has its App parts:
-// a form for each of its flows, its answer, its runs, a table and a count for each collection it keeps.
+// a form for each of its flows, its answer, its runs, a conversation with its agent, a table and a count for
+// each collection it keeps.
 import type { AppInfo } from '@shared/app-manifest';
 import { useState, type ReactNode, type RefObject } from 'react';
 import {
@@ -25,6 +26,7 @@ import {
   Megaphone,
   Minus,
   MousePointerClick,
+  MessagesSquare,
   MoveVertical,
   PanelBottom,
   Quote,
@@ -85,6 +87,7 @@ function appBlocks(app: AppInfo): { id: string; label: string; icon: ReactNode; 
   for (const f of app.flows) out.push({ id: `form:${f.id}`, label: f.id === 'run' ? 'Its form' : `Form: ${f.title}`, icon: <FileInput size={17} />, html: `<n-form flow="${attr(f.id)}"></n-form>` });
   out.push({ id: 'result', label: 'Its answer', icon: <Sparkles size={17} />, html: '<n-result flow="run"></n-result>' });
   out.push({ id: 'runs', label: 'Its runs', icon: <History size={17} />, html: '<n-runs flow="run" limit="5"></n-runs>' });
+  out.push({ id: 'chat', label: 'A conversation with its agent', icon: <MessagesSquare size={17} />, html: '<n-chat></n-chat>' });
   for (const f of app.flows.filter((x) => x.id !== 'run')) out.push({ id: `button:${f.id}`, label: `Button: ${f.title}`, icon: <MousePointerClick size={17} />, html: `<n-button flow="${attr(f.id)}">${attr(f.title)}</n-button>` });
   for (const c of app.data) {
     out.push({ id: `table:${c.name}`, label: `Table: ${c.name}`, icon: <Table size={17} />, html: `<n-table data="${attr(c.name)}" search remove></n-table>` });

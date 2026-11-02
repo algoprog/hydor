@@ -264,7 +264,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_screen',
       description:
-        "Gives a template a screen (a page of its own that its page shows in place of its form), or changes one. Without html: one made from its parts (its form, its answer, a table for each list it keeps, its runs). With html: a page that uses the App parts (<n-form flow>, <n-result>, <n-runs>, <n-table data>, <n-count data>, <n-button flow>) and window.naget.app (app_guide's API topic, Templates: screens).",
+        "Gives a template a screen (a page of its own that its page shows in place of its form), or changes one. Without html: one made from its parts (its form, its answer, a table for each list it keeps and a conversation with its agent, its runs). With html: a page that uses the App parts (<n-form flow>, <n-result>, <n-runs>, <n-table data>, <n-count data>, <n-button flow>, <n-chat>: a conversation with its agent, who can change its records and run its flows) and window.naget.app (app_guide's API topic, Templates: screens).",
       inputSchema: {
         type: 'object',
         properties: {
