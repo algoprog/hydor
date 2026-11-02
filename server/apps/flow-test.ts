@@ -510,6 +510,59 @@ test('Save as template drafts steps from the tools the session called; steps tha
   assert.equal(r3.note, undefined);
 });
 
+test('trying in the graph: a test run pauses before the steps asked, goes on a step at a time or to its end, and stops; frozen steps give what they gave in an earlier try', async () => {
+  model.answer = (_system, user) => JSON.stringify({ line: `Re ${user}` });
+  const a = app({
+    name: 'Debug',
+    answer: [{ id: 'line', label: 'Line', type: 'text', required: true }],
+    flow: {
+      steps: [
+        { id: 'a', do: 'model', model: 'fake', instructions: 'A {{topic}}', outputs: { line: 'text' } },
+        { id: 'b', title: 'B', do: 'model', model: 'fake', instructions: 'B {{a.line}}', outputs: { line: 'text' } },
+        { id: 'c', title: 'C', do: 'model', model: 'fake', instructions: 'C {{b.line}}', outputs: { line: 'text' } },
+      ],
+    },
+  });
+  const until = async (f: () => boolean) => {
+    for (let i = 0; i < 300 && !f(); i++) await sleep(20);
+    assert.ok(f());
+  };
+  const run = (payload: Record<string, unknown>) => http.inject({ method: 'POST', url: `/api/apps/${a.id}/runs`, payload: { source: 'test', ...payload } }).then((r) => r.json().run as { id: string });
+  const goOn = (id: string, step?: boolean) => http.inject({ method: 'POST', url: `/api/apps/runs/${id}/go`, payload: step ? { step } : {} });
+  const progress = async (id: string) => (await http.inject({ method: 'GET', url: `/api/apps/runs/${id}` })).json().progress;
+  const first = await run({ inputs: { topic: 'x' }, pause: ['b'] });
+  await until(() => store.getRun(db, first.id)!.status === 'waiting');
+  assert.deepEqual(stepsOf(first.id), ['a:done']);
+  let p = await progress(first.id);
+  assert.deepEqual(p.paused, ['b']);
+  assert.equal(p.waiting, 'Paused before “B”');
+  // One step: b runs, then it pauses before c.
+  assert.equal((await goOn(first.id, true)).statusCode, 200);
+  await until(() => stepsOf(first.id).includes('b:done') && store.getRun(db, first.id)!.status === 'waiting');
+  p = await progress(first.id);
+  assert.deepEqual(p.paused, ['c']);
+  // To its end.
+  await goOn(first.id);
+  const done = await ended(first.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.line, 'Re C Re B Re A x');
+  assert.equal((await goOn(first.id)).statusCode, 409, 'it is not paused');
+  // Frozen: a and b give what they gave in that try; only c runs.
+  model.calls = [];
+  const again = await run({ inputs: { topic: 'y' }, freeze: { from: first.id, steps: ['a', 'b'] } });
+  assert.equal((await ended(again.id)).status, 'done');
+  assert.deepEqual(model.calls.map((c) => c.user), ['C Re B Re A x']);
+  assert.deepEqual(store.listSteps(db, again.id).filter((st) => st.reused).map((st) => st.id), ['a', 'b']);
+  // Stopping a paused run stops it.
+  const third = await run({ inputs: { topic: 'z' }, pause: ['a'] });
+  await until(() => store.getRun(db, third.id)!.status === 'waiting');
+  await http.inject({ method: 'POST', url: `/api/apps/runs/${third.id}/stop`, payload: {} });
+  assert.equal((await ended(third.id)).status, 'stopped');
+  // A run that is not a test does not pause.
+  const plain = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'w' }, pause: ['b'] });
+  assert.equal((await ended(plain.id)).status, 'done');
+});
+
 test('At the same time, and Repeat until: branches meet after the join; rounds go on until the rule holds, seeing the last round', async () => {
   model.answer = (_system, user) => JSON.stringify({ line: `Re: ${user}` });
   const a = app({

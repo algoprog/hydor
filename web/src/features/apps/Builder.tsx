@@ -589,6 +589,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 {saved && <Advice app={saved} recipe={recipe} onChange={set} session={session} />}
                 <StepsEditor
                   recipe={{ ...recipe, flow: recipe.flow }}
+                  appId={saved?.id ?? null}
                   onChange={set}
                   onAsk={session ? (st) => composeInsert(tr(`About the step “${titleOf(st)}” (${st.id}) of the template: `), session) : undefined}
                 />

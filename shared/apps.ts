@@ -250,6 +250,8 @@ export interface RunProgress {
   waiting?: string;
   /** Its steps' titles are the template's own words (a run with steps): shown as written. */
   own?: true;
+  /** A test run tried in the graph, paused before these steps (their paths) until it is told to go on. */
+  paused?: string[];
 }
 
 /**

@@ -400,10 +400,11 @@ export function saveStep(db: DB, s: StepRecord) {
   ).run(s.run, s.path, s.id, s.kind, s.title, s.status, s.outputs === undefined || s.outputs === null ? null : JSON.stringify(s.outputs), s.childRun ?? null, s.costUsd ?? null, s.error ?? null, s.startedAt ?? null, s.endedAt ?? null, s.reused ? 1 : 0, s.rescued ? 1 : 0);
 }
 
-/** An earlier run's steps (these, by id, and the steps inside them) as another's, taken over: they replay what they gave, at no cost. */
+/** An earlier run's steps (these, by id wherever they are, and the steps inside them) as another's, taken over: they replay what they gave, at no cost. */
 export function reuseSteps(db: DB, from: string, to: string, ids: string[]) {
   for (const st of listSteps(db, from)) {
-    if (!ids.includes(st.path.split(/[/#]/)[0]) || st.status === 'running' || st.status === 'waiting' || st.status === 'stopped') continue;
+    // A step by its id wherever it is (in a Decide's path, each round of a Repeat), and the steps inside it.
+    if (!st.path.split(/[/#]/).some((seg) => ids.includes(seg)) || st.status === 'running' || st.status === 'waiting' || st.status === 'stopped') continue;
     saveStep(db, { ...st, run: to, costUsd: undefined, reused: true });
   }
 }

@@ -48,6 +48,8 @@ interface Exec {
   waiting: Set<string>;
   /** Steps as they ended, with their values: the result by name, and the reply. */
   ended: { id: string; kind: Step['do']; values: Record<string, unknown> }[];
+  /** A test run tried in the graph: the steps it pauses before, whether it pauses before the next one too, and where it waits now (each with what lets it go on). */
+  pause?: { before: Set<string>; next: boolean; at: Map<string, () => void> };
 }
 
 const execs = new Map<string, Exec>();
@@ -67,6 +69,7 @@ export interface FlowStart {
   slug: string;
   files?: StartInput['files'];
   public?: StartInput['public'];
+  pause?: string[];
 }
 
 const safeName = (n: string) => path.basename(String(n || 'file')).replace(/[^\w.\- ()]+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'file';
@@ -93,7 +96,19 @@ async function inputValues(r: RunRecord, o: FlowStart, folder: string): Promise<
 function execOf(r: RunRecord, o: FlowStart): Exec {
   const folder = o.public ? path.join(PUBLIC_DIR, r.id) : runFolder(r, o.slug);
   const flow = r.flow ? r.recipe.flows![r.flow] : r.recipe.flow!;
-  return { run: r, flow, slug: o.slug, folder, pub: o.public, stopping: false, abort: new AbortController(), children: new Set(), waiting: new Set(), ended: [] };
+  return {
+    run: r,
+    flow,
+    slug: o.slug,
+    folder,
+    pub: o.public,
+    stopping: false,
+    abort: new AbortController(),
+    children: new Set(),
+    waiting: new Set(),
+    ended: [],
+    ...(o.pause?.length ? { pause: { before: new Set(o.pause), next: false, at: new Map() } } : {}),
+  };
 }
 
 /** Starts a run's flow in the background; it ends the run itself. */
@@ -134,6 +149,34 @@ export function stopFlow(id: string) {
   x.stopping = true;
   x.abort.abort();
   for (const c of x.children) void stopRun(c);
+  // A paused step goes on, to stop.
+  for (const goOn of x.pause?.at.values() ?? []) goOn();
+}
+
+/** A test run paused in the graph goes on: to its end (or the next step it pauses before), or `step`: one step, pausing before the next. False: it is not paused. */
+export function goOn(id: string, step: boolean): boolean {
+  const x = execs.get(id);
+  if (!x?.pause?.at.size) return false;
+  x.pause.next = step;
+  const waiting = [...x.pause.at.values()];
+  x.pause.at.clear();
+  for (const g of waiting) g();
+  return true;
+}
+
+/** Waits before a step of a test run tried in the graph, until it is told to go on. */
+async function pauseAt(x: Exec, at: string) {
+  const p = x.pause!;
+  p.next = false;
+  x.waiting.add(`paused:${at}`);
+  syncStatus(x);
+  await new Promise<void>((resolve) => {
+    p.at.set(at, resolve);
+    noteChanged(x.run.id);
+  });
+  x.waiting.delete(`paused:${at}`);
+  syncStatus(x);
+  if (x.stopping) throw new Stopped();
 }
 
 async function go(x: Exec, inputs: Record<string, unknown>) {
@@ -173,6 +216,7 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
   if (before?.status === 'failed') return failed(x, s, scope, prefix, before.error ?? 'It failed');
   // It failed, and an agent was doing its work: that goes on.
   if (before?.rescued) return rescue(x, s, scope, prefix, before.error ?? 'It failed');
+  if (x.pause && !before && (x.pause.before.has(s.id) || x.pause.next)) await pauseAt(x, at);
   if (s.if && !before) {
     let holds: boolean;
     try {
@@ -875,6 +919,14 @@ export function stepsOf(runId: string, o: { values?: boolean } = {}): RunStepVie
 
 export const flowRunning = (id: string) => execs.has(id);
 
+/** What a step at a path is called, by its id (the path's last part). */
+function titleAt(r: RunRecord, at: string): string {
+  const id = at.split(/[/#]/).pop() ?? at;
+  const f = r.flow ? r.recipe.flows?.[r.flow] : r.recipe.flow;
+  const s = f ? allSteps(f.steps).find((x) => x.id === id) : undefined;
+  return s ? titleOf(s) : id;
+}
+
 /** How a run with steps is getting on: its steps so far, what its agent at work said last, and what it waits for. */
 async function flowProgress(r: RunRecord, publicView: boolean): Promise<RunProgress> {
   const all = stepsOf(r.id).filter((st) => st.kind !== 'round' && st.status !== 'skipped');
@@ -884,15 +936,18 @@ async function flowProgress(r: RunRecord, publicView: boolean): Promise<RunProgr
   const inner = child && isActive(child.status) ? await progressOf(child, publicView) : null;
   // A step asking the person waits for the answer here, on the run's page; an agent's question waits in its session.
   const asking = all.find((st) => st.kind === 'ask' && st.status === 'waiting');
+  const paused = [...(execs.get(r.id)?.pause?.at.keys() ?? [])];
   const waiting =
     r.status !== 'waiting'
       ? undefined
       : publicView
         ? 'Waiting'
-        : asking
+        : paused.length
+          ? `Paused before ${paused.map((p) => `“${titleAt(r, p)}”`).join(' and ')}`
+          : asking
           ? `“${asking.title}” needs your answer`
           : `“${working?.title ?? 'A step'}” ${inner?.waiting ? inner.waiting.replace(/^It /, 'needs you: it ').replace(/ in the session$/, ' in its session') : 'waits for you in its session'}`;
-  return { steps, said: publicView ? undefined : inner?.said, waiting, ...(publicView ? {} : { own: true as const }) };
+  return { steps, said: publicView ? undefined : inner?.said, waiting, ...(publicView ? {} : { own: true as const }), ...(paused.length && !publicView ? { paused } : {}) };
 }
 
 /** What runs flows, for runs.ts. */
