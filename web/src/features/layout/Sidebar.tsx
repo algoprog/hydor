@@ -1,7 +1,13 @@
-import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
-import { Activity, Boxes, CircleHelp, Folders, FolderTree, Gauge, GitBranch, Inbox, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
+import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Activity, Boxes, CircleHelp, Folders, FolderTree, Gauge, GitBranch, Inbox, ListFilter, MonitorSmartphone, PanelLeftClose, RotateCcw, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
+import { usualOrder, type SidebarTool } from '@shared/sidebar';
 import { activityOf } from '../../lib/activity';
+import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
 import { useMachines } from '../../lib/machines';
 import { MOD, pct } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -9,7 +15,7 @@ import { useApp, useSessions, useUI, useUsage } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Logo } from '../../components/Logo';
 import { severityColor } from '../../components/charts';
-import { cx, IconButton, Kbd, MenuItem, MenuSep, Popover } from '../../components/ui';
+import { cx, IconButton, Kbd, MenuItem, MenuSep, Popover, useMediaQuery } from '../../components/ui';
 import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
 import { SessionList } from '../sessions/SessionList';
@@ -17,6 +23,7 @@ import { openPalette } from '../palette/CommandPalette';
 import { machineId } from '../../lib/machine';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
 import { features } from '../registry';
+import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 
 /** The most-used plan window, as a tiny meter under "Usage". */
 function UsageHint() {
@@ -50,44 +57,70 @@ function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) =
   );
 }
 
-/** A tool: icon over label, four to a row, so the sessions keep the room (on phones and computers alike). */
-function NavItem({
-  path,
-  match,
-  label,
-  icon,
-  extra,
-  onGo,
-  tour,
-  anim = 'ico-lift',
-}: {
-  path: string;
-  match: boolean;
+/** One of the tools at the bottom: what it shows, and where it goes. */
+interface Tool {
+  id: SidebarTool;
   label: string;
   icon: ReactNode;
+  /** Its page is the one open. */
+  match: boolean;
+  go: () => void;
   extra?: ReactNode;
-  onGo: (p: string) => void;
   tour?: string;
   /** How its icon answers the pointer (styles.css, "small motion"). */
   anim?: string;
-}) {
+}
+
+/** What a tool being dragged gets: its place among the others, and the handlers that pick it up. */
+interface DragBits {
+  ref: (el: HTMLElement | null) => void;
+  style: CSSProperties;
+  attrs: HTMLAttributes<HTMLButtonElement>;
+  /** Picked up: its place shows faintly while its copy follows the pointer. */
+  lifted: boolean;
+}
+
+/** A drop ends with a click on the tool under the pointer; that click is ignored. */
+let lastDragEnd = 0;
+
+/** A tool: icon over label, four to a row, so the sessions keep the room (on phones and computers alike). */
+function NavItem({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; floating?: boolean; onMenu?: (e: ReactMouseEvent<HTMLElement>) => void }) {
   return (
     <button
-      data-tour={tour}
-      onClick={() => onGo(path)}
+      ref={drag?.ref}
+      style={drag?.style}
+      {...drag?.attrs}
+      data-tour={floating ? undefined : t.tour}
+      onClick={() => Date.now() - lastDragEnd > 300 && t.go()}
+      onContextMenu={onMenu}
       className={cx(
         'group relative flex h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-[10px] text-[11.5px] transition-colors',
-        match ? 'bg-bg-3 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg active:bg-bg-2',
+        // The copy that follows the pointer while it is dragged, lifted off the page.
+        floating ? 'w-full bg-bg-2 shadow-lg ring-1 ring-line-2' : t.match ? 'bg-bg-3' : 'hover:bg-bg-2 active:bg-bg-2',
+        t.match ? 'font-medium text-fg' : floating ? 'text-fg' : 'text-fg-2 hover:text-fg',
+        drag?.lifted && 'opacity-40',
       )}
     >
-      <span className={cx('ico shrink-0', anim, match ? 'text-fg' : 'text-fg-3')}>{icon}</span>
-      <span className="max-w-full truncate px-1 leading-none">{label}</span>
-      {extra}
+      <span className={cx('ico shrink-0', t.anim ?? 'ico-lift', t.match ? 'text-fg' : 'text-fg-3')}>{t.icon}</span>
+      <span className="max-w-full truncate px-1 leading-none">{t.label}</span>
+      {t.extra}
     </button>
   );
 }
 
-/** Navigation: new session, search, every session, then the tools. A drawer on phones. */
+/** A tool that drags into another place among them, as sessions do in their list. */
+function SortableTool({ t, onMenu }: { t: Tool; onMenu: (e: ReactMouseEvent<HTMLElement>) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id });
+  return (
+    <NavItem
+      t={t}
+      onMenu={onMenu}
+      drag={{ ref: setNodeRef, style: { transform: CSS.Transform.toString(transform), transition }, attrs: { ...attributes, ...(listeners as HTMLAttributes<HTMLButtonElement>) }, lifted: isDragging }}
+    />
+  );
+}
+
+/** Navigation: new session, search, every session, then the tools, in the order you drag them into. A drawer on phones. */
 export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const [loc] = useLocation();
   const [q, setQ] = useState('');
@@ -104,12 +137,69 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const searchRef = useRef<HTMLInputElement>(null);
   const filterRef = useRef<HTMLButtonElement>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-
+  const order = useToolOrder((s) => s.tools);
+  useEffect(() => loadToolOrder(), []);
+  const [dragId, setDragId] = useState<SidebarTool | null>(null);
+  const sensors = useSensors(useSensor(MouseSensor, MOUSE_DRAG), useSensor(AreaTouchSensor, TOUCH_DRAG));
+  const coarse = useMediaQuery('(pointer: coarse)');
+  const toolMenuAt = useRef<HTMLElement | null>(null);
+  const [toolMenu, setToolMenu] = useState(false);
 
   const close = () => useUI.getState().set({ drawerOpen: false });
   const nav = (path: string) => {
     go(path);
     if (mobile) close();
+  };
+
+  const tools: Tool[] = [
+    { id: 'files', label: 'Files', icon: <FolderTree size={17} />, match: loc === '/files' || loc === '/file' || loc === '/search', go: () => nav('/files') },
+    { id: 'git', label: 'Git', icon: <GitBranch size={17} />, match: loc === '/git', go: () => nav('/git') },
+    { id: 'terminal', label: 'Terminal', icon: <SquareTerminal size={17} />, match: loc === '/terminal', go: () => nav('/terminal'), anim: 'ico-nudge' },
+    ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path) }))),
+    // Dev-server previews open on this server's own preview port: its own machine only.
+    ...(machineId ? [] : [{ id: 'preview', label: 'Preview', icon: <MonitorSmartphone size={17} />, match: loc === '/preview', go: () => nav('/preview') } satisfies Tool]),
+    { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint />, anim: 'ico-grow' },
+    { id: 'system', label: 'System', icon: <Activity size={17} />, match: loc === '/system', go: () => nav('/system'), anim: 'ico-beat' },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: <Settings size={17} />,
+      match: loc === '/settings',
+      go: () => nav('/settings'),
+      anim: 'ico-turn',
+      tour: 'nav-settings',
+      extra: updates ? <span className="absolute top-2.5 left-[calc(50%+7px)] h-1.5 w-1.5 rounded-full bg-accent" title="A newer version is out (Settings → General)" /> : undefined,
+    },
+    {
+      id: 'search',
+      label: 'Search',
+      icon: <Search size={17} />,
+      match: false,
+      go: () => {
+        if (mobile) close();
+        openPalette();
+      },
+    },
+    { id: 'help', label: 'Help', icon: <CircleHelp size={17} />, match: loc === '/guide' || loc.startsWith('/guide/'), go: () => nav('/guide') },
+  ];
+  tools.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  const dragging = dragId ? tools.find((t) => t.id === dragId) : undefined;
+
+  const onToolDrop = ({ active, over }: DragEndEvent) => {
+    lastDragEnd = Date.now();
+    setDragId(null);
+    if (!over || active.id === over.id) return;
+    // Moved among every tool, the hidden ones too (Preview, on another machine's pages), so those keep their places.
+    const from = order.indexOf(active.id as SidebarTool);
+    const to = order.indexOf(over.id as SidebarTool);
+    if (from >= 0 && to >= 0) setToolOrder(arrayMove(order, from, to));
+  };
+  // Once the order was changed, a right-click on a tool can put it back (a long press on a phone picks the tool up).
+  const onToolMenu = (e: ReactMouseEvent<HTMLElement>) => {
+    if (coarse || usualOrder(order)) return;
+    e.preventDefault();
+    toolMenuAt.current = e.currentTarget;
+    setToolMenu(true);
   };
 
   return (
@@ -236,37 +326,38 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         <SessionList query={q} />
       </div>
 
-      <nav data-tour="tools" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
-        <NavItem path="/files" match={loc === '/files' || loc === '/file' || loc === '/search'} label="Files" icon={<FolderTree size={17} />} onGo={nav} />
-        <NavItem path="/git" match={loc === '/git'} label="Git" icon={<GitBranch size={17} />} onGo={nav} />
-        <NavItem path="/terminal" match={loc === '/terminal'} label="Terminal" icon={<SquareTerminal size={17} />} onGo={nav} anim="ico-nudge" />
-        {features().flatMap((f) => (f.nav ?? []).map((n) => <NavItem key={n.path} path={n.path} match={n.match ? n.match(loc) : loc === n.path} label={n.label} icon={n.icon} onGo={nav} />))}
-        {/* Dev-server previews open on this server's own preview port: its own machine only. */}
-        {!machineId && <NavItem path="/preview" match={loc === '/preview'} label="Preview" icon={<MonitorSmartphone size={17} />} onGo={nav} />}
-        <NavItem path="/usage" match={loc === '/usage' || loc === '/stats' || loc === '/arena'} label="Usage" icon={<Gauge size={17} />} extra={<UsageHint />} onGo={nav} anim="ico-grow" />
-        <NavItem path="/system" match={loc === '/system'} label="System" icon={<Activity size={17} />} onGo={nav} anim="ico-beat" />
-        <NavItem
-          path="/settings"
-          match={loc === '/settings'}
-          label="Settings"
-          icon={<Settings size={17} />}
-          onGo={nav}
-          anim="ico-turn"
-          tour="nav-settings"
-          extra={updates ? <span className="absolute top-2.5 left-[calc(50%+7px)] h-1.5 w-1.5 rounded-full bg-accent" title="A newer version is out (Settings → General)" /> : undefined}
-        />
-        <NavItem
-          path=""
-          match={false}
-          label="Search"
-          icon={<Search size={17} />}
-          onGo={() => {
-            if (mobile) close();
-            openPalette();
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={({ active }) => {
+          setDragId(active.id as SidebarTool);
+          setToolMenu(false);
+        }}
+        onDragEnd={onToolDrop}
+        onDragCancel={() => setDragId(null)}
+        accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
+      >
+        {/* Only the tools in the grid: the tour brings them in by their places in it. Touches on them may pick one up (lib/dragTouch). */}
+        <nav ref={touchDragArea} data-tour="tools" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
+          <SortableContext items={tools.map((t) => t.id)} strategy={rectSortingStrategy}>
+            {tools.map((t) => (
+              <SortableTool key={t.id} t={t} onMenu={onToolMenu} />
+            ))}
+          </SortableContext>
+        </nav>
+        {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating /> : null}</DragOverlay>, document.body)}
+      </DndContext>
+      <Popover anchor={toolMenuAt} open={toolMenu} onClose={() => setToolMenu(false)} width={210}>
+        <MenuItem
+          icon={<RotateCcw size={14} />}
+          onClick={() => {
+            setToolMenu(false);
+            setToolOrder([]);
           }}
-        />
-        <NavItem path="/guide" match={loc === '/guide' || loc.startsWith('/guide/')} label="Help" icon={<CircleHelp size={17} />} onGo={nav} />
-      </nav>
+        >
+          Back to the usual order
+        </MenuItem>
+      </Popover>
     </aside>
   );
 });
