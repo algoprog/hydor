@@ -97,6 +97,16 @@ For a big question that needs many searches, see deep research in [Deep research
 - It shows results as charts and tables on a page in the session when that helps: the simplest chart that fits (bars to compare, lines over time), with labelled axes and units, readable on a phone.
 - It saves cleaned data and results as files (CSV, or XLSX when you ask) when you'll want them.
 
+### App builder
+
+"Makes templates: small apps with a form, steps, data and a screen" (see [Templates](/guide/templates)).
+
+- It pins down what goes in, what comes out and what a good run looks like, asks only what changes the design, and says what it assumed.
+- It builds the template with tools of its own, picking the cheapest step for each part (a tool, a quick model answer, a rule, code) and an agent where judgement is needed.
+- It gives the template two to four examples with checks, tries them, and fixes what fails before handing it over, saying what a run costs and how long it takes.
+- When you change the template yourself, it builds on your change.
+- It uses the app-builder skill.
+
 ## Start a session as an assistant
 
 1. Open the [start page](/). Under the message box, a row shows who does the work: the agent, the model, the folder and the **Assistant** chip, which names the assistant picked now.

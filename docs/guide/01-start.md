@@ -80,7 +80,7 @@ The bottom of the sidebar holds the app's tools, four to a row:
 - **Agent**: who does the work (Claude Code, Codex, Custom, or another agent you added).
 - **Model**: that agent's model.
 - **Folder**: where the agent works, or a space, or a new folder made for the task.
-- **Assistant**: what the session starts as (General, Researcher, Writer, Coder, Tutor, Planner, Analyst, or one of your own).
+- **Assistant**: what the session starts as (General, Researcher, Writer, Coder, Tutor, Planner, Analyst, App builder, or one of your own).
 - **Options**: effort, permissions, memory, a spending cap and more. The chip names any of them you set away from the usual.
 
 On a computer, a line under the box reminds you: "Enter to start · Shift+Enter for a new line". Below it, **Today** sums up the day so far (lines changed, tokens, prompts, sessions); click it for the Activity page. When an agent's plan has run out of usage, a banner above the box says so and when it resets. On a phone, **Recent** lists your six latest sessions under the box.
