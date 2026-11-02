@@ -28,7 +28,7 @@ import { AGENT_FILE } from '../models/config.ts';
 import { noteUserMessage } from '../updates.ts';
 import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
 import { batchCsv, MAX_ROWS, startBatch, startBatches, stopBatch } from './batch.ts';
-import { addRecord, clearData, collectionsOf, embedSoon, ensureDataTables, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
+import { addRecord, clearData, collectionsOf, dataOp, embedSoon, ensureDataTables, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { ensureEnv, envLine, envOf, envVars } from './env.ts';
 import { answerAsk, askOf, dataChanged, flowRunner, stepsOf } from './flow.ts';
 import { installPackage, packageOf, previewOf, readPackage, zipPackage, type Catalog } from './package.ts';
@@ -723,32 +723,7 @@ function dataTool(ctx: RunCtx): RunTool | null {
       const now = runOfCtx(c);
       if (!now) return { text: 'This session was not started from a template, so it keeps no data.', isError: true };
       const appId = now.run.parent ? (getRun(db, now.run.parent)?.app ?? now.run.app) : now.run.app;
-      const kept = appOfRun(db, now.run).data;
-      const coll = String(a.collection ?? '');
-      const q = { id: typeof a.id === 'string' && a.id ? a.id : undefined, where: a.where && typeof a.where === 'object' ? a.where : undefined, search: typeof a.search === 'string' ? a.search : undefined, sort: typeof a.sort === 'string' ? a.sort : undefined, limit: Number(a.limit) || undefined };
-      try {
-        let out: unknown;
-        if (a.op === 'search') out = await searchRecords(db, appId, kept, coll, String(a.query ?? ''), { limit: Number(a.limit) || 10 });
-        else if (a.op === 'find' || a.op === 'get') {
-          const found = findRecords(db, appId, kept, coll, q);
-          out = a.op === 'get' ? (found.records[0] ?? null) : found;
-        } else if (a.op === 'add') {
-          out = { record: addRecord(db, appId, kept, coll, a.record && typeof a.record === 'object' ? a.record : {}) };
-          dataChanged(appId, coll);
-        } else if (a.op === 'update') {
-          const records = updateRecords(db, appId, kept, coll, q, a.set && typeof a.set === 'object' ? a.set : {});
-          if (records.length) dataChanged(appId, coll);
-          out = { changed: records.length, records };
-        } else if (a.op === 'remove') {
-          const removed = removeRecords(db, appId, kept, coll, q);
-          if (removed) dataChanged(appId, coll);
-          out = { removed };
-        } else return { text: 'op is find, search, get, add, update or remove', isError: true };
-        const text = JSON.stringify(out);
-        return text.length > 60_000 ? `${text.slice(0, 60_000)}… (cut: ask for fewer with limit, or search)` : text;
-      } catch (e) {
-        return { text: (e as Error).message, isError: true };
-      }
+      return dataOp(db, appId, appOfRun(db, now.run).data, a, ['find', 'search', 'get', 'add', 'update', 'remove'], (coll) => dataChanged(appId, coll));
     },
   };
 }
@@ -761,7 +736,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Templates (the app's Templates page) are the user's own apps: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save and app_try (try its examples before you hand it over, and say what a run costs), and app_screen for a screen; app_guide's templates topic says what each part does.";
+  "Templates (the app's Templates page) are the user's own apps: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's templates topic says what each part does.";
 
 export const apps: Feature = {
   id: 'apps',

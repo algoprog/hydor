@@ -1,15 +1,17 @@
 // What agents build templates with (the App builder, and any session): app_get reads them, app_save makes or
 // changes one (whole, a patch, or one step), checked first, its mistakes said in plain words; app_try runs its
-// examples or a set of answers and waits for what they gave; app_screen gives it a screen or changes one. The
-// same can be done through the app's API (app_api); these say more, in fewer calls.
+// examples or a set of answers and waits for what they gave; app_screen gives it a screen or changes one;
+// app_data reads the records it keeps and adds some. The same can be done through the app's API (app_api),
+// which asks the user for each change; these say more, in fewer calls.
 import type { AppDef, AppRecipe } from '../../shared/apps.ts';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
 import { allSteps, asText, innerLists } from '../../shared/app-manifest.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { dropEdits, noteBuilder, seenBy, userEditAt } from './edits.ts';
+import { collectionsOf, dataOp } from './data.ts';
 import { tryExamples } from './examples.ts';
-import { stepsOf } from './flow.ts';
+import { dataChanged, stepsOf } from './flow.ts';
 import { appChanged, startRun, waitFor } from './runs.ts';
 import { changeScreen, makeScreen, screensOf } from './screens.ts';
 import { adviceOf } from './advice.ts';
@@ -277,6 +279,34 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         const s = made.screen;
         appChanged(made.app, 'agent');
         return `Gave “${app.name}” the screen “${name}”${a.html ? '' : ', made from its parts'}: /apps/${app.id} (its page: /pages/${s.page})`;
+      },
+    },
+    {
+      name: 'app_data',
+      description:
+        'The records one of the user\'s templates keeps (the lists its data names): op "lists" names them, with their fields and how many records each has; "find" lists records by their fields (where, search for words, sort, limit); "search" finds those that answer a question best, by words and by meaning (query); "get" one by its id; "add" one (record), to start a template off with records or try it with some. Changing or removing the user\'s records is done on its screen, or with app_api, which asks the user.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          app: APP,
+          op: { type: 'string', enum: ['lists', 'find', 'search', 'get', 'add'] },
+          collection: { type: 'string', description: 'The list (all but lists).' },
+          query: { type: 'string', description: 'search: the question, in words.' },
+          id: { type: 'string', description: 'get: the record’s id.' },
+          record: { type: 'object', description: 'add: the new record’s fields.' },
+          where: { type: 'object', description: 'find: fields to match, each a value or {"<": 10} (=, !=, <, >, <=, >=, contains, in, empty).' },
+          search: { type: 'string', description: 'find: words to look for anywhere in a record.' },
+          sort: { type: 'string', description: 'find: the field to sort by, "-field" for highest or latest first.' },
+          limit: { type: 'number', description: 'find: at most this many (100 unless set); search: 10 unless set.' },
+        },
+        required: ['app', 'op'],
+      },
+      async run(a) {
+        const app = find(a.app);
+        if (a.op === 'lists') return JSON.stringify({ lists: collectionsOf(db, app.id, app.data) });
+        const names = Object.keys(app.data ?? {});
+        if (!names.includes(String(a.collection ?? ''))) return { text: `“${app.name}” keeps no list “${String(a.collection ?? '')}”: ${names.length ? `its lists are ${names.join(', ')}` : 'it keeps none yet (give it data with app_save)'}`, isError: true };
+        return dataOp(db, app.id, app.data, a, ['find', 'search', 'get', 'add'], (coll) => dataChanged(app.id, coll));
       },
     },
   ];

@@ -8,8 +8,9 @@ triggers: [make a template, build a template, make an app, build an app, an app 
 
 A template is a small app: what it asks (a form), what it does (one agent's task, or steps), what it gives back
 (answer fields), what it keeps (lists of records, a memory), how it looks (a screen), when it runs (its form, a
-schedule, a webhook, a watcher) and examples to try it with. Build them with app_get, app_save, app_try and
-app_screen; app_guide's templates topic says what each part does, and its API topic gives the format.
+schedule, a webhook, a watcher) and examples to try it with. Build them with app_get, app_save, app_try,
+app_screen and app_data (its records: start it off with some, or see what its runs kept); app_guide's templates
+topic says what each part does, and its API topic gives the format.
 
 ## 1. Pin down the job
 
