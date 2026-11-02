@@ -63,6 +63,7 @@ function onCall(d: Deps, key: string, c: ModelCall) {
     turns.set(key, t);
   }
   t.calls.set(c.id, callCost(d.db, key.split(':')[0] as SessionSummary['agent'], c.model, c) ?? 0);
+  if (c.model?.startsWith('openrouter/') && capOf(d.db, key) == null) tell(d, budgetState(d.db, key, (x) => titleOf(d, x)));
   void checkBudget(d, key).catch(() => {});
 }
 
@@ -137,7 +138,7 @@ export const budget: Feature = {
   start(d) {
     // After each model call an agent reports, for the sessions with a cap to watch.
     d.sessions.on('call', (key: string, c: ModelCall) => {
-      if (capOf(d.db, key) != null || parentOf(d.db, key)) onCall(d, key, c);
+      if (capOf(d.db, key) != null || parentOf(d.db, key) || c.model?.startsWith('openrouter/')) onCall(d, key, c);
     });
     // Spending also grows as transcripts are indexed (agents that report no calls, sessions run elsewhere):
     // each indexed change comes as a list update.

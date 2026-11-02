@@ -26,7 +26,7 @@ The screen has two parts: the **sidebar** on the left, and the page you are on (
 
 Under the search field is every session, in groups:
 
-- **Active**: sessions whose agent is running now, here or in VS Code or a terminal. They keep their places while they work; drag one to move it.
+- **Active**: all sessions with activity in the last five minutes, here or in VS Code or a terminal, including ones that have finished. After five minutes without activity they return to their usual group, even if their agent is still open. They keep their places while listed; drag one to move it.
 - **Pinned**: the sessions you pinned, in the order you drag them into. Drag a session from the groups below onto it to pin it.
 - A group for each of your spaces, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
 - **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
@@ -46,6 +46,8 @@ Each row shows the agent's icon with a status dot, the session's title, and a se
 - a pull request badge with its state;
 - a target: the session has a goal;
 - a pin: it is pinned.
+
+While Custom works or starts, its working indicator uses the Naget loading animation instead of a rotating agent icon.
 
 The status dot says how a session is doing:
 
@@ -239,6 +241,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "Which of my sessions are waiting on me right now, and what does each one need?"
 - "Start a Codex session in ~/code/shop that makes the checkout tests pass."
 - "Find the session where we planned the Lisbon trip and pin it."
+- "Why did a session leave Active after five minutes?"
 - "List my sessions in the sidebar by day, without the folder groups."
 - "Next time I open the start page, have it set to Claude Code with the Researcher assistant."
 - "Make my search box look only in my sessions and pages."

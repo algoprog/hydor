@@ -3,6 +3,7 @@
 // server does not take (sampling, reasoning effort) are dropped and the request sent again; a stream
 // that stalls or breaks before anything came is retried.
 import type { AgentModel } from '../../shared/types.ts';
+import { catalog } from '../models/openrouter.ts';
 
 export type Part = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
 
@@ -25,6 +26,7 @@ export interface ToolSchema {
 }
 
 export interface Reply {
+  id?: string;
   text: string;
   reasoning: string;
   /** OpenRouter's structured reasoning (signed or encrypted blocks some models need back). */
@@ -140,7 +142,9 @@ export async function chat(
     }
     const seen = { any: false };
     try {
-      return await read(r, o, stall, seen);
+      const reply = await read(r, o, stall, seen);
+      if (m.provider === 'openrouter' && reply.usage?.cost === undefined) await routerUsage(m, reply, o.signal);
+      return reply;
     } catch (e) {
       if (o.signal.aborted) throw e;
       const msg = (e as Error).message ?? String(e);
@@ -154,6 +158,33 @@ export async function chat(
       throw new StreamCut(`The connection to ${m.label} broke mid-reply: ${msg.slice(0, 200)}`);
     }
   }
+}
+
+/** Prefer the charge OpenRouter reports; its own catalog is the fallback, never a user-entered rate. */
+async function routerUsage(m: AgentModel, reply: Reply, signal: AbortSignal) {
+  if (reply.id) {
+    try {
+      const r = await fetch(`${m.baseUrl}/generation?id=${encodeURIComponent(reply.id)}`, {
+        headers: { ...(m.apiKey ? { authorization: `Bearer ${m.apiKey}` } : {}), ...m.headers },
+        signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+      });
+      if (r.ok) {
+        const { data: d } = await r.json() as any;
+        if (typeof d?.total_cost === 'number' && Number.isFinite(d.total_cost) && d.total_cost >= 0) {
+          reply.usage = { prompt: reply.usage?.prompt ?? d.native_tokens_prompt ?? d.tokens_prompt ?? 0, completion: reply.usage?.completion ?? d.native_tokens_completion ?? d.tokens_completion ?? 0, cached: reply.usage?.cached ?? d.native_tokens_cached ?? undefined, cost: d.total_cost };
+          return;
+        }
+      }
+    } catch { /* The catalog can still price tokens when generation metadata is not ready. */ }
+  }
+  if (!reply.usage) return;
+  try {
+    const price = (await catalog()).find((x) => x.id === m.id)?.price;
+    if (!price) return;
+    const u = reply.usage;
+    const cached = Math.min(u.cached ?? 0, u.prompt);
+    u.cost = ((u.prompt - cached) * price.input + cached * (price.cacheRead ?? price.input) + u.completion * price.output) / 1e6;
+  } catch { /* Keep unknown costs unknown rather than inventing a zero charge. */ }
 }
 
 /** Reads the event stream: deltas of text, reasoning and tool calls (by index), then usage. */
@@ -183,12 +214,13 @@ async function read(r: Response, o: { onText: (t: string) => void; onReasoning: 
           continue;
         }
         if (e.error) throw new Error(String(e.error.message ?? JSON.stringify(e.error)));
+        if (typeof e.id === 'string') out.id = e.id;
         if (e.usage)
           out.usage = {
-            prompt: Number(e.usage.prompt_tokens ?? 0),
-            completion: Number(e.usage.completion_tokens ?? 0),
-            cached: Number(e.usage.prompt_tokens_details?.cached_tokens ?? 0) || undefined,
-            cost: typeof e.usage.cost === 'number' && Number.isFinite(e.usage.cost) ? e.usage.cost : undefined,
+            prompt: Number(e.usage.prompt_tokens ?? out.usage?.prompt ?? 0),
+            completion: Number(e.usage.completion_tokens ?? out.usage?.completion ?? 0),
+            cached: Number(e.usage.prompt_tokens_details?.cached_tokens ?? out.usage?.cached ?? 0) || undefined,
+            cost: typeof e.usage.cost === 'number' && Number.isFinite(e.usage.cost) && e.usage.cost >= 0 ? e.usage.cost : out.usage?.cost,
           };
         const c = e.choices?.[0];
         if (!c) continue;

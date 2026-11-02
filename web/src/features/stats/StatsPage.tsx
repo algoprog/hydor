@@ -442,6 +442,8 @@ export function StatsBody() {
                         <td className="py-1.5 text-right">
                           {m.cost != null ? (
                             dollars(m.cost)
+                          ) : m.model.startsWith('openrouter/') ? (
+                            <span className="text-fg-3">—</span>
                           ) : (
                             <button onClick={() => setPricing(true)} className="text-fg-3 hover:text-accent">
                               set a price

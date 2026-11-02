@@ -30,7 +30,7 @@ import { Elapsed } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
-import { GROUP_ROWS, groupSessions, isFolded, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
+import { ACTIVE_MS, GROUP_ROWS, groupSessions, isFolded, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
@@ -459,6 +459,7 @@ export function SessionList({ query }: { query: string }) {
   const autoFolders = useApp((s) => s.boot?.autoFolders);
   const unpicked = useMemo(() => unpickedFolders(home, defaultCwd, autoFolders), [home, defaultCwd, autoFolders]);
   const [, redraw] = useState(0);
+  const [groupTime, setGroupTime] = useState(Date.now);
 
   const groups = useMemo(() => {
     const listed = order.map((k) => byKey[k]).filter((s): s is SessionSummary => !!s && !s.archived && shown(s) && !nest.under.has(s.key));
@@ -473,7 +474,16 @@ export function SessionList({ query }: { query: string }) {
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
     for (const g of out) g.keys = g.items.map((s) => s.key);
     return out;
-  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked]);
+  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, groupTime]);
+
+  // Move sessions out of Active even when no new session events arrive.
+  useEffect(() => {
+    const active = groups.find((g) => g.kind === 'active');
+    if (!active?.items.length) return;
+    const expiresAt = Math.min(...active.items.map((s) => lastActivityAt(s) + ACTIVE_MS));
+    const timer = setTimeout(() => setGroupTime(Date.now()), Math.max(1, expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [groups]);
 
   const groupOf = useMemo(() => {
     const m = new Map<string, 'active' | 'pinned' | 'dated'>();

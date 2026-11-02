@@ -200,6 +200,8 @@ Custom 会把每个对话保存在磁盘上，所以应用重启后它还能接�
 - 这台电脑上的模型（Ollama、vLLM）：不花钱。
 - 其他端点：token 的计价方式和其他智能体的一样（见[用量、限额和费用](/guide/usage)）。
 
+会话会在消息框上方显示 API 费用以及输入、缓存和输出 token，即使没有设置花费上限。费用来自 OpenRouter 的响应；如果流式响应缺少费用，则查询其生成记录，并以其自身目录价格作为后备。无需手动输入价格。
+
 [花费上限](/guide/usage#cap-what-a-session-spends)对 Custom 会话同样有效。
 
 ## 设置 → 功能 → Custom
@@ -219,3 +221,4 @@ Custom 的模型在[设置 → 智能体 → 模型](/settings?s=models)中，�
 - “给我那个叫‘上传页面’的 Custom 会话设定一个目标：npm test 通过，并且 2 GB 的上传能成功。”
 - “自动模式用的是哪个辅助模型？它能看图片吗？”
 - “从 OpenRouter 添加 Qwen3 Coder，让我能在 Custom 里用它。”（设置好 OpenRouter 密钥之后）
+- “显示我的 OpenRouter 用量和费用，不要让我输入模型价格。”

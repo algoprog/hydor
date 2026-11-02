@@ -28,7 +28,7 @@ import { imagesIn, readLineAt, sweepUploads, type FoundImage } from './retention
 import { noticeText } from '../shared/notice.ts';
 import { cleanTheme, isBuiltIn, MAX_THEMES, type AppTheme } from '../shared/themes.ts';
 import { inside, readLink, signLink } from './links.ts';
-import { priceOverrides, setPriceOverrides } from './prices.ts';
+import { priceOverrides, refreshOpenRouterPrices, setPriceOverrides } from './prices.ts';
 import { Scheduler } from './scheduler.ts';
 import { accountViews, createPr, ghToken, prDescribe, prDraft, prFromUrl, refreshPr, removeAccount, reviewChanges, saveAccount, writeGuide } from './pullrequests.ts';
 import { askCommands, commandHistory, complete, migrateTermHistory, recordCommand } from './termsuggest.ts';
@@ -1249,6 +1249,7 @@ app.put('/api/claude-retention', async (req) => {
 });
 app.get('/api/stats', async (req) => {
   const q = req.query as Record<string, string>;
+  if (db.prepare("select 1 from sessions where model like 'openrouter/%' limit 1").get()) await refreshOpenRouterPrices();
   const g = (['day', 'week', 'month', 'year'] as const).find((x) => x === q.granularity) ?? 'day';
   return computeStats(db, { granularity: g, tz: q.tz, agent: q.agent, model: q.model, count: q.count ? Number(q.count) : undefined });
 });

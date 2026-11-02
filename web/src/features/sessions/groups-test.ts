@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
-import { groupSessions, isFolded, STALE_MS, unpickedFolders, type SessionGroup } from './groups';
+import { ACTIVE_MS, groupSessions, isFolded, STALE_MS, unpickedFolders, type SessionGroup } from './groups';
 
 const HOME = '/home/alex';
 const now = new Date(2026, 10, 2, 15, 0);
@@ -49,7 +49,7 @@ test('a folder you picked gets a group once two sessions work in it; one session
 test('folders no one picked get none: home, the default folder, task folders, apps, worktrees, temporary ones', () => {
   n = 0;
   const dirs = [HOME, `${HOME}/Naget/2026-11-01-trip`, `${HOME}/naget-apps/trip/run-1`, `${HOME}/.naget-agent/worktrees/x`, '/tmp/scratch', '/'];
-  const gs = group(dirs.flatMap((d, i) => [ses(d, i * H + 1), ses(d, i * H + 2)]));
+  const gs = group(dirs.flatMap((d, i) => [ses(d, (i + 1) * H + 1), ses(d, (i + 1) * H + 2)]));
   assert.deepEqual(
     gs.map((g) => g.kind),
     ['day'],
@@ -100,13 +100,46 @@ test('active, pinned and snoozed sessions keep their groups, and still count for
   n = 0;
   const live = { status: 'idle' } as unknown as SessionSummary['live'];
   const gs = group([
-    ses(`${HOME}/code/shop`, 1 * H, { live }),
+    ses(`${HOME}/code/shop`, 60_000, { live }),
     ses(`${HOME}/code/shop`, 2 * H),
     ses(`${HOME}/code/blog`, 3 * H, { pinned: true }),
     ses(`${HOME}/code/blog`, 4 * H),
     ses(`${HOME}/code/blog`, 5 * H, { snoozedUntil: now.getTime() + H }),
   ]);
   assert.deepEqual(shape(gs), ['Active: Session 1', 'Pinned: Session 3', 'shop: Session 2', 'blog: Session 4', 'Snoozed: Session 5']);
+});
+
+test('Active includes recent finished sessions but excludes stale agents, even working or waiting ones', () => {
+  n = 0;
+  const recent = ses(HOME, ACTIVE_MS - 1);
+  const boundary = ses(HOME, ACTIVE_MS);
+  const stale = ['idle', 'working', 'waiting'].map((status) => ses(HOME, H, { live: { status, startedAt: now.getTime() - H, pendingApprovals: 0 } as SessionSummary['live'] }));
+  const external = ses(HOME, H, { external: { status: 'idle', client: 'VS Code', pid: 1, since: now.getTime() - H } });
+  const gs = group([recent, boundary, ...stale, external]);
+  assert.deepEqual(gs.find((g) => g.kind === 'active')?.items.map((s) => s.key), [recent.key]);
+  const expired = groupSessions([recent], { now: new Date(now.getTime() + 1), byFolder: false, spaces: [], unpicked });
+  assert.equal(expired.some((g) => g.kind === 'active'), false);
+});
+
+test('recent starts, turns, completions and external activity count; seen sessions do not', () => {
+  const ts = now.getTime() - 1000;
+  const live = { status: 'idle', startedAt: now.getTime() - H, pendingApprovals: 0 } as const;
+  const recent = [
+    ses(HOME, H, { live: { ...live, startedAt: ts } }),
+    ses(HOME, H, { live: { ...live, turnStartedAt: ts } }),
+    ses(HOME, H, { doneAt: ts }),
+    ses(HOME, H, { external: { status: 'waiting', client: 'terminal', pid: 1, since: ts } }),
+    ses(HOME, H, { updatedAt: undefined, createdAt: ts }),
+  ];
+  const gs = group([...recent, ses(HOME, H, { seenAt: ts }), ses(HOME, H, { updatedAt: undefined })]);
+  assert.equal(gs.find((g) => g.kind === 'active')?.items.length, recent.length);
+});
+
+test('recent pinned sessions return to Pinned after five minutes; snoozed ones stay snoozed', () => {
+  const pinned = ses(HOME, 1000, { pinned: true });
+  const snoozed = ses(HOME, 1000, { snoozedUntil: now.getTime() + H });
+  assert.deepEqual(group([pinned, snoozed]).map((g) => g.kind), ['active', 'snoozed']);
+  assert.deepEqual(groupSessions([pinned, snoozed], { now: new Date(now.getTime() + ACTIVE_MS), byFolder: false, spaces: [], unpicked }).map((g) => g.kind), ['pinned', 'snoozed']);
 });
 
 test('the order: active, pinned, spaces and folders by their newest session, the days, snoozed', () => {

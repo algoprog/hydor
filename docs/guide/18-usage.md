@@ -128,6 +128,8 @@ Claude and ChatGPT plans are flat-rate, so the app shows what the same work woul
 - Cached input (text the model read before, served from its cache) is priced at the cached price, or at the input price when there is none.
 - Models with no known price (a family name alone, such as "opus", or a model the table doesn't list) count for nothing in the totals, and show **set a price** in By model.
 
+OpenRouter models use prices fetched automatically from OpenRouter, including cached input prices. You do not need to enter them. If OpenRouter has no price available, **By model** shows a dash rather than asking you to set one.
+
 Spending caps use the same prices, but take an agent's own figure where it reports one: Claude Code's cost, or what OpenRouter says each Custom call cost. A model on this computer costs nothing there.
 
 ## Set your own price for a model
@@ -174,3 +176,4 @@ There is no button to clear Activity. Deleting a session yourself (its menu → 
 - "Count my Ollama models as free in the cost estimates."
 - "How much did Custom do this month, and with which models?"
 - "Delete sessions after two years of inactivity instead of one."
+- "Show my OpenRouter usage and costs without entering model prices."

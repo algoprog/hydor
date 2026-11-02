@@ -8,6 +8,7 @@ import type { SessionExtra, SessionNote } from '@shared/features';
 import type { SessionSummary } from '@shared/types';
 import { Button, cx, inputCls, MenuItem, Popover, SettingChip } from '../../components/ui';
 import { openSession } from '../../lib/nav';
+import { compact } from '../../lib/format';
 import type { WebFeature } from '../registry';
 import { CapDialog } from './CapDialog';
 import { useBudget, useCapDialog } from './state';
@@ -17,7 +18,8 @@ const capOf = (x?: SessionExtra) => (typeof x?.capUsd === 'number' && x.capUsd >
 /** Above the message box while a cap is set: what is spent of it. Also where the cap dialog opens. */
 function CapDock({ s }: { s: SessionSummary }) {
   const cap = capOf(s.extra);
-  const st = useBudget(s.key, cap != null, `${cap}|${s.stats.costUsd}|${s.stats.tokensOut}|${s.live?.status}`);
+  const router = s.agent === 'acp' && s.model?.startsWith('openrouter/');
+  const st = useBudget(s.key, cap != null || !!router, `${cap}|${s.stats.costUsd}|${s.stats.tokensOut}|${s.live?.status}`);
   const openDialog = useCapDialog((x) => x.open);
   const spent = st?.spentUsd ?? 0;
   const share = cap ? Math.min(1, spent / cap) : 0;
@@ -25,6 +27,12 @@ function CapDock({ s }: { s: SessionSummary }) {
   const near = !reached && share >= 0.8;
   return (
     <>
+      {router && cap == null && (
+        <div className="mx-3 mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-3 text-[12px] text-fg-3 sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
+          <span>API cost: <span className="tnum text-fg-2">{st && !st.unpriced ? usd(st.spentUsd) : s.stats.costUsd != null ? usd(s.stats.costUsd) : '—'}</span></span>
+          <span className="tnum">{compact(s.stats.tokensIn + s.stats.tokensCached)} in · {compact(s.stats.tokensCached)} cached · {compact(s.stats.tokensOut)} out</span>
+        </div>
+      )}
       {cap != null && (
         <div className="mx-3 mb-2 flex items-center gap-2.5 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
           <Wallet size={14} className={cx('shrink-0', reached ? 'text-err' : near ? 'text-warn' : 'text-fg-3')} />

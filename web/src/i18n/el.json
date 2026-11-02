@@ -8193,5 +8193,7 @@
 "This kind of file is not saved from an editor":"Αυτό το είδος αρχείου δεν αποθηκεύεται από επεξεργαστή",
 "This kind of file opens as text or a preview, not in an editor":"Αυτό το είδος αρχείου ανοίγει ως κείμενο ή προεπισκόπηση, όχι σε επεξεργαστή",
 "tracked changes":"παρακολούθηση αλλαγών",
-"Which is the document’s main file (tex.main)?":"Ποιο είναι το κύριο αρχείο του εγγράφου (tex.main);"
+"Which is the document’s main file (tex.main)?":"Ποιο είναι το κύριο αρχείο του εγγράφου (tex.main);",
+"API cost:":"Κόστος API:",
+"cached ·":"στην cache ·"
 }

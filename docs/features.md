@@ -3,6 +3,8 @@
 Everything Naget Agent does, by area. [Back to the README](../README.md).
 
 ## Sessions
+- The prompt bar’s Stop button shows a rotating ring while a session starts or works, paused while
+  waiting for you and respecting reduced-motion preferences.
 - Start a Claude Code or Codex session in any folder, optionally in a worktree of its own (a new branch in a
   separate folder, so several agents can change one repository at once). Pick the model, how hard it
   thinks, and what it may do without asking you. The start page opens with what you picked there last,
@@ -17,7 +19,8 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
   they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
-  doing right now: the active and pinned ones first, then a group for each space and each folder you picked
+  doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
+  and moves them back to their usual group after five quiet minutes. Pinned comes next, then a group for each space and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable, with a pen to start a new session
   there, then the rest by day. Snooze one until later, or settle it when you are done for now.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
@@ -216,7 +219,9 @@ agents that speak ACP and take MCP servers.
 
 ## Custom: any model
 
-Custom is the app's own agent, for models beyond Claude Code's and Codex's. It works like them: it reads,
+OpenRouter session costs and token usage show above the message box without a spending cap. Charges come from OpenRouter automatically, with its generation records and catalog prices as fallbacks; its catalog also supplies Usage estimates, so no manual prices are required.
+
+Custom is the app's own agent, for models beyond Claude Code's and Codex's. Its working and starting indicators use the Naget loading animation. It works like them: it reads,
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
 Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context. In Auto mode routine steps go ahead and a quick check asks you

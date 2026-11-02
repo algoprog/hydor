@@ -5,7 +5,7 @@ import { api, enc } from '../../lib/api';
 import { sentPicturesOf, useSentPictures, type SentPictures } from '../../lib/attachments';
 import { basename, compact, dirname, duration, prettyPath } from '../../lib/format';
 import { openFile } from '../../lib/nav';
-import { useApp, useTimeline } from '../../lib/store';
+import { useApp, useSessions, useTimeline } from '../../lib/store';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Button, cx, Throbber } from '../../components/ui';
 import { ApprovalCard } from './Approval';
@@ -18,6 +18,14 @@ import type { SessionNote } from '@shared/features';
 import { LOCALE } from '../../i18n/locale';
 
 type Block = { kind: 'item'; item: TimelineItem } | { kind: 'group'; id: string; items: TimelineItem[] };
+
+/** Custom works with Naget's loading mark; other agents keep their own animation. */
+function WorkingIcon({ agent, size, spinning, className }: { agent: Agent; size: number; spinning?: boolean; className?: string }) {
+  const { sessionKey } = useContext(SessionCtx);
+  const name = useSessions((s) => sessionKey ? s.byKey[sessionKey]?.acpName : undefined);
+  if (agent === 'acp' && (name === 'Custom' || name === 'Console') && spinning) return <Throbber size={size} className={className} />;
+  return <AgentIcon agent={agent} name={name} size={size} spinning={spinning} className={className} />;
+}
 
 const STANDALONE = new Set(['todo', 'question', 'plan']);
 
@@ -222,7 +230,7 @@ const Group = memo(function Group({ b, sessionKey, agent, busy }: { b: Extract<B
   // Thoughts on their own stay a quiet line.
   if (!tools.length) return <div className="px-1">{visible.map(row)}</div>;
   // The agent at work after the last step, shown in its box rather than on a line of its own.
-  const working = busy ? <AgentIcon agent={agent} size={14} spinning className="shrink-0" /> : undefined;
+  const working = busy ? <WorkingIcon agent={agent} size={14} spinning className="shrink-0" /> : undefined;
   // A single step is its own box.
   if (visible.length === 1)
     return (
@@ -270,7 +278,7 @@ const Group = memo(function Group({ b, sessionKey, agent, busy }: { b: Extract<B
 function StillWorking({ agent, note }: { agent: Agent; note?: string }) {
   return (
     <div className="anim-in flex min-h-7 items-center gap-2.5 px-1 text-[12.5px] text-fg-3">
-      <AgentIcon agent={agent} size={14} className="spin-gentle" />
+      <WorkingIcon agent={agent} size={14} spinning />
       {note && <span className="min-w-0 truncate">{note}</span>}
     </div>
   );
@@ -557,7 +565,7 @@ const SegmentView = memo(function SegmentView({
             {!live && <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform duration-200 group-hover:text-fg-2', expanded && 'rotate-90')} />}
             {live ? (
               <>
-                <AgentIcon agent={agent} size={15} className={live.status === 'waiting' ? 'breathe' : 'spin-gentle'} />
+                <WorkingIcon agent={agent} size={15} spinning={live.status !== 'waiting'} className={live.status === 'waiting' ? 'breathe' : undefined} />
                 <span className={cx('font-medium', live.status === 'waiting' ? 'text-warn' : 'text-busy')}>
                   {live.status === 'waiting' ? 'Waiting for you' : live.status === 'starting' ? 'Starting' : 'Working'}
                   {live.where ? ` in ${live.where}` : ''}
@@ -1046,7 +1054,7 @@ export function Timeline({
             {notes.length > 0 && <LooseNotes notes={notes} known={noteIds} sessionKey={sessionKey} complete={tl.start === 0} />}
             {working && !segs.length && (
               <div className="flex items-center gap-2.5 px-2 text-[13.5px] text-busy">
-                <AgentIcon agent={agent} size={15} className="spin-gentle" /> Starting…
+                <WorkingIcon agent={agent} size={15} spinning /> Starting…
               </div>
             )}
             {approvals.length > 0 && (

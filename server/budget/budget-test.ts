@@ -23,7 +23,7 @@ import { openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { AcpParser } from '../history/acp.ts';
 import { notesOf } from '../notes.ts';
-import { setPriceOverrides } from '../prices.ts';
+import { rateFor, refreshOpenRouterPrices, setPriceOverrides } from '../prices.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { budget, capExtra, checkBudget } from './index.ts';
 import { budgetState, capReached, childShare, ownSpend, rowCost, spending } from './spend.ts';
@@ -235,12 +235,18 @@ test('each model call counts at once: the turn stops right after the call that r
   // The indexer catches up: the same calls are not counted twice.
   indexed('claude:live1', { model: 'test-model', tin: 60_000, tout: 15_000 });
   assert.ok(Math.abs(spending(db, 'claude:live1').spentUsd - 1.05) < 1e-9);
-  // A session without a cap is not tracked; a call's own figure (Custom's) is taken as it is.
+  // A call's own figure (Custom's) is taken as it is.
   appSession('acp:live2', { capUsd: 0.5 });
   sessions.run('acp:live2');
   sessions.emit('call', 'acp:live2', { id: 'c1', model: 'openrouter/x', usd: 0.6, tokens: { in: 1, cached: 0, out: 1 } } satisfies ModelCall);
   await tick();
   assert.ok(sessions.interrupted.includes('acp:live2'));
+  appSession('acp:uncapped', {});
+  sessions.run('acp:uncapped');
+  sessions.emit('call', 'acp:uncapped', { id: 'u1', model: 'openrouter/x', usd: 0.004, tokens: { in: 1, cached: 0, out: 1 } } satisfies ModelCall);
+  await tick();
+  assert.equal(spending(db, 'acp:uncapped').spentUsd, 0.004, 'OpenRouter usage updates even without a cap');
+  assert.ok(!sessions.interrupted.includes('acp:uncapped'));
 });
 
 /** Lines from an agent's process, as its adapter reads them. */
@@ -317,6 +323,37 @@ test('chat() reads what a call cost and the tokens read from cache', async () =>
   assert.equal(r.text, 'hi');
   assert.deepEqual(r.usage, { prompt: 1200, completion: 30, cached: 1000, cost: 0.0042 });
   assert.deepEqual(asked.usage, { include: true });
+});
+
+test('OpenRouter automatically supplies catalog rates and missing stream costs without manual prices', async () => {
+  const realFetch = globalThis.fetch;
+  let generations = 0;
+  let streamCost: number | undefined;
+  globalThis.fetch = (async (input: any, init?: any) => {
+    const url = String(input);
+    if (url.endsWith('/models')) return Response.json({ data: [{ id: 'test/auto', pricing: { prompt: '0.000002', completion: '0.000006', input_cache_read: '0.0000005' } }] });
+    if (url.includes('/generation?')) {
+      generations++;
+      assert.match(url, /id=gen-test/);
+      return generations === 1 ? Response.json({ data: { total_cost: 0.007, native_tokens_prompt: 1000, native_tokens_completion: 100 } }) : new Response('', { status: 404 });
+    }
+    assert.equal(JSON.parse(init.body).stream, true);
+    return new Response(`data: ${JSON.stringify({ id: 'gen-test', choices: [{ delta: { content: 'hello' } }], usage: { prompt_tokens: 1000, completion_tokens: 100, prompt_tokens_details: { cached_tokens: 200 }, ...(streamCost == null ? {} : { cost: streamCost }) } })}\n\ndata: [DONE]\n\n`);
+  }) as typeof fetch;
+  try {
+    await refreshOpenRouterPrices();
+    assert.deepEqual(rateFor(db, 'openrouter/test/auto'), { input: 2, output: 6, cacheRead: 0.5, source: 'table' });
+    const m: AgentModel = { id: 'openrouter/test/auto', model: 'test/auto', provider: 'openrouter', baseUrl: 'https://example.invalid', tools: 'native', label: 'Auto' };
+    const opts = { messages: [], signal: AbortSignal.timeout(5000), onText: () => {}, onReasoning: () => {} };
+    assert.equal((await chat(m, opts)).usage?.cost, 0.007, 'the actual charge wins over catalog rates');
+    assert.ok(Math.abs((await chat(m, opts)).usage!.cost! - 0.0023) < 1e-12, 'catalog fallback includes cached input');
+    assert.equal(rowCost(db, { agent: 'acp', model: m.id, tokens_in: 800, tokens_cached: 200, tokens_out: 100, cost_usd: null, parent_key: null }), 0.0023);
+    streamCost = 0;
+    assert.equal((await chat(m, opts)).usage?.cost, 0, 'free calls remain zero and do not trigger a metadata lookup');
+    assert.equal(generations, 2);
+    streamCost = undefined;
+    assert.equal((await chat({ ...m, id: 'openrouter/not/listed' }, opts)).usage?.cost, undefined, 'missing prices stay unknown, not free');
+  } finally { globalThis.fetch = realFetch; }
 });
 
 test('the ACP parser adds up Custom’s usage lines: per ACP session, per turn, and the cost when known', () => {

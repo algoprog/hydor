@@ -8179,5 +8179,7 @@
 "This kind of file is not saved from an editor":"这类文件不能从编辑器保存",
 "This kind of file opens as text or a preview, not in an editor":"这类文件以文本或预览打开，不在编辑器中打开",
 "tracked changes":"修订",
-"Which is the document’s main file (tex.main)?":"哪个是文档的主文件（tex.main）？"
+"Which is the document’s main file (tex.main)?":"哪个是文档的主文件（tex.main）？",
+"API cost:":"API 费用：",
+"cached ·":"已缓存 ·"
 }
