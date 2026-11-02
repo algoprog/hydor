@@ -129,6 +129,22 @@ function segment(items: TimelineItem[]): Segment[] {
   return out;
 }
 
+/** The reply's items, with the later calls of a tool that shows them together (`many`) in its first one's `more`. */
+function together(items: TimelineItem[]): { item: TimelineItem; more?: ToolItem[] }[] {
+  const out: { item: TimelineItem; more?: ToolItem[] }[] = [];
+  const first = new Map<string, { item: TimelineItem; more?: ToolItem[] }>();
+  for (const it of items) {
+    const lead = it.kind === 'tool' && toolView(it.tool.name, it.tool)?.many ? first.get(it.tool.name) : undefined;
+    if (lead) (lead.more ??= []).push(it as ToolItem);
+    else {
+      const e = { item: it };
+      if (it.kind === 'tool' && toolView(it.tool.name, it.tool)?.many) first.set(it.tool.name, e);
+      out.push(e);
+    }
+  }
+  return out;
+}
+
 /** A file a turn changed: totals plus each edit, for the diff. */
 interface FileEntry {
   path: string;
@@ -473,6 +489,7 @@ const SegmentView = memo(function SegmentView({
   }, [!!live]);
   const visibleWork = seg.work.filter((i) => !hiddenThought(i));
   const stats = useMemo(() => workStats(seg.work), [seg.work]);
+  const answer = useMemo(() => together(seg.answer), [seg.answer]);
   const first = seg.prompt?.ts ?? seg.notice?.ts ?? seg.work[0]?.ts;
   const lastItem = [...seg.work, ...seg.answer].reverse().find((i) => i.ts);
   const took = seg.end?.durationMs ?? (first && lastItem?.ts && lastItem.ts > first ? lastItem.ts - first : 0);
@@ -539,10 +556,10 @@ const SegmentView = memo(function SegmentView({
           {q.kind === 'tool' && <ToolRow item={q} sessionKey={sessionKey} />}
         </div>
       ))}
-      {seg.answer.map((a) => (
+      {answer.map(({ item: a, more }) => (
         <div key={a.id} className={cx(fresh(a.id) && 'anim-in')}>
           {a.kind === 'assistant' && <AssistantBlock item={a} />}
-          {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} />}
+          {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} more={more} />}
         </div>
       ))}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}

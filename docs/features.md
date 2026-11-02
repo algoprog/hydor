@@ -165,7 +165,9 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Agents can answer with a page (a chart, a report, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen.
 - Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
-  from before and after, on a computer's or a phone's screen, to compare with a slider or side by side.
+  from before and after, on a computer's or a phone's screen: a reply's screenshots as one card of small
+  pictures, each opening a review (beside the conversation, or over the app on a phone) with a slider or side by
+  side, and arrows to the reply's other screens.
 - Every file a turn changed, with its diff. Screenshots you attach show in the conversation and open full size.
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - Message the agent while it works: your note joins the running turn, or waits in a queue you can reorder and

@@ -556,9 +556,10 @@ Pictures need a Chromium on this computer: the one the browser uses ([Settings �
 
 When an agent changes how a web app looks or works (a site or an app with a dev server, or HTML files), it shows you screenshots to review: before its first change, a picture of each screen it will change, and when it is done, the same screens again. It starts the app's dev server first when it isn't running.
 
-- A **Before** card shows the picture as it was. The computer and phone buttons switch between the two sizes when the agent took both.
-- A **Before and after** card shows each screen's pair. Drag the slider (or press ← and →) to sweep between before and after, or pick **Side by side**. **See them large** opens the pictures over the app. **Looks good** and **Change something** put a line about the screen in the message box, for you to finish and send.
-- On a wide screen the review opens beside the conversation, as pages do, and its card in the conversation stays small.
+- A **Before** card shows the screens as they were, in small pictures: the screenshots of one reply show together, in one card. In a **Before and after** card, a screen's pair is marked **Before → after**, its before and after split down the middle. A phone sign marks a screen the agent took on a phone's size too.
+- Click a picture to review it: on a wide screen it opens beside the conversation, as pages do; in a narrower window or on a phone, over the app. The arrows at its top go to the reply's other screens.
+- A screen's before and after show one over the other: drag the slider (or press ← and →) to sweep between them, or pick **Side by side**. The computer and phone buttons switch between the two sizes when the agent took both. **See them large** opens the pictures over the app. **Looks good** and **Change something** put a line about the screen in the message box, for you to finish and send.
+- On a wide screen, a screen's after opens beside the conversation by itself when it comes.
 - An after picture without a before one shows alone, with "No before picture to compare with"; the agent is told to take the before one first next time.
 
 You can also ask for a screenshot any time: "show me the settings page on a phone". The pictures are taken on this computer by a Chromium ([Settings → Capabilities → Browser](/settings?s=browser)) and kept with their session: they go when the session is deleted, and the oldest go first past 500 MB in all.
