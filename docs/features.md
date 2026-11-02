@@ -122,13 +122,14 @@ agents that speak ACP and take MCP servers.
   run gives) try it as it is on screen, each saying how its last try went. Describe one on the New template page
   and the App builder assistant makes it. Agents build templates with tools of their own: app_get, app_save
   (checked first; whole, a patch or one step), app_try (its examples or a set of answers, waited for) and
-  app_screen. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases
-  are searched. A template can have a screen of its own in place of its form: a page made from its parts (its
-  form, its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
-  edited in Pages' editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
-  flows. Templates travel as one file (.naget-app or .json, with their records, screens and the templates they
-  call), installed after a card that says what they will do here and offers one of your models for any it asks
-  for that is not set up here.
+  app_screen. A template an agent saves opens beside its conversation, where what you change and save reaches the
+  agent with your next message (its next save reads your version first). Its steps, its agents and programs
+  search its records by words and by meaning, as knowledge bases are searched. A template can have a screen of
+  its own in place of its form: a page made from its parts (its form, its answer, a table for each list it keeps,
+  its earlier runs) that runs it and changes as its records do, edited in Pages' editor (whose Add has an App tab
+  with those parts) or by an agent, with buttons for its other flows. Templates travel as one file (.naget-app or
+  .json, with their records, screens and the templates they call), installed after a card that says what they
+  will do here and offers one of your models for any it asks for that is not set up here.
 - **Slides**: decks kept in Pages, made by an agent (save_slides, from layouts or parts placed by position) or
   from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
   layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and

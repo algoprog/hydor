@@ -94,6 +94,11 @@ function changed(r: RunRecord | null) {
   d().broadcast({ t: 'feature', id: 'apps', data: { run: runView(r) } });
 }
 
+/** A template was saved: its editor, open anywhere, takes the new version (or asks first, while it has changes of its own). */
+export function appChanged(a: { id: string; updatedAt: number }, by: 'agent' | 'user') {
+  d().broadcast({ t: 'feature', id: 'apps', data: { app: { id: a.id, updatedAt: a.updatedAt, by } } });
+}
+
 /** Tells the pages a run changed (a step of it moved on). */
 export function noteChanged(id: string) {
   cache.delete(id);

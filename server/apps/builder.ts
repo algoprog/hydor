@@ -7,9 +7,10 @@ import { cleanRecipe, isActive } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
 import { allSteps, asText, innerLists } from '../../shared/app-manifest.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
+import { dropEdits, noteBuilder, seenBy, userEditAt } from './edits.ts';
 import { tryExamples } from './examples.ts';
 import { stepsOf } from './flow.ts';
-import { startRun, waitFor } from './runs.ts';
+import { appChanged, startRun, waitFor } from './runs.ts';
 import { changeScreen, makeScreen, screensOf } from './screens.ts';
 import { getApp, getRun, lastExampleRuns, listApps, saveApp, type RunRecord } from './store.ts';
 
@@ -129,6 +130,8 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
       async run(a) {
         if (!a.app) return JSON.stringify({ templates: listApps(db).map(lineOf) }, null, 1);
         const app = find(a.app);
+        // An agent that builds it has seen it as it is now (the user's changes too).
+        if (seenBy(db, app.id, ctx.key) !== undefined) noteBuilder(db, app.id, ctx.key);
         const last = lastExampleRuns(db, app.id);
         return JSON.stringify(
           {
@@ -156,10 +159,15 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
           patch: { type: 'object', description: 'Merged into the template as saved (or into recipe).' },
           step: { type: 'object', description: 'One step: { id, …its fields } changes it; { id, remove: true } removes it; a new id adds it (after: the step it follows; none: at the end).' },
           why: { type: 'string', description: 'What changed, in a few words ("Added a step that checks prices").' },
+          force: { type: 'boolean', description: 'Write over changes the user made since you last saved or read it.' },
         },
       },
       async run(a) {
         const prev = a.app ? find(a.app) : null;
+        // The user changed it since this agent last saw it: it reads their version first, rather than write over it.
+        const seen = prev ? seenBy(db, prev.id, ctx.key) : undefined;
+        const edited = prev ? userEditAt(db, prev.id) : undefined;
+        if (prev && seen !== undefined && edited !== undefined && edited >= seen && !a.force) return { text: `The user changed “${prev.name}” in its editor since you last saved or read it: read it with app_get and build on their version (force: true writes over their changes).`, isError: true };
         let raw: Record<string, any> = (a.recipe && typeof a.recipe === 'object' ? a.recipe : prev ? cleanRecipe(prev) : {}) as Record<string, any>;
         if (a.patch && typeof a.patch === 'object') raw = mergePatch(raw, a.patch) as Record<string, any>;
         if (a.step && typeof a.step === 'object') raw = withStep(raw, a.step as Record<string, unknown>);
@@ -167,6 +175,9 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         const { recipe, errors, warnings } = help.problemsOf(raw);
         if (errors.length) return { text: `Not saved. Fix these first:\n- ${errors.join('\n- ')}`, isError: true };
         const saved = help.prepare(saveApp(db, { id: prev?.id, recipe: { ...recipe, screens: prev?.screens } }));
+        noteBuilder(db, saved.id, ctx.key, Date.now() + 1);
+        appChanged(saved, 'agent');
+        if (a.force) dropEdits(db, saved.id, ctx.key);
         const steps = saved.flow ? allSteps(saved.flow.steps).length : 0;
         return [
           `${prev ? 'Saved' : 'Made'} “${saved.name}” (id ${saved.id}, address ${saved.slug}${steps ? `, ${steps} steps` : ''}${saved.examples?.length ? `, ${saved.examples.length} examples` : ''}): /apps/${saved.id}.`,
@@ -245,9 +256,12 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         if (app.screens?.[name]) {
           if (typeof a.html !== 'string' || !a.html.trim()) return { text: `It has a screen “${name}” already: give its html to change it`, isError: true };
           const s = changeScreen(db, app, name, { html: a.html, title: a.title });
+          appChanged(app, 'agent');
           return `Changed the screen “${name}” of “${app.name}” (version ${s.version}): /apps/${app.id}`;
         }
-        const s = makeScreen(db, app, { name, title: a.title, html: a.html, by: 'agent' }).screen;
+        const made = makeScreen(db, app, { name, title: a.title, html: a.html, by: 'agent' });
+        const s = made.screen;
+        appChanged(made.app, 'agent');
         return `Gave “${app.name}” the screen “${name}”${a.html ? '' : ', made from its parts'}: /apps/${app.id} (its page: /pages/${s.page})`;
       },
     },

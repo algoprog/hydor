@@ -706,6 +706,37 @@ test('the builder’s tools: app_save makes and changes a template (whole, a pat
   assert.ok(store.getApp(db, id)!.screens?.main, 'its screen stays');
 });
 
+test('the user’s changes reach the agent that built a template: told once with its next message, and its next app_save reads them first', async () => {
+  const ctx: RunCtx = { runId: 'builder-2', key: 'acp:builder-2', agent: 'acp', cwd: os.tmpdir(), deps };
+  const tools = Object.fromEntries(apps.tools!(ctx).map((t) => [t.name, t]));
+  const text = (out: unknown) => (typeof out === 'string' ? out : (out as { text: string }).text);
+  const made = text(await tools.app_save.run({ recipe: { name: 'Shared', prompt: 'Plan {{topic}}', fields: [{ id: 'topic', label: 'Topic', type: 'text', required: true }] } }, ctx));
+  const id = /\(id ([a-z0-9]+)/.exec(made)![1];
+  await sleep(5);
+  // The user changes it in its editor (the page, not an agent through the API).
+  const app = store.getApp(db, id)!;
+  const put = await http.inject({ method: 'PUT', url: `/api/apps/${id}`, payload: { recipe: { ...app, name: 'Shared by two', fields: [...app.fields, { id: 'budget', label: 'Budget', type: 'number' }] } } });
+  assert.equal(put.statusCode, 200, put.body);
+  const told = await apps.beforeMessage!('acp:builder-2', deps);
+  assert.match(String(told), /changed a template you built/);
+  assert.match(String(told), /Its name: “Shared” → “Shared by two”/);
+  assert.match(String(told), /The form: added “Budget” \(budget\)/);
+  assert.equal(await apps.beforeMessage!('acp:builder-2', deps), null, 'told once');
+  assert.equal(await apps.beforeMessage!('acp:someone-else', deps), null, 'only the agents that built it');
+  // Its next save reads their version first, unless it means to write over it.
+  const refused = (await tools.app_save.run({ app: id, patch: { description: 'Mine' } }, ctx)) as { text: string; isError?: boolean };
+  assert.equal(refused.isError, true);
+  assert.match(refused.text, /changed “Shared by two” in its editor since you last saved or read it/);
+  await tools.app_get.run({ app: id }, ctx);
+  assert.match(text(await tools.app_save.run({ app: id, patch: { description: 'Mine' } }, ctx)), /Saved “Shared by two”/);
+  assert.equal(store.getApp(db, id)!.fields.length, 2, 'their field stays');
+  await sleep(5);
+  const again = store.getApp(db, id)!;
+  await http.inject({ method: 'PUT', url: `/api/apps/${id}`, payload: { recipe: { ...again, name: 'Theirs' } } });
+  assert.match(text(await tools.app_save.run({ app: id, patch: { name: 'Mine after all' }, force: true }, ctx)), /Saved “Mine after all”/);
+  assert.equal(await apps.beforeMessage!('acp:builder-2', deps), null, 'written over on purpose: nothing to tell');
+});
+
 test('notify_user: a step tells you something now, and its notice opens the run', async () => {
   const notices: any[] = [];
   const on = (n: unknown) => notices.push(n);
