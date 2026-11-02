@@ -95,6 +95,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['accounts', 'More accounts', 'second account work personal subscription', 'Another subscription for an agent'],
   ['accounts', 'Switch accounts at a limit', 'auto switch rotate use all accounts usage limit continue other account', 'A session that runs out of usage carries on with another account'],
   ['accounts', 'Agent programs', 'install claude code codex gemini opencode qwen auggie version', 'Which agent programs are installed, and installing the others'],
+  ['accounts', 'Update automatically', 'update upgrade newest latest version claude code codex gemini opencode agent programs daily', 'Keeps Claude Code, Codex and the other agent programs at their newest version', 'Update agent programs automatically'],
   // Agents › More agents
   ['agents', 'Your agents', 'acp agents custom', 'Agents that show next to Claude Code and Codex'],
   ['agents', 'Add your own', 'acp command custom agent', 'Any agent that speaks ACP, by its command', 'Add your own agent'],

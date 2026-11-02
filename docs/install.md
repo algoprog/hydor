@@ -135,6 +135,12 @@ node dist/server/cli.js update   # pull, build, restart the service; running age
 The Docker container updates the copy of the app inside it. Rebuilding the image (`docker compose up -d
 --build`) starts again from your clone of the repository, so `git pull` before you do.
 
+The agents' programs keep up to date as well, however the app runs: once a day Claude Code, Codex, Gemini CLI
+and the others are brought to their newest version, the app's own copies with npm and yours with their own
+updater (`claude update`, `codex update`…), and a new version that does not work the way the sessions use it is
+undone. Settings → Accounts → Agent programs has **Update now** and a switch to turn this off. The Docker image's
+Claude Code is left to the image (it sets `DISABLE_AUTOUPDATER=1`, and it is installed for all users).
+
 The app was called Agent Console before version 0.5. Installs from then keep working as they are: the
 service stays `agent-console`, the data stays in `~/.web-agent`, and `~/.config/agent-console.env` is
 still read. With Docker the service is now named `naget-agent`, so rebuild with

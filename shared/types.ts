@@ -1142,9 +1142,46 @@ export interface ClientInfo {
   id: string;
   name: string;
   source: 'yours' | 'app' | 'bundled' | 'missing';
+  /** The version the sessions run. */
   version?: string;
   path?: string;
   installing?: boolean;
+  /** A newer version is out (as last looked up). */
+  latest?: string;
+  /** A newer version that did not work here, so the sessions keep running `version`. */
+  failed?: string;
+  /** Your own copy, when the sessions run another one (Codex: the one your terminal runs). */
+  yours?: { version?: string; path: string };
+}
+
+/** One program a run of the agent programs' updates brought up to date, or tried to. */
+export interface ClientUpdateItem {
+  id: string;
+  name: string;
+  /** Your own copy, which the sessions do not run (Codex: the one your terminal runs). */
+  yours?: boolean;
+  from?: string;
+  to?: string;
+  ok: boolean;
+  /** Why it failed. */
+  error?: string;
+  /** The new version did not work, so this one stays in use. */
+  kept?: string;
+}
+
+/** Keeping the agents' programs current: once a day by itself, or now (Settings → Accounts → Agent programs). */
+export interface ClientUpdates {
+  /** Update automatically (on unless turned off). */
+  auto: boolean;
+  /** When the newest versions were last looked up. */
+  checkedAt?: number;
+  /** The lookup failed (offline, npm's registry unreachable). */
+  error?: string;
+  /** Looking for new versions, or updating (`current`: the program it is at). */
+  running?: 'check' | 'update';
+  current?: string;
+  /** The last run that updated something or tried to. */
+  last?: { at: number; auto: boolean; items: ClientUpdateItem[] };
 }
 
 /** How the last update went. */

@@ -52,18 +52,38 @@ The model menu only lists the session's own agent's models. To move a conversati
 
 Claude Code, Codex, Gemini CLI and the others are programs on this computer. You don't have to install them by hand.
 
-Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and scroll to **Agent programs**. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code and Auggie, each with its version and where it comes from:
+Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and scroll to **Agent programs**. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code and Auggie, each with the version the sessions run and where it comes from:
 
-- **your own install**: you installed it yourself. The app uses it as it is and never changes it.
-- **installed by the app, kept up to date**: the app installed it in its own folder.
-- **comes with the app, kept up to date**: Codex ships with the app.
+- **your own install**: you installed it yourself.
+- **installed by the app**: the app installed it in its own folder.
+- **comes with the app**: Codex ships with the app.
 - **not here: installs by itself when you first use it**: missing. Click **Install** to get it now.
+
+A row also says "… is out" when a newer version is out. Codex's row adds "yours in the terminal: …" when you have a Codex of your own too: the sessions run the app's, and a terminal runs yours.
 
 A missing program also installs by itself the first time it is needed: Claude Code when you sign in to it or start a Claude Code session, an ACP agent when you add it in Settings → More agents or start a session with it. The app installs them with npm into its own folder, so you need no administrator rights.
 
-Once a day (the first check comes about ten minutes after the app starts), the app brings the copies it installed up to the latest version, and switches Codex to a newer copy when one is out. Your own installs are left alone.
-
 Goose and Kimi CLI aren't in this list: install them yourself (Settings → More agents shows where to get them).
+
+## Keep the agent programs up to date
+
+With [**Update automatically**](/settings?s=accounts&find=Update%20automatically) on, under **Agent programs** (it is on unless you turn it off), the app brings each agent program up to its newest version once a day. The first run comes about ten minutes after the app starts.
+
+- The copies the app installed update with npm, in its own folder. Codex switches to a copy newer than the one the app came with.
+- Your own installs update with their own updater: `claude update` for Claude Code, `codex update` for Codex (the one your terminal runs), `opencode upgrade` for OpenCode.
+- Gemini CLI, Qwen Code or Auggie that you installed with `npm install -g` update with npm, when your user may write to that folder. Anything installed another way is left for you to update the way you installed it.
+- Claude Code follows its own release line: the stable one when its settings say `"autoUpdatesChannel": "stable"`, else the latest.
+- If you turned Claude Code's own updates off with `DISABLE_AUTOUPDATER=1` (the Docker image does), the app doesn't update your Claude Code by itself either. **Update now** still does.
+
+The app keeps a new version only once it works the way the sessions use it. Claude Code must answer as a session starts and list its models, Codex must start its app server and list its models, and the others must start and say their version. None of this needs a sign-in or uses any of your plan. A version that fails is undone:
+
+- A copy the app installed, or one of yours it updated with npm, goes back to the version before.
+- For your own Claude Code, the sessions keep running the version before, which Claude Code's installer keeps beside the new one. The `claude` command in a terminal stays on the new one. The row says "… did not work here".
+- A version that failed isn't tried again by itself, but the next one is, and **Update now** tries it again.
+
+Under the switch, the section says when the app last looked, like "Up to date · checked 2h ago", with **Check now** to look again. When newer versions are out it says so, with **Update now** to install them at once; it shows which program it is updating while it works. The line below says what the last update changed, like "Claude Code 2.1.308 → 2.1.316", or why a version could not be installed.
+
+Sessions that are running carry on with the version they started with; new sessions use the new one. With **Update automatically** off, the app still looks once a day and shows what is out, but installs nothing until you click **Update now**.
 
 ## Sign Claude Code and Codex in
 
@@ -320,6 +340,7 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 ## Ask an agent
 
 - "Which agent programs are installed here? Install Gemini CLI."
+- "Are Claude Code and Codex up to date? Update them now."
 - "Add OpenCode to my agents."
 - "Find a model on Hugging Face that runs well on this computer and sees images, check it, and install the best size."
 - "Add the newest DeepSeek model from OpenRouter to my models." (once your OpenRouter key is set)

@@ -6,7 +6,7 @@ import { useSearch } from 'wouter';
 import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, ScrollText, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
 import { featureSections } from '../registry';
 import { isLang, LANGS } from '@shared/i18n';
-import type { AccountStatus, Agent, AgentAccount, ClientInfo, LoginFlow, RetentionSettings, StartupState, UpdateState } from '@shared/types';
+import type { AccountStatus, Agent, AgentAccount, ClientInfo, ClientUpdateItem, ClientUpdates, LoginFlow, RetentionSettings, StartupState, UpdateState } from '@shared/types';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -889,22 +889,40 @@ function AccountSettings() {
 
 const SOURCE: Record<ClientInfo['source'], string> = {
   yours: 'your own install',
-  app: 'installed by the app, kept up to date',
-  bundled: 'comes with the app, kept up to date',
+  app: 'installed by the app',
+  bundled: 'comes with the app',
   missing: 'not here: installs by itself when you first use it',
 };
 
-/** The agents' programs on this machine: whose they are and which version. */
+type ClientsState = { clients: ClientInfo[]; updates: ClientUpdates };
+
+/** What an update did to one program, in a line (each part its own text, for the translations). */
+function UpdateNote({ i }: { i: ClientUpdateItem }) {
+  return (
+    <>
+      {i.yours ? <span>{`${i.name} (your own)`}</span> : i.name} <span>{i.ok ? `${i.from ? `${i.from} → ` : ''}${i.to}` : i.kept ? `${i.to} did not work here (${i.error}), so it stays on ${i.kept}` : `${i.to} could not be installed: ${i.error}`}</span>
+    </>
+  );
+}
+
+/** The agents' programs on this machine: whose they are, which version, and keeping them up to date. */
 function AgentPrograms() {
-  const [list, setList] = useState<ClientInfo[] | null>(null);
+  const [st, setSt] = useState<ClientsState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   useEffect(() => {
-    api<{ clients: ClientInfo[] }>('/api/clients').then((r) => setList(r.clients), toastError);
+    api<ClientsState>('/api/clients').then(setSt, toastError);
   }, []);
+  // A check or an update is going on: follow it until it ends.
+  const running = st?.updates.running;
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => api<ClientsState>('/api/clients').then(setSt, () => {}), 2000);
+    return () => clearInterval(t);
+  }, [running]);
   const install = async (c: ClientInfo) => {
     setBusy(c.id);
     try {
-      setList((await post<{ clients: ClientInfo[] }>(`/api/clients/${c.id}/install`)).clients);
+      setSt(await post<ClientsState>(`/api/clients/${c.id}/install`));
       toast(`${c.name} is installed`, 'ok');
     } catch (e) {
       toastError(e);
@@ -912,9 +930,13 @@ function AgentPrograms() {
       setBusy(null);
     }
   };
-  if (!list) return null;
+  const start = (what: 'update' | 'check') => post<ClientsState>(`/api/clients/${what}`).then(setSt, toastError);
+  if (!st) return null;
+  const { clients: list, updates } = st;
+  const out = list.filter((c) => c.latest).length;
+  const last = updates.last && !running && Date.now() - updates.last.at < 7 * 86_400_000 ? updates.last : undefined;
   return (
-    <Section title="Agent programs" sub="The command-line agents the sessions run. Missing ones install by themselves (with npm, in the app’s own folder); those the app installed update daily.">
+    <Section title="Agent programs" sub="The command-line agents the sessions run. Missing ones install by themselves (with npm, in the app’s own folder).">
       <div className="-my-2 divide-y divide-line">
         {list.map((c) => (
           <div key={c.id} className="flex items-center gap-3 py-2.5 text-[13px]">
@@ -922,6 +944,24 @@ function AgentPrograms() {
             <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg-3" title={c.path}>
               {c.version ? `${c.version} · ` : ''}
               {SOURCE[c.source]}
+              {c.yours?.version && c.yours.version !== c.version && (
+                <>
+                  {' · '}
+                  <span>{`yours in the terminal: ${c.yours.version}`}</span>
+                </>
+              )}
+              {c.latest && (
+                <>
+                  {' · '}
+                  <span className="text-accent">{`${c.latest} is out`}</span>
+                </>
+              )}
+              {c.failed && (
+                <>
+                  {' · '}
+                  <span className="text-warn">{`${c.failed} did not work here`}</span>
+                </>
+              )}
             </span>
             {c.source === 'missing' && (
               <Button size="sm" variant="secondary" disabled={busy === c.id || c.installing} icon={busy === c.id || c.installing ? <Throbber /> : undefined} onClick={() => install(c)}>
@@ -930,6 +970,45 @@ function AgentPrograms() {
             )}
           </div>
         ))}
+        <SettingRow label="Update automatically" hint="Once a day: the app’s copies with npm, your own installs with their own updater (claude update, codex update…). A new version that does not work here is undone.">
+          <Switch on={updates.auto} label="Update automatically" onChange={(on) => put<ClientsState>('/api/clients/auto', { on }).then(setSt, toastError)} />
+        </SettingRow>
+        <div className="space-y-1 py-3 text-[12.5px] leading-snug text-fg-3">
+          {running ? (
+            <div className="flex items-center gap-2 text-fg-2">
+              <Throbber className="text-fg-3" /> {running === 'check' ? 'Looking for new versions…' : updates.current ? `Updating ${updates.current}…` : 'Updating…'}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              {out > 0 && (
+                <Button size="sm" variant="primary" onClick={() => start('update')}>
+                  Update now
+                </Button>
+              )}
+              <span className={cx(updates.error && 'text-warn')}>
+                {updates.error
+                  ? `Could not look for new versions: ${updates.error}`
+                  : out > 1
+                    ? 'Newer versions are out'
+                    : out === 1
+                      ? 'A newer version is out'
+                      : updates.checkedAt
+                        ? `Up to date · checked ${ago(updates.checkedAt)}`
+                        : 'Not checked yet'}
+              </span>
+              {out === 0 && (
+                <button onClick={() => start('check')} className="text-accent hover:underline">
+                  Check now
+                </button>
+              )}
+            </div>
+          )}
+          {last?.items.map((i, n) => (
+            <div key={n} className={cx(!i.ok && 'text-warn')}>
+              {n === 0 && <span>{last.auto ? `The automatic update, ${ago(last.at)}:` : `The last update, ${ago(last.at)}:`}</span>} <UpdateNote i={i} />
+            </div>
+          ))}
+        </div>
       </div>
     </Section>
   );
