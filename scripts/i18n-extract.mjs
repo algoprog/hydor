@@ -173,7 +173,8 @@ function isText(s, jsx = false) {
   // Markup and stylesheets (a page's HTML, a block the page editor adds) are no text the app shows.
   if ((/^(?:\{\d+\})*</.test(t) && /<\/?[a-z][\w-]*[\s>]/i.test(t)) || /^[.#]?[a-z][\w-]*\s*\{[^}]*:[^}]*\}/i.test(t)) return false;
   if (/=>|===|!==|&&|\|\||\$\(|\bfunction\b|\breturn\b|^\w+\(|\)\s*\{|@__PURE__|\bjsxs?\(|className:|children:|;\s*(const|let|var|if|for)\b/.test(t)) return false;
-  if (/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/.test(t)) return false;
+  // An SVG path has numbers in it: "All" and "Call" are made of its letters too.
+  if (/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/.test(t) && /\d/.test(t)) return false;
   if (/^(color-mix|translate|rgba?|hsla?|var|calc|url|linear-gradient)\(/.test(t)) return false;
   // Commands, a browser's name for itself, CSS transitions, and ids made from a word and a value ("ac-{0}").
   if (/^(curl|df|npm|npx|node|git|sudo|pip|python3?|brew|apt|ssh|uv|docker)\s.*(\s--?[a-zA-Z]|\||\/)/.test(t) || /^Mozilla\/\d/.test(t)) return false;

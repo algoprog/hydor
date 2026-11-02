@@ -175,8 +175,11 @@
 - [**按含义搜索**](/settings?s=memory&find=Search%20by%20meaning)：按含义查找笔记，以及此搜索中的任何内容。
 - [**每晚整理**](/settings?s=memory&find=Tidy%20up%20each%20night)：辅助模型会合并内容相同的笔记，并归纳相关笔记。
 - [**立即整理**](/settings?s=memory&find=Tidy%20up%20now)：立即整理记忆。
-- [**全部清除…**](/settings?s=memory&find=Clear%20all%E2%80%A6)：删除所有笔记及其历史记录。
 - [**备注**](/settings?s=memory&find=Notes)：所有已保存的笔记，按位置分类。
+- [**添加笔记**](/settings?s=memory&find=Add%20a%20note)：写一条笔记让智能体记住，关于你或某个项目。
+- [**已删除的笔记**](/settings?s=memory&find=Deleted%20notes)：最近 30 天内删除的笔记，可以恢复。
+- [**导出**](/settings?s=memory&find=Export)：把所有笔记导出为便于阅读的 Markdown，或含更改历史的 JSON。
+- [**全部清除…**](/settings?s=memory&find=Clear%20all%E2%80%A6)：删除所有笔记及其历史记录。
 
 ### 子会话
 

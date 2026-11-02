@@ -156,8 +156,11 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['memory', 'Search by meaning', 'embeddings semantic mdenseon model gpu cpu', 'Finds notes, and anything in this search, by what it means'],
   ['memory', 'Tidy up each night', 'merge duplicates summaries topics profile consolidate', 'The helper model merges notes that say the same thing and sums related ones up'],
   ['memory', 'Tidy up now', 'merge duplicates consolidate clean', 'Tidies memory up at once'],
-  ['memory', 'Clear all…', 'delete erase wipe forget everything', 'Deletes every note and its history', 'Clear all memory'],
   ['memory', 'Notes', 'memory notes remembered facts export json markdown', 'Every note kept, by place', 'Memory notes'],
+  ['memory', 'Add a note', 'remember new note write fact tell agents', 'Write a note for agents to remember, about you or a project', 'Add a memory note'],
+  ['memory', 'Deleted notes', 'trash bin restore undelete recover erase', 'Notes deleted in the last 30 days, to restore', 'Deleted memory notes'],
+  ['memory', 'Export', 'download backup save copy json markdown', 'Every note as Markdown to read, or as JSON with histories', 'Export memory notes'],
+  ['memory', 'Clear all…', 'delete erase wipe forget everything', 'Deletes every note and its history', 'Clear all memory'],
   // Capabilities › Child sessions
   ['children', 'Working at once, per session', 'child sessions parallel subagents concurrency limit', 'How many child sessions one session runs at once'],
   ['children', 'Swarm size', 'swarm mode team of agents subagents parallel angles hard problems math proof', 'How many agents of a swarm work at once'],
