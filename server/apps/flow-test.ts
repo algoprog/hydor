@@ -23,7 +23,7 @@ import { setHelperModel } from '../helper.ts';
 import { repoRoot } from '../memory/store.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { findRecords } from './data.ts';
-import { initPages, listPages, pageInfo, pageSource } from '../pages/store.ts';
+import { createPage, initPages, listPages, pageInfo, pageSource } from '../pages/store.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as vec from '../memory/vectors.ts';
 import { envDir, envOf, envTesting } from './env.ts';
@@ -792,6 +792,17 @@ test('screens: made from its parts or written, pages of the template’s own (no
   assert.equal(store.getApp(db, a.id)!.screens!.main.page, made.screen.page);
   const again = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/screens`, payload: {} });
   assert.equal(again.statusCode, 409);
+  // Its screens change only by their routes: saving its recipe keeps them, a page of another never becomes one, and a new template starts without.
+  const saved = store.getApp(db, a.id)!;
+  const other = createPage(db, { title: 'Mine', html: '<!doctype html><p>mine</p>', by: 'made' });
+  for (const screens of [{ main: { page: other.id } }, undefined]) {
+    const put = await http.inject({ method: 'PUT', url: `/api/apps/${a.id}`, payload: { recipe: { ...saved, screens } } });
+    assert.equal(put.statusCode, 200, put.body);
+    assert.equal(store.getApp(db, a.id)!.screens!.main.page, made.screen.page);
+  }
+  const copy = (await http.inject({ method: 'POST', url: '/api/apps', payload: { recipe: { ...saved, name: 'A copy' } } })).json().app;
+  assert.equal(copy.screens, undefined);
+  assert.ok(pageInfo(db, other.id), 'the other page stays');
   // An agent writes another screen, and changes it.
   const own = (await http.inject({ method: 'POST', url: `/api/apps/${a.id}/screens`, payload: { name: 'board', html: '<!doctype html><h1>Board</h1><n-count data="notes"></n-count>' } })).json();
   const changed = (await http.inject({ method: 'PUT', url: `/api/apps/${a.id}/screens/board`, payload: { html: '<!doctype html><h1>Board 2</h1>' } })).json().screen;

@@ -239,6 +239,11 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                     try {
                       const { id: _i, slug: _s, createdAt: _c, updatedAt: _u, public: _p, ...rest } = d!.app!;
                       const r = await post<{ app: AppDef }>('/api/apps', { recipe: { ...rest, name: `${rest.name} copy` }, mcp: rest.mcp });
+                      // Its screens come along as pages of the copy's own.
+                      for (const [name, s] of Object.entries(rest.screens ?? {})) {
+                        const { screen } = await api<{ screen: { html: string } }>(`/api/apps/${enc(d!.app!.id)}/screens/${enc(name)}`);
+                        await post(`/api/apps/${enc(r.app.id)}/screens`, { name, title: s.title, html: screen.html });
+                      }
                       go(appPath(r.app.id));
                     } catch (e) {
                       toastError(e);

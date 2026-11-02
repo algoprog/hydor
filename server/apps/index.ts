@@ -170,9 +170,11 @@ function routes(d: Deps) {
     return a;
   };
 
+  // Screens are pages of the template's own, made and removed by their routes: a new template starts without
+  // any (a copy makes its own), and saving a recipe keeps the ones it has, so no page of another becomes one.
   app.post('/api/apps', async (req) => {
     const { warnings, ...b } = saveInput(db, req.body);
-    return { app: prepare(saveApp(db, b)), warnings };
+    return { app: prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: undefined } })), warnings };
   });
 
   /** A recipe checked without saving it: what must change, and what may surprise. */
@@ -210,7 +212,7 @@ function routes(d: Deps) {
     const prev = getApp(db, P(req).id);
     if (!prev) throw new HttpError(404, 'No such template');
     const { warnings, ...b } = saveInput(db, req.body, prev);
-    return { app: prepare(saveApp(db, { ...b, id: prev.id })), warnings };
+    return { app: prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: prev.screens }, id: prev.id })), warnings };
   });
 
   /** What a template needs on this computer: how its packages stand, and the commands that are missing. */
