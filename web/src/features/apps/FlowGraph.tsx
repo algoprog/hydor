@@ -235,7 +235,10 @@ export function FlowGraph({ flow, onPick }: { flow: Flow; onPick: (id: string) =
                 <span className="block truncate text-[13px] font-medium" translate="no">
                   {titleOf(s)}
                 </span>
-                <span className="block truncate text-[11px] text-fg-3">{KIND[s.do]}</span>
+                <span className="block truncate text-[11px] text-fg-3">
+                  <span>{KIND[s.do]}</span>
+                  {s.failed === 'agent' && <span> · an agent if it fails</span>}
+                </span>
               </span>
             </button>
           );

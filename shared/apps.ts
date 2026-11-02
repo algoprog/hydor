@@ -2,7 +2,7 @@
 // filling the prompt from the form, the answer fields (their schema for submit_result and the check
 // of what the agent hands in), and CSV in and out for runs over many rows.
 import type { Agent } from './types.ts';
-import { cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppExample, type AppScreen, type CheckResult, type DataCollection, type Flow, type NamedFlow, type Requires } from './app-manifest.ts';
+import { cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppExample, type AppScreen, type CheckResult, type DataCollection, type Flow, type NamedFlow, type Requires, type Step } from './app-manifest.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -192,6 +192,43 @@ export interface RunStepView {
   values?: Record<string, unknown>;
   /** Taken over from the run it ran again from: what it gave then, not run again. */
   reused?: true;
+  /** It failed (error says why) and an agent did its work: run and session are that agent's. */
+  rescued?: true;
+}
+
+// What a template's latest runs say about its steps (server/apps/advice.ts).
+
+/** A step that failed in some of the latest runs, an agent doing its work instead. */
+export interface RescuedStep {
+  step: string;
+  title: string;
+  /** In how many of the runs looked at, of how many. */
+  runs: number;
+  of: number;
+  /** Why it failed, the last time, and in which run. */
+  error: string;
+  run: string;
+}
+
+/** An agent step that did the same in each of its latest runs, and the steps that could do it instead. */
+export interface FirmUp {
+  step: string;
+  title: string;
+  /** How many of its runs did the same. */
+  runs: number;
+  /** The tools it called each time, in order. */
+  calls: string[];
+  /** The steps in its place: a tool step for each call, then a model step that keeps its id. */
+  steps: Step[];
+  /** What the agent took, a run, on average. */
+  agent: { seconds: number; costUsd: number };
+  /** The answers of the runs it was seen in, to try the steps with when the template has no examples. */
+  inputs: Record<string, string>[];
+}
+
+export interface AppAdvice {
+  rescued: RescuedStep[];
+  firm: FirmUp[];
 }
 
 /** How a run is getting on, for its page: the latest steps, and what it waits for. */

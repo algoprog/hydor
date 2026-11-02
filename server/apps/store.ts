@@ -92,6 +92,8 @@ export function ensureTables(db: DB) {
   // Steps a run took over from an earlier one (Run again from here).
   const stepCols = new Set((db.prepare('pragma table_info(app_steps)').all() as { name: string }[]).map((c) => c.name));
   if (!stepCols.has('reused')) db.exec('alter table app_steps add column reused integer not null default 0');
+  // Steps that failed and an agent did their work (failed: "agent"); error says why they failed.
+  if (!stepCols.has('rescued')) db.exec('alter table app_steps add column rescued integer not null default 0');
 }
 
 // ---- apps --------------------------------------------------------------------------------------------
@@ -347,6 +349,8 @@ export interface StepRecord {
   endedAt?: number;
   /** Taken over from an earlier run (Run again from here): what it gave then, not run again. */
   reused?: boolean;
+  /** It failed, and an agent did its work (its run is childRun; error says why it failed). */
+  rescued?: boolean;
 }
 
 interface StepRow {
@@ -363,6 +367,7 @@ interface StepRow {
   started_at: number | null;
   ended_at: number | null;
   reused: number | null;
+  rescued: number | null;
 }
 
 const toStep = (r: StepRow): StepRecord => ({
@@ -379,6 +384,7 @@ const toStep = (r: StepRow): StepRecord => ({
   startedAt: r.started_at ?? undefined,
   endedAt: r.ended_at ?? undefined,
   ...(r.reused ? { reused: true } : {}),
+  ...(r.rescued ? { rescued: true } : {}),
 });
 
 export function getStep(db: DB, run: string, path: string): StepRecord | null {
@@ -389,9 +395,9 @@ export function getStep(db: DB, run: string, path: string): StepRecord | null {
 /** Writes a step's whole record (callers start from the one there). */
 export function saveStep(db: DB, s: StepRecord) {
   db.prepare(
-    `insert or replace into app_steps (run_id, path, step_id, kind, title, status, outputs, child_run, cost_usd, error, started_at, ended_at, reused)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(s.run, s.path, s.id, s.kind, s.title, s.status, s.outputs === undefined || s.outputs === null ? null : JSON.stringify(s.outputs), s.childRun ?? null, s.costUsd ?? null, s.error ?? null, s.startedAt ?? null, s.endedAt ?? null, s.reused ? 1 : 0);
+    `insert or replace into app_steps (run_id, path, step_id, kind, title, status, outputs, child_run, cost_usd, error, started_at, ended_at, reused, rescued)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(s.run, s.path, s.id, s.kind, s.title, s.status, s.outputs === undefined || s.outputs === null ? null : JSON.stringify(s.outputs), s.childRun ?? null, s.costUsd ?? null, s.error ?? null, s.startedAt ?? null, s.endedAt ?? null, s.reused ? 1 : 0, s.rescued ? 1 : 0);
 }
 
 /** An earlier run's steps (these, by id, and the steps inside them) as another's, taken over: they replay what they gave, at no cost. */

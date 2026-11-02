@@ -18,7 +18,7 @@ import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from 
 import type { NotifyEvent } from '../../shared/types.ts';
 import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step } from '../../shared/app-manifest.ts';
-import { allSteps, asText, evalRule, fillRefs, FLOW_LIMITS, lookup, STEP_TOOLS, titleOf, valueOf } from '../../shared/app-manifest.ts';
+import { allSteps, asText, evalRule, fillRefs, FLOW_LIMITS, lookup, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
@@ -171,6 +171,8 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
     return;
   }
   if (before?.status === 'failed') return failed(x, s, scope, prefix, before.error ?? 'It failed');
+  // It failed, and an agent was doing its work: that goes on.
+  if (before?.rescued) return rescue(x, s, scope, prefix, before.error ?? 'It failed');
   if (s.if && !before) {
     let holds: boolean;
     try {
@@ -206,9 +208,10 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
   record(x, at, s, { status: 'done', outputs: values, endedAt: Date.now(), ...spent() });
 }
 
-/** A step failed: its own steps for that run (then the flow goes on), it is skipped, or the run stops. */
+/** A step failed: its own steps for that run (then the flow goes on), it is skipped, an agent does its work, or the run stops. */
 async function failed(x: Exec, s: Step, scope: Scope, prefix: string, msg: string) {
   scope.steps[s.id] = {};
+  if (s.failed === 'agent') return rescue(x, s, scope, prefix, msg);
   if (Array.isArray(s.failed)) return runList(x, s.failed, { inputs: scope.inputs, steps: scope.steps, vars: { ...scope.vars, error: msg } }, prefix);
   if (s.failed === 'skip') return;
   throw new Error(`${titleOf(s)}: ${msg}`);
@@ -407,6 +410,106 @@ async function agentStep(x: Exec, s: Extract<Step, { do: 'agent' }>, scope: Scop
   if (done.status !== 'done') throw new Error(done.error || (done.status === 'stopped' ? 'Its agent was stopped' : 'Its agent did not finish'));
   if (s.outputs?.length && !done.result) throw new Error(`Its agent did not hand in ${s.outputs.map((f) => f.id).join(', ')}`);
   return { ...(done.result ?? {}), reply: done.reply ?? '' };
+}
+
+// ---- an agent in a failed step's place -------------------------------------------------------------------
+
+const OWED_TYPE: Record<string, AnswerField['type']> = { count: 'number', found: 'yesno', yes: 'yesno', meaning: 'yesno' };
+/** Values that are lists or records: handed in as JSON, and read back. */
+const STRUCTURED = new Set(['records', 'record', 'first', 'items', 'last', 'data', 'result']);
+
+/** What a failed step owes the rest of the flow, as fields its agent hands in: a model step's outputs, else the values others use of it. */
+export function owedBy(r: AppRecipe, s: Step): AnswerField[] {
+  if (s.do === 'model' && s.outputs?.length) return s.outputs;
+  const used = usedFrom(r, s.id).filter((n) => n !== 'reply');
+  const names = used.length ? used : s.do === 'model' || s.do === 'tool' ? ['text'] : s.do === 'code' ? ['result'] : [];
+  return names.map((id) => ({ id, label: id, type: OWED_TYPE[id] ?? 'markdown', ...(STRUCTURED.has(id) ? { description: 'A list or a record: as JSON' } : {}) }));
+}
+
+/** What the step was to do, with the values it was given, for the agent that does it instead. */
+function stepTask(s: Step, scope: Scope): string {
+  const vals = (v: unknown) => asText(valueOf(v ?? {}, scope), 12_000);
+  switch (s.do) {
+    case 'tool':
+      return `It calls the tool ${s.tool} with:\n${vals(s.with)}`;
+    case 'model':
+      return `It asks a model, with no tools:\n<instructions>\n${fillRefs(s.instructions, scope).slice(0, 20_000)}\n</instructions>`;
+    case 'code':
+      return `It runs this ${s.language === 'python' ? 'Python' : 'JavaScript'} program (the body of a function of input, which returns its values), with input:\n${vals(s.with)}\n\n\`\`\`\n${s.code.slice(0, 20_000)}\n\`\`\``;
+    case 'data':
+      return `It ${{ add: 'adds a record to', get: 'gets a record of', find: 'finds records of', search: 'searches', update: 'changes records of', remove: 'removes records of' }[s.op]} the template's list “${s.collection}”, with: ${vals({ with: s.with, record: s.record, where: s.where, search: s.search, query: s.query, sort: s.sort, limit: s.limit })}\nUse the tools you have for the template's lists.`;
+    case 'app':
+      return `It runs the template “${s.app}” with:\n${vals(s.with)}`;
+    default:
+      return '';
+  }
+}
+
+/** A step that failed hands its work to an agent (failed: "agent"): what it was to do and with what, why it failed, and the values the rest of the flow wants of it; the run goes on with what the agent hands in. */
+async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: string) {
+  const at = `${prefix}${s.id}`;
+  const before = getStep(db(), x.run.id, at);
+  const owed = owedBy(x.run.recipe, s);
+  let childId = before?.rescued && before.childRun && getRun(db(), before.childRun) ? before.childRun : undefined;
+  if (!childId) {
+    const recipe = x.run.recipe;
+    const prompt = [
+      `A step of the template “${recipe.name}” failed. Do its work in its place, so that the run can go on.`,
+      '',
+      `The step: “${titleOf(s)}”. ${stepTask(s, scope)}`,
+      '',
+      `It failed: ${msg}`,
+      '',
+      owed.length ? `Do what it was to do, then hand in what it would have given: ${owed.map((f) => f.id).join(', ')}${owed.some((f) => STRUCTURED.has(f.id)) ? ' (lists and records as JSON)' : ''}.` : 'Do what it was to do.',
+      'Do only this step’s work: the rest of the run carries on after you.',
+    ].join('\n');
+    const child = cleanRecipe({
+      name: `${recipe.name} · ${titleOf(s)}`,
+      icon: recipe.icon,
+      color: recipe.color,
+      description: '',
+      assistant: recipe.assistant,
+      agent: recipe.agent,
+      acpAgent: recipe.acpAgent,
+      model: recipe.model,
+      effort: recipe.effort,
+      mode: recipe.mode,
+      cwd: x.pub ? undefined : x.folder,
+      prompt,
+      fields: [],
+      answer: owed,
+      tools: recipe.tools,
+      limits: { capUsd: capFor(x) },
+    });
+    const pub = x.pub ? { ...x.pub, capUsd: capFor(x) ?? x.pub.capUsd } : undefined;
+    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub }).id;
+    record(x, at, s, { status: 'running', rescued: true, childRun: childId, error: msg, endedAt: undefined });
+  }
+  const done = await follow(x, childId);
+  if (x.stopping) {
+    record(x, at, s, { status: 'stopped', endedAt: Date.now() });
+    throw new Stopped();
+  }
+  if (done.status !== 'done' || (owed.length && !done.result)) {
+    const why = done.status !== 'done' ? done.error || 'it did not finish' : `it did not hand in ${owed.map((f) => f.id).join(', ')}`;
+    const all = `${msg} (and the agent in its place: ${why})`;
+    record(x, at, s, { status: 'failed', error: all.slice(0, 2000), endedAt: Date.now() });
+    throw new Error(`${titleOf(s)}: ${all}`);
+  }
+  const values: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(done.result ?? {})) {
+    if (STRUCTURED.has(k) && typeof v === 'string' && /^\s*[[{]/.test(v)) {
+      try {
+        values[k] = JSON.parse(v);
+        continue;
+      } catch {}
+    }
+    values[k] = v;
+  }
+  if (usedFrom(x.run.recipe, s.id).includes('reply')) values.reply = done.reply ?? '';
+  scope.steps[s.id] = values;
+  x.ended.push({ id: s.id, kind: s.do, values });
+  record(x, at, s, { status: 'done', outputs: values, endedAt: Date.now() });
 }
 
 /** How deep a run is in apps calling apps. */
@@ -688,7 +791,8 @@ function spentSoFar(x: Pick<Exec, 'run'>): number {
   let usd = 0;
   for (const st of listSteps(db(), x.run.id)) {
     if (st.childRun) usd += getRun(db(), st.childRun)?.costUsd ?? 0;
-    else usd += st.costUsd ?? 0;
+    // A step an agent stood in for spent its own too, before it failed.
+    if (!st.childRun || st.rescued) usd += st.costUsd ?? 0;
   }
   return usd;
 }
@@ -749,13 +853,14 @@ async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'st
 export function stepsOf(runId: string, o: { values?: boolean } = {}): RunStepView[] {
   return listSteps(db(), runId).map((st) => {
     const child = st.childRun ? getRun(db(), st.childRun) : null;
-    const cost = st.reused ? undefined : st.childRun ? child?.costUsd : st.costUsd;
+    const cost = st.reused ? undefined : st.rescued ? (child?.costUsd ?? 0) + (st.costUsd ?? 0) : st.childRun ? child?.costUsd : st.costUsd;
     const view: RunStepView = { path: st.path, id: st.id, kind: st.kind, title: st.title, status: child && st.status === 'running' && child.status === 'waiting' ? 'waiting' : st.status };
     if (st.error) view.error = st.error;
     if (cost !== undefined) view.costUsd = Math.round(cost * 10000) / 10000;
     if (st.childRun) view.run = st.childRun;
     if (child?.key) view.session = child.key;
     if (st.reused) view.reused = true;
+    if (st.rescued) view.rescued = true;
     else {
       if (st.startedAt) view.startedAt = st.startedAt;
       if (st.endedAt) view.endedAt = st.endedAt;

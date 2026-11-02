@@ -37,6 +37,7 @@ import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
+import { adviceOf } from './advice.ts';
 import { appChanged, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
@@ -389,7 +390,7 @@ function routes(d: Deps) {
     const id = P(req).id;
     const a = id === 'test' ? null : getApp(db, id);
     if (!a && id !== 'test') throw new HttpError(404, 'No such template');
-    const b = (req.body ?? {}) as { recipe?: unknown; only?: unknown };
+    const b = (req.body ?? {}) as { recipe?: unknown; only?: unknown; trial?: unknown };
     let recipe: AppRecipe | null = a;
     if (b.recipe && typeof b.recipe === 'object') {
       const { errors } = problemsOf(db, b.recipe);
@@ -398,8 +399,16 @@ function routes(d: Deps) {
     }
     if (!recipe?.examples?.length) throw new HttpError(400, 'It has no examples yet');
     const only = Array.isArray(b.only) ? b.only.filter((x): x is string => typeof x === 'string') : undefined;
-    const runs = tryExamples({ app: a, recipe, only, slug: a?.slug ?? 'test' });
+    // A trial (a change tried before it is used, as Firm it up does) is not the examples' last try.
+    const runs = tryExamples({ app: a, recipe, only, slug: a?.slug ?? 'test', trial: b.trial === true });
     return { runs: runs.map((x) => ({ example: x.example.id, ...(x.run ? { run: runView(x.run) } : {}), ...(x.error ? { error: x.error } : {}) })) };
+  });
+
+  /** What its latest runs say about its steps: those an agent had to do the work of, and agent steps that fixed steps could do (Firm it up). */
+  app.get('/api/apps/:id/advice', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such template');
+    return adviceOf(d, a);
   });
 
   /** A saved template's examples, each with its last run: how it went, its checks, what it cost and how long it took. */

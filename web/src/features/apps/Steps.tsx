@@ -42,11 +42,16 @@ export function RunSteps({ steps, onAgain }: { steps: RunStepView[]; onAgain?: (
                       {s.path.split('/').slice(0, -1).join(' › ')}
                     </span>
                   )}
-                  <span className="text-[12px] text-fg-3">{s.reused ? 'From the last run' : SAID[s.status]}</span>
+                  <span className={cx('text-[12px]', s.rescued && s.status === 'done' ? 'text-warn' : 'text-fg-3')}>{s.reused ? 'From the last run' : s.rescued && s.status !== 'failed' ? (s.status === 'done' ? 'An agent did its work' : 'An agent is doing its work') : SAID[s.status]}</span>
                   {took(s) && <span className="text-[12px] text-fg-3">{took(s)}</span>}
                   {!!s.costUsd && <span className="text-[12px] text-fg-3">{money(s.costUsd)}</span>}
                 </div>
-                {s.error && s.status !== 'skipped' && <div className="mt-0.5 text-[12.5px] break-words text-err">{s.error}</div>}
+                {s.error && s.status !== 'skipped' && (
+                  <div className={cx('mt-0.5 text-[12.5px] break-words', s.rescued && s.status !== 'failed' ? 'text-fg-3' : 'text-err')}>
+                    {s.rescued && s.status !== 'failed' && <span>It failed: </span>}
+                    <span>{s.error}</span>
+                  </div>
+                )}
               </div>
               {onAgain && !/[/#]/.test(s.path) && (
                 <button type="button" title="Run again from here" aria-label="Run again from here" className="shrink-0 rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg" onClick={() => onAgain(s.id)}>

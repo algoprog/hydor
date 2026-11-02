@@ -9,9 +9,10 @@ import { tr } from '../../i18n/runtime';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
 import type { Flow } from '@shared/app-manifest';
+import { titleOf } from '@shared/app-manifest';
 import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders } from '@shared/apps';
 import { api, enc, post, put } from '../../lib/api';
-import { useFeatureEvent } from '../../lib/featureEvents';
+import { composeInsert, useFeatureEvent } from '../../lib/featureEvents';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
@@ -24,6 +25,7 @@ import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { RunBody } from './Result';
 import { InstallFromFile } from './Install';
+import { Advice } from './Advice';
 import { ExamplesEditor } from './Examples';
 import { KeepsEditor } from './Keeps';
 import { RunSteps } from './Steps';
@@ -359,8 +361,8 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
   );
 }
 
-/** `embedded`: beside a session's conversation, where an agent builds it: no way back, and a save stays here. */
-export function BuilderPage({ id, template, from, embedded }: { id?: string; template?: string; from?: string; embedded?: boolean }) {
+/** `embedded`: beside a session's conversation (`session`), where an agent builds it: no way back, a save stays here, and a step can be asked about there. */
+export function BuilderPage({ id, template, from, embedded, session }: { id?: string; template?: string; from?: string; embedded?: boolean; session?: string }) {
   const [recipe, setRecipe] = useState<AppRecipe | null>(id || template || from ? null : BLANK);
   const [saved, setSaved] = useState<AppDef | null>(null);
   // The version on screen as it was loaded or saved here: what differs from it is not saved yet.
@@ -583,7 +585,14 @@ export function BuilderPage({ id, template, from, embedded }: { id?: string; tem
                 )
               }
             >
-              <StepsEditor recipe={{ ...recipe, flow: recipe.flow }} onChange={set} />
+              <div className="space-y-3">
+                {saved && <Advice app={saved} recipe={recipe} onChange={set} session={session} />}
+                <StepsEditor
+                  recipe={{ ...recipe, flow: recipe.flow }}
+                  onChange={set}
+                  onAsk={session ? (st) => composeInsert(tr(`About the step “${titleOf(st)}” (${st.id}) of the template: `), session) : undefined}
+                />
+              </div>
             </Section>
           ) : (
           <Section
