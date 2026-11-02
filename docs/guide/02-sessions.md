@@ -141,7 +141,7 @@ The conversation reads like a chat. Each turn is your message, the agent's work,
 
 The agent may also keep a checklist (**Plan** or **To-dos**, with how many are done), which ticks off as it works. Notes from the app follow the turn they are about: what memory kept, a second opinion, a spending cap reached, a child session's card. Messages from other sessions show as "From …", a child session's reply as "Reply from …" (click it to read the reply), and a scheduled task's run starts with a line naming the task.
 
-Day lines ("Today", "Yesterday") separate the days. Older messages load as you scroll up, or with **Show earlier messages**. When you scroll up while the agent works, the view stays where you are; **Latest** takes you back to the end.
+Day lines ("Today", "Yesterday") separate the days. Older messages load as you scroll up, or with **Show earlier messages**. When you send a message, it moves up near the top of the screen, and the agent's work and reply come in under it. When the agent starts writing low on the screen, its words move up near the top and stay there as they grow, so you read a long reply from its beginning. When you scroll up while the agent works, the view stays where you are; **Latest** takes you back to the end, and also shows while a reply runs on below the screen.
 
 Hover over a reply for **Fork from this reply** (Claude Code and Custom), **Read aloud**, and **Copy message**. Hover over your own message for **Edit from here** and the time it was sent.
 

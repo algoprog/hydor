@@ -71,7 +71,7 @@ function blocks(items: TimelineItem[]): Block[] {
   return out;
 }
 
-/** Whether the reader is following the end of the timeline (not reading further up). */
+/** Whether the reader is following the conversation as it comes (not reading further up). */
 const FollowCtx = createContext<() => boolean>(() => true);
 
 // ---- turns ---------------------------------------------------------------------------------
@@ -473,6 +473,23 @@ function segIds(seg: Segment): Set<string> {
   return ids;
 }
 
+/** The newest text of the last turn: the agent's latest note or reply, else your message. */
+function newestText(segs: Segment[]): TimelineItem | undefined {
+  const s = segs[segs.length - 1];
+  const said = s ? [...s.work, ...s.answer].filter((i) => i.kind === 'assistant') : [];
+  return said[said.length - 1] ?? s?.prompt;
+}
+
+/** Where an element starts in the scroller's content: its place in the layout (an item rising in does not move it). */
+function topIn(el: HTMLElement, sc: HTMLElement): number {
+  let y = 0;
+  for (let e: HTMLElement | null = el; e && e !== sc; e = e.offsetParent as HTMLElement | null) y += e.offsetTop;
+  return y;
+}
+
+/** How far below the top of the view a text it holds sits: clear of the fade under the header. */
+const HOLD_AT = 24;
+
 const SegmentView = memo(function SegmentView({
   seg,
   sessionKey,
@@ -607,7 +624,17 @@ export function Timeline({
   const [under, setUnder] = useState(false);
   // Follow the end until the reader scrolls up by their own hand; follow again once they come
   // back down to it. New output, late layout and reconnects never take over the scroll.
+  // While following, a new text (your message, the agent's note or reply) that starts low on the screen comes up
+  // to near its top, and the view holds it there as it grows below (`lead`, `offset` px from the top), so a long
+  // answer reads from its start. Room under the conversation (the spacer) lets a short one sit there too; the
+  // conversation grows into it, and it goes once the reader has scrolled it out of sight.
   const stick = useRef(true);
+  const lead = useRef<{ id: string; offset: number } | null>(null);
+  const spacer = useRef<HTMLDivElement>(null);
+  // What the follow needs from the last render, for the resize observer too.
+  const turn = useRef({ busy: false, asks: 0 });
+  const seen = useRef<TimelineItem | undefined>(undefined);
+  const loading = useRef(true);
   const dir = useRef(0);
   const touchY = useRef<number | null>(null);
   const dragging = useRef(false);
@@ -635,10 +662,19 @@ export function Timeline({
     el.scrollTop = top;
     ownTop.current = el.scrollTop;
   };
+  const room = () => spacer.current?.offsetHeight ?? 0;
+  const setRoom = (h: number) => {
+    if (spacer.current) spacer.current.style.height = `${Math.max(0, Math.round(h))}px`;
+  };
+  // Not following: room a held text needed goes once it is out of sight (the reader scrolled up, the conversation grew).
+  const trim = () => {
+    const sc = scroller.current;
+    if (sc && room() && sc.scrollTop + sc.clientHeight <= sc.scrollHeight - room()) setRoom(0);
+  };
   const capture = () => {
     const sc = scroller.current;
     if (!sc) return (anchor.current = null);
-    const fromBottom = sc.scrollHeight - sc.scrollTop;
+    const fromBottom = sc.scrollHeight - room() - sc.scrollTop;
     const blocks = content.current?.querySelectorAll<HTMLElement>(':scope > [data-seg]');
     if (!blocks?.length) return (anchor.current = { id: null, offset: 0, fromBottom });
     // The first block that reaches into view (blocks are in order, so a binary search finds it).
@@ -660,17 +696,70 @@ export function Timeline({
     const a = anchor.current;
     if (!sc || !a) return;
     const el = a.id ? content.current?.querySelector<HTMLElement>(`:scope > [data-seg="${CSS.escape(a.id)}"]`) : null;
-    const want = el ? el.offsetTop - a.offset : sc.scrollHeight - a.fromBottom;
+    const want = el ? el.offsetTop - a.offset : sc.scrollHeight - room() - a.fromBottom;
     if (Math.abs(sc.scrollTop - want) > 0.5) setTop(want);
+    trim();
+  };
+  const textEl = (id: string) => content.current?.querySelector<HTMLElement>(`[data-text="${CSS.escape(id)}"]`) ?? null;
+  // While following: the text the view holds stays in place, or the end stays in view. `came`, a text that just
+  // came, becomes the one held (near the top if it starts below the top third, else where it is), unless the reader
+  // may still be in the one held now: it runs on below the screen.
+  const follow = (came?: string) => {
+    const sc = scroller.current;
+    if (!sc) return;
+    const view = sc.clientHeight;
+    let el = lead.current && textEl(lead.current.id);
+    if (lead.current && !el) {
+      // Gone (your message took the transcript's id, or the steps it was among folded away): the last turn's newest text shown.
+      const segs = content.current?.querySelectorAll<HTMLElement>(':scope > [data-seg]');
+      const texts = segs?.[segs.length - 1]?.querySelectorAll<HTMLElement>('[data-text]');
+      el = texts?.[texts.length - 1] ?? null;
+      lead.current = el ? { id: el.dataset.text!, offset: lead.current.offset } : null;
+    }
+    let top = el && lead.current ? topIn(el, sc) - lead.current.offset : sc.scrollTop;
+    const reading = () => !!el && topIn(el, sc) + el.offsetHeight - top > view;
+    const f = came && came !== lead.current?.id ? textEl(came) : null;
+    const y = f ? topIn(f, sc) - top : -1;
+    if (f && y >= 0 && !reading()) {
+      lead.current = { id: came!, offset: y > view / 3 ? HOLD_AT : y };
+      el = f;
+      top = topIn(f, sc) - lead.current.offset;
+    }
+    const h = sc.scrollHeight - room();
+    if (el) {
+      // While the agent works, what came after a text read to its end (steps, a card to answer) may run past the
+      // screen: then the end is what to follow.
+      const last = content.current?.lastElementChild as HTMLElement | null;
+      const end = last ? last.offsetTop + last.offsetHeight : h;
+      if (!(turn.current.busy && end - top > view && (!reading() || turn.current.asks))) {
+        setRoom(top + view - h);
+        setTop(top);
+        // More below the held text: Latest goes there.
+        setShowLatest(sc.scrollHeight - sc.scrollTop - view > 80);
+        return;
+      }
+      lead.current = null;
+    }
+    // The end: room a held text needed goes as the conversation grows into it.
+    setRoom(Math.min(room(), sc.scrollTop + view - h));
+    setTop(sc.scrollHeight);
+    setShowLatest(false);
   };
   const unstick = () => {
     stick.current = false;
     dir.current = -1;
   };
+  // Reading on down from a text the view holds, by hand: it stops following there (and follows again back at the end).
+  const down = (moved = false) => {
+    dir.current = 1;
+    const el = scroller.current;
+    if (stick.current && lead.current && el && (moved || el.scrollHeight - el.scrollTop - el.clientHeight > 1)) stick.current = false;
+  };
   const toEnd = (smooth = false) => {
     stick.current = true;
     dir.current = 1;
     anchor.current = null;
+    lead.current = null;
     const el = scroller.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
   };
@@ -705,15 +794,25 @@ export function Timeline({
   }
   const fresh = (id: string) => !!known.current && !known.current.has(id);
 
-  // Follow new output while the reader is at the end; anywhere else, keep their place (before the paint).
+  // Follow new output while the reader is following; anywhere else, keep their place (before the paint).
+  const landed = useRef<string | null>(null);
   useLayoutEffect(() => {
-    const el = scroller.current;
-    if (el && stick.current) setTop(el.scrollHeight);
+    turn.current = { busy: working, asks: approvals.length };
+    // A text is new when it comes while the session is open, not with its opening or a reload; until it has
+    // opened, nothing is held.
+    const newest = newestText(segs);
+    const came = landed.current === sessionKey && !loading.current && newest?.id !== seen.current?.id ? newest?.id : undefined;
+    seen.current = newest;
+    loading.current = !!tl?.loading;
+    if (landed.current !== sessionKey) {
+      lead.current = null;
+      setRoom(0);
+    }
+    if (stick.current) follow(came);
     else restore();
-  }, [merged, overlay?.approvals, working, tl?.start]);
+  }, [merged, overlay?.approvals, working, tl?.start, tl?.loading]);
 
   // Opening a session lands at its end, once; a reload after a reconnect keeps your place.
-  const landed = useRef<string | null>(null);
   useEffect(() => {
     if (!tl || tl.loading || landed.current === sessionKey) return;
     landed.current = sessionKey;
@@ -727,22 +826,24 @@ export function Timeline({
     });
   }, [sessionKey, tl?.loading]);
 
-  // Sending a message brings the view back to the end.
+  // Sending a message brings the view back to the end; the message comes up near the top as it shows. (Shown
+  // first, ahead of the answer to sending it, it is already held there.)
   useEffect(() => {
-    const f = () => toEnd();
+    const f = () => {
+      if (!(stick.current && seen.current?.kind === 'user' && lead.current?.id === seen.current.id)) toEnd();
+    };
     window.addEventListener('wa:follow', f);
     return () => window.removeEventListener('wa:follow', f);
   }, []);
 
-  // Code and maths highlight late, so content keeps growing after a render; stay at the end
-  // while following. (The content is there once the first page is: watch from then.)
+  // Code and maths highlight late, so content keeps growing after a render; while following,
+  // keep up with it. (The content is there once the first page is: watch from then.)
   const shown = !!tl && !(tl.loading && !tl.items.length);
   useEffect(() => {
     const el = content.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      const sc = scroller.current;
-      if (sc && stick.current) setTop(sc.scrollHeight);
+      if (stick.current) follow();
       else restore();
     });
     ro.observe(el);
@@ -764,22 +865,24 @@ export function Timeline({
     setUnder(top > 2);
     const own = ownTop.current !== null && Math.abs(top - ownTop.current) < 2;
     ownTop.current = null;
+    if (!stick.current) trim();
     const dist = el.scrollHeight - top - el.clientHeight;
     // Dragging the scrollbar counts as the reader's own scroll.
     if (dragging.current) {
       if (top < lastTop.current - 1) unstick();
-      else if (top > lastTop.current + 1) dir.current = 1;
+      else if (top > lastTop.current + 1) down(true);
     }
     // Only the view actually moving up by the reader's hand (momentum after a swipe included) may load
     // another page: wheel events at the very top move nothing, so they never pile up pages.
     if (!own && !stick.current && top < lastTop.current - 1) armed.current = true;
     if (dist < 24 && dir.current >= 0) {
+      if (!stick.current) lead.current = null;
       stick.current = true;
       anchor.current = null;
     }
     lastTop.current = top;
     if (!stick.current && !own) capture();
-    setShowLatest(!stick.current && dist > 80);
+    setShowLatest((!stick.current || !!lead.current) && dist > 80);
     if (armed.current && top < 400) maybeLoad();
   };
 
@@ -836,7 +939,7 @@ export function Timeline({
               armed.current = true;
               maybeLoad();
             }
-          } else if (e.deltaY > 0) dir.current = 1;
+          } else if (e.deltaY > 0) down();
         }}
         onTouchStart={(e) => {
           touching.current = true;
@@ -857,7 +960,7 @@ export function Timeline({
             // Pulling down at the top: one page once the finger lifts and the view is still.
             if (scroller.current && scroller.current.scrollTop < 400) armed.current = true;
           }
-          else if (touchY.current != null && y < touchY.current - 2) dir.current = 1;
+          else if (touchY.current != null && y < touchY.current - 2) down();
           touchY.current = y;
         }}
         onPointerDown={(e) => {
@@ -869,7 +972,7 @@ export function Timeline({
         onKeyDown={(e) => {
           gesture.current++;
           if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') unstick();
-          else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'End' || e.key === ' ') dir.current = 1;
+          else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'End' || e.key === ' ') down();
         }}
         className="absolute inset-x-0 top-px bottom-0 overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]"
       >
@@ -945,6 +1048,8 @@ export function Timeline({
               </div>
             )}
           </div>
+          {/* Room under the conversation for a short text held near the top (sized as the view follows). */}
+          <div ref={spacer} aria-hidden />
         </FollowCtx.Provider>
       </div>
       {showLatest && (

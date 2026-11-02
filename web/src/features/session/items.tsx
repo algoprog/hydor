@@ -844,7 +844,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
   return (
     <>
       {item.handoff && <HandoffCard h={item.handoff} />}
-      <div ref={root} data-seq={item.seq} className={cx('tl-item group/u flex scroll-mt-6 flex-col items-end gap-1.5', arrive && 'anim-msg-in')}>
+      <div ref={root} data-seq={item.seq} data-text={item.id} className={cx('tl-item group/u flex scroll-mt-6 flex-col items-end gap-1.5', arrive && 'anim-msg-in')}>
         {item.images ? <MessageImages item={item} sent={sent} /> : null}
         {(text || files.length > 0 || context) && (
           // Short ones keep to their words; a long one is as wide as the message box, and lines up with it.
@@ -976,7 +976,7 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note }: { ite
   const { text, revealing } = useSmoothText(item.text, !!item.streaming);
   const { fork } = useContext(SessionCtx);
   return (
-    <div data-seq={item.seq} data-quote className="tl-item group relative">
+    <div data-seq={item.seq} data-text={item.id} data-quote className="tl-item group relative">
       <Markdown text={text} streaming={revealing} breaks className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
       {!item.streaming && (
         <div className="absolute -top-1 -right-1 flex opacity-0 transition-opacity group-hover:opacity-100">
