@@ -1120,7 +1120,7 @@ function StepList({ steps, list, ctx }: { steps: Step[]; list: ListPath; ctx: Ct
 }
 
 /** The builder's What it does, for a template with steps: the steps, where its answer comes from, and the checks. */
-export function StepsEditor({ recipe, onChange, onAsk }: { recipe: AppRecipe & { flow: Flow }; onChange: (p: Partial<AppRecipe>) => void; onAsk?: (s: Step) => void }) {
+export function StepsEditor({ recipe, onChange, onAsk, appId }: { recipe: AppRecipe & { flow: Flow }; onChange: (p: Partial<AppRecipe>) => void; onAsk?: (s: Step) => void; appId?: string | null }) {
   const flow = recipe.flow;
   const [open, setOpen] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'graph'>('list');
@@ -1221,7 +1221,7 @@ export function StepsEditor({ recipe, onChange, onAsk }: { recipe: AppRecipe & {
         </div>
       )}
       {view === 'graph' && wide ? (
-        <GraphEditor ctx={ctx} graph={recipe.graph} onGraph={(graph) => onChange({ graph })} Body={StepBody} Actions={StepActions} />
+        <GraphEditor ctx={ctx} appId={appId} graph={recipe.graph} onGraph={(graph) => onChange({ graph })} Body={StepBody} Actions={StepActions} />
       ) : (
         <StepList steps={flow.steps} list={[]} ctx={ctx} />
       )}

@@ -30,7 +30,7 @@ import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
 import { batchCsv, MAX_ROWS, startBatch, startBatches, stopBatch } from './batch.ts';
 import { addRecord, clearData, collectionsOf, dataOp, embedSoon, ensureDataTables, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { ensureEnv, envLine, envOf, envVars } from './env.ts';
-import { answerAsk, askOf, dataChanged, flowRunner, stepsOf } from './flow.ts';
+import { answerAsk, askOf, dataChanged, flowRunner, goOn, stepsOf } from './flow.ts';
 import { installPackage, packageOf, previewOf, readPackage, zipPackage, type Catalog } from './package.ts';
 import { changeScreen, makeScreen, removeScreen, removeScreens, screenHtml, screensOf } from './screens.ts';
 import { draftFromSession } from './draft.ts';
@@ -343,8 +343,18 @@ function routes(d: Deps) {
       files: b.files && typeof b.files === 'object' ? b.files : undefined,
       // Another of its flows, by name (a screen's form or button).
       flow: typeof b.flow === 'string' && b.flow && b.flow !== 'run' ? b.flow : undefined,
+      // A try in the graph: steps it pauses before, and steps frozen at what they gave in an earlier try of the same template.
+      ...(b.source === 'test' ? triedIn(db, b, a?.id ?? (template ? `tpl:${template.id}` : 'test')) : {}),
     });
     return { run: runView(r) };
+  });
+
+  /** A test run paused in the graph goes on (step: one step, pausing before the next). */
+  app.post('/api/apps/runs/:runId/go', async (req) => {
+    const r = getRun(db, P(req).runId);
+    if (!r) throw new HttpError(404, 'No such run');
+    if (!goOn(r.id, (req.body as { step?: unknown } | undefined)?.step === true)) throw new HttpError(409, 'It is not paused');
+    return { ok: true };
   });
 
   app.get('/api/apps/:id/runs', async (req) => {
@@ -726,6 +736,15 @@ function dataTool(ctx: RunCtx): RunTool | null {
       return dataOp(db, appId, appOfRun(db, now.run).data, a, ['find', 'search', 'get', 'add', 'update', 'remove'], (coll) => dataChanged(appId, coll));
     },
   };
+}
+
+/** What a try in the graph asks of its run: steps to pause before, and steps frozen at what they gave in an earlier try of the same template. */
+function triedIn(db: Deps['db'], b: Record<string, any>, app: string): { pause?: string[]; reuse?: { run: string; steps: string[] } } {
+  const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 60) : []);
+  const pause = ids(b.pause);
+  const frozen = b.freeze && typeof b.freeze === 'object' && typeof b.freeze.from === 'string' ? ids(b.freeze.steps) : [];
+  const from = frozen.length ? getRun(db, b.freeze.from) : null;
+  return { ...(pause.length ? { pause } : {}), ...(from && from.app === app ? { reuse: { run: from.id, steps: frozen } } : {}) };
 }
 
 /** Packages a saved template needs start installing at once, so its first run need not wait. */

@@ -8,13 +8,23 @@
 // the dot on a node's right carries one of its values: let go on another node to put it in one of that step's
 // inputs, or in empty space for a new step that uses it. Shift-click picks several nodes, to group them with a
 // note. The canvas moves by dragging its background, and zooms with Ctrl and the wheel, or its buttons.
+//
+// Try it runs the template as it is on screen, as a test run, in the graph: each step lights up as it runs
+// and as it ends, the wires into the steps that ran with it, and a value's wire says what it carried. A step
+// can pause the try before it (then Go on, or Step to the next one), and a frozen step gives what it gave in
+// the last try, so the steps after an expensive one can be tried again and again at no cost.
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AppWindow, Bot, CodeXml, Columns2, Database, Ellipsis, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Sparkles, Split, Wrench, X } from 'lucide-react';
+import { AppWindow, Bot, CircleDot, CodeXml, Columns2, Database, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Snowflake, Sparkles, Split, Wrench, X } from 'lucide-react';
 import type { Flow, Step, StepKind } from '@shared/app-manifest';
-import { allSteps, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
-import type { AppGraph } from '@shared/apps';
-import { cx, IconButton, MenuItem, Popover } from '../../components/ui';
+import { allSteps, asText, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
+import type { AppGraph, AppRecipe, AppRun, RunProgress, RunStepView } from '@shared/apps';
+import { isActive } from '@shared/apps';
+import { api, enc, post } from '../../lib/api';
+import { toast, toastError } from '../../lib/store';
+import { Button, cx, IconButton, MenuItem, Popover, Throbber } from '../../components/ui';
+import { money, useRunEvents, type RunDetail } from './api';
+import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { childList, listsOf, type ListPath } from './paths';
 import type { Ctx } from './StepsEditor';
 
@@ -270,13 +280,66 @@ type Menu = { pt: Pt } & ({ kind: 'add'; list: ListPath; at: number } | { kind: 
 
 export interface GraphEditorProps {
   ctx: Ctx;
+  /** The saved template's id (none: not saved yet), which its tries are runs of. */
+  appId?: string | null;
   graph: AppGraph | undefined;
   onGraph: (g: AppGraph | undefined) => void;
   Body: ComponentType<{ s: Step; list: ListPath; i: number; ctx: Ctx }>;
   Actions: ComponentType<{ s: Step; list: ListPath; i: number; last: number; ctx: Ctx; done: () => void }>;
 }
 
-export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorProps) {
+/** A try of the template as it is on screen: its run, its steps as they go, and what moves it on. */
+function useTry(appId: string | null | undefined) {
+  const [run, setRun] = useState<AppRun | null>(null);
+  const [detail, setDetail] = useState<{ steps: RunStepView[]; progress?: RunProgress } | null>(null);
+  const refresh = (id: string) =>
+    api<RunDetail>(`/api/apps/runs/${enc(id)}`).then(
+      (d) => (setRun(d.run), setDetail({ steps: d.steps ?? [], progress: d.progress })),
+      () => {},
+    );
+  useRunEvents((r) => void (run && r.id === run.id && refresh(r.id)));
+  const active = !!run && isActive(run.status);
+  useEffect(() => {
+    if (!run || !active) return;
+    const t = setInterval(() => refresh(run.id), 1500);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.id, active]);
+  return {
+    run,
+    detail,
+    active,
+    async start(recipe: AppRecipe, inputs: FormValues, files: FormFiles, pause: string[], frozen: string[]) {
+      // Frozen steps give what they gave in the last try that ended.
+      const freeze = frozen.length && run && !active ? { from: run.id, steps: frozen } : undefined;
+      const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId ?? 'test')}/runs`, {
+        recipe,
+        source: 'test',
+        inputs,
+        files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])),
+        ...(pause.length ? { pause } : {}),
+        ...(freeze ? { freeze } : {}),
+      });
+      setRun(r.run);
+      setDetail(null);
+      void refresh(r.run.id);
+    },
+    go: (step?: boolean) => run && post(`/api/apps/runs/${enc(run.id)}/go`, step ? { step: true } : {}).then(() => refresh(run.id), toastError),
+    stop: () => run && post(`/api/apps/runs/${enc(run.id)}/stop`, {}).then(() => refresh(run.id), toastError),
+  };
+}
+type Try = ReturnType<typeof useTry>;
+
+/** How a step lit up in a try: its ring. */
+const LIT: Record<string, string> = {
+  running: 'ring-2 ring-accent/70 animate-pulse',
+  waiting: 'ring-2 ring-warn/80',
+  done: 'ring-2 ring-ok/50',
+  failed: 'ring-2 ring-err/70',
+  stopped: 'ring-2 ring-fg-3/40',
+};
+
+export function GraphEditor({ ctx, appId, graph, onGraph, Body, Actions }: GraphEditorProps) {
   const flow: Flow = ctx.flow;
   const box = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 40, y: 30, k: 1 });
@@ -289,6 +352,16 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
   const menuAnchor = useRef<HTMLDivElement>(null);
   // Over the whole window, for room to work in.
   const [full, setFull] = useState(false);
+  // Trying it: the panel, the steps it pauses before, and those frozen at what they gave.
+  const t = useTry(appId);
+  const [trying, setTrying] = useState(false);
+  const [pause, setPause] = useState<Set<string>>(new Set());
+  const [frozen, setFrozen] = useState<Set<string>>(new Set());
+  const toggle = (set: Set<string>, id: string) => (set.has(id) ? new Set([...set].filter((x) => x !== id)) : new Set([...set, id]));
+  // Each step as it went in the try (the latest round of one in a Repeat), and those it is paused before.
+  const lit = new Map<string, RunStepView>();
+  for (const st of t.detail?.steps ?? []) if (st.kind !== 'round') lit.set(st.id, st);
+  const pausedAt = new Set((t.detail?.progress?.paused ?? []).map((p) => p.split(/[/#]/).pop()!));
 
   // The layout, then where each step is: placed by hand, or moved with the step it is in.
   const laid = useMemo(() => list(flow.steps, [], null), [flow.steps]);
@@ -345,7 +418,7 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
     .filter((f): f is { id: string; x: number; y: number; w: number; h: number } => !!f);
 
   // ---- the wires: what happens next, and the values ----
-  const wires: { d: string; fail?: boolean; loop?: boolean }[] = [];
+  const wires: { d: string; fail?: boolean; loop?: boolean; to?: string }[] = [];
   const pluses: { pt: Pt; list: ListPath; at: number }[] = [];
   const bottom = (id: string): Pt => {
     const p = pos.get(id)!;
@@ -390,14 +463,14 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
       if (!p) return;
       // A new step before this one.
       pluses.push({ pt: { x: p.x + W / 2, y: p.y - 13 }, list: path, at: i });
-      if (i > 0) for (const e of exitsOf(steps[i - 1], path, i - 1)) wires.push({ d: curve(e.pt, { x: p.x + W / 2, y: p.y }), fail: e.fail });
+      if (i > 0) for (const e of exitsOf(steps[i - 1], path, i - 1)) wires.push({ d: curve(e.pt, { x: p.x + W / 2, y: p.y }), fail: e.fail, to: s.id });
       for (const { key } of listsOf(s)) {
         const inner = childList(s, key);
         const ip = [...path, i, key];
         const to = entry(inner, ip);
         if (to) {
-          if (key === 'failed') wires.push({ d: `M${p.x + W} ${p.y + H / 2} C${p.x + W + 30} ${p.y + H / 2} ${to.x} ${to.y - 30} ${to.x} ${to.y}`, fail: true });
-          else wires.push({ d: curve(bottom(s.id), to) });
+          if (key === 'failed') wires.push({ d: `M${p.x + W} ${p.y + H / 2} C${p.x + W + 30} ${p.y + H / 2} ${to.x} ${to.y - 30} ${to.x} ${to.y}`, fail: true, to: inner[0]?.id });
+          else wires.push({ d: curve(bottom(s.id), to), to: inner[0]?.id });
         }
         walkWires(inner, ip);
       }
@@ -427,7 +500,24 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
       const x2 = n.x + W;
       const y2 = n.y + H / 2;
       const out = 26 + (k++ % 6) * 9;
-      values.push(<path key={`v${k}`} d={`M${x1} ${y1} C${Math.max(x1, x2) + out} ${y1} ${Math.max(x1, x2) + out} ${y2} ${x2} ${y2}`} fill="none" stroke={KIND_COLOR[from.s.do]} strokeWidth={1.5} strokeOpacity={hover && (hover === id || hover === n.s.id) ? 1 : 0.55} />);
+      const d = `M${x1} ${y1} C${Math.max(x1, x2) + out} ${y1} ${Math.max(x1, x2) + out} ${y2} ${x2} ${y2}`;
+      // What it carried in the try, when there was one.
+      const gave = lit.get(id)?.values;
+      const said = refsIn(JSON.stringify(n.s))
+        .filter((r) => r.split(/[.[]/)[0] === id)
+        .map((r) => {
+          const v = gave?.[r.split(/[.[]/)[1] ?? ''];
+          return `{{${r}}}${v !== undefined ? ` = ${asText(v, 200)}` : ''}`;
+        })
+        .join('\n');
+      values.push(
+        <g key={`v${k}`}>
+          <path d={d} fill="none" stroke={KIND_COLOR[from.s.do]} strokeWidth={1.5} strokeOpacity={hover && (hover === id || hover === n.s.id) ? 1 : 0.55} />
+          <path d={d} fill="none" stroke="transparent" strokeWidth={10} className="cursor-help">
+            <title>{said}</title>
+          </path>
+        </g>,
+      );
     }
 
   // ---- moving about ----
@@ -595,7 +685,7 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
               <rect key={f.id} x={f.x} y={f.y} width={f.w} height={f.h} rx={12} fill="none" stroke="var(--line-2)" strokeDasharray="4 4" />
             ))}
             {wires.map((w, i) => (
-              <path key={i} d={w.d} fill="none" stroke={w.fail ? 'var(--err)' : 'var(--fg-3)'} strokeWidth={w.fail || w.loop ? 1.5 : 2} strokeDasharray={w.fail || w.loop ? '5 4' : undefined} />
+              <path key={i} d={w.d} fill="none" stroke={w.to && /^(running|waiting|done)$/.test(lit.get(w.to)?.status ?? '') ? 'var(--accent)' : w.fail ? 'var(--err)' : 'var(--fg-3)'} strokeWidth={w.fail || w.loop ? 1.5 : 2} strokeDasharray={w.fail || w.loop ? '5 4' : undefined} />
             ))}
             {values}
             {linking &&
@@ -665,10 +755,16 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
             const I = ICON[n.s.do];
             const on = picked.includes(n.s.id);
             const msgs = ctx.msgs.get(n.s.id) ?? [];
+            const went = pausedAt.has(n.s.id) ? 'waiting' : lit.get(n.s.id)?.status;
             return (
               <div
                 key={n.s.id}
-                className={cx('group/n absolute flex cursor-pointer items-center gap-2.5 rounded-lg border bg-panel pr-2.5 shadow-sm transition-colors', on ? 'border-accent ring-2 ring-accent/30' : 'border-line-2 hover:border-fg-3')}
+                className={cx(
+                  'group/n absolute flex cursor-pointer items-center gap-2.5 rounded-lg border bg-panel pr-2.5 shadow-sm transition-colors',
+                  on ? 'border-accent ring-2 ring-accent/30' : 'border-line-2 hover:border-fg-3',
+                  !on && went && LIT[went],
+                  went === 'skipped' && 'opacity-55',
+                )}
                 style={{ left: n.x, top: n.y, width: W, height: H }}
                 onPointerDown={(e) => nodeStart(e, n)}
                 onPointerEnter={() => setHover(n.s.id)}
@@ -686,6 +782,13 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
                   </span>
                 </span>
                 {msgs.length > 0 && <span className={cx('h-2 w-2 shrink-0 rounded-full', msgs.some((m) => m.error) ? 'bg-err' : 'bg-warn')} />}
+                {pausedAt.has(n.s.id) && <span className="absolute -top-5 left-1 text-[10.5px] font-medium text-warn">Paused before it</span>}
+                {pause.has(n.s.id) && <span title="A try pauses before it" className="absolute -top-1.5 -left-1.5 h-3 w-3 rounded-full bg-err ring-2 ring-panel" />}
+                {frozen.has(n.s.id) && (
+                  <span title="Frozen: in a try it gives what it gave in the last one" className="absolute -top-2 right-2 rounded bg-panel px-0.5 text-accent">
+                    <Snowflake size={12} />
+                  </span>
+                )}
                 {/* Its values: drag from here to where they go. */}
                 <span
                   title="Drag one of its values to another step, or to empty space for a new step"
@@ -712,6 +815,9 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
           <IconButton label="Tidy: lay it all out again" size="sm" onClick={() => onGraph(graph?.groups ? { groups: graph.groups } : undefined)} disabled={!Object.keys(at).length}>
             <LayoutGrid size={14} />
           </IconButton>
+          <IconButton label="Try it" size="sm" onClick={() => (setTrying((x) => !x), setPicked([]))}>
+            <FlaskConical size={14} className={trying ? 'text-accent' : undefined} />
+          </IconButton>
           <IconButton label={full ? 'Back in the page' : 'Full screen'} size="sm" onClick={() => (setFull((f) => !f), setTimeout(fit, 50))}>
             {full ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </IconButton>
@@ -724,8 +830,23 @@ export function GraphEditor({ ctx, graph, onGraph, Body, Actions }: GraphEditorP
         <div className="pointer-events-none absolute right-3 bottom-2.5 text-[11px] text-fg-3">Drag a node’s dot to wire a value · Ctrl and the wheel zoom</div>
         {menu && <GraphMenu menu={menu} anchor={menuAnchor} ctx={ctx} pos={pos} onClose={() => setMenu(null)} onPick={(id) => setPicked([id])} />}
       </div>
-      {one && (
-        <Inspector key={one.s.id} n={one} ctx={ctx} last={listLen(one.list) - 1} Body={Body} Actions={Actions} onClose={() => setPicked([])} />
+      {one ? (
+        <Inspector
+          key={one.s.id}
+          n={one}
+          ctx={ctx}
+          last={listLen(one.list) - 1}
+          Body={Body}
+          Actions={Actions}
+          onClose={() => setPicked([])}
+          went={lit.get(one.s.id)}
+          pause={pause.has(one.s.id)}
+          frozen={frozen.has(one.s.id)}
+          onPause={() => setPause((x) => toggle(x, one.s.id))}
+          onFreeze={() => setFrozen((x) => toggle(x, one.s.id))}
+        />
+      ) : (
+        trying && <TryPanel recipe={ctx.recipe} t={t} pause={[...pause]} frozen={[...frozen]} titleOf={(id) => (pos.get(id) ? titleOf(pos.get(id)!.s) : id)} onClose={() => setTrying(false)} />
       )}
       </div>
     </>
@@ -791,7 +912,31 @@ function GraphMenu({ menu, anchor, ctx, pos, onClose, onPick }: { menu: Menu; an
 }
 
 /** The picked step's settings, beside the graph. */
-function Inspector({ n, ctx, last, Body, Actions, onClose }: { n: Spot; ctx: Ctx; last: number; Body: GraphEditorProps['Body']; Actions: GraphEditorProps['Actions']; onClose: () => void }) {
+function Inspector({
+  n,
+  ctx,
+  last,
+  Body,
+  Actions,
+  onClose,
+  went,
+  pause,
+  frozen,
+  onPause,
+  onFreeze,
+}: {
+  n: Spot;
+  ctx: Ctx;
+  last: number;
+  Body: GraphEditorProps['Body'];
+  Actions: GraphEditorProps['Actions'];
+  onClose: () => void;
+  went?: RunStepView;
+  pause: boolean;
+  frozen: boolean;
+  onPause: () => void;
+  onFreeze: () => void;
+}) {
   const more = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const I = ICON[n.s.do];
@@ -805,6 +950,12 @@ function Inspector({ n, ctx, last, Body, Actions, onClose }: { n: Spot; ctx: Ctx
           </span>
           <span className="block text-[11.5px] text-fg-3">{KIND[n.s.do]}</span>
         </span>
+        <IconButton label={pause ? 'A try pauses before it: no more' : 'Pause a try before it'} size="sm" onClick={onPause}>
+          <CircleDot size={15} className={pause ? 'text-err' : undefined} />
+        </IconButton>
+        <IconButton label={frozen ? 'Frozen: let it run again' : 'Freeze: in a try, it gives what it gave in the last one'} size="sm" onClick={onFreeze}>
+          <Snowflake size={15} className={frozen ? 'text-accent' : undefined} />
+        </IconButton>
         <IconButton ref={more} label="More" size="sm" onClick={() => setOpen((o) => !o)}>
           <Ellipsis size={15} />
         </IconButton>
@@ -815,8 +966,112 @@ function Inspector({ n, ctx, last, Body, Actions, onClose }: { n: Spot; ctx: Ctx
           <X size={15} />
         </IconButton>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+        {went && <LastTry st={went} />}
         <Body s={n.s} list={n.list} i={n.i} ctx={ctx} />
+      </div>
+    </aside>
+  );
+}
+
+const WENT: Record<string, string> = { running: 'Working', waiting: 'Needs you', done: 'Done', failed: 'Did not finish', skipped: 'Skipped', stopped: 'Stopped' };
+
+/** How a step went in the last try: done or not, how long, what it cost, and what it gave. */
+function LastTry({ st }: { st: RunStepView }) {
+  const took = st.startedAt && st.endedAt ? Math.max(0, Math.round((st.endedAt - st.startedAt) / 100) / 10) : null;
+  return (
+    <div className="rounded-lg border border-line bg-bg-1 px-2.5 py-2 text-[12.5px]">
+      <div className="flex flex-wrap items-baseline gap-x-2 text-fg-2">
+        <span className="font-medium text-fg">In the last try</span>
+        <span>{st.reused ? 'Frozen' : WENT[st.status]}</span>
+        {took !== null && <span>{`${took} s`}</span>}
+        {!!st.costUsd && <span>{money(st.costUsd)}</span>}
+      </div>
+      {st.error && st.status !== 'skipped' && <div className="mt-1 text-err">{st.error}</div>}
+      {st.values && Object.keys(st.values).length > 0 && (
+        <pre className="mt-1.5 max-h-40 overflow-auto rounded bg-bg-2 p-1.5 text-[11.5px] whitespace-pre-wrap" translate="no">
+          {JSON.stringify(st.values, null, 1).slice(0, 4000)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+/** Trying the template as it is on screen: its form, then the run as it goes, pausing where it was asked to. */
+function TryPanel({ recipe, t, pause, frozen, titleOf: name, onClose }: { recipe: AppRecipe; t: Try; pause: string[]; frozen: string[]; titleOf: (id: string) => string; onClose: () => void }) {
+  const [values, setValues] = useState<FormValues>(() => initialValues(recipe.fields));
+  const [files, setFiles] = useState<FormFiles>({});
+  const [busy, setBusy] = useState(false);
+  const paused = (t.detail?.progress?.paused ?? []).map((p) => p.split(/[/#]/).pop()!);
+  const start = async () => {
+    const errs = formErrors(recipe.fields, values, files);
+    if (Object.keys(errs).length) return toast(`Fill in ${Object.keys(errs).map((k) => recipe.fields.find((f) => f.id === k)?.label).join(', ')}`, 'error');
+    setBusy(true);
+    try {
+      await t.start(recipe, values, files, pause, frozen);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const r = t.run;
+  return (
+    <aside className="relative z-10 flex w-[380px] shrink-0 flex-col border-l border-line bg-panel">
+      <div className="flex items-center gap-2 border-b border-line py-2 pr-2 pl-3">
+        <FlaskConical size={15} className="shrink-0 text-accent" />
+        <span className="min-w-0 flex-1 text-[13.5px] font-medium">Try it</span>
+        <IconButton label="Close" size="sm" onClick={onClose}>
+          <X size={15} />
+        </IconButton>
+      </div>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+        <p className="text-[12.5px] text-fg-3">A test run of the template as it is on screen: each step lights up as it goes.</p>
+        <AppForm fields={recipe.fields} values={values} files={files} onChange={(k, v) => setValues((x) => ({ ...x, [k]: v }))} onFile={(k, f) => setFiles((x) => (f ? { ...x, [k]: f } : Object.fromEntries(Object.entries(x).filter(([j]) => j !== k))))} disabled={t.active} />
+        {(pause.length > 0 || frozen.length > 0) && (
+          <ul className="space-y-0.5 text-[12.5px] text-fg-2">
+            {pause.length > 0 && <li>{`It pauses before ${pause.map((id) => `“${name(id)}”`).join(', ')}`}</li>}
+            {frozen.length > 0 && <li>{r && !t.active ? `Frozen, giving what they gave in the last try: ${frozen.map((id) => `“${name(id)}”`).join(', ')}` : `Frozen once there is a try to keep: ${frozen.map((id) => `“${name(id)}”`).join(', ')}`}</li>}
+          </ul>
+        )}
+        {r && (
+          <div className="rounded-lg border border-line bg-bg-1 px-2.5 py-2 text-[12.5px]">
+            {paused.length ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="min-w-0 flex-1 text-warn">{`Paused before ${paused.map((id) => `“${name(id)}”`).join(' and ')}`}</span>
+                <Button size="sm" variant="secondary" onClick={() => void t.go(true)}>
+                  One step
+                </Button>
+                <Button size="sm" variant="primary" onClick={() => void t.go()}>
+                  Go on
+                </Button>
+              </div>
+            ) : t.active ? (
+              <span className="flex items-center gap-2 text-fg-2">
+                <Throbber className="h-3.5" />
+                {t.detail?.progress?.waiting ?? 'Working…'}
+              </span>
+            ) : (
+              <span className={r.status === 'done' ? 'text-ok' : 'text-err'}>
+                {r.status === 'done' ? 'Done' : r.status === 'stopped' ? 'Stopped' : 'Did not finish'}
+                {r.startedAt && r.endedAt ? ` · ${Math.max(1, Math.round((r.endedAt - r.startedAt) / 1000))} s` : ''}
+                {r.costUsd ? ` · ${money(r.costUsd)}` : ''}
+              </span>
+            )}
+            {r.error && !t.active && <div className="mt-1 text-err">{r.error}</div>}
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end gap-2 border-t border-line p-2.5">
+        {t.active ? (
+          <Button variant="ghost" onClick={() => void t.stop()}>
+            Stop
+          </Button>
+        ) : (
+          <Button variant="primary" icon={busy ? <Throbber /> : undefined} disabled={busy} onClick={() => void start()}>
+            {r ? 'Try again' : 'Run'}
+          </Button>
+        )}
       </div>
     </aside>
   );

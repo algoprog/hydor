@@ -173,6 +173,8 @@ export interface StartInput {
   flow?: string;
   /** Run again from a step: these steps (by id) give what they gave in that run, without running again. */
   reuse?: { run: string; steps: string[] };
+  /** A test run tried in the graph: the steps to pause before. */
+  pause?: string[];
   /** The example it tries (its checks are read when it ends). */
   example?: string;
 }
@@ -209,12 +211,12 @@ export function startRun(o: StartInput): RunRecord {
 }
 
 /** Sets a run going: its flow, or its one agent; once the packages its template needs are installed. */
-function go(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe' | 'source' | 'files' | 'public'>) {
+function go(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe' | 'source' | 'files' | 'public' | 'pause'>) {
   syncMemoryHome(o.recipe, o.slug);
   const start = () => {
     if (isFlowRun(r)) {
       if (!flows) return void finish(r.id, 'failed', 'Templates with steps cannot run here yet');
-      return flows.start(r, { slug: o.slug, files: o.files, public: o.public });
+      return flows.start(r, { slug: o.slug, files: o.files, public: o.public, ...(o.pause?.length && o.source === 'test' ? { pause: o.pause } : {}) });
     }
     void launch(r, o).catch(() => {});
   };
