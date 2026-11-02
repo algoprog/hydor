@@ -47,7 +47,7 @@ export function appSchema(): Record<string, unknown> {
       if: str('A rule: it runs only when this holds ({{price}} < 100 and {{kind}} = bug)'),
       failed: { description: 'When it fails: steps to run instead, "skip" to go on without it, or "agent" for an agent to do its work', anyOf: [{ type: 'array', items: { $ref: '#/$defs/step' } }, { enum: ['skip', 'agent'] }] },
       instructions: textOrFile('agent, model: what it is asked to do, with {{values}}'),
-      outputs,
+      outputs: { ...outputs, description: `${outputs.description}; code: the fields of the object it returns` },
       agent: { enum: ['claude', 'codex', 'acp'] },
       model: str('agent: its model; model: one of Custom’s (unset: the helper model)'),
       tools: { type: ['array', 'null'], items: { type: 'string' } },
@@ -79,8 +79,8 @@ export function appSchema(): Record<string, unknown> {
       question: str('ask: what the person is asked, with {{values}}'),
       fields: { type: 'array', items: field, description: 'ask: its form (none: yes or no)' },
       waitHours: { type: 'number' },
-      language: { enum: ['javascript', 'python'] },
-      code: textOrFile('code: the body of a function of input that returns the step’s values (in a file of steps/: the function, as written there)'),
+      language: { enum: ['javascript', 'typescript', 'python'] },
+      code: textOrFile('code: the body of a function of input and ctx that returns the step’s values (in a file of steps/: the function, as written there); ctx.model, ctx.agent, ctx.tool, ctx.ask, ctx.data and ctx.app are steps of the run'),
       seconds: { type: 'number', description: 'code: most seconds it may take (1 to 120)' },
     },
     required: ['do'],
@@ -128,10 +128,42 @@ export function appSchema(): Record<string, unknown> {
 
 /** The types of a code step, for an editor to check its file with. */
 export const STEP_TYPES = `// A code step of a Naget Agent template. It runs in a sandbox: no network, none of this computer's files but
-// the template's own packages (requires.node / requires.python in app.json), and a time limit.
+// the template's own packages (requires.node / requires.python in app.json), and a time limit (not counting
+// the time its ctx calls take). It reaches the world outside only through ctx: each call is a step of the run,
+// kept, so when the run starts again after a restart, the program runs again and a call it made before gives
+// what it gave then. Make the same calls in the same order for the same input, so they can.
 /** The values the step is given (its "with" in app.json), by name. */
 export type StepInput = Record<string, any>;
 /** What the step gives: an object's fields are its values ({{step.field}}); anything else is {{step.result}}. What it prints is {{step.printed}}. */
 export type StepValues = Record<string, unknown> | unknown;
-export default function step(input: StepInput): StepValues | Promise<StepValues>;
+/** Answer kinds: text, long, number, yesno, date, url, list, table(column: kind, …). */
+export type Outputs = Record<string, string>;
+interface Said {
+  /** Values its words use by {{name}} (those not named come after the words). */
+  with?: Record<string, unknown>;
+  /** What the step is called on the run's page. */
+  title?: string;
+}
+export interface Ctx {
+  /** One answer from a model, with no tools: its outputs' fields, or { text }. model: one of Custom's (unset: the helper model). */
+  model(instructions: string, o?: Said & { outputs?: Outputs; model?: string }): Promise<Record<string, any>>;
+  /** An agent's session does it, with its tools: its outputs' fields, and { reply }. */
+  agent(instructions: string, o?: Said & { outputs?: Outputs; assistant?: string; agent?: 'claude' | 'codex' | 'acp'; model?: string; tools?: string[]; capUsd?: number }): Promise<Record<string, any>>;
+  /** One of the app's own tools (web_search, read_page, http_request, read_document, generate_image, knowledge_search, knowledge_read, recall, notify_user): { text, data? }. */
+  tool(tool: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<{ text: string; data?: unknown }>;
+  /** Waits for the person: { yes }, or its fields' answers. */
+  ask(question: string, o?: Said & { fields?: { id: string; label: string; type?: string; required?: boolean; options?: string[] }[]; waitHours?: number }): Promise<Record<string, any>>;
+  /** Another of the user's templates, by its address: its answer fields, and { reply }. */
+  app(app: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<Record<string, any>>;
+  /** The records the template keeps (the lists its data names). */
+  data: {
+    add(collection: string, record: Record<string, unknown>): Promise<{ record: Record<string, any>; id: string }>;
+    get(collection: string, id: string): Promise<{ record: Record<string, any> | null; found: boolean }>;
+    find(collection: string, o?: { where?: Record<string, unknown>; search?: string; sort?: string; limit?: number }): Promise<{ records: Record<string, any>[]; count: number; first: Record<string, any> | null }>;
+    search(collection: string, query: string, o?: { mode?: 'auto' | 'words' | 'meaning'; limit?: number }): Promise<{ records: Record<string, any>[]; count: number; first: Record<string, any> | null; meaning: boolean }>;
+    update(collection: string, o: { id?: string; where?: Record<string, unknown>; set: Record<string, unknown> }): Promise<{ records: Record<string, any>[]; count: number }>;
+    remove(collection: string, o: { id?: string; where?: Record<string, unknown> }): Promise<{ count: number }>;
+  };
+}
+export default function step(input: StepInput, ctx: Ctx): StepValues | Promise<StepValues>;
 `;

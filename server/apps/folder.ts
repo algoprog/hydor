@@ -42,21 +42,22 @@ const dedent = (t: string, by: number) =>
     .map((l) => (l.startsWith(' '.repeat(by)) ? l.slice(by) : l.trimStart() === '' ? '' : l))
     .join('\n');
 
-/** A code step as a file: the body of its function, inside the function an editor can check. */
+/** A code step as a file: the body of its function, inside the function an editor can check (with ctx's types). */
 function codeFile(s: Extract<Step, { do: 'code' }>, app: string): string {
-  if (s.language === 'python')
-    return `# “${titleOf(s)}”, a step of the template “${app}”: it gets input (the values it is given) and returns the step's values.\ndef step(input):\n${indent(s.code, '    ')}\n`;
-  return `// “${titleOf(s)}”, a step of the template “${app}”: it gets \`input\` (the values it is given) and returns the step's values.\n// @ts-check\n/** @param {Record<string, any>} input */\nexport default async function step(input) {\n${indent(s.code, '  ')}\n}\n`;
+  const head = `“${titleOf(s)}”, a step of the template “${app}”: it gets input (the values it is given) and returns the step's values; ctx (.naget/step.d.ts) asks models, agents, tools and people, each call a step of the run.`;
+  if (s.language === 'python') return `# ${head}\ndef step(input, ctx):\n${indent(s.code, '    ')}\n`;
+  if (s.language === 'typescript') return `// ${head}\nimport type { Ctx, StepInput } from '../.naget/step';\n\nexport default async function step(input: StepInput, ctx: Ctx) {\n${indent(s.code, '  ')}\n}\n`;
+  return `// ${head}\n// @ts-check\n/** @param {import('../.naget/step').StepInput} input @param {import('../.naget/step').Ctx} ctx */\nexport default async function step(input, ctx) {\n${indent(s.code, '  ')}\n}\n`;
 }
 
 /** The body of a code step's file (null: its function is not there as the file began with it). */
 function codeOf(text: string, python: boolean): string | null {
   if (python) {
-    const m = /^def step\(input\):[ \t]*\r?\n([\s\S]*)$/m.exec(text);
+    const m = /^def step\(input(?:\s*,\s*ctx)?\)(?:\s*->[^:]+)?:[ \t]*\r?\n([\s\S]*)$/m.exec(text);
     return m ? dedent(m[1].replace(/\s+$/, ''), 4) : null;
   }
-  const m = /export default async function step\s*\(\s*input\s*\)\s*\{[ \t]*\r?\n([\s\S]*)\r?\n\}\s*$/.exec(text);
-  return m ? dedent(m[1], 2) : null;
+  const m = /export default async function step\s*\(([^)]*)\)\s*(?::[^{]+)?\{[ \t]*\r?\n([\s\S]*)\r?\n\}\s*$/.exec(text);
+  return m && /^\s*input\b/.test(m[1]) ? dedent(m[2], 2) : null;
 }
 
 const README = (name: string) => `# ${name}
@@ -89,7 +90,7 @@ export function filesOf(db: DB, a: AppDef): Files {
         (s as unknown as { instructions: FileRef }).instructions = { file: `instructions/${s.id}.md` };
       }
       if (s.do === 'code') {
-        const file = `steps/${s.id}.${s.language === 'python' ? 'py' : 'js'}`;
+        const file = `steps/${s.id}.${s.language === 'python' ? 'py' : s.language === 'typescript' ? 'ts' : 'js'}`;
         files[file] = codeFile(s, r.name);
         (s as unknown as { code: FileRef }).code = { file };
       }
@@ -135,7 +136,7 @@ export function readFolder(dir: string): { recipe: Record<string, any>; screens:
       if (isRef(s.code)) {
         const text = read(s.code.file);
         const code = text === null ? null : codeOf(text, s.language === 'python');
-        if (text !== null && code === null) errors.push(`${s.code.file}: keep the step's code inside ${s.language === 'python' ? '“def step(input):”' : '“export default async function step(input) { … }”'}`);
+        if (text !== null && code === null) errors.push(`${s.code.file}: keep the step's code inside ${s.language === 'python' ? '“def step(input, ctx):”' : '“export default async function step(input, ctx) { … }”'}`);
         s.code = code ?? '';
       }
     }
@@ -281,7 +282,7 @@ function filesOn(dir: string): Files {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.name.startsWith('.')) continue;
       if (e.isDirectory()) walk(r);
-      else if (/^(app\.json|graph\.json|instructions\/.+\.md|steps\/.+\.(js|py)|screens\/.+\.html)$/.test(r)) out[r] = fs.readFileSync(path.join(dir, r), 'utf8');
+      else if (/^(app\.json|graph\.json|instructions\/.+\.md|steps\/.+\.(js|ts|py)|screens\/.+\.html)$/.test(r)) out[r] = fs.readFileSync(path.join(dir, r), 'utf8');
     }
   };
   try {
