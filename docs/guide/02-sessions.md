@@ -113,7 +113,7 @@ The start page opens with what you picked last, on every device: the agent; for 
 
 A link to the start page can fill it in, for example `/?prompt=Summarize%20my%20notes&agent=codex`; `model=` and `cwd=` (a folder's path) can be added. It only fills the box and the choices; it never starts anything by itself. Invisible characters are removed from a linked message, with a notice.
 
-What you write in the box waits there while you go to other pages: the message, the files you attach, the options for this task alone (**Swarm**, **Deep research**, **Arena**, **Guidelines** for this session) and the folder a link or **New agent session here** opened it in. The box empties when the session starts. The message and those options are kept in this browser, so they are still there after a reload; attached files are not.
+What you write in the box waits there while you go to other pages: the message, the files you attach, the options for this task alone (**Swarm**, **Deep research**, **Arena**, **Guidelines** for this session) and the folder a link or **New agent session here** opened it in. The box empties when the session starts: while the agent gets going, the arrow on **Start** keeps going up; then the start page becomes the session, the box moving down to its place at the bottom and what you wrote moving up as your first message. The message and those options are kept in this browser, so they are still there after a reload; attached files are not.
 
 ## Follow the work in a session
 

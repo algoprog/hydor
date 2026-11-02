@@ -11,6 +11,7 @@ import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
 import { keepStartDraft, startDraft } from '../../lib/drafts';
 import { timeAgo } from '../../lib/format';
+import { carryToSession } from '../../lib/motion';
 import { openSession } from '../../lib/nav';
 import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
 import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
@@ -178,6 +179,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     };
   }, [cwd]);
   const ta = useRef<HTMLTextAreaElement>(null);
+  const box = useRef<HTMLDivElement>(null);
   const menu = useComposerMenu({ ta, setText, root: cwd || undefined, commands: cat?.commands });
   const fileRef = useRef<HTMLInputElement>(null);
   // Text from the capabilities' buttons (dictation) joins what is being written.
@@ -272,16 +274,23 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         ...(Object.keys(extra).length ? { extra } : {}),
         ...attachmentPayload(atts),
       });
-      releaseAttachments(atts);
-      setAtts([]);
-      setText('');
-      // What was written went with the session.
-      sent.current = true;
-      keepStartDraft(null);
-      openSession(r.key);
+      // The box goes down to the session's, what was written up to its first message (lib/motion.ts). Still
+      // busy until the session shows, so a second press starts nothing.
+      carryToSession(
+        () => {
+          releaseAttachments(atts);
+          setAtts([]);
+          setText('');
+          // What was written went with the session.
+          sent.current = true;
+          keepStartDraft(null);
+          openSession(r.key);
+        },
+        box.current,
+        text.trim() ? ta.current : null,
+      );
     } catch (e) {
       toastError(e);
-    } finally {
       setBusy(false);
     }
   };
@@ -338,6 +347,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
       <NewSpaceDialog open={newSpace} onClose={() => setNewSpace(false)} onMade={pickSpace} />
       <LimitBanner agent={agent} account={acct} className="mb-3" />
       <div
+        ref={box}
         data-tour="composer"
         className="relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50"
         onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
@@ -359,6 +369,8 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         <textarea
           ref={ta}
           value={text}
+          // What is being sent stays as it went.
+          readOnly={busy}
           autoFocus={!mobile}
           autoComplete="off"
           data-1p-ignore=""
@@ -424,13 +436,14 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
             title="Start (Enter)"
             aria-label="Start"
             className={cx(
-              // A round arrow on phones.
-              'group inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full pr-3 pl-3.5 text-[13.5px] font-medium transition duration-150 active:scale-95 max-md:w-9 max-md:px-0',
-              ready ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3',
+              // A round arrow on phones. While the session starts, its arrow keeps going up.
+              'group inline-flex h-9 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-full pr-3 pl-3.5 text-[13.5px] font-medium transition duration-150 active:scale-95 max-md:w-9 max-md:px-0',
+              ready || busy ? 'bg-accent text-accent-fg' : 'bg-bg-3 text-fg-3',
+              ready && 'hover:opacity-90',
             )}
           >
             <span className="max-md:hidden">{busy ? 'Starting…' : 'Start'}</span>
-            <span className={cx('ico', ready && 'ico-rise')}>
+            <span className={cx('ico', ready && 'ico-rise', busy && 'anim-send-up')}>
               <ArrowUp size={16} strokeWidth={2.4} />
             </span>
           </button>
