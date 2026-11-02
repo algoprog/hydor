@@ -20,15 +20,15 @@ Memory works in the sessions this app runs, not in ones it only lists, such as a
 
 ## How notes get written
 
-Agents save notes in two cases: when you ask ("Remember that I'm vegetarian", "Remember that the test server is test.example.com"), or when they learn something lasting that will matter later. Nothing is written by itself after a reply: notes come from agents choosing to save them, from your own edits, and from the nightly tidy-up, which only reworks notes already kept.
+Agents save notes in two cases: when you ask ("Remember that I'm vegetarian", "Remember that the test server is test.example.com"), or when they learn something lasting that will matter later. Nothing is written by itself after a reply: notes come from agents choosing to save them, from notes you write or edit yourself, and from the nightly tidy-up, which only reworks notes already kept.
 
 - **The agent picks the place**: about you, this project, or this session.
-- **Some notes are true only until a date**: a trip, a deadline, a visit. The agent gives such a note an end date. From then on agents no longer get it, and within the hour it moves to Deleted, where you can restore it for 30 days.
+- **Some notes are true only until a date**: a trip, a deadline, a visit. The agent gives such a note an end date. From then on agents no longer get it, and within the hour it moves to Deleted notes, where you can restore it for 30 days.
 - **Corrections replace the old note**: to update a note, the agent rewrites it under its number instead of adding another. A note with the same text is not saved twice. With [search by meaning](/guide/memory#search-by-meaning) on, neither is a note that says the same thing in other words.
 - **Agents forget, too**: an agent removes a note when it turns out wrong or out of date, or when you ask ("Forget my old address").
 - **Never secrets**: a note that seems to hold a password, a key, a token or a card number is refused. So is text that reads like instructions to an agent ("ignore the previous instructions…"), since it would reach every later session.
 
-There is no button to type a new note yourself: ask any agent to remember it. You can edit, date and delete every note in [Settings → Memory](/settings?s=memory).
+You can also write a note yourself with **Add a note** in [Settings → Memory](/settings?s=memory&find=Add%20a%20note), and edit, date and delete every note there.
 
 ## See what an agent saved after a reply
 
@@ -84,7 +84,7 @@ A scheduled task's editor has the same Memory chip, so its runs can work without
 
 ## Turn memory off for all sessions
 
-Turn off the **Memory** switch at the top of [Settings → Memory](/settings?s=memory&find=Memory). Its hint: "Agents start with what earlier sessions kept about you, your projects and the session they go on with, and save notes when you ask or they learn something lasting. Off: they get none, and nothing is written."
+Turn off the **Memory** switch at the top of [Settings → Memory](/settings?s=memory&find=Memory). The line under it says what it does: "Agents start with what earlier sessions kept about you and your projects, and save what they learn." Once it is off: "Off: agents get no notes and save nothing new. Your notes stay."
 
 While it is off:
 
@@ -92,14 +92,15 @@ While it is off:
 - Your notes stay. Turn the switch back on and agents get them again.
 - The Memory option leaves the start page, and the search box (Ctrl+K) stops showing notes.
 - **Search by meaning** and **Tidy up each night** are greyed out, and the tidy-up report and **Tidy up now** are hidden.
+- Above the notes, a line says "Memory is off: agents don’t get these notes, and save no new ones."
 
 ## Settings → Memory
 
-Everything about memory is in [Settings → Capabilities → Memory](/settings?s=memory): "What agents remember about you, your projects and each session, and when it was written". At the top are three switches (**Memory**, **Search by meaning**, **Tidy up each night**) and the last tidy-up. Below them is **Notes**, the list of every note. On a phone, Settings opens as a list: tap **Memory** to open it on its own page.
+Everything about memory is in [Settings → Capabilities → Memory](/settings?s=memory): "What agents remember about you, your projects and each session, and when it was written". At the top are three switches (**Memory**, **Search by meaning**, **Tidy up each night**), each with a line on what it does, and the last tidy-up. Below them is **Notes**, the list of every note. On a phone, Settings opens as a list: tap **Memory** to open it on its own page. There the notes take the screen's whole width, and every menu on the page opens as a sheet from the bottom of the screen.
 
 ### Search by meaning
 
-[Search by meaning](/settings?s=memory&find=Search%20by%20meaning) "finds notes by what they mean, not only their words, in nine languages, with LightOn's mDenseOn model on this computer." The model runs here, so your notes aren't sent to a service to be searched. Without it, notes are found by their words alone. With it on:
+[Search by meaning](/settings?s=memory&find=Search%20by%20meaning) "finds notes by what they mean, not only their words, with a model that runs on this computer": LightOn's mDenseOn, which reads nine languages. The model runs here, so your notes aren't sent to a service to be searched. Without it, notes are found by their words alone. With it on:
 
 - Agents start with the notes that bear on your request even when the notes use other words than you did.
 - Agents looking notes up, and the search field in the Notes list, find them by meaning as well as by words.
@@ -141,7 +142,7 @@ It runs once a night, between 2 and 5 o'clock by this computer's clock. If the a
 
 ### Tidy up now and undo its changes
 
-Under the switches, a line reports the last tidy-up:
+Under **Tidy up each night**, a line reports the last tidy-up:
 
 - "Not tidied up yet."
 - "Tidying up…" while it runs.
@@ -155,48 +156,60 @@ Under the switches, a line reports the last tidy-up:
 
 ### The Notes list
 
-[Notes](/settings?s=memory&find=Notes) lists every note kept, with the count at the top: "42 kept: 12 about you, 25 in projects, 5 in sessions". Its buttons, **JSON**, **Markdown** and **Clear all…**, are described below.
+[Notes](/settings?s=memory&find=Notes) lists every note kept, with the count under its title: "42 kept: 12 about you, 25 in projects, 5 in sessions". **Add a note**, beside the title, writes one of your own (below).
 
 - **Search**: the field at the top ("Search the notes", or "Search the notes, by words or meaning" when search by meaning is ready) finds notes with every word you type, the last one as the start of a word, and with search by meaning on, notes that mean the same. The best come first. Escape clears it.
-- **Tabs**: **All**, **About you**, **Projects**, **Sessions**, **Not needed lately** (only when there are some) and **Deleted**, each with its count.
-- **Groups**: notes come grouped by place: About you first, then each project (its folder's name and path), then each session (its title: click it to open the session). Each group shows how many notes it holds. Notes come newest change first, or best match first when you search.
+- **Tabs**: **All**, **About you**, **Projects** and **Sessions**. Where there is room, each shows its count.
+- **Groups**: notes come grouped by place: About you first, then each project (its folder's name and path), then the sessions' notes together, each naming its session (click the name to open the session). Each group shows how many notes it holds. A place's profile comes first, then its topics, then its notes, newest change first; when you search, the best match comes first.
+- When some notes have gone unused for months, a line above the list says how many, with **Review** (see [Notes no agent needed lately](/guide/memory#notes-no-agent-needed-lately)).
+- At the bottom of the list: **Deleted notes**, **Export** and **Clear all…** (below).
 
 Each note shows its text (with a **Topic** or **Profile** badge when it is one) and a line under it:
 
-- **Added** and, if it changed since, **changed** (or **deleted**) and when. Point at a time to see the exact date.
-- **by you**, **by an agent** or **by the helper** (the tidy-up), and **in** the session it came from, which you can click to open.
+- **Added** and when, or **Changed** and when if it changed since, and who did it: **by you**, **by an agent** or **by the helper** (the tidy-up). Point at the time to see the exact dates.
+- **in** the session it came from, which you can click to open.
 - For a topic or profile, how many notes it **sums up**.
-- **needed** once or N times, and when last: how often an agent got it as bearing on a request, or found it by looking it up.
+- **needed** once or N times: how often an agent got it as bearing on a request, or found it by looking it up. Point at it to see when last.
 - **until** a date, when it has an end date.
 
-The buttons beside each note (under it on a phone):
+The **⋯** button beside each note (Note menu) holds what you can do with it. On a phone it opens as a sheet from the bottom of the screen, with the note's first words at the top.
 
+- **Edit**: change the text in place, up to 500 characters (800 for a topic or profile). Enter saves, Shift+Enter starts a new line, Escape cancels. Text that seems to hold a secret can't be saved.
+- **End date** (with the date beside it, when the note has one): "True until" a date, then **Save**. The note stops being true at the end of that day: from tomorrow up to five years ahead. **No end date** takes an end date away.
 - **What it sums up** (topics and profiles only): the notes it stands for, deleted ones struck through.
 - **History of changes**: every step in the note's life, newest first: Added, Changed (old text → new text), Deleted, Restored, End date ("Until" a date, or "Taken away"), each with when, by whom, in which session, and why.
-- **End date**: "True until" a date, then **Save**. The note stops being true at the end of that day: from tomorrow up to five years ahead. **No end date** takes an end date away; **Cancel** closes it.
-- **Edit**: change the text in place, up to 500 characters (800 for a topic or profile). Enter saves, Shift+Enter starts a new line, Escape cancels. Text that seems to hold a secret can't be saved.
-- **Delete**: "Deleted. It stays under Deleted for 30 days."
+- **Delete**: "Deleted. It stays under Deleted notes for 30 days."
+
+What opens under a note (its end date, its history, or what it sums up) closes with its **×**, or by picking the same item in the menu again.
+
+### Add a note
+
+[Add a note](/settings?s=memory&find=Add%20a%20note) opens a field at the top of the list: "What should agents remember? Say, “I prefer short answers”." Write the note, then **Save** or press Enter. Shift+Enter starts a new line; Escape or **Cancel** drops it.
+
+- **Where it belongs**: a note is about you unless you pick a project. The chip before the buttons (**About you**) lists the projects memory has notes for; a note about a project reaches only the sessions that work in it. With no project notes yet, the chip is not there and the note is about you.
+- The same rules as for agents' notes: at most 500 characters, kept as one paragraph, and never anything that seems to hold a password, a key, a token or a card number.
+- The note shows **by you**. Sessions get it as they start (Custom before its next turn), like every note.
 
 ### Notes no agent needed lately
 
-The **Not needed lately** tab appears when some notes have gone unused for four months: "No agent has needed these for four months: not changed, not found, not given as bearing on a request. Keep what still matters (✓); delete the rest."
+When some notes have gone unused for four months, a line above the list says how many ("One note no agent has needed for four months"). **Review** opens them: "No agent has needed these for four months: not changed, not found, not given as bearing on a request. Keep what still matters; delete the rest."
 
-Only notes about you and projects are suggested, never topics, profiles, notes with an end date, or sessions' notes. **Keep it** (✓) counts the note as needed today, so it leaves the list. **Delete** removes it. The list shows up to 100, the longest unneeded first.
+Only notes about you and projects are suggested, never topics, profiles, notes with an end date, or sessions' notes. **Keep it** counts the note as needed today, so it leaves the list. **Delete** removes it. The list shows up to 100, the longest unneeded first. **All notes**, at the top, goes back.
 
 ### Deleted notes
 
-The **Deleted** tab holds notes deleted by you, an agent, the tidy-up, or their end date. Each stays 30 days, then is erased for good. A session's notes go for good soon after the session itself is deleted.
+[Deleted notes](/settings?s=memory&find=Deleted%20notes), at the bottom of the list, opens the notes deleted by you, an agent, the tidy-up, or their end date: "Deleted notes stay here for 30 days, then go for good." A session's notes go for good soon after the session itself is deleted. The search field finds deleted notes by their words, and **All notes**, at the top, goes back.
 
 - **Restore** brings a note back. A note whose end date had passed comes back without it.
-- **Erase for good** asks "Erase this note for good?" ("It goes with its history, and cannot come back.") and then removes it at once.
+- The **⋯** menu has the note's **History of changes**, and **Erase for good**, which asks "Erase this note for good?" ("It goes with its history, and cannot come back.") and then removes it at once.
 
 ### Export your notes
 
-**JSON** downloads every note kept, each with its history and, for topics and profiles, the notes they sum up. **Markdown** downloads a readable list grouped by place, with when each note was added and changed and its end date. Deleted notes are not included.
+[Export](/settings?s=memory&find=Export), at the bottom of the list, downloads every note kept. **Markdown** ("A list to read") is a readable list grouped by place, with when each note was added and changed and its end date. **JSON** ("With histories") has each note with its history and, for topics and profiles, the notes they sum up. Deleted notes are not included.
 
 ### Clear all…
 
-[Clear all…](/settings?s=memory&find=Clear%20all%E2%80%A6) deletes every note and its history. It asks first: "Clear all memory? Every note about you, your projects and your sessions goes, with its history. This cannot be undone; export first to keep a copy." Click **Clear all** to go ahead. The button is greyed out when there are no notes.
+[Clear all…](/settings?s=memory&find=Clear%20all%E2%80%A6), at the bottom of the list, deletes every note and its history. It asks first: "Clear all memory? Every note about you, your projects and your sessions goes, with its history. This cannot be undone; export first to keep a copy." Click **Clear all** to go ahead. The button is greyed out when there are no notes.
 
 ## Search earlier sessions
 

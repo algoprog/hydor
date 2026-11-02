@@ -181,13 +181,8 @@ export const SHOTS = [
     },
   }),
   settingsShot('guidelines', 'guidelines', { until: button('The garden') }),
-  settingsShot('memory', 'memory', {
-    height: 900,
-    prepare: async (p) => {
-      await p.eval(`(() => { const h = [...document.querySelectorAll('div')].find((e) => e.textContent.trim() === 'Notes'); h?.scrollIntoView({ block: 'start' }); })()`);
-      await sleep(500);
-    },
-  }),
+  // The switches and the first notes fit in one picture.
+  settingsShot('memory', 'memory', { height: 900 }),
   settingsShot('tasks', 'tasks', { until: cardWith('Water the greenhouse reminder') }),
   settingsShot('skills', 'skillpack'),
   settingsShot('connections', 'connections'),

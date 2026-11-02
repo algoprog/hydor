@@ -1,5 +1,5 @@
 // Small pieces the memory note, the session menu and Settings → Memory share.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Brain } from 'lucide-react';
 import { Badge, Button, cx, inputCls, MenuItem } from '../../components/ui';
 import type { MemoryChange } from '@shared/memory';
@@ -14,8 +14,22 @@ export function SessionMemoryItem({ sessionKey, on, allOff, close, label = 'Memo
   );
 }
 
-/** Edits a note's text in place: Enter saves, Shift+Enter breaks the line, Escape cancels. */
-export function EntryEditor({ text, onSave, onCancel, max = 500 }: { text: string; onSave: (text: string) => Promise<unknown>; onCancel: () => void; max?: number }) {
+/** Edits a note's text in place (or writes a new one): Enter saves, Shift+Enter breaks the line, Escape cancels. `extra` goes before the buttons. */
+export function EntryEditor({
+  text,
+  onSave,
+  onCancel,
+  max = 500,
+  placeholder,
+  extra,
+}: {
+  text: string;
+  onSave: (text: string) => Promise<unknown>;
+  onCancel: () => void;
+  max?: number;
+  placeholder?: string;
+  extra?: ReactNode;
+}) {
   const [v, setV] = useState(text);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -48,6 +62,7 @@ export function EntryEditor({ text, onSave, onCancel, max = 500 }: { text: strin
         value={v}
         rows={2}
         maxLength={max}
+        placeholder={placeholder}
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onCancel();
@@ -58,7 +73,8 @@ export function EntryEditor({ text, onSave, onCancel, max = 500 }: { text: strin
         }}
         className={cx(inputCls, 'h-auto resize-none py-2 text-[13.5px] leading-snug')}
       />
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-end gap-2">
+        {extra && <div className="mr-auto min-w-0">{extra}</div>}
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>

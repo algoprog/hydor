@@ -175,8 +175,11 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Search by meaning**](/settings?s=memory&find=Search%20by%20meaning): Finds notes, and anything in this search, by what it means.
 - [**Tidy up each night**](/settings?s=memory&find=Tidy%20up%20each%20night): The helper model merges notes that say the same thing and sums related ones up.
 - [**Tidy up now**](/settings?s=memory&find=Tidy%20up%20now): Tidies memory up at once.
-- [**Clear all…**](/settings?s=memory&find=Clear%20all%E2%80%A6): Deletes every note and its history.
 - [**Notes**](/settings?s=memory&find=Notes): Every note kept, by place.
+- [**Add a note**](/settings?s=memory&find=Add%20a%20note): Write a note for agents to remember, about you or a project.
+- [**Deleted notes**](/settings?s=memory&find=Deleted%20notes): Notes deleted in the last 30 days, to restore.
+- [**Export**](/settings?s=memory&find=Export): Every note as Markdown to read, or as JSON with histories.
+- [**Clear all…**](/settings?s=memory&find=Clear%20all%E2%80%A6): Deletes every note and its history.
 
 ### Child sessions
 

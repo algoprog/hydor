@@ -54,9 +54,9 @@ agents that speak ACP and take MCP servers.
   with LightOn's mDenseOn model on your own computer (on a GPU, or on the CPU in about 1.5 GB, only while
   needed). Each night the helper model tidies memory up: it merges notes that say the same thing and, when
   there are more than fit, sums related ones up in topics and a short profile; every change can be undone.
-  Settings → Memory lists every note with when it was written, changed and last needed, and suggests
-  removing the ones no agent needed for months. Turn it off for one session or for all. Agents can also look
-  up earlier sessions.
+  Settings → Memory lists every note with when it was written, changed and last needed, lets you add your
+  own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
+  Agents can also look up earlier sessions.
 - **Spaces** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a
   folder: its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
