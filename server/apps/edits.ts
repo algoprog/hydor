@@ -7,6 +7,10 @@ import type { Step } from '../../shared/app-manifest.ts';
 import { allSteps, STEP_KINDS, titleOf } from '../../shared/app-manifest.ts';
 import type { DB } from '../db.ts';
 
+/** Now, as a number no two calls share: what the user changed and what an agent saw are told apart in the same millisecond. */
+let last = 0;
+const tick = () => (last = Math.max(Date.now(), last + 1));
+
 export function initAppEdits(db: DB) {
   db.exec(`
     create table if not exists app_builders (app_id text not null, key text not null, seen integer not null, primary key (app_id, key));
@@ -21,7 +25,7 @@ export function userEditAt(db: DB, appId: string): number | undefined {
 }
 
 /** A session's agent saved (or read) a template as it is now: it builds it, and has seen the user's changes so far. */
-export function noteBuilder(db: DB, appId: string, key: string, seen = Date.now()) {
+export function noteBuilder(db: DB, appId: string, key: string, seen = tick()) {
   db.prepare('insert into app_builders (app_id, key, seen) values (?, ?, ?) on conflict(app_id, key) do update set seen = excluded.seen').run(appId, key, seen);
 }
 
@@ -37,7 +41,7 @@ export function dropEdits(db: DB, appId: string, key: string) {
 
 /** The user changed a template in its editor: each session that builds it hears of it with its next message (from the version it last heard of). */
 export function noteUserEdit(db: DB, appId: string, name: string, before: AppRecipe, after: AppRecipe) {
-  db.prepare('insert or replace into app_user_edits (app_id, at) values (?, ?)').run(appId, Date.now());
+  db.prepare('insert or replace into app_user_edits (app_id, at) values (?, ?)').run(appId, tick());
   for (const { key } of db.prepare('select key from app_builders where app_id = ?').all(appId) as { key: string }[]) {
     const had = db.prepare('select before from app_edits where key = ? and app_id = ?').get(key, appId) as { before: string } | undefined;
     db.prepare('insert or replace into app_edits (key, app_id, name, before, after, at) values (?, ?, ?, ?, ?, ?)').run(key, appId, name, had?.before ?? JSON.stringify(before), JSON.stringify(after), Date.now());
