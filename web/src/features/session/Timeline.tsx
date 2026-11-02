@@ -620,8 +620,14 @@ export function Timeline({
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const [showLatest, setShowLatest] = useState(false);
-  // The conversation has scrolled under the header: a fade there.
+  // The conversation has scrolled under the header: a fade there. Likewise above the message box while more of it is below.
   const [under, setUnder] = useState(false);
+  const [below, setBelow] = useState(false);
+  // The end moves without a scroll too (a text held near the top growing past the screen, content changing size).
+  const fadeBelow = () => {
+    const el = scroller.current;
+    if (el) setBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 2);
+  };
   // Follow the end until the reader scrolls up by their own hand; follow again once they come
   // back down to it. New output, late layout and reconnects never take over the scroll.
   // While following, a new text (your message, the agent's note or reply) that starts low on the screen comes up
@@ -810,6 +816,7 @@ export function Timeline({
     }
     if (stick.current) follow(came);
     else restore();
+    fadeBelow();
   }, [merged, overlay?.approvals, working, tl?.start, tl?.loading]);
 
   // Opening a session lands at its end, once; a reload after a reconnect keeps your place.
@@ -845,6 +852,7 @@ export function Timeline({
     const ro = new ResizeObserver(() => {
       if (stick.current) follow();
       else restore();
+      fadeBelow();
     });
     ro.observe(el);
     // So does the view itself changing size: the message box growing a line, the keyboard opening.
@@ -867,6 +875,7 @@ export function Timeline({
     ownTop.current = null;
     if (!stick.current) trim();
     const dist = el.scrollHeight - top - el.clientHeight;
+    setBelow(dist > 2);
     // Dragging the scrollbar counts as the reader's own scroll.
     if (dragging.current) {
       if (top < lastTop.current - 1) unstick();
@@ -923,8 +932,8 @@ export function Timeline({
         aria-hidden
         className={cx('pointer-events-none absolute inset-x-0 top-0 z-[2] h-8 bg-gradient-to-b from-bg via-bg/60 to-transparent transition-opacity duration-300', under ? 'opacity-100' : 'opacity-0')}
       />
-      {/* A pixel below the fade's top: where the header ends between device pixels, the scroller's edge and the
-          fade round to different rows, and a line of the conversation would show above the fade. */}
+      {/* A pixel inside each fade's edge: where the header ends (or the message box starts) between device pixels, the
+          scroller's edge and the fade round to different rows, and a line of the conversation would show past the fade. */}
       <div
         ref={scroller}
         onScroll={onScroll}
@@ -974,7 +983,7 @@ export function Timeline({
           if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') unstick();
           else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'End' || e.key === ' ') down();
         }}
-        className="absolute inset-x-0 top-px bottom-0 overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]"
+        className="absolute inset-x-0 top-px bottom-px overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]"
       >
         <QuoteSelection />
         <FollowCtx.Provider value={following}>
@@ -1052,10 +1061,14 @@ export function Timeline({
           <div ref={spacer} aria-hidden />
         </FollowCtx.Provider>
       </div>
+      <div
+        aria-hidden
+        className={cx('pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-8 bg-gradient-to-t from-bg via-bg/60 to-transparent transition-opacity duration-300', below ? 'opacity-100' : 'opacity-0')}
+      />
       {showLatest && (
         <button
           onClick={() => toEnd(true)}
-          className="anim-pop absolute bottom-3 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full border border-line bg-elevated px-3.5 text-[12.5px] text-fg-2 shadow-lg transition-colors hover:text-fg"
+          className="anim-pop absolute bottom-3 left-1/2 z-[3] flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full border border-line bg-elevated px-3.5 text-[12.5px] text-fg-2 shadow-lg transition-colors hover:text-fg"
         >
           <ArrowDown size={13} /> Latest
         </button>
