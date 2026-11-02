@@ -137,11 +137,14 @@ function MobileDrawer() {
       />
       <div
         inert={!rest}
-        // Only `translate` changes, which the compositor animates on its own. The shadow stays as it is,
-        // out of sight past the left edge while shut (fading it in repainted the drawer on every frame).
+        // Only `transform` changes, which the compositor animates on its own (Safari's surest path). The shadow
+        // stays as it is, out of sight past the left edge while shut (fading it in repainted the drawer on every frame).
+        // What moves on its own inside (a working session's breathing dot) holds still unless the drawer is open
+        // and at rest: running as the slide began, it left Safari showing the drawer at once, without the slide.
         className={cx(
-          'fixed inset-y-0 left-0 z-40 w-full shadow-lg transition-[translate] duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-[translate] motion-reduce:transition-none',
-          open ? 'translate-x-0' : '-translate-x-[calc(100%+64px)]',
+          'fixed inset-y-0 left-0 z-40 w-full shadow-lg transition-transform duration-[260ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-transform motion-reduce:transition-none',
+          open ? 'transform-none' : '[transform:translateX(calc(-100%_-_64px))]',
+          !(open && rest) && 'drawer-still',
         )}
       >
         <Sidebar mobile />

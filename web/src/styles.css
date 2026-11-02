@@ -424,6 +424,10 @@ html {
 .breathe {
   animation: breathe 2.4s ease-in-out infinite;
 }
+/* The phone's drawer while shut or sliding (layout/Shell.tsx): what moves forever inside it holds still. */
+.drawer-still :is(.breathe, .spin-gentle, .animate-pulse) {
+  animation: none;
+}
 /* What runs right now (a step's name, "Thinking"): a soft light glides across the words, like the
    old "slide to unlock". The words rest in a quieter colour under it. */
 @keyframes shine {
