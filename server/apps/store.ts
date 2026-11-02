@@ -112,7 +112,7 @@ interface AppRow {
 
 function toApp(r: AppRow): AppDef {
   const d = JSON.parse(r.data);
-  return { ...cleanRecipe(d), id: r.id, slug: r.slug, mcp: d.mcp !== false, public: cleanPublic(d.public, DEFAULT_PUBLIC), template: d.template || undefined, createdAt: r.created_at, updatedAt: r.updated_at };
+  return { ...cleanRecipe(d), id: r.id, slug: r.slug, mcp: d.mcp !== false, public: cleanPublic(d.public, DEFAULT_PUBLIC), template: d.template || undefined, ...(typeof d.folder === 'string' && d.folder ? { folder: d.folder } : {}), createdAt: r.created_at, updatedAt: r.updated_at };
 }
 
 export function listApps(db: DB): AppDef[] {
@@ -144,7 +144,7 @@ export function coreOf(r: AppRecipe): string {
   return JSON.stringify(core);
 }
 
-export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: AppRecipe; mcp?: boolean; public?: Partial<PublicSettings>; template?: string; by?: VersionBy; why?: string }): AppDef {
+export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: AppRecipe; mcp?: boolean; public?: Partial<PublicSettings>; template?: string; by?: VersionBy; why?: string; folder?: string | null }): AppDef {
   const now = Date.now();
   const prev = input.id ? getApp(db, input.id) : null;
   const id = prev?.id ?? newId(6);
@@ -154,6 +154,7 @@ export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: App
     mcp: input.mcp ?? prev?.mcp ?? true,
     public: cleanPublic(input.public ?? {}, prev?.public ?? DEFAULT_PUBLIC),
     template: input.template ?? prev?.template,
+    folder: input.folder === null ? undefined : (input.folder ?? prev?.folder),
   };
   if (prev) db.prepare('update apps set slug = ?, data = ?, updated_at = ? where id = ?').run(slug, JSON.stringify(data), now, id);
   else db.prepare('insert into apps (id, slug, data, created_at, updated_at) values (?, ?, ?, ?, ?)').run(id, slug, JSON.stringify(data), now, now);

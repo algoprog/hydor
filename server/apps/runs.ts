@@ -95,9 +95,14 @@ function changed(r: RunRecord | null) {
 }
 
 /** A template was saved: its editor, open anywhere, takes the new version (or asks first, while it has changes of its own). */
-export function appChanged(a: { id: string; updatedAt: number }, by: 'agent' | 'user') {
+export function appChanged(a: { id: string; updatedAt: number }, by: 'agent' | 'user' | 'folder') {
   d().broadcast({ t: 'feature', id: 'apps', data: { app: { id: a.id, updatedAt: a.updatedAt, by } } });
+  for (const f of savedHooks) f(a.id, by);
 }
+
+const savedHooks: ((id: string, by: 'agent' | 'user' | 'folder') => void)[] = [];
+/** Hears of each template saved (its folder keeps in step with it). */
+export const onAppSaved = (f: (id: string, by: 'agent' | 'user' | 'folder') => void) => void savedHooks.push(f);
 
 /** Tells the pages a run changed (a step of it moved on). */
 export function noteChanged(id: string) {

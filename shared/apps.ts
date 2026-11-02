@@ -138,6 +138,8 @@ export interface AppDef extends AppRecipe {
   public: PublicSettings;
   /** The template it started from. */
   template?: string;
+  /** Its folder of files, kept in step with it (made in its Edit, or with the command line). */
+  folder?: string;
   createdAt: number;
   updatedAt: number;
 }

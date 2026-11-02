@@ -126,23 +126,26 @@ agents that speak ACP and take MCP servers.
   its own; and install the Node and Python packages it needs in a folder of its own. Examples (answers with
   checks on what a run gives) try it as it is on screen, each saying how its last try went. Each save that
   changes it is a version (who saved it, what changed, how its examples went with it), any of which can be
-  brought back, and each run keeps the version it ran. Describe one on the New template page and the App builder
-  assistant makes it. Save as template turns a session that went well into one, with steps drafted from the tools
-  it called (read a page, search the web) when they check out. Agents build templates with tools of their own:
-  app_get, app_save (checked first; whole, a patch or one step), app_try (its examples or a set of answers,
-  waited for), app_screen and app_data (the records it keeps: read, or added to). A template an agent saves opens
-  beside its conversation, where what you change and save reaches the agent with your next message (its next save
-  reads your version first). A tool, model, code, data or app step that fails can have an agent do its work, so
-  the run goes on; Edit shows the steps that had to, with Ask an agent to fix it, and offers Firm it up for an
-  agent step that did the same in each of its last runs: fixed steps in its place (the tools it called, with the
-  values it called them with, then a model step), tried on its examples first, with what a run takes and costs
-  either way. Beside a conversation, a step's menu has Ask the agent about it. Its steps, its agents and programs
-  search its records by words and by meaning, as knowledge bases are searched. A template can have a screen of
-  its own in place of its form: a page made from its parts (its form, its answer, a table for each list it keeps,
-  its earlier runs) that runs it and changes as its records do, edited in Pages' editor (whose Add has an App tab
-  with those parts) or by an agent, with buttons for its other flows. Templates travel as one file (.naget-app or
-  .json, with their records, screens and the templates they call), installed after a card that says what they
-  will do here and offers one of your models for any it asks for that is not set up here.
+  brought back, and each run keeps the version it ran. A template can live as a folder of files too (app.json,
+  each step's instructions, code steps as functions, its screens, with a schema for editors), changed in any
+  editor or by a coding agent, each saved change coming back as a version. Describe one on the New template page
+  and the App builder assistant makes it. Save as template turns a session that went well into one, with steps
+  drafted from the tools it called (read a page, search the web) when they check out. Agents build templates with
+  tools of their own: app_get, app_save (checked first; whole, a patch or one step), app_try (its examples or a
+  set of answers, waited for), app_screen and app_data (the records it keeps: read, or added to). A template an
+  agent saves opens beside its conversation, where what you change and save reaches the agent with your next
+  message (its next save reads your version first). A tool, model, code, data or app step that fails can have an
+  agent do its work, so the run goes on; Edit shows the steps that had to, with Ask an agent to fix it, and
+  offers Firm it up for an agent step that did the same in each of its last runs: fixed steps in its place (the
+  tools it called, with the values it called them with, then a model step), tried on its examples first, with
+  what a run takes and costs either way. Beside a conversation, a step's menu has Ask the agent about it. Its
+  steps, its agents and programs search its records by words and by meaning, as knowledge bases are searched. A
+  template can have a screen of its own in place of its form: a page made from its parts (its form, its answer, a
+  table for each list it keeps, its earlier runs) that runs it and changes as its records do, edited in Pages'
+  editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other flows. Templates
+  travel as one file (.naget-app or .json, with their records, screens and the templates they call), installed
+  after a card that says what they will do here and offers one of your models for any it asks for that is not set
+  up here.
 - **Slides**: decks kept in Pages, made by an agent (save_slides, from layouts or parts placed by position) or
   from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
   layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and
