@@ -222,10 +222,11 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - Message the agent while it works: your note joins the running turn, or waits in a queue you can reorder and
   edit, attachments included. Quote any part of a reply into your next message.
-- Notifications when a session finishes, fails or needs you: in the app, as a system notification, or as a
-  push notification on your phone with the app closed. A plain yes-or-no approval has Approve and Deny right
-  on the notification (where the browser shows buttons), and the Inbox lists everything waiting on you across
-  sessions, scheduled tasks and machines, with approvals, questions and forms answered right there.
+- Notifications when a session finishes, fails or needs you: in the app, as a system notification, or as a push
+  notification on your phone with the app closed; agents and templates' steps can also send you one themselves
+  (notify_user) for what cannot wait. A plain yes-or-no approval has Approve and Deny right on the notification
+  (where the browser shows buttons), and the Inbox lists everything waiting on you across sessions, scheduled
+  tasks and machines, with approvals, questions and forms answered right there.
 
 ## Shipping the work
 - Open a pull request on GitHub or Gitea from a session's branch, with a description written for you; its

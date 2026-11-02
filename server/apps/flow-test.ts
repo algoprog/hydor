@@ -16,6 +16,7 @@ import cookie from '@fastify/cookie';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanFlow, cleanRequires, evalRule, fillRefs, flowOf, readRule, valueOf, type Scope } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
+import { automations } from '../automations/index.ts';
 import { listRuns as listTaskRuns } from '../automations/runs.ts';
 import { kvSet, openDb } from '../db.ts';
 import { Scheduler } from '../scheduler.ts';
@@ -150,7 +151,7 @@ http.setErrorHandler((err: Error, _req, reply) => {
 const scheduler = new Scheduler(db, sessions as unknown as SessionManager);
 const deps = { app: http, db, sessions: sessions as any, scheduler, models: null as any, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'http://test.local' } as Deps;
 apps.routes!(deps);
-registerFeatures([fakeTools], deps);
+registerFeatures([fakeTools, automations], deps);
 startRuns(deps);
 await http.ready();
 setHelperModel(db, 'fake');
@@ -483,6 +484,20 @@ test('scheduled tasks run a template: its answers set or filled from a webhook c
   assert.equal(fail.task.status, 'failed');
   assert.ok(fail.task.summary);
   for (const x of [t, h, b]) scheduler.remove(x.id);
+});
+
+test('notify_user: a step tells you something now, and its notice opens the run', async () => {
+  const notices: any[] = [];
+  const on = (n: unknown) => notices.push(n);
+  sessions.on('notify', on);
+  const a = app({ name: 'Notifier', flow: { steps: [{ id: 'tell', do: 'tool', tool: 'notify_user', with: { message: 'Found {{topic}}' } }] } });
+  const done = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'it' } }).id);
+  sessions.off('notify', on);
+  assert.equal(done.status, 'done', done.error);
+  const n = notices.find((x) => x.body === 'Found it');
+  assert.ok(n, 'a notice went out');
+  assert.equal(n.title, 'Notifier');
+  assert.equal(n.url, `/apps/runs/${done.id}`);
 });
 
 test('app_data: the agents of a template that keeps data find and add its records; a public run gets no such tool', async () => {

@@ -439,7 +439,7 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope)
   if (x.pub && !(x.pub.web && PUBLIC_WEB_TOOLS.includes(s.tool))) throw new Error(`A run from a public page cannot use ${s.tool}`);
   const allowed = x.run.recipe.tools;
   if (allowed && !allowed.includes(s.tool)) throw new Error(`The template does not let its runs use ${s.tool} (Tools, in its settings)`);
-  const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal };
+  const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal, notice: { url: `/apps/runs/${encodeURIComponent(x.run.id)}`, title: x.run.appName } };
   const tool = runTools(ctx).find((t) => t.name === s.tool);
   if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of the app turned on?`);
   const out = await tool.run(valueOf(s.with ?? {}, scope) as Record<string, unknown>, ctx);
