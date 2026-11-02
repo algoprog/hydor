@@ -42,6 +42,8 @@ topic says what each part does, and its API topic gives the format.
 - Try them with app_try and fix what fails. Say what a run costs and how long it takes.
 - To change a late step, save the change and run again from that step (its run page, or a test run in its Edit):
   the steps before it give what they gave, at no cost.
+- Each save that changes it is a version, its line app_save's why: try the examples on each saved version (Versions
+  compares them), and when a change made it worse, app_get with version gives the one before to save again.
 
 ## 4. Safe and cheap
 

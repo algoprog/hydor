@@ -610,6 +610,42 @@ test('Collapse to a block: steps that follow one another become a template of th
   assert.deepEqual(c2.block.flow.outputs, { summary: '{{sum.summary}}', line: '{{say.line}}' });
 });
 
+test('versions: each save that changes what it does is one, saying who saved it and what changed; runs keep the version they ran, and its examples are counted for each', async () => {
+  model.answer = (_system, user) => JSON.stringify({ line: `Re ${user}` });
+  const a = app({
+    name: 'Versioned',
+    answer: [{ id: 'line', label: 'Line', type: 'text', required: true }],
+    flow: { steps: [{ id: 'say', title: 'Say', do: 'model', model: 'fake', instructions: 'Say {{topic}}', outputs: { line: 'text' } }] },
+    examples: [{ id: 'one', inputs: { topic: 'x' }, checks: ['{{answer.line}} = Re Say x'] }],
+  });
+  assert.deepEqual(store.listVersions(db, a.id).map((v) => [v.n, v.by, v.line]), [[1, 'you', 'Made it.']]);
+  // Where its steps sit is no version.
+  store.saveApp(db, { id: a.id, recipe: { ...cleanRecipe(a), graph: { at: { say: { x: 1, y: 2 } } } } });
+  assert.equal(store.listVersions(db, a.id).length, 1);
+  // Runs keep the version they ran.
+  const tryIt = async (recipe?: unknown) => ended((await http.inject({ method: 'POST', url: `/api/apps/${a.id}/examples/run`, payload: recipe ? { recipe } : {} })).json().runs[0].run.id);
+  assert.equal((await tryIt()).version, 1);
+  // A change is a version that says what changed, and who changed it.
+  const changed = { ...cleanRecipe(store.getApp(db, a.id)!), flow: { steps: [{ id: 'say', title: 'Say', do: 'model' as const, model: 'fake', instructions: 'Tell {{topic}}', outputs: [{ id: 'line', label: 'Line', type: 'text' as const }] }] } };
+  store.saveApp(db, { id: a.id, recipe: changed, by: 'agent' });
+  const vs = store.listVersions(db, a.id);
+  assert.deepEqual(vs.map((v) => [v.n, v.by]), [[2, 'agent'], [1, 'you']]);
+  assert.match(vs[0].line, /Changed the step “Say” \(say\)/);
+  assert.equal((await tryIt()).version, 2);
+  // A try of changes not saved runs no version.
+  assert.equal((await tryIt({ ...changed, name: 'Changed here' })).version, undefined);
+  // The versions, with how the examples went with each.
+  const list = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/versions` })).json().versions;
+  assert.deepEqual(list.map((v: any) => [v.n, v.examples?.tried, v.examples?.passed]), [[2, 1, 0], [1, 1, 1]]);
+  // One brought back: its recipe as it was, saved again as the newest, saying so.
+  const v1 = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/versions/1` })).json();
+  assert.equal(v1.recipe.flow.steps[0].instructions, 'Say {{topic}}');
+  const put = await http.inject({ method: 'PUT', url: `/api/apps/${a.id}`, payload: { recipe: v1.recipe, why: 'Brought back version 1' } });
+  assert.equal(put.statusCode, 200, put.body);
+  assert.deepEqual(store.listVersions(db, a.id).slice(0, 1).map((v) => [v.n, v.by, v.line]), [[3, 'you', 'Brought back version 1']]);
+  assert.equal((await http.inject({ method: 'GET', url: `/api/apps/${a.id}/versions/9` })).statusCode, 404);
+});
+
 test('At the same time, and Repeat until: branches meet after the join; rounds go on until the rule holds, seeing the last round', async () => {
   model.answer = (_system, user) => JSON.stringify({ line: `Re: ${user}` });
   const a = app({
