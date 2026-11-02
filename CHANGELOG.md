@@ -3,6 +3,37 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.12.0 · 2 November 2026
+
+Apps: what were Templates are now apps of your own, with steps, data, memory, a screen and a conversation with
+their agent, made by describing them, in a graph or as files; and Connections speak of services and connected
+accounts.
+
+- **Apps**: Templates are called Apps again, everywhere you read about them. An app still starts as a form an
+  agent fills in, and can now do much more. Old links to the guide's Templates topic open the Apps topic.
+- **Steps**: an app can work in steps: an agent, a quick answer from a model, one of the app's tools, a decision
+  by a rule or in words, a repeat over a list or until something holds, branches side by side, another app, its
+  own data, a question for you (it waits, and the Inbox says so), a program in JavaScript, TypeScript or Python,
+  or a value worked out at no cost. A step that fails can have an agent do its work, **Firm it up** offers cheaper
+  steps for work an agent did the same way each time, and a finished run can run again from any step.
+- **Build them your way**: describe one and the **App builder** makes it, with examples and checks it tries
+  before handing it over; save a session that went well as an app, its steps drafted from what the agent did;
+  change the steps in a list or in a graph of nodes and wires, where **Try it** lights each step up as it runs,
+  pauses before a step or keeps an expensive one's answer, and **Collapse to a block** turns steps into an app of
+  their own; or work on it as a folder of files in any editor, or from the command line.
+- **Data, memory and screens**: an app can keep lists of records, searched by words and by meaning, and a memory
+  of its own. It can have a screen in place of its form: a page made from its parts (its form, its answer, a
+  table for each list, its runs) or by an agent, edited in Pages' editor, that runs it live. On a screen you can
+  also talk with the app's agent, who reads and changes its records and runs its flows for you.
+- **Blocks, versions and examples**: apps made to be steps of others (five come ready-made: sum up a page,
+  translate, answer from the web, sort into kinds, pull out the facts); every save that changes an app is a
+  version you can bring back, with how its examples went.
+- **Running and sharing**: a scheduled task can run an app at a time, on a webhook or when a watcher sees a
+  change; agents and steps can send you a notification; an app travels as one file with its records, screens,
+  the apps it calls and what it needs (packages, models), installed after a card that says what it will do.
+- **Connections**: the marketplace now lists services, and what you connect are connected accounts, in Settings,
+  in a session's menu and in what agents are told.
+
 ## 0.11.0 · 2 November 2026
 
 Slides, documents, spreadsheets and LaTeX in Pages, each with its own editor and an agent to ask; assistants you
