@@ -9,7 +9,7 @@ import { agentName } from '../../components/AgentIcon';
 import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { cx, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
 import { confirmResume, takeoverDialog } from '../../lib/activity';
-import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
+import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, releaseSentPictures, sendingPictures, type Attachment } from '../../lib/attachments';
 import { clearDraft, draftFiles, draftText, keepDraftFiles, keepDraftText } from '../../lib/drafts';
 import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
 import { AttachmentList } from '../../components/Attachments';
@@ -149,6 +149,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   useEffect(() => {
     keepDraftFiles(key, atts);
   }, [atts, key]);
+  // The pictures its messages showed from here go with the box.
+  useEffect(() => () => releaseSentPictures(key), [key]);
 
   // "Quote" on a selected part of a reply: it goes in the box as a quote, the caret after it.
   useEffect(() => {
@@ -207,15 +209,19 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     if (takeover ? !(await confirm(takeoverDialog(s))) : !running && !(await confirmResume(s))) return;
     const queue = working && !takeover && (followUpPref() === 'queue') !== opposite;
     setBusy(true);
+    // The message shows these pictures the moment it does, not once the agent has written it down (lib/attachments.ts).
+    const went = sendingPictures(key, t, atts, queue);
     try {
       await post(`/api/sessions/${enc(key)}/${takeover ? 'takeover' : queue ? 'queue' : 'message'}`, { text: t, ...attachmentPayload(atts) });
+      went(true);
       window.dispatchEvent(new Event('wa:follow'));
       // Also when the page was left while it went.
       clearDraft(key);
       setText('');
-      releaseAttachments(atts);
+      // Its pictures went with it; the other files have nothing to release.
       setAtts([]);
     } catch (e) {
+      went(false);
       toastError(e);
     } finally {
       setBusy(false);

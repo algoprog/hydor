@@ -33,7 +33,7 @@ import { childReplyOf } from '@shared/children';
 import type { FileChange, HandoffInfo, Question, TimelineItem, ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { confirmResume, takeoverDialog } from '../../lib/activity';
-import { splitAttachedFiles } from '../../lib/attachments';
+import { sentPicturesShown, splitAttachedFiles, type SentPictures } from '../../lib/attachments';
 import { basename, clockTime, compact, duration, stripAnsi, tildify } from '../../lib/format';
 import { langFromPath } from '../../lib/highlight';
 import { openFile, openSession } from '../../lib/nav';
@@ -55,13 +55,34 @@ import { ChildReplyRow } from '../children/ChildReply';
 /** `fork(at)`: start a new session from this one, up to the transcript entry `at` (Claude) or all of it. */
 export const SessionCtx = createContext<{ sessionKey?: string; cwd?: string; openChanges?: (path?: string) => void; fork?: (at?: string) => void }>({});
 
-/** A message's images, read from its transcript line; a click opens them large. */
-function MessageImages({ item }: { item: Extract<TimelineItem, { kind: 'user' }> }) {
+const imageUrl = (key: string, at: number, n: number) => mu(`/api/sessions/${enc(key)}/image?at=${at}&n=${n}`);
+
+/**
+ * A message's images, read from its transcript line; a click opens them large. `sent`: its pictures as sent from
+ * this page (lib/attachments.ts), shown until its own have loaded in their place.
+ */
+function MessageImages({ item, sent }: { item: Extract<TimelineItem, { kind: 'user' }>; sent?: SentPictures }) {
   const { sessionKey } = useContext(SessionCtx);
   const [failed, setFailed] = useState<Set<number>>(new Set());
+  const at = item.imageAt;
+  // Its own pictures load and decode out of sight first, then take the place of these without a blank moment.
+  useEffect(() => {
+    if (!sent || sent.done || at == null || !sessionKey) return;
+    let gone = false;
+    const own = sent.urls.map((_, n) => {
+      const img = new Image();
+      img.src = imageUrl(sessionKey, at, n);
+      return img.decode();
+    });
+    // Not there (yet): these stay.
+    Promise.all(own).then(() => gone || sentPicturesShown(sessionKey, sent.id), () => {});
+    return () => {
+      gone = true;
+    };
+  }, [sent, at, sessionKey]);
   if (!item.images) return null;
-  if (item.imageAt == null || !sessionKey) return <div className="text-[12px] text-fg-3">{item.images} image{item.images > 1 ? 's' : ''} attached</div>;
-  const srcs = Array.from({ length: item.images }, (_, n) => mu(`/api/sessions/${enc(sessionKey)}/image?at=${item.imageAt}&n=${n}`));
+  const srcs = sent && !sent.done ? sent.urls : at != null && sessionKey ? Array.from({ length: item.images }, (_, n) => imageUrl(sessionKey, at, n)) : null;
+  if (!srcs) return <div className="text-[12px] text-fg-3">{item.images} image{item.images > 1 ? 's' : ''} attached</div>;
   return (
     <div className="flex flex-wrap justify-end gap-1.5">
       {srcs.map((src, n) =>
@@ -73,7 +94,8 @@ function MessageImages({ item }: { item: Extract<TimelineItem, { kind: 'user' }>
           <button key={n} type="button" onClick={() => openLightbox(srcs.map((s, i) => ({ src: s, name: `Image ${i + 1}` })), n)} className="cursor-zoom-in" aria-label={`Show image ${n + 1} large`}>
             <img
               src={src}
-              loading="lazy"
+              // Sent from here: in memory already, and a lazy one would show a frame late.
+              loading={sent ? undefined : 'lazy'}
               alt=""
               onError={() => setFailed((f) => new Set(f).add(n))}
               className="h-24 max-w-[220px] rounded-xl border border-line object-cover transition-opacity hover:opacity-90"
@@ -766,7 +788,8 @@ function scrollBox(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
-export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Extract<TimelineItem, { kind: 'user' }>; arrive?: boolean }) {
+/** `sent`: its pictures as sent from this page, while it cannot show its own (lib/attachments.ts). */
+export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { item: Extract<TimelineItem, { kind: 'user' }>; arrive?: boolean; sent?: SentPictures }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -822,7 +845,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive }: { item: Ext
     <>
       {item.handoff && <HandoffCard h={item.handoff} />}
       <div ref={root} data-seq={item.seq} className={cx('tl-item group/u flex scroll-mt-6 flex-col items-end gap-1.5', arrive && 'anim-msg-in')}>
-        {item.images ? <MessageImages item={item} /> : null}
+        {item.images ? <MessageImages item={item} sent={sent} /> : null}
         {(text || files.length > 0 || context) && (
           // Short ones keep to their words; a long one is as wide as the message box, and lines up with it.
           <div className="max-w-full rounded-[20px] bg-bg-2 px-4 py-2.5">

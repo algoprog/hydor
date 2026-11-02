@@ -1,5 +1,7 @@
+import { create } from 'zustand';
+import type { QueuedMessage, TimelineItem } from '@shared/types';
 import { mu } from './machine';
-import { toast } from './store';
+import { toast, useTimeline } from './store';
 
 /**
  * A file attached to a message. Images go to the model as images; any other file is saved
@@ -87,6 +89,115 @@ export function splitAttachedFiles(text: string): { text: string; files: string[
   const m = /\n*Attached files:\n((?:- [^\n]+\n?)+)$/.exec(text);
   if (!m) return { text, files: [] };
   return { text: text.slice(0, m.index), files: m[1].trim().split('\n').map((l) => l.slice(2)) };
+}
+
+// ---- pictures of messages sent from this page ---------------------------------------------
+
+/**
+ * A message's own pictures come from the agent's transcript, once the agent has written the message down
+ * (a moment, or up to a minute when it was sent while the agent worked), and are downloaded again then. Until
+ * they have loaded, a message sent from this page shows its pictures as its box had them.
+ */
+export interface SentPictures {
+  id: number;
+  /** The message's words, as the conversation shows them. */
+  text: string;
+  urls: string[];
+  /** How many items the session's transcript had when it was sent: the message comes after them. */
+  after: number;
+  /** It went to the queue, to go out when the running turn ends. */
+  queued?: boolean;
+  /** It went: the pictures are no longer its box's to keep. */
+  own?: boolean;
+  /** Its own pictures have loaded in their place, and `urls` are released. */
+  done?: boolean;
+}
+
+/** By session. */
+export const useSentPictures = create<{ byKey: Record<string, SentPictures[]> }>(() => ({ byKey: {} }));
+
+const changeSent = (key: string, f: (list: SentPictures[]) => SentPictures[]) => useSentPictures.setState((s) => ({ byKey: { ...s.byKey, [key]: f(s.byKey[key] ?? []) } }));
+const sentOne = (key: string, id: number) => useSentPictures.getState().byKey[key]?.find((p) => p.id === id);
+const revoke = (p: SentPictures) => p.urls.forEach((u) => URL.revokeObjectURL(u));
+
+/**
+ * Session `key`'s box is sending `text` with `list` (`queued`: to the queue): the message shows their pictures
+ * from here. Call the result with whether it went; one that did not keeps them in the box.
+ */
+export function sendingPictures(key: string, text: string, list: Attachment[], queued = false): (went: boolean) => void {
+  const urls = list.filter((a) => a.image && a.url && !a.path).map((a) => a.url!);
+  if (!urls.length) return () => {};
+  const tl = useTimeline.getState().byKey[key];
+  // Its length unknown (not loaded yet), only the message's first copy, before the transcript has it, shows them.
+  const p: SentPictures = { id: nextId++, text, urls, after: tl && !(tl.loading && !tl.items.length) ? tl.total : Infinity, queued };
+  changeSent(key, (l) => [...l, p]);
+  return (went) => {
+    if (sentOne(key, p.id)) changeSent(key, (l) => (went ? l.map((x) => (x.id === p.id ? { ...x, own: true } : x)) : l.filter((x) => x.id !== p.id)));
+    // The box was left while it went: nothing shows them now.
+    else if (went) revoke(p);
+  };
+}
+
+/** The message shows its own pictures now: these go. It stays on the list, done, so a later one with the same words does not take its place. */
+export function sentPicturesShown(key: string, id: number) {
+  const p = sentOne(key, id);
+  if (!p || p.done) return;
+  revoke(p);
+  changeSent(key, (l) => l.map((x) => (x.id === id ? { ...x, done: true } : x)));
+}
+
+/** A waiting message was changed or taken off: it shows the server's copies from now on. */
+export function dropSentPictures(key: string, id: number) {
+  const p = sentOne(key, id);
+  if (!p) return;
+  if (p.own && !p.done) revoke(p);
+  changeSent(key, (l) => l.filter((x) => x.id !== id));
+}
+
+/** Session `key`'s box is gone (another session opened, the page left): its messages show their own pictures. */
+export function releaseSentPictures(key: string) {
+  const list = useSentPictures.getState().byKey[key];
+  if (!list) return;
+  for (const p of list) if (p.own && !p.done) revoke(p);
+  useSentPictures.setState((s) => {
+    const byKey = { ...s.byKey };
+    delete byKey[key];
+    return { byKey };
+  });
+}
+
+/**
+ * Which pictures sent from here each message of a conversation shows. In order, each message with pictures takes
+ * the first sent before it with its words and number of pictures; one sent to the queue only when no other fits,
+ * as it goes out after them. `items`: the first `saved` are the transcript's, the rest not in it yet.
+ */
+export function sentPicturesOf(list: SentPictures[] | undefined, items: TimelineItem[], saved: number): Map<string, SentPictures> {
+  const out = new Map<string, SentPictures>();
+  if (!list?.length) return out;
+  const free = [...list];
+  items.forEach((it, i) => {
+    if (it.kind !== 'user' || !it.images) return;
+    const text = splitAttachedFiles(it.text).text.trim();
+    const fits = (p: SentPictures) => p.urls.length === it.images && p.text === text && (i >= saved || it.seq >= p.after);
+    const p = free.find((x) => !x.queued && fits(x)) ?? free.find(fits);
+    if (!p) return;
+    out.set(it.id, p);
+    free.splice(free.indexOf(p), 1);
+  });
+  return out;
+}
+
+/** The same for the messages waiting in the queue: each takes the first sent to the queue with its words and number of pictures. */
+export function queuedPicturesOf(list: SentPictures[] | undefined, queue: QueuedMessage[]): Map<string, SentPictures> {
+  const out = new Map<string, SentPictures>();
+  const free = (list ?? []).filter((p) => p.queued && !p.done);
+  for (const m of queue) {
+    const p = free.find((x) => x.urls.length === (m.images ?? 0) && x.text === m.text.trim());
+    if (!p) continue;
+    out.set(m.id, p);
+    free.splice(free.indexOf(p), 1);
+  }
+  return out;
 }
 
 /** Whether this browser can capture the screen (desktop browsers; phones cannot). */

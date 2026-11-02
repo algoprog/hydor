@@ -8,7 +8,7 @@ import { CornerDownLeft, FileText, GripVertical, Paperclip, Pencil, Play, Trash2
 import { childReplyOf } from '@shared/children';
 import type { QueuedAttachment, QueuedMessage, SessionSummary } from '@shared/types';
 import { enc, post } from '../../lib/api';
-import { attachmentPayload, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
+import { attachmentPayload, dropSentPictures, queuedPicturesOf, readAttachments, releaseAttachments, useSentPictures, type Attachment, type SentPictures } from '../../lib/attachments';
 import { toast, toastError } from '../../lib/store';
 import { AttachmentList } from '../../components/Attachments';
 import { openLightbox } from '../../components/Lightbox';
@@ -24,18 +24,20 @@ const MOUSE = { activationConstraint: { distance: 4 } };
 const TOUCH = { activationConstraint: { delay: 180, tolerance: 6 } };
 const KEYS = { coordinateGetter: sortableKeyboardCoordinates };
 
-const attUrl = (key: string, m: QueuedMessage, a: QueuedAttachment) => mu(`/api/sessions/${enc(key)}/queue/${enc(m.id)}/attachment?ref=${encodeURIComponent(a.ref)}`);
+/** A picture sent from this page shows from here (`sent`, lib/attachments.ts); the rest come from the server. */
+const attUrl = (key: string, m: QueuedMessage, a: QueuedAttachment, sent?: SentPictures) =>
+  (a.image && sent?.urls[Number(a.ref.slice(4))]) || mu(`/api/sessions/${enc(key)}/queue/${enc(m.id)}/attachment?ref=${encodeURIComponent(a.ref)}`);
 
-function showImages(key: string, m: QueuedMessage, a: QueuedAttachment) {
+function showImages(key: string, m: QueuedMessage, a: QueuedAttachment, sent?: SentPictures) {
   const imgs = (m.att ?? []).filter((x) => x.image);
   openLightbox(
-    imgs.map((x) => ({ src: attUrl(key, m, x), name: x.name })),
+    imgs.map((x) => ({ src: attUrl(key, m, x, sent), name: x.name })),
     imgs.indexOf(a),
   );
 }
 
 /** An attachment of a waiting message: a thumbnail (opens large) or the file's name. */
-function Chip({ sessionKey, m, a, big, onRemove }: { sessionKey: string; m: QueuedMessage; a: QueuedAttachment; big?: boolean; onRemove?: () => void }) {
+function Chip({ sessionKey, m, a, sent, big, onRemove }: { sessionKey: string; m: QueuedMessage; a: QueuedAttachment; sent?: SentPictures; big?: boolean; onRemove?: () => void }) {
   const remove = onRemove && (
     <button type="button" className="absolute -top-1.5 -right-1.5 rounded-full bg-fg p-0.5 text-bg" onClick={onRemove} aria-label={`Remove ${a.name}`}>
       <X size={10} />
@@ -44,8 +46,8 @@ function Chip({ sessionKey, m, a, big, onRemove }: { sessionKey: string; m: Queu
   if (a.image)
     return (
       <span className="relative">
-        <button type="button" onClick={() => showImages(sessionKey, m, a)} className="block cursor-zoom-in" aria-label={`Show ${a.name} large`}>
-          <img src={attUrl(sessionKey, m, a)} alt={a.name} className={cx('rounded-lg border border-line object-cover', big ? 'h-14 w-14' : 'h-9 w-9')} />
+        <button type="button" onClick={() => showImages(sessionKey, m, a, sent)} className="block cursor-zoom-in" aria-label={`Show ${a.name} large`}>
+          <img src={attUrl(sessionKey, m, a, sent)} alt={a.name} className={cx('rounded-lg border border-line object-cover', big ? 'h-14 w-14' : 'h-9 w-9')} />
         </button>
         {remove}
       </span>
@@ -59,9 +61,9 @@ function Chip({ sessionKey, m, a, big, onRemove }: { sessionKey: string; m: Queu
   );
 }
 
-function QueueRow({ s, m, n, onEdit }: { s: SessionSummary; m: QueuedMessage; n: number; onEdit: () => void }) {
+function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessage; n: number; sent?: SentPictures; onEdit: () => void }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: m.id });
-  const call = (path: string) => post(`/api/sessions/${enc(s.key)}/queue/${enc(m.id)}${path}`).catch(toastError);
+  const call = (path: string, then?: () => void) => post(`/api/sessions/${enc(s.key)}/queue/${enc(m.id)}${path}`).then(then, toastError);
   const reply = childReplyOf(m.text);
   return (
     <div
@@ -88,7 +90,7 @@ function QueueRow({ s, m, n, onEdit }: { s: SessionSummary; m: QueuedMessage; n:
         {m.att && (
           <div className={cx('flex flex-wrap gap-1.5', m.text && 'mt-1.5')}>
             {m.att.map((a) => (
-              <Chip key={a.ref} sessionKey={s.key} m={m} a={a} />
+              <Chip key={a.ref} sessionKey={s.key} m={m} a={a} sent={sent} />
             ))}
           </div>
         )}
@@ -100,7 +102,7 @@ function QueueRow({ s, m, n, onEdit }: { s: SessionSummary; m: QueuedMessage; n:
         <button title="Edit the text and attachments" onClick={onEdit} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg">
           <Pencil size={13} />
         </button>
-        <button title="Remove" onClick={() => call('/delete')} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-err">
+        <button title="Remove" onClick={() => call('/delete', () => sent && dropSentPictures(s.key, sent.id))} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-err">
           <Trash2 size={13} />
         </button>
       </span>
@@ -109,7 +111,7 @@ function QueueRow({ s, m, n, onEdit }: { s: SessionSummary; m: QueuedMessage; n:
 }
 
 /** A waiting message opened for changes: its text, what stays attached, and new files. */
-function QueueEditor({ s, m, onDone }: { s: SessionSummary; m: QueuedMessage; onDone: () => void }) {
+function QueueEditor({ s, m, sent, onDone }: { s: SessionSummary; m: QueuedMessage; sent?: SentPictures; onDone: () => void }) {
   const { setNodeRef, transform, transition } = useSortable({ id: m.id, disabled: true });
   const [text, setText] = useState(m.text);
   const [keep, setKeep] = useState<string[]>(() => (m.att ?? []).map((a) => a.ref));
@@ -129,6 +131,8 @@ function QueueEditor({ s, m, onDone }: { s: SessionSummary; m: QueuedMessage; on
     setBusy(true);
     try {
       await post(`/api/sessions/${enc(s.key)}/queue/${enc(m.id)}/edit`, { text, keep, ...attachmentPayload(added) });
+      // What it carries now comes from the server.
+      if (sent) dropSentPictures(s.key, sent.id);
       onDone();
     } catch (e) {
       toastError(e);
@@ -171,7 +175,7 @@ function QueueEditor({ s, m, onDone }: { s: SessionSummary; m: QueuedMessage; on
       {(kept.length > 0 || added.length > 0) && (
         <div className="mt-1.5 flex flex-wrap gap-2 px-1">
           {kept.map((a) => (
-            <Chip key={a.ref} sessionKey={s.key} m={m} a={a} big onRemove={() => setKeep((k) => k.filter((x) => x !== a.ref))} />
+            <Chip key={a.ref} sessionKey={s.key} m={m} a={a} sent={sent} big onRemove={() => setKeep((k) => k.filter((x) => x !== a.ref))} />
           ))}
           <AttachmentList
             items={added}
@@ -217,8 +221,10 @@ export function QueueList({ s }: { s: SessionSummary }) {
   useEffect(() => setOrder(null), [ids]);
   const [editing, setEditing] = useState<string | null>(null);
   const sensors = useSensors(useSensor(MouseSensor, MOUSE), useSensor(AreaTouchSensor, TOUCH), useSensor(KeyboardSensor, KEYS));
+  const sentList = useSentPictures((x) => x.byKey[s.key]);
   const list = order ? order.map((id) => server.find((m) => m.id === id)).filter((m): m is QueuedMessage => !!m) : server;
   if (!list.length) return null;
+  const sent = queuedPicturesOf(sentList, server);
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
     const cur = list.map((m) => m.id);
@@ -242,7 +248,11 @@ export function QueueList({ s }: { s: SessionSummary }) {
       <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[vertical]} onDragEnd={onDragEnd}>
         <SortableContext items={list.map((m) => m.id)} strategy={verticalListSortingStrategy}>
           {list.map((m, i) =>
-            editing === m.id ? <QueueEditor key={m.id} s={s} m={m} onDone={() => setEditing(null)} /> : <QueueRow key={m.id} s={s} m={m} n={i + 1} onEdit={() => setEditing(m.id)} />,
+            editing === m.id ? (
+              <QueueEditor key={m.id} s={s} m={m} sent={sent.get(m.id)} onDone={() => setEditing(null)} />
+            ) : (
+              <QueueRow key={m.id} s={s} m={m} n={i + 1} sent={sent.get(m.id)} onEdit={() => setEditing(m.id)} />
+            ),
           )}
         </SortableContext>
       </DndContext>
