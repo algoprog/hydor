@@ -1,6 +1,6 @@
 # Assistants
 
-An assistant is a preset a session works as: it tells the agent who it is for this session and how to go about the work, and can limit what the agent may use, favor some skills, turn on connected apps, and suggest an agent, model and permissions. This topic covers the seven assistants that come with the app, picking one on the start page, switching a session to another one, making, changing, deleting and importing your own, the task folders a session gets when you pick no folder, and having agents clean up after a task.
+An assistant is a preset a session works as: it tells the agent who it is for this session and how to go about the work, and can limit what the agent may use, favor some skills, turn on connected accounts, and suggest an agent, model and permissions. This topic covers the seven assistants that come with the app, picking one on the start page, switching a session to another one, making, changing, deleting and importing your own, the task folders a session gets when you pick no folder, and having agents clean up after a task.
 
 ![Picking an assistant on the start page: General, Researcher, Writer, Coder, Tutor, Planner or Analyst](images/assistants.webp)
 
@@ -13,7 +13,7 @@ An assistant can hold:
 - **Instructions**: who the agent is for the session and how it works. The agent is told to work this way throughout, but what you ask in the conversation comes first.
 - **What it may use**: reading files, creating and changing files, running commands, using the web, and other tools. Leave all of them on, or switch some off.
 - **Skills to favor**: skills the agent loads before it starts when they fit the task (see [Skills](/guide/skills)).
-- **Connections**: connected apps to turn on in its sessions (see [Connections, keys and tools](/guide/connections)).
+- **Connections**: connected accounts to turn on in its sessions (see [Connections, keys and tools](/guide/connections)).
 - **An agent, model and permission mode** to suggest: picked with it on the start page, and still yours to change before you start.
 - **Where its sessions start** when you pick no folder: a new task folder of their own, or the folder shown on the start page.
 
@@ -120,7 +120,7 @@ For a big question that needs many searches, see deep research in [Deep research
 What picking an assistant does on the start page:
 
 - **Agent, model and permissions**: if the assistant suggests an agent, the start page switches to it, with the assistant's model when it names one. If it has a permission mode, the start page's **Permissions** (under **Options**) changes to the matching mode of that agent. You can still change any of them before you start.
-- **Connections**: the connected apps the assistant turns on are on for the new session.
+- **Connections**: the connected accounts the assistant turns on are on for the new session.
 - **Folder**: unless you picked a folder yourself, the assistant decides. Most assistants start in **New task folder**; Coder, and assistants set to "The folder on the start page", use the folder shown.
 
 The start page opens with the assistant you picked last, on any device you use; the very first time, that is General. When the page opens this way, your other picks (agent, model, permissions) stay as you left them; only picking an assistant changes them. If the assistant you picked last has been deleted, General is picked instead.
@@ -140,7 +140,7 @@ From your next message on, the agent works as the new assistant, and the convers
 - The agent is told of the switch with your message (the conversation doesn't show this).
 - **Claude Code and Codex** read their instructions when they start, so when the session is free, its agent starts afresh before your message, with the new assistant's instructions and limits; that message takes a moment longer. In the middle of a turn, or while the agent works towards a goal or has work in the background, it gets the new instructions with your message instead, and starts afresh at a later message, once it is free.
 - **Custom** reads its instructions before each turn. Other agents (Gemini CLI, OpenCode…) get the new assistant's instructions with your message.
-- The connected apps the new assistant turns on are on in the session, in place of the previous one's; what you turned on or off for the session yourself stays. If it has a permission mode, the session switches to the matching mode, and to its model when it suggests the session's own agent. The agent itself stays the same: to move the conversation to another one, see [Continue in another agent](/guide/sessions#continue-in-another-agent).
+- The connected accounts the new assistant turns on are on in the session, in place of the previous one's; what you turned on or off for the session yourself stays. If it has a permission mode, the session switches to the matching mode, and to its model when it suggests the session's own agent. The agent itself stays the same: to move the conversation to another one, see [Continue in another agent](/guide/sessions#continue-in-another-agent).
 
 A session started without an assistant (in VS Code or a terminal, or before assistants came to the app) shows **No assistant** there: pick one to give it one. The session's menu (⋯) → **Session settings** → **Assistant** names it too; clicking it opens [Settings → Assistants](/settings?s=assistants).
 
@@ -175,7 +175,7 @@ The fields, from the top:
   Claude Code, Codex and Custom each have a mode that matches these. Other agents (Gemini CLI, OpenCode…) keep their own.
 - **What it may use**: five switches, all on for a new assistant (see below).
 - **Skills to favor**: skill names, one at a time (see below).
-- **Connections**: shown when you have connected apps (see below).
+- **Connections**: shown when you have connected accounts (see below).
 
 **Cancel** closes the editor without saving.
 
@@ -191,11 +191,11 @@ Each switch covers a kind of tool:
 
 What happens to the ones you switch off depends on the agent:
 
-- **Claude Code and Custom** have those tools switched off. With **Other tools** off, Claude Code gets only the app's own tools and your connected apps, none of the MCP servers you set up yourself.
+- **Claude Code and Custom** have those tools switched off. With **Other tools** off, Claude Code gets only the app's own tools and your connected accounts, none of the MCP servers you set up yourself.
 - **Codex** is told not to use them. With **Use the web** off, its own web search is turned off too. With **Run commands** off but **Read files** on, Codex is told to use its shell only to read and search files, since it reads files through the shell.
 - **Other agents** are told not to use them.
 
-The app's own tools (pages, memory and the like) stay on, except those that fall under a switch you turned off: with **Use the web** off, the app's web search, page reading and browser go too; with **Read files** off, its document reader. Connected apps are not "other tools": the **Connections** below decide those. When a task needs something the assistant can't use, the agent is told to say so instead of working around it.
+The app's own tools (pages, memory and the like) stay on, except those that fall under a switch you turned off: with **Use the web** off, the app's web search, page reading and browser go too; with **Read files** off, its document reader. Connected accounts are not "other tools": the **Connections** below decide those. When a task needs something the assistant can't use, the agent is told to say so instead of working around it.
 
 ### Skills to favor
 
@@ -203,7 +203,7 @@ Type a skill's name and press Enter (or a comma) to add it. The field suggests C
 
 ### Connections
 
-This part shows only when you have connected apps (set up in [Settings → Connections](/settings?s=connections)). Each app has a switch: on means it is on in this assistant's sessions. An app that is already on for every session says "On for every session" instead. If an app the assistant names is no longer connected, it shows as "(not connected)" with a button to remove it. See [Connections, keys and tools](/guide/connections).
+This part shows only when you have connected accounts (set up in [Settings → Connections](/settings?s=connections)). Each one has a switch: on means it is on in this assistant's sessions. One that is already on for every session says "On for every session" instead. If an account the assistant names is no longer connected, it shows as "(not connected)" with a button to remove it. See [Connections, keys and tools](/guide/connections).
 
 ## Change, duplicate or delete an assistant
 

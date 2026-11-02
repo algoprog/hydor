@@ -22,6 +22,31 @@ import { TopicPage } from './TopicPage';
 /** The topic a path shows: /guide/<topic>. */
 const topicOf = (loc: string) => (loc.startsWith('/guide/') ? decodeURIComponent(loc.slice(7).split('/')[0]) : null);
 
+/** Sections renamed since links to them were made, by topic (connected apps became connected accounts, 2 November 2026). */
+const RENAMED: Record<string, Record<string, string>> = {
+  connections: {
+    'find-an-app-in-the-marketplace': 'find-a-service-in-the-marketplace',
+    'connect-an-app': 'connect-a-service',
+    'apps-with-nothing-to-enter': 'services-with-nothing-to-enter',
+    'apps-that-take-a-key': 'services-that-take-a-key',
+    'apps-you-sign-in-to-in-the-browser': 'services-you-sign-in-to-in-the-browser',
+    'apps-that-run-on-this-computer': 'services-that-run-on-this-computer',
+    'check-that-an-app-works': 'check-that-a-connected-account-works',
+    'turn-an-app-or-some-of-its-tools-off': 'turn-an-account-or-some-of-its-tools-off',
+    'disconnect-an-app': 'disconnect-an-account',
+    'choose-the-apps-one-session-uses': 'choose-the-accounts-one-session-uses',
+    'how-agents-use-connected-apps': 'how-agents-use-connected-accounts',
+    'add-an-app-to-the-marketplace': 'add-a-service-to-the-marketplace',
+    'fill-in-a-form-a-connected-app-asks-for': 'fill-in-a-form-a-service-asks-for',
+  },
+  sessions: {
+    'fill-in-forms-from-connected-apps': 'fill-in-forms-a-service-asks-for',
+  },
+  api: {
+    'connections-connected-apps': 'connections-connected-accounts',
+  },
+};
+
 /** Topics renamed since links to them were made: an old address opens the new one, at the same section. */
 const MOVED: Record<string, { to: string; sections: Record<string, string> }> = {
   // Templates became Apps (2 November 2026).
@@ -62,12 +87,13 @@ export function GuidePage() {
   const id = topicOf(loc);
   const topic = topics?.find((t) => t.id === id) ?? null;
 
-  // A renamed topic's old address: the new one, in its place in the history.
+  // A renamed topic's (or section's) old address: the new one, in its place in the history.
   useEffect(() => {
     const m = MOVED[id ?? ''];
-    if (!m) return;
     const h = decodeURIComponent(location.hash.slice(1));
-    go(`/guide/${m.to}${h ? `#${m.sections[h] ?? h}` : ''}`, true);
+    const to = m ? `/guide/${m.to}${h ? `#${m.sections[h] ?? h}` : ''}` : id && RENAMED[id]?.[h] ? `/guide/${id}#${RENAMED[id][h]}` : null;
+    if (!to) return;
+    go(to, true);
     window.dispatchEvent(new Event('naget:hash'));
   }, [id]);
 

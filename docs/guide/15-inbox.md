@@ -18,7 +18,7 @@ Everything an agent is waiting on you for, from every session on this machine, i
 
 - **Approvals**: a command the agent wants to run, a file it wants to change, a tool it wants to use.
 - **Questions** the agent asks you, and **plans** waiting for your approval.
-- **Forms** a connected app asks you to fill in partway through ("Notion asks you to fill in a form"), or a page it asks you to open.
+- **Forms** a service asks you to fill in partway through ("Notion asks you to fill in a form"), or a page it asks you to open.
 - **A browser that needs you**: "Needs you in the browser: …" (to log in or get past a check), "Stopped before paying or ordering: …", or "Wants to open …, on this machine or its network".
 - **A key an agent asked for**: "Asks for a key: OPENWEATHER_KEY", with why it needs it.
 - **A skill an agent suggests**: "Suggests a new skill: …" or "Suggests a change to the … skill", with its reason.
@@ -34,7 +34,7 @@ Approvals, questions and forms show as the same card you see in the session, so 
 - **An approval** shows what the agent wants to do: the command, the change to a file (as a diff), or the tool's input. Click one of its buttons: **Allow**, an "always" choice when the agent offers one (such as **Allow all edits this session** or **Allow for this session**), or **Deny**. Clicking **Deny…** first opens a box, "Optional: tell the agent what to do instead"; write a word to the agent if you like, then click **Deny**.
 - **A plan** (from Claude Code) shows the plan with **Approve, auto-accept edits**, **Approve, ask before edits** and **Keep planning**.
 - **A question** shows its choices: pick one (or several, where allowed), or type your own under **Other — type your own answer**; you can attach a file to an answer. Then click **Send answers**, or **Skip**.
-- **A form from a connected app** shows the app's message and its fields. Fill them in and click **Send**, or **Decline**, or **Not now**. A form with nothing to fill in asks **Allow** instead of **Send**. When the app asks you to open a page, **Open it** opens it in a new tab.
+- **A form from a service** shows the service's message and its fields. Fill them in and click **Send**, or **Decline**, or **Not now**. A form with nothing to fill in asks **Allow** instead of **Send**. When the service asks you to open a page, **Open it** opens it in a new tab.
 
 Once answered, the item leaves the inbox and the agent goes on. What each choice means is explained in [Approve or deny what the agent wants to do](/guide/sessions#approve-or-deny-what-the-agent-wants-to-do) and [Answer questions and approve plans](/guide/sessions#answer-questions-and-approve-plans).
 

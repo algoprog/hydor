@@ -1,38 +1,38 @@
 # Connections, keys and tools
 
-Connect the apps and services you use (Notion, Gmail, GitHub, Stripe, a folder on this computer…) once, and every agent can work with them. Keep API keys and sign-ins in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
+Connect the services you use (Notion, Gmail, GitHub, Stripe, a folder on this computer…) once, and every agent can work with them. Keep API keys and sign-ins in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
 
-![Settings → Connections: apps to connect, by category](images/connections.webp)
+![Settings → Connections: services to connect, by category](images/connections.webp)
 
 ## What connections, keys and tools are
 
 Agents can do more when you give them tools. There are three places to do that:
 
-- **Connections** ([Settings → Connections](/settings?s=connections)): apps and services from a marketplace, connected once for every agent: Claude Code, Codex, Custom and the agents that speak ACP. Each connected app gives the agents its tools.
+- **Connections** ([Settings → Connections](/settings?s=connections)): services from a marketplace, connected once for every agent: Claude Code, Codex, Custom and the agents that speak ACP. Each connected account gives the agents its tools.
 - **The vault** (the **Keys** tab of the same page): API keys, tokens and the passwords of sign-ins. An API key is a password a service gives you so that programs can use your account. Agents use these to call a service, sign in to a site or run a program, but never see them.
 - **MCP servers and plugins** ([Settings → MCP servers](/settings?s=mcp) and [Settings → Plugins](/settings?s=plugins)): tool servers you set up yourself in Claude Code's and Codex's own settings, and add-ons for Claude Code.
 
-MCP (the Model Context Protocol) is the common way an app offers tools to agents. A connected app is an MCP server that Naget Agent sets up and signs in to for every agent. The MCP servers in Settings → Agents are ones you set up by hand, with a command or an address.
+MCP (the Model Context Protocol) is the common way a service offers tools to agents. A connected account is an MCP server that Naget Agent sets up and signs in to for every agent. The MCP servers in Settings → Agents are ones you set up by hand, with a command or an address.
 
 ## Open Connections
 
 Go to [Settings → Capabilities → Connections](/settings?s=connections). It has three tabs:
 
-- **Marketplace**: every app you can connect.
-- **Connected**: the apps you connected, and how each one is doing. The number on the tab counts them.
+- **Marketplace**: every service you can connect.
+- **Connected**: the accounts you connected, and how each one is doing. The number on the tab counts them.
 - **Keys**: the vault. The number on the tab counts your keys.
 
 The page opens on **Connected** when you have connected something, and on **Marketplace** when you haven't. On a phone, Settings is a list of sections: tap **Connections** and it opens on its own page. Dialogs rise from the bottom of the screen.
 
-## Find an app in the marketplace
+## Find a service in the marketplace
 
 Open [the Marketplace tab](/settings?s=connections&find=Marketplace).
 
-- The search box ("Search … apps: mail, Notion, invoices…") looks in names, descriptions, keywords and categories. Every word you type has to match.
-- The chips under it show one category at a time, each with how many apps it has: **All**, **Notes & docs**, **Tasks & projects**, **Mail, chat & meetings**, **Calendar & scheduling**, **Files & storage**, **Design & media**, **Developer tools**, **Cloud & hosting**, **Databases & data**, **Analytics & monitoring**, **Sales, marketing & support**, **Payments & finance**, **Websites & shops**, **Search & the web**, **AI & automation**, **Travel & everyday** and **On this computer**. On a phone they scroll sideways.
-- **Featured**: a row of larger cards for well-known apps (Notion, Linear, GitHub, Figma, Stripe, Zapier…). It shows while you haven't searched or picked a category. **All apps** follows.
+- The search box ("Search … services: mail, Notion, invoices…") looks in names, descriptions, keywords and categories. Every word you type has to match.
+- The chips under it show one category at a time, each with how many services it has: **All**, **Notes & docs**, **Tasks & projects**, **Mail, chat & meetings**, **Calendar & scheduling**, **Files & storage**, **Design & media**, **Developer tools**, **Cloud & hosting**, **Databases & data**, **Analytics & monitoring**, **Sales, marketing & support**, **Payments & finance**, **Websites & shops**, **Search & the web**, **AI & automation**, **Travel & everyday** and **On this computer**. On a phone they scroll sideways.
+- **Featured**: a row of larger cards for well-known services (Notion, Linear, GitHub, Figma, Stripe, Zapier…). It shows while you haven't searched or picked a category. **All services** follows.
 
-Each card shows the app's name, what an agent can do with it, and how it connects:
+Each card shows the service's name, what an agent can do with it, and how it connects:
 
 - **Browser sign-in**: you sign in to your account in the browser.
 - **API key**: you paste a key the service gives you.
@@ -40,7 +40,7 @@ Each card shows the app's name, what an agent can do with it, and how it connect
 - **Runs on this computer**: a program Naget Agent starts here when an agent needs it.
 - **Runs here, with a key**: the same, with a key you give it.
 
-A check mark beside the name means someone checked that the app's server answers as its entry says. **not checked** means nobody has yet. Apps you connected show **Connected** (or **Sign in again**) where the others show **Connect**.
+A check mark beside the name means someone checked that the service's server answers as its entry says. **not checked** means nobody has yet. Services you connected show **Connected** (or **Sign in again**) where the others show **Connect**.
 
 Some of what is there:
 
@@ -54,102 +54,102 @@ Some of what is there:
 - **AI and everyday life**: Hugging Face, Zapier, AllTrails, Kiwi.com, trivago, Strava.
 - **On this computer**: Files on this computer (the folders you choose), Git, Time and a memory graph.
 
-When no app matches, the page says **No app matches**. You can add the app yourself: see [Add an app to the marketplace](/guide/connections#add-an-app-to-the-marketplace). New apps arrive with the app's updates.
+When no service matches, the page says **No service matches**. You can add the service yourself: see [Add a service to the marketplace](/guide/connections#add-a-service-to-the-marketplace). New services arrive with the app's updates.
 
-## Connect an app
+## Connect a service
 
-1. Click the app's card. A dialog shows what it does, its category, how it connects, and **Checked** with a date (or **Address not checked yet**). **Website** and **Docs** link to the service. A box shows where it runs: the server's address, or the command it runs here. It also says that every agent gets the app's tools under the app's short name (Notion's under "notion"), and that you can turn it off per session.
+1. Click the service's card. A dialog shows what it does, its category, how it connects, and **Checked** with a date (or **Address not checked yet**). **Website** and **Docs** link to the service. A box shows where it runs: the server's address, or the command it runs here. It also says that every agent gets the service's tools under its short name (Notion's under "notion"), and that you can turn it off per session.
 2. Read the note in the yellow box, if there is one. It says what to know first, like "Needs uv (uvx) on this computer." or that a service needs your own sign-in client.
-3. Fill in what the dialog asks, then click **Connect**, or **Sign in to** and the app's name.
+3. Fill in what the dialog asks, then click **Connect**, or **Sign in to** and the service's name.
 
-After it connects, the app moves to the **Connected** tab and is tested in the background. What the dialog asks depends on the app.
+After it connects, the service moves to the **Connected** tab and is tested in the background. What the dialog asks depends on the service.
 
-### Apps with nothing to enter
+### Services with nothing to enter
 
 Click **Connect**. Some ask for a setting first. GitLab asks for its address (gitlab.com, unless you run your own). Files on this computer asks for the folders it may use, as full paths, one per line; it can read and change files only inside them. SQLite asks for the database file. Fields marked **optional** can stay empty. **Get one** next to a field links to where you get that value.
 
-### Apps that take a key
+### Services that take a key
 
-An app on the internet has a **Key** field, with **Get a key** linking to the page where the service makes one. An app that runs here asks for its key in one or more fields of its own (a token, a connection string). Paste the key and click **Connect**.
+A service on the internet has a **Key** field, with **Get a key** linking to the page where it makes one. One that runs here asks for its key in one or more fields of its own (a token, a connection string). Paste the key and click **Connect**.
 
 The key goes into the vault, encrypted. From then on you only see its last characters. GitHub, for example, takes a fine-grained personal access token: a key you can limit to the repositories and permissions you want agents to have.
 
-### Apps you sign in to in the browser
+### Services you sign in to in the browser
 
-1. Click **Sign in to** and the app's name.
+1. Click **Sign in to** and the service's name.
 2. On a computer, a small window opens. On a phone, the service's sign-in page opens in the same tab instead.
 3. Sign in and allow access. While you do, the dialog says "Waiting for you to finish signing in…".
-4. When you are done, a notice says the app is connected. On a phone you come back to Settings → Connections.
+4. When you are done, a notice says the account is connected. On a phone you come back to Settings → Connections.
 
 The tokens stay encrypted on this computer and renew by themselves; agents never see them. A sign-in has to be finished within 15 minutes; after that, start again. If you refuse access, you're told "You did not allow access".
 
-Some services only let you sign in through a sign-in client (an OAuth app) of your own: Asana, Box, HubSpot, Slack and Google's apps, for example. Their dialog opens **Your own client ID (this app needs one)**, with what to do. Other browser sign-ins offer the same as **Use your own client ID (optional)**, which also opens by itself when a service turns out not to let apps register on their own.
+Some services only let you sign in through a sign-in client (an OAuth app) of your own: Asana, Box, HubSpot, Slack and Google's apps, for example. Their dialog opens **Your own client ID (this service needs one)**, with what to do. Other browser sign-ins offer the same as **Use your own client ID (optional)**, which also opens by itself when a service turns out not to let apps register on their own.
 
 1. Make the client in the service's developer settings.
 2. Give it the address under **Callback address to give it** (it has a copy button).
 3. Paste its **Client ID**, and its **Client secret** if it has one.
-4. Click **Sign in to** and the app's name.
+4. Click **Sign in to** and the service's name.
 
-### Apps that run on this computer
+### Services that run on this computer
 
-These start a program here (with npx or uvx) for each session's agent. The first test can take a while if the program has to download first. A key such an app needs goes into its environment from the vault when it starts. It never appears on a command line, where other programs could read it.
+These start a program here (with npx or uvx) for each session's agent. The first test can take a while if the program has to download first. A key such a service needs goes into its environment from the vault when it starts. It never appears on a command line, where other programs could read it.
 
-## Check that an app works
+## Check that a connected account works
 
-On the **Connected** tab, each app says how it is:
+On the **Connected** tab, each account says how it is:
 
 - **Working**, when it was last checked, and how many of its tools are on ("12 of 14 tools on").
 - **Not tested yet**.
 - **Needs signing in again**: its sign-in ended and could not renew.
 - **Not working**, with the reason.
 
-**Test** connects to the app the way agents will and lists its tools. A notice says the app works and how many tools it has, or what went wrong: "The key was refused", or "The sign-in was refused: connect again" (the app then shows **Needs signing in again**). Apps are tested by themselves right after you connect them.
+**Test** connects to the service the way agents will and lists its tools. A notice says the account works and how many tools it has, or what went wrong: "The key was refused", or "The sign-in was refused: connect again" (the account then shows **Needs signing in again**). Accounts are tested by themselves right after you connect them.
 
-## Turn an app or some of its tools off
+## Turn an account or some of its tools off
 
-- **Every session** (on a phone, just the switch): when it's on, every session's agent gets the app, unless a session turns it off. When it's off, no session gets it unless that session turns it on. A newly connected app starts on.
-- **Tools**: once a test has listed an app's tools, this button opens them, each with a switch and what it does. Turn off the ones agents should not use, such as deleting or sending. An agent that tries a tool you turned off is told it is off.
+- **Every session** (on a phone, just the switch): when it's on, every session's agent gets the account, unless a session turns it off. When it's off, no session gets it unless that session turns it on. A newly connected account starts on.
+- **Tools**: once a test has listed an account's tools, this button opens them, each with a switch and what it does. Turn off the ones agents should not use, such as deleting or sending. An agent that tries a tool you turned off is told it is off.
 
 ## Change a connection or sign in again
 
-- **Change** (for apps with a key or settings) opens the dialog again with what you entered. Settings keep their values. The key and secret fields say "Saved: leave empty to keep it": type a new one to replace it, then click **Save**.
-- **Sign in again** (for browser sign-ins) signs in afresh. When an app shows **Needs signing in again**, agents stop getting it until you do.
+- **Change** (for accounts with a key or settings) opens the dialog again with what you entered. Settings keep their values. The key and secret fields say "Saved: leave empty to keep it": type a new one to replace it, then click **Save**.
+- **Sign in again** (for browser sign-ins) signs in afresh. When an account shows **Needs signing in again**, agents stop getting it until you do.
 
-If the marketplace changes an app's address or how it signs in after you connected it, the app says "The catalog has a new address or sign-in for it. It keeps using the old one until you connect again." Your key or sign-in never goes to a new address until you connect again yourself.
+If the marketplace changes a service's address or how it signs in after you connected it, the account says "The catalog has a new address or sign-in for it. It keeps using the old one until you connect again." Your key or sign-in never goes to a new address until you connect again yourself.
 
-## Disconnect an app
+## Disconnect an account
 
-Click **Disconnect** (an unplug icon on a phone) and confirm. The app's sign-in or key is deleted here, and agents stop getting its tools. For a browser sign-in, Naget Agent also tells the service that the tokens are no longer wanted, when the service offers a way to.
+Click **Disconnect** (an unplug icon on a phone) and confirm. The account's sign-in or key is deleted here, and agents stop getting its tools. For a browser sign-in, Naget Agent also tells the service that the tokens are no longer wanted, when the service offers a way to.
 
-## Choose the apps one session uses
+## Choose the accounts one session uses
 
-Every session gets the connected apps whose **Every session** switch is on. To change that for one session:
+Every session gets the connected accounts whose **Every session** switch is on. To change that for one session:
 
-1. Open the session's menu (⋯) → **Session settings** → **Connected apps**.
-2. Turn apps on or off for this session. Each app says where it stands: "On, as in every session", "Off, as in every session", "On here only" or "Off here only".
+1. Open the session's menu (⋯) → **Session settings** → **Connected accounts**.
+2. Turn accounts on or off for this session. Each one says where it stands: "On, as in every session", "Off, as in every session", "On here only" or "Off here only".
 3. Click **Done**.
 
-Apps on the internet follow the change at once. Apps that run on this computer follow it when the agent next starts. With nothing connected yet, the dialog offers **Open Settings → Connections**.
+Services on the internet follow the change at once. Those that run on this computer follow it when the agent next starts. With nothing connected yet, the dialog offers **Open Settings → Connections**.
 
-An assistant can also turn apps on for the sessions that start as it: see [Assistants](/guide/assistants).
+An assistant can also turn accounts on for the sessions that start as it: see [Assistants](/guide/assistants).
 
-## How agents use connected apps
+## How agents use connected accounts
 
-- Every kind of agent gets a connected app the same way: Claude Code, Codex, Custom and the ACP agents get its tools under the app's short name.
-- At the start of a session, the agent is told which of your apps are connected and to use them when a task involves them. It can also list what is connected and which keys are saved, by name only.
-- An agent only gets the apps that are on for its session and signed in. Sign-ins renew in the background, even for apps no session is using, so long sessions keep working.
-- Keys and tokens never go into an agent's settings or command line. Known key values are masked in whatever the app's tools send back.
-- The search box (Ctrl+K, ⌘K on a Mac) finds your connected apps too.
+- Every kind of agent gets a connected account the same way: Claude Code, Codex, Custom and the ACP agents get its tools under the service's short name.
+- At the start of a session, the agent is told which of your accounts are connected and to use them when a task involves them. It can also list what is connected and which keys are saved, by name only.
+- An agent only gets the accounts that are on for its session and signed in. Sign-ins renew in the background, even for accounts no session is using, so long sessions keep working.
+- Keys and tokens never go into an agent's settings or command line. Known key values are masked in whatever the service's tools send back.
+- The search box (Ctrl+K, ⌘K on a Mac) finds your connected accounts too.
 
-## Add an app to the marketplace
+## Add a service to the marketplace
 
-Anyone can add an app to the marketplace, or fix one, with a pull request to Naget Agent's repository on GitHub. **How to add one**, at the bottom of the Marketplace tab, opens the guide for it.
+Anyone can add a service to the marketplace, or fix one, with a pull request to Naget Agent's repository on GitHub. **How to add one**, at the bottom of the Marketplace tab, opens the guide for it.
 
-1. Write a small JSON file for the app in the repository's `catalog/` folder, as the guide there describes. It holds the app's name, one plain sentence on what an agent can do with it, its category, icon and colour, homepage and docs, its server (an address, or a command that runs here) and how it signs in (nothing, a browser sign-in, or a key), plus any fields people fill in.
+1. Write a small JSON file for the service in the repository's `catalog/` folder, as the guide there describes. It holds the service's name, one plain sentence on what an agent can do with it, its category, icon and colour, homepage and docs, its server (an address, or a command that runs here) and how it signs in (nothing, a browser sign-in, or a key), plus any fields people fill in.
 2. Use the service's own MCP server at its documented address when there is one. A program that runs here is welcome when there is no such server, or for things only a local one can do, like files on this computer.
 3. Put no keys or tokens in the file. People enter their own, into the vault.
 4. Run the check the guide describes. It tests the file against the rules and can ask the server how it answers.
-5. Send the pull request. Once it is merged, the app reaches everyone's marketplace with the next update.
+5. Send the pull request. Once it is merged, the service reaches everyone's marketplace with the next update.
 
 ## Keep keys in the vault
 
@@ -235,15 +235,15 @@ Some work needs a password or a token in a program on this computer: pushing to 
 - A command can do anything a program can, sending the key elsewhere included: allow only commands you understand, and turn this on only for keys a program here needs.
 - A command stops after two minutes, unless the agent gives it longer (up to ten).
 
-## Fill in a form a connected app asks for
+## Fill in a form a service asks for
 
-Some apps need something from you partway through a task: a date, a choice, a yes or no, or a page to open. Whichever agent is working, the request shows as a card in the session, beside the agent's own approvals, and in the [Inbox](/guide/inbox). The card's title says what the app wants:
+Some services need something from you partway through a task: a date, a choice, a yes or no, or a page to open. Whichever agent is working, the request shows as a card in the session, beside the agent's own approvals, and in the [Inbox](/guide/inbox). The card's title says what the service wants:
 
-- **…asks you to fill in a form**: the app's message, then its fields, as a form. There are text boxes, longer text, numbers, dates, a switch for yes or no, and chips or a list to pick from (chips you can pick several of, when the app allows more than one). Click **Send**. Empty fields it needs ("Needed") and numbers that aren't numbers are marked before anything goes. An answer the app can't take (too long, not an email address, too few picked) is refused with what to fix, and the card stays.
-- **…asks you to open a page**: a link. **Open it** opens the page in a new tab (to approve something or sign in there) and tells the app you did.
+- **…asks you to fill in a form**: the service's message, then its fields, as a form. There are text boxes, longer text, numbers, dates, a switch for yes or no, and chips or a list to pick from (chips you can pick several of, when the service allows more than one). Click **Send**. Empty fields it needs ("Needed") and numbers that aren't numbers are marked before anything goes. An answer the service can't take (too long, not an email address, too few picked) is refused with what to fix, and the card stays.
+- **…asks you to open a page**: a link. **Open it** opens the page in a new tab (to approve something or sign in there) and tells the service you did.
 - **…asks to go ahead**: a plain yes or no. **Allow** says yes.
 
-**Decline** says no. **Not now** cancels this time. A connected app's card waits up to an hour; if the agent's turn ends first, the request is cancelled. MCP servers you set up for Codex ask in the same kind of card.
+**Decline** says no. **Not now** cancels this time. A service's card waits up to an hour; if the agent's turn ends first, the request is cancelled. MCP servers you set up for Codex ask in the same kind of card.
 
 ## Set up MCP servers for Claude Code and Codex
 
@@ -332,7 +332,7 @@ Naget Agent asks Claude Code for the list of plugins at most every 10 minutes, a
 
 Agents can do these for you, with your OK on a card. They never type a key's value into the app: for a key or a sign-in, they show the card where you enter it.
 
-- "Which apps are connected? Test Notion and tell me if it works."
+- "Which accounts are connected? Test Notion and tell me if it works."
 - "Connect Context7 so agents can look up library docs."
 - "Turn Gmail off for every session, but keep it on in this one."
 - "Show me Notion's tools and turn off the ones that delete pages."

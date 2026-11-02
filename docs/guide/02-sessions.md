@@ -44,7 +44,7 @@ Whether a session gets a new task folder by default depends on the assistant: mo
 
 ### Pick an assistant
 
-**Assistant** sets what the session starts as: **General** (the first time), **Researcher**, **Writer**, **Coder**, **Tutor**, **Planner**, **Analyst**, **App builder**, or one of yours under **Yours**. Point at one to read what it does and which agent and model it uses. Picking one can also set the agent, model and permissions it suggests, and turn on its connected apps. **Make or change assistants** opens [Settings → Assistants](/settings?s=assistants). See [Assistants](/guide/assistants).
+**Assistant** sets what the session starts as: **General** (the first time), **Researcher**, **Writer**, **Coder**, **Tutor**, **Planner**, **Analyst**, **App builder**, or one of yours under **Yours**. Point at one to read what it does and which agent and model it uses. Picking one can also set the agent, model and permissions it suggests, and turn on its connected accounts. **Make or change assistants** opens [Settings → Assistants](/settings?s=assistants). See [Assistants](/guide/assistants).
 
 ### Options: effort, permissions and more
 
@@ -186,9 +186,9 @@ When the question comes as an approval card instead, its buttons are **Send answ
 
 **Plans.** In Claude Code's **Plan** mode the agent reads and plans, then shows its plan in a card: **Approve, auto-accept edits** (go ahead, editing without asking), **Approve, ask before edits**, or **Keep planning** (it stays in Plan; tell it what to change). In Codex's Plan mode, Codex discusses and plans first and can ask you clarifying questions. Custom's Plan mode ends with a numbered plan; switch the permissions (Shift+Tab) and reply to have it carried out.
 
-## Fill in forms from connected apps
+## Fill in forms a service asks for
 
-When a connected app needs something from you partway through a task (a date, a choice, a page to approve on), its form shows as a card, whichever agent is working: "Linear asks you to fill in a form", "… asks you to open a page" or "… asks to go ahead". Fill in the fields and press **Send** (or **Open it**, which opens the page, or **Allow**), or press **Decline** or **Not now**. Codex's own tool servers ask the same way. See [Connections, keys and tools](/guide/connections).
+When a service you connected needs something from you partway through a task (a date, a choice, a page to approve on), its form shows as a card, whichever agent is working: "Linear asks you to fill in a form", "… asks you to open a page" or "… asks to go ahead". Fill in the fields and press **Send** (or **Open it**, which opens the page, or **Allow**), or press **Decline** or **Not now**. Codex's own tool servers ask the same way. See [Connections, keys and tools](/guide/connections).
 
 ## Message the agent while it works
 
@@ -375,7 +375,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - **Session settings** (a submenu):
   - **Memory**, with **On** or **Off** beside it: turns memory on or off for this session ("Off for all" when memory is off in Settings). See [Memory](/guide/memory).
   - **Spending cap**, with the cap beside it: set, change or raise it. See [Usage, limits and costs](/guide/usage).
-  - **Connected apps**: turn each connected app on or off for this session only. See [Connections, keys and tools](/guide/connections).
+  - **Connected accounts**: turn each connected account on or off for this session only. See [Connections, keys and tools](/guide/connections).
   - **Assistant**, with its name beside it: opens Settings → Assistants (sessions with an assistant). The message box switches it.
 - **More** (a submenu):
   - **Open a browser** / **Show the browser**: the agents' browser for this session, which you can watch and take over. See [Search and the browser](/guide/web).

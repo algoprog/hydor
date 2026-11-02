@@ -50,7 +50,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['memory', 'Memory', 'Capabilities', 'What agents remember about you, your projects and each session, and when it was written'],
   ['children', 'Child sessions', 'Capabilities', 'Agents handing parts of a job to other agents, and swarms for hard problems'],
   ['images', 'Images', 'Capabilities', 'Pictures agents make for you, with an image model through OpenRouter'],
-  ['connections', 'Connections', 'Capabilities', 'Apps every agent can use, from a marketplace anyone can add to, and a vault for keys'],
+  ['connections', 'Connections', 'Capabilities', 'Services every agent can use, from a marketplace anyone can add to, and a vault for keys'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
   ['assistants', 'Assistants', 'Capabilities', 'Presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go'],
   ['skillpack', 'Skill library', 'Capabilities', 'Skills that come with the app, and the ones agents learned with your approval'],
@@ -168,7 +168,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['images', 'Making images', 'image generation pictures openrouter', 'Let agents make images'],
   ['images', 'Image model', 'image model flux openrouter', 'The model that makes them'],
   // Capabilities › Connections
-  ['connections', 'Marketplace', 'connections apps marketplace notion linear github google', 'Apps every agent can use, to connect once', 'Connections marketplace'],
+  ['connections', 'Marketplace', 'connections apps services accounts marketplace notion linear github google', 'Services every agent can use, to connect once', 'Connections marketplace'],
   ['connections', 'Add a key', 'api key secret vault token password sign-in login credentials', 'A key agents can use without seeing it', 'Add a key to the vault'],
   // Capabilities › Voice
   ['voice', 'Dictation', 'speech to text dictate microphone voice input', 'Speak a message instead of typing it'],

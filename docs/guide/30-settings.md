@@ -197,9 +197,9 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Connections
 
-[Settings → Connections](/settings?s=connections): apps every agent can use, from a marketplace anyone can add to, and a vault for keys. More in [Connections, keys and tools](/guide/connections).
+[Settings → Connections](/settings?s=connections): services every agent can use, from a marketplace anyone can add to, and a vault for keys. More in [Connections, keys and tools](/guide/connections).
 
-- [**Marketplace**](/settings?s=connections&find=Marketplace): Apps every agent can use, to connect once.
+- [**Marketplace**](/settings?s=connections&find=Marketplace): Services every agent can use, to connect once.
 - [**Add a key**](/settings?s=connections&find=Add%20a%20key): A key agents can use without seeing it.
 
 ### Voice

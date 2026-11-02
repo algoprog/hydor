@@ -396,7 +396,7 @@ const PAID = new Set('payment order charge invoice transfer payout subscription 
 /** Why an MCP call needs the user's say: it sends or posts something, or spends money. */
 function mcpRisk(full: string): string | null {
   const m = /^mcp__(.+?)__(.+)$/.exec(full);
-  const server = m?.[1] ?? 'a connected app';
+  const server = m?.[1] ?? 'a connected account';
   const w = words(m?.[2] ?? full);
   const verb = w[0] ?? '';
   if (w.some((x) => PAY.has(x)) || (['create', 'place', 'submit', 'send', 'make'].includes(verb) && w.some((x) => PAID.has(x)))) return `may spend money (${server})`;

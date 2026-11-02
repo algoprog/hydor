@@ -47,7 +47,7 @@ function launchSpec(d: Deps, token: string, app: string): { status: number; body
   const live = runId ? d.sessions.liveByRun(runId) : null;
   if (!runId || !live) return { status: 404, body: { error: 'No session runs with that address' } };
   const c = connection(d.db, app);
-  if (!c || c.entry.server.transport !== 'stdio') return { status: 404, body: { error: 'That app is not connected here' } };
+  if (!c || c.entry.server.transport !== 'stdio') return { status: 404, body: { error: 'That service is not connected here' } };
   if (!onFor(c, sessionExtra(d.db, live.key))) return { status: 403, body: { error: `${c.entry.name} is turned off for this session` } };
   const lc = localCommand(d.db, c);
   const f = toolFilter(c);
@@ -222,7 +222,7 @@ export function relayRoutes(d: Deps) {
     };
     const fail = (message: string) => out(asked.map((m) => ({ jsonrpc: '2.0', id: m.id, error: { code: -32000, message } })));
     const c = connection(d.db, String((req.params as { app: string }).app));
-    if (!c || c.entry.server.transport === 'stdio') return fail('That app is not connected here');
+    if (!c || c.entry.server.transport === 'stdio') return fail('That service is not connected here');
     if (!onFor(c, sessionExtra(d.db, run.key))) return fail(`${c.entry.name} is turned off for this session`);
     if (c.status === 'signin') return fail(`${c.entry.name} needs connecting again (Settings → Connections)`);
     // Calls to tools that are off are answered here; the rest go to the app.
@@ -289,7 +289,7 @@ export function relayRoutes(d: Deps) {
     if (socketFile || !runFor(d, req)) return reply.code(404).send({ error: 'No session runs with that address' });
     const p = req.params as { token: string; app: string };
     const c = connection(d.db, p.app);
-    if (!c) return reply.code(404).send({ error: 'That app is not connected here' });
+    if (!c) return reply.code(404).send({ error: 'That service is not connected here' });
     const ac = new AbortController();
     reply.raw.once('close', () => ac.abort());
     return askForm(d, runOf(p.token)!, c.entry.name, (req.body ?? {}) as Record<string, unknown>, ac.signal);

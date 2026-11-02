@@ -365,7 +365,7 @@ function EditAssistant({ value, onClose }: { value: Draft | null; onClose: () =>
           <NameList value={d.skills ?? []} onChange={(v) => set({ skills: v })} suggestions={skills} placeholder="Add a skill" />
         </Field>
         {!!(conns?.length || d.connections?.length) && (
-          <Field label="Connections" hint="Apps from Settings → Connections to turn on in its sessions.">
+          <Field label="Connections" hint="Connected accounts (Settings → Connections) to turn on in its sessions.">
             <div className="divide-y divide-line rounded-xl border border-line">
               {(conns ?? []).map((c) => (
                 <div key={c.id} className="flex items-center gap-3 px-3 py-2">

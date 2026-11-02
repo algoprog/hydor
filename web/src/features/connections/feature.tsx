@@ -19,7 +19,7 @@ export const connectionsFeature: WebFeature = {
       id: 'connections',
       label: 'Connections',
       icon: PlugZap,
-      sub: 'Apps every agent can use, from a marketplace anyone can add to, and a vault for keys',
+      sub: 'Services every agent can use, from a marketplace anyone can add to, and a vault for keys',
       Body: ConnectionsSettings,
     },
   ],

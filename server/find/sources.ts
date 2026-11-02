@@ -85,7 +85,7 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
     case 'pages':
       return listPages(db).map((p) => ({ id: `page:${p.id}`, text: text(p.title, 'A page') }));
     case 'connections':
-      return connections(db).map((c) => ({ id: `conn:${c.id}`, text: text(connectionView(db, c).name, 'A connected app', c.entry.name, c.entry.description) }));
+      return connections(db).map((c) => ({ id: `conn:${c.id}`, text: text(connectionView(db, c).name, 'A connected account', c.entry.name, c.entry.description) }));
   }
 }
 

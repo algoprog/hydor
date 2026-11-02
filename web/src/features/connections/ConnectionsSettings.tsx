@@ -108,7 +108,7 @@ function Marketplace({ onOpen }: { onOpen: (a: CatalogApp) => void }) {
     <div className="space-y-4">
       <div className="relative">
         <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${apps.length} apps: mail, Notion, invoices…`} className={cx(inputCls, 'pl-9 text-[16px] sm:text-[14px]')} type="search" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${apps.length} services: mail, Notion, invoices…`} className={cx(inputCls, 'pl-9 text-[16px] sm:text-[14px]')} type="search" />
       </div>
       <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
         {(['all', ...Object.keys(CONNECTION_CATEGORIES)] as const)
@@ -140,7 +140,7 @@ function Marketplace({ onOpen }: { onOpen: (a: CatalogApp) => void }) {
         </div>
       )}
       <div>
-        {featured.length > 0 && <div className="mb-2 text-[12.5px] font-medium text-fg-3">All apps</div>}
+        {featured.length > 0 && <div className="mb-2 text-[12.5px] font-medium text-fg-3">All services</div>}
         {shown.length ? (
           <div className="grid gap-2.5 md:grid-cols-2 2xl:grid-cols-3">
             {shown.map((a) => (
@@ -148,7 +148,7 @@ function Marketplace({ onOpen }: { onOpen: (a: CatalogApp) => void }) {
             ))}
           </div>
         ) : (
-          <Empty icon={<Search size={20} />} title="No app matches">
+          <Empty icon={<Search size={20} />} title="No service matches">
             Try other words, or add it to the catalog yourself (below).
           </Empty>
         )}
@@ -156,7 +156,7 @@ function Marketplace({ onOpen }: { onOpen: (a: CatalogApp) => void }) {
       <div className="flex gap-3 rounded-2xl border border-dashed border-line-2 px-4 py-3.5 text-[13px] leading-relaxed text-fg-2">
         <GitPullRequest size={17} className="mt-0.5 shrink-0 text-fg-3" />
         <div>
-          Missing an app? Anyone can add one: a small JSON file in the <code className="rounded bg-bg-2 px-1 font-mono text-[12px]">catalog/</code> folder of Naget Agent’s repository, sent as a pull request.{' '}
+          Missing a service? Anyone can add one: a small JSON file in the <code className="rounded bg-bg-2 px-1 font-mono text-[12px]">catalog/</code> folder of Naget Agent’s repository, sent as a pull request.{' '}
           <a href={REPO_CATALOG} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
             How to add one <ExternalLink size={11} />
           </a>
@@ -274,7 +274,7 @@ function Connected({ onBrowse, onReconnect }: { onBrowse: () => void; onReconnec
     return (
       <Section>
         <Empty icon={<PlugZap size={20} />} title="Nothing connected yet">
-          <p>Connect an app once, and every agent can use it: Claude Code, Codex, other agents and Custom.</p>
+          <p>Connect an account once, and every agent can use it: Claude Code, Codex, other agents and Custom.</p>
           <Button className="mt-3" variant="primary" size="sm" icon={<Store size={14} />} onClick={onBrowse}>
             Browse the marketplace
           </Button>
@@ -282,7 +282,7 @@ function Connected({ onBrowse, onReconnect }: { onBrowse: () => void; onReconnec
       </Section>
     );
   return (
-    <Section title="Connected apps" sub="Every agent gets the ones that are on. A session can turn an app off (or on) for itself from its menu.">
+    <Section title="Connected accounts" sub="Every agent gets the ones that are on. A session can turn one off (or on) for itself from its menu.">
       <div className="-my-3.5 divide-y divide-line">
         {connections.map((c) => (
           <ConnectedApp key={c.id} c={c} onReconnect={() => onReconnect(apps?.find((a) => a.id === c.id) ?? c.app)} />

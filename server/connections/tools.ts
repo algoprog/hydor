@@ -304,7 +304,7 @@ const LIST_CONNECTIONS: RunTool = {
   name: 'list_connections',
   annotations: { readOnlyHint: true },
   description:
-    'What is connected here: the apps whose tools you have (by MCP server name) and those turned off for this session, and the keys in the vault with where each may be used (hosts, commands on this computer). Names only, never values.',
+    'What is connected here: the connected accounts whose tools you have (by MCP server name) and those turned off for this session, and the keys in the vault with where each may be used (hosts, commands on this computer). Names only, never values.',
   inputSchema: { type: 'object', properties: {} },
   async run(_a, ctx) {
     const db = ctx.deps.db;
@@ -314,14 +314,14 @@ const LIST_CONNECTIONS: RunTool = {
     const on = apps.filter((c) => onFor(c, extra));
     const off = apps.filter((c) => !onFor(c, extra));
     if (on.length) {
-      out.push('Connected apps (their tools come from the MCP server of the same name):');
+      out.push('Connected accounts (their tools come from the MCP server of the same name):');
       for (const c of on) {
         const tools = c.tools?.filter((t) => toolOn(c, t.name)).map((t) => t.name);
         const state = c.status === 'signin' ? ' — needs the user to connect it again (Settings → Connections)' : c.status === 'error' ? ` — not working: ${c.error ?? 'unknown error'}` : '';
         out.push(`- ${c.id}: ${c.entry.name}, ${c.entry.description}${tools?.length ? ` Tools: ${tools.slice(0, 40).join(', ')}${tools.length > 40 ? '…' : ''}.` : ''}${isRemote(c.entry) ? '' : ' (runs on this computer)'}${state}`);
       }
-    } else out.push('No apps are connected for this session. The user connects them in Settings → Connections.');
-    if (off.length) out.push('', `Off for this session (the user can turn them on in the session's menu, under Session settings → Connected apps): ${off.map((c) => `${c.id} (${c.entry.name})`).join(', ')}.`);
+    } else out.push('No accounts are connected for this session. The user connects them in Settings → Connections.');
+    if (off.length) out.push('', `Off for this session (the user can turn them on in the session's menu, under Session settings → Connected accounts): ${off.map((c) => `${c.id} (${c.entry.name})`).join(', ')}.`);
     const keys = listSecrets(db);
     out.push('');
     if (keys.length) {

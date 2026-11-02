@@ -16,7 +16,7 @@ const useOpen = create<{ key: string | null; set: (k: string | null) => void }>(
 export function SessionAppsItem({ s, close }: { s: SessionSummary; close: () => void }) {
   return (
     <MenuItem icon={<PlugZap size={15} />} onClick={() => (close(), useOpen.getState().set(s.key))}>
-      Connected apps
+      Connected accounts
     </MenuItem>
   );
 }
@@ -47,7 +47,7 @@ export function SessionAppsDialog({ s }: { s: SessionSummary }) {
     <Dialog
       open
       onClose={close}
-      title="Connected apps in this session"
+      title="Connected accounts in this session"
       width={460}
       footer={
         <Button variant="primary" onClick={close}>
@@ -59,7 +59,7 @@ export function SessionAppsDialog({ s }: { s: SessionSummary }) {
         <Throbber className="text-fg-3" />
       ) : !list.length ? (
         <div className="space-y-3 text-[13.5px] leading-relaxed text-fg-2">
-          <p>No apps are connected yet. Connect one once in Settings, and every agent can use it.</p>
+          <p>No accounts are connected yet. Connect one once in Settings, and every agent can use it.</p>
           <Button size="sm" variant="secondary" onClick={() => (close(), go('/settings?s=connections'))}>
             Open Settings → Connections
           </Button>
@@ -81,7 +81,7 @@ export function SessionAppsDialog({ s }: { s: SessionSummary }) {
               );
             })}
           </div>
-          <p className="text-[12px] leading-snug text-fg-3">Apps over the internet follow at once. Apps that run on this computer follow when the agent next starts.</p>
+          <p className="text-[12px] leading-snug text-fg-3">Services over the internet follow at once. Those that run on this computer follow when the agent next starts.</p>
         </div>
       )}
     </Dialog>

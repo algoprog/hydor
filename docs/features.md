@@ -30,7 +30,7 @@ Every agent here gets the same help from the app, whatever its model: Claude Cod
 agents that speak ACP and take MCP servers.
 
 - **Assistants**: start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or App builder (it makes
-  apps), or one of your own (its instructions, model, tools and connected apps; import Claude Code's agent
+  apps), or one of your own (its instructions, model, tools and connected accounts; import Claude Code's agent
   files), and switch to another in the session's message box when the work changes. A task without a folder gets
   one of its own (`~/Naget/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,

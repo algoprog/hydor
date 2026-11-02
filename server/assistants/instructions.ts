@@ -19,7 +19,7 @@ const DOING: Record<ToolKind, string> = {
   edit: 'create or change files',
   run: 'run commands or programs',
   web: 'use the web',
-  mcp: 'use other tools (MCP servers and plugins beyond the app’s own and the connected apps)',
+  mcp: 'use other tools (MCP servers and plugins beyond the app’s own and the connected accounts)',
 };
 
 const or = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`);

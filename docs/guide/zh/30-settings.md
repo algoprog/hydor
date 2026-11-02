@@ -197,9 +197,9 @@
 
 ### 连接
 
-[设置 → 连接](/settings?s=connections)：每个智能体都能使用的应用（来自人人都能添加的市场），以及存放密钥的保险库。详见[连接、密钥和工具](/guide/connections)。
+[设置 → 连接](/settings?s=connections)：每个智能体都能使用的服务（来自人人都能添加的市场），以及存放密钥的保险库。详见[连接、密钥和工具](/guide/connections)。
 
-- [**市场**](/settings?s=connections&find=Marketplace)：每个智能体都能使用的应用，只需连接一次。
+- [**市场**](/settings?s=connections&find=Marketplace)：每个智能体都能使用的服务，只需连接一次。
 - [**添加密钥**](/settings?s=connections&find=Add%20a%20key)：智能体可以使用但看不到的密钥。
 
 ### 语音
