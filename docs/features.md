@@ -114,12 +114,13 @@ agents that speak ACP and take MCP servers.
   repeat over a list or until something holds, branches side by side, another template, its own data, a question
   to you that it waits for, a program in JavaScript, TypeScript or Python in a sandbox, which can be the whole
   flow: its ctx calls to models, agents, tools, people, its data and other templates are steps of the run, kept
-  and replayed after a restart), each handing typed values to the next, laid out in its Edit (steps added from a
-  short menu, values put in from the form and the steps before, checks shown as you go, and a graph of nodes and
-  wires to build in on a computer: a step's settings beside it, a + on a wire, values wired by dragging from one
-  step to another or into empty space for a new step, nodes placed by hand or laid out by Tidy, groups with
-  notes, full screen, and Try it there: steps lighting up as a test run goes, what each value's wire carried,
-  pausing before a step to go on or take one step, and frozen steps that give what they gave in the last try; and
+  and replayed after a restart, and values worked out at once and at no cost: the first, a count, a sum, a field
+  of each, a join, a sort), each handing typed values to the next, laid out in its Edit (steps added from a short
+  menu, values put in from the form and the steps before, checks shown as you go, and a graph of nodes and wires
+  to build in on a computer: a step's settings beside it, a + on a wire, values wired by dragging from one step
+  to another or into empty space for a new step, nodes placed by hand or laid out by Tidy, groups with notes,
+  full screen, and Try it there: steps lighting up as a test run goes, what each value's wire carried, pausing
+  before a step to go on or take one step, and frozen steps that give what they gave in the last try; and
   Collapse to a block, steps that follow one another made a template of their own, called in their place, which
   other templates can call too) or by an agent, shown step by step on the run's page, run again from any step
   there (the steps before it giving what they gave, also from a test run in its Edit) and resumed after a

@@ -16,9 +16,9 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from '../../shared/apps.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
-import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
-import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step } from '../../shared/app-manifest.ts';
-import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
+import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, readDate, readNumber } from '../../shared/apps.ts';
+import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
+import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, order, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
@@ -195,7 +195,7 @@ async function runList(x: Exec, steps: Step[], scope: Scope, prefix: string) {
   for (const s of steps) await runOne(x, s, scope, prefix);
 }
 
-const LEAF = new Set(['agent', 'model', 'tool', 'app', 'data', 'ask', 'code']);
+const LEAF = new Set(['agent', 'model', 'tool', 'app', 'data', 'ask', 'code', 'value']);
 
 function record(x: Exec, at: string, s: Step, p: Partial<StepRecord>) {
   const prev = getStep(db(), x.run.id, at);
@@ -279,6 +279,8 @@ async function body(x: Exec, s: Step, scope: Scope, prefix: string, at: string, 
       return askStep(x, s, scope, at, before);
     case 'code':
       return codeStep(x, s, scope, at);
+    case 'value':
+      return valueStep(s, scope);
     case 'decide':
       return decideStep(x, s, scope, prefix, at, before, cost);
     case 'repeat':
@@ -374,6 +376,56 @@ async function codeStep(x: Exec, s: CodeStep, scope: Scope, at: string): Promise
     onCall: (kind, args) => ctxCall(x, scope, at, ++n, kind, args),
   });
   return out.values;
+}
+
+/** A value worked out from another, at once and at no cost (Work out a value). */
+export function valueStep(s: ValueStep, scope: Scope): Record<string, unknown> {
+  const v = valueOf(s.of, scope);
+  // Text goes by lines; one value alone is a list of one.
+  const list: unknown[] = Array.isArray(v) ? v : typeof v === 'string' ? v.split('\n').map((l) => l.trim()).filter(Boolean) : v === null || v === undefined ? [] : [v];
+  const field = (x: unknown) => (s.arg && x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>)[s.arg.replace(/^[-+]/, '')] : x);
+  const nums = () => list.map((x) => readNumber(field(x) as string | number)).filter((n): n is number => n !== null);
+  const round = (n: number) => Math.round(n * 1e6) / 1e6;
+  switch (s.op) {
+    case 'first':
+      return { value: list[0] ?? null };
+    case 'last':
+      return { value: list.at(-1) ?? null };
+    case 'count':
+      return { value: list.length };
+    case 'sum':
+      return { value: round(nums().reduce((a, b) => a + b, 0)) };
+    case 'average': {
+      const n = nums();
+      return { value: n.length ? round(n.reduce((a, b) => a + b, 0) / n.length) : null };
+    }
+    case 'min':
+    case 'max': {
+      const n = nums();
+      return { value: n.length ? (s.op === 'min' ? Math.min(...n) : Math.max(...n)) : null };
+    }
+    case 'pick':
+      return { value: list.map((x) => (x && typeof x === 'object' && !Array.isArray(x) ? ((x as Record<string, unknown>)[s.arg ?? ''] ?? null) : null)) };
+    case 'join':
+      return { value: list.map((x) => asText(x, 100_000)).join((s.arg ?? ', ').replace(/\\n/g, '\n')) };
+    case 'unique': {
+      const seen = new Set<string>();
+      return { value: list.filter((x) => !seen.has(JSON.stringify(x)) && !!seen.add(JSON.stringify(x))) };
+    }
+    case 'sort': {
+      const desc = s.arg?.startsWith('-') ? -1 : 1;
+      return { value: [...list].sort((a, b) => desc * (order(field(a), field(b)) ?? String(field(a) ?? '').localeCompare(String(field(b) ?? '')))) };
+    }
+    case 'number':
+      return { value: readNumber((Array.isArray(v) ? v[0] : v) as string | number) };
+    case 'date': {
+      const today = String(scope.vars.today ?? new Date().toISOString().slice(0, 10));
+      const from = (v !== null && v !== undefined && v !== '' ? readDate(String(Array.isArray(v) ? v[0] : v)) : null) ?? today;
+      const d = new Date(`${from}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + (Number(s.arg) || 0));
+      return { value: d.toISOString().slice(0, 10) };
+    }
+  }
 }
 
 /** A call through ctx as a step: its kind, and what it is given, in a step's own words (its values by {{name}}). */

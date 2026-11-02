@@ -31,6 +31,7 @@ export const STEP_KINDS = [
   { value: 'data', label: 'Keep data', hint: 'Add, find, change or remove records the app keeps' },
   { value: 'ask', label: 'Ask a person', hint: 'Waits for your answer: yes or no, or a short form' },
   { value: 'code', label: 'Run code', hint: 'A program in JavaScript, TypeScript or Python, in a sandbox: it can ask models and agents too' },
+  { value: 'value', label: 'Work out a value', hint: 'The first item, a count, a sum, values joined, a field of each…: at once, at no cost' },
 ] as const;
 export type StepKind = (typeof STEP_KINDS)[number]['value'];
 
@@ -189,7 +190,39 @@ export interface CodeStep extends StepCommon {
   outputs?: AnswerField[];
 }
 
-export type Step = AgentStep | ModelStep | ToolStep | DecideStep | RepeatStep | ParallelStep | AppStep | DataStep | AskStep | CodeStep;
+/** What Work out a value can work out. */
+export const VALUE_OPS = [
+  { value: 'first', label: 'The first item' },
+  { value: 'last', label: 'The last item' },
+  { value: 'count', label: 'How many' },
+  { value: 'sum', label: 'The sum' },
+  { value: 'average', label: 'The average' },
+  { value: 'min', label: 'The smallest' },
+  { value: 'max', label: 'The largest' },
+  { value: 'pick', label: 'A field of each' },
+  { value: 'join', label: 'Joined into text' },
+  { value: 'unique', label: 'Without repeats' },
+  { value: 'sort', label: 'Sorted' },
+  { value: 'number', label: 'As a number' },
+  { value: 'date', label: 'A date, days later' },
+] as const;
+export type ValueOp = (typeof VALUE_OPS)[number]['value'];
+
+/**
+ * A value worked out from another, at once and at no cost (a pure node): the first or last item of a list, how
+ * many, a sum or an average (of a field of each, with arg), a field of each, the items joined into text, without
+ * repeats, sorted (by a field, "-field" highest first), as a number, or a date some days later. Gives {{id.value}}.
+ */
+export interface ValueStep extends StepCommon {
+  do: 'value';
+  /** What it works on: a value of the form or of a step before it ("{{find.records}}"). */
+  of: string;
+  op: ValueOp;
+  /** pick: the field; sum, average, min, max, sort: of this field of each; join: between the items (", " unless set); date: days to add. */
+  arg?: string;
+}
+
+export type Step = AgentStep | ModelStep | ToolStep | DecideStep | RepeatStep | ParallelStep | AppStep | DataStep | AskStep | CodeStep | ValueStep;
 
 /** A collection of records an app keeps between runs: its fields' kinds when given (values are checked and tidied to them), any JSON otherwise. */
 export interface DataCollection {
@@ -844,6 +877,16 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
         ...(outputs?.length ? { outputs } : {}),
       };
     }
+    case 'value': {
+      const of = text(x.of, 2000);
+      if (!of) t.errors.push(`${where}: say what it works on (of: a value, like {{find.records}})`);
+      const op = VALUE_OPS.some((o) => o.value === x.op) ? (x.op as ValueOp) : null;
+      if (!op) t.errors.push(`${where}: what it works out (op) is one of ${VALUE_OPS.map((o) => o.value).join(', ')}`);
+      const arg = x.arg === undefined || x.arg === null ? '' : String(x.arg).slice(0, 200);
+      if (op === 'pick' && !arg.trim()) t.errors.push(`${where}: say which field of each it picks (arg)`);
+      if (op === 'date' && arg.trim() && !Number.isFinite(Number(arg))) t.errors.push(`${where}: the days to add (arg) are a number`);
+      return { ...common, do: 'value', of, op: op ?? 'first', ...(arg ? { arg } : {}) };
+    }
     case 'ask': {
       const question = text(x.question ?? x.ask, 4000);
       if (!question) t.errors.push(`${where}: write what it asks (question)`);
@@ -1365,6 +1408,8 @@ export function givesOf(s: Step): string[] | null {
       return s.fields?.length ? s.fields.map((f) => f.id) : ['yes'];
     case 'code':
       return s.outputs?.length ? [...s.outputs.map((f) => f.id), 'printed'] : null;
+    case 'value':
+      return ['value'];
     default:
       return null;
   }

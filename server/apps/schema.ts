@@ -68,7 +68,6 @@ export function appSchema(): Record<string, unknown> {
       steps: { type: 'array', items: { $ref: '#/$defs/step' } },
       branches: { type: 'array', items: { type: 'array', items: { $ref: '#/$defs/step' } } },
       app: str('app: another template’s address'),
-      op: { enum: ['add', 'get', 'find', 'search', 'update', 'remove'] },
       collection: str('data: the list (one its data names)'),
       record: str('data: one record’s id'),
       where: values('data: which records: { field: value }, or { field: { "<": 10 } }'),
@@ -82,6 +81,9 @@ export function appSchema(): Record<string, unknown> {
       language: { enum: ['javascript', 'typescript', 'python'] },
       code: textOrFile('code: the body of a function of input and ctx that returns the step’s values (in a file of steps/: the function, as written there); ctx.model, ctx.agent, ctx.tool, ctx.ask, ctx.data and ctx.app are steps of the run'),
       seconds: { type: 'number', description: 'code: most seconds it may take (1 to 120)' },
+      of: str('value: what it works on ({{find.records}})'),
+      op: { description: 'data: add, get, find, search, update or remove; value: first, last, count, sum, average, min, max, pick, join, unique, sort, number or date', type: 'string' },
+      arg: str('value: pick: the field; sum, average, min, max: of this field of each; sort: by this field ("-price": highest first); join: between the items; date: days to add'),
     },
     required: ['do'],
   };

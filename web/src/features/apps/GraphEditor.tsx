@@ -19,7 +19,7 @@
 // theirs its answer. Other templates can call it too, and a change to it is a change for all of them.
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AppWindow, Bot, Boxes, CircleDot, CodeXml, Columns2, Database, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Snowflake, Sparkles, Split, Wrench, X } from 'lucide-react';
+import { AppWindow, Bot, Boxes, CircleDot, CodeXml, Columns2, Database, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Sigma, Snowflake, Sparkles, Split, Wrench, X } from 'lucide-react';
 import type { Flow, NamedFlow, Step, StepKind } from '@shared/app-manifest';
 import { allSteps, asText, collapseSteps, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
 import type { AppDef, AppGraph, AppRecipe, AppRun, RunProgress, RunStepView } from '@shared/apps';
@@ -54,8 +54,9 @@ export const KIND_COLOR: Record<StepKind, string> = {
   data: '#22c55e',
   ask: '#f97316',
   code: '#ec4899',
+  value: '#84cc16',
 };
-export const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml };
+export const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml, value: Sigma };
 const KIND = Object.fromEntries(STEP_KINDS.map((k) => [k.value, k.label])) as Record<StepKind, string>;
 
 // ---- laying it out ------------------------------------------------------------------------------------------
@@ -191,6 +192,7 @@ function usesOf(s: Step): string[] {
   if (s.do === 'decide') own.push(s.rule, s.ask);
   if (s.do === 'repeat') own.push(s.over, s.until, s.untilAsk);
   if (s.do === 'ask') own.push(s.question);
+  if (s.do === 'value') own.push(s.of);
   return [...new Set(refsIn(own).map((r) => r.split(/[.[]/)[0]))];
 }
 
@@ -247,6 +249,9 @@ function inputsOf(s: Step, ctx: Ctx, value: string): Input[] {
     case 'ask':
       out.push({ label: 'Its question', put: (x, r) => ({ ...x, question: addTo((x as typeof s).question, r) }) as Step });
       break;
+    case 'value':
+      out.push({ label: 'What it works on', put: (x, r) => ({ ...x, of: r }) as Step });
+      break;
   }
   out.push({ label: 'Only when it is there', put: (x, r) => ({ ...x, if: `${r} is not empty` }) });
   return out;
@@ -259,6 +264,7 @@ function usersOf(ctx: Ctx): { label: string; make: (ref: string) => Step }[] {
     { label: 'Ask a model about it', make: (r) => ({ ...(ctx.make('model') as Extract<Step, { do: 'model' }>), instructions: r }) },
     { label: 'Ask an agent about it', make: (r) => ({ ...(ctx.make('agent') as Extract<Step, { do: 'agent' }>), instructions: r }) },
     { label: 'Decide on it', make: (r) => ({ ...(ctx.make('decide') as Extract<Step, { do: 'decide' }>), rule: `${r} is not empty` }) },
+    { label: 'Work out a value of it', make: (r) => ({ ...(ctx.make('value') as Extract<Step, { do: 'value' }>), of: r }) },
     { label: 'Repeat for each item of it', make: (r) => ({ ...(ctx.make('repeat') as Extract<Step, { do: 'repeat' }>), over: r }) },
     ...(lists.length
       ? [
@@ -767,7 +773,9 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
               <div
                 key={n.s.id}
                 className={cx(
-                  'group/n absolute flex cursor-pointer items-center gap-2.5 rounded-lg border bg-panel pr-2.5 shadow-sm transition-colors',
+                  'group/n absolute flex cursor-pointer items-center gap-2.5 border bg-panel pr-2.5 shadow-sm transition-colors',
+                  // A value worked out (a pure node): a pill.
+                  n.s.do === 'value' ? 'rounded-full border-dashed pl-1' : 'rounded-lg',
                   on ? 'border-accent ring-2 ring-accent/30' : 'border-line-2 hover:border-fg-3',
                   !on && went && LIT[went],
                   went === 'skipped' && 'opacity-55',
@@ -777,7 +785,7 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
                 onPointerEnter={() => setHover(n.s.id)}
                 onPointerLeave={() => setHover((h) => (h === n.s.id ? null : h))}
               >
-                <span className="h-full w-1.5 shrink-0 rounded-l-lg" style={{ background: KIND_COLOR[n.s.do] }} />
+                {n.s.do !== 'value' && <span className="h-full w-1.5 shrink-0 rounded-l-lg" style={{ background: KIND_COLOR[n.s.do] }} />}
                 <I size={15} className="shrink-0" style={{ color: KIND_COLOR[n.s.do] }} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-medium" translate="no">

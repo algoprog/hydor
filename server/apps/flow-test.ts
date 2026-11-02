@@ -1057,6 +1057,39 @@ test('a program as a flow: its ctx calls are steps of the run, kept, and replaye
   assert.ok(outs['py/c1'] && outs['ts/c1'], 'their calls are steps of the run');
 });
 
+test('Work out a value: the first or last, how many, a sum or average of a field, a field of each, joined, without repeats, sorted, a date some days later; at once, at no cost', async () => {
+  const a = app({
+    name: 'Worked',
+    answer: [],
+    flow: {
+      steps: [
+        { id: 'list', do: 'code', language: 'javascript', code: "return { items: [{ name: 'b', price: 3 }, { name: 'a', price: 5 }, { name: 'b', price: 3 }] };", outputs: { items: 'table(name: text, price: number)' } },
+        { id: 'n', do: 'value', of: '{{list.items}}', op: 'count' },
+        { id: 'total', do: 'value', of: '{{list.items}}', op: 'sum', arg: 'price' },
+        { id: 'avg', do: 'value', of: '{{list.items}}', op: 'average', arg: 'price' },
+        { id: 'names', do: 'value', of: '{{list.items}}', op: 'pick', arg: 'name' },
+        { id: 'joined', do: 'value', of: '{{names.value}}', op: 'join', arg: ' + ' },
+        { id: 'once', do: 'value', of: '{{names.value}}', op: 'unique' },
+        { id: 'dear', do: 'value', of: '{{list.items}}', op: 'sort', arg: '-price' },
+        { id: 'top', do: 'value', of: '{{dear.value}}', op: 'first' },
+        { id: 'later', do: 'value', of: '2026-11-02', op: 'date', arg: '7' },
+        { id: 'lines', do: 'value', of: 'one\ntwo\nthree', op: 'last' },
+      ],
+    },
+  });
+  assert.deepEqual(checkFlow(a).errors, []);
+  const done = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'x' } }).id, 60_000);
+  assert.equal(done.status, 'done', done.error);
+  const v = Object.fromEntries(store.listSteps(db, done.id).map((st) => [st.id, st.outputs?.value]));
+  assert.deepEqual(
+    [v.n, v.total, v.avg, v.names, v.joined, v.once, v.top, v.later, v.lines],
+    [3, 11, 3.666667, ['b', 'a', 'b'], 'b + a + b', ['b', 'a'], { name: 'a', price: 5 }, '2026-11-09', 'three'],
+  );
+  assert.ok(store.listSteps(db, done.id).every((st) => st.kind !== 'value' || !st.costUsd), 'at no cost');
+  assert.match(cleanFlow({ steps: [{ id: 'p', do: 'value', of: '{{x}}', op: 'pick' }] }).errors.join(), /which field of each it picks/);
+  assert.match(cleanFlow({ steps: [{ id: 'p', do: 'value', of: '{{x}}', op: 'guess' }] }).errors.join(), /one of first, last, count/);
+});
+
 test('examples: saved inputs with checks; trying them runs each as a test, and its checks are read against what it gave', async () => {
   const a = app({
     name: 'Counted',
