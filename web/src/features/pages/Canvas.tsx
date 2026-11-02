@@ -20,7 +20,7 @@ import { memoryStore, pageStore, type Store } from './frame';
 import { CANVAS_MEDIA, onDraftStart, onScreen, savedRef, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { usePicks } from '../session/HtmlPage';
-import { ReviewPane } from '../shots/Review';
+import { ReviewPane, shotsOfTurn } from '../shots/Review';
 
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10_240 ? 1 : 0)} KB`);
 
@@ -405,12 +405,16 @@ export function CanvasSide({ s }: { s: SessionSummary }) {
   );
 }
 
-/** Before and after screenshots of a web app the agent changed, beside the conversation. */
+/** Before and after screenshots of a web app the agent changed, beside the conversation, with the reply's other screens. */
 function ReviewBeside({ sessionKey, id, onClose }: { sessionKey: string; id: string; onClose: () => void }) {
   const items = useTimeline((x) => x.byKey[sessionKey]?.items);
   const overlay = useLive((x) => x.byKey[sessionKey]?.overlay);
-  const item = useMemo(() => [...(items ?? []), ...(overlay?.items ?? [])].find((i): i is ToolItem => i.kind === 'tool' && i.id === id), [items, overlay, id]);
-  return <ReviewPane key={id} sessionKey={sessionKey} item={item} onClose={onClose} />;
+  const shots = useMemo(() => {
+    const seen = new Set<string>();
+    const all = [...(items ?? []), ...(overlay?.items ?? [])].filter((i) => !seen.has(i.id) && !!seen.add(i.id));
+    return shotsOfTurn(all, id);
+  }, [items, overlay, id]);
+  return <ReviewPane sessionKey={sessionKey} items={shots} id={id} onClose={onClose} />;
 }
 
 /** Whether a session shows something beside its conversation now. */

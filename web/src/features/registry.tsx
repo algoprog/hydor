@@ -41,7 +41,9 @@ export interface ToolView {
   place?: 'work' | 'answer' | 'attention';
   /** How its step reads on a line and counts in a folded group (as an MCP tool it would be "other"): web_search counts with web searches. */
   step?: (t: ToolInfo) => { category?: ToolCategory; verb?: string; title?: string };
-  Row: ComponentType<{ item: ToolItem; sessionKey: string }>;
+  /** Shown with the reply, its later calls in that reply come to the first as `more` and show with it, as one (screenshots). */
+  many?: boolean;
+  Row: ComponentType<{ item: ToolItem; sessionKey: string; more?: ToolItem[] }>;
 }
 
 /** A part of a session's menu: its main list, or its Session settings or More submenu. */
