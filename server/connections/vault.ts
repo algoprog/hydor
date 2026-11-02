@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { cleanDomains, SECRET_NAME, type SecretRequestView, type SecretView } from '../../shared/connections.ts';
+import { cleanDomains, SECRET_NAME, type SecretField, type SecretRequestView, type SecretView } from '../../shared/connections.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
@@ -111,13 +111,19 @@ export function rotateVaultKey(db: DB): { sealed: number; keyId: string } {
 export function vaultTables(db: DB) {
   db.exec(`create table if not exists conn_secrets (
     name text primary key, value text not null, hint text not null, domains text not null default '[]', note text not null default '',
-    header text, prefix text, query text, created_at integer not null, updated_at integer not null, used_at integer
+    header text, prefix text, query text, created_at integer not null, updated_at integer not null, used_at integer,
+    commands integer not null default 0
   );
   create table if not exists conn_requests (
     id text primary key, key text not null, name text not null, why text not null, domains text not null default '[]',
-    state text not null, created_at integer not null, done_at integer
+    state text not null, created_at integer not null, done_at integer, fields text, commands integer not null default 0
   );
   create index if not exists conn_requests_key on conn_requests (key, name, created_at);`);
+  // Vaults from before sign-ins and commands.
+  const has = (t: string, col: string) => (db.prepare(`pragma table_info(${t})`).all() as { name: string }[]).some((c) => c.name === col);
+  if (!has('conn_secrets', 'commands')) db.exec('alter table conn_secrets add column commands integer not null default 0');
+  if (!has('conn_requests', 'fields')) db.exec('alter table conn_requests add column fields text');
+  if (!has('conn_requests', 'commands')) db.exec('alter table conn_requests add column commands integer not null default 0');
 }
 
 /** What a page may see of a value: its first characters when long enough to say what kind it is, and its last four. */
@@ -142,6 +148,7 @@ interface SecretRow {
   created_at: number;
   updated_at: number;
   used_at: number | null;
+  commands: number;
 }
 
 const parseList = (s: string | null | undefined): string[] => {
@@ -157,6 +164,7 @@ const view = (r: SecretRow): SecretView => ({
   name: r.name,
   hint: r.hint,
   domains: parseList(r.domains),
+  ...(r.commands ? { commands: true } : {}),
   note: r.note,
   ...(r.header ? { header: r.header } : {}),
   ...(r.prefix ? { prefix: r.prefix } : {}),
@@ -186,6 +194,8 @@ export interface SecretInput {
   /** A new value (to add, or to rotate); left out to keep the current one. */
   value?: string;
   domains?: unknown;
+  /** Whether commands on this computer may have it; left out to keep what it was (off for a new key). */
+  commands?: boolean;
   note?: string;
   header?: string | null;
   prefix?: string | null;
@@ -210,12 +220,13 @@ export function saveSecret(db: DB, s: SecretInput): SecretView {
   if (query && !/^[A-Za-z0-9_.-]{1,64}$/.test(query)) throw new HttpError(400, 'A query parameter name has letters, digits, dots, dashes and underscores');
   const prefix = s.prefix === undefined ? old?.prefix ?? null : s.prefix ? String(s.prefix).replace(/[\r\n]/g, '').slice(0, 40) : null;
   const domains = s.domains === undefined ? parseList(old?.domains) : cleanDomains(s.domains);
+  const commands = s.commands === undefined ? !!old?.commands : !!s.commands;
   const note = s.note === undefined ? old?.note ?? '' : String(s.note).replace(/\s+/g, ' ').trim().slice(0, 300);
   const now = Date.now();
   db.prepare(
-    `insert into conn_secrets (name, value, hint, domains, note, header, prefix, query, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `insert into conn_secrets (name, value, hint, domains, note, header, prefix, query, created_at, updated_at, commands) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      on conflict(name) do update set value = excluded.value, hint = excluded.hint, domains = excluded.domains, note = excluded.note,
-       header = excluded.header, prefix = excluded.prefix, query = excluded.query, updated_at = excluded.updated_at`,
+       header = excluded.header, prefix = excluded.prefix, query = excluded.query, updated_at = excluded.updated_at, commands = excluded.commands`,
   ).run(
     name,
     value ? seal(value, `secret:${name}`) : old!.value,
@@ -227,6 +238,7 @@ export function saveSecret(db: DB, s: SecretInput): SecretView {
     query,
     old?.created_at ?? now,
     value || !old ? now : old.updated_at,
+    commands ? 1 : 0,
   );
   invalidateMask();
   return secretView(db, name)!;
@@ -250,16 +262,38 @@ interface RequestRow {
   state: SecretRequestView['state'];
   created_at: number;
   done_at: number | null;
+  fields: string | null;
+  commands: number;
 }
+
+const parseFields = (s: string | null): SecretField[] => {
+  try {
+    const v = JSON.parse(s ?? 'null');
+    return Array.isArray(v) ? v.filter((f) => f && typeof f.key === 'string' && SECRET_NAME.test(f.key)) : [];
+  } catch {
+    return [];
+  }
+};
 
 function requestView(db: DB, r: RequestRow): SecretRequestView {
   const s = secretView(db, r.name);
+  const fields = parseFields(r.fields);
+  const have: Record<string, string> = {};
+  let commandsOn = !!s?.commands;
+  for (const f of fields.filter((x) => x.secret)) {
+    const k = secretView(db, f.key);
+    if (k) have[f.key] = k.hint;
+    if (k?.commands) commandsOn = true;
+  }
   return {
     id: r.id,
     key: r.key,
     name: r.name,
     why: r.why,
     domains: parseList(r.domains),
+    ...(fields.length ? { fields, have } : {}),
+    ...(r.commands ? { commands: true } : {}),
+    ...(commandsOn ? { commandsOn: true } : {}),
     state: r.state,
     createdAt: r.created_at,
     ...(r.done_at ? { doneAt: r.done_at } : {}),
@@ -268,9 +302,19 @@ function requestView(db: DB, r: RequestRow): SecretRequestView {
   };
 }
 
-export function addRequest(db: DB, r: { key: string; name: string; why: string; domains: string[] }): SecretRequestView {
+export function addRequest(db: DB, r: { key: string; name: string; why: string; domains: string[]; fields?: SecretField[]; commands?: boolean }): SecretRequestView {
   const id = `sr_${crypto.randomBytes(9).toString('base64url')}`;
-  db.prepare('insert into conn_requests (id, key, name, why, domains, state, created_at) values (?, ?, ?, ?, ?, ?, ?)').run(id, r.key, r.name, r.why, JSON.stringify(r.domains), 'pending', Date.now());
+  db.prepare('insert into conn_requests (id, key, name, why, domains, state, created_at, fields, commands) values (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    id,
+    r.key,
+    r.name,
+    r.why,
+    JSON.stringify(r.domains),
+    'pending',
+    Date.now(),
+    r.fields?.length ? JSON.stringify(r.fields) : null,
+    r.commands ? 1 : 0,
+  );
   return requestView(db, db.prepare('select * from conn_requests where id = ?').get(id) as RequestRow);
 }
 
@@ -289,6 +333,9 @@ export function latestRequest(db: DB, key: string, name: string): SecretRequestV
 export function pendingRequests(db: DB): SecretRequestView[] {
   return (db.prepare("select * from conn_requests where state = 'pending' order by created_at desc limit 100").all() as RequestRow[]).map((r) => requestView(db, r));
 }
+
+/** The hosts the person kept on the card, for the card to show once it is saved. */
+export const setRequestDomains = (db: DB, id: string, domains: string[]) => db.prepare('update conn_requests set domains = ? where id = ?').run(JSON.stringify(domains), id);
 
 /** Marks every open request for `name` in the session as answered. */
 export function settleRequests(db: DB, key: string, name: string, state: 'saved' | 'dismissed') {
@@ -356,5 +403,24 @@ export function redact(text: string): string {
   if (!text) return text;
   let t = text;
   for (const m of maskList()) if (t.includes(m.find)) t = t.split(m.find).join(m.put);
+  return t;
+}
+
+/**
+ * `text` with the values a call just used masked by name, shorter ones too (from 4 characters, where
+ * redact starts at 6), as they are and as an address, JSON or base64 would carry them.
+ */
+export function maskUsed(text: string, used: { name: string; value: string }[]): string {
+  if (!text) return text;
+  const list: { find: string; put: string }[] = [];
+  for (const u of used) {
+    if (u.value.length < 4) continue;
+    const forms = new Set([u.value, encodeURIComponent(u.value), new URLSearchParams({ v: u.value }).toString().slice(2), JSON.stringify(u.value).slice(1, -1)]);
+    if (u.value.length >= 8) forms.add(Buffer.from(u.value).toString('base64').replace(/=+$/, ''));
+    for (const f of forms) list.push({ find: f, put: `[secret ${u.name}]` });
+  }
+  list.sort((x, y) => y.find.length - x.find.length);
+  let t = text;
+  for (const m of list) if (t.includes(m.find)) t = t.split(m.find).join(m.put);
   return t;
 }

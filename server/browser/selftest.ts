@@ -204,6 +204,34 @@ async function main() {
     assert.doesNotMatch(r.text, /hunter2/);
   });
 
+  await check('types a key from the vault on its own host only, never showing it, and hides it on the page', async () => {
+    const vault: Record<string, { value: string; domains: string[] }> = {
+      SITE_USER: { value: 'ada-lovelace', domains: ['127.0.0.1'] },
+      SITE_PASSWORD: { value: 'vault-pw-123', domains: ['127.0.0.1'] },
+      ELSEWHERE_PASSWORD: { value: 'other-pw-456', domains: ['example.com'] },
+    };
+    const vctx: OpCtx = { ...ctx, secret: (n) => vault[n] ?? null };
+    let r = await open(vctx, `${base}/form`, false, false);
+    const nameId = idOf(r.text, /textbox "Name"/);
+    const pwId = idOf(r.text, /textbox "Password"/);
+    r = await act(vctx, [{ action: 'type', id: pwId, secret: 'ELSEWHERE_PASSWORD' }], false);
+    assert.match(r.text, /ELSEWHERE_PASSWORD may only be typed on example\.com/);
+    r = await act(vctx, [{ action: 'type', id: idOf(r.text, /textbox "Note"/), secret: 'SITE_PASSWORD' }], false);
+    assert.match(r.text, /not a one-line text field/);
+    r = await act(vctx, [{ action: 'type', id: pwId, secret: 'NO_SUCH_KEY' }], false);
+    assert.match(r.text, /no key named NO_SUCH_KEY in the vault: ask the user for it with request_secret/);
+    r = await act(vctx, [{ action: 'type', id: nameId, secret: 'SITE_USER' }, { action: 'type', id: pwId, secret: 'SITE_PASSWORD' }], false);
+    assert.match(r.text, /Typed SITE_USER into \[\d+\] textbox "Name"\./);
+    assert.match(r.text, /textbox "Name" \(filled with SITE_USER from the vault, value hidden/);
+    assert.doesNotMatch(r.text, /ada-lovelace|vault-pw-123/);
+    const b = browserOf(KEY)!;
+    const shown = await b.active!.onElement<string>(b.refs.get(nameId)!, "function () { return this.style.getPropertyValue('-webkit-text-security'); }");
+    assert.equal(shown, 'disc');
+    r = await act(vctx, [{ action: 'click', id: idOf(r.text, /button "Create account"/) }], false);
+    assert.match(r.text, /# Welcome ada-lovelace/);
+    assert.match(r.text, /pwlen=12/);
+  });
+
   await check('marks elements that appeared, and stops on an in-page route change', async () => {
     let r = await open(ctx, `${base}/changing`, false, false);
     r = await act(ctx, [{ action: 'click', id: idOf(r.text, /button "Add item"/) }], false);

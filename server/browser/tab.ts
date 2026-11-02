@@ -55,6 +55,8 @@ export class Tab {
   prev: Set<number> | null = null;
   /** Elements the user typed into while driving: their values never reach the agent. */
   userTyped = new Set<string>();
+  /** Fields the agent filled with a key from the vault, by `${session}:${backendNodeId}`: the key's name. */
+  vaultTyped = new Map<string, string>();
   /** Requests refused since the agent last looked. */
   blocked: { url: string; why: string }[] = [];
   fileChooser: { backendNodeId: number; multiple: boolean } | null = null;
@@ -178,6 +180,7 @@ export class Tab {
     this.ids.clear();
     this.prev = null;
     this.userTyped.clear();
+    this.vaultTyped.clear();
     this.fileChooser = null;
   }
 
@@ -318,6 +321,7 @@ export class Tab {
       },
       prev: this.prev,
       userTyped: this.userTyped,
+      vaultTyped: this.vaultTyped,
       budget,
       url: this.url,
     });
@@ -656,6 +660,31 @@ export class Tab {
     const s = this.sessionOf(ref);
     if (!s) throw new CdpError('its frame has gone');
     await s.send('DOM.setFileInputFiles', { files, backendNodeId: ref.backendNodeId });
+  }
+
+  /**
+   * A field just filled with a key from the vault: the one aimed at, and the one that took the text (inside a
+   * wrapper or a shadow root). The outline hides their values, and the page shows dots, for screenshots.
+   */
+  async markVault(ref: ElRef, name: string) {
+    this.vaultTyped.set(`${ref.session}:${ref.backendNodeId}`, name);
+    const s = this.sessionOf(ref);
+    if (!s) return;
+    try {
+      const o = await s.send('DOM.resolveNode', { backendNodeId: ref.backendNodeId });
+      const r = await s.send('Runtime.callFunctionOn', {
+        objectId: o.object.objectId,
+        functionDeclaration: 'function () { let a = this.ownerDocument.activeElement; for (let i = 0; i < 4 && a && a.shadowRoot && a.shadowRoot.activeElement; i++) a = a.shadowRoot.activeElement; return a; }',
+        returnByValue: false,
+      });
+      if (!r.result?.objectId) return;
+      const n = await s.send('DOM.describeNode', { objectId: r.result.objectId });
+      if (n.node?.backendNodeId) this.vaultTyped.set(`${ref.session}:${n.node.backendNodeId}`, name);
+      await s.send('Runtime.callFunctionOn', {
+        objectId: r.result.objectId,
+        functionDeclaration: "function () { if (this.type !== 'password' && this.style) this.style.setProperty('-webkit-text-security', 'disc', 'important'); }",
+      });
+    } catch {}
   }
 
   /** What the user is typing into now, so its value never reaches the agent. */

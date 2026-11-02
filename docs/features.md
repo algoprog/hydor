@@ -45,8 +45,9 @@ agents that speak ACP and take MCP servers.
   read whole pages, or only the parts that answer a question. Each search shows its results, and each reply its
   sources. [Search providers](search-providers.md).
 - **A browser**: agents open sites, click, type and read pages, in a Chromium of their own. You watch it live
-  above the message box and take over to log in, solve a check or pay, on a computer or a phone; sites on your
-  own network stay off limits unless you allow one.
+  above the message box and take over to log in, solve a check or pay, on a computer or a phone; with a sign-in
+  saved in the vault, the agent signs in itself, typing the password without seeing it, on that site only. Sites
+  on your own network stay off limits unless you allow one.
 - **Memory**: agents save notes about you, the project and the session when you ask or they learn something
   lasting, some only until a date, and a chip under the reply shows what changed (undo, edit, delete). Each
   agent starts with the notes that bear on what you asked, found by words and, once you turn it on, by meaning,
@@ -76,8 +77,10 @@ agents that speak ACP and take MCP servers.
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
   Images can be made and edited through OpenRouter.
 - **Connections**: a marketplace of apps and services (Notion, Linear, GitHub, Google, Stripe and more), signed
-  in once for every agent; anyone can add one with a pull request to `catalog/`. Keys live in an encrypted
-  vault: agents ask for one with a card and use it without ever seeing it. When an app needs something from
+  in once for every agent; anyone can add one with a pull request to `catalog/`. Keys and sign-ins live in an
+  encrypted vault: when a task needs one that isn't there, the agent asks with a card (one key, or a sign-in's
+  fields), and uses it by name without ever seeing it, in API calls and site sign-ins on the hosts you allow, and
+  in commands on this computer that you allow (what they print comes back masked). When an app needs something from
   you partway through (a date, a choice, a page to approve on), its form shows as a card in the session,
   whichever agent is working; Codex's own servers ask the same way.
 - **Child sessions**: an agent hands parts of a job to new sessions, with any agent and model, and gets their

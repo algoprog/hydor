@@ -112,8 +112,10 @@ export interface ConnectionView {
 export interface SecretView {
   name: string;
   hint: string;
-  /** Where http_request may send it: these hosts and their subdomains. */
+  /** Where http_request may send it and the browser may type it: these hosts and their subdomains. */
   domains: string[];
+  /** Commands on this computer may have it in their environment (run_with_secrets, as $NAME). */
+  commands?: boolean;
   note: string;
   /** How http_request sends it by default: a header (with a prefix), or a query parameter. */
   header?: string;
@@ -124,20 +126,53 @@ export interface SecretView {
   usedAt?: number;
 }
 
-/** An agent asked the person for a key (request_secret), with a card in the conversation. */
+/**
+ * One thing a sign-in card asks for (request_secret with fields). A secret goes to the vault as `key`; a
+ * detail that is not secret (a server's address, a port) goes to the agent as typed.
+ */
+export interface SecretField {
+  /** The key it is saved as (VOLTARO_PASSWORD); for a detail, the name the agent gave it. */
+  key: string;
+  label: string;
+  secret: boolean;
+  /** How the field takes it: hidden as typed, or shown (with the keyboard for an email, an address, a number). */
+  type: 'password' | 'text' | 'email' | 'url' | 'number';
+  help?: string;
+  optional?: boolean;
+}
+
+/** An agent asked the person for a key or a sign-in (request_secret), with a card in the conversation. */
 export interface SecretRequestView {
   id: string;
   key: string;
+  /** The key's name; for a sign-in, what its keys start with (VOLTARO). */
   name: string;
   why: string;
   domains: string[];
+  /** A sign-in: the card's fields, in order. Left out for one key. */
+  fields?: SecretField[];
+  /** The agent needs it in commands on this computer: the card asks the person to allow that. */
+  commands?: boolean;
   state: 'pending' | 'saved' | 'dismissed';
   createdAt: number;
   doneAt?: number;
   /** The vault has a key by that name (its hint, when so). */
   exists: boolean;
   hint?: string;
+  /** A sign-in's keys that are in the vault: their hints, by key. */
+  have?: Record<string, string>;
+  /** Some of the keys asked for may already be used in commands. */
+  commandsOn?: boolean;
 }
+
+/** A sign-in field's key: the request's name, then the field's ("password" in VOLTARO → VOLTARO_PASSWORD). */
+export const fieldKey = (name: string, field: string) => {
+  const f = secretName(field);
+  return f === name || f.startsWith(`${name}_`) ? f : `${name}_${f}`.slice(0, 64);
+};
+
+/** Fields hidden as they are typed, unless the agent says otherwise. */
+export const SECRET_LIKE = /PASS|PWD|SECRET|TOKEN|KEY|PIN|CVC|CVV|OTP|PRIVATE/;
 
 /** One app as a session sees it: on or off here, and whether that differs from every session's default. */
 export interface SessionConnection {

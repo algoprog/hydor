@@ -55,6 +55,8 @@ export interface OutlineIn {
   prev: Set<number> | null;
   /** Elements the user typed into while driving: their values stay with the user. */
   userTyped: Set<string>;
+  /** Fields filled with a key from the vault: the key's name, never the value. */
+  vaultTyped?: Map<string, string>;
   /** Most characters for the outline's body. */
   budget: number;
   /** The page's address, to show links on it briefly. */
@@ -352,7 +354,7 @@ export function buildOutline(o: OutlineIn): Outline {
         const r = (sax?.role && !/^(generic|none|presentation|StaticText|LabelText)$/i.test(sax.role) ? sax.role : '') || role || implicitRole(tagName, stype, sa);
         let name = squash(sax?.name || ax?.name || a['aria-label'] || a.title || a.placeholder || a.alt || '');
         if (!name) name = textIn(i, 120);
-        if (!name && (tagName === 'input' || tagName === 'button') && sa.value && !/password/.test(stype)) name = sa.value;
+        if (!name && (tagName === 'input' || tagName === 'button') && sa.value && !/password/.test(stype) && !o.vaultTyped?.has(`${f.session}:${N.backendNodeId[labelFor ?? i]}`)) name = sa.value;
         if (!name && a.name) name = a.name;
         const sensitive = stype === 'password' || SENSITIVE_AC.test(sa.autocomplete ?? '') || (tagName === 'input' && SENSITIVE_NAME.test(`${sa.name ?? ''} ${sa.id ?? ''} ${sa['aria-label'] ?? ''} ${sa.placeholder ?? ''}`));
         const id = o.idFor(f.session, N.backendNodeId[labelFor ?? i]);
@@ -384,7 +386,9 @@ export function buildOutline(o: OutlineIn): Outline {
           if (a.multiple !== undefined) st.push('multiple');
         } else if (isText && !fileInput) {
           const v = tagName === 'textarea' ? (textValues.get(src) ?? values.get(src) ?? '') : isEditable ? textIn(i, 200) : (values.get(src) ?? '');
-          if (o.userTyped.has(`${f.session}:${N.backendNodeId[src]}`)) st.push(v ? 'filled by the user, value hidden' : 'empty');
+          const vault = o.vaultTyped?.get(`${f.session}:${N.backendNodeId[src]}`);
+          if (vault) st.push(v ? `filled with ${vault} from the vault, value hidden` : 'empty');
+          else if (o.userTyped.has(`${f.session}:${N.backendNodeId[src]}`)) st.push(v ? 'filled by the user, value hidden' : 'empty');
           else if (sensitive) st.push(v ? 'filled, value hidden' : 'empty');
           else st.push(v ? `value ${quote(clip(squash(v), 80))}` : 'empty');
         }
