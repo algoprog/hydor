@@ -76,7 +76,7 @@ Custom 按以下顺序从多个文件夹读取技能：项目自己的技能（�
 - **word-documents**：制作或修改 Word 文档（.docx），使用真正的标题、列表和表格，交付前先查看页面效果，还能阅读 .docx、.doc 和 .odt 文件。
 - **writing**：用于任何要给人读的东西（报告、文章、信件、演讲稿、故事）。智能体先确定谁来读、为什么读，先列提纲再起草，并分几遍分别修改。
 
-文档类技能（pdf、presentations、spreadsheets、word-documents）用小型 Python 脚本生成文件。它们需要这台电脑上有 Python 3。第一次需要时，它们用到的库会被下载到应用数据文件夹中的一个私有文件夹里（约 30 MB，只下载一次）；不会为整个系统安装任何东西。如果缺少 Python，智能体会告诉你安装它的命令。为了在交付文件前把页面当作图片查看，如果这台电脑上有 LibreOffice 和 Poppler，它们就会用上这两者。参见[文档、图片和语音](/guide/documents-voice)。
+文档类技能（pdf、presentations、spreadsheets、word-documents）用小型 Python 脚本生成文件。它们需要这台电脑上有 Python 3。第一次需要时，它们用到的库会被下载到应用数据文件夹中的一个私有文件夹里（约 30 MB，只下载一次）；不会为整个系统安装任何东西。如果缺少 Python，智能体会告诉你安装它的命令。为了在交付文件前把页面当作图片查看，如果这台电脑上有 LibreOffice 和 Poppler，它们就会用上这两者。参见[文档、图片、视频和语音](/guide/documents-voice)。
 
 内置技能没有“移除”按钮。你不能删除它们，但智能体可以提议改进某个内置技能，改进后的版本会保存为你自己的版本（参见[你自己版本的内置技能](#your-version-of-a-built-in-skill)）。
 

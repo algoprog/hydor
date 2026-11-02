@@ -120,19 +120,13 @@ export const SHOTS = [
     },
   },
   {
-    // A page in the editor: its heading picked, with its words and look beside it.
-    id: 'pages',
+    // The Library's Media tab: images and videos kept from conversations, with their titles and descriptions.
+    id: 'library',
     async take(p, ctx) {
-      await ctx.go('/pages', { settle: 2000 });
-      await p.click('[aria-label="E-bike loan calculator"]', { wait: 2000 });
-      await p.click(p.byText('Edit'), { wait: 2000 });
-      // The heading, inside the page's frame (the page is 720 pixels wide, centred).
-      const b = await p.box('iframe[title="E-bike loan calculator"]');
-      const x = b.x + Math.max(40, (b.width - 720) / 2 + 70);
-      const y = b.y + 46;
-      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await p.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
-      await new Promise((r) => setTimeout(r, 800));
-      return p.shot(ctx.file, { clip: await main(p, 548) });
+      await ctx.go('/library?tab=media', { settle: 2500 });
+      await p.park();
+      await sleep(600);
+      return p.shot(ctx.file, { clip: await main(p, 420) });
     },
   },
   {

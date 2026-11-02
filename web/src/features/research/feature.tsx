@@ -82,7 +82,7 @@ function LeadDock({ s, r }: { s: SessionSummary; r: ResearchSettings }) {
       title={
         r.format === 'document'
           ? `${r.breadth} researchers at a time, ${r.depth} rounds and at most ${r.queries} searches. The report comes as a Word document.`
-          : `${r.breadth} researchers at a time, ${r.depth} rounds and at most ${r.queries} searches. The report comes as a page in Pages.`
+          : `${r.breadth} researchers at a time, ${r.depth} rounds and at most ${r.queries} searches. The report comes as a page in the Library.`
       }
     >
       <Telescope size={14} className="shrink-0 text-fg-3" />

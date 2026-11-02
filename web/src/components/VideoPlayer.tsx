@@ -1,4 +1,4 @@
-// A video player of the app's own (Files, and any file opened over a page): a seek bar that shows what has
+// A video player of the app's own (Files, any file opened over a page, videos agents made and the Library's): a seek bar that shows what has
 // loaded and the time under the pointer, volume, speed, loop, picture in picture and full screen, with the
 // controls fading while it plays. Keys while it has focus: Space or K plays and pauses, ← → move 5 s, J L
 // 10 s, ↑ ↓ the volume, M mutes, F full screen, 0–9 a tenth of the way each, , . a frame while paused. On a
@@ -66,7 +66,7 @@ const along = (el: HTMLElement, x: number) => {
   return r.width ? Math.min(1, Math.max(0, (x - r.left) / r.width)) : 0;
 };
 
-export function VideoPlayer({ src, name, downloadUrl, className }: { src: string; name?: string; downloadUrl?: string; className?: string }) {
+export function VideoPlayer({ src, name, downloadUrl, poster, className }: { src: string; name?: string; downloadUrl?: string; /** A still to show before it plays. */ poster?: string; className?: string }) {
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const bar = useRef<HTMLDivElement>(null);
@@ -274,6 +274,7 @@ export function VideoPlayer({ src, name, downloadUrl, className }: { src: string
       <video
         ref={video}
         src={src}
+        poster={poster}
         playsInline
         preload="metadata"
         className="h-full w-full object-contain"

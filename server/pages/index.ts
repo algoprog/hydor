@@ -122,8 +122,8 @@ const SHOW_HTML: RunTool = {
 const SAVE_PAGE: RunTool = {
   name: 'save_page',
   description: [
-    'Save a page in the user’s Pages library: a small app or tool they keep and come back to (a tracker, a calculator, a checklist, a planner).',
-    'It shows in the conversation, in Pages, and at an address of its own that the user can add to a phone’s home screen.',
+    'Save a page in the user’s Library: a small app or tool they keep and come back to (a tracker, a calculator, a checklist, a planner).',
+    'It shows in the conversation, in the Library, and at an address of its own that the user can add to a phone’s home screen.',
     'The same page rules, look, choices and classes as show_html, plus storage that lasts, kept by this app for the page:',
     'await naget.storage.get(key) (the value, or null), set(key, value) (any JSON), remove(key), keys(); about 2 MB per page. localStorage keeps nothing.',
     'Leave out id to make a new page; give the id of a saved page (get_page lists them) to replace it with a new version:',
@@ -133,7 +133,7 @@ const SAVE_PAGE: RunTool = {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'A saved page’s id, to save a new version of it.' },
-      title: { type: 'string', description: 'The page’s name in Pages and on a home screen: "Workout log".' },
+      title: { type: 'string', description: 'The page’s name in the Library and on a home screen: "Workout log".' },
       html: { type: 'string', description: 'The whole page, <!doctype html> included.' },
     },
     required: ['title', 'html'],
@@ -146,7 +146,7 @@ const SAVE_PAGE: RunTool = {
     const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', sessionKey: ctx.key });
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
-    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.`;
+    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.`;
   },
 };
 
@@ -206,7 +206,7 @@ const SAVE_SLIDES: RunTool = {
     const p = keepModel(ctx, id, 'slides', a.title, deck);
     const n = deck.slides.length;
     return [
-      `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} slide${n === 1 ? '' : 's'}. It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it, present it and export it to PowerPoint or PDF.`,
+      `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} slide${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it, present it and export it to PowerPoint or PDF.`,
       ...notes,
     ].join(' ');
   },
@@ -223,7 +223,7 @@ const SAVE_DOC: RunTool = {
     const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, id ? pageSource(ctx.deps.db, id)?.text : undefined);
     const p = keepModel(ctx, id, 'doc', a.title, doc);
     return [
-      `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
+      `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
       ...notes,
     ].join(' ');
   },
@@ -240,7 +240,7 @@ const SAVE_SHEET: RunTool = {
     const p = keepModel(ctx, id, 'sheet', a.title, book);
     const n = book.sheets.length;
     return [
-      `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} sheet${n === 1 ? '' : 's'}. It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Excel or Google Sheets and export it as an Excel file, a CSV or a PDF.`,
+      `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} sheet${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Excel or Google Sheets and export it as an Excel file, a CSV or a PDF.`,
       ...notes,
     ].join(' ');
   },
@@ -261,7 +261,7 @@ const SAVE_LATEX: RunTool = {
     const p = keepModel(ctx, id, 'tex', a.title, doc);
     return [
       [
-        `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit the source beside its typeset pages and export it as a PDF, its .tex source or the project as a .zip.`,
+        `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit the source beside its typeset pages and export it as a PDF, its .tex source or the project as a .zip.`,
         ...notes,
       ].join(' '),
       compileSummary(r),
@@ -272,7 +272,7 @@ const SAVE_LATEX: RunTool = {
 const EXPORT_PAGE: RunTool = {
   name: 'export_page',
   description: [
-    'Save a page, slide deck, document, spreadsheet or LaTeX document of the user’s Pages as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
+    'Save a page, slide deck, document, spreadsheet or LaTeX document of the user’s Library as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
     'a deck as PowerPoint (pptx) or a PDF (a slide a page), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
     'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip); any of them as a web page (html) that works on its own.',
     'The file goes in this session’s folder unless you give a path.',
@@ -349,7 +349,7 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  'Pages: show_html shows a page in the conversation (a report, a chart, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Pages library, can go on a phone’s home screen, and keeps what it stores with naget.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in Pages) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, and anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, unless they ask for a file made another way. get_page lists all of these, to change one. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown or LaTeX). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
+  'Pages: show_html shows a page in the conversation (a report, a chart, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with naget.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, and anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, unless they ask for a file made another way. get_page lists all of these, to change one. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown or LaTeX). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
 
 /** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
 function askInstructions(db: Deps['db'], v: unknown): string | null {
@@ -364,7 +364,7 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
     tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (what you leave out stays); it is typeset again, and you hear of any errors: fix them.',
   };
   return [
-    `The user is asking from their ${k?.noun ?? 'page'} "${p.title}" (saved page ${p.id}), open in front of them in Pages: their messages are about changing it.`,
+    `The user is asking from their ${k?.noun ?? 'page'} "${p.title}" (saved page ${p.id}), open in front of them in the Library: their messages are about changing it.`,
     k ? how[p.kind!] : 'Read it with get_page and save the whole changed page with save_page and that id. When they name a part, change that part, and the rest only as needed.',
     'What they look at updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',
   ].join(' ');
@@ -374,7 +374,7 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
 function outcome(r: PublishRequest, base: string): string {
   if (r.status === 'published' && r.site) {
     const how = r.site.visibility === 'public' ? 'a public link: anyone can open it' : 'a private link: only people who have it can open it';
-    return `publish_site: the user published "${r.name}" at ${base}${r.site.path} (${how}). They can unpublish it in Pages → Published.`;
+    return `publish_site: the user published "${r.name}" at ${base}${r.site.path} (${how}). They can unpublish it in Library → Published.`;
   }
   if (r.status === 'failed') return `publish_site: publishing "${r.name}" failed: ${r.error ?? 'unknown error'}`;
   return `publish_site: the user chose not to publish "${r.name}".`;

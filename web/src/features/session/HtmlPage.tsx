@@ -123,7 +123,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
   }, [kept]);
 
   if (sessionKey && wide && besideOpen) {
-    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : kept ? `Kept in Pages${keptInfo && keptInfo.version > 1 ? ` · version ${keptInfo.version}` : ''}` : `A page · ${kb(html.length)}`;
+    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : kept ? `Kept in the Library${keptInfo && keptInfo.version > 1 ? ` · version ${keptInfo.version}` : ''}` : `A page · ${kb(html.length)}`;
     return <SmallPageCard sessionKey={sessionKey} item={item} title={title} sub={sub} writing={writing} />;
   }
 
@@ -142,7 +142,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
     try {
       const r = await post<{ page: PageInfo }>('/api/pages', { title, html, sessionKey, item: item.id, data: memory.dump() });
       usePagesStore.getState().setKept(sessionKey, item.id, r.page.id);
-      toast('Kept in Pages', 'ok');
+      toast('Kept in the Library', 'ok');
     } catch (e) {
       toastError(e);
     } finally {
@@ -167,7 +167,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
                 type="button"
                 onClick={keep}
                 disabled={keeping}
-                title={kept ? 'Open it in Pages' : 'Keep this page in Pages, with its own address and storage'}
+                title={kept ? 'Open it in the Library' : 'Keep this page in the Library, with its own address and storage'}
                 className={cx(
                   'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium transition-colors disabled:opacity-50',
                   kept ? 'text-accent hover:bg-accent-soft' : 'text-fg-3 hover:bg-bg-2 hover:text-fg',

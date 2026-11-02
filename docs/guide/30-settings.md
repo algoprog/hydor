@@ -189,12 +189,15 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Working at once, per session**](/settings?s=children&find=Working%20at%20once%2C%20per%20session): How many child sessions one session runs at once.
 - [**Swarm size**](/settings?s=children&find=Swarm%20size): How many agents of a swarm work at once.
 
-### Images
+### Images and video
 
-[Settings → Images](/settings?s=images): pictures agents make for you, with an image model through OpenRouter. More in [Documents, images and voice](/guide/documents-voice).
+[Settings → Images and video](/settings?s=images): pictures and videos agents make for you through OpenRouter, and who writes their captions in the Library. More in [Documents, images, videos and voice](/guide/documents-voice).
 
 - [**Making images**](/settings?s=images&find=Making%20images): Let agents make images.
 - [**Image model**](/settings?s=images&find=Image%20model): The model that makes them.
+- [**Making videos**](/settings?s=images&find=Making%20videos): Let agents make videos.
+- [**Video model**](/settings?s=images&find=Video%20model): The model that makes videos.
+- [**Captions in the Library**](/settings?s=images&find=Captions%20in%20the%20Library): The model that writes the titles and descriptions of the images and videos you keep.
 
 ### Connections
 
@@ -205,7 +208,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Voice
 
-[Settings → Voice](/settings?s=voice): dictate messages, and have replies read aloud. More in [Documents, images and voice](/guide/documents-voice).
+[Settings → Voice](/settings?s=voice): dictate messages, and have replies read aloud. More in [Documents, images, videos and voice](/guide/documents-voice).
 
 - [**Dictation**](/settings?s=voice&find=Dictation): Speak a message instead of typing it.
 - [**Language you speak**](/settings?s=voice&find=Language%20you%20speak): The language dictation listens for.

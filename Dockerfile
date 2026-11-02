@@ -49,6 +49,13 @@ RUN if [ "$LATEX" = true ]; then apt-get update \
       texlive-xetex latexmk lmodern \
  && rm -rf /var/lib/apt/lists/*; fi
 
+# ffmpeg (about 150 MB more) takes a video's frames in the Library, which its title and description are written
+# from, and its still: build with --build-arg FFMPEG=false to leave it out.
+ARG FFMPEG=true
+RUN if [ "$FFMPEG" = true ]; then apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*; fi
+
 # Chromium for the agents' browser (Settings → Browser), with fonts for most pages and emoji. Build
 # with --build-arg BROWSER=false to leave it out (on x86-64 the app can then download Chrome itself).
 ARG BROWSER=true

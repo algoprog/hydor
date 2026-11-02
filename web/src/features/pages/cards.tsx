@@ -108,7 +108,7 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
   const noun = kind === 'slides' ? 'the slides' : kind === 'doc' ? 'the document' : kind === 'sheet' ? 'the spreadsheet' : kind === 'tex' ? 'the LaTeX document' : 'the page';
   if (item.tool.status === 'error') return <Note>{`Could not save ${noun}`}: {failure(item)}</Note>;
   if (wide && besideOpen) {
-    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : `Saved in Pages · version ${ref?.version ?? 1}${info && !current ? ' · a newer one is there' : ''}`;
+    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : `Saved in the Library · version ${ref?.version ?? 1}${info && !current ? ' · a newer one is there' : ''}`;
     return <SmallPageCard sessionKey={sessionKey} item={item} title={title} sub={sub} writing={writing} />;
   }
   if (writing && deck)
@@ -157,7 +157,7 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
               {title}
             </span>
             <span className="block truncate text-[12px] leading-4 text-fg-3">
-              {kind === 'slides' ? 'Slides in Pages' : kind === 'doc' ? 'A document in Pages' : kind === 'sheet' ? 'A spreadsheet in Pages' : kind === 'tex' ? 'LaTeX in Pages' : 'Saved in Pages'} · version {ref.version}
+              {kind === 'slides' ? 'Slides in the Library' : kind === 'doc' ? 'A document in the Library' : kind === 'sheet' ? 'A spreadsheet in the Library' : kind === 'tex' ? 'LaTeX in the Library' : 'Saved in the Library'} · version {ref.version}
               {info && !current ? ' · a newer one is there' : ''}
             </span>
           </span>
@@ -301,7 +301,7 @@ export function PublishCard({ item }: { item: ToolItem; sessionKey: string }) {
             <Segmented<SiteVisibility> size="sm" value={vis} onChange={setVis} options={VISIBILITY.map((v) => ({ value: v.value, label: v.label }))} />
           </div>
           <p className="text-[12.5px] leading-relaxed text-fg-3">
-            {VISIBILITY.find((v) => v.value === vis)!.hint} It opens in a sandbox, apart from this app; unpublish it any time in Pages.
+            {VISIBILITY.find((v) => v.value === vis)!.hint} It opens in a sandbox, apart from this app; unpublish it any time in the Library.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="primary" icon={<Globe size={14} />} disabled={busy} onClick={() => decide(true)}>

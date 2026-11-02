@@ -14,7 +14,7 @@ export interface OneShot {
   system: string;
   prompt: string;
   /** Claude model alias; Haiku by default. */
-  model?: 'haiku' | 'sonnet';
+  model?: 'haiku' | 'sonnet' | 'opus';
   /** The Codex model when Claude cannot answer. */
   codexModel?: string;
   timeoutMs?: number;
@@ -53,6 +53,29 @@ async function askCodex(q: OneShot): Promise<string> {
   } finally {
     fs.rmSync(file, { force: true });
   }
+}
+
+/**
+ * Claude alone (no Codex after it), reading the given files with its Read tool and nothing else: a picture to
+ * describe. The files' folders are opened to it; the prompt names the files.
+ */
+export async function askClaudeAbout(q: OneShot & { files: string[] }): Promise<string> {
+  const dirs = [...new Set(q.files.map((f) => path.dirname(f)))];
+  let out: string;
+  try {
+    out = await run(
+      config.claudeBin,
+      ['-p', '--model', q.model ?? 'haiku', '--tools', 'Read', '--allowedTools', 'Read', '--add-dir', ...dirs, '--setting-sources', '', '--strict-mcp-config', '--no-session-persistence', '--disable-slash-commands', '--output-format', 'json', '--system-prompt', q.system, q.prompt],
+      q.timeoutMs ?? 120_000,
+    );
+  } catch (e) {
+    // Without words of its own, the failure names the whole command: say what it means instead.
+    const why = String((e as Error).message ?? '');
+    throw new Error(/^Command failed|The picture:/.test(why) || q.files.some((f) => why.includes(f)) ? 'Claude Code did not answer: is it installed and signed in?' : why);
+  }
+  const r = JSON.parse(out);
+  if (r.is_error || typeof r.result !== 'string') throw new Error(r.result || 'Claude did not answer');
+  return r.result;
 }
 
 /** The model's answer as text. */

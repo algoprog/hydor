@@ -28,7 +28,7 @@ Seven assistants come with the app. None of them suggests an agent, model or per
 "Help with anything: questions, writing, planning, files." The start page picks General until you pick another. It is written for people who may not be programmers.
 
 - It works out what you want and does it. It asks one short question only when the request is unclear in a way that changes the result; otherwise it makes a sensible choice and says what it chose.
-- It searches the web for anything current or anything it isn't sure of, reads the files you point it to, and saves work you'll want to keep as files in the session's folder, or in [Pages](/guide/pages) when it is a page you'll use again, such as a tracker or a calculator.
+- It searches the web for anything current or anything it isn't sure of, reads the files you point it to, and saves work you'll want to keep as files in the session's folder, or in your [Library](/guide/library) when it is a page you'll use again, such as a tracker or a calculator.
 - It leads with the answer, then the detail that matters, in plain words, and explains any technical term it can't avoid.
 - When it made or changed files, it ends by saying which ones and where they are.
 
@@ -259,7 +259,7 @@ Open the folder chip on the start page:
 
 Until you choose, the assistant decides: the built-ins other than Coder, and your own set to "A new task folder", use a task folder; Coder and assistants set to "The folder on the start page" use the folder shown. The start page remembers what you chose. Picking another assistant hands the choice back to it, unless you picked a folder since the page opened.
 
-Task folders don't crowd the folder menu: the folders used lately that it lists leave them out. Sessions started by voice in hands-free mode get a task folder too, unless the start page was last set to a folder or a space (see [Documents, images and voice](/guide/documents-voice)).
+Task folders don't crowd the folder menu: the folders used lately that it lists leave them out. Sessions started by voice in hands-free mode get a task folder too, unless the start page was last set to a folder or a space (see [Documents, images, videos and voice](/guide/documents-voice)).
 
 ### Move task folders
 

@@ -11,7 +11,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
-import { AppWindow, ArrowRight, BookOpen, Bot, Boxes, Brain, Cable, CalendarClock, Check, ChevronDown, Compass, CornerDownLeft, FileText, LayoutGrid, Layers, Library, ListFilter, MessageSquareText, MessagesSquare, Search, Settings, Sparkles, X } from 'lucide-react';
+import { ArrowRight, BookOpen, Bot, Boxes, Brain, Cable, CalendarClock, Check, ChevronDown, Compass, CornerDownLeft, FileText, LayoutGrid, Layers, Library, LibraryBig, ListFilter, MessageSquareText, MessagesSquare, Search, Settings, Sparkles, X } from 'lucide-react';
 import { FIND_PLACES, matchItem, matchStrength, queryAffinity, queryWords, usageBoost, type FindPlace, type FindResponse, type FindUsage } from '@shared/find';
 import type { SessionSummary } from '@shared/types';
 import { api } from '../../lib/api';
@@ -62,6 +62,7 @@ const WEIGHT: Record<Group, number> = {
   Skills: 0.85,
   Connections: 0.85,
   Pages: 0.85,
+  'Images and videos': 0.85,
   Themes: 0.8,
   Memory: 0.75,
   Files: 0.7,
@@ -79,7 +80,7 @@ const PLACES: Record<FindPlace, { label: string; icon: ReactNode; groups: Group[
   sessions: { label: 'Sessions', icon: <MessagesSquare size={15} />, groups: ['Sessions'] },
   messages: { label: 'Messages', icon: <MessageSquareText size={15} />, groups: ['In messages'] },
   spaces: { label: 'Spaces', icon: <Boxes size={15} />, groups: ['Spaces'] },
-  pages: { label: 'Pages', icon: <AppWindow size={15} />, groups: ['Pages'] },
+  pages: { label: 'Library', icon: <LibraryBig size={15} />, groups: ['Pages', 'Images and videos'] },
   templates: { label: 'Apps', icon: <LayoutGrid size={15} />, groups: ['Apps'] },
   files: { label: 'Files', icon: <FileText size={15} />, groups: ['Files'] },
   memory: { label: 'Memory', icon: <Brain size={15} />, groups: ['Memory'] },

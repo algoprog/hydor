@@ -4,12 +4,13 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, AppWindow, ArrowRight, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Headphones, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, AppWindow, ArrowRight, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
 import type { ScheduledTask } from '@shared/automations';
 import type { ConnectionView } from '@shared/connections';
+import type { MediaItem } from '@shared/media';
 import type { PageInfo } from '@shared/pages';
 import type { SkillLibrary } from '@shared/skillpack';
 import { isGroup, type SpaceView } from '@shared/spaces';
@@ -27,7 +28,7 @@ import { openAsk } from '../guide/ask';
 import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
 
-export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Spaces' | 'Apps' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Themes' | 'Files';
+export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Spaces' | 'Apps' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Images and videos' | 'Themes' | 'Files';
 
 export interface Entry extends Findable {
   id: string;
@@ -59,8 +60,9 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:terminal': <SquareTerminal size={15} />,
   'go:apps': <LayoutGrid size={15} />,
   'go:new-app': <LayoutGrid size={15} />,
-  'go:pages': <AppWindow size={15} />,
-  'go:published': <AppWindow size={15} />,
+  'go:library': <LibraryBig size={15} />,
+  'go:media': <Images size={15} />,
+  'go:published': <Globe size={15} />,
   'go:preview': <MonitorSmartphone size={15} />,
   'go:usage': <Gauge size={15} />,
   'go:stats': <TrendingUp size={15} />,
@@ -127,7 +129,7 @@ let held: { at: number; entries: Entry[] } | null = null;
 export async function liveEntries(): Promise<Entry[]> {
   if (held && Date.now() - held.at < 60_000) return held.entries;
   const get = <T,>(path: string) => api<T>(path).catch(() => null);
-  const [apps, tasks, assistants, lib, pages, conns, spaces] = await Promise.all([
+  const [apps, tasks, assistants, lib, pages, conns, spaces, media] = await Promise.all([
     get<Gallery>('/api/apps'),
     get<{ tasks: ScheduledTask[] }>('/api/tasks'),
     get<{ assistants?: { id: string; name: string; description?: string }[] }>('/api/assistants'),
@@ -135,6 +137,7 @@ export async function liveEntries(): Promise<Entry[]> {
     get<{ pages: PageInfo[] }>('/api/pages'),
     get<{ connections: ConnectionView[] }>('/api/connections'),
     get<{ spaces: SpaceView[] }>('/api/spaces'),
+    get<{ items: MediaItem[] }>('/api/media'),
   ]);
   const out: Entry[] = [];
   for (const s of spaces?.spaces ?? [])
@@ -179,7 +182,20 @@ export async function liveEntries(): Promise<Entry[]> {
   for (const s of lib?.skills ?? [])
     out.push({ id: `skill:${s.name}`, group: 'Skills', icon: <Library size={15} />, title: s.name, keywords: `skill ${s.triggers.join(' ')}`, text: s.description, where: 'Settings › Capabilities › Skill library', body: s.description, opens: 'Opens the skill library, at this skill', within: 'sec:skillpack', run: () => go(settingsAt('skillpack', s.name)) });
   for (const p of pages?.pages ?? [])
-    out.push({ id: `page:${p.id}`, group: 'Pages', icon: <AppWindow size={15} />, title: p.title, keywords: 'page published', where: 'Pages', body: `Version ${p.version}`, opens: 'Opens the page', run: () => go(`/pages/${encodeURIComponent(p.id)}`) });
+    out.push({ id: `page:${p.id}`, group: 'Pages', icon: <AppWindow size={15} />, title: p.title, keywords: 'page published', where: 'Library', body: `Version ${p.version}`, opens: 'Opens the page', run: () => go(`/pages/${encodeURIComponent(p.id)}`) });
+  for (const m of media?.items ?? [])
+    out.push({
+      id: `media:${m.id}`,
+      group: 'Images and videos',
+      icon: m.kind === 'video' ? <Play size={15} /> : <ImageIcon size={15} />,
+      title: m.title,
+      keywords: `${m.kind === 'video' ? 'video clip' : 'image picture'} library`,
+      text: [m.description, m.prompt].filter(Boolean).join(' '),
+      where: 'Library › Media',
+      body: m.description,
+      opens: m.kind === 'video' ? 'Opens the video' : 'Opens the image',
+      run: () => go(`/media/${encodeURIComponent(m.id)}`),
+    });
   for (const c of conns?.connections ?? [])
     out.push({
       id: `conn:${c.id}`,

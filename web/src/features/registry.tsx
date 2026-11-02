@@ -21,6 +21,7 @@ import { documentsFeature } from './documents/feature';
 import { guideFeature } from './guide/feature';
 import { guidelinesFeature } from './guidelines/feature';
 import { imagesFeature } from './images/feature';
+import { mediaFeature } from './media/feature';
 import { knowledgeFeature } from './knowledge/feature';
 import { memoryFeature } from './memory/feature';
 import { opinionFeature } from './opinion/feature';
@@ -119,6 +120,7 @@ export const features = (): WebFeature[] =>
     arenaFeature,
     documentsFeature,
     imagesFeature,
+    mediaFeature,
     connectionsFeature,
     automationsFeature,
     voiceFeature,

@@ -312,9 +312,9 @@ for (const f of files(path.join(ROOT, 'server'), /\.ts$/)) {
   for (const m of src.matchAll(/new HttpError\(\s*\d+\s*,\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
   if (!/(^|\/)(tools|mcp|cli)\.ts$/.test(where)) for (const m of src.matchAll(/new Error\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
 }
-// Whole files whose strings the pages show: the search providers, the helper model's choices, the agents' list, and
-// the sessions' notices (a session finished, needs you, failed) and messages.
-for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) => `server/search/${x}.ts`).concat('server/helper.ts', 'server/agents/acp.ts', 'server/sessions.ts')) {
+// Whole files whose strings the pages show: the search providers, the helper model's choices, the agents' list, the
+// sessions' notices (a session finished, needs you, failed) and messages, and the form an image or a video asks first.
+for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) => `server/search/${x}.ts`).concat('server/helper.ts', 'server/agents/acp.ts', 'server/sessions.ts', 'server/images/settings.ts')) {
   const js = transformSync(fs.readFileSync(path.join(ROOT, f), 'utf8'), { loader: 'ts', legalComments: 'none' }).code;
   for (const s of literals(js)) add(s, f);
 }

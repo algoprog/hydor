@@ -1,8 +1,8 @@
 // What the server finds by meaning, each as an id the search box knows ("app:<id>", "s:<session key>") and a
 // short text: what ships with the app (the catalog of shared/find-catalog.ts, app templates, built-in assistants
 // and skills), whose vectors are made ahead of time (npm run find:vectors), and what people make (sessions,
-// spaces, apps, scheduled tasks, assistants, learned skills, pages, connected apps), whose vectors are made the
-// moment they are made or changed (index.ts). The guide's sections (docs/guide) ship too.
+// spaces, apps, scheduled tasks, assistants, learned skills, the Library's pages, images and videos, connected
+// apps), whose vectors are made the moment they are made or changed (index.ts). The guide's sections ship too.
 import type { FindPlace } from '../../shared/find.ts';
 import { catalogItems, catalogText } from '../../shared/find-catalog.ts';
 import { isGroup } from '../../shared/spaces.ts';
@@ -15,6 +15,7 @@ import { connections, connectionView } from '../connections/apps.ts';
 import type { DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { guideItems } from '../guide/content.ts';
+import { listMedia } from '../media/store.ts';
 import { listPages } from '../pages/store.ts';
 import { libraryView } from '../skillpack/proposals.ts';
 import { allSpaces } from '../spaces/index.ts';
@@ -83,7 +84,11 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
     case 'skills':
       return libraryView(db).map(skill);
     case 'pages':
-      return listPages(db).map((p) => ({ id: `page:${p.id}`, text: text(p.title, 'A page') }));
+      // The Library: its pages, and the images and videos kept there.
+      return [
+        ...listPages(db).map((p) => ({ id: `page:${p.id}`, text: text(p.title, 'A page') })),
+        ...listMedia(db).map((m) => ({ id: `media:${m.id}`, text: text(m.title, m.kind === 'video' ? 'A video' : 'An image', m.description) })),
+      ];
     case 'connections':
       return connections(db).map((c) => ({ id: `conn:${c.id}`, text: text(connectionView(db, c).name, 'A connected account', c.entry.name, c.entry.description) }));
   }

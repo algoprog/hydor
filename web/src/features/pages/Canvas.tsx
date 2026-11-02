@@ -188,7 +188,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
               },
             }
           : {}),
-        sub: `${page.info.kind === 'slides' ? 'Slides in Pages' : page.info.kind === 'doc' ? 'A document in Pages' : page.info.kind === 'sheet' ? 'A spreadsheet in Pages' : page.info.kind === 'tex' ? 'LaTeX in Pages' : 'In Pages'} · version ${page.info.version}`,
+        sub: `${page.info.kind === 'slides' ? 'Slides in the Library' : page.info.kind === 'doc' ? 'A document in the Library' : page.info.kind === 'sheet' ? 'A spreadsheet in the Library' : page.info.kind === 'tex' ? 'LaTeX in the Library' : 'In the Library'} · version ${page.info.version}`,
         save: async (html, force) => {
           await post(`/api/pages/${enc(id)}/versions`, { html, base: page.info.version, sessionKey: key, force: !!force });
           toast('Saved. The agent sees your changes with your next message.', 'ok');
@@ -208,7 +208,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
         save: async (edited) => {
           const r = await post<{ page: PageInfo }>('/api/pages', { title: titleOf(item, kind), html, sessionKey: key, item: item.id, data: shownStore(item.id).dump(), edited });
           usePagesStore.getState().setKept(key, item.id, r.page.id);
-          toast('Kept in Pages with your changes. The agent sees them with your next message.', 'ok');
+          toast('Kept in the Library with your changes. The agent sees them with your next message.', 'ok');
           return true;
         },
       };
@@ -296,7 +296,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
       <Popover anchor={moreRef} open={menu === 'more'} onClose={() => setMenu(null)} align="end" width={250}>
         {loaded?.pageId && (
           <MenuItem icon={<ExternalLink size={14} />} onClick={() => (setMenu(null), go(`/pages/${loaded.pageId}`))}>
-            Open in Pages
+            Open in the Library
           </MenuItem>
         )}
         {loaded?.path && (

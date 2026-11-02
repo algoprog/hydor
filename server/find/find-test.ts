@@ -277,8 +277,11 @@ test('places: each address as the search box lists it', () => {
   assert.equal(placeOf('/apps/t/invoice', '', pages), 'app:tpl:invoice');
   assert.equal(placeOf('/apps/ab12', '', pages), 'app:ab12');
   assert.equal(placeOf('/apps/new', '', pages), 'go:new-app');
-  assert.equal(placeOf('/pages', '?tab=published', pages), 'go:published');
+  assert.equal(placeOf('/library', '?tab=published', pages), 'go:published');
+  assert.equal(placeOf('/library', '?tab=media', pages), 'go:media');
+  assert.equal(placeOf('/library', '', pages), 'go:library');
   assert.equal(placeOf('/pages/p1', '', pages), 'page:p1');
+  assert.equal(placeOf('/media/0a1b2c3d4e', '', pages), 'media:0a1b2c3d4e');
   assert.equal(placeOf('/spaces', '', pages), 'go:spaces');
   assert.equal(placeOf('/spaces/sp1a2b', '', pages), 'space:sp1a2b');
   assert.equal(placeOf('/spaces/sp1a2b/files', '', pages), 'space:sp1a2b', 'a space’s tab is the space');

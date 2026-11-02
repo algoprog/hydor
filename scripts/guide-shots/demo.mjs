@@ -6,7 +6,11 @@ import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { formatPage, formatSearch } from '../../shared/search.ts';
+
+/** Pictures and clips an agent made, for the conversation and the Library (made with OpenRouter, kept small). */
+const MEDIA = path.join(path.dirname(fileURLToPath(import.meta.url)), 'media');
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -336,6 +340,33 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     out.report = { key: t.key, cwd, at: t.t };
   }
 
+  // A picture and a short clip made through OpenRouter, each with Save to Library under it.
+  {
+    const cwd = path.join(tasks, '2026-11-02-lisbon-pictures');
+    const pic = path.join(cwd, 'images', 'yellow-lisbon-tram.jpg');
+    const clip = path.join(cwd, 'videos', 'yellow-tram-climbing.mp4');
+    fs.mkdirSync(path.dirname(pic), { recursive: true });
+    fs.mkdirSync(path.dirname(clip), { recursive: true });
+    fs.copyFileSync(path.join(MEDIA, 'tram.jpg'), pic);
+    fs.copyFileSync(path.join(MEDIA, 'tram.mp4'), clip);
+    const t = new Transcript({ cwd, at: now - 50 * MIN });
+    t.user('Make me a picture of a yellow Lisbon tram on a sunny hill street for my trip blog, then a short clip of it climbing.');
+    const prompt = 'A yellow Lisbon tram climbing a narrow sunny street between tiled houses, two people walking beside it, bright flat illustration';
+    t.tool(naget('generate_image'), { prompt, aspect_ratio: '4:3' }, {
+      say: "I'll make the picture first.",
+      text: `Made an image with recraft/recraft-v4.1-flash ($0.007), 4:3:\n${pic} (800×590, 96 KB)\nThe user sees it with your reply, a tap away from full size, download and keeping it in their Library: don’t repeat it or its path. To look at it yourself, open the file.`,
+      ms: 14_000,
+    });
+    t.tool(naget('generate_video'), { prompt: 'The yellow tram climbs the street towards the camera, warm afternoon light, gentle camera follow', first_frame: pic }, {
+      say: 'Now a short clip that starts from it.',
+      text: `Made a video with x-ai/grok-imagine-video-1.5 ($0.42), 3 s, 16:9, 720p, with sound:\n${clip} (640×362, 3.1 s, 101 KB)\nThe user sees it with your reply, where they can play it, download it and keep it in their Library: don’t repeat it or its path.`,
+      ms: 52_000,
+    });
+    t.say(['Here they are: the picture for the post, and a 3-second clip that starts from it. **Save to Library** under either one keeps it, with a title and a description written for it.'], { out: 300 });
+    t.title('Pictures for the Lisbon trip blog').save(projects);
+    out.pictures = { key: t.key, cwd, at: t.t, pic, clip };
+  }
+
   // Plain conversations, for the session list.
   const plain = [
     ['lisbon', path.join(tasks, '2026-10-31-lisbon-trip'), 30 * HOUR, 'Plan a 4-day trip to Lisbon in May: two adults, mid-range hotels, lots of walking.', 'Here is a day-by-day plan, with the neighbourhoods to stay in and what to book ahead.', '4 days in Lisbon in May'],
@@ -451,6 +482,22 @@ export async function seedApi(api, home, now, s) {
     html: PAGE('Thesis reading tracker', '<p>23 of 31 sources read · <span class="tag">chapter 3</span></p><ul><li>☑ Putnam, Bowling Alone</li><li>☑ Klinenberg, Palaces for the People</li><li>☐ Oldenburg, The Great Good Place</li></ul>'),
     sessionKey: s.thesis.key,
   });
+
+  // The Library's images and videos: two kept from the trip pictures, and two from earlier, with titles as a model wrote them.
+  const pictures = path.join(home, 'Pictures');
+  fs.mkdirSync(pictures, { recursive: true });
+  fs.copyFileSync(path.join(MEDIA, 'boat.jpg'), path.join(pictures, 'red-paper-boat.jpg'));
+  fs.copyFileSync(path.join(MEDIA, 'boat.mp4'), path.join(pictures, 'paper-boat-drifting.mp4'));
+  const keep = async (file, prompt, model, title, description, sessionKey) => {
+    const { item } = await api('POST', '/api/media', { path: file, prompt, model, sessionKey });
+    await api('PATCH', `/api/media/${item.id}`, { title, description });
+  };
+  await keep(path.join(pictures, 'red-paper-boat.jpg'), 'A small red paper boat on a calm blue pond, flat illustration', 'tencent/hy-image-v3.5-preview', 'Red paper boat on a still pond', 'A small red paper boat floats on a calm blue pond among lily pads, with reeds behind, in a soft flat-illustration style.');
+  await keep(path.join(pictures, 'paper-boat-drifting.mp4'), 'The red paper boat drifting on a lake, gentle ripples', 'x-ai/grok-imagine-video-1.5-lite', 'Paper boat drifting on a lake', 'A red origami boat sits at the centre of a calm lake while ripples spread around it and the trees on the far shore mirror in the water.');
+  if (s.pictures) {
+    await keep(s.pictures.pic, 'A yellow Lisbon tram climbing a narrow sunny street between tiled houses, bright flat illustration', 'recraft/recraft-v4.1-flash', 'Yellow tram on a Lisbon hill', 'A yellow tram climbs a cobbled street between tiled houses, two people walking beside it, drawn in a bright comic style.', s.pictures.key);
+    await keep(s.pictures.clip, 'The yellow tram climbs the street towards the camera, warm afternoon light', 'x-ai/grok-imagine-video-1.5', 'Lisbon tram coming up the street', 'A yellow tram comes slowly up a narrow cobbled street lined with tiled buildings, in warm afternoon light.', s.pictures.key);
+  }
 
   await api('POST', '/api/apps', {
     recipe: {
