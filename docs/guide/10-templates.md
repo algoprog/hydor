@@ -334,6 +334,7 @@ The kinds of steps:
 - **Call an app**: another of your templates, as one step.
 - **Keep data**: add, find, change or remove the records the template keeps (see below).
 - **Ask a person**: the run waits for your answer, yes or no or a short form: a notice opens the run, where a card asks it, and the Inbox lists it. It waits a week unless you set another limit, then it fails.
+- **Run code**: a short program of yours, in JavaScript or Python, gets the values you give it and gives back the step's values. It runs in a sandbox: no network, and none of this computer's files but the packages the template installs. A template file with code steps says so on its install card.
 
 A step can run only when a rule holds, and say what happens when it fails: other steps instead, or carry on without it.
 

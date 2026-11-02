@@ -3,7 +3,7 @@
 // the form and the steps before put in from a short menu, and the flow's checks as you go. Agents change
 // the same steps through the API; shared/app-manifest.ts has the format and the checks.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, Plus, Repeat, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
+import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, CodeXml, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, Plus, Repeat, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
 import type { AnswerField, AppDef, AppField, AppRecipe } from '@shared/apps';
 import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
 import type { DataOp, Flow, Step, StepKind } from '@shared/app-manifest';
@@ -11,7 +11,7 @@ import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, STEP_KINDS, STEP_TOOL
 import { api } from '../../lib/api';
 import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch } from '../../components/ui';
 
-const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion };
+const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml };
 const KIND = Object.fromEntries(STEP_KINDS.map((k) => [k.value, k])) as Record<StepKind, (typeof STEP_KINDS)[number]>;
 const OPS: { value: DataOp; label: string }[] = [
   { value: 'add', label: 'Add a record' },
@@ -98,7 +98,7 @@ function copyOf(s: Step, taken: Set<string>): Step {
   return copy;
 }
 
-const WORD: Record<StepKind, string> = { agent: 'agent', model: 'model', tool: 'tool', decide: 'decide', repeat: 'each', parallel: 'together', app: 'call', data: 'data', ask: 'ask' };
+const WORD: Record<StepKind, string> = { agent: 'agent', model: 'model', tool: 'tool', decide: 'decide', repeat: 'each', parallel: 'together', app: 'call', data: 'data', ask: 'ask', code: 'code' };
 
 function newStep(kind: StepKind, taken: string[], recipe: AppRecipe): Step {
   const id = fieldId(WORD[kind], taken);
@@ -121,8 +121,16 @@ function newStep(kind: StepKind, taken: string[], recipe: AppRecipe): Step {
       return { id, do: 'data', op: 'find', collection: Object.keys(recipe.data ?? {})[0] ?? '' };
     case 'ask':
       return { id, do: 'ask', question: '' };
+    case 'code':
+      return { id, do: 'code', language: 'javascript', code: CODE_START.javascript };
   }
 }
+
+/** What a new code step starts with: its input read, its values returned. */
+const CODE_START = {
+  javascript: "const { text = '' } = input;\nreturn { words: text.split(/\\s+/).filter(Boolean).length };",
+  python: "text = input.get('text', '')\nreturn {'words': len(text.split())}",
+};
 
 // ---- values ------------------------------------------------------------------------------------------------
 
@@ -478,6 +486,28 @@ function AskForm({ fields, onChange }: { fields: AppField[]; onChange: (f: AppFi
   );
 }
 
+/** A program's text: monospace, Tab indents (two spaces in JavaScript, four in Python). */
+function CodeBox({ value, onChange, language }: { value: string; onChange: (v: string) => void; language: 'javascript' | 'python' }) {
+  return (
+    <textarea
+      className={cx(small, 'block h-auto min-h-[150px] resize-y py-2 font-mono text-[12.5px] leading-relaxed')}
+      rows={Math.min(18, Math.max(6, value.split('\n').length + 1))}
+      spellCheck={false}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
+        e.preventDefault();
+        const el = e.currentTarget;
+        const pad = language === 'python' ? '    ' : '  ';
+        const at = el.selectionStart;
+        onChange(value.slice(0, at) + pad + value.slice(el.selectionEnd));
+        requestAnimationFrame(() => el.setSelectionRange(at + pad.length, at + pad.length));
+      }}
+    />
+  );
+}
+
 const WAITS: [number, string][] = [
   [1, 'An hour'],
   [24, 'A day'],
@@ -627,6 +657,40 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
     }
     case 'parallel':
       return <div className="text-[12.5px] text-fg-3">Its branches run side by side; the next step starts when they have all ended.</div>;
+    case 'code':
+      return (
+        <>
+          <Segmented
+            size="sm"
+            value={s.language}
+            onChange={(language) => set({ ...s, language, code: s.code.trim() && s.code !== CODE_START[s.language] ? s.code : CODE_START[language] })}
+            options={[
+              { value: 'javascript', label: 'JavaScript' },
+              { value: 'python', label: 'Python' },
+            ]}
+          />
+          <div>
+            <Label hint={s.language === 'python' ? 'It reads input; what it gives back is the step’s values' : 'It reads input and may await (await import() for packages); what it gives back is the step’s values'}>The program</Label>
+            <CodeBox value={s.code} onChange={(code) => set({ ...s, code })} language={s.language} />
+            <div className="mt-1 text-[12px] leading-snug text-fg-3">It runs in a sandbox: no network, and nothing of this computer's files but the packages What it needs installs. What it prints is {`{{${s.id}.printed}}`}.</div>
+          </div>
+          <div>
+            <Label hint="input.name in the program">Its input</Label>
+            <NamedValues value={s.with} onChange={(w) => set({ ...s, with: w })} groups={groups} />
+          </div>
+          <label className="block">
+            <Label>It may take at most</Label>
+            <select className={small} value={s.seconds ?? 20} onChange={(e) => set({ ...s, seconds: Number(e.target.value) === 20 ? undefined : Number(e.target.value) })}>
+              {[5, 20, 60, 120].map((n) => (
+                <option key={n} value={n}>
+                  {`${n} seconds`}
+                </option>
+              ))}
+              {s.seconds && ![5, 20, 60, 120].includes(s.seconds) && <option value={s.seconds}>{`${s.seconds} seconds`}</option>}
+            </select>
+          </label>
+        </>
+      );
     case 'ask': {
       const form = s.fields !== undefined;
       const wait = s.waitHours ?? 168;
@@ -902,6 +966,12 @@ function summaryOf(s: Step, ctx: Ctx): ReactNode {
       );
     case 'ask':
       return first(s.question) ? <span translate="no">{first(s.question)}</span> : 'No question yet';
+    case 'code':
+      return (
+        <>
+          {s.language === 'python' ? 'Python' : 'JavaScript'} · <span translate="no">{first(s.code)}</span>
+        </>
+      );
   }
 }
 
