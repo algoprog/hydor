@@ -29,6 +29,7 @@ export const STEP_KINDS = [
   { value: 'parallel', label: 'At the same time', hint: 'Branches side by side, joined at the end' },
   { value: 'app', label: 'Call an app', hint: 'Another of your apps, as one step' },
   { value: 'data', label: 'Keep data', hint: 'Add, find, change or remove records the app keeps' },
+  { value: 'ask', label: 'Ask a person', hint: 'Waits for your answer: yes or no, or a short form' },
 ] as const;
 export type StepKind = (typeof STEP_KINDS)[number]['value'];
 
@@ -148,7 +149,21 @@ export interface DataStep extends StepCommon {
   limit?: number;
 }
 
-export type Step = AgentStep | ModelStep | ToolStep | DecideStep | RepeatStep | ParallelStep | AppStep | DataStep;
+/**
+ * A person answers before the flow goes on: yes or no ({{id.yes}}), or a short form of its own (its fields'
+ * values), on the run's page, in the inbox, and from a notice on their phone. The run waits meanwhile.
+ */
+export interface AskStep extends StepCommon {
+  do: 'ask';
+  /** What is asked, with {{values}}. */
+  question: string;
+  /** Its form; none: yes or no. */
+  fields?: AppField[];
+  /** How long it waits before it fails, in hours (1 to 720; a week unless set). */
+  waitHours?: number;
+}
+
+export type Step = AgentStep | ModelStep | ToolStep | DecideStep | RepeatStep | ParallelStep | AppStep | DataStep | AskStep;
 
 /** A collection of records an app keeps between runs: its fields' kinds when given (values are checked and tidied to them), any JSON otherwise. */
 export interface DataCollection {
@@ -637,6 +652,14 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
       if ((op === 'get' || op === 'update' || op === 'remove') && !step.record && !(op !== 'get' && step.where)) t.errors.push(`${where}: say which record (record: its id${op === 'get' ? '' : ', or where'})`);
       return step;
     }
+    case 'ask': {
+      const question = text(x.question ?? x.ask, 4000);
+      if (!question) t.errors.push(`${where}: write what it asks (question)`);
+      const fields = x.fields === undefined || x.fields === null ? [] : cleanFields(x.fields).slice(0, 12);
+      if (fields.some((f) => f.type === 'file')) t.errors.push(`${where}: an answer cannot be a file`);
+      const hours = Number(x.waitHours);
+      return { ...common, do: 'ask', question, ...(fields.length ? { fields } : {}), ...(Number.isFinite(hours) && hours > 0 ? { waitHours: Math.min(720, Math.max(1, Math.round(hours))) } : {}) };
+    }
     default: {
       const app = short(x.app, 60);
       if (!app) t.errors.push(`${where}: name the app it calls (its address)`);
@@ -1083,6 +1106,8 @@ export function givesOf(s: Step): string[] | null {
       return ['items', 'count', 'last'];
     case 'data':
       return { add: ['record', 'id'], get: ['record', 'found'], find: ['records', 'count', 'first'], search: ['records', 'count', 'first', 'meaning'], update: ['records', 'count'], remove: ['count'] }[s.op];
+    case 'ask':
+      return s.fields?.length ? s.fields.map((f) => f.id) : ['yes'];
     default:
       return null;
   }
@@ -1174,6 +1199,9 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
           break;
         case 'app':
           checkRefs(where, s.with, seen, names, siblings);
+          break;
+        case 'ask':
+          checkRefs(where, s.question, seen, names, siblings);
           break;
         case 'data': {
           const c = r.data?.[s.collection];

@@ -333,6 +333,7 @@ The kinds of steps:
 - **At the same time**: branches that run side by side; the flow goes on when they have all ended.
 - **Call an app**: another of your templates, as one step.
 - **Keep data**: add, find, change or remove the records the template keeps (see below).
+- **Ask a person**: the run waits for your answer, yes or no or a short form: a notice opens the run, where a card asks it, and the Inbox lists it. It waits a week unless you set another limit, then it fails.
 
 A step can run only when a rule holds, and say what happens when it fails: other steps instead, or carry on without it.
 

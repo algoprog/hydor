@@ -1,6 +1,6 @@
 // Apps in the pages: what the server sends, where each page lives, and live news of runs.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppBatch, AppDef, AppRecipe, AppRun, AppTemplate, RunAsk, RunProgress, RunStepView } from '@shared/apps';
+import type { AppBatch, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunAsk, RunProgress, RunStepView } from '@shared/apps';
 import type { EnvView } from '@shared/app-manifest';
 import { isActive } from '@shared/apps';
 import { api, enc } from '../../lib/api';
@@ -54,6 +54,8 @@ export interface RunDetail {
   noAsks?: string;
   /** A run with steps: each step and how it went. */
   steps?: RunStepView[];
+  /** An Ask a person step waiting for the answer: where, what it asks, and its form (none: yes or no). */
+  question?: { step: string; question: string; fields?: AppField[]; since: number };
 }
 
 export interface BatchDetail {

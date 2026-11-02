@@ -6,7 +6,7 @@ import { isActive } from '@shared/apps';
 import { del, enc, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
-import { toastError } from '../../lib/store';
+import { toast, toastError } from '../../lib/store';
 import { Button, cx, Empty, IconButton, Throbber, useConfirm } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { useSessionShow } from '../session/show';
@@ -14,6 +14,7 @@ import { appPath, runPath, SOURCE_LABEL, useRunDetail, type RunDetail } from './
 import { AppIcon } from './AppIcon';
 import { RunsWith } from './AppPage';
 import { AskBox, FollowUps } from './FollowUps';
+import { AppForm, formErrors, initialValues, type FormValues } from './Form';
 import { RunBody } from './Result';
 import { RunSteps } from './Steps';
 
@@ -41,20 +42,73 @@ function Asked({ d }: { d: RunDetail }) {
   );
 }
 
+/** An Ask a person step waiting: its question, and yes or no or its form, answered here (the run goes on). */
+function AnswerCard({ runId, q }: { runId: string; q: NonNullable<RunDetail['question']> }) {
+  const [values, setValues] = useState<FormValues>(() => initialValues(q.fields ?? []));
+  const [busy, setBusy] = useState(false);
+  const send = async (body: Record<string, unknown>) => {
+    setBusy(true);
+    try {
+      await post(`/api/apps/runs/${enc(runId)}/answer`, { step: q.step, ...body });
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="rounded-2xl border border-warn/40 bg-warn/5 px-4 py-3">
+      <div className="text-[12px] font-medium text-warn">Needs your answer</div>
+      <p className="mt-1 text-[14px] leading-relaxed whitespace-pre-wrap" translate="no">
+        {q.question}
+      </p>
+      {q.fields ? (
+        <div className="mt-3 space-y-3">
+          <AppForm fields={q.fields} values={values} files={{}} onChange={(k, v) => setValues((x) => ({ ...x, [k]: v }))} onFile={() => {}} />
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={() => {
+              const errs = formErrors(q.fields!, values, {});
+              if (Object.keys(errs).length) return toast(Object.values(errs)[0], 'error');
+              void send({ values });
+            }}
+          >
+            Send the answer
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-3 flex gap-2">
+          <Button variant="primary" disabled={busy} onClick={() => void send({ yes: true })}>
+            Yes
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => void send({ yes: false })}>
+            No
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** A run as its person sees it, on its page and in its session: the result, what was asked, the follow-ups. */
 export function RunView({ d, statusExtra }: { d: RunDetail; statusExtra?: ReactNode }) {
   const r = d.run;
+  // A step asking you: the card below asks it, and the line above names it.
+  const asking = d.question ? d.steps?.find((s) => s.path === d.question!.step)?.title : undefined;
+  const progress = d.question && d.progress ? { ...d.progress, waiting: asking ? `“${asking}” needs your answer` : 'Needs your answer' } : d.progress;
   return (
     <>
       <RunBody
         run={r}
-        progress={d.progress}
+        progress={progress}
         answer={d.recipe.answer}
         name={d.recipe.name}
         statusExtra={statusExtra}
         reply={d.asks.length ? (d.first ?? '') : undefined}
         followUp={d.asks.at(-1) && { updated: d.asks.at(-1)!.updated && d.recipe.answer.length > 0 }}
       />
+      {d.question && <AnswerCard runId={r.id} q={d.question} />}
       {d.steps && (
         <RunSteps
           steps={d.steps}

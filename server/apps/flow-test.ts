@@ -524,6 +524,63 @@ test('run again from a step: the steps before it give what they gave, the rest r
   assert.equal(missing.statusCode, 400);
 });
 
+test('Ask a person: the run waits for the answer (its page, the inbox, a notice), goes on with it, asks the same after a restart, and fails when nobody answers in time', async () => {
+  const notices: any[] = [];
+  const on = (n: unknown) => notices.push(n);
+  sessions.on('notify', on);
+  try {
+    const a = app({
+      name: 'Asks',
+      data: { items: { title: 'text' } },
+      answer: [{ id: 'note', label: 'Note', type: 'text', required: true }],
+      flow: {
+        steps: [
+          { id: 'ok', do: 'ask', question: 'Keep {{topic}}?' },
+          { id: 'how', do: 'ask', question: 'Under what name?', fields: [{ id: 'name', label: 'Name', type: 'text', required: true }], if: '{{ok.yes}}' },
+          { id: 'keep', do: 'data', op: 'add', collection: 'items', with: { title: '{{how.name}}' } },
+        ],
+        outputs: { note: '{{keep.record.title}}' },
+      },
+    });
+    const asked = async (id: string, path: string, question?: string) => {
+      for (let i = 0; i < 200; i++) {
+        const d = (await http.inject({ method: 'GET', url: `/api/apps/runs/${id}` })).json();
+        if (d.question?.step === path && (!question || d.question.question === question)) return d;
+        await sleep(25);
+      }
+      throw new Error(`it never asked at ${path}`);
+    };
+    const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'tides' } });
+    const answer = (payload: Record<string, unknown>) => http.inject({ method: 'POST', url: `/api/apps/runs/${r.id}/answer`, payload });
+    const d1 = await asked(r.id, 'ok');
+    assert.equal(d1.run.status, 'waiting');
+    assert.equal(d1.question.question, 'Keep tides?');
+    assert.ok(notices.some((n) => n.kind === 'waiting' && n.url === `/apps/runs/${r.id}` && n.body === 'Keep tides?'), 'a notice opens the run');
+    assert.ok(apps.inbox!(deps).some((it) => it.id === `app-ask:${r.id}:ok` && it.kind === 'question'), 'the inbox lists it');
+    assert.equal((await answer({ values: {} })).statusCode, 400);
+    assert.equal((await answer({ step: 'ok', yes: true })).statusCode, 200);
+    const d2 = await asked(r.id, 'how');
+    assert.deepEqual(d2.question.fields.map((f: any) => f.id), ['name']);
+    assert.equal((await answer({ values: {} })).statusCode, 400, 'its form is checked');
+    assert.equal((await answer({ values: { name: 'Tide tables' } })).statusCode, 200);
+    const done = await ended(r.id);
+    assert.equal(done.status, 'done', done.error);
+    assert.equal(done.result!.note, 'Tide tables');
+    // As the server left another: waiting on its question since almost an hour, its limit.
+    const later = store.insertRun(db, { app: a.id, appName: a.name, recipe: { ...a, answer: [], flow: { steps: [{ id: 'ok', do: 'ask', question: 'Changed since?', waitHours: 1 }] } } as any, source: 'api', inputs: { topic: 'x' }, status: 'waiting' });
+    store.saveStep(db, { run: later.id, path: 'ok', id: 'ok', kind: 'ask', title: 'Ok', status: 'waiting', outputs: { question: 'Asked before the restart' }, startedAt: Date.now() - 3_600_000 + 1500 });
+    const seen = notices.length;
+    flowRunner.resume(store.getRun(db, later.id)!);
+    await asked(later.id, 'ok', 'Asked before the restart');
+    assert.equal(notices.length, seen, 'no second notice for the same question');
+    const gaveUp = await ended(later.id);
+    assert.equal(gaveUp.status, 'failed');
+    assert.match(gaveUp.error ?? '', /Nobody answered in time/);
+  } finally {
+    sessions.off('notify', on);
+  }
+});
+
 test('notify_user: a step tells you something now, and its notice opens the run', async () => {
   const notices: any[] = [];
   const on = (n: unknown) => notices.push(n);
