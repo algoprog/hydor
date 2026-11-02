@@ -27,6 +27,7 @@ import { RunBody } from './Result';
 import { InstallFromFile } from './Install';
 import { Advice } from './Advice';
 import { ExamplesEditor } from './Examples';
+import { Versions } from './Versions';
 import { KeepsEditor } from './Keeps';
 import { RunSteps } from './Steps';
 import { StepsEditor } from './StepsEditor';
@@ -52,8 +53,8 @@ const BLANK: AppRecipe = {
 
 // Every part of the recipe, so a save keeps what this page does not show yet (its data, memory, needs, other flows).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples, graph } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples, graph };
 };
 
 /** A text box that grows with what is written in it. */
@@ -376,6 +377,9 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
     setNewer(null);
   };
   const [note, setNote] = useState('');
+  // What the next save says it did, when it is not what the changes say (a version brought back).
+  const why = useRef<string | undefined>(undefined);
+  const noteBox = useRef<HTMLDivElement>(null);
   const [auto, setAuto] = useState<Set<string>>(new Set());
   const [tools, setTools] = useState<{ name: string; description: string }[] | null>(null);
   const [assistants, setAssistants] = useState<{ id: string; name: string }[]>([]);
@@ -477,8 +481,9 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
     if (!recipe.prompt.trim() && !recipe.flow) return toast('Write the task: it is what the agent is asked to do', 'error');
     setBusy(true);
     try {
-      const body = { recipe: { ...recipe, answer: cleanAnswer(), fields: recipe.fields.map((f) => ({ ...f, options: f.options?.map((o) => o.trim()).filter(Boolean) })) }, ...(template && !saved ? { template } : {}) };
+      const body = { recipe: { ...recipe, answer: cleanAnswer(), fields: recipe.fields.map((f) => ({ ...f, options: f.options?.map((o) => o.trim()).filter(Boolean) })) }, ...(template && !saved ? { template } : {}), ...(why.current ? { why: why.current } : {}) };
       const r = saved ? await put<{ app: AppDef }>(`/api/apps/${enc(saved.id)}`, body) : await post<{ app: AppDef }>('/api/apps', body);
+      why.current = undefined;
       // Beside the conversation: it stays, and the agent that builds it hears of the change.
       if (embedded && saved) {
         load(r.app);
@@ -526,7 +531,11 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
       />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[820px] space-y-4 px-4 py-6 pb-24 sm:px-6">
-          {note && <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">{note}</div>}
+          {note && (
+            <div ref={noteBox} className="scroll-mt-16 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">
+              {note}
+            </div>
+          )}
           {newer && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">
               <span className="min-w-0 flex-1">A newer version was saved (by the agent, or elsewhere) while you changed it here.</span>
@@ -748,6 +757,19 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             )}
           </Section>
 
+          {saved && (
+            <Section title="Versions" sub="Each save that changed what it does (by you, an agent or its folder), and how its examples went with it.">
+              <Versions
+                app={saved}
+                onBring={(r, n) => {
+                  setRecipe(recipeOf({ ...saved, ...r, screens: saved.screens }));
+                  why.current = tr(`Brought back version ${n}`);
+                  setNote(tr(`Version ${n} is on screen: save to bring it back (it becomes the newest version), or leave without saving.`));
+                  setTimeout(() => noteBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                }}
+              />
+            </Section>
+          )}
           <Section title="Limits">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">

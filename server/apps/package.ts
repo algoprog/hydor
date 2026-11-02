@@ -444,7 +444,7 @@ export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Reco
   const made: { app: AppDef; recipe: AppRecipe }[] = [];
   const out: { name: string; slug: string; reused: boolean }[] = [];
   for (const b of bundled) {
-    const app = b.reuse ?? saveApp(db, { recipe: b.recipe });
+    const app = b.reuse ?? saveApp(db, { recipe: b.recipe, by: 'install' });
     if (!b.reuse) {
       b.recipe.screens = screensFrom(db, app.id, b.pkg.app.screens);
       made.push({ app, recipe: b.recipe });
@@ -455,12 +455,12 @@ export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Reco
   // Their calls to each other, and its own, go to the addresses they got here.
   for (const m of made) {
     retarget(m.recipe, moved);
-    saveApp(db, { id: m.app.id, recipe: m.recipe });
+    saveApp(db, { id: m.app.id, recipe: m.recipe, by: 'install' });
   }
   retarget(recipe, moved);
-  const first = saveApp(db, { recipe });
+  const first = saveApp(db, { recipe, by: 'install' });
   recipe.screens = screensFrom(db, first.id, (pkg.app as Record<string, unknown>).screens);
-  const app = recipe.screens ? saveApp(db, { id: first.id, recipe }) : first;
+  const app = recipe.screens ? saveApp(db, { id: first.id, recipe, by: 'install' }) : first;
   let records = 0;
   let skipped = 0;
   for (const [name, list] of Object.entries(pkg.records ?? {})) {

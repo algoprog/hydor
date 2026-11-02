@@ -15,7 +15,7 @@ import { dataChanged, stepsOf } from './flow.ts';
 import { appChanged, startRun, waitFor } from './runs.ts';
 import { changeScreen, makeScreen, screensOf } from './screens.ts';
 import { adviceOf } from './advice.ts';
-import { getApp, getRun, lastExampleRuns, listApps, saveApp, type RunRecord } from './store.ts';
+import { getApp, getRun, getVersion, lastExampleRuns, listApps, listVersions, saveApp, type RunRecord } from './store.ts';
 
 /** What saving checks a recipe with, and what follows a save (its packages): from index.ts. */
 export interface BuilderHelp {
@@ -127,12 +127,18 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_get',
       description:
-        "The user's templates (Templates in the app: a form, a task or steps, an answer, data, screens, examples). Without app: each one in a line. With app: the whole template as app_save takes it (its format: app_guide's templates and API topics), its screens, how its examples last went, and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
-      inputSchema: { type: 'object', properties: { app: APP } },
+        "The user's templates (Templates in the app: a form, a task or steps, an answer, data, screens, examples). Without app: each one in a line. With app: the whole template as app_save takes it (its format: app_guide's templates and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
+      inputSchema: { type: 'object', properties: { app: APP, version: { type: 'number', description: 'One of its versions, whole (its recipe as it was then).' } } },
       annotations: { readOnlyHint: true },
       async run(a) {
         if (!a.app) return JSON.stringify({ templates: listApps(db).map(lineOf) }, null, 1);
         const app = find(a.app);
+        if (a.version !== undefined) {
+          const v = getVersion(db, app.id, Number(a.version));
+          if (!v) return { text: `“${app.name}” has no version ${String(a.version)}: app_get lists its latest`, isError: true };
+          const { recipe, ...version } = v;
+          return JSON.stringify({ id: app.id, version, recipe }, null, 1);
+        }
         // An agent that builds it has seen it as it is now (the user's changes too).
         if (seenBy(db, app.id, ctx.key) !== undefined) noteBuilder(db, app.id, ctx.key);
         const last = lastExampleRuns(db, app.id);
@@ -145,6 +151,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
             recipe: cleanRecipe(app),
             screens: screensOf(db, app),
             examples: (app.examples ?? []).map((e) => ({ id: e.id, ...(last.get(e.id) ? { last: runOf(last.get(e.id)!, false) } : {}) })),
+            versions: listVersions(db, app.id, 8).map((v) => ({ ...v, at: new Date(v.at).toISOString() })),
             ...(advice.rescued.length || advice.firm.length
               ? {
                   advice: [
@@ -192,7 +199,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         if (!prev && !a.recipe && !a.patch) return { text: 'Give the template to make (recipe), or the one to change (app)', isError: true };
         const { recipe, errors, warnings } = help.problemsOf(raw);
         if (errors.length) return { text: `Not saved. Fix these first:\n- ${errors.join('\n- ')}`, isError: true };
-        const saved = help.prepare(saveApp(db, { id: prev?.id, recipe: { ...recipe, screens: prev?.screens } }));
+        const saved = help.prepare(saveApp(db, { id: prev?.id, recipe: { ...recipe, screens: prev?.screens }, by: 'agent', why: typeof a.why === 'string' ? a.why : undefined }));
         noteBuilder(db, saved.id, ctx.key);
         appChanged(saved, 'agent');
         if (a.force) dropEdits(db, saved.id, ctx.key);

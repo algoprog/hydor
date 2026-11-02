@@ -237,6 +237,10 @@ On your template's page:
 - **More** (⋯) → **Duplicate** makes a copy named with " copy" at the end, at an address of its own. Its screen comes along as a page of its own; its public page starts closed, and its keys and the records it keeps are not copied.
 - **More** (⋯) → **Delete** asks "Delete …?": its runs, keys and public page go with it, and runs still going are stopped. The sessions it started stay.
 
+### Versions
+
+Each save that changes what a template does is a version: **Versions**, near the end of its **Edit**, lists them newest first, each with what changed (or what the agent said it did), who saved it (**You**, **An agent**, **Its folder** or **Installed**) and when, and, for the versions its examples were tried with as saved, how many passed and what a run took and cost, so you can see whether a change made it better. **Bring it back** puts an earlier version on screen, and **Save** makes it the newest version again. Moving its steps about in the graph, and its screens (which have versions of their own), make no new version. Each run keeps the version it ran.
+
 ## Call a template from your own programs
 
 Scripts, shortcuts and other programs can run your template with a key and get its answer back. Open your template → **API & sharing** → **API**.

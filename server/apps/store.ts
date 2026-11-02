@@ -6,6 +6,7 @@ import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunSource, Ru
 import type { CheckResult } from '../../shared/app-manifest.ts';
 import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
 import type { DB } from '../db.ts';
+import { changesOf } from './edits.ts';
 
 export const newId = (n = 8) => crypto.randomBytes(n).toString('hex');
 
@@ -94,6 +95,9 @@ export function ensureTables(db: DB) {
   if (!stepCols.has('reused')) db.exec('alter table app_steps add column reused integer not null default 0');
   // Steps that failed and an agent did their work (failed: "agent"); error says why they failed.
   if (!stepCols.has('rescued')) db.exec('alter table app_steps add column rescued integer not null default 0');
+  // Each save that changed what a template is: a version, with who saved it and what changed; a run keeps the version it ran.
+  db.exec('create table if not exists app_versions (app_id text not null, n integer not null, at integer not null, by text not null, line text not null, recipe text not null, primary key (app_id, n))');
+  if (!cols.has('version')) db.exec('alter table app_runs add column version integer');
 }
 
 // ---- apps --------------------------------------------------------------------------------------------
@@ -131,7 +135,16 @@ function freeSlug(db: DB, want: string, own?: string): string {
   }
 }
 
-export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: AppRecipe; mcp?: boolean; public?: Partial<PublicSettings>; template?: string }): AppDef {
+/** Who saved a version: you in the editor, an agent, the template's folder, or a file installed. */
+export type VersionBy = 'you' | 'agent' | 'folder' | 'install';
+
+/** What a template is, for its versions: its recipe without where its steps sit in the graph and its screens (which have versions of their own). */
+export function coreOf(r: AppRecipe): string {
+  const { graph: _g, screens: _s, ...core } = cleanRecipe(r);
+  return JSON.stringify(core);
+}
+
+export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: AppRecipe; mcp?: boolean; public?: Partial<PublicSettings>; template?: string; by?: VersionBy; why?: string }): AppDef {
   const now = Date.now();
   const prev = input.id ? getApp(db, input.id) : null;
   const id = prev?.id ?? newId(6);
@@ -144,11 +157,44 @@ export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: App
   };
   if (prev) db.prepare('update apps set slug = ?, data = ?, updated_at = ? where id = ?').run(slug, JSON.stringify(data), now, id);
   else db.prepare('insert into apps (id, slug, data, created_at, updated_at) values (?, ?, ?, ?, ?)').run(id, slug, JSON.stringify(data), now, now);
+  // A version when what it is changed (not only where its steps sit, or its screens).
+  const last = latestVersion(db, id);
+  const core = coreOf(data);
+  if (!last || last.core !== core) {
+    const before = last ? (JSON.parse(last.recipe) as AppRecipe) : prev ? cleanRecipe(prev) : null;
+    const line = input.why?.trim() || (before ? changesOf(before, cleanRecipe(data)).join(' ') : 'Made it.') || 'Saved again.';
+    db.prepare('insert into app_versions (app_id, n, at, by, line, recipe) values (?, ?, ?, ?, ?, ?)').run(id, (last?.n ?? 0) + 1, now, input.by ?? 'you', line.slice(0, 500), JSON.stringify(cleanRecipe(data)));
+  }
   return getApp(db, id)!;
+}
+
+export interface AppVersion {
+  n: number;
+  at: number;
+  by: VersionBy;
+  line: string;
+}
+
+/** A template's latest version: its number, the recipe, and what it is (for runs to say which they ran). */
+export function latestVersion(db: DB, app: string): (AppVersion & { recipe: string; core: string }) | null {
+  const r = db.prepare('select n, at, by, line, recipe from app_versions where app_id = ? order by n desc limit 1').get(app) as (AppVersion & { recipe: string }) | undefined;
+  return r ? { ...r, core: coreOf(JSON.parse(r.recipe) as AppRecipe) } : null;
+}
+
+/** A template's versions, newest first. */
+export function listVersions(db: DB, app: string, limit = 50): AppVersion[] {
+  return db.prepare('select n, at, by, line from app_versions where app_id = ? order by n desc limit ?').all(app, limit) as AppVersion[];
+}
+
+/** One version, with its recipe. */
+export function getVersion(db: DB, app: string, n: number): (AppVersion & { recipe: AppRecipe }) | null {
+  const r = db.prepare('select n, at, by, line, recipe from app_versions where app_id = ? and n = ?').get(app, n) as (AppVersion & { recipe: string }) | undefined;
+  return r ? { ...r, recipe: cleanRecipe(JSON.parse(r.recipe)) } : null;
 }
 
 export function deleteApp(db: DB, id: string) {
   db.prepare('delete from apps where id = ?').run(id);
+  db.prepare('delete from app_versions where app_id = ?').run(id);
   db.prepare('delete from app_keys where app_id = ?').run(id);
 }
 
@@ -176,6 +222,7 @@ interface RunRow {
   flow: string | null;
   example: string | null;
   checks: string | null;
+  version: number | null;
   nudged: number;
   created_at: number;
   started_at: number | null;
@@ -225,6 +272,7 @@ function toRun(r: RunRow): RunRecord {
     flow: r.flow ?? undefined,
     example: r.example ?? undefined,
     checks: r.checks ? parse<CheckResult[]>(r.checks, []) : undefined,
+    ...(r.version ? { version: r.version } : {}),
     nudged: !!r.nudged,
     createdAt: r.created_at,
     startedAt: r.started_at ?? undefined,
@@ -240,11 +288,38 @@ export function runView(r: RunRecord): AppRun {
 
 export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string }): RunRecord {
   const id = newId(8);
+  // The version it runs, when it runs the template as saved (a try of changes not saved yet runs none).
+  const last = r.source === 'step' ? null : latestVersion(db, r.app);
+  const version = last && last.core === coreOf(r.recipe) ? last.n : null;
   db.prepare(
-    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, Date.now());
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, Date.now());
   return getRun(db, id)!;
+}
+
+/** How a template's examples went with each version: those tried with it as saved, the latest run of each example. */
+export function examplesByVersion(db: DB, app: string): Map<number, { tried: number; passed: number; seconds: number; costUsd: number }> {
+  const rows = db.prepare("select * from app_runs where app_id = ? and version is not null and example is not null and example not like 'trial:%' and status in ('done', 'failed', 'stopped') order by created_at desc limit 2000").all(app) as RunRow[];
+  const seen = new Set<string>();
+  const out = new Map<number, { tried: number; passed: number; seconds: number; costUsd: number }>();
+  for (const row of rows) {
+    const k = `${row.version}:${row.example}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const r = toRun(row);
+    const v = out.get(row.version!) ?? { tried: 0, passed: 0, seconds: 0, costUsd: 0 };
+    v.tried++;
+    if (r.status === 'done' && (r.checks ?? []).every((c) => c.ok)) v.passed++;
+    v.seconds += r.startedAt && r.endedAt ? (r.endedAt - r.startedAt) / 1000 : 0;
+    v.costUsd += r.costUsd ?? 0;
+    out.set(row.version!, v);
+  }
+  for (const v of out.values()) {
+    v.seconds = Math.round(v.seconds / v.tried);
+    v.costUsd = Math.round((v.costUsd / v.tried) * 10000) / 10000;
+  }
+  return out;
 }
 
 /** Each example's latest run, of a template (by the example's id). */

@@ -47,15 +47,18 @@ import {
   deleteRun,
   deleteRuns,
   ensureTables,
+  examplesByVersion,
   getApp,
   getBatch,
   getRun,
+  getVersion,
   KEY_PREFIX,
   lastExampleRuns,
   listApps,
   listBatches,
   listKeys,
   listRuns,
+  listVersions,
   revokeKey,
   runView,
   saveApp,
@@ -112,7 +115,7 @@ function saveInput(db: Deps['db'], b: any, prev?: AppDef) {
   const pub = b?.public && typeof b.public === 'object' ? b.public : undefined;
   if (pub?.on && !(pub.model ?? prev?.public.model)) throw new HttpError(400, 'Pick the model public runs use (one of Custom’s)');
   if (pub?.model && !customModels().some((m) => m.id === pub.model)) throw new HttpError(400, 'That model is not one of Custom’s: add it in Settings → Models');
-  return { recipe, warnings, mcp: typeof b?.mcp === 'boolean' ? b.mcp : undefined, public: pub, slug: typeof b?.slug === 'string' ? b.slug : undefined, template: typeof b?.template === 'string' ? b.template : undefined };
+  return { recipe, warnings, mcp: typeof b?.mcp === 'boolean' ? b.mcp : undefined, public: pub, slug: typeof b?.slug === 'string' ? b.slug : undefined, template: typeof b?.template === 'string' ? b.template : undefined, why: typeof b?.why === 'string' ? b.why.slice(0, 300) : undefined };
 }
 
 /** A rough cost for a number of runs: from the app's own runs, else from the model's price. */
@@ -221,7 +224,7 @@ function routes(d: Deps) {
   // any (a copy makes its own), and saving a recipe keeps the ones it has, so no page of another becomes one.
   app.post('/api/apps', async (req) => {
     const { warnings, ...b } = saveInput(db, req.body);
-    return { app: prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: undefined } })), warnings };
+    return { app: prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: undefined }, by: isInternal(req) ? 'agent' : 'you' })), warnings };
   });
 
   /** A recipe checked without saving it: what must change, and what may surprise. */
@@ -259,7 +262,7 @@ function routes(d: Deps) {
     const prev = getApp(db, P(req).id);
     if (!prev) throw new HttpError(404, 'No such template');
     const { warnings, ...b } = saveInput(db, req.body, prev);
-    const saved = prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: prev.screens }, id: prev.id }));
+    const saved = prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: prev.screens }, id: prev.id, by: isInternal(req) ? 'agent' : 'you' }));
     // A change made in its editor (not an agent's, through the API): the agents that built it hear of it.
     if (!isInternal(req)) noteUserEdit(db, saved.id, saved.name, cleanRecipe(prev), cleanRecipe(saved));
     appChanged(saved, isInternal(req) ? 'agent' : 'user');
@@ -412,6 +415,23 @@ function routes(d: Deps) {
     // A trial (a change tried before it is used, as Firm it up does) is not the examples' last try.
     const runs = tryExamples({ app: a, recipe, only, slug: a?.slug ?? 'test', trial: b.trial === true });
     return { runs: runs.map((x) => ({ example: x.example.id, ...(x.run ? { run: runView(x.run) } : {}), ...(x.error ? { error: x.error } : {}) })) };
+  });
+
+  /** Its versions, newest first: each save that changed what it is, who saved it and what changed, and how its examples went with it. */
+  app.get('/api/apps/:id/versions', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such template');
+    const tried = examplesByVersion(db, a.id);
+    return { versions: listVersions(db, a.id).map((v) => ({ ...v, ...(tried.get(v.n) ? { examples: tried.get(v.n) } : {}) })) };
+  });
+
+  /** One version, with its recipe (to look at, or to bring back by saving it). */
+  app.get('/api/apps/:id/versions/:n', async (req) => {
+    const a = getApp(db, P(req).id);
+    const v = a ? getVersion(db, a.id, Number(P(req).n)) : null;
+    if (!v) throw new HttpError(404, 'No such version');
+    const { recipe, ...version } = v;
+    return { version, recipe: { ...recipe, screens: a!.screens } };
   });
 
   /** What its latest runs say about its steps: those an agent had to do the work of, and agent steps that fixed steps could do (Firm it up). */

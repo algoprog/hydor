@@ -175,6 +175,8 @@ export interface AppRun {
   /** The example it tried, and how that example's checks went once it ended. */
   example?: string;
   checks?: CheckResult[];
+  /** The template's version it ran (none: a try of changes not saved, or a template as it was before versions). */
+  version?: number;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
