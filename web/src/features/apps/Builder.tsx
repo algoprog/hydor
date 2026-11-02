@@ -22,6 +22,7 @@ import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { RunBody } from './Result';
 import { InstallFromFile } from './Install';
+import { ExamplesEditor } from './Examples';
 import { KeepsEditor } from './Keeps';
 import { RunSteps } from './Steps';
 import { StepsEditor } from './StepsEditor';
@@ -47,8 +48,8 @@ const BLANK: AppRecipe = {
 
 // Every part of the recipe, so a save keeps what this page does not show yet (its data, memory, needs, other flows).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples };
 };
 
 /** A text box that grows with what is written in it. */
@@ -223,7 +224,7 @@ function AnswerRow({ f, onChange, ...nav }: { f: AnswerField; onChange: (f: Answ
 }
 
 /** A test of what is on screen: the form, then the run as it goes. */
-function TestRun({ recipe, appId, open, onClose }: { recipe: AppRecipe; appId: string | null; open: boolean; onClose: () => void }) {
+function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; appId: string | null; open: boolean; onClose: () => void; onKeep: (inputs: FormValues) => void }) {
   const [values, setValues] = useState<FormValues>({});
   const [files, setFiles] = useState<FormFiles>({});
   const [run, setRun] = useState<{ run: AppRun; progress?: RunProgress; steps?: RunDetail['steps'] } | null>(null);
@@ -263,6 +264,17 @@ function TestRun({ recipe, appId, open, onClose }: { recipe: AppRecipe; appId: s
             {run.run.key && (
               <Button variant="ghost" onClick={() => go(`/s/${enc(run.run.key!)}`)}>
                 Open the session
+              </Button>
+            )}
+            {!isActive(run.run.status) && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  onKeep(values);
+                  onClose();
+                }}
+              >
+                Keep as an example
               </Button>
             )}
             <Button variant="secondary" onClick={() => setRun(null)}>
@@ -572,6 +584,10 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
             </div>
           </Section>
 
+          <Section title="Examples" sub="Answers to try it with, and checks on what a run gives: to try a change, and to notice when it gets worse.">
+            <ExamplesEditor recipe={recipe} appId={saved?.id ?? null} onChange={set} />
+          </Section>
+
           <Section title="What it keeps" sub="Lists of records it keeps between runs, which its steps, its agents and its screen share, and a memory of its own.">
             <KeepsEditor recipe={recipe} onChange={set} />
           </Section>
@@ -667,7 +683,17 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
           </Section>
         </div>
       </div>
-      <TestRun recipe={{ ...recipe, answer: cleanAnswer() }} appId={saved?.id ?? null} open={testing} onClose={() => setTesting(false)} />
+      <TestRun
+        recipe={{ ...recipe, answer: cleanAnswer() }}
+        appId={saved?.id ?? null}
+        open={testing}
+        onClose={() => setTesting(false)}
+        onKeep={(inputs) => {
+          const list = recipe.examples ?? [];
+          set({ examples: [...list, { id: fieldId('example', list.map((x) => x.id)), inputs }] });
+          toast('Kept as an example: give it checks under Examples', 'ok');
+        }}
+      />
     </div>
   );
 }

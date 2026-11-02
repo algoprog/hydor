@@ -3,6 +3,7 @@
 // API keys (hashed) and runs over the rows of a CSV. What apps keep for themselves is in data.ts.
 import crypto from 'node:crypto';
 import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunSource, RunStatus, StepStatus } from '../../shared/apps.ts';
+import type { CheckResult } from '../../shared/app-manifest.ts';
 import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
 import type { DB } from '../db.ts';
 
@@ -84,6 +85,9 @@ export function ensureTables(db: DB) {
   if (!cols.has('step')) db.exec('alter table app_runs add column step text');
   // Which of its flows a run ran, when not the main one.
   if (!cols.has('flow')) db.exec('alter table app_runs add column flow text');
+  // The example a run tried, and how its checks went.
+  if (!cols.has('example')) db.exec('alter table app_runs add column example text');
+  if (!cols.has('checks')) db.exec('alter table app_runs add column checks text');
   db.exec('create index if not exists app_runs_parent on app_runs (parent)');
   // Steps a run took over from an earlier one (Run again from here).
   const stepCols = new Set((db.prepare('pragma table_info(app_steps)').all() as { name: string }[]).map((c) => c.name));
@@ -168,6 +172,8 @@ interface RunRow {
   parent: string | null;
   step: string | null;
   flow: string | null;
+  example: string | null;
+  checks: string | null;
   nudged: number;
   created_at: number;
   started_at: number | null;
@@ -215,6 +221,8 @@ function toRun(r: RunRow): RunRecord {
     parent: r.parent ?? undefined,
     step: r.step ?? undefined,
     flow: r.flow ?? undefined,
+    example: r.example ?? undefined,
+    checks: r.checks ? parse<CheckResult[]>(r.checks, []) : undefined,
     nudged: !!r.nudged,
     createdAt: r.created_at,
     startedAt: r.started_at ?? undefined,
@@ -228,13 +236,20 @@ export function runView(r: RunRecord): AppRun {
   return view;
 }
 
-export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string }): RunRecord {
+export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string }): RunRecord {
   const id = newId(8);
   db.prepare(
-    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, Date.now());
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, Date.now());
   return getRun(db, id)!;
+}
+
+/** Each example's latest run, of a template (by the example's id). */
+export function lastExampleRuns(db: DB, app: string): Map<string, RunRecord> {
+  const out = new Map<string, RunRecord>();
+  for (const r of db.prepare('select * from app_runs where app_id = ? and example is not null order by created_at desc limit 400').all(app) as RunRow[]) if (!out.has(r.example!)) out.set(r.example!, toRun(r));
+  return out;
 }
 
 export function getRun(db: DB, id: string): RunRecord | null {
@@ -253,7 +268,7 @@ export function runIdByKey(db: DB, key: string): string | null {
   return r?.id ?? null;
 }
 
-export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: RunStatus; result: Record<string, unknown> | null; reply: string; error: string | null; costUsd: number; nudged: boolean; startedAt: number; endedAt: number | null }>) {
+export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: RunStatus; result: Record<string, unknown> | null; reply: string; error: string | null; costUsd: number; nudged: boolean; startedAt: number; endedAt: number | null; checks: CheckResult[] }>) {
   const sets: string[] = [];
   const vals: unknown[] = [];
   const put = (col: string, v: unknown) => {
@@ -269,6 +284,7 @@ export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: 
   if (p.nudged !== undefined) put('nudged', p.nudged ? 1 : 0);
   if (p.startedAt !== undefined) put('started_at', p.startedAt);
   if (p.endedAt !== undefined) put('ended_at', p.endedAt);
+  if (p.checks !== undefined) put('checks', JSON.stringify(p.checks));
   if (!sets.length) return;
   db.prepare(`update app_runs set ${sets.join(', ')} where id = ?`).run(...vals, id);
 }

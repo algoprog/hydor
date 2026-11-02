@@ -749,6 +749,59 @@ export function cleanFlows(raw: unknown): { flows?: Record<string, NamedFlow>; e
   return { flows: Object.keys(out).length ? out : undefined, errors };
 }
 
+// ---- examples --------------------------------------------------------------------------------------------
+
+/**
+ * Saved inputs to try the app with, and checks on what a run gives: rules on its values ({{answer.field}},
+ * {{step.value}}, {{reply}}), each of which holds when the run is good. To try a change, and to notice when
+ * the app gets worse.
+ */
+export interface AppExample {
+  id: string;
+  /** Its name in the list (unset: its answers, in a line). */
+  name?: string;
+  /** The flow it tries (unset: the main one). */
+  flow?: string;
+  inputs: Record<string, unknown>;
+  checks?: string[];
+}
+
+/** How a check went on a run. */
+export interface CheckResult {
+  rule: string;
+  ok: boolean;
+  /** Why it could not be read, or what it saw. */
+  why?: string;
+}
+
+export const EXAMPLE_LIMITS = { examples: 20, checks: 10, inputs: 20_000 };
+
+/** An app's examples, from anything: each with an id of its own, its checks readable rules. */
+export function cleanExamples(raw: unknown): { examples?: AppExample[]; errors: string[] } {
+  const errors: string[] = [];
+  if (raw === undefined || raw === null) return { errors };
+  if (!Array.isArray(raw)) return { errors: ['Examples ("examples") are a list of { name?, inputs, checks? }'] };
+  if (raw.length > EXAMPLE_LIMITS.examples) errors.push(`An app has at most ${EXAMPLE_LIMITS.examples} examples`);
+  const taken = new Set<string>();
+  const out: AppExample[] = [];
+  for (const x of raw.slice(0, EXAMPLE_LIMITS.examples) as any[]) {
+    if (!x || typeof x !== 'object') continue;
+    const name = short(x.name, 80);
+    const id = typeof x.id === 'string' && /^[A-Za-z][\w-]{0,39}$/.test(x.id) && !taken.has(x.id) ? x.id : freeId(name || 'example', taken);
+    taken.add(id);
+    const inputs = x.inputs && typeof x.inputs === 'object' && !Array.isArray(x.inputs) ? (x.inputs as Record<string, unknown>) : {};
+    if (JSON.stringify(inputs).length > EXAMPLE_LIMITS.inputs) errors.push(`Example “${name || id}”: its answers are too long`);
+    const checks = (Array.isArray(x.checks) ? x.checks : []).map((c: unknown) => text(c, 400)).filter(Boolean).slice(0, EXAMPLE_LIMITS.checks);
+    for (const c of checks) {
+      const r = readRule(c);
+      if ('error' in r) errors.push(`Example “${name || id}”, its check “${c}”: ${r.error}`);
+    }
+    const flow = short(x.flow, 40);
+    out.push({ id, ...(name ? { name } : {}), ...(flow && flow !== 'run' ? { flow } : {}), inputs, ...(checks.length ? { checks } : {}) });
+  }
+  return { examples: out.length ? out : undefined, errors };
+}
+
 /** An app's screens, from anything: names to the pages they are. */
 export function cleanScreens(raw: unknown): Record<string, AppScreen> | undefined {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;

@@ -118,10 +118,11 @@ agents that speak ACP and take MCP servers.
   run's page, run again from any step there (the steps before it giving what they gave, also from a test run in
   its Edit) and resumed after a restart; keep records between runs that its steps, its agents and the API share
   (lists named in its Edit, with the fields their records hold); remember across runs in a memory of its own; and
-  install the Node and Python packages it needs in a folder of its own. Its steps, its agents and programs search
-  its records by words and by meaning, as knowledge bases are searched. A template can have a screen of its own
-  in place of its form: a page made from its parts (its form, its answer, a table for each list it keeps, its
-  earlier runs) that runs it and changes as its records do, edited in Pages' editor (whose Add has an App tab
+  install the Node and Python packages it needs in a folder of its own. Examples (answers with checks on what a
+  run gives) try it as it is on screen, each saying how its last try went. Its steps, its agents and programs
+  search its records by words and by meaning, as knowledge bases are searched. A template can have a screen of
+  its own in place of its form: a page made from its parts (its form, its answer, a table for each list it keeps,
+  its earlier runs) that runs it and changes as its records do, edited in Pages' editor (whose Add has an App tab
   with those parts) or by an agent, with buttons for its other flows. Templates travel as one file (.naget-app or
   .json, with their records, screens and the templates they call), installed after a card that says what they
   will do here and offers one of your models for any it asks for that is not set up here.

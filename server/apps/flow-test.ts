@@ -619,6 +619,40 @@ test('Run code: a program in JavaScript or Python gets its input and returns the
   assert.match(ps.slow.error ?? '', /past its 2 seconds/);
 });
 
+test('examples: saved inputs with checks; trying them runs each as a test, and its checks are read against what it gave', async () => {
+  const a = app({
+    name: 'Counted',
+    data: { items: { title: 'text' } },
+    answer: [{ id: 'count', label: 'Count', type: 'number', required: true }],
+    flow: { steps: [{ id: 'save', do: 'data', add: 'items', with: { title: '{{topic}}' } }, { id: 'all', do: 'data', op: 'find', collection: 'items' }], outputs: { count: '{{all.count}}' } },
+    examples: [
+      { name: 'One', inputs: { topic: 'first' }, checks: ['{{answer.count}} > 0', '{{save.record.title}} = first'] },
+      { name: 'Wrong', inputs: { topic: 'second' }, checks: ['{{answer.count}} > 99'] },
+    ],
+  });
+  assert.deepEqual(a.examples!.map((e) => e.id), ['one', 'wrong']);
+  const bad = (await http.inject({ method: 'POST', url: '/api/apps/check', payload: { recipe: { ...a, examples: [{ inputs: {}, checks: ['{{x}} >'] }] } } })).json();
+  assert.ok(bad.errors.some((e: string) => /its check/.test(e)), bad.errors.join('\n'));
+  const res = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/examples/run`, payload: {} });
+  assert.equal(res.statusCode, 200, res.body);
+  const runs = res.json().runs;
+  assert.deepEqual(runs.map((x: any) => x.example), ['one', 'wrong']);
+  for (const x of runs) await ended(x.run.id);
+  await sleep(50);
+  const list = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/examples` })).json().examples;
+  const one = list.find((e: any) => e.id === 'one');
+  assert.equal(one.last.status, 'done');
+  assert.deepEqual(one.last.checks.map((c: any) => c.ok), [true, true]);
+  const wrong = list.find((e: any) => e.id === 'wrong');
+  assert.equal(wrong.last.checks[0].ok, false);
+  assert.match(wrong.last.checks[0].why, /answer\.count is \d/);
+  // The builder's recipe, not saved yet, and only the example named.
+  const tried = (await http.inject({ method: 'POST', url: `/api/apps/${a.id}/examples/run`, payload: { recipe: { ...a, examples: [{ id: 'one', inputs: { topic: 'x' }, checks: ['{{answer.count}} > 0'] }, { id: 'two', inputs: { topic: 'y' } }] }, only: ['one'] } })).json().runs;
+  assert.equal(tried.length, 1);
+  assert.equal(tried[0].run.source, 'test');
+  assert.equal((await ended(tried[0].run.id)).status, 'done');
+});
+
 test('notify_user: a step tells you something now, and its notice opens the run', async () => {
   const notices: any[] = [];
   const on = (n: unknown) => notices.push(n);
