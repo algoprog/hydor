@@ -102,8 +102,8 @@ function Starting({ question }: { question: string }) {
   );
 }
 
-/** The session's conversation, live, as its own page shows it. */
-function Conversation({ sessionKey }: { sessionKey: string }) {
+/** The session's conversation, live, as its own page shows it (also beside a page in Pages). */
+export function Conversation({ sessionKey }: { sessionKey: string }) {
   const s = useSessions((x) => x.byKey[sessionKey]);
   const lv = useLive((x) => x.byKey[sessionKey]);
   useEffect(() => {

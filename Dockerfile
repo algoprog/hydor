@@ -40,6 +40,15 @@ RUN if [ "$OFFICE" = true ]; then apt-get update \
       fonts-liberation2 fonts-dejavu-core fonts-crosextra-carlito fonts-crosextra-caladea \
  && rm -rf /var/lib/apt/lists/*; fi
 
+# TeX Live (about 500 MB more) typesets the LaTeX documents in Pages and shows their pages: build with
+# --build-arg LATEX=true to add it. Without it, LaTeX documents are still kept and edited, not typeset.
+# pdfLaTeX and XeLaTeX only: LuaLaTeX runs only in bubblewrap's sandbox, which Docker does not allow.
+ARG LATEX=false
+RUN if [ "$LATEX" = true ]; then apt-get update \
+ && apt-get install -y --no-install-recommends texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+      texlive-xetex latexmk lmodern \
+ && rm -rf /var/lib/apt/lists/*; fi
+
 # Chromium for the agents' browser (Settings → Browser), with fonts for most pages and emoji. Build
 # with --build-arg BROWSER=false to leave it out (on x86-64 the app can then download Chrome itself).
 ARG BROWSER=true

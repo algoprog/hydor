@@ -2,7 +2,7 @@
 // itself, working (its storage is the page's own), with Open for Pages. publish_site: a card that
 // needs the user, private or public link, Publish or Not now; then the link, or what happened.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppWindow, ChevronRight, Expand, ExternalLink, Globe, GlobeLock, PenLine } from 'lucide-react';
+import { AppWindow, ChevronRight, Expand, ExternalLink, FileText, Globe, GlobeLock, PenLine, Presentation, Sheet, Sigma } from 'lucide-react';
 import type { PublishRequest, SiteVisibility } from '@shared/pages';
 import type { ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
@@ -39,6 +39,20 @@ export function readPageStep(t: { status: string; input?: unknown }) {
     category: 'read' as const,
     verb: t.status === 'running' || t.status === 'pending' ? 'Reading' : 'Read',
     title: typeof id === 'string' && id ? (title ? `the page “${title}”` : 'a saved page') : 'the list of saved pages',
+  };
+}
+
+const FORMAT_NAMES: Record<string, string> = { pdf: 'a PDF', docx: 'a Word document', pptx: 'a PowerPoint file', html: 'a web page' };
+
+/** How export_page reads as a step: which page it saved as a file, and as what. */
+export function exportPageStep(t: { status: string; input?: unknown }) {
+  const a = (t.input ?? {}) as { id?: unknown; format?: unknown };
+  const title = typeof a.id === 'string' ? usePagesStore.getState().pages?.find((p) => p.id === a.id)?.title : undefined;
+  const as = typeof a.format === 'string' ? (FORMAT_NAMES[a.format] ?? a.format) : 'a file';
+  return {
+    category: 'edit' as const,
+    verb: t.status === 'running' || t.status === 'pending' ? 'Saving' : 'Saved',
+    title: `${title ? `“${title}”` : 'a page'} as ${as}`,
   };
 }
 
@@ -89,11 +103,20 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
   const writing = !ref && item.tool.status !== 'error' && (!draft || !draft.done || item.tool.status === 'running' || item.tool.status === 'pending');
   const title = info?.title ?? (page && page !== 'gone' ? page.title : undefined) ?? draft?.title ?? 'Page';
 
-  if (item.tool.status === 'error') return <Note>Could not save the page: {failure(item)}</Note>;
+  const kind = /save_slides$/.test(item.tool.name) ? 'slides' : /save_doc$/.test(item.tool.name) ? 'doc' : /save_sheet$/.test(item.tool.name) ? 'sheet' : /save_latex$/.test(item.tool.name) ? 'tex' : null;
+  const deck = kind !== null;
+  const noun = kind === 'slides' ? 'the slides' : kind === 'doc' ? 'the document' : kind === 'sheet' ? 'the spreadsheet' : kind === 'tex' ? 'the LaTeX document' : 'the page';
+  if (item.tool.status === 'error') return <Note>{`Could not save ${noun}`}: {failure(item)}</Note>;
   if (wide && besideOpen) {
     const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : `Saved in Pages · version ${ref?.version ?? 1}${info && !current ? ' · a newer one is there' : ''}`;
     return <SmallPageCard sessionKey={sessionKey} item={item} title={title} sub={sub} writing={writing} />;
   }
+  if (writing && deck)
+    return (
+      <Note>
+        <Throbber /> {kind === 'slides' ? 'Making the slides…' : kind === 'doc' ? 'Writing the document…' : kind === 'tex' ? 'Writing and typesetting the LaTeX…' : 'Making the spreadsheet…'}
+      </Note>
+    );
   if (writing)
     return draft?.text ? (
       <div className="tl-item my-1.5 overflow-hidden rounded-xl border border-line bg-panel">
@@ -127,14 +150,14 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
       <div className="flex items-center gap-3 py-2.5 pr-2 pl-2.5">
         <button type="button" onClick={open} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <Tile>
-            <AppWindow size={19} strokeWidth={1.8} />
+            {kind === 'slides' ? <Presentation size={19} strokeWidth={1.8} /> : kind === 'doc' ? <FileText size={19} strokeWidth={1.8} /> : kind === 'sheet' ? <Sheet size={19} strokeWidth={1.8} /> : kind === 'tex' ? <Sigma size={19} strokeWidth={1.8} /> : <AppWindow size={19} strokeWidth={1.8} />}
           </Tile>
           <span className="min-w-0 flex-1">
             <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
               {title}
             </span>
             <span className="block truncate text-[12px] leading-4 text-fg-3">
-              Saved in Pages · version {ref.version}
+              {kind === 'slides' ? 'Slides in Pages' : kind === 'doc' ? 'A document in Pages' : kind === 'sheet' ? 'A spreadsheet in Pages' : kind === 'tex' ? 'LaTeX in Pages' : 'Saved in Pages'} · version {ref.version}
               {info && !current ? ' · a newer one is there' : ''}
             </span>
           </span>
@@ -177,7 +200,7 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
       )}
       {full && page && page !== 'gone' && store && (
         <PageOverlay title={title} onClose={() => setFull(false)}>
-          <PageFrame key={frameKey} html={page.html} title={title} store={store} onPick={onPick} />
+          <PageFrame key={frameKey} html={page.html} title={title} store={store} onPick={onPick} fill />
         </PageOverlay>
       )}
     </div>

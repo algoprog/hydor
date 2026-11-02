@@ -104,10 +104,38 @@ agents that speak ACP and take MCP servers.
   set the whole page's colours, fonts, width and the look of its headings, links and buttons, ask the agent about
   a part, or edit its HTML with the page beside it; the agent hears of your changes with your next message.
   HTML files an agent writes open the same way. Make pages of your own from a blank page, notes, a checklist or
-  a tracker, and see or clear the data a page keeps.
-  Templates are tasks you repeat, each with a form: ready-made or your own, run from the Templates page, the
-  API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's result, asked on its page
-  or in its session, which opens on that result with a switch to the conversation.
+  a tracker, and see or clear the data a page keeps. Export a page as a PDF, a Word document (headings, lists,
+  tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
+  or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
+  watch it change as it saves. Templates are tasks you repeat, each with a form: ready-made or your own, run from
+  the Templates page, the API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's
+  result, asked on its page or in its session, which opens on that result with a switch to the conversation.
+- **Slides**: decks kept in Pages, made by an agent (save_slides, from layouts or parts placed by position) or
+  from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
+  layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and
+  charts (column, bar, line, area, pie, doughnut), snapping guides, alignment, stacking, undo, copy and paste;
+  animations in order (on a click, with or after the one before, a paragraph at a time) and transitions; themes
+  of colours and fonts; speaker notes; a slideshow (keys, swipes, black and white screens, every slide at once)
+  and a presenter's view with notes, the next slide, a timer and an audience window that follows it. They export
+  as PowerPoint (every part still editable, native charts, notes, transitions and animations), PDF or a web page
+  that presents itself, and open as a slideshow at their own address or a published link.
+- **Documents, spreadsheets and LaTeX**: kept in Pages beside slides, each with versions, a picture in the list,
+  its own address and an agent that changes it on request. Documents (save_doc, written in Markdown, or opened from
+  a Word, Markdown, text or HTML file) are edited as in Word or Google Docs on a page of their paper: paragraph
+  styles, fonts, sizes, colours and highlights, links, alignment, bullets, numbers and checklists, tables, pictures
+  with captions, lines and page breaks, Markdown shortcuts as you type, paste from Word and Google Docs cleaned, an
+  outline and a word count; they export as Word (styles, lists, tables and pictures as Word's own), PDF on their
+  paper, Markdown or a web page. Spreadsheets (save_sheet, with formulas, or opened from an Excel, ODS, CSV or TSV
+  file) work as in Excel or Google Sheets: a grid that stays quick with thousands of rows, frozen rows and columns,
+  sizes to drag, about two hundred of Excel's functions worked out as you type (lookups, criteria, dates, text,
+  loans), references that move as cells are copied, filled, inserted and deleted, number formats, styles, sorting,
+  several sheets, copy and paste with Excel and Google Sheets, and the sum, average and count of what is picked;
+  they export as Excel (formulas, formats, widths and frozen panes kept), CSV or PDF. LaTeX documents (save_latex, or opened from a .tex file or a project's .zip) keep
+  their source files and pictures, typeset on this computer (pdfLaTeX, XeLaTeX or LuaLaTeX, with BibTeX) as you
+  type, beside the pages: errors and warnings at their lines, the log, an outline, snippets, completion of
+  citations, labels and pictures, and a jump between a place on a page and its line. TeX runs in a folder of its
+  own, with no shell escape and, where bubblewrap is installed, in its sandbox. They export as the PDF, the main
+  .tex file or the whole project as a .zip.
 - **Skills**: a library that comes with the app (clarify first, check before saying it is done,
   troubleshooting, research, writing, documents) for every agent, and skills of a space's own for its sessions.
   Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a space, for the

@@ -6,7 +6,8 @@ import type { PageEditNote } from '../../shared/pages.ts';
 import type { DB } from '../db.ts';
 import { addNote, getNote, updateNote } from '../notes.ts';
 import { lineDiff } from '../skillpack/diff.ts';
-import { pageHtml, pageInfo } from './store.ts';
+import { pageInfo, pageSource } from './store.ts';
+import { kindOf } from './kinds.ts';
 
 export function initEdits(db: DB) {
   db.exec(`
@@ -109,27 +110,29 @@ export function takeEdits(db: DB, key: string): string | null {
       if (n) updateNote(db, n.id, { ...(n.data as PageEditNote), told: true });
     }
     if (!page) continue;
-    const before = r.from_version ? pageHtml(db, r.page_id, r.from_version) : null;
-    const after = pageHtml(db, r.page_id, r.to_version);
+    const before = r.from_version ? pageSource(db, r.page_id, r.from_version) : null;
+    const after = pageSource(db, r.page_id, r.to_version);
+    const k = kindOf(page.kind);
+    const noun = k?.noun ?? 'page';
     const what = r.kept_from_item
       ? `- "${page.title}", a page you showed with show_html: the user kept it in their Pages as saved page ${page.id} and changed it (version ${r.to_version} is theirs; version 1 is yours as you showed it).`
-      : `- "${page.title}" (saved page ${page.id}): the user changed it, from version ${r.from_version} to version ${r.to_version}.`;
-    const base = r.kept_from_item ? pageHtml(db, r.page_id, 1) : before;
+      : `- "${page.title}" (saved ${noun} ${page.id}): the user changed it, from version ${r.from_version} to version ${r.to_version}.`;
+    const base = r.kept_from_item ? pageSource(db, r.page_id, 1) : before;
     let diff = '';
     if (base && after) {
-      const d = lineDiff(base.html, after.html, 2);
+      const d = lineDiff(base.text, after.text, 2);
       diff = !d.diff
-        ? ' Its HTML did not change.'
+        ? ` It did not change.`
         : d.diff.length > MAX_DIFF
-          ? ` Their changes are too long to show here (${d.added} lines added, ${d.removed} removed): get_page gives the page as it is now.`
-          : ` Their changes, as a diff of the page's HTML:\n\`\`\`diff\n${d.diff}\n\`\`\``;
-    } else diff = ' get_page gives the page as it is now.';
+          ? ` Their changes are too long to show here (${d.added} lines added, ${d.removed} removed): get_page gives the ${noun} as it is now.`
+          : ` Their changes, as a diff of the ${k ? `${noun} as it is kept (a line per part)` : 'page\'s HTML'}:\n\`\`\`diff\n${d.diff}\n\`\`\``;
+    } else diff = ` get_page gives the ${noun} as it is now.`;
     if (page.version !== r.to_version) diff += ` (The page is at version ${page.version} now.)`;
     parts.push(what + diff);
   }
   if (!parts.length) return null;
   return [
-    'The user changed a page in Naget Agent’s page editor since your last turn. Keep their changes when you change it again: for a saved page start from its current HTML (get_page) and save with its id (save_page), which adds a version; a file, read it first.',
+    'The user changed a page in Naget Agent’s page editor since your last turn. Keep their changes when you change it again: for a saved page start from it as it is now (get_page) and save with its id (save_page, or its kind’s own: save_slides, save_doc, save_sheet or save_latex), which adds a version; a file, read it first.',
     ...parts,
   ].join('\n');
 }

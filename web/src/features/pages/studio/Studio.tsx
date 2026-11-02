@@ -139,6 +139,7 @@ export function Studio({
   onDirty,
   initialMode,
   onAsk,
+  saveNowRef,
 }: {
   doc: StudioDoc | null;
   /** An agent is writing it: what came so far. */
@@ -162,6 +163,8 @@ export function Studio({
   initialMode?: StudioMode;
   /** Puts a note on the part picked in the message box: the editor's "Ask the agent". */
   onAsk?: (text: string) => void;
+  /** Saves now, if there are changes (before an agent is asked about the page): false when it did not. */
+  saveNowRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
 }) {
   const [mode, setMode] = useState<StudioMode>(initialMode ?? 'view');
   const [device, setDevice] = useState<Device>('desktop');
@@ -283,6 +286,7 @@ export function Studio({
   };
   const saveRef = useRef(save);
   saveRef.current = save;
+  if (saveNowRef) saveNowRef.current = () => (dirtyRef.current ? saveRef.current() : Promise.resolve(true));
 
   const discard = async () => {
     if (!(await confirm({ title: 'Discard your changes?', body: 'The page goes back to how it was saved.', confirm: 'Discard', danger: true }))) return;

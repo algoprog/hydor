@@ -1,6 +1,6 @@
 # Pages and published sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker, a calculator or a checklist. This topic covers watching a page as an agent writes it, changing it yourself (by clicking on it, or in its code) so the agent builds on your version, keeping a page in your Pages library (with its picture, its versions, the data it keeps and an address of its own for your phone), making pages of your own, and publishing a page or a built website at a link others can open.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They can also make slides, documents, spreadsheets and LaTeX documents you edit as in PowerPoint, Word, Excel or Overleaf. This topic covers watching a page as it is written, changing it yourself, keeping it in your Pages library (with its versions, its data and an address for your phone), making your own or opening your files, saving them as PDF, Word, PowerPoint, Excel, CSV, Markdown or LaTeX files, asking an agent to change what you have open, and publishing a page or a website at a link.
 
 ![A page in the editor: its heading picked, with its words and look beside it](images/pages.webp)
 
@@ -22,6 +22,8 @@ A page runs in a frame of its own, apart from the app: it can't reach the app, y
 
 Pages look like part of the app: agents make them in its theme, light or dark as the app is, in your theme's colours (your own ones too) and the app's font, and an open page changes with it when you switch. A page written with light and dark looks of its own shows the one the app is in, whatever your device is set to. Ask for another look when you want one: "in our brand's colours", "a dark page with neon accents".
 
+Slides an agent makes show in the conversation as a slideshow: click the slide or its arrows to go through it, the grid button to see every slide, and the full screen button to present it ([Slides](#slides)).
+
 If you share the session with a read-only link, the person sees its pages too, but can't keep or change them, and what they pick on them goes nowhere ([Share a read-only link](/guide/sessions#share-a-read-only-link)).
 
 ## Watch a page as it is written
@@ -32,7 +34,8 @@ The panel also opens for an HTML file an agent writes whole (a static site's `in
 
 - Drag the panel's left edge to make it wider or narrower; the app remembers the width on this device.
 - When a conversation has several pages, click the page's title in the panel to switch to another.
-- **More** (⋯) in the panel has **Open in Pages** (a saved page), **Show in Files** (an HTML file), **Save as a file**, and **Open pages here as they are written**: turn it off, and pages wait for you to open them from their cards.
+- **More** (⋯) in the panel has **Open in Pages** (a saved page), **Show in Files** (an HTML file), **Save as a file** (or, for a saved page or slides, **Download as** a PDF, a Word document, a PowerPoint file or a web page), and **Open pages here as they are written**: turn it off, and pages wait for you to open them from their cards.
+- Slides open in the panel in the slides editor ([Edit slides](#edit-slides)).
 - ✕ closes the panel. **Details** in the session's header opens the session's details in its place.
 
 ## Change a page yourself
@@ -143,21 +146,23 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 The page has two tabs, each with a count:
 
-- **Saved**: your pages, each as a card with a picture of it (the page as it opens, with its data; until the picture is taken, its first letter shows), its title, when it last changed and its version, a globe when it is published and a cylinder when it keeps data. Click a card to open the page. Its **More** (⋯) has **Edit**, **Rename**, **Duplicate** (a copy without its data), **Download** (as an `.html` file) and **Delete**.
+- **Saved**: your pages, slides, documents, spreadsheets and LaTeX documents, each as a card with a picture of it (a page as it opens, with its data; slides by their first slide; the others by the top of their first page or sheet; until the picture is taken, its first letter shows), its title, when it last changed and its version, a sign for slides, documents, spreadsheets and LaTeX, a globe when it is published and a cylinder when it keeps data. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Rename**, **Duplicate** (a copy without its data), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**.
 - **Published**: the pages and folders you published, with their links (see [See and unpublish what you published](#see-and-unpublish-what-you-published)). [Open the Published tab](/pages?tab=published).
 
 With more than four pages, **Find a page** above the cards narrows them by title, and the button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
 
-With nothing kept yet, the Saved tab says "No pages yet", with **New page**.
+With nothing kept yet, the Saved tab says "No pages yet", with **New page** and **New slides**.
 
 ## Make a page
 
-**New page**, at the top right of the Saved tab ([or from the search box](/pages?new=1)), makes a page of your own:
+**New page**, at the top right of the Saved tab ([or from the search box](/pages?new=1)), makes a page of your own. At the top, pick what to make: **A page**, **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet** or **LaTeX** (see [Documents](#documents), [Spreadsheets](#spreadsheets) and [LaTeX documents](#latex-documents)). For a page:
 
 1. Pick where it starts: **Blank page** (a heading and some words, to build on), **Notes** (a page to write in, kept as you type), **Checklist** (things to do, ticked off as you go) or **Tracker** (a number a day, with the last 30 days drawn).
 2. Change **Its name** if you like, and click **Make it**. A blank page opens in **Edit**; the others open ready to use.
 
-Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking") and click **Ask**: the start page opens with your words, for an agent to make the page and keep it in Pages.
+A document, a spreadsheet or a LaTeX document starts empty but for its name (a LaTeX document with a short article to build on), or from a file of yours: **Open a Word or text file** (.docx, .md, .txt or .html), **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv) or **Open a .tex or .zip file** (one LaTeX file, or a whole project in a .zip). The file becomes a page of its kind; the file itself stays as it was.
+
+Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking", "a monthly budget for two") and click **Ask**: the start page opens with your words, for an agent to make it and keep it in Pages.
 
 ## Open a page
 
@@ -167,12 +172,127 @@ A page opens full screen inside the app, at its own place in Pages. The bar at t
 - the page's title, and under it its version, when it last changed and how much data it keeps. Click the title to rename the page;
 - **Use**, **Edit** and **Code**, and the **Computer**, **Tablet** and **Phone** sizes (see [Change a page yourself](#change-a-page-yourself));
 - **Versions** (the clock): its earlier versions (see [Go back to an earlier version](#go-back-to-an-earlier-version));
+- **Export**: the page as a PDF, a Word document or a web page (see [Export to a file](#export-to-a-file));
 - **Share**: its own address for your phone, and publishing it at a link (see [Use a page on your phone](#use-a-page-on-your-phone) and [Publish a page](#publish-a-page));
-- **More** (⋯): **What it keeps** (see [The data a page keeps](#the-data-a-page-keeps)), **Rename**, **Duplicate**, **Download**, **Open in a new tab** (opens the page at its own address) and **Delete**.
+- **Ask**: an agent changes the page while you watch (see [Change it by asking an agent](#change-it-by-asking-an-agent));
+- **More** (⋯): **What it keeps** (see [The data a page keeps](#the-data-a-page-keeps)), **Rename**, **Duplicate**, **Open in a new tab** (opens the page at its own address) and **Delete**.
 
-On a phone, **Use**, **Edit** and **Code** are icons, **Share** is the share icon, and the sizes are left out (the phone is the size).
+On a phone, **Use**, **Edit** and **Code** are icons, **Share** is the share icon, **Ask** is the sparkles icon, **Export** is under **More** (⋯) as **Download as**, and the sizes are left out (the phone is the size).
+
+Slides, documents, spreadsheets and LaTeX documents open in their own editors instead, with the same bar (see [Edit slides](#edit-slides), [Documents](#documents), [Spreadsheets](#spreadsheets) and [LaTeX documents](#latex-documents)).
 
 Pages made with the app's ready-made look follow the app's light or dark theme.
+
+## Export to a file
+
+**Export** at the top of an open page, slides, document, spreadsheet or LaTeX document (on a phone, **More** (⋯) → **Download as**), or **Download as** in a card's **More** (⋯) in the list, saves it as a file in your downloads:
+
+- a page: **PDF** (as it shows, on A4 paper, or Letter where that is the usual size, with its data and its backgrounds), **Word document (.docx)** (its headings, paragraphs, lists, tables and links as Word's own, its charts and pictures as pictures, the values in its fields as text) or **Web page (.html)** (a file any browser opens, with its ready-made look);
+- slides: **PowerPoint (.pptx)** (every slide with its text boxes, shapes, pictures, tables and charts still editable, the theme's colours and fonts, speaker notes, transitions and animations, ready for PowerPoint, Keynote or Google Slides), **PDF** (a slide a page) or **Web page (.html)** (the slideshow in one file, to present from any browser);
+- a document: **Word document (.docx)** (its styles, lists, tables, pictures and links as Word's own, for Word, Google Docs or LibreOffice), **PDF** (on its own paper size and margins, with its page breaks), **Markdown (.md)** (its words, headings, lists, tables and links as plain text) or **Web page (.html)**;
+- a spreadsheet: **Excel (.xlsx)** (every sheet, with its formulas, formats, column widths and frozen rows, for Excel, Google Sheets or LibreOffice), **CSV (.csv)** (the first sheet's values as they show) or **PDF** (every sheet as a table);
+- a LaTeX document: **PDF** (typeset by LaTeX, as the preview shows it), **LaTeX source (.tex)** (the main file) or **LaTeX project (.zip)** (every file and picture, to typeset elsewhere, in Overleaf say).
+
+An older version on view exports as it is. The PDF and Word files of pages, and the PDFs of slides, documents and spreadsheets, are made by the browser the app takes pictures with; without one, the app says so and **Settings → Browser** can download one ([Browser settings](/settings?s=browser)). Slides then still print as a PDF from your own browser: pick **Save as PDF** in its print window. A LaTeX document's PDF is made by LaTeX on the computer the app runs on (see [LaTeX documents](#latex-documents)).
+
+Agents can export too: ask "send me the deck as a PowerPoint file", "make a PDF of the report page" or "give me the budget as an Excel file", and the agent hands the file over in the conversation.
+
+## Slides
+
+Slides are kept in Pages too, with versions, a picture in the list and an address of their own. You edit them as in PowerPoint or Google Slides, present them full screen or with a presenter's view, and save them as PowerPoint or PDF files.
+
+### Make slides
+
+- **Ask an agent**: "make me 8 slides on our first year, with a chart of the sales", "turn this report into a short talk with speaker notes". The agent makes the deck in Pages and it shows in the conversation as a slideshow.
+- **New page** in Pages, then **Slides** at the top ([or New slides from the search box](/pages?new=slides)): pick a look (**Daylight**, **Midnight**, **Ember**, **Forest**, **Ocean**, **Noir**, **Blossom** or **Slate**), **Wide (16:9)** or **Standard (4:3)**, a name, and **Make it**. Or describe the talk under **Or describe it, and an agent makes it**.
+
+### Edit slides
+
+The slides editor has the slides down the left (across under the slide on a phone or in a narrow window), the slide being edited in the middle, a toolbar above it, the side panel on the right (a drawer under the slide on a phone), and **Speaker notes** under the slide.
+
+- **The slides**: click one to edit it; drag one to move it in the order; its **More** (⋯, or a right-click) has **A new slide after it**, **Duplicate**, **Skip it in the slideshow** (a skipped slide is dimmed, with a crossed eye) and **Delete**. **A slide** under the list adds one at the end.
+- **The toolbar**: **Undo** and **Redo**; **New slide**, from a layout (**Title**, **Title and text**, **Two columns**, **Section**, **Text and picture**, **Picture**, **Big numbers**, **Cards**, **Steps**, **Quote**, **Chart**, **Table**, **Title only**, **Closing** or **Blank**); then **Text box**, **Shape** (twenty, from rectangles to arrows, stars and speech bubbles), **Picture** (**From this device** or **From a web address**), **Line or arrow**, **Table** and **Chart**. With words picked, it also has their font, size, **Bold**, **Italic**, **Underline**, **Strikethrough**, colour, alignment, **Bulleted list**, **Numbered list**, indent and **Link**.
+- **Pick** a part by clicking it; Shift-click adds one, and a drag across the slide picks all it touches. Drag a part to move it: it snaps to the slide's middle and edges and to other parts, with pink guides (hold Alt to move it freely, Shift to keep it straight). Drag its handles to size it (a picture keeps its shape; Shift keeps any part's shape) and the round handle above it to turn it (Shift: by 15°). A line has a handle at each end.
+- **Change words** by double-clicking them (or pick the part and press Enter). Tab and Shift+Tab move a bullet a level in or out; Esc or a click elsewhere finishes. Double-click a picture to put another in its place, a table's cell to type in it (Enter goes down, Tab to the next cell), a chart to change its numbers.
+- **Keys**: Ctrl+C, Ctrl+X, Ctrl+V and Ctrl+D copy, cut, paste and duplicate parts (also into another deck while the app is open); Delete removes them; the arrow keys nudge them (with Shift, by ten); Ctrl+A picks them all; Ctrl+M adds a slide; with nothing picked, the arrow keys go to the next or the slide before. A picture pasted or dropped on the slide becomes a part of it. A right-click on a part or the slide has the same, and **Ask the agent about it**.
+- **Every slide** (the grid button beside **Present**) shows all the slides at once, to drag them into order; click one to edit it.
+
+Changes stay unsaved until **Save** (Ctrl+S) in the bar at the bottom, as a page's do; **Discard** drops them. Each save is a version.
+
+### Format, Animate, Slide and Theme
+
+The side panel's four tabs:
+
+- **Format**: the part picked. Its name, **Lock it in place**, **Delete** and **Ask the agent about it**; for words, their **Font**, **Size**, colour, where they sit **Up and down**, their **Line spacing** (and the space after a paragraph), the space **Inside**, and **Smaller words when they don't fit**; its **Fill** (a colour, none, or fading into another), **Border** (colour, width, dashes, corners) and **Shadow**; a shape's kind; a picture's **Fit** (**Fill**, **Whole** or **Stretch**), corners, flips, border and description; a line's colour, width, style and what it **Starts with** and **Ends with** (an arrow or a dot); a table's rows, columns, header row, shaded rows and colours; a chart's **Kind** (columns, bars, line, area, pie or doughnut), title, legend, values, stacking, grid and its **Data**, a row per label and a column per series. Then **Place and size** (in pixels of the slide, 1280 across), the turn and how see-through it is, **On the slide** (to an edge or the middle) and the order front to back, and a **Link** (an address, or #3 for slide 3). With several parts picked: line them up, spread them evenly, or delete them.
+- **Animate**: pick a part, then an effect under **Comes in** (**Appear**, **Fade**, **Fly**, **Float**, **Zoom**, **Wipe**, **Bounce**), **Stands out** (**Pulse**, **Spin**, **Grow**, **Shake**) or **Goes out**. **In order** lists the slide's animations with the click each starts on; open one to change its effect, the side it comes in **From** or goes out **To**, when it **Starts** (**On a click**, **With the one before** or **After the one before**), how long it takes and how long it waits first, and for words **A paragraph at a time**. The arrows move it earlier or later; **Play** shows the slide as it will play.
+- **Slide**: its **Background** (the theme's, a colour, a colour fading into another, or **A picture**, made darker behind words), and **Use on every slide**; its **Transition** as it comes in (**Fade**, **Push in**, **Wipe**, **Cover**, **Zoom** or **Split**, from which side, how long), whether it **Goes on** **On a click** or **By itself** after some seconds, and **Use on every slide**; and **Skip this slide**.
+- **Theme**: a **Ready-made** look, or the deck's own **Colours** (background, text, headings, quiet text, accent, on the accent, soft fill, and six for charts) and **Fonts** for headings and body; and the **Slide shape**. Parts coloured with the theme's colours change with it.
+
+### Present
+
+**Present** starts the slideshow from the slide you are on, full screen; its arrow has **From the beginning**, **From this slide** and **Presenter view, with notes**. In the slideshow:
+
+- a click, →, ↓, Space or Page Down goes on (the next animation, then the next slide); ←, ↑ or Page Up goes back; on a touch screen, swipe or tap;
+- a slide's number and Enter goes to it; Home and End go to the first and the last;
+- **B** makes the screen black and **W** white (again to come back); **G** shows every slide, to jump to one;
+- the controls at the bottom left show when the pointer moves; Esc ends it.
+
+**Presenter view** shows the slide, the next one (or that more is coming on this one), the speaker notes (bigger or smaller with − and +), a timer you can pause and restart, the time, and **Back** and **Next**. **Open the audience's window** opens the slideshow in a window of its own: drag it to the other screen or the projector and double-click it for full screen. It follows the presenter's view, and the presenter's view follows it.
+
+Slides also present from their own address on a phone or from a published link, and the **Web page** export plays them in any browser.
+
+## Documents
+
+Documents are kept in Pages too, with versions, a picture in the list and an address of their own. You write and edit them as in Word or Google Docs, on a page the size of their paper, and save them as Word, PDF or Markdown files.
+
+- **Make one**: ask an agent ("write me a cover letter for this job ad", "turn my notes into a two-page report"), or **New page** in Pages, then **Document** ([or New document from the search box](/pages?new=doc)): empty, or from a file of yours with **Open a Word or text file**.
+- **The toolbar**: **Undo** and **Redo**; the paragraph's style (**Normal text**, **Title**, **Subtitle**, **Heading 1** to **Heading 4**, **Quote** or **Code**); the font and its size; **Bold**, **Italic** and **Underline**; **Text colour** and **Highlight**; **Link** (Ctrl+K); **Alignment**; **Bullets**, **Numbers** and **Checklist**; **Insert**: **A picture from this device**, **A picture from the web**, **A table** (pick its size on the grid), **A line across** or **A page break**; **Table**, while you are in one: **Insert a row above** or **below**, **Insert a column on the left** or **on the right**, **Header row**, and deleting the row, the column or the table; and **More formatting**: **Strikethrough**, **Superscript**, **Subscript**, **Less indent**, **More indent** and **Clear the formatting**. On a phone it scrolls sideways.
+- **Keys**: Ctrl+B, Ctrl+I and Ctrl+U; Ctrl+Alt+1 to 4 for a heading and Ctrl+Alt+0 for normal text; Ctrl+Shift+7, 8 and 9 for numbers, bullets and a checklist; Tab and Shift+Tab to indent a list (in a table: the next cell, with a new row after the last); Ctrl+Enter for a page break. At the start of a line, `# `, `- `, `1. `, `[] ` and `> ` make a heading, a list, a checklist or a quote.
+- **Pictures**: click one to pick it and drag a corner to size it; its bar puts it **On the left**, **In the middle** or **On the right**, gives it a **Caption** and a **Description** (for people who can't see it), puts **Another picture** in its place, or deletes it. A picture pasted or dropped on the page goes where you drop it.
+- **Paste** from Word, Google Docs or a web page: headings, bold, italic, links, lists and tables come along, and the rest is left out.
+- At the top: **Outline** (the headings, to go to one; beside the page on a wide screen) and **Page setup**: **Paper size** (**A4** or **US Letter**), **Margins** (**Narrow**, **Medium**, **Wide**, or in millimetres) and the document's **Font** and **Size**. The number of words shows at the bottom right.
+
+Pick some words and **Ask the agent about it** shows above them. Changes stay unsaved until **Save** (Ctrl+S) in the bar at the bottom; **Discard** drops them. Each save is a version.
+
+## Spreadsheets
+
+Spreadsheets are kept in Pages too, with versions, a picture in the list and an address of their own. You work in them as in Excel or Google Sheets, with formulas, and save them as Excel, CSV or PDF files.
+
+- **Make one**: ask an agent ("make me a monthly budget for two, with totals", "put these numbers in a spreadsheet and add a column with each one's share"), or **New page** in Pages, then **Spreadsheet** ([or New spreadsheet from the search box](/pages?new=sheet)): empty, or from a file of yours with **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv).
+- **Cells**: click one, or drag across several (Shift-click adds to the range; click a column's letter or a row's number to pick it all). Type to replace what a cell holds, or double-click it (or F2) to change it; Enter goes down, Tab right, Esc cancels. A value that starts with = is a formula: `=SUM(B2:B9)`, `=B2*C2`, `=IF(C2>100,"high","ok")` (Excel's functions, about two hundred of them, from SUM, AVERAGE and IF to VLOOKUP, XLOOKUP, SUMIFS, TEXT, the dates and the loans). While you type one, click cells to put them in, and the names of functions that match show below it.
+- **The name box** at the top left shows the cell picked; type a cell or a range (C12, B2:D9) and press Enter to go there. Beside it, the cell's formula or value, to change it there too.
+- **The toolbar**: **Undo** and **Redo**; **How numbers show** (**Automatic**, **Number**, **Percent**, **Currency** in dollars, pounds or euros, **Date** or **Text**), with **Fewer decimals** and **More decimals**; **Type size**; **Bold**, **Italic**, **Underline** and **Strikethrough**; **Text colour** and **Fill colour**; **Align left**, **Align centre** and **Align right**; **Wrap words in the cell**; **Keep in view (freeze)**: **Nothing frozen**, **The first row**, **The first column**, or the rows or columns up to the cell picked; **Sort A to Z** and **Sort Z to A**, by the cell's column; and **Rows and columns**, to insert rows above or below, columns left or right, or delete them.
+- **Keys**: Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste, also to and from Excel and Google Sheets (formulas pasted move with their cells, and one value pasted on several cells fills them all); Ctrl+D and Ctrl+R fill down and right; Ctrl+B, Ctrl+I and Ctrl+U; Delete clears; Ctrl+Z undoes; Ctrl and an arrow go to the edge of the data. A right-click on cells has **Cut**, **Copy**, **Paste**, inserting and deleting rows and columns, sorting, **Clear** and **Ask the agent about it**.
+- **Columns and rows**: drag the edge of a column's letter or a row's number to size it; double-click it to fit what it holds.
+- **Sheets**: the tabs at the bottom, with **Add a sheet** (+). A tab's menu has **Rename**, **Duplicate**, **Move left**, **Move right**, **Add a sheet from a CSV file** and **Delete this sheet**; double-click a tab to rename it.
+
+With several numbers picked, the bar at the bottom shows their **Sum**, **Average** and **Count**. On a phone, tap a cell to pick it and tap it again to type; a long press has the menu, and the round handle stretches what is picked. Changes stay unsaved until **Save** (Ctrl+S) in the bar at the bottom, and each save is a version.
+
+## LaTeX documents
+
+A LaTeX document is its source (the main file, main.tex, and any others it reads, such as a .bib of references) and its pictures, typeset into pages by LaTeX on the computer the app runs on. You edit the source beside its typeset pages, as in Overleaf, and save the PDF, the .tex file or the whole project.
+
+- **Make one**: ask an agent ("write up these results as a short paper in LaTeX, with the equations numbered"), or **New page** in Pages, then **LaTeX** ([or New LaTeX document from the search box](/pages?new=tex)): a short article to build on, or your own with **Open a .tex or .zip file** (one file, or a project's folder in a .zip; PDF pictures in it become PNG ones).
+- **The source** has a tab for each file and one for **Pictures** (to add, rename, put in a figure or remove them); **Add a file or a picture** (+) has **A new file**, **A file from this device** and **A picture**, and a file's tab renames or deletes it. As you type `\cite{`, `\ref{` or `\includegraphics{`, the document's own references, labels and pictures are offered.
+- **The toolbar**: **Insert** (a section, a subsection, bold or italic words, a bulleted or numbered list, a figure with a picture, a table, an equation, aligned equations, a citation, a footnote or a link, where the cursor is), **Bold** and **Italic**, **Section heading**, **Equation**, **Figure with a picture**, **Outline**, **Find and replace** (Ctrl+F), **Show this line in the PDF** and **Ask the agent**.
+- **Typesetting**: the pages follow what you type, a moment after you stop. **Recompile** (Ctrl+Enter) typesets at once, and its arrow has **Recompile as you type** (to turn that off), **Show the log** and **Open the PDF**. The engine at the top is **pdfLaTeX** (the usual one), **XeLaTeX** (any language, and this computer's fonts) or **LuaLaTeX**. The pages zoom in and out and **Fit the width**; double-click a place on a page to go to its line in the source.
+- **Errors and warnings** show under the source and beside their lines: click one to go to it, or **Ask the agent to fix them**. **Log** shows all that TeX said.
+
+On a phone, **Code** and **Preview** are two tabs. Changes stay unsaved until **Save** (Ctrl+S) in the bar at the bottom, and each save is a version.
+
+LaTeX has to be installed on the computer the app runs on (TeX Live). Without it a LaTeX document is still kept and edited, not typeset, and the editor says what to install. TeX works in a folder of its own: a document cannot read or change other files or run programs, and where bubblewrap is installed, TeX runs in its sandbox too (LuaLaTeX only runs there).
+
+## Change it by asking an agent
+
+**Ask** at the top of an open page, slides, document, spreadsheet or LaTeX document opens a panel beside it (over it on a phone) where an agent changes it for you:
+
+1. Pick what it is about: for slides, **This slide**, **Every slide** or **What's picked** (the parts picked on the slide); for a document, **The whole document**, **This section** (the one you are in), **The words picked** or **The picture picked**; for a spreadsheet, **The whole workbook**, **This sheet** or the cells picked; for a LaTeX document, **The whole document**, **This file**, **This section** or the lines picked; for a page, **The whole page** or **The part picked** (after **Ask the agent** on a part in **Edit**).
+2. Say what should change ("make the titles shorter", "add a slide with a chart of these numbers", "make this section friendlier", "add a total row under the numbers", "fix the errors so it typesets") and send it. Changes not saved yet are saved first, so the agent works on them.
+3. The agent starts with the agent and model you picked last on the start page; the panel shows its work and its answer, and what you have open changes in front of you as soon as it saves it. Each change is a version, so you can go back ([Go back to an earlier version](#go-back-to-an-earlier-version)).
+
+Say more in the panel's message box; the buttons above it put which slide or part you mean in your message. **A new request** starts over, and **Open as a session** opens the conversation on its own page (it stays among your sessions). On a phone, **See the page** folds the panel away while the agent works; the button at the bottom brings it back.
+
+**Ask the agent about it** opens the panel with what you picked: a part of a slide, a page's part in **Edit**, words or a picture in a document, cells in a spreadsheet (in their right-click menu), or lines in a LaTeX document (**Ask the agent** in its toolbar). **Ask the agent to fix them**, under a LaTeX document's errors, asks for them all to be fixed.
 
 ## Rename a page
 
@@ -230,7 +350,7 @@ Add the new address to your home screen again where you want it.
 
 Use **More** (⋯) → **Delete** on its card or in the open page, and confirm. The page goes with all its versions, the data it keeps and any published copy of it. Its address stops working.
 
-Pages holds up to 1,000 pages, and one page's HTML can be up to 2 MB.
+Pages holds up to 1,000 pages and slides. One page's HTML can be up to 2 MB; slides' words up to 3 MB, their pictures apart (up to 12 MB each).
 
 ## Publish a page
 
@@ -308,3 +428,10 @@ Agents can read and change your pages for you, with your OK on a card. A few thi
 - "I sent my packing list's address to the wrong person: give it a new address."
 - "Publish the trip plan at a private link", or "unpublish the site we made last week."
 - "Make the headings on my landing page smaller on phones, and its buttons rounder."
+- "Make me 10 slides for a talk on our first year, with a chart of sales and speaker notes."
+- "On my 'Launch plan' slides, make every title shorter and add a closing slide."
+- "Send me the 'Launch plan' slides as a PowerPoint file, and the report page as a PDF."
+- "Write me a cover letter for this job ad and keep it in Pages: I'll change it myself."
+- "In my 'Household budget' spreadsheet, add a column with each item's share of the total."
+- "Turn these notes into a short paper in LaTeX, with the equations numbered."
+- "Send me the 'Household budget' spreadsheet as an Excel file."

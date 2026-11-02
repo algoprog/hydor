@@ -1,8 +1,11 @@
-// Pages (/pages): the pages kept from conversations, saved by agents and made here, each with its
-// picture, and the sites published from them or from a project's build. A page opens at its own place
-// (/pages/<id>) to use, edit (visually or as code) and save, with its versions (view one, bring it back),
-// the data it keeps, its own address for a phone's home screen, and Publish.
+// Pages (/pages): the pages and slide decks kept from conversations, saved by agents and made here, each with
+// its picture, and the sites published from them or from a project's build. A page opens at its own place
+// (/pages/<id>) to use, edit (visually or as code) and save, a deck to edit and present (/pages/<id>/show is the
+// audience's window of a presentation), with versions (view one, bring it back), Export (PDF, Word, PowerPoint,
+// a web page), the data it keeps, its own address for a phone's home screen, Publish, and Ask: an agent changes
+// it while you watch.
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useSearch } from 'wouter';
 import {
   AppWindow,
@@ -13,6 +16,11 @@ import {
   Download,
   Ellipsis,
   ExternalLink,
+  FileText,
+  Play,
+  Presentation,
+  Sheet,
+  Sigma,
   Globe,
   GlobeLock,
   History,
@@ -28,6 +36,7 @@ import {
   X,
 } from 'lucide-react';
 import { VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion, type SiteInfo, type SiteVisibility } from '@shared/pages';
+import { newDeck, THEMES, type Deck, type Ratio } from '@shared/slides';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { ago, basename, bytes, tildify } from '../../lib/format';
 import { useFeatureEvent } from '../../lib/featureEvents';
@@ -35,17 +44,26 @@ import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Tabs, Throbber, useConfirm, useIsMobile } from '../../components/ui';
+import { Button, cx, Dialog, Empty, IconButton, inputCls, MenuItem, MenuLabel, MenuSep, Popover, Segmented, Tabs, Throbber, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { SiteLink, VISIBILITY } from './cards';
-import { pageFile, pageStore, previewStore } from './frame';
+import { pageStore, previewStore } from './frame';
 import { absolute, usePagesStore } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { STARTERS } from './templates';
 import { tr } from '../../i18n/runtime';
+import { closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
+import { loadModelVersion, type AskScope } from './kinds';
+import { EDITORS, preloadEditors } from './editors';
+import { exportFile, type ExportFormat } from './exportFile';
+import { EXPORTS } from './exports';
+import { AudienceView } from './slides/Present';
+import { SlideThumb } from './slides/Thumb';
 
 export function PagesRoute() {
   const [loc] = useLocation();
+  const show = /^\/pages\/([a-f0-9]{10})\/show$/.exec(loc)?.[1];
+  if (show) return <AudienceView id={show} />;
   const id = /^\/pages\/([a-f0-9]{10})$/.exec(loc)?.[1];
   return id ? <PageView id={id} /> : <Library />;
 }
@@ -328,37 +346,100 @@ function DataDialog({ page, open, onClose }: { page: PageInfo; open: boolean; on
 
 // ---- making a page -------------------------------------------------------------------------------------
 
-function NewPageDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+type NewKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex';
+const NEW_TITLE: Record<NewKind, string> = { page: '', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document' };
+const ASK_FOR: Record<NewKind, string> = {
+  page: 'Make me a page and keep it in Pages: ',
+  slides: 'Make me slides and keep them in Pages: ',
+  doc: 'Write me a document and keep it in Pages: ',
+  sheet: 'Make me a spreadsheet and keep it in Pages: ',
+  tex: 'Write me a LaTeX document and keep it in Pages: ',
+};
+const OPENS: Partial<Record<NewKind, string>> = { doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip' };
+const KIND_TILES: { value: NewKind; label: string; icon: ReactNode }[] = [
+  { value: 'page', label: 'A page', icon: <AppWindow size={16} /> },
+  { value: 'slides', label: 'Slides', icon: <Presentation size={16} /> },
+  { value: 'doc', label: 'Document', icon: <FileText size={16} /> },
+  { value: 'sheet', label: 'Spreadsheet', icon: <Sheet size={16} /> },
+  { value: 'tex', label: 'LaTeX', icon: <Sigma size={16} /> },
+];
+
+/** A file's bytes as base64, for the import. */
+const base64Of = (f: File) =>
+  new Promise<string>((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).replace(/^data:[^,]*,/, ''));
+    r.onerror = () => fail(new Error('The file could not be read'));
+    r.readAsDataURL(f);
+  });
+
+function NewPageDialog({ open, onClose, kind: startKind = 'page' }: { open: boolean; onClose: () => void; kind?: NewKind }) {
+  const [kind, setKind] = useState<NewKind>(startKind);
   const [pick, setPick] = useState(STARTERS[0].id);
   const [title, setTitle] = useState(STARTERS[0].title);
+  const [theme, setTheme] = useState(THEMES[0].id);
+  const [ratio, setRatio] = useState<Ratio>('16:9');
   const [ask, setAsk] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
+    setKind(startKind);
     setPick(STARTERS[0].id);
-    setTitle(STARTERS[0].title);
+    setTitle(NEW_TITLE[startKind] || STARTERS[0].title);
     setAsk('');
-  }, [open]);
+  }, [open, startKind]);
   const starter = STARTERS.find((s) => s.id === pick)!;
+  const defaultTitle = NEW_TITLE[kind] || starter.title;
   const make = async () => {
     setBusy(true);
     try {
-      const t = title.trim() || starter.title;
-      const r = await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t) });
+      const t = title.trim() || defaultTitle;
+      const r =
+        kind === 'slides'
+          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: newDeck(t, theme, ratio) })
+          : kind === 'page'
+            ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t) })
+            : await post<{ page: PageInfo }>('/api/pages', { title: t, kind });
       onClose();
-      go(`/pages/${r.page.id}?mode=${pick === 'blank' ? 'edit' : 'view'}`);
+      go(kind === 'page' ? `/pages/${r.page.id}?mode=${pick === 'blank' ? 'edit' : 'view'}` : `/pages/${r.page.id}`);
     } catch (e) {
       toastError(e);
     } finally {
       setBusy(false);
     }
   };
+  /** A Word document, a spreadsheet or a CSV opened as a page of its kind. */
+  const openFile = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = OPENS[kind] ?? '';
+    input.onchange = async () => {
+      const f = input.files?.[0];
+      if (!f) return;
+      setBusy(true);
+      try {
+        const r = await post<{ page: PageInfo; notes?: string[] }>('/api/pages/import', { name: f.name, data: await base64Of(f) });
+        onClose();
+        go(`/pages/${r.page.id}`);
+        if (r.notes?.length) toast(r.notes.map((n) => tr(n)).join(' '));
+      } catch (e) {
+        toastError(e);
+      } finally {
+        setBusy(false);
+      }
+    };
+    input.click();
+  };
+  const switchKind = (k: NewKind) => {
+    if (title === defaultTitle || !title.trim()) setTitle(NEW_TITLE[k] || starter.title);
+    setKind(k);
+  };
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title="A new page"
-      width={540}
+      title={kind === 'slides' ? 'New slides' : kind === 'doc' ? 'A new document' : kind === 'sheet' ? 'A new spreadsheet' : kind === 'tex' ? 'A new LaTeX document' : 'A new page'}
+      width={560}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -371,22 +452,83 @@ function NewPageDialog({ open, onClose }: { open: boolean; onClose: () => void }
       }
     >
       <div className="space-y-4 text-[13.5px]">
-        <div className="grid grid-cols-2 gap-2">
-          {STARTERS.map((s) => (
+        <div className="grid grid-cols-5 gap-1.5 max-sm:grid-cols-3" role="radiogroup" aria-label="What to make">
+          {KIND_TILES.map((t) => (
             <button
-              key={s.id}
+              key={t.value}
               type="button"
-              onClick={() => {
-                if (title === starter.title || !title.trim()) setTitle(s.title);
-                setPick(s.id);
-              }}
-              className={cx('rounded-xl border px-3 py-2.5 text-left transition-colors', pick === s.id ? 'border-accent/60 bg-accent-soft' : 'border-line hover:border-line-2 hover:bg-bg-1')}
+              role="radio"
+              aria-checked={kind === t.value}
+              onClick={() => switchKind(t.value)}
+              className={cx(
+                'flex flex-col items-center gap-1 rounded-xl border px-1.5 py-2 text-[12.5px] transition-colors',
+                kind === t.value ? 'border-accent/60 bg-accent-soft font-medium text-fg' : 'border-line text-fg-2 hover:border-line-2 hover:bg-bg-1',
+              )}
             >
-              <span className="block font-medium text-fg">{s.label}</span>
-              <span className="block text-[12px] leading-snug text-fg-3">{s.hint}</span>
+              <span className={cx(kind === t.value ? 'text-accent' : 'text-fg-3')}>{t.icon}</span>
+              {t.label}
             </button>
           ))}
         </div>
+        {kind === 'doc' || kind === 'sheet' || kind === 'tex' ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-2.5">
+            <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-fg-2">
+              {kind === 'doc'
+                ? 'A document to write and edit as in Word or Google Docs, and save as a Word file, a PDF or Markdown.'
+                : kind === 'sheet'
+                  ? 'A spreadsheet with formulas, as in Excel or Google Sheets, to save as an Excel file, a CSV or a PDF.'
+                  : 'LaTeX source beside its typeset pages, as in Overleaf, to save as a PDF or the .tex project.'}
+            </span>
+            <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={openFile}>
+              {kind === 'doc' ? 'Open a Word or text file' : kind === 'sheet' ? 'Open an Excel or CSV file' : 'Open a .tex or .zip file'}
+            </Button>
+          </div>
+        ) : kind === 'page' ? (
+          <div className="grid grid-cols-2 gap-2">
+            {STARTERS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  if (title === starter.title || !title.trim()) setTitle(s.title);
+                  setPick(s.id);
+                }}
+                className={cx('rounded-xl border px-3 py-2.5 text-left transition-colors', pick === s.id ? 'border-accent/60 bg-accent-soft' : 'border-line hover:border-line-2 hover:bg-bg-1')}
+              >
+                <span className="block font-medium text-fg">{s.label}</span>
+                <span className="block text-[12px] leading-snug text-fg-3">{s.hint}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-4 gap-2">
+              {THEMES.map((th) => {
+                const d = newDeck(title.trim() || 'Slides', th.id, ratio);
+                return (
+                  <button
+                    key={th.id}
+                    type="button"
+                    onClick={() => setTheme(th.id)}
+                    className={cx('overflow-hidden rounded-lg border text-left transition-colors', theme === th.id ? 'border-accent ring-2 ring-accent/30' : 'border-line hover:border-line-2')}
+                  >
+                    <SlideThumb deck={d} index={0} slide={d.slides[0]} theme={d.theme} width={118} fonts={0} />
+                    <span className="block truncate px-2 py-1 text-[12px] text-fg-2">{th.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <Segmented<Ratio>
+              size="sm"
+              value={ratio}
+              onChange={setRatio}
+              options={[
+                { value: '16:9', label: 'Wide (16:9)' },
+                { value: '4:3', label: 'Standard (4:3)' },
+              ]}
+            />
+          </>
+        )}
         <label className="block space-y-1.5">
           <span className="text-[12.5px] font-medium text-fg-2">Its name</span>
           <input value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && make()} className={inputCls} />
@@ -397,7 +539,7 @@ function NewPageDialog({ open, onClose }: { open: boolean; onClose: () => void }
             e.preventDefault();
             if (!ask.trim()) return;
             onClose();
-            go(`/?prompt=${enc(tr(`Make me a page and keep it in Pages: ${ask.trim()}`))}`);
+            go(`/?prompt=${enc(`${tr(ASK_FOR[kind])}${ask.trim()}`)}`);
           }}
         >
           <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2">
@@ -405,7 +547,22 @@ function NewPageDialog({ open, onClose }: { open: boolean; onClose: () => void }
             Or describe it, and an agent makes it
           </span>
           <div className="flex gap-2">
-            <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="A packing list for a week of hiking" className={cx(inputCls, 'min-w-0 flex-1')} />
+            <input
+              value={ask}
+              onChange={(e) => setAsk(e.target.value)}
+              placeholder={
+                kind === 'slides'
+                  ? 'A 10-minute talk on our first year'
+                  : kind === 'doc'
+                    ? 'A cover letter for a design job'
+                    : kind === 'sheet'
+                      ? 'A monthly budget for two'
+                      : kind === 'tex'
+                        ? 'A two-page paper on my results, with equations'
+                        : 'A packing list for a week of hiking'
+              }
+              className={cx(inputCls, 'min-w-0 flex-1')}
+            />
             <Button type="submit" variant="secondary" disabled={!ask.trim()}>
               Ask
             </Button>
@@ -439,16 +596,11 @@ function PageCard({ page }: { page: PageInfo }) {
       toastError(e);
     }
   };
-  const download = async () => {
+  const slides = page.kind === 'slides';
+  const download = async (format: ExportFormat) => {
     close();
     try {
-      const r = await api<{ html: string }>(`/api/pages/${enc(page.id)}`);
-      const url = URL.createObjectURL(new Blob([pageFile(r.html)], { type: 'text/html' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${page.title.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'page'}.html`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await exportFile(page.id, format);
     } catch (e) {
       toastError(e);
     }
@@ -466,6 +618,10 @@ function PageCard({ page }: { page: PageInfo }) {
           <span className="flex items-center gap-1.5 truncate text-[12px] leading-4 text-fg-3">
             {ago(page.updatedAt)}
             {page.version > 1 && <span>· v{page.version}</span>}
+            {slides && <Presentation size={11} className="shrink-0" aria-label="Slides" />}
+            {page.kind === 'doc' && <FileText size={11} className="shrink-0" aria-label="A document" />}
+            {page.kind === 'sheet' && <Sheet size={11} className="shrink-0" aria-label="A spreadsheet" />}
+            {page.kind === 'tex' && <Sigma size={11} className="shrink-0" aria-label="LaTeX" />}
             {page.published && <Globe size={11} className="shrink-0 text-accent" aria-label="Published" />}
             {page.storageBytes > 0 && <Database size={11} className="shrink-0" aria-label={`Keeps ${bytes(page.storageBytes)}`} />}
           </span>
@@ -474,19 +630,29 @@ function PageCard({ page }: { page: PageInfo }) {
           <Ellipsis size={15} />
         </IconButton>
       </div>
-      <Popover anchor={anchor} open={menu} onClose={close} align="end" width={200}>
-        <MenuItem icon={<PenLine size={14} />} onClick={() => (close(), open('edit'))}>
-          Edit
-        </MenuItem>
+      <Popover anchor={anchor} open={menu} onClose={close} align="end" width={230}>
+        {slides ? (
+          <MenuItem icon={<Play size={14} />} onClick={() => (close(), go(`/pages/${page.id}?present=1`))}>
+            Present
+          </MenuItem>
+        ) : (
+          <MenuItem icon={<PenLine size={14} />} onClick={() => (close(), open('edit'))}>
+            Edit
+          </MenuItem>
+        )}
         <MenuItem icon={<Pencil size={14} />} onClick={() => (close(), setRename(true))}>
           Rename
         </MenuItem>
         <MenuItem icon={<Copy size={14} />} onClick={duplicate}>
           Duplicate
         </MenuItem>
-        <MenuItem icon={<Download size={14} />} onClick={download}>
-          Download
-        </MenuItem>
+        <MenuSep />
+        <MenuLabel>Download as</MenuLabel>
+        {EXPORTS(page.kind).map((x) => (
+          <MenuItem key={x.format} icon={x.icon} onClick={() => void download(x.format)}>
+            {x.label}
+          </MenuItem>
+        ))}
         <MenuSep />
         <MenuItem icon={<Trash2 size={14} />} danger onClick={remove}>
           Delete
@@ -548,7 +714,7 @@ function Library() {
   const pages = usePagesStore((s) => s.pages);
   const sites = usePagesStore((s) => s.sites);
   const [publish, setPublish] = useState(false);
-  const [making, setMaking] = useState(false);
+  const [making, setMaking] = useState<NewKind | null>(null);
   const [find, setFind] = useState('');
   const [sort, setSort] = useState<Sort>(() => (localStorage.getItem('wa.pages.sort') as Sort) || 'changed');
   const [sortMenu, setSortMenu] = useState(false);
@@ -556,12 +722,13 @@ function Library() {
   useEffect(() => {
     usePagesStore.getState().loadPages().catch(toastError);
     usePagesStore.getState().loadSites().catch(toastError);
+    preloadEditors();
   }, []);
-  // The search box's "New page" opens here with the dialog.
-  const asked = new URLSearchParams(search).get('new') === '1';
+  // The search box's "New page", "New slides"… open here with the dialog.
+  const asked = new URLSearchParams(search).get('new');
   useEffect(() => {
     if (!asked) return;
-    setMaking(true);
+    setMaking(asked === 'slides' || asked === 'doc' || asked === 'sheet' || asked === 'tex' ? asked : 'page');
     go('/pages', true);
   }, [asked]);
   useEffect(() => localStorage.setItem('wa.pages.sort', sort), [sort]);
@@ -583,7 +750,7 @@ function Library() {
               Publish a folder
             </Button>
           ) : (
-            <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking(true)}>
+            <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
               New page
             </Button>
           )
@@ -607,10 +774,13 @@ function Library() {
               </div>
             ) : !pages.length ? (
               <Empty icon={<AppWindow size={22} />} title="No pages yet">
-                <span className="block">Keep a page an agent shows you, ask one for a small tool (a tracker, a calculator, a checklist), or make one here. It keeps its data, and opens on your phone.</span>
+                <span className="block">Keep a page an agent shows you, ask one for a small tool (a tracker, a calculator, a checklist) or for slides, or make one here. A page keeps its data, and opens on your phone.</span>
                 <span className="mt-3 inline-flex gap-2">
-                  <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking(true)}>
+                  <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
                     New page
+                  </Button>
+                  <Button size="sm" variant="secondary" icon={<Presentation size={14} />} onClick={() => setMaking('slides')}>
+                    New slides
                   </Button>
                 </span>
               </Empty>
@@ -668,7 +838,7 @@ function Library() {
         </div>
       </div>
       <PublishDialog open={publish} onClose={() => setPublish(false)} />
-      <NewPageDialog open={making} onClose={() => setMaking(false)} />
+      <NewPageDialog open={!!making} kind={making ?? 'page'} onClose={() => setMaking(null)} />
     </div>
   );
 }
@@ -677,26 +847,45 @@ function Library() {
 
 interface Loaded {
   page: PageInfo;
-  html: string;
+  /** A page's HTML, or another kind's model (a deck, a document, a spreadsheet). */
+  html?: string;
+  model?: unknown;
   versions: PageVersion[];
   link: string;
 }
 
 const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you' };
 
+/**
+ * Where a request to an agent is for: what the open editor offers (this slide, the section the caret is in, the
+ * cells picked…), then the part "Ask the agent about it" named; a page of HTML: the whole page, or the part picked.
+ */
+function scopesOf(page: PageInfo, fromEditor: AskScope[], part: string | null): AskScope[] {
+  if (page.kind) return part ? [...fromEditor, { id: 'asked', label: part.replace(/: $/, ''), lead: part }] : fromEditor;
+  const out: AskScope[] = [{ id: 'page', label: tr('The whole page'), lead: '' }];
+  if (part) out.push({ id: 'part', label: `${tr('The part picked')}: ${part.replace(/^On the page “[^”]*”, the /, '').replace(/ \(`[^`]*`\): $/, '')}`, lead: part });
+  return out;
+}
+
 function PageView({ id }: { id: string }) {
   const mobile = useIsMobile();
   const search = useSearch();
+  const wideAsk = useMediaQuery('(min-width: 1100px)');
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   // An older version on view.
-  const [old, setOld] = useState<{ version: number; title: string; html: string } | null>(null);
-  const [menu, setMenu] = useState<'history' | 'more' | 'share' | null>(null);
+  const [old, setOld] = useState<{ version: number; title: string; html?: string; model?: unknown } | null>(null);
+  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | null>(null);
   const [dialog, setDialog] = useState<'rename' | 'publish' | 'data' | null>(null);
+  const [scopes, setScopes] = useState<AskScope[]>([]);
+  const [part, setPart] = useState<string | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const historyRef = useRef<HTMLButtonElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const shareRef = useRef<HTMLButtonElement>(null);
+  const exportRef = useRef<HTMLButtonElement>(null);
+  const saveFirst = useRef<(() => Promise<boolean>) | null>(null);
+  const ask = usePageAsk();
   const load = () =>
     api<Loaded>(`/api/pages/${enc(id)}`)
       .then((r) => {
@@ -707,17 +896,22 @@ function PageView({ id }: { id: string }) {
   useEffect(() => {
     setData(null);
     setOld(null);
+    setPart(null);
     void load();
   }, [id]);
   useFeatureEvent('pages', ({ data: e }) => (e as { what?: string })?.what === 'pages' && load());
   const store = useMemo(() => (old ? previewStore(id) : pageStore(id)), [id, old]);
   const startMode = new URLSearchParams(search).get('mode');
+  const startPresent = new URLSearchParams(search).get('present') === '1';
+  const kind = data?.page.kind;
+  const slides = kind === 'slides';
 
   const viewVersion = async (v: number) => {
     setMenu(null);
     if (!data || v === data.page.version) return setOld(null);
     try {
-      setOld({ version: v, ...(await api<{ title: string; html: string }>(`/api/pages/${enc(id)}/versions/${v}`)) });
+      if (kind) setOld({ version: v, ...(await loadModelVersion(enc(id), v)) });
+      else setOld({ version: v, ...(await api<{ title: string; html: string }>(`/api/pages/${enc(id)}/versions/${v}`)) });
     } catch (e) {
       toastError(e);
     }
@@ -738,6 +932,7 @@ function PageView({ id }: { id: string }) {
     if (!data || !(await confirm({ title: `Delete “${data.page.title}”?`, body: 'Its versions, what it keeps and any published copy go with it.', confirm: 'Delete', danger: true }))) return;
     try {
       await del(`/api/pages/${enc(id)}`);
+      closePageAsk();
       go('/pages');
     } catch (e) {
       toastError(e);
@@ -752,15 +947,14 @@ function PageView({ id }: { id: string }) {
       toastError(e);
     }
   };
-  const download = () => {
+  const download = async (format: ExportFormat) => {
     setMenu(null);
     if (!data) return;
-    const url = URL.createObjectURL(new Blob([pageFile(data.html)], { type: 'text/html' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${data.page.title.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'page'}.html`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      await exportFile(id, format, { version: old?.version, deck: slides ? ((old?.model ?? data.model) as Deck) : undefined });
+    } catch (e) {
+      toastError(e);
+    }
   };
   const resetLink = async () => {
     setMenu(null);
@@ -773,15 +967,16 @@ function PageView({ id }: { id: string }) {
       toastError(e);
     }
   };
-  const save = async (html: string) => {
+  /** Saves a new version (a page's HTML, or a deck); a newer one saved meanwhile is asked about first. */
+  const saveBody = async (body: { html: string } | { model: unknown }) => {
     if (!data) return false;
     try {
-      await post(`/api/pages/${enc(id)}/versions`, { html, base: data.page.version });
+      await post(`/api/pages/${enc(id)}/versions`, { ...body, base: data.page.version });
     } catch (e) {
       if ((e as { status?: number }).status !== 409) throw e;
-      if (!(await confirm({ title: 'A newer version is there', body: 'The page was saved again while you changed it (by an agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
+      if (!(await confirm({ title: 'A newer version is there', body: 'It was saved again while you changed it (by an agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
         return false;
-      await post(`/api/pages/${enc(id)}/versions`, { html, base: data.page.version, force: true });
+      await post(`/api/pages/${enc(id)}/versions`, { ...body, base: data.page.version, force: true });
     }
     toast(data.page.sessionKey ? 'Saved. The agent that made it sees your changes with your next message to it.' : 'Saved', 'ok');
     void load();
@@ -803,12 +998,17 @@ function PageView({ id }: { id: string }) {
   }
   const page = data?.page;
   const title = old?.title ?? page?.title ?? 'Page';
-  const doc: StudioDoc | null = data ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, html: old?.html ?? data.html, store } : null;
+  const doc: StudioDoc | null = data && !kind ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, html: old?.html ?? data.html ?? '', store } : null;
+  const askOpen = ask.open && !!page;
+  const askThis = (text?: string) => {
+    if (text !== undefined) setPart(text);
+    openPageAsk({ scope: text !== undefined ? (kind ? 'asked' : 'part') : undefined });
+  };
 
   const lead = (
     <>
       {!mobile && <NavButton />}
-      <IconButton label="All pages" onClick={() => go('/pages')}>
+      <IconButton label="All pages" onClick={() => (closePageAsk(), go('/pages'))}>
         <ArrowLeft size={18} />
       </IconButton>
       <button type="button" className="ml-0.5 min-w-0 text-left" onClick={() => page && setDialog('rename')} title="Rename">
@@ -829,6 +1029,11 @@ function PageView({ id }: { id: string }) {
       <IconButton ref={historyRef} label="Versions" active={menu === 'history'} onClick={() => setMenu(menu === 'history' ? null : 'history')}>
         <History size={16} />
       </IconButton>
+      {!mobile && (
+        <Button ref={exportRef} size="sm" variant="secondary" icon={<Download size={14} />} onClick={() => setMenu(menu === 'export' ? null : 'export')} className={cx(menu === 'export' && 'bg-bg-3')}>
+          Export
+        </Button>
+      )}
       {mobile ? (
         <IconButton ref={shareRef} label="Share" active={menu === 'share'} onClick={() => setMenu(menu === 'share' ? null : 'share')}>
           <Share2 size={16} />
@@ -838,6 +1043,16 @@ function PageView({ id }: { id: string }) {
           Share
         </Button>
       )}
+      {!old &&
+        (mobile ? (
+          <IconButton label="Ask an agent" active={askOpen} onClick={() => (askOpen ? closePageAsk() : askThis())}>
+            <Sparkles size={16} />
+          </IconButton>
+        ) : (
+          <Button size="sm" variant={askOpen ? 'secondary' : 'subtle'} icon={<Sparkles size={14} className="text-accent" />} onClick={() => (askOpen ? closePageAsk() : askThis())} className={cx(askOpen && 'bg-bg-3')}>
+            Ask
+          </Button>
+        ))}
       <IconButton ref={moreRef} label="More" active={menu === 'more'} onClick={() => setMenu(menu === 'more' ? null : 'more')}>
         <Ellipsis size={16} />
       </IconButton>
@@ -854,20 +1069,56 @@ function PageView({ id }: { id: string }) {
       </Button>
     </div>
   );
-  return (
-    <div className="flex h-full min-h-0 flex-col pt-[var(--safe-top)]">
-      <Studio
+  const Editor = kind ? EDITORS[kind] : undefined;
+  const editor = kind ? (
+    Editor ? (
+      <Editor
         key={id}
-        doc={doc}
+        doc={data?.model !== undefined ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, model: old?.model ?? data.model } : null}
+        pageId={id}
         layout={mobile ? 'sheet' : 'page'}
         readOnly={!!old}
-        onSave={save}
+        onSave={(model) => saveBody({ model })}
         lead={lead}
         tail={tail}
         band={band}
-        initialMode={startMode === 'edit' || startMode === 'code' ? startMode : undefined}
         savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
+        onAsk={(text) => askThis(text)}
+        onScopes={setScopes}
+        saveNowRef={saveFirst}
+        startPresent={startPresent}
       />
+    ) : (
+      <Empty icon={<AppWindow size={22} />} title="This app cannot open it">
+        It is a kind of page this version of the app does not know yet.
+      </Empty>
+    )
+  ) : (
+    <Studio
+      key={id}
+      doc={doc}
+      layout={mobile ? 'sheet' : 'page'}
+      readOnly={!!old}
+      onSave={(html) => saveBody({ html })}
+      lead={lead}
+      tail={tail}
+      band={band}
+      initialMode={startMode === 'edit' || startMode === 'code' ? startMode : undefined}
+      savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
+      onAsk={(text) => askThis(text)}
+      saveNowRef={saveFirst}
+    />
+  );
+  const allScopes = page ? scopesOf(page, scopes, part) : [];
+  const panel = page && <PageAskPanel page={page} scopes={allScopes} beforeSend={() => saveFirst.current?.() ?? Promise.resolve(true)} className={wideAsk ? 'w-[400px] shrink-0 border-l border-line' : undefined} />;
+  return (
+    <div className="flex h-full min-h-0 flex-col pt-[var(--safe-top)]">
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{editor}</div>
+        {askOpen && wideAsk && panel}
+      </div>
+      {askOpen && !wideAsk && !ask.folded && createPortal(<div className="fixed inset-0 z-50 flex flex-col bg-bg pt-[var(--safe-top)] pb-[var(--safe-bottom)]">{panel}</div>, document.body)}
+      {page && ask.open && ask.folded && !wideAsk && <PageAskPill page={page} />}
       {data && (
         <>
           <Popover anchor={historyRef} open={menu === 'history'} onClose={() => setMenu(null)} align="end" width={290}>
@@ -891,6 +1142,13 @@ function PageView({ id }: { id: string }) {
               ))}
             </div>
           </Popover>
+          <Popover anchor={exportRef} open={menu === 'export'} onClose={() => setMenu(null)} align="end" width={240}>
+            {EXPORTS(kind).map((x) => (
+              <MenuItem key={x.format} icon={x.icon} onClick={() => void download(x.format)}>
+                {x.label}
+              </MenuItem>
+            ))}
+          </Popover>
           <ShareMenu
             page={data.page}
             link={data.link}
@@ -903,18 +1161,28 @@ function PageView({ id }: { id: string }) {
             }}
             onReset={resetLink}
           />
-          <Popover anchor={moreRef} open={menu === 'more'} onClose={() => setMenu(null)} align="end" width={220}>
-            <MenuItem icon={<Database size={14} />} onClick={() => (setMenu(null), setDialog('data'))}>
-              What it keeps
-            </MenuItem>
+          <Popover anchor={moreRef} open={menu === 'more'} onClose={() => setMenu(null)} align="end" width={240}>
+            {mobile && (
+              <>
+                <MenuLabel>Download as</MenuLabel>
+                {EXPORTS(kind).map((x) => (
+                  <MenuItem key={x.format} icon={x.icon} onClick={() => void download(x.format)}>
+                    {x.label}
+                  </MenuItem>
+                ))}
+                <MenuSep />
+              </>
+            )}
+            {!kind && (
+              <MenuItem icon={<Database size={14} />} onClick={() => (setMenu(null), setDialog('data'))}>
+                What it keeps
+              </MenuItem>
+            )}
             <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(null), setDialog('rename'))}>
               Rename
             </MenuItem>
             <MenuItem icon={<Copy size={14} />} onClick={duplicate}>
               Duplicate
-            </MenuItem>
-            <MenuItem icon={<Download size={14} />} onClick={download}>
-              Download
             </MenuItem>
             <MenuItem
               icon={<ExternalLink size={14} />}

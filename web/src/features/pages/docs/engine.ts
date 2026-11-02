@@ -1,0 +1,1115 @@
+// The documents editor's engine: the document drawn into one contentEditable element (shared/docs.ts' blockHtml,
+// the same HTML the document's own page shows), the browser's selection read as places in the model and set from
+// them (ops.ts), and every edit made to the model and drawn again: Enter, Backspace and Delete across blocks,
+// typing over a selection, pasting and dropping, lists, styles, tables, pictures. The browser itself only types and
+// deletes within one block's words (so spelling, accents and phone keyboards work as they do anywhere), and those
+// words are read back after each change; anything else it would do to the page is stopped and done here. Undo and
+// redo go back and forth through the model's versions.
+import {
+  blockHtml,
+  docMarkdown,
+  htmlBlocks,
+  htmlRuns,
+  listInfo,
+  normalizeBlocks,
+  PAPERS,
+  runsHtml,
+  runsText,
+  type Align,
+  type Block,
+  type Doc,
+  type ImageBlock,
+  type ListKind,
+  type Look,
+  type ParaStyle,
+  type Run,
+} from '@shared/docs';
+import * as ops from './ops';
+import type { Pos, TableOp } from './ops';
+
+export interface Sel {
+  a: Pos;
+  f: Pos;
+}
+
+type Flag = 'b' | 'i' | 'u' | 's' | 'code' | 'sup' | 'sub';
+
+/** What the toolbar and the page around show of where the caret is. */
+export interface SelState {
+  collapsed: boolean;
+  /** The block the selection starts in, and where it is. */
+  block: Block | null;
+  index: number;
+  /** In a table: its cell (row, column). */
+  cell: [number, number] | null;
+  /** How the words there look (all of them, for a stretch). */
+  look: Look;
+  on: Record<Flag, boolean>;
+  style: ParaStyle;
+  list: ListKind | null;
+  align: Align;
+  /** A picture, a line across or a page break picked. */
+  picked: Block | null;
+  /** The words picked (up to 2000 characters). */
+  text: string;
+  /** The link the caret is in. */
+  link: string | null;
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+export interface EngineOpts {
+  readOnly: boolean;
+  /** Where a picture's source shows from in the app. */
+  src: (s: string) => string;
+  /** A page break's label, in the user's language. */
+  breakLabel: string;
+  onChange: (doc: Doc) => void;
+  onState: (s: SelState) => void;
+  /** The editor's own keys first (Ctrl+K, Ctrl+S): true when one was. */
+  onKey?: (e: KeyboardEvent) => boolean;
+  /** A picture from the device kept by the app. */
+  upload: (f: File) => Promise<{ src: string; w: number; h: number }>;
+  /** A picture at an address (or a data: one) kept by the app: its kept source, or null. */
+  takeIn: (src: string) => Promise<string | null>;
+  onError: (e: unknown) => void;
+}
+
+const HISTORY_MAX = 200;
+const FLAGS: Flag[] = ['b', 'i', 'u', 's', 'code', 'sup', 'sub'];
+
+/** How many characters the model counts for a piece of the page: text, and line breaks (not the ones that only hold a line open). */
+function lengthOf(n: Node): number {
+  if (n.nodeType === 3) return (n as Text).data.length;
+  if (n.nodeName === 'BR') return (n as Element).hasAttribute('data-ph') ? 0 : 1;
+  let k = 0;
+  for (let c = n.firstChild; c; c = c.nextSibling) k += lengthOf(c);
+  return k;
+}
+
+/** How far into a block's words a point of the page is. */
+function offsetIn(box: Element, node: Node, offset: number): number {
+  const r = document.createRange();
+  try {
+    r.setStart(box, 0);
+    r.setEnd(node, offset);
+  } catch {
+    return 0;
+  }
+  return lengthOf(r.cloneContents());
+}
+
+const indexIn = (n: Node) => Array.prototype.indexOf.call(n.parentNode?.childNodes ?? [], n) as number;
+
+/** A browser's line break that only holds the end of a line open: not a line of the words. */
+const trailingBreak = /<br(?![^>]*data-ph)[^>]*>((?:\s|<\/(?:span|a|strong|em|u|s|b|i|sup|sub|code|font)>)*)$/i;
+
+/** Where the caret goes for a point on the screen (browsers name it two ways). */
+function caretAt(x: number, y: number): { node: Node; offset: number } | null {
+  const d = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
+  if (d.caretPositionFromPoint) {
+    const p = d.caretPositionFromPoint(x, y);
+    return p ? { node: p.offsetNode, offset: p.offset } : null;
+  }
+  const r = document.caretRangeFromPoint?.(x, y);
+  return r ? { node: r.startContainer, offset: r.startOffset } : null;
+}
+
+const b64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+const unb64 = (s: string) => new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
+
+/** Blocks as HTML for another app to paste (lists as lists, a checklist's boxes as boxes), and as themselves for this one. */
+function copyHtml(blocks: Block[], src: (s: string) => string): string {
+  const { labels } = listInfo(blocks);
+  let out = '';
+  const open: { tag: 'ul' | 'ol'; lvl: number; kind: ListKind }[] = [];
+  const close = (to: number) => {
+    while (open.length > to) out += `</${open.pop()!.tag}>`;
+  };
+  blocks.forEach((b, i) => {
+    if (b.type !== 'li') {
+      close(0);
+      if (b.type === 'p') {
+        const st = [b.align ? `text-align:${b.align}` : '', b.lvl ? `margin-left:${b.lvl * 36}pt` : ''].filter(Boolean).join(';');
+        const tag = b.style === 'code' ? 'pre' : b.style === 'quote' ? 'blockquote' : /^h\d$/.test(b.style ?? '') ? b.style! : 'p';
+        const cls = b.style === 'title' || b.style === 'subtitle' ? ` class="${b.style}"` : '';
+        out += `<${tag}${cls}${st ? ` style="${st}"` : ''}>${runsHtml(b.runs, { view: true })}</${tag}>`;
+      } else out += blockHtml(b, labels[i], { src: (s) => new URL(src(s), location.href).href }).replace(/<div class="nd-b nd-pb"[^>]*><\/div>/, '<div style="page-break-before:always"></div>');
+      return;
+    }
+    const lvl = b.lvl ?? 0;
+    const tag = b.list === 'number' ? 'ol' : 'ul';
+    while (open.length && (open[open.length - 1].lvl > lvl || (open[open.length - 1].lvl === lvl && open[open.length - 1].kind !== b.list))) close(open.length - 1);
+    while (!open.length || open[open.length - 1].lvl < lvl) {
+      open.push({ tag, lvl: open.length ? open[open.length - 1].lvl + 1 : 0, kind: b.list });
+      if (open[open.length - 1].lvl > lvl) open[open.length - 1].lvl = lvl;
+      out += `<${tag}>`;
+      if (open[open.length - 1].lvl === lvl) break;
+    }
+    const box = b.list === 'check' ? `<input type="checkbox"${b.checked ? ' checked' : ''}> ` : '';
+    out += `<li${b.align ? ` style="text-align:${b.align}"` : ''}>${box}${runsHtml(b.runs, { view: true })}</li>`;
+  });
+  close(0);
+  return `<meta charset="utf-8"><!--naget-doc:${b64(JSON.stringify(blocks))}--><div>${out}</div>`;
+}
+
+export class DocEngine {
+  doc: Doc;
+  picked: string | null = null;
+  private els = new Map<string, HTMLElement>();
+  private drawn = new Map<string, Block>();
+  private sel: Sel | null = null;
+  /** The selection before the change being made (what undo goes back to). */
+  private before: Sel | null = null;
+  /** The look words typed next get, at a caret where bold (say) was just turned on. */
+  private pending: Look | null = null;
+  private pendingAt: Pos | null = null;
+  private past: { doc: Doc; sel: Sel | null }[] = [];
+  private future: { doc: Doc; sel: Sel | null }[] = [];
+  private last: { key: string; at: number } | null = null;
+  private composing = false;
+  private plainNext = false;
+  private frame = 0;
+  private off: (() => void)[] = [];
+
+  constructor(
+    public root: HTMLElement,
+    doc: Doc,
+    private o: EngineOpts,
+  ) {
+    this.doc = ops.fixDoc(doc);
+    root.setAttribute('translate', 'no');
+    root.spellcheck = true;
+    this.setReadOnly(o.readOnly);
+    this.draw(true);
+    const on = <K extends keyof HTMLElementEventMap>(t: K, f: (e: HTMLElementEventMap[K]) => void) => {
+      root.addEventListener(t, f as EventListener);
+      this.off.push(() => root.removeEventListener(t, f as EventListener));
+    };
+    on('beforeinput', (e) => this.onBeforeInput(e));
+    on('input', () => this.onInput());
+    on('keydown', (e) => this.onKey(e));
+    on('mousedown', (e) => this.onDown(e));
+    on('paste', (e) => this.onPaste(e));
+    on('copy', (e) => this.onCopy(e, false));
+    on('cut', (e) => this.onCopy(e, true));
+    on('dragstart', (e) => e.preventDefault());
+    on('dragover', (e) => e.dataTransfer && [...e.dataTransfer.types].some((t) => t === 'Files' || t === 'text/html' || t === 'text/plain') && e.preventDefault());
+    on('drop', (e) => this.onDrop(e));
+    on('compositionstart', () => (this.composing = true));
+    on('compositionend', () => {
+      this.composing = false;
+      this.onInput();
+    });
+    on('focus', () => this.emitSoon());
+    const sc = () => this.onSelChange();
+    document.addEventListener('selectionchange', sc);
+    this.off.push(() => document.removeEventListener('selectionchange', sc));
+  }
+
+  destroy() {
+    for (const f of this.off) f();
+    cancelAnimationFrame(this.frame);
+  }
+
+  setReadOnly(ro: boolean) {
+    this.o.readOnly = ro;
+    this.root.contentEditable = ro ? 'false' : 'true';
+  }
+
+  /** Another document (or another version): drawn anew, its history its own. */
+  load(doc: Doc) {
+    this.doc = ops.fixDoc(doc);
+    this.past = [];
+    this.future = [];
+    this.last = null;
+    this.pending = null;
+    this.picked = null;
+    this.draw(true);
+    this.sel = null;
+    this.emitSoon();
+  }
+
+  // ---- drawing --------------------------------------------------------------------------------------------
+
+  private make(b: Block, label: string): HTMLElement {
+    const t = document.createElement('template');
+    t.innerHTML = blockHtml(b, label, { src: this.o.src, edit: true, breakLabel: this.o.breakLabel });
+    const el = t.content.firstElementChild as HTMLElement;
+    if (b.type === 'image') el.querySelector('img')?.setAttribute('draggable', 'false');
+    return el;
+  }
+
+  /** The page made to show the model: blocks that changed drawn anew, the others left as they are. */
+  private draw(all = false) {
+    if (all) {
+      this.els.clear();
+      this.drawn.clear();
+      this.root.replaceChildren();
+    }
+    const { labels } = listInfo(this.doc.blocks);
+    const mine = new Set<Node>();
+    this.doc.blocks.forEach((b, i) => {
+      let el = this.els.get(b.id);
+      if (!el || this.drawn.get(b.id) !== b) {
+        const fresh = this.make(b, labels[i]);
+        el?.remove();
+        el = fresh;
+        this.els.set(b.id, el);
+        this.drawn.set(b.id, b);
+      } else if (b.type === 'li' && el.dataset.n !== labels[i]) el.dataset.n = labels[i];
+      mine.add(el);
+    });
+    for (const [id, el] of this.els)
+      if (!mine.has(el)) {
+        el.remove();
+        this.els.delete(id);
+        this.drawn.delete(id);
+      }
+    // Anything else in the page (the browser's doing) goes; the blocks stand in their order.
+    for (const n of Array.from(this.root.childNodes)) if (!mine.has(n)) n.remove();
+    let prev: Node | null = null;
+    for (const b of this.doc.blocks) {
+      const el = this.els.get(b.id)!;
+      const want: Node | null = prev ? prev.nextSibling : this.root.firstChild;
+      if (want !== el) this.root.insertBefore(el, want);
+      prev = el;
+    }
+    if (this.picked) {
+      const p = this.els.get(this.picked);
+      if (p) p.classList.add('nd-picked');
+      else this.picked = null;
+    }
+  }
+
+  /** A block's element on the page. */
+  elementOf = (id: string) => this.els.get(id) ?? null;
+
+  // ---- places and the selection --------------------------------------------------------------------------------
+
+  /** A point of the page as a place in the model (a point between blocks, or on a picture: the nearest words). */
+  posOf(node: Node, offset: number): Pos | null {
+    const el = node.nodeType === 1 ? (node as Element) : node.parentElement;
+    if (!el || !this.root.contains(el)) return null;
+    const box = el.closest('[data-t]');
+    if (box && this.root.contains(box)) {
+      const blk = box.closest('[data-b]') as HTMLElement | null;
+      const b = blk?.dataset.b;
+      if (!b) return null;
+      const cs = (box as HTMLElement).dataset.c;
+      const c = cs ? (cs.split(',').map(Number) as [number, number]) : undefined;
+      const runs = ops.boxRuns(this.doc, b, c);
+      if (!runs) return null;
+      const o = Math.min(ops.lenOf(runs), offsetIn(box, node, offset));
+      return c ? { b, c, o } : { b, o };
+    }
+    if (el === this.root) {
+      const child = this.root.childNodes[offset] as HTMLElement | undefined;
+      const id = child?.dataset?.b;
+      if (id) return ops.nearPos(this.doc, ops.indexOf(this.doc, id));
+      return ops.nearPos(this.doc, this.doc.blocks.length - 1, true);
+    }
+    const blk = el.closest('[data-b]') as HTMLElement | null;
+    return ops.nearPos(this.doc, blk?.dataset.b ? ops.indexOf(this.doc, blk.dataset.b) : 0);
+  }
+
+  /** A place in the model as a point of the page. */
+  domOf(p: Pos): { node: Node; offset: number } | null {
+    const blk = this.els.get(p.b);
+    if (!blk) return null;
+    const box = p.c ? blk.querySelector(`[data-c="${p.c[0]},${p.c[1]}"]`) : blk;
+    if (!box) return null;
+    let left = p.o;
+    const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (let x = walk.nextNode(); x; x = walk.nextNode()) {
+      if (x.nodeType === 3) {
+        const len = (x as Text).data.length;
+        if (left <= len) return { node: x, offset: left };
+        left -= len;
+      } else if (x.nodeName === 'BR' && !(x as Element).hasAttribute('data-ph')) {
+        if (left === 0) return { node: x.parentNode!, offset: indexIn(x) };
+        left -= 1;
+      }
+    }
+    const ph = box.querySelector('br[data-ph]');
+    if (ph?.parentNode) return { node: ph.parentNode, offset: indexIn(ph) };
+    return { node: box, offset: box.childNodes.length };
+  }
+
+  private readSel(): Sel | null {
+    const s = window.getSelection();
+    if (!s || !s.rangeCount || !s.anchorNode || !s.focusNode || !this.root.contains(s.anchorNode)) return null;
+    const a = this.posOf(s.anchorNode, s.anchorOffset);
+    const f = this.posOf(s.focusNode, s.focusOffset);
+    return a && f ? { a, f } : null;
+  }
+
+  /** The selection, the first place first: the page's own as it is now (the last one, while the toolbar has the focus). */
+  range(): [Pos, Pos] {
+    if (!this.picked) {
+      const now = this.readSel();
+      if (now) this.sel = now;
+    }
+    const s = this.sel ?? { a: ops.firstPos(this.doc), f: ops.firstPos(this.doc) };
+    const valid = (p: Pos) => !!ops.boxRuns(this.doc, p.b, p.c);
+    if (!valid(s.a) || !valid(s.f)) {
+      const p = ops.firstPos(this.doc);
+      return [p, p];
+    }
+    return ops.ordered(this.doc, s.a, s.f);
+  }
+
+  /** A place made one that is in the document now (a block that went: the start of the document). */
+  private valid(p: Pos): Pos {
+    const runs = ops.boxRuns(this.doc, p.b, p.c);
+    return runs ? { ...p, o: Math.min(p.o, ops.lenOf(runs)) } : ops.firstPos(this.doc);
+  }
+
+  /** Sets the selection on the page (and keeps it in view). */
+  place(sel: Sel | null, scroll = true) {
+    if (sel) sel = { a: this.valid(sel.a), f: this.valid(sel.f) };
+    this.sel = sel;
+    if (!sel || this.o.readOnly) return;
+    const a = this.domOf(sel.a);
+    const f = this.domOf(sel.f);
+    if (!a || !f) return;
+    if (document.activeElement !== this.root) this.root.focus({ preventScroll: true });
+    const s = window.getSelection();
+    try {
+      s?.setBaseAndExtent(a.node, a.offset, f.node, f.offset);
+    } catch {
+      return;
+    }
+    if (scroll) this.reveal();
+  }
+
+  /** The caret brought into view, if it is out of it. */
+  private reveal() {
+    const s = window.getSelection();
+    if (!s?.rangeCount) return;
+    let r = s.getRangeAt(0).getBoundingClientRect();
+    if (!r.height) {
+      const n = s.focusNode;
+      const el = (n?.nodeType === 1 ? (n as Element) : n?.parentElement)?.closest('[data-t], [data-b]');
+      if (el) r = el.getBoundingClientRect();
+    }
+    let sc: HTMLElement | null = this.root.parentElement;
+    while (sc && !/(auto|scroll)/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement;
+    if (!sc) return;
+    const box = sc.getBoundingClientRect();
+    if (r.bottom > box.bottom - 24) sc.scrollTop += r.bottom - box.bottom + 48;
+    else if (r.top < box.top + 8) sc.scrollTop -= box.top - r.top + 48;
+  }
+
+  private onSelChange() {
+    if (!this.root.contains(document.activeElement) && document.activeElement !== this.root) return;
+    const sel = this.readSel();
+    if (!sel) return;
+    if (this.pending && !(this.pendingAt && ops.samePos(sel.f, this.pendingAt) && ops.samePos(sel.a, sel.f))) this.pending = null;
+    this.sel = sel;
+    this.emitSoon();
+  }
+
+  private emitSoon() {
+    if (this.frame) return;
+    this.frame = requestAnimationFrame(() => {
+      this.frame = 0;
+      this.o.onState(this.state());
+    });
+  }
+
+  /** What the toolbar shows: how the words picked look, what kind of block they are in. */
+  state(): SelState {
+    const [s, e] = this.range();
+    const collapsed = ops.samePos(s, e);
+    const index = ops.indexOf(this.doc, s.b);
+    const block = this.doc.blocks[index] ?? null;
+    const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+    const look = collapsed ? (this.pending ?? ops.lookAt(runs, s.o)) : ops.commonLook(this.doc, s, e);
+    const on = {} as Record<Flag, boolean>;
+    for (const k of FLAGS) on[k] = collapsed ? !!look[k] : ops.allHave(this.doc, s, e, k);
+    const cell = s.c && block?.type === 'table' ? block.rows[s.c[0]]?.[s.c[1]] : null;
+    const picked = this.picked ? (ops.blockOf(this.doc, this.picked) ?? null) : null;
+    return {
+      collapsed,
+      block,
+      index,
+      cell: s.c ?? null,
+      look,
+      on,
+      style: block?.type === 'p' ? (block.style ?? 'normal') : 'normal',
+      list: block?.type === 'li' ? block.list : null,
+      align: (cell ? cell.align : block?.type === 'p' || block?.type === 'li' ? block.align : undefined) ?? 'left',
+      picked,
+      text: collapsed ? '' : ops.textBetween(this.doc, s, e).slice(0, 2000),
+      link: collapsed ? (ops.linkAt(this.doc, s)?.link ?? null) : (look.link ?? null),
+      canUndo: this.past.length > 0,
+      canRedo: this.future.length > 0,
+    };
+  }
+
+  // ---- changes ---------------------------------------------------------------------------------------------------
+
+  /**
+   * A new model: kept for undo (changes of one kind in a row, typing say, undo together), drawn (unless the page
+   * shows it already), the selection set where the change leaves it.
+   */
+  private commit(doc: Doc, sel: Sel | null, o: { key?: string; draw?: boolean; pick?: string | null } = {}) {
+    const next = ops.fixDoc(doc);
+    if (next === this.doc && o.pick === undefined) {
+      if (sel) this.place(sel);
+      return;
+    }
+    if (next !== this.doc) {
+      const now = Date.now();
+      const same = !!o.key && this.last?.key === o.key && now - this.last.at < 1500;
+      if (!same) {
+        this.past.push({ doc: this.doc, sel: this.before ?? this.sel });
+        if (this.past.length > HISTORY_MAX) this.past.shift();
+      }
+      this.future = [];
+      this.last = o.key ? { key: o.key, at: now } : null;
+      this.doc = next;
+    }
+    this.before = null;
+    if (o.pick !== undefined && o.pick !== this.picked) this.setPicked(o.pick);
+    if (o.draw !== false) this.draw();
+    if (sel && !this.picked) this.place(sel);
+    this.o.onChange(this.doc);
+    this.emitSoon();
+  }
+
+  /** An edit's result applied: its model, its caret (or what it picks). */
+  private apply(e: ops.Edit, key?: string) {
+    this.commit(e.doc, e.pick ? null : { a: e.at, f: e.at }, { key, pick: e.pick ?? null });
+  }
+
+  undo() {
+    const e = this.past.pop();
+    if (!e) return;
+    this.future.push({ doc: this.doc, sel: this.sel });
+    this.doc = e.doc;
+    this.last = null;
+    this.setPicked(null);
+    this.draw();
+    this.place(e.sel ?? { a: ops.firstPos(this.doc), f: ops.firstPos(this.doc) });
+    this.o.onChange(this.doc);
+    this.emitSoon();
+  }
+
+  redo() {
+    const e = this.future.pop();
+    if (!e) return;
+    this.past.push({ doc: this.doc, sel: this.sel });
+    this.doc = e.doc;
+    this.last = null;
+    this.setPicked(null);
+    this.draw();
+    this.place(e.sel ?? { a: ops.firstPos(this.doc), f: ops.firstPos(this.doc) });
+    this.o.onChange(this.doc);
+    this.emitSoon();
+  }
+
+  /** A picture, a line across or a page break picked (or none). */
+  setPicked(id: string | null) {
+    if (this.picked === id) return;
+    if (this.picked) this.els.get(this.picked)?.classList.remove('nd-picked');
+    this.picked = id && this.els.has(id) ? id : id && ops.blockOf(this.doc, id) ? id : null;
+    if (this.picked) {
+      this.els.get(this.picked)?.classList.add('nd-picked');
+      window.getSelection()?.removeAllRanges();
+      this.root.focus({ preventScroll: true });
+    }
+    this.emitSoon();
+  }
+
+  // ---- what the browser does ----------------------------------------------------------------------------------------
+
+  /** A block's words read back from the page. */
+  private readBox(box: Element): Run[] {
+    return htmlRuns(box.innerHTML.replace(trailingBreak, '$1'));
+  }
+
+  /** Whether the page's blocks are still the model's, one for one. */
+  private intact(): boolean {
+    const kids = this.root.children;
+    if (kids.length !== this.doc.blocks.length) return false;
+    for (let i = 0; i < kids.length; i++) if ((kids[i] as HTMLElement).dataset.b !== this.doc.blocks[i].id) return false;
+    return this.root.childNodes.length === kids.length;
+  }
+
+  private onBeforeInput(e: InputEvent) {
+    if (this.o.readOnly) return e.preventDefault();
+    const t = e.inputType;
+    if (this.picked) {
+      e.preventDefault();
+      if (t === 'insertParagraph') this.afterPicked();
+      else if (t.startsWith('delete')) this.removePicked();
+      return;
+    }
+    if (t === 'historyUndo' || t === 'historyRedo') {
+      e.preventDefault();
+      return t === 'historyUndo' ? this.undo() : this.redo();
+    }
+    const sel = this.readSel() ?? this.sel;
+    if (!sel) return e.preventDefault();
+    this.sel = sel;
+    this.before = sel;
+    const [s, en] = ops.ordered(this.doc, sel.a, sel.f);
+    const collapsed = ops.samePos(s, en);
+    const oneBox = ops.sameBox(s, en);
+    const len = ops.lenOf(ops.boxRuns(this.doc, s.b, s.c) ?? []);
+    if (t === 'insertCompositionText') return;
+    if (t === 'insertText' || t === 'insertReplacementText') {
+      const data = e.data ?? e.dataTransfer?.getData('text/plain') ?? '';
+      if (collapsed && t === 'insertText' && data === ' ' && this.shortcut(s)) return e.preventDefault();
+      if (oneBox && !(collapsed && this.pending && t === 'insertText')) return;
+      e.preventDefault();
+      const look = this.pending ?? ops.lookAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], collapsed ? s.o : s.o + 1);
+      const cut = ops.deleteRange(this.doc, s, en);
+      this.pending = null;
+      return this.apply(ops.insertText(cut.doc, cut.at, data.replace(/\r\n?/g, '\n'), look), `type:${s.b}`);
+    }
+    if (t === 'insertParagraph') {
+      e.preventDefault();
+      return this.enter();
+    }
+    if (t === 'insertLineBreak') {
+      e.preventDefault();
+      const cut = ops.deleteRange(this.doc, s, en);
+      return this.apply(ops.insertText(cut.doc, cut.at, '\n'));
+    }
+    if (t.startsWith('delete')) {
+      if (t === 'deleteByDrag' || t === 'deleteByCut') return e.preventDefault();
+      const back = t.includes('Backward');
+      if (!collapsed) {
+        if (oneBox) return;
+        e.preventDefault();
+        return this.apply(ops.deleteRange(this.doc, s, en));
+      }
+      if (back && s.o === 0) {
+        e.preventDefault();
+        return this.apply(ops.backspace(this.doc, s));
+      }
+      if (!back && s.o >= len) {
+        e.preventDefault();
+        return this.apply(ops.deleteForward(this.doc, s));
+      }
+      return;
+    }
+    const fmt: Record<string, Flag> = { formatBold: 'b', formatItalic: 'i', formatUnderline: 'u', formatStrikeThrough: 's', formatSuperscript: 'sup', formatSubscript: 'sub' };
+    e.preventDefault();
+    if (fmt[t]) this.toggle(fmt[t]);
+    else if (t === 'formatIndent' || t === 'formatOutdent') this.indent(t === 'formatIndent' ? 1 : -1);
+    else if (t === 'insertOrderedList' || t === 'insertUnorderedList') this.list(t === 'insertOrderedList' ? 'number' : 'bullet');
+    else if (t === 'formatRemove') this.clear();
+  }
+
+  /** Words the browser typed or took out, inside one block: read back into the model. */
+  private onInput() {
+    if (this.o.readOnly) return;
+    const s = window.getSelection();
+    const node = s?.anchorNode;
+    const el = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
+    const box = el?.closest('[data-t]');
+    if (!box || !this.root.contains(box) || !this.intact()) return this.resync();
+    const blk = box.closest('[data-b]') as HTMLElement;
+    const id = blk.dataset.b!;
+    const cs = (box as HTMLElement).dataset.c;
+    const c = cs ? (cs.split(',').map(Number) as [number, number]) : undefined;
+    const runs = this.readBox(box);
+    const doc = ops.setBox(this.doc, id, c, runs);
+    if (doc === this.doc) return;
+    // The page shows this block as it now is.
+    this.drawn.set(id, doc.blocks[ops.indexOf(doc, id)]);
+    const sel = this.readSel();
+    this.commit(doc, null, { key: `type:${id}`, draw: false });
+    this.sel = sel;
+    if (this.composing) return;
+    // What the browser left is drawn as this editor draws it (its own spans and breaks gone).
+    const t = document.createElement('template');
+    t.innerHTML = runsHtml(runs);
+    if (t.innerHTML !== box.innerHTML) {
+      box.innerHTML = t.innerHTML;
+      if (sel) this.place(sel, false);
+    }
+  }
+
+  /** The page read back whole, after the browser changed more than one block's words: its blocks, as they now are. */
+  private resync() {
+    const used = new Set<string>();
+    const blocks: Block[] = [];
+    for (const n of Array.from(this.root.childNodes)) {
+      const el = n as HTMLElement;
+      const id = n.nodeType === 1 ? el.dataset.b : undefined;
+      const known = id && !used.has(id) ? ops.blockOf(this.doc, id) : undefined;
+      if (known) {
+        used.add(known.id);
+        if (ops.isText(known)) blocks.push({ ...known, runs: this.readBox(el) });
+        else if (known.type === 'table')
+          blocks.push({ ...known, rows: known.rows.map((r, ri) => r.map((c, ci) => ({ ...c, runs: ((x) => (x ? this.readBox(x) : c.runs))(el.querySelector(`[data-c="${ri},${ci}"]`)) }))) });
+        else blocks.push(known);
+      } else {
+        const html = n.nodeType === 1 ? el.outerHTML : (n.textContent ?? '').replace(/[&<>]/g, (x) => `&#${x.charCodeAt(0)};`);
+        blocks.push(...normalizeBlocks(htmlBlocks(html, { pre: true }), {}, new Set([...used, ...this.doc.blocks.map((b) => b.id)])));
+      }
+    }
+    const sel = this.readSel();
+    this.commit({ ...this.doc, blocks: blocks.length ? blocks : [{ id: ops.freshId(this.doc), type: 'p', runs: [] }] }, null, { key: 'type:page' });
+    this.draw(true);
+    if (sel) this.place(sel, false);
+  }
+
+  /** "# ", "- ", "1. ", "[] ", "> " typed at a paragraph's start: a heading, a list, a checklist, a quote. */
+  private shortcut(at: Pos): boolean {
+    if (at.c) return false;
+    const b = ops.blockOf(this.doc, at.b);
+    if (b?.type !== 'p' || b.style) return false;
+    const before = runsText(b.runs).slice(0, at.o);
+    const m = /^(#{1,4}|[-*+]|1[.)]|\[ ?\]|\[[xX]\]|>)$/.exec(before);
+    if (!m) return false;
+    const rest = ops.splitAt(b.runs, at.o)[1];
+    const k = m[1];
+    const nb: Block = k.startsWith('#')
+      ? { id: b.id, type: 'p', style: `h${k.length}` as Exclude<ParaStyle, 'normal'>, runs: rest }
+      : k === '>'
+        ? { id: b.id, type: 'p', style: 'quote', runs: rest }
+        : k.startsWith('[')
+          ? { id: b.id, type: 'li', list: 'check', ...(/x/i.test(k) ? { checked: true } : {}), runs: rest }
+          : { id: b.id, type: 'li', list: /\d/.test(k) ? 'number' : 'bullet', runs: rest };
+    this.apply({ doc: ops.patchBlock(this.doc, b.id, () => nb), at: { b: b.id, o: 0 } });
+    return true;
+  }
+
+  /** Enter: the block split (a line of "---" becomes a line across, "```" a block of code). */
+  enter() {
+    const [s, e] = this.range();
+    const cut = ops.deleteRange(this.doc, s, e);
+    const at = cut.at;
+    const b = ops.blockOf(cut.doc, at.b);
+    if (!at.c && b?.type === 'p' && !b.style) {
+      const text = runsText(b.runs);
+      if (/^(-{3,}|\*{3,}|_{3,})$/.test(text) && at.o === text.length) {
+        const np: Block = { id: ops.freshId(cut.doc), type: 'p', runs: [] };
+        const i = ops.indexOf(cut.doc, b.id);
+        return this.apply({ doc: ops.splice(cut.doc, i, 1, [{ id: b.id, type: 'hr' }, np]), at: { b: np.id, o: 0 } });
+      }
+      if (/^```\w*$/.test(text) && at.o === text.length) return this.apply({ doc: ops.patchBlock(cut.doc, b.id, () => ({ id: b.id, type: 'p', style: 'code', runs: [] })), at: { b: b.id, o: 0 } });
+    }
+    this.apply(ops.enter(cut.doc, at));
+  }
+
+  private onKey(e: KeyboardEvent) {
+    if (this.o.onKey?.(e)) return;
+    if (this.o.readOnly) return;
+    const mod = e.ctrlKey || e.metaKey;
+    const k = e.key.toLowerCase();
+    if (this.picked) {
+      const p = this.picked;
+      if (e.key === 'Backspace' || e.key === 'Delete') return void (e.preventDefault(), this.removePicked());
+      if (e.key === 'Enter') return void (e.preventDefault(), this.afterPicked());
+      if (e.key === 'Escape' || e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const i = ops.indexOf(this.doc, p);
+        this.setPicked(null);
+        const at = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? ops.nearPos(this.doc, i, true) : ops.nearPos(this.doc, i);
+        return this.place({ a: at, f: at });
+      }
+      if (mod && (k === 'z' || k === 'y')) {
+        e.preventDefault();
+        return k === 'y' || e.shiftKey ? this.redo() : this.undo();
+      }
+      if (!mod && e.key.length === 1) e.preventDefault();
+      return;
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const [s] = this.range();
+      const b = ops.blockOf(this.doc, s.b);
+      if (s.c) return this.apply(ops.nextCell(this.doc, s, e.shiftKey));
+      if (b?.type === 'li' || e.shiftKey) return this.indent(e.shiftKey ? -1 : 1);
+      this.before = this.sel;
+      const [a, z] = this.range();
+      const cut = ops.deleteRange(this.doc, a, z);
+      return this.apply(ops.insertText(cut.doc, cut.at, '\t'), `type:${s.b}`);
+    }
+    if (mod && e.key === 'Enter') return void (e.preventDefault(), this.insertAtom('pagebreak'));
+    if (mod && e.altKey && !e.getModifierState('AltGraph')) {
+      const m = /^Digit([0-4])$/.exec(e.code);
+      if (m) {
+        e.preventDefault();
+        return this.style(m[1] === '0' ? 'normal' : (`h${m[1]}` as ParaStyle));
+      }
+    }
+    if (mod && e.shiftKey && !e.altKey) {
+      const map: Record<string, () => void> = {
+        Digit7: () => this.list('number'),
+        Digit8: () => this.list('bullet'),
+        Digit9: () => this.list('check'),
+        KeyX: () => this.toggle('s'),
+        KeyL: () => this.align('left'),
+        KeyE: () => this.align('center'),
+        KeyR: () => this.align('right'),
+        KeyJ: () => this.align('justify'),
+        KeyV: () => {
+          this.plainNext = true;
+          setTimeout(() => (this.plainNext = false), 800);
+        },
+      };
+      const f = map[e.code];
+      if (f) {
+        if (e.code !== 'KeyV') e.preventDefault();
+        return f();
+      }
+    }
+    if (mod && !e.altKey) {
+      const map: Record<string, () => void> = {
+        z: () => (e.shiftKey ? this.redo() : this.undo()),
+        y: () => this.redo(),
+        b: () => this.toggle('b'),
+        i: () => this.toggle('i'),
+        u: () => this.toggle('u'),
+        '\\': () => this.clear(),
+        '.': () => this.toggle('sup'),
+        ',': () => this.toggle('sub'),
+      };
+      const f = !e.shiftKey || k === 'z' ? map[k] : undefined;
+      if (f) {
+        e.preventDefault();
+        f();
+      }
+    }
+  }
+
+  private onDown(e: MouseEvent) {
+    const t = e.target as HTMLElement;
+    const atom = t.closest('figure.nd-img, .nd-hr, .nd-pb') as HTMLElement | null;
+    if (atom && this.root.contains(atom) && !this.o.readOnly) {
+      e.preventDefault();
+      return this.setPicked(atom.dataset.b ?? null);
+    }
+    const li = t.closest('.nd-check') as HTMLElement | null;
+    if (li && this.root.contains(li) && !this.o.readOnly) {
+      // The box itself: ticked or not (not the words beside it).
+      const st = getComputedStyle(li, '::before');
+      const r = li.getBoundingClientRect();
+      const x0 = r.left + (parseFloat(st.left) || 0);
+      const x1 = x0 + (parseFloat(st.width) || 16);
+      const line = parseFloat(getComputedStyle(li).lineHeight) || 24;
+      if (e.clientX >= x0 - 6 && e.clientX <= x1 + 6 && e.clientY <= r.top + line + 4) {
+        e.preventDefault();
+        const id = li.dataset.b!;
+        this.before = this.sel;
+        return this.commit(ops.toggleCheck(this.doc, id), null);
+      }
+    }
+    if (this.picked) this.setPicked(null);
+    const a = t.closest('a[href]') as HTMLAnchorElement | null;
+    if (a && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      window.open(a.href, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  // ---- pasting, copying, dropping ------------------------------------------------------------------------------------
+
+  private ids = () => new Set(this.doc.blocks.map((b) => b.id));
+
+  /** Pasted or dropped content as blocks: this editor's own exactly, other HTML cleaned, plain text as paragraphs. */
+  private blocksFrom(dt: DataTransfer, plain: boolean): Block[] {
+    const html = plain ? '' : dt.getData('text/html');
+    const text = dt.getData('text/plain');
+    const ours = /<!--naget-doc:([A-Za-z0-9+/=]+)-->/.exec(html);
+    if (ours) {
+      try {
+        const list = normalizeBlocks(JSON.parse(unb64(ours[1])) as unknown[], {}, this.ids());
+        if (list.length) return list;
+      } catch {}
+    }
+    if (html) {
+      const list = normalizeBlocks(htmlBlocks(html), {}, this.ids());
+      if (list.length) return list;
+    }
+    if (!text) return [];
+    const lines = text.replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n');
+    return normalizeBlocks(
+      lines.map((l) => ({ type: 'p', runs: l ? [{ t: l }] : [] })),
+      {},
+      this.ids(),
+    );
+  }
+
+  /** Blocks put in where the selection is (what is selected goes); their pictures then taken in. */
+  insert(blocks: Block[]) {
+    if (!blocks.length) return;
+    let e: ops.Edit;
+    if (this.picked) {
+      const i = ops.indexOf(this.doc, this.picked);
+      const np: Block = { id: ops.freshId(this.doc), type: 'p', runs: [] };
+      const d = ops.splice(this.doc, i + 1, 0, [np]);
+      this.setPicked(null);
+      e = ops.insertBlocks(d, { b: np.id, o: 0 }, blocks);
+    } else {
+      this.before = this.sel;
+      const [s, en] = this.range();
+      const cut = ops.deleteRange(this.doc, s, en);
+      e = ops.insertBlocks(cut.doc, cut.at, blocks);
+    }
+    this.apply(e);
+    void this.takeInPictures(blocks);
+  }
+
+  /** A table of `rows` × `cols` at the caret, the caret in its first cell. */
+  insertTable(rows: number, cols: number) {
+    const t = ops.newTable(this.doc, rows, cols);
+    this.insert([t]);
+    this.place({ a: { b: t.id, c: [0, 0], o: 0 }, f: { b: t.id, c: [0, 0], o: 0 } });
+  }
+
+  /** A line across, or a page break, at the caret. */
+  insertAtom(type: 'hr' | 'pagebreak') {
+    this.insert([{ id: ops.freshId(this.doc), type }]);
+  }
+
+  /** Pictures from the web or inside what was pasted: kept by the app, their sources changed when they are. */
+  private async takeInPictures(blocks: Block[]) {
+    for (const b of blocks) {
+      if (b.type !== 'image' || b.src.startsWith('naget-asset:')) continue;
+      const src = await this.o.takeIn(b.src).catch(() => null);
+      if (!src || !ops.blockOf(this.doc, b.id)) continue;
+      this.commit(
+        ops.patchBlock<ImageBlock>(this.doc, b.id, (x) => ({ ...x, src })),
+        null,
+        { key: 'picture', pick: this.picked },
+      );
+    }
+  }
+
+  private onPaste(e: ClipboardEvent) {
+    if (this.o.readOnly) return;
+    e.preventDefault();
+    const dt = e.clipboardData;
+    if (!dt) return;
+    const files = [...dt.files].filter((f) => f.type.startsWith('image/'));
+    if (files.length && !dt.getData('text/html')) return void this.addPictures(files);
+    const [s] = this.range();
+    const target = ops.blockOf(this.doc, s.b);
+    // In code, words come as they are.
+    const plain = this.plainNext || (target?.type === 'p' && target.style === 'code');
+    this.plainNext = false;
+    if (plain && !this.picked) {
+      const text = dt.getData('text/plain').replace(/\r\n?/g, '\n');
+      if (!text) return;
+      this.before = this.sel;
+      const [a, z] = this.range();
+      const cut = ops.deleteRange(this.doc, a, z);
+      if (target?.type === 'p' && target.style === 'code') return this.apply(ops.insertText(cut.doc, cut.at, text, {}));
+    }
+    this.insert(this.blocksFrom(dt, plain));
+  }
+
+  /** Pictures from the device: each kept by the app, then put in where the caret is. */
+  async addPictures(files: File[]) {
+    for (const f of files) {
+      try {
+        const p = await this.o.upload(f);
+        this.insert([this.picture(p.src, p.w)]);
+      } catch (err) {
+        this.o.onError(err);
+      }
+    }
+  }
+
+  /** A picture block of `px` pixels wide, as a share of the text's width (no wider than it). */
+  picture(src: string, px: number): ImageBlock {
+    const paper = PAPERS[this.doc.page.size];
+    const text = ((paper.w - 2 * this.doc.page.margin) * 96) / 25.4;
+    return { id: ops.freshId(this.doc), type: 'image', src, w: Math.max(0.05, Math.min(1, Math.round((px / text) * 1000) / 1000)) };
+  }
+
+  private onCopy(e: ClipboardEvent, cut: boolean) {
+    const [s, en] = this.range();
+    const picked = this.picked ? ops.blockOf(this.doc, this.picked) : undefined;
+    if (!picked && ops.samePos(s, en)) return;
+    e.preventDefault();
+    const blocks = picked ? [{ ...picked }] : ops.sliceBlocks(this.doc, s, en);
+    e.clipboardData?.setData('text/html', copyHtml(blocks, this.o.src));
+    e.clipboardData?.setData('text/plain', ops.blocksPlain(blocks));
+    if (!cut || this.o.readOnly) return;
+    if (picked) return this.removePicked();
+    this.before = this.sel;
+    this.apply(ops.deleteRange(this.doc, s, en));
+  }
+
+  private onDrop(e: DragEvent) {
+    if (this.o.readOnly || !e.dataTransfer) return;
+    e.preventDefault();
+    const pt = caretAt(e.clientX, e.clientY);
+    const at = pt ? this.posOf(pt.node, pt.offset) : null;
+    if (at) {
+      this.setPicked(null);
+      this.place({ a: at, f: at }, false);
+    }
+    const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
+    if (files.length) return void this.addPictures(files);
+    this.insert(this.blocksFrom(e.dataTransfer, false));
+  }
+
+  // ---- what the toolbar asks ----------------------------------------------------------------------------------------
+
+  /** A look for the words picked; at a caret, for its word (or, between words, for what is typed next). */
+  private looks(f: (s: Pos, e: Pos) => Doc, pend: (l: Look) => Look) {
+    if (this.picked) return;
+    this.before = this.sel;
+    const [s, e] = this.range();
+    if (ops.samePos(s, e)) {
+      const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+      const w = ops.wordAt(runs, s.o);
+      if (w) {
+        const d = f({ ...s, o: w[0] }, { ...s, o: w[1] });
+        return this.commit(d, { a: s, f: s });
+      }
+      this.pending = pend({ ...(this.pending ?? ops.lookAt(runs, s.o)) });
+      this.pendingAt = s;
+      this.place({ a: s, f: s }, false);
+      return this.emitSoon();
+    }
+    this.commit(f(s, e), this.sel);
+  }
+
+  toggle(k: Flag) {
+    const [s, e] = this.range();
+    const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+    const w = ops.samePos(s, e) ? ops.wordAt(runs, s.o) : null;
+    const on = ops.samePos(s, e) ? !(w ? ops.allHave(this.doc, { ...s, o: w[0] }, { ...s, o: w[1] }, k) : (this.pending ?? ops.lookAt(runs, s.o))[k]) : !ops.allHave(this.doc, s, e, k);
+    this.looks(
+      (a, z) => ops.setFlag(this.doc, a, z, k, on),
+      (l) => {
+        if (on) l[k] = true;
+        else delete l[k];
+        if (on && k === 'sup') delete l.sub;
+        if (on && k === 'sub') delete l.sup;
+        return l;
+      },
+    );
+  }
+
+  /** A colour, highlight, size or font (undefined: none of its own). */
+  value(k: 'color' | 'hl' | 'size' | 'font', v: string | number | undefined) {
+    this.looks(
+      (a, z) => ops.setValue(this.doc, a, z, k, v),
+      (l) => {
+        if (v === undefined) delete l[k];
+        else (l as Record<string, unknown>)[k] = v;
+        return l;
+      },
+    );
+  }
+
+  clear() {
+    this.looks(
+      (a, z) => ops.clearLook(this.doc, a, z),
+      () => ({}),
+    );
+  }
+
+  /** A link on the words picked (or the link the caret is in; with `text`, new words with it at the caret); null takes it off. */
+  link(url: string | null, text?: string) {
+    if (this.picked) return;
+    this.before = this.sel;
+    const [s, e] = this.range();
+    if (ops.samePos(s, e)) {
+      const l = ops.linkAt(this.doc, s);
+      if (l) return this.commit(ops.setValue(this.doc, { ...s, o: l.from }, { ...s, o: l.to }, 'link', url ?? undefined), { a: s, f: s });
+      if (!url) return;
+      const words = text?.trim() || url.replace(/^mailto:|^tel:/i, '');
+      const look = { ...ops.lookAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], s.o), link: url };
+      return this.apply(ops.insertText(this.doc, s, words, look));
+    }
+    this.commit(ops.setValue(this.doc, s, e, 'link', url ?? undefined), this.sel);
+  }
+
+  /** The blocks picked as this style. */
+  style(st: ParaStyle) {
+    this.before = this.sel;
+    const [s, e] = this.range();
+    this.commit(ops.setStyle(this.doc, s, e, st), this.sel);
+  }
+
+  list(kind: ListKind) {
+    this.before = this.sel;
+    const [s, e] = this.range();
+    this.commit(ops.toggleList(this.doc, s, e, kind), this.sel);
+  }
+
+  indent(by: 1 | -1) {
+    this.before = this.sel;
+    const [s, e] = this.range();
+    this.commit(ops.indent(this.doc, s, e, by), this.sel);
+  }
+
+  align(a: Align) {
+    this.before = this.sel;
+    const [s, e] = this.range();
+    this.commit(ops.setAlign(this.doc, s, e, a), this.sel);
+  }
+
+  table(op: TableOp) {
+    const [s] = this.range();
+    if (!s.c) return;
+    this.before = this.sel;
+    this.apply(ops.tableOp(this.doc, s.b, s.c, op));
+  }
+
+  /** A picture's width, alignment, caption, description or source. */
+  image(id: string, patch: Partial<Omit<ImageBlock, 'id' | 'type'>>) {
+    this.before = this.sel;
+    this.commit(
+      ops.patchBlock<ImageBlock>(this.doc, id, (b) => ({ ...b, ...patch })),
+      null,
+      { key: `image:${id}:${Object.keys(patch).join()}`, pick: this.picked },
+    );
+  }
+
+  /** The picked block out (its place goes to the words after it). */
+  removePicked() {
+    if (!this.picked) return;
+    const id = this.picked;
+    this.setPicked(null);
+    this.apply(ops.removeBlock(this.doc, id));
+  }
+
+  /** Enter on a picked block: a paragraph after it, the caret in it. */
+  private afterPicked() {
+    if (!this.picked) return;
+    const i = ops.indexOf(this.doc, this.picked);
+    const np: Block = { id: ops.freshId(this.doc), type: 'p', runs: [] };
+    this.setPicked(null);
+    this.apply({ doc: ops.splice(this.doc, i + 1, 0, [np]), at: { b: np.id, o: 0 } });
+  }
+
+  /** The caret at a block's start, in view. */
+  focusBlock(id: string) {
+    const at = ops.nearPos(this.doc, ops.indexOf(this.doc, id));
+    this.setPicked(null);
+    this.els.get(id)?.scrollIntoView({ block: 'start', behavior: 'instant' as ScrollBehavior });
+    this.place({ a: at, f: at }, false);
+    this.emitSoon();
+  }
+
+  /** The document's paper, margins, font or size. */
+  setDoc(patch: Partial<Pick<Doc, 'page' | 'font' | 'size'>>) {
+    this.before = this.sel;
+    this.commit({ ...this.doc, ...patch }, null, { key: `doc:${Object.keys(patch).join()}` });
+  }
+
+  /** The document as Markdown (to copy it all as text). */
+  markdown = () => docMarkdown(this.doc);
+
+  /** The element of the link the caret is in. */
+  linkElement(): HTMLElement | null {
+    const n = window.getSelection()?.anchorNode;
+    const el = (n?.nodeType === 1 ? (n as Element) : n?.parentElement)?.closest('a[href]');
+    return el && this.root.contains(el) ? (el as HTMLElement) : null;
+  }
+}

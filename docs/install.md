@@ -10,6 +10,10 @@ How to run Naget Agent with Docker or as a service of your user, and keep it up 
 - With Docker, nothing else. Without it: Node.js 22.12 or newer, `git`, `tmux`, a C/C++ toolchain for the
   native modules (`build-essential` and `python3` on Debian or Ubuntu), and
   [Claude Code](https://docs.anthropic.com/en/docs/claude-code) if you want it (Codex is installed with the app).
+- Optional: [TeX Live](https://tug.org/texlive/) to typeset LaTeX documents in Pages, with bubblewrap to keep it
+  in a sandbox of its own (on Debian or Ubuntu `sudo apt install texlive-latex-extra texlive-xetex latexmk
+  poppler-utils bubblewrap`; LuaLaTeX runs only in that sandbox). The Docker image leaves TeX out; build it with
+  `--build-arg LATEX=true` to add it (about 500 MB more; pdfLaTeX and XeLaTeX).
 
 ## With Docker
 

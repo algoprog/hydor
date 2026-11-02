@@ -63,7 +63,7 @@ const LOOKS: Record<string, TopicLook> = {
   web: { icon: Globe, group: 'abilities', blurb: 'Web searches, and a browser you can take over' },
   research: { icon: Telescope, group: 'abilities', blurb: 'Deep research, second opinions and teams of agents' },
   'documents-voice': { icon: FileText, group: 'abilities', blurb: 'Documents and pictures in and out, and talking' },
-  pages: { icon: AppWindow, group: 'abilities', blurb: 'Reports, charts and small tools agents make for you' },
+  pages: { icon: AppWindow, group: 'abilities', blurb: 'Pages, slides, documents and spreadsheets agents make' },
   templates: { icon: LayoutGrid, group: 'abilities', blurb: 'Fill in a short form, and an agent does the job' },
   tasks: { icon: CalendarClock, group: 'abilities', blurb: 'Work that starts by itself, when you say' },
   'agents-models': { icon: Cpu, group: 'setup', blurb: 'Claude Code, Codex and others, their accounts and models' },

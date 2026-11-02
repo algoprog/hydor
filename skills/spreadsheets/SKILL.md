@@ -1,9 +1,15 @@
 ---
 name: spreadsheets
-description: Use when the user wants a spreadsheet (.xlsx) made or changed (a budget, tracker, schedule, invoice, data table, anything with rows, totals or charts), or an .xlsx, .xls, .ods or .csv read, cleaned up or analysed.
+description: Use when the user wants an Excel file (.xlsx) made or changed from code (a budget, tracker, schedule, invoice, data table, anything with rows, totals or charts), or an .xlsx, .xls, .ods or .csv read, cleaned up or analysed. For a new spreadsheet to edit in the app, make it with save_sheet instead.
 ---
 
 # Spreadsheets
+
+First, the app's own spreadsheets: for a new one, make it with the `save_sheet` tool (naget-agent),
+with its formulas. It shows in the conversation, the user edits it in Pages (as in Excel or Google
+Sheets), and `export_page` writes it as an .xlsx, CSV or PDF file to hand over with `present_files`.
+Use this skill for what those lack (charts, conditional formatting, pivot tables, data validation, the
+user's own template), for a workbook of the user's own, or when they ask for a file made this way.
 
 You build the workbook with **openpyxl** in a short Python script and hand it over as a file. The
 scripts in `scripts/` (next to this file):

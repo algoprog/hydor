@@ -190,6 +190,7 @@ export function PageFrame({
   onPick,
   title = 'Page',
   className,
+  fill,
 }: {
   html: string;
   store: Store;
@@ -197,10 +198,12 @@ export function PageFrame({
   onPick?: (p: Pick) => void;
   title?: string;
   className?: string;
+  /** The frame fills a space of its own (over everything), rather than growing with the page. */
+  fill?: boolean;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const cb = useRef({ html, store, onHeight, onPick });
-  cb.current = { html, store, onHeight, onPick };
+  const cb = useRef({ html, store, onHeight, onPick, fill });
+  cb.current = { html, store, onHeight, onPick, fill };
   const nRef = useRef('');
   useThemeChange(() => nRef.current && ref.current?.contentWindow?.postMessage({ type: 'wa-html-theme', n: nRef.current, theme: themeNow(), css: themeCss() }, '*'));
   // Before the frame can load (it posts "ready" as soon as it does).
@@ -217,7 +220,7 @@ export function PageFrame({
       if (d.type === 'wa-html-ready') {
         n = nonce();
         nRef.current = n;
-        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value } }, '*');
+        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill }, '*');
         return;
       }
       const { store, onHeight, onPick } = cb.current;
@@ -271,10 +274,15 @@ export function PageFrame({
       src="/htmlframe"
       title={title}
       sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
+      // A slide deck's own page may go full screen to present.
+      allow={isDeckPage(html) ? 'fullscreen' : undefined}
       className={cx(FRAME_CLS, className)}
     />
   );
 }
+
+/** A slide deck's own page (server/pages/slides.ts), by its marker. */
+export const isDeckPage = (html: string) => html.slice(0, 6000).includes('<script type="application/json" id="n-deck">');
 
 const SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals';
 

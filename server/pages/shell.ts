@@ -26,7 +26,7 @@ function shell(cfg: { base: string; max: { key: number; value: number } }) {
     // window.crypto: this module's own `crypto` is Node's.
     n = [...window.crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
     const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-    frame.contentWindow.postMessage({ type: 'wa-html-page', html: page.html, n, theme: dark ? 'dark' : 'light', max: cfg.max }, '*');
+    frame.contentWindow.postMessage({ type: 'wa-html-page', html: page.html, n, theme: dark ? 'dark' : 'light', max: cfg.max, fill: true }, '*');
   };
   fetch(`${cfg.base}/html`, { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? 'This link no longer opens a page: it was reset or the page was deleted.' : 'The page could not be loaded.'))))
@@ -86,7 +86,7 @@ export function shellPage(token: string, title: string): { html: string; csp: st
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
 <style>html,body{margin:0;height:100%;background:#fff}@media (prefers-color-scheme:dark){html,body{background:#151412;color:#a39b8e}}iframe{position:fixed;inset:0;display:block;width:100%;height:100%;border:0}.msg{max-width:28rem;margin:0 auto;padding:48px 24px;font:15px/1.5 system-ui,sans-serif;color:#675f52;text-align:center}</style>
 </head><body>
-<iframe id="page" src="/htmlframe" title="${t}" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"></iframe>
+<iframe id="page" src="/htmlframe" title="${t}" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals" allow="fullscreen"></iframe>
 <script>${script}</script>
 </body></html>`;
   const csp = [

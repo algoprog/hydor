@@ -1,7 +1,10 @@
 // Script tests for Pages: version history, the storage limits, the signed links (a page's own address,
 // private sites), the publish flow (the card's answer, the agent's message) and how pages and sites are
-// served (sandbox policy, no cookies, nothing outside the folder). Through the routes, with a stand-in
-// for the session manager. Build and run with a scratch folder:
+// served (sandbox policy, no cookies, nothing outside the folder); slide decks (save_slides, their checks,
+// pictures, versions, their own page), documents (save_doc, Word and Markdown in and out), spreadsheets
+// (save_sheet, formulas, Excel and CSV in and out), LaTeX documents
+// (save_latex, typeset when TeX is here, kept in its folder) and the exports (PowerPoint and Word read back,
+// the web page, PDF when a browser is here). Through the routes, with a stand-in for the session manager. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/pages-test.ts
 //   DATA_DIR=/tmp/naget-test-pages-unit node dist/dev/pages-test.js
 import crypto from 'node:crypto';
@@ -12,6 +15,9 @@ import Fastify from 'fastify';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { notesOf } from '../notes.ts';
+import { extractText } from '../documents/extract.ts';
+import { canCapture } from '../capture/index.ts';
+import { normalizeDeck } from '../../shared/slides.ts';
 import { draftsOf, endDrafts, feedDraft, JsonFields } from './drafts.ts';
 import { takeEdits } from './edits.ts';
 import { pages } from './index.ts';
@@ -314,6 +320,263 @@ let privPath = '';
   await req('DELETE', `/api/pages/${id}/data`);
   ok((await req('GET', `/api/pages/${id}/data`)).json().entries.length === 0, 'and can clear it');
   ok((await req('GET', `/api/pages/${id}/thumb`)).statusCode === 404, 'a page has no picture until one is taken');
+}
+
+// ---- slide decks ----------------------------------------------------------------------------------------
+{
+  // A picture of the agent's, in its session's folder (a 1×1 PNG).
+  fs.writeFileSync(path.join(tmp, 'dot.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'));
+  const made = await run('save_slides', {
+    title: 'Launch',
+    theme: 'ocean',
+    slides: [
+      { layout: 'title', title: 'Launch plan', subtitle: 'Spring', notes: 'Say hello.', transition: 'fade' },
+      { layout: 'content', title: 'Sales grew **12%**', text: '- Europe\n  - Spain\n- Online', build: true },
+      { layout: 'image-right', title: 'The store', text: 'Opening day', image: 'dot.png' },
+      { layout: 'chart', title: 'By quarter', chart: { kind: 'pie', labels: ['A', 'B'], series: [{ name: 'Share', values: [60, 40] }], values: true } },
+      { els: [{ type: 'shape', shape: 'star', x: 100, y: 100, w: 200, h: 200, anim: 'zoom' }, { type: 'text', x: 400, y: 100, w: 400, h: 100, text: 'Hi', color: 'red;background:url(x)', link: 'javascript:alert(1)' }, { type: 'image', x: 0, y: 0, w: 10, h: 10, src: 'nope.png' }] },
+    ],
+  });
+  const id = idOf(made.text);
+  ok(id && made.text?.includes('5 slides'), 'save_slides makes a deck');
+  ok(made.text?.includes('nope.png') && made.text.includes('left out'), 'a picture that is not there is said to be left out');
+  const info = (await req('GET', `/api/pages/${id}`)).json();
+  ok(info.page.kind === 'slides' && info.model && info.html === undefined, 'a deck reads back as its slides');
+  const deck = info.model;
+  ok(deck.theme.id === 'ocean' && !('label' in deck.theme), 'its theme is the preset’s, without its label');
+  const s2 = deck.slides[1];
+  const body = s2.els.find((e: { role?: string }) => e.role === 'body');
+  ok(body.paras.length === 3 && body.paras[1].lvl === 1 && body.paras[0].list === 'bullet', 'bullets keep their levels');
+  ok(s2.els.find((e: { role?: string }) => e.role === 'title').paras[0].runs.some((r: { t: string; b?: boolean }) => r.t === '12%' && r.b), '**bold** words are bold');
+  ok(s2.anims?.[0]?.byPara && s2.anims[0].el === body.id, 'build: the bullets come one at a time');
+  const img = deck.slides[2].els.find((e: { type: string }) => e.type === 'image');
+  ok(/^naget-asset:[a-f0-9]{40}$/.test(img.src), 'the agent’s picture file is kept by the app');
+  const pic = await req('GET', `/api/pages/assets/${img.src.slice(12)}`);
+  ok(pic.statusCode === 200 && pic.headers['content-type'] === 'image/png' && pic.rawPayload.length === 70, 'and served as it is');
+  const s5 = deck.slides[4];
+  const hi = s5.els.find((e: { type: string }) => e.type === 'text');
+  ok(!hi.color && !hi.link, 'a colour or a link that is not one is dropped');
+  ok(s5.els.find((e: { type: string }) => e.type === 'image').src === '', 'a picture source that is not one stays empty');
+  ok(s5.anims?.length === 1 && s5.anims[0].fx === 'zoom' && s5.anims[0].type === 'in', 'a part’s own anim becomes the slide’s');
+  ok(JSON.stringify(normalizeDeck(deck)) === JSON.stringify(deck), 'a kept deck is kept as it is when checked again');
+  const got = (await run('get_page', { id })).text ?? '';
+  ok(got.includes('A slide deck of 5 slides') && got.includes('save_slides') && got.includes('1. Launch plan'), 'get_page gives a deck’s outline and slides');
+  ok(!got.includes('base64'), 'without picture data');
+  ok((await run('save_page', { id, title: 'x', html: page(1) })).error?.includes('save_slides'), 'save_page refuses a deck');
+  const plain = idOf((await run('save_page', { title: 'Plain', html: page(1) })).text);
+  ok((await run('save_slides', { id: plain, title: 'x', slides: [] })).error?.includes('not a slide deck'), 'save_slides refuses a page');
+  ok((await run('get_page', {})).text?.includes(`${id} · Launch · slide deck`), 'the list says which are decks');
+  // The user's version, from the editor; the agent hears of it.
+  const changed = { ...deck, slides: deck.slides.map((x: { id: string; notes?: string }, i: number) => (i === 0 ? { ...x, notes: 'Say hello, slowly.' } : x)) };
+  let r = await req('POST', `/api/pages/${id}/versions`, { model: changed, base: 1, sessionKey: 'claude:s5' });
+  ok(r.json().page.version === 2 && r.json().page.by === 'edit', 'a changed deck is saved as a version');
+  ok((await req('POST', `/api/pages/${id}/versions`, { html: page(1), base: 2 })).statusCode === 400, 'a deck takes slides, not HTML');
+  const heard = takeEdits(db, 'claude:s5') ?? '';
+  ok(heard.includes(`saved slide deck ${id}`) && heard.includes('Say hello, slowly.'), 'the agent hears what changed, a line per part');
+  ok((await req('POST', `/api/pages/${id}/versions/1/restore`)).json().page.version === 3, 'an older deck comes back as a new version');
+  const v1 = (await req('GET', `/api/pages/${id}/versions/1`)).json();
+  const json = /<script type="application\/json" id="n-deck">([^<]*)<\/script>/.exec(v1.html)?.[1] ?? '';
+  ok(json.includes('data:image/png;base64,') && !json.includes('naget-asset:'), 'a deck’s own page has its pictures inside it');
+  ok((await req('GET', `/api/pages/${id}/versions/1?model=1`)).json().model.slides.length === 5, 'and its slides when asked');
+  const copy = (await req('POST', `/api/pages/${id}/copy`)).json().page;
+  ok(copy.kind === 'slides' && copy.title === 'Launch (copy)', 'a copy of a deck is a deck');
+  const tok = (await req('GET', `/api/pages/${id}`)).json().link.slice(4);
+  ok((await req('GET', `/pg/${tok}/html`)).json().html.includes('id="n-deck"'), 'a deck opens at its own address as its slideshow');
+  // Pages the editor uploads.
+  const up = await req('POST', '/api/pages/assets', { data: `data:image/png;base64,${fs.readFileSync(path.join(tmp, 'dot.png')).toString('base64')}` });
+  ok(up.json().src === img.src, 'the same picture uploaded is kept once');
+  ok((await req('POST', '/api/pages/assets', { data: 'data:image/png;base64,aGVsbG8=' })).statusCode === 415, 'what is not a picture is refused');
+  // The exports.
+  const pptx = await req('GET', `/api/pages/${id}/export?format=pptx`);
+  ok(pptx.statusCode === 200 && /presentationml/.test(String(pptx.headers['content-type'])) && /Launch\.pptx/.test(String(pptx.headers['content-disposition'])), 'a deck exports as PowerPoint');
+  const file = path.join(tmp, 'Launch.pptx');
+  fs.writeFileSync(file, pptx.rawPayload);
+  const read = (await extractText(file))?.text ?? '';
+  ok(read.includes('Launch plan') && read.includes('Sales grew') && read.includes('Spain') && read.includes('Say hello'), 'the PowerPoint file reads back with its words and notes');
+  const html = await req('GET', `/api/pages/${id}/export?format=html`);
+  ok(html.statusCode === 200 && html.body.includes('id="n-deck"'), 'a deck exports as a web page that plays it');
+  ok((await req('GET', `/api/pages/${id}/export?format=docx`)).statusCode === 400, 'a deck does not export as Word');
+  ok((await req('GET', `/api/pages/${plain}/export?format=pptx`)).statusCode === 400, 'a page does not export as PowerPoint');
+  ok((await req('GET', `/api/pages/${plain}/export?format=html`)).body.includes('id="n-kit"'), 'a page exports as a web page with its kit');
+  ok((await req('GET', `/api/pages/${id}/export?format=gif`)).statusCode === 400, 'an unknown format is refused');
+  if (canCapture()) {
+    const pdf = await req('GET', `/api/pages/${id}/export?format=pdf`);
+    ok(pdf.statusCode === 200 && pdf.rawPayload.subarray(0, 5).toString() === '%PDF-', 'a deck exports as a PDF');
+  } else ok((await req('GET', `/api/pages/${id}/export?format=pdf`)).statusCode === 503, 'without a browser a PDF says what it needs');
+  // An agent asked from the deck in Pages is told which deck it is.
+  const spawn = (await pages.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { page: id } }, deps)) ?? {};
+  ok(spawn.instructions?.some((x) => x.includes(`saved page ${id}`) && x.includes('save_slides')), 'an agent asked from a deck knows it and how to change it');
+}
+
+// ---- documents ------------------------------------------------------------------------------------------
+{
+  const md = '# Garden plan\n\nWe grow **beans** and *peas*.\n\n## Costs\n\n| Item | Cost |\n| --- | --- |\n| Beds | 300 |\n\n- Water\n  - Taps\n- Tools\n\n![A bed](dot.png)\n\n![Gone](nope.png)\n';
+  const made = await run('save_doc', { title: 'Garden plan', markdown: md });
+  const id = idOf(made.text);
+  ok(id && made.text?.includes('Word'), 'save_doc makes a document');
+  ok(made.text?.includes('nope.png'), 'a picture that is not there is said to be left out');
+  const info = (await req('GET', `/api/pages/${id}`)).json();
+  ok(info.page.kind === 'doc' && Array.isArray(info.model?.blocks) && info.html === undefined, 'a document reads back as its blocks');
+  const blocks = info.model.blocks as { id: string; type: string; style?: string; src?: string; lvl?: number; list?: string; rows?: unknown[][] }[];
+  ok(blocks.some((b) => b.type === 'p' && b.style === 'h2') && blocks.some((b) => b.type === 'table' && b.rows?.length === 2), 'its headings and table are kept as such');
+  ok(blocks.some((b) => b.type === 'li' && b.list === 'bullet' && b.lvl === 1), 'lists keep their levels');
+  ok(/^naget-asset:[a-f0-9]{40}$/.test(blocks.find((b) => b.type === 'image')?.src ?? ''), 'the agent’s picture file is kept by the app');
+  const got = (await run('get_page', { id })).text ?? '';
+  ok(got.includes('save_doc') && got.includes('## Costs') && got.includes('**beans**'), 'get_page gives the document as Markdown and how to change it');
+  ok((await run('get_page', {})).text?.includes(`${id} · Garden plan · document`), 'the list says which are documents');
+  ok((await run('save_slides', { id, title: 'x', slides: [] })).error?.includes('not a slide deck'), 'save_slides refuses a document');
+  const plain = idOf((await run('save_page', { title: 'Plain', html: page(1) })).text);
+  ok((await run('save_doc', { id: plain, title: 'x', markdown: 'Hi' })).error?.includes('not a document'), 'save_doc refuses a page');
+  // The agent changes it: the blocks it kept keep their ids.
+  const again = await run('save_doc', { id, title: 'Garden plan', markdown: md.replace('300', '320') });
+  const v2 = (await req('GET', `/api/pages/${id}`)).json();
+  ok(idOf(again.text) === id && v2.page.version === 2, 'save_doc with the id saves a new version');
+  ok(v2.model.blocks[0].id === blocks[0].id, 'unchanged blocks keep their ids');
+  // The user's version, from the editor; the agent hears of it.
+  const changed = { ...v2.model, blocks: [...v2.model.blocks, { type: 'p', runs: [{ t: 'Planting day in April.' }] }] };
+  const r = await req('POST', `/api/pages/${id}/versions`, { model: changed, base: 2, sessionKey: 'claude:s6' });
+  ok(r.json().page?.version === 3 && r.json().page.by === 'edit', 'a changed document is saved as a version');
+  ok((takeEdits(db, 'claude:s6') ?? '').includes('Planting day in April.'), 'the agent hears what changed');
+  ok((await req('POST', `/api/pages/${id}/versions`, { html: page(1), base: 3 })).statusCode === 400, 'a document takes its blocks, not HTML');
+  // The exports.
+  const docx = await req('GET', `/api/pages/${id}/export?format=docx`);
+  ok(docx.statusCode === 200 && /wordprocessingml/.test(String(docx.headers['content-type'])) && /Garden plan\.docx/.test(String(docx.headers['content-disposition'])), 'a document exports as Word');
+  const file = path.join(tmp, 'Garden plan.docx');
+  fs.writeFileSync(file, docx.rawPayload);
+  const read = (await extractText(file))?.text ?? '';
+  ok(read.includes('Garden plan') && read.includes('beans') && read.includes('320') && read.includes('Planting day'), 'the Word file reads back with its words and table');
+  const mdOut = await req('GET', `/api/pages/${id}/export?format=md`);
+  ok(mdOut.statusCode === 200 && mdOut.body.includes('## Costs') && mdOut.body.includes('**beans**'), 'a document exports as Markdown');
+  ok(mdOut.body.includes('data:image/png;base64,') && !mdOut.body.includes('naget-asset:'), 'with its pictures inside it');
+  const html = await req('GET', `/api/pages/${id}/export?format=html`);
+  ok(html.statusCode === 200 && html.body.includes('Planting day') && !html.body.includes('naget-asset:'), 'a document exports as a web page with its pictures inside');
+  ok((await req('GET', `/api/pages/${id}/export?format=pptx`)).statusCode === 400, 'a document does not export as PowerPoint');
+  if (canCapture()) {
+    const pdf = await req('GET', `/api/pages/${id}/export?format=pdf`);
+    ok(pdf.statusCode === 200 && pdf.rawPayload.subarray(0, 5).toString() === '%PDF-', 'a document exports as a PDF');
+  }
+  // Files opened in Pages.
+  const imp = await req('POST', '/api/pages/import', { name: 'Garden plan.docx', data: docx.rawPayload.toString('base64') });
+  ok(imp.statusCode === 200 && imp.json().page.kind === 'doc' && imp.json().page.title === 'Garden plan', 'a Word file opens as a document');
+  const back = (await req('GET', `/api/pages/${imp.json().page.id}`)).json().model;
+  ok(JSON.stringify(back).includes('beans') && back.blocks.some((b: { type: string }) => b.type === 'table'), 'with its words and table');
+  const mdImp = await req('POST', '/api/pages/import', { name: 'notes.md', data: Buffer.from('# Notes\n\n- one\n- two\n').toString('base64') });
+  ok(mdImp.json().page?.kind === 'doc' && mdImp.json().page.title === 'notes', 'a Markdown file opens as a document');
+  ok((await req('POST', '/api/pages/import', { name: 'broken.docx', data: Buffer.from('not a zip').toString('base64') })).statusCode === 422, 'a file that cannot be read says so');
+  ok((await req('POST', '/api/pages/import', { name: 'song.mp3', data: 'AAAA' })).statusCode === 400, 'a file of another kind is refused');
+  // A new one from New, and an agent asked from it.
+  const fresh = (await req('POST', '/api/pages', { title: 'Letter', kind: 'doc' })).json().page;
+  ok(fresh?.kind === 'doc' && (await req('GET', `/api/pages/${fresh.id}`)).json().model.blocks.length >= 1, 'New makes an empty document');
+  const spawn = (await pages.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { page: id } }, deps)) ?? {};
+  ok(spawn.instructions?.some((x) => x.includes(`saved page ${id}`) && x.includes('save_doc')), 'an agent asked from a document knows it and how to change it');
+}
+
+// ---- spreadsheets ---------------------------------------------------------------------------------------
+{
+  fs.writeFileSync(path.join(tmp, 'sales.csv'), 'Month,Sales\nJan,120\nFeb,95.5\n');
+  const budgetRows = [['Item', 'Cost'], ['Beds', 300], ['Water', 120], ['Total', '=SUM(B2:B3)']];
+  const gone = await run('save_sheet', { title: 'Budget', sheets: [{ name: 'Gone', file: 'nope.csv' }] });
+  ok(gone.error?.includes('nope.csv'), 'a sheet from a file that is not there says so');
+  const made = await run('save_sheet', {
+    title: 'Budget',
+    sheets: [
+      { name: 'Budget', header: true, rows: budgetRows },
+      { name: 'Sales', file: 'sales.csv' },
+    ],
+  });
+  const id = idOf(made.text);
+  ok(id && made.text?.includes('Excel') && made.text.includes('2 sheets'), 'save_sheet makes a spreadsheet');
+  const info = (await req('GET', `/api/pages/${id}`)).json();
+  ok(info.page.kind === 'sheet' && info.model?.sheets?.length >= 2 && info.html === undefined, 'a spreadsheet reads back as its sheets');
+  const budget = info.model.sheets[0];
+  ok(budget.cells.B4?.f === 'SUM(B2:B3)' && budget.cells.B2?.v === 300 && budget.cells.A1?.s?.b, 'its formulas stay formulas, its numbers numbers, its header bold');
+  ok(info.model.sheets[1].cells.B3?.v === 95.5, 'a CSV file of the session fills a sheet');
+  const got = (await run('get_page', { id })).text ?? '';
+  ok(got.includes('save_sheet') && got.includes('SUM(B2:B3)') && got.includes('420'), 'get_page gives its cells, its formulas and what they make');
+  ok((await run('get_page', {})).text?.includes(`${id} · Budget · spreadsheet`), 'the list says which are spreadsheets');
+  ok((await run('save_doc', { id, title: 'x', markdown: 'Hi' })).error?.includes('not a document'), 'save_doc refuses a spreadsheet');
+  // The user's version, from the editor; the agent hears of it.
+  const changed = { ...info.model, sheets: info.model.sheets.map((sh: { cells: Record<string, unknown> }, i: number) => (i === 0 ? { ...sh, cells: { ...sh.cells, B3: { v: 150 } } } : sh)) };
+  const r = await req('POST', `/api/pages/${id}/versions`, { model: changed, base: 1, sessionKey: 'claude:s8' });
+  ok(r.json().page?.version === 2 && r.json().page.by === 'edit', 'a changed spreadsheet is saved as a version');
+  ok((takeEdits(db, 'claude:s8') ?? '').includes('150'), 'the agent hears what changed');
+  ok((await req('POST', `/api/pages/${id}/versions`, { html: page(1), base: 2 })).statusCode === 400, 'a spreadsheet takes its cells, not HTML');
+  // The exports.
+  const xlsx = await req('GET', `/api/pages/${id}/export?format=xlsx`);
+  ok(xlsx.statusCode === 200 && /spreadsheetml/.test(String(xlsx.headers['content-type'])) && xlsx.rawPayload.subarray(0, 2).toString() === 'PK', 'a spreadsheet exports as Excel');
+  const csv = await req('GET', `/api/pages/${id}/export?format=csv`);
+  ok(csv.statusCode === 200 && csv.body.includes('Total,450'), 'and as a CSV of what its cells show, worked out');
+  const html = await req('GET', `/api/pages/${id}/export?format=html`);
+  ok(html.statusCode === 200 && html.body.includes('Water') && html.body.includes('450'), 'and as a web page');
+  ok((await req('GET', `/api/pages/${id}/export?format=docx`)).statusCode === 400, 'a spreadsheet does not export as Word');
+  if (canCapture()) {
+    const pdf = await req('GET', `/api/pages/${id}/export?format=pdf`);
+    ok(pdf.statusCode === 200 && pdf.rawPayload.subarray(0, 5).toString() === '%PDF-', 'a spreadsheet exports as a PDF');
+  }
+  // Files opened in Pages.
+  const imp = (await req('POST', '/api/pages/import', { name: 'Budget.xlsx', data: xlsx.rawPayload.toString('base64') })).json();
+  ok(imp.page?.kind === 'sheet' && Array.isArray(imp.notes), 'an Excel file opens as a spreadsheet');
+  const back = (await req('GET', `/api/pages/${imp.page.id}`)).json().model;
+  ok(back.sheets[0].cells.B4?.f === 'SUM(B2:B3)' && back.sheets.length === info.model.sheets.length, 'with its sheets and formulas');
+  const cimp = (await req('POST', '/api/pages/import', { name: 'prices.csv', data: Buffer.from('Item;Price\nTea;1,50\n').toString('base64') })).json();
+  ok(cimp.page?.kind === 'sheet' && (await req('GET', `/api/pages/${cimp.page.id}`)).json().model.sheets[0].cells.B2?.v === 1.5, 'a CSV file opens as a spreadsheet, its separator and decimal comma read');
+  const fresh = (await req('POST', '/api/pages', { title: 'Plan', kind: 'sheet' })).json().page;
+  ok(fresh?.kind === 'sheet', 'New makes an empty spreadsheet');
+  const spawn = (await pages.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { page: id } }, deps)) ?? {};
+  ok(spawn.instructions?.some((x) => x.includes(`saved page ${id}`) && x.includes('save_sheet')), 'an agent asked from a spreadsheet knows it and how to change it');
+}
+
+// ---- LaTeX documents ------------------------------------------------------------------------------------
+{
+  const setup = (await req('GET', '/api/pages/tex/setup')).json();
+  const doc = (body: string) => `\\documentclass{article}\n\\begin{document}\n${body}\n\\end{document}\n`;
+  const made = await run('save_latex', {
+    title: 'Heat',
+    source: doc('\\section{Heat}\nIt flows: $\\Delta u = 0$.\n\\section{Rods}\nA rod.'),
+    files: { 'refs.bib': '@book{fourier, title={Th\\\'eorie}, author={Fourier}, year={1822}}' },
+  });
+  const id = idOf(made.text);
+  ok(id && made.text?.includes('Saved "Heat"'), 'save_latex makes a LaTeX document');
+  const info = (await req('GET', `/api/pages/${id}`)).json();
+  ok(info.page.kind === 'tex' && info.model?.main?.includes('\\section{Heat}') && info.model.files?.[0]?.name === 'refs.bib', 'it reads back as its files');
+  const got = (await run('get_page', { id })).text ?? '';
+  ok(got.includes('save_latex') && got.includes('Heat (main.tex:3)') && got.includes('=== refs.bib ==='), 'get_page gives its outline and files');
+  ok((await run('get_page', {})).text?.includes(`${id} · Heat · LaTeX document`), 'the list says which are LaTeX');
+  ok((await run('save_doc', { id, title: 'x', markdown: 'Hi' })).error?.includes('not a document'), 'save_doc refuses a LaTeX document');
+  // The agent sends what changes; what it leaves out stays.
+  await run('save_latex', { id, title: 'Heat', source: doc('\\section{Heat}\nIt flows.') });
+  const v2 = (await req('GET', `/api/pages/${id}`)).json();
+  ok(v2.page.version === 2 && v2.model.files?.[0]?.name === 'refs.bib' && v2.model.main.includes('It flows.'), 'what the agent leaves out stays');
+  const r = await req('POST', `/api/pages/${id}/versions`, { model: { ...v2.model, main: v2.model.main.replace('It flows.', 'It flows from hot to cold.') }, base: 2, sessionKey: 'claude:s7' });
+  ok(r.json().page?.version === 3 && r.json().page.by === 'edit', 'a changed LaTeX document is saved as a version');
+  ok((takeEdits(db, 'claude:s7') ?? '').includes('from hot to cold'), 'the agent hears what changed');
+  // The exports that need no TeX, and files opened in Pages.
+  const texOut = await req('GET', `/api/pages/${id}/export?format=tex`);
+  ok(texOut.statusCode === 200 && texOut.body.includes('from hot to cold') && /Heat\.tex/.test(String(texOut.headers['content-disposition'])), 'it exports its source');
+  const zip = await req('GET', `/api/pages/${id}/export?format=zip`);
+  ok(zip.statusCode === 200 && zip.rawPayload.subarray(0, 2).toString() === 'PK', 'and its project as a zip');
+  ok((await req('GET', `/api/pages/${id}/export?format=docx`)).statusCode === 400, 'a LaTeX document does not export as Word');
+  const imp = await req('POST', '/api/pages/import', { name: 'note.tex', data: Buffer.from(doc('Hello.')).toString('base64') });
+  ok(imp.statusCode === 200 && imp.json().page?.kind === 'tex' && Array.isArray(imp.json().notes), 'a .tex file opens as a LaTeX document');
+  const zimp = (await req('POST', '/api/pages/import', { name: 'Heat.zip', data: zip.rawPayload.toString('base64') })).json();
+  ok(zimp.page?.kind === 'tex' && (await req('GET', `/api/pages/${zimp.page.id}`)).json().model.files.some((f: { name: string }) => f.name === 'refs.bib'), 'a project’s zip opens with its files');
+  if (!setup.missing && setup.engines?.pdflatex) {
+    ok(made.text?.includes('Typeset with pdfLaTeX') && made.text.includes('no errors'), 'save_latex says how it typeset');
+    const bad = await run('save_latex', { title: 'Broken', source: doc('Fine.\n\\undefinedthing\nMore.') });
+    ok(/error/.test(bad.text ?? '') && (bad.text ?? '').includes('main.tex:4'), 'an error is told with its file and line');
+    const c = (await req('POST', '/api/pages/tex/compile', { model: v2.model })).json();
+    ok(c.ok && c.pages === 1 && /^[a-f0-9]{40}$/.test(c.key), 'the editor’s preview typesets what it sends');
+    const png = await req('GET', `/api/pages/tex/${c.key}/1?w=400`);
+    ok(png.statusCode === 200 && png.headers['content-type'] === 'image/png', 'and draws its pages');
+    const pdf = await req('GET', `/api/pages/${id}/export?format=pdf`);
+    ok(pdf.statusCode === 200 && pdf.rawPayload.subarray(0, 5).toString() === '%PDF-', 'it exports as the PDF LaTeX makes');
+    ok((await req('GET', '/api/pages/tex/0123456789abcdef0123456789abcdef01234567/pdf')).statusCode === 404, 'a typesetting that is not there is not served');
+    const host = fs.readFileSync('/etc/hostname', 'utf8').trim();
+    const sneaky = await run('save_latex', { title: 'Sneaky', source: doc('\\input{/etc/hostname}') });
+    ok(!!host && !(sneaky.text ?? '').includes(`: ${host}`) && /error/.test(sneaky.text ?? ''), 'TeX reads no file outside its folder');
+  } else ok(made.text?.includes('not typeset'), 'without TeX it is kept and says what to install');
+  const spawn = (await pages.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { page: id } }, deps)) ?? {};
+  ok(spawn.instructions?.some((x) => x.includes(`saved page ${id}`) && x.includes('save_latex')), 'an agent asked from a LaTeX document knows it and how to change it');
 }
 
 await app.close();
