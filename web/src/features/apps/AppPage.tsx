@@ -22,6 +22,7 @@ import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } f
 import { statusBadge } from './Gallery';
 import { DownloadDialog, EnvLine } from './Install';
 import { AppScreen } from './Screen';
+import { Schedules } from './Schedules';
 import { ShareTab } from './Share';
 
 type Tab = 'run' | 'runs' | 'rows' | 'share';
@@ -164,7 +165,7 @@ export function RunsList({ app, runs, more, onMore }: { app: { fields: AppDef['f
   );
 }
 
-function RunsTab({ id, app }: { id: string; app: AppDef | AppTemplate }) {
+function RunsTab({ id, app, def }: { id: string; app: AppDef | AppTemplate; def?: AppDef }) {
   const [runs, setRuns] = useState<AppRun[] | null>(null);
   const [more, setMore] = useState(false);
   useEffect(() => {
@@ -176,7 +177,12 @@ function RunsTab({ id, app }: { id: string; app: AppDef | AppTemplate }) {
     if (!last) return;
     api<{ runs: AppRun[] }>(`/api/apps/${enc(id)}/runs?before=${last.createdAt}`).then((r) => (setRuns((l) => [...(l ?? []), ...r.runs]), setMore(r.runs.length >= 50)), toastError);
   };
-  return <div className="mx-auto max-w-[860px] px-4 py-6 sm:px-6">{runs ? <RunsList app={app} runs={runs} more={more} onMore={older} /> : <Throbber className="mx-auto block text-[24px] text-fg-3" />}</div>;
+  return (
+    <div className="mx-auto max-w-[860px] space-y-4 px-4 py-6 sm:px-6">
+      {def && <Schedules app={def} />}
+      {runs ? <RunsList app={app} runs={runs} more={more} onMore={older} /> : <Throbber className="mx-auto block text-[24px] text-fg-3" />}
+    </div>
+  );
 }
 
 export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: string | null }) {
@@ -336,7 +342,7 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                 {(tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} />}
               </>
             )}
-            {tab === 'runs' && !template && <RunsTab id={id} app={recipe} />}
+            {tab === 'runs' && !template && <RunsTab id={id} app={recipe} def={d?.app} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}
             {tab === 'share' && d?.app && <ShareTab detail={d} onChange={load} />}
           </>

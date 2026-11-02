@@ -6,7 +6,7 @@ import { ExternalLink, NotebookPen, RotateCcw } from 'lucide-react';
 import { TRIGGER_LABEL, type ScheduledTask, type TaskRun } from '@shared/automations';
 import { api, enc, post, put } from '../../lib/api';
 import { duration, money } from '../../lib/format';
-import { openSession } from '../../lib/nav';
+import { go, openSession } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
 import { Button, cx, IconButton, inputCls, Throbber } from '../../components/ui';
@@ -37,10 +37,16 @@ function RunRow({ r, onRerun }: { r: TaskRun; onRerun: () => void }) {
         {open && r.reply && <Markdown text={r.reply} breaks className="anim-expand mt-1.5 rounded-lg border border-line px-3 py-2 !text-[13px]" />}
       </div>
       <div className="flex shrink-0 items-center">
-        {r.key && (
-          <IconButton label="Open its session" size="sm" onClick={() => openSession(r.key!)}>
+        {r.appRun ? (
+          <IconButton label="Open its run" size="sm" onClick={() => go(`/apps/runs/${enc(r.appRun!)}`)}>
             <ExternalLink size={13} />
           </IconButton>
+        ) : (
+          r.key && (
+            <IconButton label="Open its session" size="sm" onClick={() => openSession(r.key!)}>
+              <ExternalLink size={13} />
+            </IconButton>
+          )
         )}
         {r.hasInput && r.taskId && (
           <IconButton

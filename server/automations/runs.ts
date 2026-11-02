@@ -28,6 +28,8 @@ export interface RunRow {
   notified: number;
   error: string | null;
   rerun_of: string | null;
+  /** The template run it started (a task that runs a template). */
+  app_run: string | null;
 }
 
 /** Runs kept per task. */
@@ -43,6 +45,9 @@ export function migrateRuns(db: DB) {
   create index if not exists task_runs_task on task_runs(task_id, started_at);
   create index if not exists task_runs_key on task_runs(key, started_at);
   create table if not exists hook_deliveries (task_id text not null, delivery text not null, run_id text, at integer not null, primary key (task_id, delivery));`);
+  const cols = new Set((db.prepare('pragma table_info(task_runs)').all() as { name: string }[]).map((c) => c.name));
+  if (!cols.has('app_run')) db.exec('alter table task_runs add column app_run text');
+  db.exec('create index if not exists task_runs_app on task_runs(app_run)');
 }
 
 export function toRun(r: RunRow): TaskRun {
@@ -60,6 +65,7 @@ export function toRun(r: RunRow): TaskRun {
     error: r.error ?? undefined,
     rerunOf: r.rerun_of ?? undefined,
     hasInput: !!r.input,
+    ...(r.app_run ? { appRun: r.app_run } : {}),
   };
 }
 
@@ -80,7 +86,12 @@ export function startRun(db: DB, r: { taskId: string; trigger: RunTrigger; input
   return id;
 }
 
-type Fields = Partial<Pick<RunRow, 'key' | 'cost_base' | 'sent' | 'queued' | 'outcome' | 'summary' | 'notified' | 'cost_usd' | 'error'>>;
+type Fields = Partial<Pick<RunRow, 'key' | 'cost_base' | 'sent' | 'queued' | 'outcome' | 'summary' | 'notified' | 'cost_usd' | 'error' | 'app_run'>>;
+
+/** The task run that started a template run. */
+export function runOfApp(db: DB, appRun: string): RunRow | undefined {
+  return db.prepare('select * from task_runs where app_run = ?').get(appRun) as RunRow | undefined;
+}
 
 export function setRun(db: DB, id: string, f: Fields) {
   const keys = Object.keys(f) as (keyof Fields)[];

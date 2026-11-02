@@ -50,6 +50,15 @@ export interface RunMark {
 }
 
 /** Agent work that starts by itself; each run starts a new session or sends a message into one. */
+/**
+ * A task that runs one of your templates instead of starting a session: which, and its form's answers as
+ * text, filled in from a webhook's call ({{body.field}}, as in a prompt) or with what a watcher saw ({{change}}).
+ */
+export interface TaskApp {
+  id: string;
+  inputs: Record<string, string>;
+}
+
 export interface ScheduledTask {
   id: string;
   name: string;
@@ -91,6 +100,10 @@ export interface ScheduledTask {
   check?: { at: number; ok: boolean; note?: string };
   /** Where it came from: "chat" (an agent proposed it), "session" (made from a session), "template:<id>". */
   origin?: string;
+  /** It runs this template (its prompt, agent and folder go unused). */
+  app?: TaskApp;
+  /** That template's name now (gone: unset). */
+  appName?: string;
 }
 
 /** How a run ended, as its agent reported it (report_outcome), or as the app saw it. */
@@ -119,6 +132,8 @@ export interface TaskRun {
   rerunOf?: string;
   /** Its input is kept, so it can run again with it. */
   hasInput: boolean;
+  /** The template run it started (a task that runs a template). */
+  appRun?: string;
 }
 
 /** What a task would be: everything needed to save it (an id when it changes one). */

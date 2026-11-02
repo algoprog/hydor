@@ -263,14 +263,15 @@ with npm into the app's folder), and the copies the app installed are kept up to
   phones.
 - Scheduled tasks: agent work, by any agent (Custom included), that starts at a time of day in your time zone,
   every few minutes, once, by a cron expression, when a webhook is called, or when a watcher sees a change (new
-  items in a feed, a page or a value in JSON changing, new files in a folder, a command's output): watchers
-  check without a model and wake the agent only then. Ask in any conversation ("remind me Friday at 9", "every
-  Monday summarize…") and confirm the task in a card; or start from a template, or turn a session that worked
-  into one. Each run reports how it went: its history keeps the outcome, a summary, the cost and the session,
-  and runs again with the same input. Runs with nothing to report stay quiet, failures always tell you, and
-  failures in a row pause the task. Webhooks can require a signature, skip repeated deliveries, filter on the
-  payload, and wait for the reply (`?wait=60`). Sessions stopped by a usage limit can continue by themselves
-  when it resets.
+  items in a feed, a page or a value in JSON changing, new files in a folder, a command's output): watchers check
+  without a model and wake the agent only then. Ask in any conversation ("remind me Friday at 9", "every Monday
+  summarize…") and confirm the task in a card; or start from a template, or turn a session that worked into one.
+  A task can also run one of your templates, with the answers you set (a webhook's call or what a watcher saw
+  filling them in), made from the template's Runs. Each run reports how it went: its history keeps the outcome, a
+  summary, the cost and the session (or the template's run), and runs again with the same input. Runs with
+  nothing to report stay quiet, failures always tell you, and failures in a row pause the task. Webhooks can
+  require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
+  Sessions stopped by a usage limit can continue by themselves when it resets.
 - Usage: how much of each plan's limits you have used and when they reset, what the same work would cost
   through the API, and activity over time, for every agent or one (Custom and the ACP agents by name) and every
   model or one.

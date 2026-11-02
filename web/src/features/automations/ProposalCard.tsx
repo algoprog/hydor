@@ -87,6 +87,23 @@ function When({ p, t }: { p: TaskProposal; t: TaskDraft }) {
   );
 }
 
+/** A task that runs a template: which one, and the answers it gives it. */
+function AppLine({ t }: { t: TaskProposal['task'] }) {
+  const answers = Object.entries(t.app?.inputs ?? {});
+  return (
+    <div className="min-w-0">
+      <span className="font-medium" translate="no">
+        {t.appName ?? t.app?.id}
+      </span>
+      {answers.length > 0 && (
+        <div className="mt-0.5 line-clamp-3 text-[12.5px] text-fg-3" translate="no">
+          {answers.map(([k, v]) => `${k}: ${v}`).join(' · ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** For a change: the parts that change, as they are and as they would be. */
 function Changes({ p, sessionKey }: { p: TaskProposal; sessionKey: string }) {
   const a = p.before!;
@@ -174,12 +191,20 @@ export function ProposalCard({ item, sessionKey }: { item: ToolItem; sessionKey:
             <Row label="When">
               <When p={p} t={task} />
             </Row>
-            <Row label="Does">
-              <Prompt text={task.prompt} />
-            </Row>
-            <Row label="Runs">
-              <Who t={task} sessionKey={sessionKey} />
-            </Row>
+            {task.app ? (
+              <Row label="Runs">
+                <AppLine t={task} />
+              </Row>
+            ) : (
+              <>
+                <Row label="Does">
+                  <Prompt text={task.prompt} />
+                </Row>
+                <Row label="Runs">
+                  <Who t={task} sessionKey={sessionKey} />
+                </Row>
+              </>
+            )}
           </>
         )}
       </dl>

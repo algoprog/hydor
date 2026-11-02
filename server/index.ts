@@ -1390,7 +1390,7 @@ sessions.on('notify', (n: NotifyEvent) => {
   broadcast({ t: 'notify', n });
   // A notification shows a title and a body: the session's name, then the status and the reply.
   const p = pushed(n);
-  push.send({ ...p.n, ...p.t, url: `/s/${encodeURIComponent(n.key)}`, api: '' }).catch(() => {});
+  push.send({ ...p.n, ...p.t, url: n.url ?? `/s/${encodeURIComponent(n.key)}`, api: '' }).catch(() => {});
 });
 // Other machines' notices come here too, so one device hears from all of them.
 machines.on('notify', (n: NotifyEvent) => {
