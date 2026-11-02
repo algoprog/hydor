@@ -14,7 +14,7 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
-import { checkFlow, cleanData, cleanFlow, cleanRequires, evalRule, fillRefs, flowOf, readRule, valueOf, type Scope } from '../../shared/app-manifest.ts';
+import { checkFlow, cleanData, cleanFlow, cleanRequires, collapseSteps, evalRule, fillRefs, flowOf, readRule, valueOf, type Collapsed, type Scope } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
 import { automations } from '../automations/index.ts';
 import { listRuns as listTaskRuns } from '../automations/runs.ts';
@@ -561,6 +561,53 @@ test('trying in the graph: a test run pauses before the steps asked, goes on a s
   // A run that is not a test does not pause.
   const plain = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'w' }, pause: ['b'] });
   assert.equal((await ended(plain.id)).status, 'done');
+});
+
+test('Collapse to a block: steps that follow one another become a template of their own, called in their place; what they use is its form, what the steps after them use its answer', async () => {
+  model.answer = (_system, user) => (user.startsWith('Sum ') ? JSON.stringify({ summary: `S(${user.slice(4)})` }) : JSON.stringify({ line: `L(${user})` }));
+  const r = cleanRecipe({
+    name: 'Long',
+    agent: 'claude',
+    fields: [{ id: 'url', label: 'Link', type: 'url', required: true }],
+    answer: [
+      { id: 'summary', label: 'Summary', type: 'markdown', required: true },
+      { id: 'line', label: 'Line', type: 'text' },
+    ],
+    flow: {
+      steps: [
+        { id: 'read', do: 'tool', tool: 'read_page', with: { url: '{{url}}' } },
+        { id: 'sum', do: 'model', model: 'fake', instructions: 'Sum {{read.text}}', outputs: { summary: 'long' } },
+        { id: 'say', do: 'model', model: 'fake', instructions: 'Say {{sum.summary}} for {{url}}', outputs: { line: 'text' } },
+      ],
+      outputs: { summary: '{{sum.summary}}' },
+    },
+  });
+  assert.match((collapseSteps(r, ['read', 'say'], { title: 'x', app: 'x' }) as { error: string }).error, /follow one another/);
+  const c = collapseSteps(r, ['read', 'sum'], { title: 'Read and sum', app: 'read-and-sum' }) as Collapsed;
+  assert.deepEqual(c.block.fields.map((f) => f.id), ['url']);
+  assert.deepEqual(c.block.answer.map((f) => [f.id, f.type]), [['summary', 'markdown']]);
+  assert.deepEqual(c.block.flow.outputs, { summary: '{{sum.summary}}' });
+  assert.deepEqual(c.call, { id: 'read_and_sum', title: 'Read and sum', do: 'app', app: 'read-and-sum', with: { url: '{{url}}' } });
+  assert.deepEqual(c.flows.flow!.steps.map((x) => x.id), ['read_and_sum', 'say']);
+  assert.equal((c.flows.flow!.steps[1] as { instructions: string }).instructions, 'Say {{read_and_sum.summary}} for {{url}}');
+  assert.deepEqual(c.flows.flow!.outputs, { summary: '{{read_and_sum.summary}}' });
+  assert.equal((r.flow!.steps[1] as { instructions: string }).instructions, 'Sum {{read.text}}', 'the template it came from is as it was');
+  // It runs: the block saved as a template, the template calling it.
+  const block = store.saveApp(db, { slug: 'read-and-sum', recipe: cleanRecipe({ name: 'Read and sum', agent: 'claude', prompt: '', ...c.block }) });
+  const parent = app({ ...r, ...c.flows });
+  const run = startRun({ app: parent.id, slug: parent.slug, recipe: parent, source: 'web', inputs: { url: 'https://example.org/z' } });
+  const done = await ended(run.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(block.slug, 'read-and-sum');
+  assert.equal(done.result!.summary, 'S(The page at https://example.org/z says hello.)');
+  assert.equal(done.result!.line, 'L(Say S(The page at https://example.org/z says hello.) for https://example.org/z)');
+  // A value of a step before them is a question of its own; an answer field that came by name from them still does.
+  const c2 = collapseSteps(r, ['sum', 'say'], { title: 'Sum and say', app: 'sum-and-say' }) as Collapsed;
+  assert.deepEqual(c2.block.fields.map((f) => f.id), ['read_text', 'url']);
+  assert.deepEqual(c2.call.with, { read_text: '{{read.text}}', url: '{{url}}' });
+  assert.equal((c2.block.flow.steps[0] as { instructions: string }).instructions, 'Sum {{read_text}}');
+  assert.deepEqual(c2.block.answer.map((f) => f.id), ['summary', 'line']);
+  assert.deepEqual(c2.block.flow.outputs, { summary: '{{sum.summary}}', line: '{{say.line}}' });
 });
 
 test('At the same time, and Repeat until: branches meet after the join; rounds go on until the rule holds, seeing the last round', async () => {

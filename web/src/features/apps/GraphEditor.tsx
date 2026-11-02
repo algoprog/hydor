@@ -13,16 +13,21 @@
 // and as it ends, the wires into the steps that ran with it, and a value's wire says what it carried. A step
 // can pause the try before it (then Go on, or Step to the next one), and a frozen step gives what it gave in
 // the last try, so the steps after an expensive one can be tried again and again at no cost.
+//
+// Collapse to a block makes steps that follow one another a template of their own (a block), which a Call an
+// app step runs in their place: what they used from outside is its form, what the steps after them used of
+// theirs its answer. Other templates can call it too, and a change to it is a change for all of them.
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AppWindow, Bot, CircleDot, CodeXml, Columns2, Database, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Snowflake, Sparkles, Split, Wrench, X } from 'lucide-react';
-import type { Flow, Step, StepKind } from '@shared/app-manifest';
-import { allSteps, asText, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
-import type { AppGraph, AppRecipe, AppRun, RunProgress, RunStepView } from '@shared/apps';
+import { AppWindow, Bot, Boxes, CircleDot, CodeXml, Columns2, Database, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Snowflake, Sparkles, Split, Wrench, X } from 'lucide-react';
+import type { Flow, NamedFlow, Step, StepKind } from '@shared/app-manifest';
+import { allSteps, asText, collapseSteps, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
+import type { AppDef, AppGraph, AppRecipe, AppRun, RunProgress, RunStepView } from '@shared/apps';
 import { isActive } from '@shared/apps';
 import { api, enc, post } from '../../lib/api';
+import { tr } from '../../i18n/runtime';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, IconButton, MenuItem, Popover, Throbber } from '../../components/ui';
+import { Button, cx, IconButton, inputCls, MenuItem, Popover, Throbber } from '../../components/ui';
 import { money, useRunEvents, type RunDetail } from './api';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { childList, listsOf, type ListPath } from './paths';
@@ -284,6 +289,8 @@ export interface GraphEditorProps {
   appId?: string | null;
   graph: AppGraph | undefined;
   onGraph: (g: AppGraph | undefined) => void;
+  /** Its flows changed as a whole (steps collapsed into a block). */
+  onFlows: (f: { flow?: Flow; flows?: Record<string, NamedFlow> }) => void;
   Body: ComponentType<{ s: Step; list: ListPath; i: number; ctx: Ctx }>;
   Actions: ComponentType<{ s: Step; list: ListPath; i: number; last: number; ctx: Ctx; done: () => void }>;
 }
@@ -339,7 +346,7 @@ const LIT: Record<string, string> = {
   stopped: 'ring-2 ring-fg-3/40',
 };
 
-export function GraphEditor({ ctx, appId, graph, onGraph, Body, Actions }: GraphEditorProps) {
+export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions }: GraphEditorProps) {
   const flow: Flow = ctx.flow;
   const box = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 40, y: 30, k: 1 });
@@ -821,6 +828,7 @@ export function GraphEditor({ ctx, appId, graph, onGraph, Body, Actions }: Graph
           <IconButton label={full ? 'Back in the page' : 'Full screen'} size="sm" onClick={() => (setFull((f) => !f), setTimeout(fit, 50))}>
             {full ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </IconButton>
+          {picked.length > 0 && <CollapseButton ctx={ctx} picked={picked} onFlows={onFlows} done={(id) => setPicked([id])} />}
           {picked.length > 1 && (
             <IconButton label="Group them, with a note" size="sm" onClick={() => (setGroups([...groups, { id: `g${Date.now().toString(36)}`, note: '', steps: picked }]), setPicked([]))}>
               <Group size={14} />
@@ -1074,5 +1082,77 @@ function TryPanel({ recipe, t, pause, frozen, titleOf: name, onClose }: { recipe
         )}
       </div>
     </aside>
+  );
+}
+
+/** Collapse to a block: the steps picked become a template of their own, run by a Call an app step in their place. */
+function CollapseButton({ ctx, picked, onFlows, done }: { ctx: Ctx; picked: string[]; onFlows: GraphEditorProps['onFlows']; done: (id: string) => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const r = ctx.recipe;
+  const collapse = async () => {
+    const title = name.trim() || 'A block';
+    // Steps that keep data stay with the data they keep: a block keeps its own.
+    const steps = allSteps([...(r.flow?.steps ?? []), ...Object.values(r.flows ?? {}).flatMap((f) => f.steps)]).filter((x) => picked.includes(x.id));
+    if (allSteps(steps).some((x) => x.do === 'data')) return toast('Steps that keep data stay in the template: a block would keep data of its own', 'error');
+    const c = collapseSteps(r, picked, { title, app: '' });
+    if ('error' in c) return toast(c.error, 'error');
+    setBusy(true);
+    try {
+      const made = await post<{ app: AppDef }>('/api/apps', {
+        recipe: {
+          name: title,
+          description: tr(`Steps from “${r.name}”: ${steps.map((x) => titleOf(x)).join(', ')}`).slice(0, 300),
+          icon: r.icon,
+          color: r.color,
+          agent: r.agent,
+          acpAgent: r.acpAgent,
+          model: r.model,
+          effort: r.effort,
+          mode: r.mode,
+          assistant: r.assistant,
+          tools: r.tools,
+          limits: r.limits,
+          prompt: '',
+          ...c.block,
+        },
+      });
+      for (const x of [...(c.flows.flow ? allSteps(c.flows.flow.steps) : []), ...Object.values(c.flows.flows ?? {}).flatMap((f) => allSteps(f.steps))]) if (x.id === c.call.id && x.do === 'app') x.app = made.app.slug;
+      ctx.addApp(made.app);
+      onFlows(c.flows);
+      setOpen(false);
+      done(c.call.id);
+      toast(c.asText.length ? tr(`“${title}” is a template of its own now, called in their place (lists and tables reach it as text: ${c.asText.join(', ')}). Save this one to keep the change.`) : tr(`“${title}” is a template of its own now, called in their place. Save this one to keep the change.`));
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <IconButton ref={ref} label="Collapse to a block" size="sm" onClick={() => setOpen((o) => !o)}>
+        <Boxes size={14} />
+      </IconButton>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300}>
+        <form
+          className="space-y-2 p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void collapse();
+          }}
+        >
+          <p className="text-[12.5px] text-fg-2">These steps become a template of their own, which a Call an app step runs in their place. Other templates can call it too.</p>
+          <input autoFocus className={cx(inputCls, 'h-8.5 text-[13.5px]')} placeholder="Its name" value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="flex justify-end">
+            <Button size="sm" variant="primary" type="submit" disabled={busy} icon={busy ? <Throbber /> : undefined}>
+              Collapse
+            </Button>
+          </div>
+        </form>
+      </Popover>
+    </>
   );
 }

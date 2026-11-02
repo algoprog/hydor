@@ -502,6 +502,8 @@ export interface Ctx {
   insert: (list: ListPath, at: number, s: StepKind | Step) => string;
   /** A new step of a kind, with a name of its own (not put anywhere yet). */
   make: (kind: StepKind) => Step;
+  /** A template made here (a block), for the steps that call one. */
+  addApp: (a: AppDef) => void;
   edit: (list: ListPath, f: (l: Step[]) => Step[]) => void;
   copy: (list: ListPath, i: number) => void;
   msgs: Map<string, { text: string; error: boolean }[]>;
@@ -1170,6 +1172,7 @@ export function StepsEditor({ recipe, onChange, onAsk, appId }: { recipe: AppRec
       setSteps(editList(flow.steps, list, f));
     },
     make: (kind) => newStep(kind, taken(), recipe),
+    addApp: (a) => setApps((x) => [...x.filter((y) => y.id !== a.id), a]),
     insert: (list, at, what) => {
       const s = typeof what === 'string' ? newStep(what, taken(), recipe) : what;
       setSteps(editList(flow.steps, list, (l) => [...l.slice(0, at), s, ...l.slice(at)]));
@@ -1221,7 +1224,7 @@ export function StepsEditor({ recipe, onChange, onAsk, appId }: { recipe: AppRec
         </div>
       )}
       {view === 'graph' && wide ? (
-        <GraphEditor ctx={ctx} appId={appId} graph={recipe.graph} onGraph={(graph) => onChange({ graph })} Body={StepBody} Actions={StepActions} />
+        <GraphEditor ctx={ctx} appId={appId} graph={recipe.graph} onGraph={(graph) => onChange({ graph })} onFlows={(f) => onChange(f)} Body={StepBody} Actions={StepActions} />
       ) : (
         <StepList steps={flow.steps} list={[]} ctx={ctx} />
       )}

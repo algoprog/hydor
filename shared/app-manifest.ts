@@ -408,6 +408,126 @@ export function swapStep<R extends { flow?: Flow; flows?: Record<string, NamedFl
   return next;
 }
 
+/** Steps collapsed into a block: the block (a template of its own: its form, answer and steps), the step that calls it in their place, and the template's flows with that step in. */
+export interface Collapsed {
+  block: { fields: AppField[]; answer: AnswerField[]; flow: Flow };
+  call: AppStep;
+  /** The template's flows, the call in the steps' place and the values the steps gave renamed to the call's. */
+  flows: { flow?: Flow; flows?: Record<string, NamedFlow> };
+  /** The block's questions that get a list or a table, which reach it as text. */
+  asText: string[];
+}
+
+const LISTY = new Set(['records', 'items', 'record', 'first', 'last', 'data']);
+const renameRefs = (json: string, from: string, to: string) => json.replace(new RegExp(`(\\{\\{\\s*[#^/]?\\s*)${from.replace(/\./g, '\\.')}(?=[.\\[}\\s])`, 'g'), `$1${to}`);
+
+/**
+ * Steps that follow one another, collapsed into a block that a Call an app step runs in their place (Collapse to
+ * a block). What they use from outside (the form's answers, the values of steps before them, a Repeat's item)
+ * becomes the block's form, given by the call; what the steps after them use becomes its answer, and those
+ * values are the call's now.
+ */
+export function collapseSteps(r: { fields: AppField[]; answer: AnswerField[]; flow?: Flow; flows?: Record<string, NamedFlow> }, ids: string[], o: { title: string; app: string }): Collapsed | { error: string } {
+  // A copy of its flows, to change.
+  const c = JSON.parse(JSON.stringify({ flow: r.flow, flows: r.flows })) as Collapsed['flows'];
+  const lists: Step[][] = [];
+  const collect = (steps: Step[] | undefined) => {
+    if (!steps) return;
+    lists.push(steps);
+    for (const s of steps) for (const inner of innerLists(s)) collect(inner);
+  };
+  collect(c.flow?.steps);
+  for (const f of Object.values(c.flows ?? {})) collect(f.steps);
+  const home = ids.length ? lists.find((l) => ids.every((id) => l.some((s) => s.id === id))) : undefined;
+  if (!home) return { error: 'Pick steps that are in one list, not some inside a Decide or a Repeat and some outside it' };
+  const at = home.map((s, i) => (ids.includes(s.id) ? i : -1)).filter((i) => i >= 0);
+  if (at[at.length - 1] - at[0] + 1 !== at.length) return { error: 'Pick steps that follow one another' };
+  const picked = home.slice(at[0], at[at.length - 1] + 1);
+  const inside = new Map(allSteps(picked).map((s) => [s.id, s]));
+  const everyStep = [...(c.flow ? allSteps(c.flow.steps) : []), ...Object.values(c.flows ?? {}).flatMap((f) => allSteps(f.steps))];
+  const callId = freeId(o.title || 'block', new Set(everyStep.map((s) => s.id)));
+  const rootOf = (ref: string) => ref.split(/[.[]/)[0];
+  const segOf = (ref: string) => /^[^.[]+\.([A-Za-z_][\w-]*)/.exec(ref)?.[1];
+  const form = new Map(r.fields.map((f) => [f.id, f]));
+
+  // What the steps use from outside: each a question of the block's form, which the call gives.
+  const fields: AppField[] = [];
+  const given: Record<string, unknown> = {};
+  const asText: string[] = [];
+  const taken = new Set<string>();
+  const named = new Map<string, string>();
+  let body = JSON.stringify(picked);
+  for (const ref of refsIn(picked)) {
+    const root = rootOf(ref);
+    if (inside.has(root) || root === 'today') continue;
+    const own = root === 'inputs' ? segOf(ref) : form.has(root) ? root : undefined;
+    if (own && form.has(own)) {
+      // The template's own questions are its block's too, by the same names.
+      if (!taken.has(own)) {
+        taken.add(own);
+        fields.push(form.get(own)!);
+        given[own] = `{{${own}}}`;
+      }
+      continue;
+    }
+    const seg = segOf(ref);
+    const value = seg ? `${root}.${seg}` : root;
+    if (named.has(value)) continue;
+    const id = freeId(value.replace('.', '_'), new Set([...taken, ...form.keys()]));
+    taken.add(id);
+    named.set(value, id);
+    fields.push({ id, label: labelOf(id), type: 'long' });
+    given[id] = `{{${value}}}`;
+    const from = everyStep.find((s) => s.id === root);
+    const kind = from && (from.do === 'model' || from.do === 'agent') ? from.outputs?.find((f) => f.id === seg)?.type : undefined;
+    if ((seg && LISTY.has(seg)) || kind === 'list' || kind === 'table' || root === 'item') asText.push(id);
+    body = renameRefs(body, value, id);
+  }
+
+  // What the steps after them use of theirs: the block's answer, the call's values in the template.
+  const without = JSON.parse(JSON.stringify(c, (_k, v) => (v && typeof v === 'object' && !Array.isArray(v) && typeof v.id === 'string' && inside.has(v.id) ? undefined : v)));
+  const answer: AnswerField[] = [];
+  const outputs: Record<string, string> = {};
+  const renames: [string, string][] = [];
+  for (const ref of refsIn(without)) {
+    const root = rootOf(ref);
+    if (!inside.has(root)) continue;
+    const seg = segOf(ref) ?? 'reply';
+    const value = `${root}.${seg}`;
+    if (renames.some(([v]) => v === value)) continue;
+    const id = answer.some((f) => f.id === seg) ? freeId(`${root}_${seg}`, new Set(answer.map((f) => f.id))) : seg;
+    const s = inside.get(root)!;
+    const typed = s.do === 'model' || s.do === 'agent' ? s.outputs?.find((f) => f.id === seg) : undefined;
+    answer.push(typed ? { ...typed, id, required: false } : { id, label: labelOf(id), type: seg === 'count' ? 'number' : 'markdown' });
+    outputs[id] = `{{${value}}}`;
+    renames.push([value, `${callId}.${id}`]);
+  }
+  // The template's answer fields that come by name from these steps (none after them giving one) come by name from the call.
+  const main = c.flow ? allSteps(c.flow.steps) : [];
+  const last = main.findIndex((s) => s.id === picked[picked.length - 1].id);
+  if (last >= 0) {
+    const later = main.slice(last + 1).filter((s) => !inside.has(s.id));
+    for (const f of r.answer) {
+      if (c.flow?.outputs?.[f.id] || answer.some((x) => x.id === f.id) || later.some((s) => givesOf(s)?.includes(f.id))) continue;
+      const giver = [...inside.values()].reverse().find((s) => givesOf(s)?.includes(f.id));
+      if (!giver) continue;
+      answer.push({ ...f, required: false });
+      outputs[f.id] = `{{${giver.id}.${f.id}}}`;
+    }
+  }
+
+  const call: AppStep = { id: callId, title: o.title || labelOf(callId), do: 'app', app: o.app, ...(Object.keys(given).length ? { with: given } : {}) };
+  home.splice(at[0], picked.length, call);
+  let rest = JSON.stringify(c);
+  for (const [from, to] of renames) rest = renameRefs(rest, from, to);
+  return {
+    block: { fields, answer, flow: { steps: JSON.parse(body) as Step[], ...(Object.keys(outputs).length ? { outputs } : {}) } },
+    call,
+    flows: JSON.parse(rest),
+    asText,
+  };
+}
+
 /** The lists of steps inside a step: a Decide's paths, a Repeat's steps, the branches, what runs when it fails. */
 export function innerLists(s: Step): Step[][] {
   const out: Step[][] = [];
