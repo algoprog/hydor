@@ -120,7 +120,8 @@ export function handleNotify(n: NotifyEvent, own = false) {
   const on = n.machine ? n.machine.id : own ? null : machineId;
   // The machine this page shows sends its own notices.
   if (own && on === machineId) return;
-  const path = machinePath(on, sessionPath(n.key));
+  // A session's notice opens it; one about something else (a template's run) where it says.
+  const path = machinePath(on, n.url ?? sessionPath(n.key));
   const where = on === machineId ? undefined : (n.machine?.name ?? ownName());
   const visible = document.visibilityState === 'visible';
   if (visible && document.hasFocus() && location.pathname === path) return;

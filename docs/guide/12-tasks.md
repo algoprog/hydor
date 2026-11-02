@@ -16,14 +16,17 @@ A task can start:
 - **Watch**: when a watcher sees a change in a feed, a web page, a value in JSON, a folder or a command's output. A watcher looks without a model, so its checks cost no tokens; the agent wakes only when something changed.
 - **Webhook**: when another service (GitHub, Gitea, a form, a script of yours) calls the task's own address.
 
+A task can also run one of your templates in place of a prompt: each time its trigger fires, the template runs with the answers you set, and the task's history links to that run (see [Run a template by itself](/guide/templates#run-a-template-by-itself)).
+
 Times are in your time zone, which the app takes from your browser. A run that could not start at its time, because the computer was off or the app was not running, runs at the next chance.
 
-Your tasks are in [Settings → Scheduled tasks](/settings?s=tasks) (**Settings → Agents → Scheduled tasks**). The search box (Ctrl+K, ⌘K on a Mac) also finds a task by its name and opens it there. There are four ways to make one:
+Your tasks are in [Settings → Scheduled tasks](/settings?s=tasks) (**Settings → Agents → Scheduled tasks**). The search box (Ctrl+K, ⌘K on a Mac) also finds a task by its name and opens it there. There are five ways to make one:
 
 - **New task** in Settings, where you set every part yourself.
 - **Start from an example**: a short form for a common task.
 - Asking an agent in any conversation ("remind me Friday at 9"): it shows a card you confirm.
 - **Make this an automation** in a session's menu: it drafts a task from a session that worked.
+- **Add a schedule** on a template's **Runs**: a task that runs that template.
 
 Continuing a session by itself once a plan's usage limit resets is a separate switch: [Settings → General → Resume after usage limits](/settings?s=general&find=Resume%20after%20usage%20limits) (see [Usage, limits and costs](/guide/usage)).
 
@@ -266,3 +269,4 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "Which of my scheduled tasks failed this week, and why?"
 - "Pause my Morning brief", or "Run the weekly report now."
 - "Make this conversation a task that runs every Monday at 9."
+- "Run my Reading list template whenever this feed has a new post, with the post's link."

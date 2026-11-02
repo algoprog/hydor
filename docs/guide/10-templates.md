@@ -299,6 +299,14 @@ While the rows run, a table fills in: the row number, the first two questions, t
 
 Rows keep going if the app restarts. **Earlier tables** lists your past runs of rows (the last 30) with their progress and whether they are **Running**, **Stopped** or **Finished**; click one to open its table again.
 
+## Run a template by itself
+
+A template can run by itself: at a time of day, every so often, once, when another service calls a webhook, or when a watcher sees a change (a feed, a page, a value, a folder). Each time, it runs with the answers you set, as if from its form, and the run joins its others under **Runs**.
+
+- **To set one up**: open the template, then **Runs** → **When it runs by itself** → **Add a schedule**. Give it a name, fill in the answers each run gets, and pick when it runs, as for any [scheduled task](/guide/tasks#when-it-runs). **Test run** tries it once without saving.
+- **Answers from outside**: a webhook's answers can take parts of the call (`{{body.title}}`, `{{headers.name}}`, `{{query.name}}`), and a watcher's `{{change}}`, what it saw change. The run takes them as data, never as instructions.
+- Each run notifies you with what it gave back, or why it did not finish, and the notice opens the run. Its row under **When it runs by itself** pauses it, runs it now, shows its history or removes it; the task is in [Settings → Scheduled tasks](/settings?s=tasks) too.
+
 ## What a run costs
 
 Each run's cost shows on its page once it ends, and in the **Runs** list. It is the figure the agent reports, or its use priced at API rates (for Custom, estimated from what it read and wrote); models running on this computer cost $0.
@@ -373,6 +381,7 @@ Agents in the app can make and run templates for you through the app's API, with
 - "Turn this session into a template I can run again."
 - "Run the Trip planner template for Lisbon, four days from 20 November, and show me the result when it's done."
 - "Run my Company research template for each of these 20 companies and give me the table."
+- "Run my Trip planner every Friday at 18:00 for Lisbon, three days."
 - "Open a public page for my Cover letter template, with at most $1 a day."
 - "Stop all runs of my Price check template, and revoke its API keys."
 - "Make a template with steps that reads each link I send, sums it up with a quick model and keeps it in a reading list."

@@ -130,7 +130,7 @@ export interface AppDef extends AppRecipe {
   updatedAt: number;
 }
 
-export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app' | 'screen';
+export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app' | 'screen' | 'task';
 export type RunStatus = 'queued' | 'starting' | 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
 
 export interface AppRun {

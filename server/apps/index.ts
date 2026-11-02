@@ -19,6 +19,7 @@ import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { runTools } from '../features/registry.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
+import type { AppRunEnd } from '../scheduler.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { noteUserMessage } from '../updates.ts';
 import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
@@ -32,7 +33,7 @@ import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
-import { finish, followUpsOf, isFlowRun, markOf, noteAgentRun, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
+import { finish, followUpsOf, isFlowRun, markOf, noteAgentRun, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -123,6 +124,13 @@ function estimate(db: Deps['db'], appId: string, recipe: AppRecipe, rows: number
   return { rows, perRun, basis, total: perRun === null ? null : perRun * rows, cap: cap ?? null, most: cap ? cap * rows : null, from: costs.length };
 }
 
+/** A run's end as the scheduled task that started it keeps it: how it went, and one line of what it gave back. */
+function taskEnd(r: RunRecord): AppRunEnd {
+  const first = r.recipe.answer.map((f) => r.result?.[f.id]).find((v) => (typeof v === 'string' ? v.trim() : typeof v === 'number' || typeof v === 'boolean'));
+  const summary = r.status === 'done' ? (first !== undefined ? String(first) : (r.reply ?? '')) : (r.error ?? (r.status === 'stopped' ? 'Stopped' : 'It did not finish'));
+  return { status: r.status === 'done' ? 'done' : r.status === 'stopped' ? 'stopped' : 'failed', summary, ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}), url: `/apps/runs/${encodeURIComponent(r.id)}` };
+}
+
 /** A tool's inputs as the steps editor shows them: each name, its kind, whether it is needed, and its first sentence. */
 function inputsOf(schema: Record<string, unknown>): { name: string; type?: string; required?: true; description?: string }[] {
   const props = (schema.properties ?? {}) as Record<string, { type?: unknown; description?: unknown }>;
@@ -143,6 +151,25 @@ function routes(d: Deps) {
   embedSoon(db, 20_000);
   setDeps(d);
   useFlows(flowRunner);
+  // Scheduled tasks run templates too (Settings → Tasks): started here, and told when the run ends.
+  d.scheduler?.useApps({
+    id: (idOrSlug) => getApp(db, idOrSlug)?.id,
+    name: (id) => getApp(db, id)?.name,
+    start: ({ app: id, inputs, test }) => {
+      const a = getApp(db, id);
+      if (!a) throw new HttpError(404, 'Its template is gone');
+      if (!test) checkDaily(db, a);
+      const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'task', inputs });
+      return { id: r.id, ...(r.key ? { key: r.key } : {}) };
+    },
+    ended: (id) => {
+      const r = getRun(db, id);
+      return !r ? undefined : isActive(r.status) ? null : taskEnd(r);
+    },
+  });
+  onFinished((r) => {
+    if (r.source === 'task') d.scheduler?.appRunEnded(r.id, taskEnd(r));
+  });
   const link = (key: string) => `${d.publicBase()}/s/${encodeURIComponent(key)}`;
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
 

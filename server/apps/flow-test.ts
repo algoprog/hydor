@@ -16,7 +16,10 @@ import cookie from '@fastify/cookie';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanFlow, cleanRequires, evalRule, fillRefs, flowOf, readRule, valueOf, type Scope } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
+import { listRuns as listTaskRuns } from '../automations/runs.ts';
 import { kvSet, openDb } from '../db.ts';
+import { Scheduler } from '../scheduler.ts';
+import type { SessionManager } from '../sessions.ts';
 import { registerFeatures } from '../features/registry.ts';
 import type { Deps, Feature, RunCtx } from '../features/types.ts';
 import { setHelperModel } from '../helper.ts';
@@ -144,7 +147,8 @@ await http.register(cookie);
 http.setErrorHandler((err: Error, _req, reply) => {
   reply.code(err instanceof HttpError ? err.status : 500).send({ error: err.message });
 });
-const deps = { app: http, db, sessions: sessions as any, scheduler: null as any, models: null as any, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'http://test.local' } as Deps;
+const scheduler = new Scheduler(db, sessions as unknown as SessionManager);
+const deps = { app: http, db, sessions: sessions as any, scheduler, models: null as any, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'http://test.local' } as Deps;
 apps.routes!(deps);
 registerFeatures([fakeTools], deps);
 startRuns(deps);
@@ -430,6 +434,55 @@ test('the answer: fields its outputs name come from there, the rest by name, fro
   const done = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'Mapped' } }).id);
   assert.equal(done.status, 'done', done.error);
   assert.deepEqual(done.result, { title: 'Mapped', count: 1 });
+});
+
+test('scheduled tasks run a template: its answers set or filled from a webhook call; the task’s run ends with the template’s, and runs again with the same answers', async () => {
+  const a = app({
+    name: 'Logged',
+    data: { items: { title: 'text' } },
+    answer: [{ id: 'count', label: 'Count', type: 'number', required: true }],
+    flow: { steps: [{ id: 'save', do: 'data', add: 'items', with: { title: '{{topic}}' } }, { id: 'all', do: 'data', op: 'find', collection: 'items' }], outputs: { count: '{{all.count}}' } },
+  });
+  assert.throws(() => scheduler.save({ name: 'Nope', schedule: { kind: 'daily', time: '09:00' }, app: { id: 'nope', inputs: {} } } as any), /no such template/);
+  const t = scheduler.save({ name: 'Log it', schedule: { kind: 'daily', time: '09:00' }, app: { id: a.id, inputs: { topic: 'From the timer', empty: '' } } } as any);
+  assert.equal(t.appName, 'Logged');
+  assert.deepEqual(t.app, { id: a.id, inputs: { topic: 'From the timer' } });
+  const notices: any[] = [];
+  sessions.on('notify', (n) => notices.push(n));
+  /** The task's newest run, once it has ended. */
+  const lastRun = async (taskId: string) => {
+    const r = listTaskRuns(db, taskId)[0];
+    assert.ok(r?.appRun, 'its run started a template run');
+    const run = await ended(r.appRun!);
+    assert.equal(run.source, 'task');
+    return { task: (await scheduler.waitRun(r.id, 5000))!, run };
+  };
+  await scheduler.runNow(t.id);
+  const first = await lastRun(t.id);
+  assert.equal(first.run.inputs.topic, 'From the timer');
+  assert.equal(first.task.status, 'done');
+  assert.equal(first.task.summary, '1');
+  assert.ok(notices.some((n) => n.title === 'Log it' && n.kind === 'done' && n.url === `/apps/runs/${first.run.id}`), 'its notice opens the run');
+  // A webhook's call fills its answers.
+  const h = scheduler.save({ name: 'Hook', schedule: { kind: 'webhook' }, app: { id: a.id, inputs: { topic: 'Called: {{body.title}}' } } } as any);
+  const out = await scheduler.webhook(h.hookPath!.split('/').pop()!, { body: { title: 'a call' }, raw: Buffer.from('{}'), headers: {}, query: {} });
+  assert.equal(out.status, 'started');
+  const hooked = await lastRun(h.id);
+  assert.equal(hooked.run.inputs.topic, 'Called: a call');
+  assert.equal(hooked.task.summary, '2');
+  // Run again: the answers it had then.
+  await scheduler.rerun(first.task.id);
+  const again = await lastRun(t.id);
+  assert.equal(again.run.inputs.topic, 'From the timer');
+  assert.equal(again.task.rerunOf, first.task.id);
+  // A run that fails fails its task's run, with why.
+  const broken = app({ name: 'Broken', flow: { steps: [{ id: 'x', do: 'data', op: 'get', collection: 'nothing', record: 'r' }] }, data: { other: {} } });
+  const b = scheduler.save({ name: 'Breaks', schedule: { kind: 'daily', time: '09:00' }, app: { id: broken.id, inputs: { topic: 'x' } } } as any);
+  await scheduler.runNow(b.id);
+  const fail = await lastRun(b.id);
+  assert.equal(fail.task.status, 'failed');
+  assert.ok(fail.task.summary);
+  for (const x of [t, h, b]) scheduler.remove(x.id);
 });
 
 test('app_data: the agents of a template that keeps data find and add its records; a public run gets no such tool', async () => {

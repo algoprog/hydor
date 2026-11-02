@@ -408,6 +408,8 @@ export interface NotifyEvent {
   machine?: { id: string; name: string };
   /** Waiting on an approval that is a plain yes or no: a notification's Approve and Deny buttons answer it. */
   approval?: QuickAnswer;
+  /** Where it opens, when that is not its session (a template's run, which may have none). */
+  url?: string;
 }
 
 /** Another machine running Naget Agent that this one uses (Settings → Machines); its token stays on the server. */

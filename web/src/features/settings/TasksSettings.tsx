@@ -4,11 +4,12 @@
 // keeps how each run went. Examples start common ones from a short form.
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Clock, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MoreHorizontal, Pencil, Play, Plus, Trash2, TriangleAlert, Webhook } from 'lucide-react';
-import { scheduleText, type ScheduledTask, type TaskDraft, type TaskRun } from '@shared/automations';
+import { scheduleText, type ScheduledTask, type TaskApp, type TaskDraft, type TaskRun, type TaskSchedule } from '@shared/automations';
+import type { AppDef } from '@shared/apps';
 import type { Agent } from '@shared/types';
 import { api, del, enc, post } from '../../lib/api';
 import { basename, timeAgo, untilText } from '../../lib/format';
-import { openSession } from '../../lib/nav';
+import { go, openSession } from '../../lib/nav';
 import { toast, toastError, useApp, useSessions } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
@@ -32,12 +33,12 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hookUrl = (t: ScheduledTask) => (t.hookPath ? `${location.origin}${t.hookPath}` : '');
 
 /** What a task can be saved from: the task's own fields, nothing it only reports. */
-function draftOf(t: ScheduledTask): TaskDraft {
-  const { name, prompt, schedule, agent, acpAgent, cwd, model, effort, mode, target, extra, failLimit } = t;
-  return { name, prompt, schedule, agent, acpAgent, cwd, model, effort, mode, target, extra, failLimit };
+export function draftOf(t: ScheduledTask): TaskDraft {
+  const { name, prompt, schedule, agent, acpAgent, cwd, model, effort, mode, target, extra, failLimit, app } = t;
+  return { name, prompt, schedule, agent, acpAgent, cwd, model, effort, mode, target, extra, failLimit, app };
 }
 
-function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTask; onEdit: () => void; onDuplicate: () => void; onChanged: () => void }) {
+export function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTask; onEdit: () => void; onDuplicate: () => void; onChanged: () => void }) {
   const home = useApp((s) => s.boot?.home);
   const acpName = useApp((s) => (t.agent === 'acp' ? s.boot?.acpAgents?.find((a) => a.id === t.acpAgent)?.name : undefined));
   const [menu, setMenu] = useState(false);
@@ -58,10 +59,19 @@ function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTask; onEd
             <span translate="no" className="truncate text-[13.5px] font-medium text-fg">
               {t.name}
             </span>
-            <AgentIcon agent={t.agent} name={acpName} size={13} />
+            {!t.app && <AgentIcon agent={t.agent} name={acpName} size={13} />}
           </div>
           <div className="mt-0.5 truncate text-[12px] text-fg-3">
-            {scheduleText(t.schedule, undefined, LOCALE)} · {t.target ? 'posts into a session' : `new session in ${t.cwd === home ? '~' : basename(t.cwd)}`}
+            {scheduleText(t.schedule, undefined, LOCALE)} ·{' '}
+            {t.app ? (
+              <>
+                runs <span translate="no">{t.appName ?? 'a template that is gone'}</span>
+              </>
+            ) : t.target ? (
+              'posts into a session'
+            ) : (
+              `new session in ${t.cwd === home ? '~' : basename(t.cwd)}`
+            )}
             {t.enabled && t.nextAt ? ` · next ${untilText(t.nextAt)}` : ''}
           </div>
           {t.schedule.kind === 'watch' && t.check && (
@@ -88,7 +98,7 @@ function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTask; onEd
                   {t.recent?.length ? '· ' : ''}Last run {timeAgo(t.lastAt)} ago{failed ? `: ${t.lastStatus}` : ''}
                 </span>
               )}
-              {t.lastKey && (
+              {t.lastKey && !t.app && (
                 <button className="text-accent hover:underline" onClick={() => openSession(t.lastKey!)}>
                   Open
                 </button>
@@ -201,14 +211,81 @@ function TestStrip({ run }: { run: TaskRun }) {
           <span className="font-medium text-fg-2">Test run</span>
           <OutcomeBadge status={run.status} />
           {run.status === 'running' && <Throbber className="h-3.5 text-fg-3" />}
-          {run.key && (
-            <button type="button" className="text-accent hover:underline" onClick={() => openSession(run.key!)}>
-              Open its session
+          {run.appRun ? (
+            <button type="button" className="text-accent hover:underline" onClick={() => go(`/apps/runs/${enc(run.appRun!)}`)}>
+              Open its run
             </button>
+          ) : (
+            run.key && (
+              <button type="button" className="text-accent hover:underline" onClick={() => openSession(run.key!)}>
+                Open its session
+              </button>
+            )
           )}
         </div>
-        <p className="mt-0.5 line-clamp-3 text-[12.5px] leading-snug text-fg-2">{run.summary ?? (run.status === 'running' ? 'It runs like a real run, in a session of its own; this updates when it ends.' : '')}</p>
+        <p className="mt-0.5 line-clamp-3 text-[12.5px] leading-snug text-fg-2">{run.summary ?? (run.status === 'running' ? (run.appRun ? 'It runs like a real run of the template; this updates when it ends.' : 'It runs like a real run, in a session of its own; this updates when it ends.') : '')}</p>
       </div>
+    </div>
+  );
+}
+
+/** A task that runs a template: the answers its form gets on each run (a webhook's call and a watcher's find fill them in). */
+function AppAnswers({ app, schedule, onChange }: { app: TaskApp; schedule: TaskSchedule; onChange: (a: TaskApp) => void }) {
+  const [def, setDef] = useState<AppDef | null | undefined>(undefined);
+  useEffect(() => {
+    api<{ app: AppDef }>(`/api/apps/${enc(app.id)}`).then(
+      (r) => setDef(r.app),
+      () => setDef(null),
+    );
+  }, [app.id]);
+  if (def === undefined) return <Throbber className="text-fg-3" />;
+  if (def === null) return <p className="text-[12.5px] text-err">Its template is gone: remove the task, or make it again from another template.</p>;
+  const put = (id: string, v: string) => {
+    const inputs = { ...app.inputs };
+    if (v) inputs[id] = v;
+    else delete inputs[id];
+    onChange({ ...app, inputs });
+  };
+  return (
+    <div className="space-y-2.5">
+      <p className="text-[13px] text-fg-2">
+        Each run, it runs <span className="font-medium text-fg" translate="no">{def.name}</span> with these answers.
+      </p>
+      {def.fields.map((f) => (
+        <label key={f.id} className="block">
+          <span className="mb-1 flex items-baseline gap-1 text-[12.5px] text-fg-3">
+            <span translate="no">{f.label || f.id}</span>
+            {f.required && <span className="text-err">*</span>}
+          </span>
+          {f.type === 'file' ? (
+            <span className="block text-[12.5px] text-fg-3">A task cannot attach files.</span>
+          ) : f.type === 'choice' || f.type === 'yesno' ? (
+            <select className={cx(inputCls, 'h-9 text-[13px]')} value={app.inputs[f.id] ?? ''} onChange={(e) => put(f.id, e.target.value)}>
+              <option value="">—</option>
+              {(f.type === 'yesno' ? ['Yes', 'No'] : (f.options ?? [])).map((o) => (
+                <option key={o} value={o} translate="no">
+                  {o}
+                </option>
+              ))}
+            </select>
+          ) : f.type === 'long' ? (
+            <textarea className={cx(inputCls, 'h-auto min-h-[72px] resize-y py-2 text-[13px] leading-relaxed')} rows={3} placeholder={f.placeholder} value={app.inputs[f.id] ?? ''} onChange={(e) => put(f.id, e.target.value)} />
+          ) : (
+            <input className={cx(inputCls, 'h-9 text-[13px]')} placeholder={f.placeholder} value={app.inputs[f.id] ?? ''} onChange={(e) => put(f.id, e.target.value)} />
+          )}
+        </label>
+      ))}
+      {!def.fields.length && <p className="text-[12.5px] text-fg-3">Its form asks nothing.</p>}
+      {schedule.kind === 'webhook' && (
+        <p className="text-[12px] leading-relaxed text-fg-3">
+          Fill in parts of the call with <code className="font-mono">{'{{body.path.to.field}}'}</code>, <code className="font-mono">{'{{headers.name}}'}</code> or <code className="font-mono">{'{{query.name}}'}</code>; the run takes them as data, never as instructions.
+        </p>
+      )}
+      {schedule.kind === 'watch' && (
+        <p className="text-[12px] leading-relaxed text-fg-3">
+          <code className="font-mono">{'{{change}}'}</code> is what the watcher saw change.
+        </p>
+      )}
     </div>
   );
 }
@@ -320,13 +397,13 @@ export function TaskEditor({
       width={620}
       footer={
         <>
-          <Button variant="ghost" className="mr-auto" icon={<FlaskConical size={14} />} onClick={runTest} disabled={testing || !d.name.trim() || !d.prompt.trim()} title="Run it once now, as the form is, without saving">
+          <Button variant="ghost" className="mr-auto" icon={<FlaskConical size={14} />} onClick={runTest} disabled={testing || !d.name.trim() || (!d.app && !d.prompt.trim())} title="Run it once now, as the form is, without saving">
             {testing ? 'Starting…' : 'Test run'}
           </Button>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={save} disabled={busy || !d.name.trim() || !d.prompt.trim()}>
+          <Button variant="primary" onClick={save} disabled={busy || !d.name.trim() || (!d.app && !d.prompt.trim())}>
             {busy ? 'Saving…' : (submitLabel ?? (task ? 'Save' : 'Create task'))}
           </Button>
         </>
@@ -335,6 +412,10 @@ export function TaskEditor({
       <div className="space-y-4">
         {note && <p className="rounded-xl bg-accent-soft px-3 py-2 text-[12.5px] leading-relaxed text-fg-2">{note}</p>}
         <input value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="Name, e.g. Morning CI summary" className={inputCls} autoFocus={!initial} />
+        {d.app ? (
+          <AppAnswers app={d.app} schedule={sch} onChange={(app) => set({ app })} />
+        ) : (
+          <>
         <div className="flex flex-wrap items-center gap-2">
           <AgentPicker
             agent={d.agent}
@@ -366,6 +447,8 @@ export function TaskEditor({
             </p>
           )}
         </div>
+          </>
+        )}
         <div className="space-y-2.5">
           <div className="text-[12.5px] font-medium text-fg-2">When</div>
           <div className="-mx-1 overflow-x-auto px-1 [&::-webkit-scrollbar]:hidden">
@@ -475,16 +558,18 @@ export function TaskEditor({
         </div>
         <div className="space-y-2">
           <div className="text-[12.5px] font-medium text-fg-2">Each run</div>
-          <select value={d.target ?? ''} onChange={(e) => set({ target: e.target.value || undefined })} className={cx(inputCls, 'h-9 text-[13px]')}>
-            <option value="">Starts a new session</option>
-            {recent.map((s) => (
-              <option key={s.key} value={s.key}>
-                Posts into: {s.title.slice(0, 70)}
-              </option>
-            ))}
-          </select>
+          {!d.app && (
+            <select value={d.target ?? ''} onChange={(e) => set({ target: e.target.value || undefined })} className={cx(inputCls, 'h-9 text-[13px]')}>
+              <option value="">Starts a new session</option>
+              {recent.map((s) => (
+                <option key={s.key} value={s.key}>
+                  Posts into: {s.title.slice(0, 70)}
+                </option>
+              ))}
+            </select>
+          )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-fg-2">
-            <label className="flex items-center gap-2">
+            <label className={cx('flex items-center gap-2', d.app && 'hidden')}>
               Stops past $
               <input
                 type="number"
