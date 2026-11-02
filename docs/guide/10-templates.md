@@ -311,7 +311,9 @@ To keep costs in hand, set **Most one run may spend (US$)** and **Runs a day (fr
 
 A template can also do its work in **steps**: an agent does one part, a quick question to a model sorts something out, a tool fetches a page, a rule decides which way to go, the same steps go through each item of a list. Each step hands what it found to the next, and the run gives back the answer fields at the end. Steps make a template cheaper, faster and surer than one agent doing everything, and let it do more: keep data between runs, call your other templates, run parts side by side.
 
-For now, you make a template with steps by asking an agent: "Make a template that reads each link I give it, sums it up with a quick model, and keeps it in a reading list." The agent writes the steps, checks them and tries them. In your template's **Edit**, they show under **What it does**; to change them, ask an agent ("add a step that…"). The rest (the form, the answer, who does it, tools, limits) you change there yourself.
+You make a template with steps in its **Edit**, or by asking an agent. In **Edit**, **Work in steps** (beside **The task**) turns the task into a first step, an agent that does it; **What it does** then lists the steps in order. **Add a step** picks a kind; a step opens to its settings when you click it, and its **⋯** menu moves it, copies it or removes it. The steps inside a **Decide**, a **Repeat** or **At the same time** show under it, each list with its own **Add a step**. A text box's **{ }** button (**Put in a value**) puts in a value: an answer from the form, or what a step before it gave (`{{find.records}}`). **Where its answer comes from** says which value fills each answer field (left empty: the last step that gave one of its name). What needs fixing shows under its step as you go, **Test run** tries what is on screen, and **Back to one task** turns a template that is only that first step back into a task.
+
+Or ask an agent: "Make a template that reads each link I give it, sums it up with a quick model, and keeps it in a reading list." The agent writes the steps, checks them and tries them, and you can change them in **Edit** after.
 
 The kinds of steps:
 
@@ -330,7 +332,7 @@ While a run works, its page lists the steps as they go. Once it ends, **Steps** 
 
 ### What a template keeps
 
-A template can keep data between its runs: lists of records, like the links of a reading list or the clients of a small CRM. Its steps add, find and change them, and so do its agents, with a tool of their own. A list can say what each record holds (a title, a score, a date…), and the app then checks what goes in.
+A template can keep data between its runs: lists of records, like the links of a reading list or the clients of a small CRM. Its steps add, find and change them, and so do its agents, with a tool of their own. A list can say what each record holds (a title, a score, a date…), and the app then checks what goes in. In **Edit**, **What it keeps** lists them: **Add a list**, then give it a name and, if you like, the fields its records hold (without fields, any record goes in).
 
 Steps and agents can also search the records for a question, the way your knowledge bases are searched: by their words, and by what they mean when [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) is on, best first. A step can search your knowledge bases and memory notes too, with the knowledge_search and recall tools.
 
@@ -338,7 +340,7 @@ What a template keeps stays with it until you delete the template. Runs from its
 
 ### A template that remembers
 
-A template can remember across its runs: its agents keep what later runs should know (a preference you showed, a source that works, a mistake to avoid) in a memory of the template's own, and each run starts with it. [Settings → Memory](/settings?s=memory) lists it as a project, under the template's name.
+A template can remember across its runs: its agents keep what later runs should know (a preference you showed, a source that works, a mistake to avoid) in a memory of the template's own, and each run starts with it. [Settings → Memory](/settings?s=memory) lists it as a project, under the template's name. Turn it on with **Remembers across runs**, under **What it keeps** in its **Edit**.
 
 ### What a template needs on this computer
 

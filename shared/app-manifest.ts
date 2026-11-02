@@ -1069,7 +1069,7 @@ export interface InstallPreview {
 // ---- checks ------------------------------------------------------------------------------------------------
 
 /** The values a step gives, by name, where they are known before it runs (null: any). */
-function givesOf(s: Step): string[] | null {
+export function givesOf(s: Step): string[] | null {
   switch (s.do) {
     case 'agent':
       return [...(s.outputs ?? []).map((f) => f.id), 'reply'];
