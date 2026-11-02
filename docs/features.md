@@ -110,6 +110,13 @@ agents that speak ACP and take MCP servers.
   watch it change as it saves. Templates are tasks you repeat, each with a form: ready-made or your own, run from
   the Templates page, the API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's
   result, asked on its page or in its session, which opens on that result with a switch to the conversation.
+  A template can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words,
+  a repeat over a list or until something holds, branches side by side, another template, its own data), each
+  handing typed values to the next, shown step by step on the run's page and resumed after a restart; keep
+  records between runs that its steps, its agents and the API share; remember across runs in a memory of its
+  own; and install the Node and Python packages it needs in a folder of its own. Templates travel as one file
+  (.naget-app or .json, with their records and the templates they call), installed after a card that says what
+  they will do here.
 - **Slides**: decks kept in Pages, made by an agent (save_slides, from layouts or parts placed by position) or
   from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
   layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and

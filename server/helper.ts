@@ -10,6 +10,7 @@ import { kvGet, kvSet, type DB } from './db.ts';
 import { AGENT_FILE } from './models/config.ts';
 import type { ModelManager } from './models/manager.ts';
 import { oneShot } from './oneshot.ts';
+import { costOf } from './prices.ts';
 
 export interface HelperAsk {
   system: string;
@@ -20,6 +21,10 @@ export interface HelperAsk {
   model?: string;
   maxTokens?: number;
   timeoutMs?: number;
+  /** Stops the call (one of Custom's models; "auto" runs to its end or its timeout). */
+  signal?: AbortSignal;
+  /** Told what the call cost, in US dollars, when that is known ($0 on a model on this computer). */
+  onCost?: (usd: number) => void;
 }
 
 const KEY = 'helper.model';
@@ -77,7 +82,14 @@ export async function helper(db: DB, q: HelperAsk): Promise<string> {
     { role: 'system', content: q.system },
     { role: 'user', content },
   ];
-  const r = await chat(m, { messages, signal: AbortSignal.timeout(timeout), onText: () => {}, onReasoning: () => {}, maxTokens: q.maxTokens });
+  const signal = q.signal ? AbortSignal.any([AbortSignal.timeout(timeout), q.signal]) : AbortSignal.timeout(timeout);
+  const r = await chat(m, { messages, signal, onText: () => {}, onReasoning: () => {}, maxTokens: q.maxTokens });
+  if (q.onCost && r.usage) {
+    const cached = r.usage.cached ?? 0;
+    const tokens = { tokensIn: Math.max(0, r.usage.prompt - cached), tokensCached: cached, tokensOut: r.usage.completion };
+    const usd = m.provider === 'ollama' || m.provider === 'vllm' ? 0 : (r.usage.cost ?? costOf(db, m.id, tokens) ?? costOf(db, m.model, tokens));
+    if (typeof usd === 'number' && Number.isFinite(usd)) q.onCost(usd);
+  }
   return r.text;
 }
 

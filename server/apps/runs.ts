@@ -4,12 +4,14 @@
 // (publicRun.ts), in a fresh folder under the system's temporary folder, deleted when they end.
 // After that, follow-ups refine it: a message to the run's session (from the run's page or the session
 // itself) opens the run again until that turn ends, and the agent hands in the whole updated result.
+// An app with steps runs its flow instead (flow.ts, through useFlows): each agent step is a run of this
+// kind of its own, with the flow's run as its parent.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { SessionExtra } from '../../shared/features.ts';
-import type { AppRecipe, AppRun, RunAsk, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
+import type { AnswerField, AppRecipe, AppRun, RunAsk, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
 import { ACTIVE, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
 import type { Agent, AgentModel, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -21,6 +23,7 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { costOf, rateFor } from '../prices.ts';
 import { sessionExtra } from '../sessionExtra.ts';
+import { ensureEnv } from './env.ts';
 import { getRun, insertRun, listRuns, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
 
 /** Where an app's runs keep their files when the app names no folder: outside the app's data, which Custom treats as private. */
@@ -48,6 +51,20 @@ const d = () => {
   if (!deps) throw new Error('Templates are still starting');
   return deps;
 };
+export const runDeps = d;
+
+/** What runs a flow (flow.ts registers it: it calls back into this module). */
+export interface FlowRunner {
+  start(r: RunRecord, o: { slug: string; files?: StartInput['files']; public?: StartInput['public'] }): void;
+  resume(r: RunRecord): void;
+  stop(id: string): void;
+  progress(r: RunRecord, publicView: boolean): Promise<RunProgress>;
+}
+let flows: FlowRunner | null = null;
+export const useFlows = (f: FlowRunner) => (flows = f);
+
+/** Whether a run follows a flow (rather than one agent doing the task in its prompt). */
+export const isFlowRun = (r: Pick<RunRecord, 'recipe' | 'source'>) => !!r.recipe.flow?.steps.length && r.source !== 'step';
 
 /** The agent process (its run id) behind each app run, from the moment it starts. */
 const byAgentRun = new Map<string, string>();
@@ -75,6 +92,12 @@ export const onFinished = (fn: (r: RunRecord) => void) => finishedHooks.push(fn)
 function changed(r: RunRecord | null) {
   if (!r) return;
   d().broadcast({ t: 'feature', id: 'apps', data: { run: runView(r) } });
+}
+
+/** Tells the pages a run changed (a step of it moved on). */
+export function noteChanged(id: string) {
+  cache.delete(id);
+  changed(getRun(d().db, id));
 }
 
 // ---- which run a session or tool call belongs to ------------------------------------------------------
@@ -138,6 +161,9 @@ export interface StartInput {
   row?: number;
   /** Wait in line (rows of a CSV) instead of starting now. */
   queued?: boolean;
+  /** The run this one is a step of, and where in its flow. */
+  parent?: string;
+  step?: string;
 }
 
 /** The checked form, or an error that says what to fix. */
@@ -158,10 +184,26 @@ export function startRun(o: StartInput): RunRecord {
     if (typeof f?.data !== 'string' || typeof f.name !== 'string') throw new HttpError(400, 'Send each file as a name and its base64 contents');
     if (f.data.length * 0.75 > maxFile) throw new HttpError(413, `${f.name} is too big (at most ${maxFile >> 20} MB)`);
   }
-  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row });
-  if (!o.queued) void launch(r, o).catch(() => {});
+  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step });
+  if (!o.queued) go(r, o);
   changed(r);
   return r;
+}
+
+/** Sets a run going: its flow, or its one agent; once the packages its template needs are installed. */
+function go(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe' | 'source' | 'files' | 'public'>) {
+  syncMemoryHome(o.recipe, o.slug);
+  const start = () => {
+    if (isFlowRun(r)) {
+      if (!flows) return void finish(r.id, 'failed', 'Templates with steps cannot run here yet');
+      return flows.start(r, { slug: o.slug, files: o.files, public: o.public });
+    }
+    void launch(r, o).catch(() => {});
+  };
+  const req = o.recipe.requires;
+  if (!o.public && (req?.python?.length || (req?.node && Object.keys(req.node).length)))
+    return void ensureEnv(o.recipe, o.slug).then(start, (e) => finish(r.id, 'failed', `What it needs could not be installed: ${(e as Error).message} (What it needs, in its settings, shows the install's output)`));
+  start();
 }
 
 /** Starts a run that waited in line. */
@@ -169,14 +211,40 @@ export function launchQueued(r: RunRecord, slug: string) {
   updateRun(d().db, r.id, { status: 'starting' });
   const next = getRun(d().db, r.id)!;
   changed(next);
-  void launch(next, { app: r.app, slug, recipe: r.recipe, source: r.source }).catch(() => {});
+  go(next, { app: r.app, slug, recipe: r.recipe, source: r.source });
 }
 
-const stamp = (t = Date.now()) => {
+/** Where a run works: the folder its app names, or a new one of its own under the app's. */
+export function runFolder(r: Pick<RunRecord, 'id' | 'createdAt' | 'recipe'>, slug: string): string {
+  if (r.recipe.cwd) return path.resolve(r.recipe.cwd.replace(/^~(?=\/|$)/, config.home));
+  return path.join(WORK_DIR, slug, `${stamp(r.createdAt)}-${r.id.slice(0, 4)}`);
+}
+
+/** Memory finds an app's own memory by this file in the app's folder (server/memory/store.ts). */
+export const MEMORY_MARK = '.naget-memory';
+
+/**
+ * An app that remembers keeps its notes as a project of its own: the folder its runs work in, under
+ * the app's own (or the folder the app names), so every run finds what earlier ones saved.
+ */
+function syncMemoryHome(recipe: AppRecipe, slug: string) {
+  if (recipe.cwd || !slug || slug === 'test') return;
+  const mark = path.join(WORK_DIR, slug, MEMORY_MARK);
+  try {
+    if (recipe.memory) {
+      if (!fs.existsSync(mark)) {
+        fs.mkdirSync(path.dirname(mark), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(mark, `The memory of the template "${recipe.name}": its runs keep their notes about it here, as a project.\n`);
+      }
+    } else if (fs.existsSync(mark)) fs.rmSync(mark, { force: true });
+  } catch {}
+}
+
+function stamp(t = Date.now()) {
   const x = new Date(t);
   const p = (n: number) => String(n).padStart(2, '0');
   return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}-${p(x.getHours())}${p(x.getMinutes())}`;
-};
+}
 
 const safeName = (n: string) => path.basename(String(n || 'file')).replace(/[^\w.\- ()]+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'file';
 
@@ -200,21 +268,33 @@ function modeFor(agent: Agent, acpAgent: string | undefined, mode: string | unde
   return acpAgent === CONSOLE_ID ? 'auto' : undefined;
 }
 
+/** One answer field as the agent is told it: "- summary (text, Markdown, required): Summary — what goes there". */
+export function fieldLine(f: AnswerField): string {
+  const kind = f.type === 'table' ? `table: a list of rows, each with ${(f.columns ?? []).map((c) => `${c.id} (${c.type})`).join(', ')}` : f.type === 'list' ? 'list of short texts' : f.type === 'markdown' ? 'text, Markdown' : f.type === 'yesno' ? 'true or false' : f.type;
+  return `- ${f.id} (${kind}${f.required ? ', required' : ''}): ${f.label}${f.description ? ` — ${f.description}` : ''}`;
+}
+
 /** What the agent is told about the run: the answer fields to hand in, to finish without asking, and how follow-ups refine it. */
-export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appName'>): string {
+export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appName'> & { data?: AppRecipe['data']; memory?: boolean }): string {
   const lines = [
-    `This session runs the template "${r.appName}" (Naget Agent Templates)${r.source === 'web' || r.source === 'test' ? '' : ': nobody watches it live'}. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`,
+    r.source === 'step'
+      ? `This session does one step ("${r.appName}") of a template that runs on its own (Naget Agent Templates): nobody watches it live, and what you hand in goes on to its next steps. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`
+      : `This session runs the template "${r.appName}" (Naget Agent Templates)${r.source === 'web' || r.source === 'test' ? '' : ': nobody watches it live'}. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`,
   ];
+  const kept = Object.entries(r.data ?? {});
+  if (kept.length)
+    lines.push(
+      `The template keeps data between its runs, which the app_data tool finds, adds, changes and removes: ${kept.map(([name, c]) => `${name}${c.fields?.length ? ` (${c.fields.map((f) => `${f.id}: ${f.type}`).join(', ')})` : ' (any fields)'}${c.description ? ` — ${c.description}` : ''}`).join('; ')}. Use it as the task says.`,
+    );
+  if (r.memory)
+    lines.push('The template remembers across its runs: what a later run should know (a preference it showed, a source that works, a mistake to avoid), save with the remember tool, scope "repo"; it comes back in its next runs. Keep notes few and lasting.');
   // A public page's visitor sends no follow-ups.
   const later = r.source !== 'public';
   const a = r.recipe.answer;
   if (a.length) {
     lines.push(
       'When you have the result, call the submit_result tool (on the naget-agent server) with these fields:',
-      ...a.map((f) => {
-        const kind = f.type === 'table' ? `table: a list of rows, each with ${(f.columns ?? []).map((c) => `${c.id} (${c.type})`).join(', ')}` : f.type === 'list' ? 'list of short texts' : f.type === 'markdown' ? 'text, Markdown' : f.type === 'yesno' ? 'true or false' : f.type;
-        return `- ${f.id} (${kind}${f.required ? ', required' : ''}): ${f.label}${f.description ? ` — ${f.description}` : ''}`;
-      }),
+      ...a.map(fieldLine),
       'If it answers with problems, fix them and call it again. Then end with a short reply; the person sees the result as a card, so there is no need to repeat it all.',
     );
     if (later)
@@ -240,7 +320,7 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
       cwd = path.resolve(recipe.cwd.replace(/^~(?=\/|$)/, config.home));
       if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) throw new Error(`The template’s folder is not there: ${cwd}`);
       fresh = false;
-    } else cwd = path.join(WORK_DIR, o.slug, `${stamp(r.createdAt)}-${r.id.slice(0, 4)}`);
+    } else cwd = runFolder(r, o.slug);
     if (fresh) fs.mkdirSync(cwd, { recursive: true, mode: 0o700 });
     // Files: saved for agents that open them, their text in the message for public runs.
     const values = { ...r.inputs };
@@ -286,8 +366,8 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
     runOfKey.set(key, { at: Date.now(), id: r.id });
     const t: Follow = { idleSince: 0, stopping: followed.get(r.id)?.stopping };
     followed.set(r.id, t);
-    // Runs nobody opens one by one stay out of the session list (they show under their app).
-    if (r.source === 'public' || r.source === 'batch' || r.source === 'api' || r.source === 'mcp') sessions.setFlags(key, { archived: true });
+    // Runs nobody opens one by one stay out of the session list (they show under their app, or their run).
+    if (r.source !== 'web' && r.source !== 'test') sessions.setFlags(key, { archived: true });
     changed(getRun(db, r.id));
     if (t.stopping) await sessions.interrupt(key).catch(() => {});
   } catch (e) {
@@ -507,29 +587,29 @@ export function runCost(r: Pick<RunRecord, 'recipe' | 'source' | 'key'>, s: Sess
   return (tokensIn * rate.input + (out / 4) * rate.output) / 1e6;
 }
 
-/** Ends a run: its reply, what it spent, and the waiters told. */
-export function finish(id: string, status: RunStatus, error?: string) {
+/** Ends a run: its reply, what it spent, and the waiters told. A flow brings its own result, reply and cost. */
+export function finish(id: string, status: RunStatus, error?: string, got?: { result?: Record<string, unknown> | null; reply?: string; costUsd?: number }) {
   const { db, sessions } = d();
   followed.delete(id);
   const r = getRun(db, id);
   if (!r || !isActive(r.status)) return;
   ending.add(id);
   const done = async () => {
-    let reply: string | undefined;
-    let cost: number | undefined;
-    if (r.key) {
+    let reply: string | undefined = got?.reply;
+    let cost: number | undefined = got?.costUsd;
+    if (!got && r.key) {
       const tl = await sessions.timeline(r.key).catch(() => null);
       await tl?.readMore().catch(() => {});
       const items = tl?.parser.items ?? [];
       reply = replyOf(items);
       cost = runCost(r, sessions.summary(r.key), items);
     }
-    // Done with nothing to show is a failure, said plainly.
-    if (status === 'done' && !reply && !getRun(db, id)?.result) {
+    // An agent done with nothing to show is a failure, said plainly (a flow may end with nothing to say).
+    if (status === 'done' && !reply && !getRun(db, id)?.result && !got?.result && r.key) {
       status = 'failed';
       error ??= 'The agent ended without an answer';
     }
-    updateRun(db, id, { status, endedAt: Date.now(), ...(reply ? { reply } : {}), ...(cost !== undefined ? { costUsd: Math.round(cost * 10000) / 10000 } : {}), ...(error ? { error } : {}) });
+    updateRun(db, id, { status, endedAt: Date.now(), ...(got?.result ? { result: got.result } : {}), ...(reply ? { reply } : {}), ...(cost !== undefined ? { costUsd: Math.round(cost * 10000) / 10000 } : {}), ...(error ? { error } : {}) });
     ending.delete(id);
     const next = getRun(db, id)!;
     cache.delete(id);
@@ -588,6 +668,7 @@ export async function stopRun(id: string) {
     for (const h of finishedHooks) h(next);
     return;
   }
+  if (isFlowRun(r)) return flows ? flows.stop(id) : finish(id, 'stopped');
   const t = followed.get(id) ?? { idleSince: 0 };
   t.stopping = true;
   followed.set(id, t);
@@ -625,6 +706,7 @@ export function stepTitle(t: { name: string; category?: string; title: string; l
 
 /** How a run is getting on: the latest steps and what the agent said last. */
 export async function progressOf(r: RunRecord, publicView: boolean): Promise<RunProgress> {
+  if (isFlowRun(r) && flows && r.status !== 'queued') return flows.progress(r, publicView);
   if (!r.key || r.status === 'queued') return { steps: [] };
   const { sessions } = d();
   const tl = await sessions.timeline(r.key).catch(() => null);
@@ -651,8 +733,9 @@ export async function progressOf(r: RunRecord, publicView: boolean): Promise<Run
 export function startRuns(dd: Deps) {
   deps = dd;
   const { db, sessions } = dd;
-  for (const r of listRuns(db, { status: ACTIVE.filter((s) => s !== 'queued'), limit: 2000 })) {
-    if (!r.key) finish(r.id, 'failed', 'The server restarted before the run started');
+  for (const r of listRuns(db, { status: ACTIVE.filter((s) => s !== 'queued'), limit: 2000, steps: true })) {
+    if (isFlowRun(r)) flows?.resume(r);
+    else if (!r.key) finish(r.id, 'failed', 'The server restarted before the run started');
     else followed.set(r.id, { idleSince: 0 });
   }
   sessions.on('live', (key: string, live?: { status?: string } | null) => {

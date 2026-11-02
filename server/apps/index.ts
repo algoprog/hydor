@@ -1,16 +1,19 @@
 // Apps: reusable tasks with a form, run from a gallery, the API, MCP or a public page. People see them
-// as Templates.
+// as Templates. One agent does an app's task, or the app follows steps (flow.ts), keeps data between
+// runs (data.ts) and, when it remembers, a memory of its own; an app travels as one file (package.ts).
 //
 //   /api/apps…                 the gallery, apps and their runs (and follow-ups to them), keys, runs over
-//                              CSV rows (signed in)
+//                              CSV rows, the data apps keep, installing from a file (signed in)
 //   POST /api/apps/:slug/run   a program runs an app with its API key (Authorization: Bearer napp_…),
-//                              waiting up to `wait` seconds: {status, result, reply, session}
+//                              waiting up to `wait` seconds: {status, result, reply, session, steps}
 //   /a-api/:slug…              the public page's form and the visitor's own runs (public.ts)
 //   submit_result              on each app run's own MCP server: the answer fields, checked
+//   app_data                   on an app run's own MCP server: the records the app keeps
 import fs from 'node:fs';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
+import { checkFlow, cleanData, cleanFlow, cleanRequires, allSteps, DATA_LIMITS } from '../../shared/app-manifest.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -20,16 +23,21 @@ import { AGENT_FILE } from '../models/config.ts';
 import { noteUserMessage } from '../updates.ts';
 import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
 import { batchCsv, MAX_ROWS, startBatch, startBatches, stopBatch } from './batch.ts';
+import { addRecord, clearData, collectionsOf, ensureDataTables, findRecords, removeRecords, updateRecords } from './data.ts';
+import { ensureEnv, envLine, envOf, envVars } from './env.ts';
+import { dataChanged, flowRunner, stepsOf } from './flow.ts';
+import { installPackage, packageOf, previewOf, readPackage, zipPackage } from './package.ts';
 import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
-import { finish, followUpsOf, markOf, noteAgentRun, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, waitFor, WORK_DIR } from './runs.ts';
+import { finish, followUpsOf, isFlowRun, markOf, noteAgentRun, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
   dayStart,
   deleteApp,
+  deleteRun,
   deleteRuns,
   ensureTables,
   getApp,
@@ -71,15 +79,31 @@ function customModels(): { id: string; label: string; provider: string }[] {
   }
 }
 
+/**
+ * What is wrong with a recipe as sent (errors: it cannot be saved or run) and what may surprise
+ * (warnings): its task or steps, its flow's values and rules, what it keeps, the templates it calls.
+ */
+function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const recipe = cleanRecipe(src);
+  const errors = [...cleanFlow(src.flow).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors];
+  if (!recipe.prompt.trim() && !recipe.flow) errors.push('Write the prompt: it is what the agent is asked to do');
+  for (const f of recipe.fields) if (f.type === 'choice' && !f.options?.length) errors.push(`${f.label}: give the choices`);
+  const checked = checkFlow(recipe);
+  errors.push(...checked.errors);
+  const warnings = [...checked.warnings];
+  for (const s of recipe.flow ? allSteps(recipe.flow.steps) : []) if (s.do === 'app' && !getApp(db, s.app)) warnings.push(`Step “${s.id}” calls the template “${s.app}”, which is not here`);
+  return { recipe, errors: [...new Set(errors)], warnings };
+}
+
 /** The app's settings from the builder: a recipe, and whether other agents and the public get it. */
-function saveInput(b: any, prev?: AppDef) {
-  const recipe = cleanRecipe(b?.recipe ?? b);
-  if (!recipe.prompt.trim()) throw new HttpError(400, 'Write the prompt: it is what the agent is asked to do');
-  for (const f of recipe.fields) if (f.type === 'choice' && !f.options?.length) throw new HttpError(400, `${f.label}: give the choices`);
+function saveInput(db: Deps['db'], b: any, prev?: AppDef) {
+  const { recipe, errors, warnings } = problemsOf(db, b?.recipe ?? b);
+  if (errors.length) throw new HttpError(400, errors.length === 1 ? errors[0] : `Fix these first: ${errors.join('; ')}`);
   const pub = b?.public && typeof b.public === 'object' ? b.public : undefined;
   if (pub?.on && !(pub.model ?? prev?.public.model)) throw new HttpError(400, 'Pick the model public runs use (one of Custom’s)');
   if (pub?.model && !customModels().some((m) => m.id === pub.model)) throw new HttpError(400, 'That model is not one of Custom’s: add it in Settings → Models');
-  return { recipe, mcp: typeof b?.mcp === 'boolean' ? b.mcp : undefined, public: pub, slug: typeof b?.slug === 'string' ? b.slug : undefined, template: typeof b?.template === 'string' ? b.template : undefined };
+  return { recipe, warnings, mcp: typeof b?.mcp === 'boolean' ? b.mcp : undefined, public: pub, slug: typeof b?.slug === 'string' ? b.slug : undefined, template: typeof b?.template === 'string' ? b.template : undefined };
 }
 
 /** A rough cost for a number of runs: from the app's own runs, else from the model's price. */
@@ -101,7 +125,9 @@ function estimate(db: Deps['db'], appId: string, recipe: AppRecipe, rows: number
 function routes(d: Deps) {
   const { app, db, sessions } = d;
   ensureTables(db);
+  ensureDataTables(db);
   setDeps(d);
+  useFlows(flowRunner);
   const link = (key: string) => `${d.publicBase()}/s/${encodeURIComponent(key)}`;
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
 
@@ -135,32 +161,77 @@ function routes(d: Deps) {
     return draftFromSession(d, key);
   });
 
+  /** Packages a saved template needs start installing at once, so its first run need not wait. */
+  const prepare = (a: AppDef) => {
+    void ensureEnv(a, a.slug).catch(() => {});
+    return a;
+  };
+
   app.post('/api/apps', async (req) => {
-    const b = saveInput(req.body);
-    return { app: saveApp(db, b) };
+    const { warnings, ...b } = saveInput(db, req.body);
+    return { app: prepare(saveApp(db, b)), warnings };
   });
+
+  /** A recipe checked without saving it: what must change, and what may surprise. */
+  app.post('/api/apps/check', async (req) => {
+    const b = (req.body ?? {}) as { recipe?: unknown };
+    const { errors, warnings } = problemsOf(db, b.recipe ?? b);
+    return { errors, warnings };
+  });
+
+  // ---- a template from a file ----
+
+  app.post('/api/apps/install/check', { bodyLimit: 30 * 1024 * 1024 }, async (req) => ({ preview: previewOf(db, readPackage((req.body ?? {}) as Record<string, any>)).preview }));
+
+  app.post('/api/apps/install', { bodyLimit: 30 * 1024 * 1024 }, async (req) => installPackage(db, readPackage((req.body ?? {}) as Record<string, any>)));
 
   app.get('/api/apps/:id', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
     if (template) return { template };
     const today = dayStart();
-    return { app: a, keys: listKeys(db, a!.id), usage: usageSince(db, a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR };
+    return { app: a, keys: listKeys(db, a!.id), usage: usageSince(db, a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug) };
   });
 
   app.put('/api/apps/:id', async (req) => {
     const prev = getApp(db, P(req).id);
     if (!prev) throw new HttpError(404, 'No such template');
-    const b = saveInput(req.body, prev);
-    return { app: saveApp(db, { ...b, id: prev.id }) };
+    const { warnings, ...b } = saveInput(db, req.body, prev);
+    return { app: prepare(saveApp(db, { ...b, id: prev.id })), warnings };
+  });
+
+  /** What a template needs on this computer: how its packages stand, and the commands that are missing. */
+  app.get('/api/apps/:id/env', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such template');
+    return { env: envOf(a, a.slug), requires: a.requires ?? null };
+  });
+
+  /** Installs a template's packages again (after a failure, or to start afresh). */
+  app.post('/api/apps/:id/env', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such template');
+    void ensureEnv(a, a.slug, { force: true }).catch(() => {});
+    return { env: envOf(a, a.slug) };
   });
 
   app.delete('/api/apps/:id', async (req) => {
     const a = getApp(db, P(req).id);
     if (!a) throw new HttpError(404, 'No such template');
-    for (const r of listRuns(db, { app: a.id, status: ['queued', 'starting', 'running', 'waiting'] })) await stopRun(r.id);
+    for (const r of listRuns(db, { app: a.id, status: ['queued', 'starting', 'running', 'waiting'], steps: true })) await stopRun(r.id);
     deleteApp(db, a.id);
     deleteRuns(db, a.id);
+    clearData(db, a.id);
     return { ok: true };
+  });
+
+  /** A template as one file: .naget-app (a zip, with the records it keeps when data=1) or .json. */
+  app.get('/api/apps/:id/export', async (req, reply) => {
+    const { app: a, template } = recipeOf(db, P(req).id);
+    const q = req.query as Record<string, string>;
+    const pkg = packageOf(db, a ?? template!, q.data === '1' || q.data === 'true');
+    const name = (a?.slug ?? template!.id).replace(/[^\w-]/g, '');
+    if (q.as === 'json') return reply.header('Content-Type', 'application/json; charset=utf-8').header('Content-Disposition', `attachment; filename="${name}.json"`).send(`${JSON.stringify(pkg, null, 2)}\n`);
+    return reply.header('Content-Type', 'application/zip').header('Content-Disposition', `attachment; filename="${name}.naget-app"`).send(zipPackage(pkg));
   });
 
   // ---- runs ----
@@ -174,7 +245,11 @@ function routes(d: Deps) {
     // A test from the builder runs the recipe as it is on screen; a template takes the agent picked on its page.
     if (b.recipe && typeof b.recipe === 'object') recipe = cleanRecipe(b.recipe);
     else if (template && typeof b.agent === 'string') recipe = cleanRecipe({ ...template, agent: b.agent, acpAgent: b.acpAgent, model: b.model, mode: b.mode, effort: b.effort });
-    if (!recipe.prompt.trim()) throw new HttpError(400, 'The prompt is empty');
+    if (b.recipe && typeof b.recipe === 'object') {
+      const { errors } = problemsOf(db, b.recipe);
+      if (errors.length) throw new HttpError(400, errors.length === 1 ? errors[0] : `Fix these first: ${errors.join('; ')}`);
+    }
+    if (!recipe.prompt.trim() && !recipe.flow) throw new HttpError(400, 'The prompt is empty');
     if (a) checkDaily(db, a);
     const r = startRun({
       app: a?.id ?? (template ? `tpl:${template.id}` : 'test'),
@@ -197,6 +272,7 @@ function routes(d: Deps) {
   /** Why a run takes no follow-ups, or nothing when it does. */
   const noAsks = (r: RunRecord): string | undefined => {
     if (r.source === 'public') return 'Runs from the public page take no follow-ups.';
+    if (isFlowRun(r)) return 'A run with steps takes no follow-ups: change the answers and run it again, or open a step’s session to go on there.';
     const s = r.key ? sessions.summary(r.key) : null;
     if (!s) return r.key ? 'Its session is gone.' : undefined;
     if (s.external && (!s.live || s.live.status === 'exited')) return `Its session is open in ${s.external.client}: continue it there.`;
@@ -215,6 +291,7 @@ function routes(d: Deps) {
       recipe: { name, icon, color, fields, answer, agent, acpAgent, model },
       slug: a?.slug ?? null,
       ...(r.source === 'public' ? { asks: [] } : await followUpsOf(r)),
+      ...(isFlowRun(r) ? { steps: stepsOf(r.id, { values: true }) } : {}),
       // Follow-ups typed while the agent works wait their turn in the session's queue.
       queued: (s?.queue ?? []).map((m) => ({ id: m.id, text: m.text.slice(0, 4000), at: m.at })),
       noAsks: noAsks(r),
@@ -247,7 +324,7 @@ function routes(d: Deps) {
     const r = getRun(db, P(req).runId);
     if (!r) return { ok: true };
     if (isActive(r.status)) throw new HttpError(409, 'Stop the run first');
-    db.prepare('delete from app_runs where id = ?').run(r.id);
+    deleteRun(db, r.id);
     return { ok: true };
   });
 
@@ -263,6 +340,58 @@ function routes(d: Deps) {
   app.delete('/api/apps/:id/keys/:keyId', async (req) => {
     if (!revokeKey(db, own(req).id, P(req).keyId)) throw new HttpError(404, 'No such key');
     return { ok: true };
+  });
+
+  // ---- what an app keeps ----
+
+  const kept = (req: FastifyRequest) => {
+    const a = own(req);
+    if (!a.data?.[P(req).collection] && P(req).collection) throw new HttpError(404, `The template keeps no collection “${P(req).collection}”`);
+    return a;
+  };
+  app.get('/api/apps/:id/data', async (req) => {
+    const a = own(req);
+    return { collections: collectionsOf(db, a.id, a.data), limits: DATA_LIMITS };
+  });
+  app.get('/api/apps/:id/data/:collection', async (req) => {
+    const a = kept(req);
+    const q = req.query as Record<string, string>;
+    let where: Record<string, unknown> | undefined;
+    if (q.where) {
+      try {
+        where = JSON.parse(q.where);
+      } catch {
+        throw new HttpError(400, 'where should be JSON, like {"read": false}');
+      }
+    }
+    return findRecords(db, a.id, a.data, P(req).collection, { where, search: q.q || undefined, sort: q.sort || undefined, limit: Number(q.limit) || 100 });
+  });
+  app.post('/api/apps/:id/data/:collection', async (req) => {
+    const a = kept(req);
+    const b = (req.body ?? {}) as { record?: Record<string, unknown> };
+    const record = addRecord(db, a.id, a.data, P(req).collection, b.record && typeof b.record === 'object' ? b.record : {});
+    dataChanged(a.id, P(req).collection);
+    return { record };
+  });
+  app.patch('/api/apps/:id/data/:collection/:recordId', async (req) => {
+    const a = kept(req);
+    const b = (req.body ?? {}) as { set?: Record<string, unknown> };
+    const [record] = updateRecords(db, a.id, a.data, P(req).collection, { id: P(req).recordId }, b.set && typeof b.set === 'object' ? b.set : {});
+    if (!record) throw new HttpError(404, 'No such record');
+    dataChanged(a.id, P(req).collection);
+    return { record };
+  });
+  app.delete('/api/apps/:id/data/:collection/:recordId', async (req) => {
+    const a = kept(req);
+    const n = removeRecords(db, a.id, a.data, P(req).collection, { id: P(req).recordId });
+    if (n) dataChanged(a.id, P(req).collection);
+    return { ok: true, removed: n };
+  });
+  app.delete('/api/apps/:id/data/:collection', async (req) => {
+    const a = kept(req);
+    const n = clearData(db, a.id, P(req).collection);
+    if (n) dataChanged(a.id, P(req).collection);
+    return { ok: true, removed: n };
   });
 
   // ---- runs over CSV rows ----
@@ -331,7 +460,8 @@ function routes(d: Deps) {
     checkDaily(db, a);
     const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'api', inputs: inputs && typeof inputs === 'object' ? inputs : rest, files: files && typeof files === 'object' ? files : undefined });
     const done = await waitFor(r.id, waitSeconds(wait, 0, 900) * 1000);
-    return apiAnswer(done ?? r, link);
+    const now = done ?? r;
+    return apiAnswer(now, link, isFlowRun(now) ? stepsOf(now.id) : undefined);
   });
 
   app.get('/api/apps/:slug/run/:runId', async (req) => {
@@ -339,13 +469,14 @@ function routes(d: Deps) {
     const r = getRun(db, P(req).runId);
     if (!r || r.app !== a.id) throw new HttpError(404, 'No such run of this template');
     const done = await waitFor(r.id, waitSeconds((req.query as Record<string, string>).wait, 0, 900) * 1000);
-    return apiAnswer(done ?? r, link);
+    const now = done ?? r;
+    return apiAnswer(now, link, isFlowRun(now) ? stepsOf(now.id) : undefined);
   });
 
   publicRoutes(d);
   // A session ended or gone takes its runs with it.
   sessions.on('sessions', (_up: unknown, removed: string[]) => {
-    for (const key of removed ?? []) for (const r of listRuns(db, { status: ['starting', 'running', 'waiting'], limit: 500 })) if (r.key === key) finish(r.id, 'failed', 'The session was removed');
+    for (const key of removed ?? []) for (const r of listRuns(db, { status: ['starting', 'running', 'waiting'], limit: 500, steps: true })) if (r.key === key) finish(r.id, 'failed', 'The session was removed');
   });
 }
 
@@ -375,23 +506,90 @@ function submitTool(ctx: RunCtx): RunTool | null {
   };
 }
 
+// ---- the data an app keeps, on its runs' own MCP server ----
+
+/** The app a run belongs to, as it is now: a run of a step goes by its parent's. */
+function appOfRun(db: Deps['db'], r: RunRecord): { data?: AppRecipe['data']; memory?: boolean; requires?: AppRecipe['requires']; slug?: string } {
+  const top = r.parent && r.source === 'step' ? (getRun(db, r.parent) ?? r) : r;
+  const now = top.app.startsWith('tpl:') ? null : getApp(db, top.app);
+  return { data: now?.data ?? top.recipe.data, memory: now?.memory ?? top.recipe.memory, requires: now?.requires ?? top.recipe.requires, slug: now?.slug };
+}
+
+function dataTool(ctx: RunCtx): RunTool | null {
+  const hit = runOfCtx(ctx);
+  if (!hit || hit.mark.public || hit.run.source === 'public') return null;
+  const { db } = ctx.deps;
+  const data = appOfRun(db, hit.run).data;
+  const names = Object.keys(data ?? {});
+  if (!names.length) return null;
+  const said = names.map((n) => `${n}${data![n].fields?.length ? ` (${data![n].fields!.map((f) => `${f.id}: ${f.type}`).join(', ')})` : ' (any fields)'}${data![n].description ? ` — ${data![n].description}` : ''}`).join('; ');
+  return {
+    name: 'app_data',
+    description: `The records the template "${hit.run.appName}" keeps between its runs. op "find" lists records (where, search, sort, limit), "get" one by its id, "add" one (record), "update" one by id or those that match where (set: the fields to change; null clears one), "remove" one by id or those that match where. Collections: ${said}.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        op: { type: 'string', enum: ['find', 'get', 'add', 'update', 'remove'] },
+        collection: { type: 'string', enum: names },
+        id: { type: 'string', description: 'One record, by its id (get, update, remove).' },
+        record: { type: 'object', description: 'add: the new record’s fields.' },
+        set: { type: 'object', description: 'update: the fields to change.' },
+        where: { type: 'object', description: 'find, update, remove: fields to match, each a value or {"<": 10} (=, !=, <, >, <=, >=, contains, in, empty); {} for every record.' },
+        search: { type: 'string', description: 'find: words to look for anywhere in a record.' },
+        sort: { type: 'string', description: 'find: the field to sort by, "-field" for highest or latest first.' },
+        limit: { type: 'number', description: 'find: at most this many (100 unless set).' },
+      },
+      required: ['op', 'collection'],
+    },
+    async run(a, c) {
+      const now = runOfCtx(c);
+      if (!now) return { text: 'This session was not started from a template, so it keeps no data.', isError: true };
+      const appId = now.run.parent ? (getRun(db, now.run.parent)?.app ?? now.run.app) : now.run.app;
+      const kept = appOfRun(db, now.run).data;
+      const coll = String(a.collection ?? '');
+      const q = { id: typeof a.id === 'string' && a.id ? a.id : undefined, where: a.where && typeof a.where === 'object' ? a.where : undefined, search: typeof a.search === 'string' ? a.search : undefined, sort: typeof a.sort === 'string' ? a.sort : undefined, limit: Number(a.limit) || undefined };
+      try {
+        let out: unknown;
+        if (a.op === 'find' || a.op === 'get') {
+          const found = findRecords(db, appId, kept, coll, q);
+          out = a.op === 'get' ? (found.records[0] ?? null) : found;
+        } else if (a.op === 'add') {
+          out = { record: addRecord(db, appId, kept, coll, a.record && typeof a.record === 'object' ? a.record : {}) };
+          dataChanged(appId, coll);
+        } else if (a.op === 'update') {
+          const records = updateRecords(db, appId, kept, coll, q, a.set && typeof a.set === 'object' ? a.set : {});
+          if (records.length) dataChanged(appId, coll);
+          out = { changed: records.length, records };
+        } else if (a.op === 'remove') {
+          const removed = removeRecords(db, appId, kept, coll, q);
+          if (removed) dataChanged(appId, coll);
+          out = { removed };
+        } else return { text: 'op is find, get, add, update or remove', isError: true };
+        const text = JSON.stringify(out);
+        return text.length > 60_000 ? `${text.slice(0, 60_000)}… (cut: ask for fewer with limit, or search)` : text;
+      } catch (e) {
+        return { text: (e as Error).message, isError: true };
+      }
+    },
+  };
+}
+
 export const apps: Feature = {
   id: 'apps',
   routes,
   tools(ctx) {
-    const t = submitTool(ctx);
-    return t ? [t] : [];
+    return [submitTool(ctx), dataTool(ctx)].filter((t): t is RunTool => !!t);
   },
   /** An app's run gets the tools its app allows; a public run only the answer and, if allowed, the web. */
   allowTool(name, ctx) {
     const hit = runOfCtx(ctx);
     if (!hit) return true;
-    if (name === 'submit_result') return true;
+    if (name === 'submit_result' || name === 'app_data') return true;
     if (hit.mark.public || hit.run.source === 'public') return !!hit.mark.web && PUBLIC_WEB_TOOLS.includes(name);
     const allowed = hit.run.recipe.tools;
     return allowed === null || allowed.includes(name);
   },
-  spawn(s) {
+  spawn(s, d) {
     const mark = markOf(s.extra);
     if (!mark) return;
     noteAgentRun(s.runId, mark);
@@ -399,7 +597,11 @@ export const apps: Feature = {
     if (!hit) return;
     // A public run is Custom with no shell, no files and none of the user's servers; what it needs to know comes with its message.
     if (mark.public) return { env: { [PUBLIC_RUN_ENV]: mark.web ? 'web' : '1' } };
-    return { instructions: [runInstructions(hit.run)] };
+    const own = appOfRun(d.db, hit.run);
+    // Its template's packages, within reach: their commands first on PATH.
+    const env = own.slug ? envVars(own, own.slug) : undefined;
+    const line = own.slug ? envLine(own, own.slug) : null;
+    return { instructions: [[runInstructions({ ...hit.run, ...own }), line].filter(Boolean).join('\n')], ...(env ? { env } : {}) };
   },
   start(d) {
     startRuns(d);

@@ -2,7 +2,7 @@
 // how to reach it from outside (API keys, other agents, the public page). A template runs as it is,
 // with the agent and model picked here, or becomes an app of your own.
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChevronRight, Copy, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
 import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
 import { inputsLine } from '@shared/apps';
@@ -20,6 +20,7 @@ import { AppIcon } from './AppIcon';
 import { BatchTab } from './Batch';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { statusBadge } from './Gallery';
+import { DownloadDialog, EnvLine } from './Install';
 import { ShareTab } from './Share';
 
 type Tab = 'run' | 'runs' | 'rows' | 'share';
@@ -181,12 +182,19 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
   const [d, setD] = useState<AppDetail | null>(null);
   const [err, setErr] = useState('');
   const [menu, setMenu] = useState(false);
+  const [saving, setSaving] = useState(false);
   const more = useRef<HTMLButtonElement>(null);
   const [ask, confirmNode] = useConfirm();
   const load = () => api<AppDetail>(`/api/apps/${enc(id)}`).then(setD, (e) => setErr((e as Error).message));
   useEffect(() => {
     load();
   }, [id]);
+  // While its packages install, the line about them follows along.
+  useEffect(() => {
+    if (d?.env?.state !== 'installing') return;
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [d?.env?.state]);
   const template = id.startsWith('tpl:');
   const recipe = d?.app ?? d?.template;
   const setTab = (t: Tab) => go(`${appPath(id)}${t === 'run' ? '' : `?tab=${t}`}`, true);
@@ -239,11 +247,20 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                   Duplicate
                 </MenuItem>
                 <MenuItem
+                  icon={<Download size={15} />}
+                  onClick={() => {
+                    setMenu(false);
+                    setSaving(true);
+                  }}
+                >
+                  Download as a file
+                </MenuItem>
+                <MenuItem
                   icon={<Trash2 size={15} />}
                   danger
                   onClick={async () => {
                     setMenu(false);
-                    if (!(await ask({ title: `Delete ${recipe.name}?`, body: 'Its runs, keys and public page go with it. The sessions it started stay.', confirm: 'Delete', danger: true }))) return;
+                    if (!(await ask({ title: `Delete ${recipe.name}?`, body: 'Its runs, keys, public page and the data it keeps go with it. The sessions it started stay.', confirm: 'Delete', danger: true }))) return;
                     try {
                       await del(`/api/apps/${enc(id)}`);
                       go('/apps');
@@ -255,6 +272,7 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                   Delete
                 </MenuItem>
               </Popover>
+              {d?.app && <DownloadDialog app={d.app} open={saving} onClose={() => setSaving(false)} />}
             </>
           ))
         }
@@ -279,6 +297,11 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
           </div>
         ) : (
           <>
+            {d?.app && d.env && tab === 'run' && (d.env.state !== 'none' && d.env.state !== 'ready' ? true : d.env.missing.length > 0) && (
+              <div className="mx-auto max-w-[760px] px-5 pt-5 sm:px-7">
+                <EnvLine appId={d.app.id} env={d.env} onChange={load} />
+              </div>
+            )}
             {recipe.description && (tab === 'run' || template) && <p className={cx('mx-auto max-w-[760px] px-5 pt-5 text-[13.5px] leading-relaxed text-fg-2 sm:px-7')}>{recipe.description}</p>}
             {(tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} />}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} />}

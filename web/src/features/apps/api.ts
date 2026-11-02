@@ -1,6 +1,7 @@
 // Apps in the pages: what the server sends, where each page lives, and live news of runs.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppBatch, AppDef, AppRecipe, AppRun, AppTemplate, RunAsk, RunProgress } from '@shared/apps';
+import type { AppBatch, AppDef, AppRecipe, AppRun, AppTemplate, RunAsk, RunProgress, RunStepView } from '@shared/apps';
+import type { EnvView } from '@shared/app-manifest';
 import { isActive } from '@shared/apps';
 import { api, enc } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
@@ -31,6 +32,8 @@ export interface AppDetail {
   usage?: Usage;
   publicUsage?: Usage;
   workDir?: string;
+  /** How what it needs stands on this computer (its packages, commands). */
+  env?: EnvView;
 }
 
 export type RunRecipe = Pick<AppRecipe, 'name' | 'icon' | 'color' | 'fields' | 'answer' | 'agent' | 'acpAgent' | 'model'>;
@@ -49,6 +52,8 @@ export interface RunDetail {
   queued: { id: string; text: string; at: number }[];
   /** Why it takes no follow-ups (a public page's run, its session gone or open elsewhere). */
   noAsks?: string;
+  /** A run with steps: each step and how it went. */
+  steps?: RunStepView[];
 }
 
 export interface BatchDetail {
@@ -129,4 +134,4 @@ export function useRunDetail(id: string) {
 
 export const money = (n?: number | null) => (n == null ? '' : n === 0 ? '$0' : n < 0.01 ? '<$0.01' : `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`);
 
-export const SOURCE_LABEL: Record<AppRun['source'], string> = { web: 'From the form', test: 'Test run', api: 'From the API', mcp: 'From another agent', public: 'Public page', batch: 'Row' };
+export const SOURCE_LABEL: Record<AppRun['source'], string> = { web: 'From the form', test: 'Test run', api: 'From the API', mcp: 'From another agent', public: 'Public page', batch: 'Row', step: 'A step of another run', app: 'From another template' };

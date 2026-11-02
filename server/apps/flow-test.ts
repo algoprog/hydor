@@ -1,0 +1,676 @@
+// Script tests for templates with steps (flow.ts and shared/app-manifest.ts), the data templates keep
+// (data.ts), a template's own memory, and templates as files (package.ts): the format tidied and checked
+// in words, values in text, rules, and flows run end to end through the routes, with stand-ins for the
+// session manager (agent steps), a model server (model steps) and the tools.
+// Build and run with scratch folders:
+//   OUTDIR=dist/dev node scripts/build-server.mjs server/apps/flow-test.ts
+//   DATA_DIR=/tmp/naget-test-flow NAGET_APPS_DIR=/tmp/naget-test-flow-apps node dist/dev/flow-test.js
+import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import fs from 'node:fs';
+import { createServer } from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import Fastify from 'fastify';
+import cookie from '@fastify/cookie';
+import { cleanRecipe, isActive } from '../../shared/apps.ts';
+import { checkFlow, cleanData, cleanFlow, cleanRequires, evalRule, fillRefs, flowOf, readRule, valueOf, type Scope } from '../../shared/app-manifest.ts';
+import { HttpError } from '../auth.ts';
+import { openDb } from '../db.ts';
+import { registerFeatures } from '../features/registry.ts';
+import type { Deps, Feature, RunCtx } from '../features/types.ts';
+import { setHelperModel } from '../helper.ts';
+import { repoRoot } from '../memory/store.ts';
+import { AGENT_FILE } from '../models/config.ts';
+import { findRecords } from './data.ts';
+import { envDir, envOf, envTesting } from './env.ts';
+import { flowRunner } from './flow.ts';
+import { apps } from './index.ts';
+import { packageOf, zipPackage } from './package.ts';
+import { MEMORY_MARK, runFolder, saveResult, startRun, startRuns, stopRun, waitFor, WORK_DIR } from './runs.ts';
+import * as store from './store.ts';
+
+if (!process.env.DATA_DIR?.startsWith('/tmp/') || !process.env.NAGET_APPS_DIR?.startsWith('/tmp/')) {
+  console.error('Run with DATA_DIR=/tmp/… and NAGET_APPS_DIR=/tmp/… so nothing touches real data.');
+  process.exit(2);
+}
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-flow-test-'));
+const db = openDb(path.join(tmp, 'test.db'));
+store.ensureTables(db);
+let passed = 0;
+const tests: [string, () => void | Promise<void>][] = [];
+const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ---- stand-ins -------------------------------------------------------------------------------------------
+
+/** The session manager: sessions start at once and work until a test ends their turn. */
+class FakeSessions extends EventEmitter {
+  made: { key: string; o: any }[] = [];
+  status = new Map<string, string>();
+  replies = new Map<string, string[]>();
+  archived = new Set<string>();
+  interrupted: string[] = [];
+  async create(o: any) {
+    const key = `acp:fake-${this.made.length + 1}-${Math.random().toString(36).slice(2, 8)}`;
+    this.made.push({ key, o });
+    this.status.set(key, 'working');
+    return key;
+  }
+  setFlags(key: string, f: { archived?: boolean }) {
+    if (f.archived) this.archived.add(key);
+  }
+  summary(key: string) {
+    const st = this.status.get(key);
+    return st ? ({ key, agent: 'acp', stats: { tokensIn: 0, tokensOut: 0, tokensCached: 0 }, live: { status: st } } as any) : null;
+  }
+  async timeline(key: string) {
+    const said = this.replies.get(key) ?? [];
+    return { parser: { items: said.map((text, i) => ({ kind: 'assistant', id: `a${i}`, seq: i, text })) }, readMore: async () => {} } as any;
+  }
+  liveSnapshot() {
+    return { live: null, overlay: { items: [], patches: {}, approvals: [] } };
+  }
+  async interrupt(key: string) {
+    this.interrupted.push(key);
+    this.status.set(key, 'idle');
+    this.emit('live', key);
+  }
+  async deliverOrQueue(key: string) {
+    this.status.set(key, 'working');
+  }
+  end(key: string, reply = 'All done.') {
+    this.replies.set(key, [...(this.replies.get(key) ?? []), reply]);
+    this.status.set(key, 'idle');
+    this.emit('live', key);
+  }
+}
+
+/** A model server as Custom's models speak to theirs (chat completions, streamed): answers from `model.answer`, keeps each call. */
+const model = { calls: [] as { system: string; user: string }[], answer: (_system: string, _user: string): string => '{}' };
+const srv = createServer((req, res) => {
+  let body = '';
+  req.on('data', (c) => (body += c));
+  req.on('end', () => {
+    const b = JSON.parse(body || '{}');
+    const system = String(b.messages?.find((m: any) => m.role === 'system')?.content ?? '');
+    const user = String(b.messages?.find((m: any) => m.role === 'user')?.content ?? '');
+    model.calls.push({ system, user });
+    res.writeHead(200, { 'content-type': 'text/event-stream' });
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: model.answer(system, user) }, finish_reason: 'stop' }] })}\n\n`);
+    res.write(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 120, completion_tokens: 30, cost: 0.001 } })}\n\n`);
+    res.end('data: [DONE]\n\n');
+  });
+});
+await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+fs.mkdirSync(path.dirname(AGENT_FILE), { recursive: true });
+fs.writeFileSync(AGENT_FILE, JSON.stringify({ models: [{ id: 'fake', label: 'Fake', provider: 'endpoint', baseUrl: `http://127.0.0.1:${(srv.address() as { port: number }).port}/v1`, model: 'fake-1', tools: 'native' }] }));
+
+/** Two of the app's own tools: a search that answers JSON, and a page reader that cannot read "broken" pages. */
+const toolCalls: { tool: string; args: any }[] = [];
+const fakeTools: Feature = {
+  id: 'fake-tools',
+  tools: () => [
+    {
+      name: 'web_search',
+      description: 'Searches the web.',
+      inputSchema: { type: 'object' },
+      async run(a) {
+        toolCalls.push({ tool: 'web_search', args: a });
+        return JSON.stringify({ results: [{ title: `About ${a.query}`, url: 'https://example.com/1' }] });
+      },
+    },
+    {
+      name: 'read_page',
+      description: 'Reads a page.',
+      inputSchema: { type: 'object' },
+      async run(a) {
+        toolCalls.push({ tool: 'read_page', args: a });
+        if (String(a.url).includes('broken')) return { text: 'That page could not be read', isError: true };
+        return `The page at ${a.url} says hello.`;
+      },
+    },
+  ],
+};
+
+const sessions = new FakeSessions();
+const http = Fastify();
+await http.register(cookie);
+http.setErrorHandler((err: Error, _req, reply) => {
+  reply.code(err instanceof HttpError ? err.status : 500).send({ error: err.message });
+});
+const deps = { app: http, db, sessions: sessions as any, scheduler: null as any, models: null as any, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'http://test.local' } as Deps;
+apps.routes!(deps);
+registerFeatures([fakeTools], deps);
+startRuns(deps);
+await http.ready();
+setHelperModel(db, 'fake');
+
+const app = (p: Record<string, unknown>) =>
+  store.saveApp(db, {
+    recipe: cleanRecipe({ name: 'Flow', agent: 'claude', fields: [{ id: 'topic', label: 'Topic', type: 'text', required: true }, { id: 'names', label: 'Names', type: 'long' }], answer: [], tools: null, limits: {}, ...p }),
+  });
+
+/** Waits for a run to end. */
+async function ended(id: string, ms = 30_000) {
+  const r = await waitFor(id, ms);
+  assert.ok(r && !isActive(r.status), `run ${id} ended (it is ${r?.status})`);
+  return r!;
+}
+
+/** An agent step's run, once its session is there; it hands in `result` and ends its turn. */
+async function agentAnswers(parent: string, step: string, result: Record<string, unknown> | null, reply = 'Done.') {
+  let child: store.RunRecord | undefined;
+  for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent }).find((r) => r.step === step && r.key)); i++) await sleep(25);
+  assert.ok(child, `the step ${step} started its run`);
+  if (result) saveResult(child.id, result);
+  sessions.end(child.key!, reply);
+  return child;
+}
+
+const stepsOf = (id: string) => store.listSteps(db, id).map((s) => `${s.path}:${s.status}`);
+
+// ---- the format -----------------------------------------------------------------------------------------
+
+test('format: steps tidied from what an agent writes (ids from titles, kinds in short), mistakes said in words', () => {
+  const { flow, errors } = cleanFlow({
+    steps: [
+      { do: 'model', title: 'Sum it up', instructions: 'Sum up {{topic}}', outputs: { title: 'text', tags: 'list(text)', rows: 'table(name: text, price: number)', notes: 'long' } },
+      { do: 'data', add: 'items', with: { title: '{{sum_it_up.title}}' } },
+      { do: 'nonsense' },
+      { id: 'sum_it_up', do: 'agent' },
+      { id: 'x', do: 'model', instructions: 'y', outputs: { a: 'colour' } },
+    ],
+  });
+  const [sum, add] = flow!.steps as any[];
+  assert.equal(sum.id, 'sum_it_up');
+  assert.deepEqual(
+    sum.outputs.map((f: any) => [f.id, f.type, f.columns?.map((c: any) => `${c.id}:${c.type}`).join(',')]),
+    [
+      ['title', 'text', undefined],
+      ['tags', 'list', undefined],
+      ['rows', 'table', 'name:text,price:number'],
+      ['notes', 'markdown', undefined],
+    ],
+  );
+  assert.deepEqual([add.do, add.op, add.collection], ['data', 'add', 'items']);
+  assert.ok(errors.some((e) => /“nonsense” is not a kind of step/.test(e)), errors.join('\n'));
+  assert.ok(errors.some((e) => /Two steps are called “sum_it_up”/.test(e)));
+  assert.ok(errors.some((e) => /write what the agent is asked to do/.test(e)));
+  assert.ok(errors.some((e) => /“colour” is not a kind of value/.test(e)));
+});
+
+test('format: a recipe without steps is one agent step; flows, data and memory survive tidying', () => {
+  const r = cleanRecipe({ name: 'X', prompt: 'Do {{topic}}', answer: [{ id: 'a', label: 'A', type: 'text' }], data: { items: { title: 'text', done: 'yesno' }, notes: {} }, memory: true, flow: [{ id: 'one', do: 'model', instructions: 'Hi' }] });
+  assert.equal(r.flow!.steps[0].id, 'one');
+  assert.deepEqual(Object.keys(r.data!), ['items', 'notes']);
+  assert.deepEqual(r.data!.items.fields!.map((f) => f.type), ['text', 'yesno']);
+  assert.equal(r.memory, true);
+  const plain = cleanRecipe({ name: 'Y', prompt: 'Do it', answer: [{ id: 'a', label: 'A', type: 'text' }] });
+  assert.equal(plain.flow, undefined);
+  const one = flowOf(plain).steps[0] as any;
+  assert.deepEqual([one.do, one.instructions, one.outputs[0].id], ['agent', 'Do it', 'a']);
+  assert.ok(cleanData({ items: { id: 'text' } }).errors.some((e) => /a record's own/.test(e)));
+});
+
+test('checks: values from later steps, from inside a Repeat, from another branch; rules, tools and what it keeps', () => {
+  const r = cleanRecipe({
+    name: 'x',
+    prompt: '',
+    fields: [{ id: 'topic', label: 'Topic' }],
+    answer: [{ id: 'summary', label: 'Summary', type: 'markdown', required: true }],
+    data: { items: { title: 'text', done: 'yesno' } },
+    flow: {
+      steps: [
+        { id: 'a', do: 'model', instructions: '{{b.text}} {{inputs.nope}} {{loopstep.text}}' },
+        { id: 'b', do: 'tool', tool: 'web_search', with: { query: '{{topic}}' } },
+        { id: 'c', do: 'tool', tool: 'bash' },
+        { id: 'd', do: 'decide', rule: '{{b.text}} ~~ x', then: [{ id: 'e', do: 'model', instructions: 'x' }] },
+        { id: 'f', do: 'model', instructions: '{{e.text}} {{a.titel}}', outputs: { summary: 'long' } },
+        { id: 'loop', do: 'repeat', over: '{{b.data.results}}', until: '{{index}} > 3', steps: [{ id: 'loopstep', do: 'model', instructions: '{{item.title}} #{{index}}' }] },
+        { id: 'par', do: 'parallel', branches: [[{ id: 'p1', do: 'model', instructions: '{{p2.text}}' }], [{ id: 'p2', do: 'model', instructions: 'x' }]] },
+        { id: 'g', do: 'data', op: 'add', collection: 'things', with: { title: 'x' } },
+        { id: 'h', do: 'data', op: 'add', collection: 'items', with: { titel: 'x' } },
+      ],
+    },
+  });
+  const { errors, warnings } = checkFlow(r);
+  const has = (re: RegExp) => assert.ok(errors.some((e) => re.test(e)), `${re}\n${errors.join('\n')}`);
+  has(/Step “a” uses \{\{b\.text\}\}, but “b” comes later/);
+  has(/no question “nope”/);
+  has(/“loopstep” runs once for each round of “loop”/);
+  has(/bash cannot run as a step on its own/);
+  has(/could not be read/);
+  has(/\{\{a\.titel\}\}: “a” gives text/);
+  has(/“p2” runs at the same time, in another branch/);
+  has(/keeps no collection “things”/);
+  has(/no field “titel”/);
+  assert.ok(warnings.some((w) => /\{\{e\.text\}\}, which is empty when the decision “d” goes the other way/.test(w)), warnings.join('\n'));
+  assert.ok(!errors.some((e) => /index/.test(e)) && !warnings.some((w) => /\{\{index\}\}/.test(w)), 'a round knows its index');
+});
+
+test('values: text, tables and lists; one value alone keeps its kind; sections; rules in words', () => {
+  const s: Scope = { inputs: { topic: 'vLLM', days: '4' }, steps: { find: { results: [{ title: 'A', price: 3 }, { title: 'B|x', price: 5 }], tags: ['a', 'b'] }, gone: null }, vars: { item: { name: 'Z' }, index: 2 } };
+  assert.equal(fillRefs('About {{topic}} ({{inputs.days}} days), {{find.results[1].title}}, last {{find.results[-1].price}}, item {{item.name}} #{{index}}', s), 'About vLLM (4 days), B|x, last 5, item Z #2');
+  assert.equal(fillRefs('{{find.results}}', s), '| title | price |\n| --- | --- |\n| A | 3 |\n| B\\|x | 5 |');
+  assert.equal(fillRefs('{{find.tags}}', s), '- a\n- b');
+  assert.equal(fillRefs('{{#gone.text}}yes{{/gone.text}}{{^gone.text}}none{{/gone.text}} {{nobody.x}}', s), 'none {{nobody.x}}');
+  assert.deepEqual(valueOf({ q: '{{find.tags}}', t: 'on {{topic}}', n: 3 }, s), { q: ['a', 'b'], t: 'on vLLM', n: 3 });
+  assert.equal(evalRule('{{inputs.days}} > 3 and {{topic}} = vllm', s), true);
+  assert.equal(evalRule('{{find.tags}} contains b or {{topic}} is empty', s), true);
+  assert.equal(evalRule('{{gone.text}} is not empty', s), false);
+  assert.equal(evalRule('"2026-11-03" < "2026-12-01"', s), true);
+  assert.equal(evalRule('{{find.tags}}', s), true);
+  assert.equal(evalRule('{{topic}} = "vllm" and {{inputs.days}} != 4', s), false);
+  assert.ok('error' in readRule('{{a}} >'));
+  assert.throws(() => evalRule('', s), /could not be read/);
+});
+
+// ---- running ------------------------------------------------------------------------------------------------
+
+test('a flow from the API: a model step, then an agent step that uses its values; each step shown, the answer by name', async () => {
+  model.answer = (system) => (system.includes('angle') ? JSON.stringify({ angle: 'Throughput on one GPU', questions: ['How fast?', 'How cheap?'] }) : '{}');
+  const a = app({
+    name: 'Brief',
+    answer: [
+      { id: 'brief', label: 'Brief', type: 'markdown', required: true },
+      { id: 'angle', label: 'Angle', type: 'text' },
+    ],
+    flow: {
+      steps: [
+        { id: 'plan', do: 'model', model: 'fake', instructions: 'Find an angle on {{topic}}', outputs: { angle: 'text', questions: 'list' } },
+        { id: 'write', do: 'agent', instructions: 'Write a brief on {{topic}} from the angle {{plan.angle}}. Answer:\n{{plan.questions}}', outputs: [{ id: 'brief', label: 'Brief', type: 'markdown', required: true }] },
+      ],
+    },
+  });
+  const { key } = store.createKey(db, a.id, 'Test');
+  const pending = http.inject({ method: 'POST', url: `/api/apps/${a.slug}/run`, headers: { authorization: `Bearer ${key}` }, payload: { inputs: { topic: 'vLLM' }, wait: 30 } });
+  await sleep(200);
+  const runId = store.listRuns(db, { app: a.id, limit: 1 })[0].id;
+  const child = await agentAnswers(runId, 'write', { brief: 'vLLM is fast.' }, 'Wrote it.');
+  assert.match(sessions.made.find((m) => m.key === child.key)!.o.prompt, /from the angle Throughput on one GPU\. Answer:\n- How fast\?\n- How cheap\?/);
+  const body = (await pending).json();
+  assert.equal(body.status, 'done', body.error);
+  assert.deepEqual(body.result, { brief: 'vLLM is fast.', angle: 'Throughput on one GPU' });
+  assert.equal(body.reply, 'Wrote it.');
+  assert.equal(body.session, null);
+  assert.equal(body.costUsd, 0.001);
+  assert.deepEqual(body.steps.map((s: any) => [s.step, s.status]), [['plan', 'done'], ['write', 'done']]);
+  assert.ok(sessions.archived.has(child.key!), 'agent steps stay out of the session list');
+  assert.equal(child.source, 'step');
+  // The run's page: each step with what it gave, the agent step's session, what the model step cost.
+  const page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${runId}` })).json();
+  assert.equal(page.steps[1].session, child.key);
+  assert.equal(page.steps[0].values.angle, 'Throughput on one GPU');
+  assert.equal(page.steps[0].costUsd, 0.001);
+  assert.match(page.noAsks, /takes no follow-ups/);
+  // The template's runs: one, as is its count for the day; its agent step's run is part of it.
+  const runs = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/runs` })).json().runs;
+  assert.deepEqual(runs.map((r: any) => r.id), [runId]);
+  assert.equal(store.usageSince(db, a.id, 0).runs, 1);
+});
+
+test('Decide, Repeat and a step that fails: a rule picks the path, rounds go through a list, a failure goes its own way', async () => {
+  model.answer = (_system, user) => {
+    const m = /Item (\w+)/.exec(user);
+    return m ? JSON.stringify({ line: `Seen ${m[1]}` }) : '{}';
+  };
+  const a = app({
+    name: 'Loops',
+    answer: [
+      { id: 'lines', label: 'Lines', type: 'table', required: true, columns: [{ id: 'line', label: 'Line', type: 'text' }] },
+      { id: 'path', label: 'Path', type: 'text' },
+    ],
+    flow: {
+      steps: [
+        { id: 'find', do: 'tool', tool: 'web_search', with: { query: 'about {{topic}}' } },
+        { id: 'big', do: 'decide', rule: '{{find.data.results}} is not empty', then: [{ id: 'yes', do: 'model', instructions: 'Say Item yes', outputs: { line: 'text' } }], else: [{ id: 'no', do: 'model', instructions: 'Say Item no', outputs: { line: 'text' } }] },
+        { id: 'each', do: 'repeat', over: '{{inputs.names}}', atOnce: 2, steps: [{ id: 'one', do: 'model', instructions: 'Item {{item}} at {{index}}', outputs: { line: 'text' } }] },
+        { id: 'read', do: 'tool', tool: 'read_page', with: { url: 'https://broken.example' }, failed: [{ id: 'sorry', do: 'model', instructions: 'Item failed because {{error}}', outputs: { line: 'text' } }] },
+        { id: 'maybe', do: 'model', if: '{{topic}} = never', instructions: 'Item never', outputs: { line: 'text' } },
+        { id: 'quiet', do: 'tool', tool: 'read_page', with: { url: 'https://broken.example/2' }, failed: 'skip' },
+      ],
+      outputs: { lines: '{{each.items}}', path: '{{yes.line}}' },
+    },
+  });
+  model.calls = [];
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'GPUs', names: 'a\nb\nc' } });
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.deepEqual(done.result, { lines: [{ line: 'Seen a' }, { line: 'Seen b' }, { line: 'Seen c' }], path: 'Seen yes' });
+  assert.deepEqual(stepsOf(r.id).sort(), ['big:done', 'each#1/one:done', 'each#1:done', 'each#2/one:done', 'each#2:done', 'each#3/one:done', 'each#3:done', 'each:done', 'find:done', 'maybe:skipped', 'quiet:failed', 'read:failed', 'sorry:done', 'yes:done'].sort());
+  assert.ok(model.calls.some((c) => c.user === 'Item failed because That page could not be read'), 'the failure says why');
+  assert.deepEqual(toolCalls.find((t) => t.tool === 'web_search')!.args, { query: 'about GPUs' });
+  assert.ok(!model.calls.some((c) => c.user.includes('never')), 'a rule that does not hold skips its step');
+});
+
+test('At the same time, and Repeat until: branches meet after the join; rounds go on until the rule holds, seeing the last round', async () => {
+  model.answer = (_system, user) => JSON.stringify({ line: `Re: ${user}` });
+  const a = app({
+    name: 'Branches',
+    answer: [{ id: 'line', label: 'Line', type: 'text', required: true }],
+    flow: {
+      steps: [
+        { id: 'both', do: 'parallel', branches: [[{ id: 'left', do: 'model', instructions: 'L', outputs: { line: 'text' } }], [{ id: 'right', do: 'model', instructions: 'R', outputs: { line: 'text' } }]] },
+        { id: 'again', do: 'repeat', until: '{{index}} >= 3', steps: [{ id: 'draft', do: 'model', instructions: 'Draft {{index}} after {{draft.line}}', outputs: { line: 'text' } }] },
+        { id: 'join', do: 'model', instructions: '{{left.line}} + {{right.line}} + {{draft.line}} + {{again.count}}', outputs: { line: 'text' } },
+      ],
+    },
+  });
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'x' } });
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.line, 'Re: Re: L + Re: R + Re: Draft 3 after Re: Draft 2 after Re: Draft 1 after + 3');
+});
+
+test('Keep data: steps add, find, change and remove records; fields are checked; programs reach the data through routes', async () => {
+  const a = app({
+    name: 'Reading list',
+    data: { items: { title: 'text', score: 'number', read: 'yesno' } },
+    answer: [{ id: 'count', label: 'Count', type: 'number', required: true }],
+    flow: {
+      steps: [
+        { id: 'save', do: 'data', add: 'items', with: { title: '{{topic}}', score: '7', read: 'no' } },
+        { id: 'more', do: 'data', add: 'items', with: { title: 'Second', score: 3 } },
+        { id: 'mark', do: 'data', op: 'update', collection: 'items', record: '{{save.id}}', with: { read: true } },
+        { id: 'unread', do: 'data', op: 'find', collection: 'items', where: { read: { '!=': true } } },
+        { id: 'high', do: 'data', op: 'find', collection: 'items', where: { score: { '>': 5 } }, sort: '-score' },
+        { id: 'drop', do: 'data', op: 'remove', collection: 'items', where: { title: 'Second' } },
+      ],
+      outputs: { count: '{{high.count}}' },
+    },
+  });
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'First' } });
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.count, 1);
+  const steps = Object.fromEntries(store.listSteps(db, r.id).map((s) => [s.id, s.outputs]));
+  assert.equal((steps.save as any).record.score, 7, 'a number field takes "7" as 7');
+  assert.equal((steps.mark as any).records[0].read, true);
+  assert.deepEqual((steps.unread as any).records.map((x: any) => x.title), ['Second']);
+  assert.equal((steps.drop as any).count, 1);
+  // Through the routes: the collections, a record added, found by a where, changed, removed.
+  const cols = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/data` })).json();
+  assert.deepEqual(cols.collections.map((c: any) => [c.name, c.count]), [['items', 1]]);
+  const added = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/data/items`, payload: { record: { title: 'Third', score: '2.5' } } });
+  assert.equal(added.json().record.score, 2.5);
+  const bad = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/data/items`, payload: { record: { titel: 'x' } } });
+  assert.equal(bad.statusCode, 400);
+  assert.match(bad.json().error, /no field titel/);
+  const found = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/data/items?where=${encodeURIComponent(JSON.stringify({ score: { '<': 3 } }))}` })).json();
+  assert.deepEqual(found.records.map((x: any) => x.title), ['Third']);
+  const id = found.records[0].id;
+  const changed = (await http.inject({ method: 'PATCH', url: `/api/apps/${a.id}/data/items/${id}`, payload: { set: { read: 'yes' } } })).json();
+  assert.equal(changed.record.read, true);
+  assert.equal((await http.inject({ method: 'DELETE', url: `/api/apps/${a.id}/data/items/${id}` })).json().removed, 1);
+  assert.equal((await http.inject({ method: 'GET', url: `/api/apps/${a.id}/data/things` })).statusCode, 404);
+});
+
+test('app_data: the agents of a template that keeps data find and add its records; a public run gets no such tool', async () => {
+  const a = app({ name: 'Keeper', prompt: 'Keep {{topic}}', data: { notes: {} }, answer: [] });
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'this' } });
+  await sleep(100);
+  const key = store.getRun(db, r.id)!.key!;
+  const mark = sessions.made.find((m) => m.key === key)!.o.extra.app;
+  const add = await apps.spawn!({ agent: 'claude', key, cwd: tmp, runId: 'agent-data-1', resume: false, extra: { app: mark } }, deps);
+  assert.match(add!.instructions![0], /keeps data between its runs.*notes \(any fields\)/);
+  const ctx: RunCtx = { runId: 'agent-data-1', key, agent: 'claude', cwd: tmp, deps };
+  const tool = apps.tools!(ctx).find((t) => t.name === 'app_data')!;
+  assert.ok(tool, 'the app_data tool');
+  const made = JSON.parse(String(await tool.run({ op: 'add', collection: 'notes', record: { text: 'Remember the milk', tags: ['home'] } }, ctx)));
+  assert.equal(made.record.text, 'Remember the milk');
+  const found = JSON.parse(String(await tool.run({ op: 'find', collection: 'notes', search: 'milk' }, ctx)));
+  assert.equal(found.count, 1);
+  const err = await tool.run({ op: 'find', collection: 'nope' }, ctx);
+  assert.ok(typeof err === 'object' && err.isError);
+  assert.equal(apps.allowTool!('app_data', ctx), true);
+  sessions.end(key, 'Kept.');
+  await ended(r.id);
+  assert.equal(findRecords(db, a.id, a.data, 'notes').count, 1);
+});
+
+test('another template as a step: its form filled from values, its answer the step’s values; apps calling apps stop three deep', async () => {
+  const inner = app({ name: 'Verdict', prompt: 'Judge {{topic}}', answer: [{ id: 'verdict', label: 'Verdict', type: 'text', required: true }] });
+  const outer = app({
+    name: 'Asks another',
+    answer: [{ id: 'verdict', label: 'Verdict', type: 'text', required: true }],
+    flow: { steps: [{ id: 'judge', do: 'app', app: inner.slug, with: { topic: 'the {{topic}}' } }] },
+  });
+  const r = startRun({ app: outer.id, slug: outer.slug, recipe: outer, source: 'web', inputs: { topic: 'plan' } });
+  const child = await agentAnswers(r.id, 'judge', { verdict: 'Good' }, 'It is good.');
+  assert.equal(child.app, inner.id);
+  assert.equal(child.source, 'app');
+  assert.equal(child.inputs.topic, 'the plan');
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.verdict, 'Good');
+  // A template that calls itself: three levels, then no further.
+  const loop = app({ name: 'Ouroboros', answer: [], flow: { steps: [{ id: 'again', do: 'app', app: 'ouroboros', with: { topic: '{{topic}}' } }] } });
+  assert.equal(loop.slug, 'ouroboros');
+  const deep = await ended(startRun({ app: loop.id, slug: loop.slug, recipe: loop, source: 'web', inputs: { topic: 'x' } }).id);
+  assert.equal(deep.status, 'failed');
+  assert.match(deep.error!, /too deep/);
+});
+
+test('stopping a flow stops the agent at work, and the run ends as stopped', async () => {
+  const a = app({ name: 'Stoppable', answer: [], flow: { steps: [{ id: 'long', do: 'agent', instructions: 'Work long on {{topic}}' }, { id: 'after', do: 'model', instructions: 'never' }] } });
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'x' } });
+  let child: store.RunRecord | undefined;
+  for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: r.id })[0])?.key; i++) await sleep(25);
+  await stopRun(r.id);
+  const done = await ended(r.id);
+  assert.equal(done.status, 'stopped');
+  assert.ok(sessions.interrupted.includes(child!.key!), 'its agent was interrupted');
+  assert.ok(!store.getStep(db, r.id, 'after'), 'nothing after it ran');
+});
+
+test('after a restart a flow carries on: the steps that ended stand, the rest runs', async () => {
+  const a = app({ name: 'Resumed', answer: [{ id: 'line', label: 'Line', type: 'text', required: true }], flow: { steps: [{ id: 'first', do: 'model', instructions: 'First', outputs: { line: 'text' } }, { id: 'second', do: 'model', instructions: 'Second after {{first.line}}', outputs: { line: 'text' } }] } });
+  // As the server left it: running, its first step done.
+  const r = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'api', inputs: { topic: 'x' }, status: 'running' });
+  store.saveStep(db, { run: r.id, path: 'first', id: 'first', kind: 'model', title: 'First', status: 'done', outputs: { line: 'kept from before' }, startedAt: 1, endedAt: 2 });
+  model.calls = [];
+  model.answer = (_system, user) => JSON.stringify({ line: `Re: ${user}` });
+  flowRunner.resume(store.getRun(db, r.id)!);
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.line, 'Re: Second after kept from before');
+  assert.deepEqual(model.calls.map((c) => c.user), ['Second after kept from before'], 'the first step did not run again');
+});
+
+test('a public page’s flow: its agent steps run in Custom with the page’s model, and the data stays out of its reach', async () => {
+  const a = app({ name: 'Public flow', answer: [], data: { secrets: {} }, flow: { steps: [{ id: 'think', do: 'agent', instructions: 'Think about {{topic}}' }, { id: 'peek', do: 'data', op: 'find', collection: 'secrets' }] } });
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'public', inputs: { topic: 'x' }, public: { model: 'fake', web: false, capUsd: 0.5 } });
+  const child = await agentAnswers(r.id, 'think', null, 'Thought.');
+  const o = sessions.made.find((m) => m.key === child.key)!.o;
+  assert.deepEqual([o.agent, o.acpAgent, o.model, o.mode, o.extra.memory, o.extra.capUsd], ['acp', 'console', 'fake', 'ask', false, 0.5]);
+  const done = await ended(r.id);
+  assert.equal(done.status, 'failed');
+  assert.match(done.error!, /cannot use the data/);
+});
+
+// ---- memory -------------------------------------------------------------------------------------------------
+
+test('a template that remembers: its runs share a project memory of its own; turned off, they no longer do', async () => {
+  const a = app({ name: 'Rememberer', prompt: 'Do {{topic}}', answer: [], memory: true });
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'x' } });
+  await sleep(100);
+  const home = path.join(WORK_DIR, a.slug);
+  assert.ok(fs.existsSync(path.join(home, MEMORY_MARK)), 'its folder is marked');
+  const folder = runFolder(store.getRun(db, r.id)!, a.slug);
+  assert.equal(repoRoot(folder), home, 'memory files its notes under the template, not the run');
+  const key = store.getRun(db, r.id)!.key!;
+  const mark = sessions.made.find((m) => m.key === key)!.o.extra.app;
+  const add = await apps.spawn!({ agent: 'claude', key, cwd: folder, runId: 'agent-mem-1', resume: false, extra: { app: mark } }, deps);
+  assert.match(add!.instructions![0], /remembers across its runs/);
+  sessions.end(key, 'Done.');
+  await ended(r.id);
+  const off = store.saveApp(db, { id: a.id, recipe: cleanRecipe({ ...a, memory: false }) });
+  const r2 = startRun({ app: off.id, slug: off.slug, recipe: off, source: 'web', inputs: { topic: 'y' } });
+  await sleep(100);
+  assert.ok(!fs.existsSync(path.join(home, MEMORY_MARK)), 'the mark is gone');
+  sessions.end(store.getRun(db, r2.id)!.key!, 'Done.');
+  await ended(r2.id);
+});
+
+// ---- as a file ----------------------------------------------------------------------------------------------
+
+test('a template as a file: .naget-app and .json round trips with its records; installing says what changes; what cannot work stops it', async () => {
+  const a = app({
+    name: 'Shared list',
+    cwd: tmp,
+    mode: 'bypassPermissions',
+    assistant: 'nobody-here',
+    memory: true,
+    data: { items: { title: 'text', score: 'number' } },
+    answer: [{ id: 'count', label: 'Count', type: 'number', required: true }],
+    flow: { steps: [{ id: 'all', do: 'data', op: 'find', collection: 'items' }], outputs: { count: '{{all.count}}' } },
+  });
+  await http.inject({ method: 'POST', url: `/api/apps/${a.id}/data/items`, payload: { record: { id: 'r1', title: 'One', score: 1 } } });
+  await http.inject({ method: 'POST', url: `/api/apps/${a.id}/data/items`, payload: { record: { id: 'r2', title: 'Two', score: 2 } } });
+  const zip = await http.inject({ method: 'GET', url: `/api/apps/${a.id}/export?data=1` });
+  assert.equal(zip.headers['content-type'], 'application/zip');
+  assert.match(String(zip.headers['content-disposition']), /shared-list\.naget-app/);
+  const file = { name: 'shared-list.naget-app', data: zip.rawPayload.toString('base64') };
+  const check = await http.inject({ method: 'POST', url: '/api/apps/install/check', payload: { file } });
+  const p = check.json().preview;
+  assert.deepEqual([p.name, p.steps, p.memory, p.data], ['Shared list', 1, true, [{ name: 'items', records: 2 }]]);
+  assert.ok(p.notes.some((n: string) => /every step allowed \(bypassPermissions\)/.test(n)), p.notes.join('\n'));
+  assert.ok(p.notes.some((n: string) => /assistant “nobody-here”, which is not here/.test(n)));
+  assert.ok(p.notes.some((n: string) => /installs beside it/.test(n)));
+  const got = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { file } })).json();
+  assert.equal(got.records, 2);
+  const b = store.getApp(db, got.app.id)!;
+  assert.notEqual(b.slug, a.slug);
+  assert.deepEqual([b.cwd, b.mode, b.assistant, b.memory, b.public.on], [undefined, undefined, undefined, true, false]);
+  assert.deepEqual(findRecords(db, b.id, b.data, 'items').records.map((x) => [x.id, x.title]), [['r1', 'One'], ['r2', 'Two']]);
+  const ran = await ended(startRun({ app: b.id, slug: b.slug, recipe: b, source: 'web', inputs: { topic: 'x' } }).id);
+  assert.equal(ran.result!.count, 2);
+  // As .json, without records; a bare recipe installs too.
+  const json = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/export?as=json` })).json();
+  assert.equal(json.naget, 'app');
+  assert.equal(json.records, undefined);
+  assert.equal(json.app.cwd, undefined);
+  const bare = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: { name: 'Bare', prompt: 'Do {{x}}', fields: [{ id: 'x', label: 'X' }], cwd: '/somewhere/else' } } })).json();
+  assert.equal(bare.app.name, 'Bare');
+  assert.equal(bare.app.cwd, undefined);
+  assert.ok(bare.notes.some((n: string) => /worked in the folder \/somewhere\/else/.test(n)), 'a folder from elsewhere is left out, and said so');
+  // A zip written here reads back; what is not a template, is newer, or cannot run is refused in words.
+  const back = await http.inject({ method: 'POST', url: '/api/apps/install/check', payload: { file: { name: 'x.zip', data: zipPackage(packageOf(db, a, false)).toString('base64') } } });
+  assert.equal(back.statusCode, 200);
+  const junk = await http.inject({ method: 'POST', url: '/api/apps/install', payload: { file: { name: 'x.json', data: Buffer.from('hello').toString('base64') } } });
+  assert.equal(junk.statusCode, 400);
+  assert.match(junk.json().error, /neither a template/);
+  const newer = await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: { naget: 'app', format: 99, app: { name: 'N', prompt: 'x' } } } });
+  assert.match(newer.json().error, /newer Naget Agent/);
+  const broken = await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: { naget: 'app', format: 1, app: { name: 'B', flow: { steps: [{ id: 'a', do: 'model', instructions: '{{b.text}}' }, { id: 'b', do: 'model', instructions: 'x' }] } } } } });
+  assert.equal(broken.statusCode, 400);
+  assert.match(broken.json().error, /comes later/);
+});
+
+test('what a template needs: packages by name and version only, installed in a folder of its own before its runs; its agents get them first on PATH', async () => {
+  const bad = cleanRequires({ node: { lodash: 'git+https://example.com/x.git', '-x': '1' }, python: ['pandas>=2', '--index-url http://evil.example', 'x @ https://example.com/x.whl'], commands: ['ffmpeg', 'rm -rf'] });
+  assert.equal(bad.errors.length, 5, bad.errors.join('\n'));
+  assert.deepEqual(bad.requires, { python: ['pandas>=2'], commands: ['ffmpeg'] });
+  assert.deepEqual(cleanRequires({ node: ['cheerio'], python: ['requests[socks]', 'numpy>=1.26,<3'], pythonVersion: '3.12' }).requires, { node: { cheerio: 'latest' }, python: ['requests[socks]', 'numpy>=1.26,<3'], pythonVersion: '3.12' });
+  const ran: string[][] = [];
+  let failing = false;
+  envTesting.run = async (cmd, args) => {
+    ran.push([cmd, ...args]);
+    await sleep(150);
+    return failing && cmd === 'uv' && args[0] === 'pip' ? { code: 1, out: 'No solution found: pandas>=99' } : { code: 0, out: 'ok' };
+  };
+  try {
+    const a = app({ name: 'Needy', prompt: 'Do {{topic}}', answer: [], requires: { node: { cheerio: '^1.0.0' }, python: ['pandas>=2'], commands: ['surely-not-a-command-here'] } });
+    assert.deepEqual(envOf(a, a.slug).missing, ['surely-not-a-command-here']);
+    const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'x' } });
+    await sleep(60);
+    assert.equal(store.getRun(db, r.id)!.key, undefined, 'the run waits while its packages install');
+    assert.equal(envOf(a, a.slug).state, 'installing');
+    let key: string | undefined;
+    for (let i = 0; i < 200 && !(key = store.getRun(db, r.id)!.key); i++) await sleep(25);
+    assert.ok(key, 'then it starts');
+    const dir = envDir(a.slug);
+    assert.deepEqual(ran.map((x) => x.slice(0, 3).join(' ')), ['npm install --ignore-scripts', 'uv venv --allow-existing', 'uv pip install']);
+    assert.deepEqual(ran[2].slice(-3), ['--python', path.join(dir, '.venv', 'bin', 'python'), 'pandas>=2']);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).dependencies.cheerio, '^1.0.0');
+    assert.equal(envOf(a, a.slug).state, 'ready');
+    const mark = sessions.made.find((m) => m.key === key)!.o.extra.app;
+    const add = await apps.spawn!({ agent: 'claude', key: key!, cwd: tmp, runId: 'agent-env-1', resume: false, extra: { app: mark } }, deps);
+    assert.ok(add!.env!.PATH.startsWith(`${path.join(dir, '.venv', 'bin')}${path.delimiter}${path.join(dir, 'node_modules', '.bin')}${path.delimiter}`));
+    assert.equal(add!.env!.VIRTUAL_ENV, path.join(dir, '.venv'));
+    assert.match(add!.instructions![0], /packages are installed for you/);
+    sessions.end(key!, 'Done.');
+    await ended(r.id);
+    // Ready stays ready; new needs install again, and one that cannot install fails the run, saying why.
+    ran.length = 0;
+    const r2 = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'y' } });
+    for (let i = 0; i < 100 && !store.getRun(db, r2.id)!.key; i++) await sleep(20);
+    assert.equal(ran.length, 0, 'nothing installs twice');
+    sessions.end(store.getRun(db, r2.id)!.key!, 'Done.');
+    await ended(r2.id);
+    failing = true;
+    const changed = (await http.inject({ method: 'PUT', url: `/api/apps/${a.id}`, payload: { recipe: { ...a, requires: { python: ['pandas>=99'] } } } })).json().app;
+    const r3 = await ended(startRun({ app: changed.id, slug: changed.slug, recipe: changed, source: 'web', inputs: { topic: 'z' } }).id);
+    assert.equal(r3.status, 'failed');
+    assert.match(r3.error!, /What it needs could not be installed: Installing its Python packages failed/);
+    const env = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/env` })).json().env;
+    assert.equal(env.state, 'failed');
+    assert.match(env.log, /No solution found/);
+  } finally {
+    envTesting.run = null;
+  }
+});
+
+test('a template with the templates it calls: they come in its file, install first (or the same one you have is used), and its steps call them where they landed', async () => {
+  const helper = app({ name: 'Helper step', prompt: 'Help with {{topic}}', answer: [{ id: 'v', label: 'V', type: 'text' }] });
+  const main = app({ name: 'Uses helper', answer: [], flow: { steps: [{ id: 'h', do: 'app', app: helper.slug, with: { topic: '{{topic}}' } }] } });
+  const pkg = packageOf(db, main, false);
+  assert.deepEqual(pkg.apps!.map((x) => x.slug), [helper.slug]);
+  // The same one is here: used again.
+  const same = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: pkg } })).json();
+  assert.deepEqual(same.bundled, [{ name: 'Helper step', slug: helper.slug, reused: true }]);
+  assert.equal((store.getApp(db, same.app.id)!.flow!.steps[0] as any).app, helper.slug);
+  // Yours changed since: the one in the file installs beside it, and the new template's step calls that one.
+  store.saveApp(db, { id: helper.id, recipe: cleanRecipe({ ...helper, prompt: 'Changed {{topic}}' }) });
+  const file = { name: 'uses-helper.naget-app', data: zipPackage(pkg).toString('base64') };
+  const p = (await http.inject({ method: 'POST', url: '/api/apps/install/check', payload: { file } })).json().preview;
+  assert.deepEqual(p.bundled, [{ name: 'Helper step', from: helper.slug, installs: 'new' }]);
+  const beside = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { file } })).json();
+  assert.equal(beside.bundled[0].reused, false);
+  assert.notEqual(beside.bundled[0].slug, helper.slug);
+  assert.equal((store.getApp(db, beside.app.id)!.flow!.steps[0] as any).app, beside.bundled[0].slug);
+  assert.match(store.getApp(db, beside.bundled[0].slug)!.prompt, /^Help with/);
+});
+
+test('saving checks a flow: what must change refuses it in words, what may surprise comes back as warnings', async () => {
+  const bad = await http.inject({ method: 'POST', url: '/api/apps', payload: { recipe: { name: 'Bad', flow: { steps: [{ id: 'a', do: 'tool', tool: 'bash' }] } } } });
+  assert.equal(bad.statusCode, 400);
+  assert.match(bad.json().error, /bash cannot run as a step/);
+  const ok = await http.inject({
+    method: 'POST',
+    url: '/api/apps',
+    payload: { recipe: { name: 'Warned', fields: [{ id: 'topic', label: 'Topic' }], flow: { steps: [{ id: 'd', do: 'decide', rule: '{{topic}} = x', then: [{ id: 'e', do: 'model', instructions: 'x' }] }, { id: 'f', do: 'model', instructions: '{{e.text}}' }] } } },
+  });
+  assert.equal(ok.statusCode, 200, ok.body);
+  assert.match(ok.json().warnings.join('\n'), /empty when the decision “d” goes the other way/);
+  const checked = (await http.inject({ method: 'POST', url: '/api/apps/check', payload: { recipe: { name: 'C', flow: [{ id: 'a', do: 'repeat', steps: [] }] } } })).json();
+  assert.ok(checked.errors.some((e: string) => /what to go through/.test(e)), checked.errors.join('\n'));
+});
+
+for (const [name, fn] of tests) {
+  try {
+    await fn();
+    passed++;
+    console.log(`ok   ${name}`);
+  } catch (e) {
+    console.error(`FAIL ${name}\n${(e as Error).stack}`);
+    process.exitCode = 1;
+  }
+}
+console.log(`\n${passed} of ${tests.length} passed`);
+srv.close();
+fs.rmSync(tmp, { recursive: true, force: true });
+fs.rmSync(process.env.NAGET_APPS_DIR!, { recursive: true, force: true });
+process.exit(process.exitCode ?? 0);

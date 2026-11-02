@@ -2,6 +2,7 @@
 // filling the prompt from the form, the answer fields (their schema for submit_result and the check
 // of what the agent hands in), and CSV in and out for runs over many rows.
 import type { Agent } from './types.ts';
+import { cleanData, cleanFlow, cleanRequires, type DataCollection, type Flow, type Requires } from './app-manifest.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -94,6 +95,17 @@ export interface AppRecipe {
   /** Tools of the session's own MCP server the runs may use (web search, browser…); null: all. */
   tools: string[] | null;
   limits: AppLimits;
+  /**
+   * What the app does, step by step (shared/app-manifest.ts). Without it, one agent step does the task in
+   * `prompt`, with the agent settings above: the simplest app, and every template.
+   */
+  flow?: Flow;
+  /** What it keeps between runs: collections of records its steps, agents and screens share. */
+  data?: Record<string, DataCollection>;
+  /** Its agents remember what later runs should know, in a memory of the app's own (Settings → Memory lists it as a project). */
+  memory?: boolean;
+  /** What it needs on this computer: packages installed in an environment of its own (server/apps/env.ts), commands that must be here. */
+  requires?: Requires;
 }
 
 /** A built-in template: a recipe to run as it is, or to start an app from. */
@@ -114,7 +126,7 @@ export interface AppDef extends AppRecipe {
   updatedAt: number;
 }
 
-export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch';
+export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app';
 export type RunStatus = 'queued' | 'starting' | 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
 
 export interface AppRun {
@@ -138,9 +150,35 @@ export interface AppRun {
   model?: string;
   batch?: string;
   row?: number;
+  /** The run this one is a step of (an agent step, or another app a step called). */
+  parent?: string;
+  /** Where in the parent's flow ("sum", "loop#2/read"). */
+  step?: string;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
+}
+
+export type StepStatus = 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'stopped';
+
+/** One step of a run with steps, as its page shows it. */
+export interface RunStepView {
+  /** Where in the flow: its id, inside a Repeat's round "loop#2/read". */
+  path: string;
+  id: string;
+  /** Its kind of step, or "round" for a round of a Repeat. */
+  kind: string;
+  title: string;
+  status: StepStatus;
+  error?: string;
+  costUsd?: number;
+  /** The run behind an agent step or a call to another app, and its session. */
+  run?: string;
+  session?: string;
+  startedAt?: number;
+  endedAt?: number;
+  /** What it gave (long values shortened). */
+  values?: Record<string, unknown>;
 }
 
 /** How a run is getting on, for its page: the latest steps, and what it waits for. */
@@ -228,7 +266,7 @@ export const APP_COLORS: Record<string, string> = {
 };
 
 /** Addresses the app's own routes use, which no app may take as its name. */
-export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test']);
+export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data']);
 
 // ---- names -----------------------------------------------------------------------------------------
 
@@ -587,22 +625,10 @@ const posNum = (v: unknown, max: number) => {
   return Number.isFinite(n) && n > 0 ? Math.min(n, max) : undefined;
 };
 
-/** A recipe from anything (a form, the helper model, an API call): known fields only, within bounds. */
-export function cleanRecipe(raw: any): AppRecipe {
-  const r = raw && typeof raw === 'object' ? raw : {};
-  const taken: string[] = [];
-  const fields: AppField[] = (Array.isArray(r.fields) ? r.fields : []).slice(0, 30).flatMap((x: any): AppField[] => {
-    if (!x || typeof x !== 'object') return [];
-    const label = str(x.label, 80) || str(x.id, 80);
-    if (!label) return [];
-    const type: FieldType = FIELD_TYPES.some((t) => t.value === x.type) ? x.type : 'text';
-    const id = fieldId(str(x.id, 40) || label, taken);
-    taken.push(id);
-    const options = type === 'choice' ? [...new Set<string>((Array.isArray(x.options) ? x.options : []).map((o: unknown) => str(o, 80)).filter(Boolean))].slice(0, 30) : undefined;
-    return [{ id, label, type, required: !!x.required || undefined, help: opt(x.help, 240), placeholder: opt(x.placeholder, 160), options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined, default: opt(x.default, 4000) }];
-  });
+/** Answer fields (or a step's outputs) from anything: known kinds, ids from labels, tables with columns. */
+export function cleanAnswer(raw: unknown): AnswerField[] {
   const atTaken: string[] = [];
-  const answer: AnswerField[] = (Array.isArray(r.answer) ? r.answer : []).slice(0, 30).flatMap((x: any): AnswerField[] => {
+  return (Array.isArray(raw) ? raw : []).slice(0, 30).flatMap((x: any): AnswerField[] => {
     if (!x || typeof x !== 'object') return [];
     const label = str(x.label, 80) || str(x.id, 80);
     if (!label) return [];
@@ -622,7 +648,27 @@ export function cleanRecipe(raw: any): AppRecipe {
         : undefined;
     return [{ id, label, type, description: opt(x.description, 400), required: !!x.required || undefined, columns: type === 'table' ? (columns?.length ? columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined }];
   });
+}
+
+/** A recipe from anything (a form, the helper model, an API call): known fields only, within bounds. */
+export function cleanRecipe(raw: any): AppRecipe {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  const taken: string[] = [];
+  const fields: AppField[] = (Array.isArray(r.fields) ? r.fields : []).slice(0, 30).flatMap((x: any): AppField[] => {
+    if (!x || typeof x !== 'object') return [];
+    const label = str(x.label, 80) || str(x.id, 80);
+    if (!label) return [];
+    const type: FieldType = FIELD_TYPES.some((t) => t.value === x.type) ? x.type : 'text';
+    const id = fieldId(str(x.id, 40) || label, taken);
+    taken.push(id);
+    const options = type === 'choice' ? [...new Set<string>((Array.isArray(x.options) ? x.options : []).map((o: unknown) => str(o, 80)).filter(Boolean))].slice(0, 30) : undefined;
+    return [{ id, label, type, required: !!x.required || undefined, help: opt(x.help, 240), placeholder: opt(x.placeholder, 160), options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined, default: opt(x.default, 4000) }];
+  });
+  const answer = cleanAnswer(r.answer);
   const agent: Agent = r.agent === 'codex' || r.agent === 'acp' ? r.agent : 'claude';
+  const flow = cleanFlow(r.flow).flow;
+  const data = cleanData(r.data).data;
+  const requires = cleanRequires(r.requires).requires;
   return {
     name: str(r.name, 60) || 'Untitled template',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
@@ -641,6 +687,10 @@ export function cleanRecipe(raw: any): AppRecipe {
     answer,
     tools: Array.isArray(r.tools) ? [...new Set<string>(r.tools.map((t: unknown) => str(t, 80)).filter(Boolean))].slice(0, 80) : null,
     limits: { runsPerDay: posNum(r.limits?.runsPerDay, 100_000) && Math.round(posNum(r.limits?.runsPerDay, 100_000)!), capUsd: posNum(r.limits?.capUsd, 10_000) },
+    ...(flow ? { flow } : {}),
+    ...(data ? { data } : {}),
+    ...(r.memory === true ? { memory: true } : {}),
+    ...(requires ? { requires } : {}),
   };
 }
 

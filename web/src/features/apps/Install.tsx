@@ -1,0 +1,261 @@
+// A template from a file and to a file: the link on the New template page that installs one (after a card
+// saying what it will do here), the dialog that downloads one, and the line on a template's page that
+// says how the packages it needs stand.
+import { useRef, useState } from 'react';
+import { Download, FileUp } from 'lucide-react';
+import type { AppDef } from '@shared/apps';
+import type { EnvView, InstallPreview } from '@shared/app-manifest';
+import { enc, post } from '../../lib/api';
+import { go } from '../../lib/nav';
+import { toast, toastError } from '../../lib/store';
+import { Button, cx, Dialog, Switch } from '../../components/ui';
+import { appPath, fileToBase64, money } from './api';
+import { AppIcon } from './AppIcon';
+
+function Line({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 py-1.5 text-[13.5px]">
+      <span className="w-[136px] shrink-0 text-fg-3">{label}</span>
+      <span className="min-w-0 flex-1 break-words">{children}</span>
+    </div>
+  );
+}
+
+/** What a template from a file will do here, before it is installed. */
+function PreviewCard({ p }: { p: InstallPreview }) {
+  const needs = [...p.needs.node.map((n) => `${n} (Node)`), ...p.needs.python.map((n) => `${n} (Python)`)];
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-3">
+        <AppIcon icon={p.icon} color={p.color} size={36} />
+        <div className="min-w-0">
+          <div className="text-[15px] font-semibold" translate="no">
+            {p.name}
+          </div>
+          {p.description && (
+            <div className="text-[13px] text-fg-2" translate="no">
+              {p.description}
+            </div>
+          )}
+        </div>
+      </div>
+      {p.problems.length > 0 && (
+        <div className="rounded-xl border border-err/40 bg-err/10 px-3 py-2 text-[13px]">
+          <div className="font-medium">It cannot be installed:</div>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {p.problems.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="divide-y divide-line rounded-xl border border-line px-3">
+        <Line label="Who does the work">{p.agents.join(', ') || '—'}</Line>
+        <Line label="What it does">{p.steps ? `${p.steps} steps` : 'One agent does the task'}</Line>
+        <Line label="Tools it may use">{p.tools === null ? 'All of the app’s tools' : p.tools.length ? p.tools.join(', ') : 'None of the app’s tools'}</Line>
+        {p.bundled.length > 0 && (
+          <Line label="Comes with">
+            {p.bundled.map((b) => (
+              <div key={b.from || b.name}>
+                <span translate="no">{b.name}</span> <span className="text-fg-3">· {b.installs === 'reuse' ? 'you have it: used again' : 'installed too'}</span>
+              </div>
+            ))}
+          </Line>
+        )}
+        {needs.length > 0 && (
+          <Line label="It installs">
+            <span translate="no">{needs.join(', ')}</span>
+            <div className="text-fg-3">In a folder of its own, not for the whole computer</div>
+          </Line>
+        )}
+        {p.needs.commands.length > 0 && (
+          <Line label="Commands it uses">
+            {p.needs.commands.map((c) => (
+              <div key={c}>
+                <span className={cx('font-mono text-[12.5px]', p.needs.missing.includes(c) && 'text-warn')} translate="no">
+                  {c}
+                </span>
+                {p.needs.missing.includes(c) && <span className="text-warn"> (not on this computer)</span>}
+              </div>
+            ))}
+          </Line>
+        )}
+        {p.data.length > 0 && (
+          <Line label="What it keeps">
+            {p.data.map((d) => (
+              <div key={d.name}>
+                <span translate="no">{d.name}</span>
+                {d.records > 0 && <span className="text-fg-3"> {`(${d.records} records)`}</span>}
+              </div>
+            ))}
+          </Line>
+        )}
+        {p.memory && <Line label="Memory">Remembers across its runs, in a memory of its own</Line>}
+        {(p.limits.capUsd || p.limits.runsPerDay) && (
+          <Line label="Limits">
+            {p.limits.capUsd && <div>{`${money(p.limits.capUsd)} a run at most`}</div>}
+            {p.limits.runsPerDay && <div>{`${p.limits.runsPerDay} runs a day`}</div>}
+          </Line>
+        )}
+      </div>
+      {p.notes.length > 0 && (
+        <ul className="list-disc space-y-1 pl-5 text-[13px] text-fg-2">
+          {p.notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
+      {p.warnings.length > 0 && (
+        <ul className="list-disc space-y-1 pl-5 text-[13px] text-warn">
+          {p.warnings.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** "Install a template from a file": picks a .naget-app or .json, shows what it will do, installs it. */
+export function InstallFromFile() {
+  const input = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<{ name: string; data: string } | null>(null);
+  const [preview, setPreview] = useState<InstallPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    if (f.size > 20 << 20) return toast('A template file is at most 20 MB', 'error');
+    try {
+      const sent = { name: f.name, data: await fileToBase64(f) };
+      const r = await post<{ preview: InstallPreview }>('/api/apps/install/check', { file: sent });
+      setFile(sent);
+      setPreview(r.preview);
+    } catch (e) {
+      toastError(e);
+    }
+  };
+  const install = async () => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const r = await post<{ app: AppDef }>('/api/apps/install', { file });
+      const needs = preview && preview.needs.node.length + preview.needs.python.length > 0;
+      toast(needs ? 'Installed. What it needs is installing; its first run waits for it.' : 'Installed', 'ok');
+      go(appPath(r.app.id));
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const close = () => (setPreview(null), setFile(null));
+  return (
+    <>
+      <button type="button" onClick={() => input.current?.click()} className="inline-flex items-center gap-1.5 text-[13px] text-fg-3 hover:text-fg">
+        <FileUp size={14} />
+        Install a template from a file
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept=".naget-app,.zip,.json,application/json,application/zip"
+        className="hidden"
+        onChange={(e) => {
+          void pick(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      <Dialog
+        open={!!preview}
+        onClose={close}
+        title="Install this template?"
+        width={560}
+        footer={
+          <>
+            <Button variant="ghost" onClick={close}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={install} disabled={busy || !!preview?.problems.length}>
+              Install
+            </Button>
+          </>
+        }
+      >
+        {preview && <PreviewCard p={preview} />}
+      </Dialog>
+    </>
+  );
+}
+
+/** Downloads a template as a .naget-app; one that keeps data asks whether its records go too. */
+export function DownloadDialog({ app, open, onClose }: { app: AppDef; open: boolean; onClose: () => void }) {
+  const [records, setRecords] = useState(false);
+  const download = () => {
+    const a = document.createElement('a');
+    a.href = `/api/apps/${enc(app.id)}/export${records ? '?data=1' : ''}`;
+    a.download = `${app.slug}.naget-app`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    onClose();
+  };
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Download as a file"
+      width={460}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" icon={<Download size={14} />} onClick={download}>
+            Download
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-[13.5px]">
+        <p className="text-fg-2">One file with everything it does and needs, and the templates its steps call, to keep or to install on another Naget Agent. Its folder, keys and public page stay here.</p>
+        {app.data && (
+          <label className="flex items-center justify-between gap-3">
+            <span>Include the records it keeps</span>
+            <Switch on={records} onChange={setRecords} label="Include the records it keeps" />
+          </label>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
+/** How the packages a template needs stand, when there is something to say: installing, failed, a command missing. */
+export function EnvLine({ appId, env, onChange }: { appId: string; env: EnvView; onChange: () => void }) {
+  const [log, setLog] = useState(false);
+  if (env.state === 'none' || env.state === 'ready') {
+    if (!env.missing.length) return null;
+    const list = env.missing.join(', ');
+    return <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-2.5 text-[13px]">{env.missing.length > 1 ? `It uses ${list}, which are not on this computer: install them, or the steps that use them fail.` : `It uses ${list}, which is not on this computer: install it, or the steps that use it fail.`}</div>;
+  }
+  const again = () => post<{ env: EnvView }>(`/api/apps/${enc(appId)}/env`).then(onChange, toastError);
+  return (
+    <div className={cx('rounded-xl border px-4 py-2.5 text-[13px]', env.state === 'failed' ? 'border-err/40 bg-err/10' : 'border-line bg-bg-1')}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="flex-1">
+          {env.state === 'installing' ? 'Installing what it needs (its Node and Python packages); its runs wait for it.' : env.state === 'failed' ? `What it needs could not be installed: ${env.error ?? ''}` : 'What it needs has changed: it installs before the next run.'}
+        </span>
+        {env.log && (
+          <button type="button" className="text-fg-3 hover:text-fg" onClick={() => setLog((o) => !o)}>
+            {log ? 'Hide the output' : 'Show the output'}
+          </button>
+        )}
+        {env.state !== 'installing' && (
+          <Button size="sm" variant="ghost" onClick={again}>
+            Install again
+          </Button>
+        )}
+      </div>
+      {log && env.log && <pre className="mt-2 max-h-[260px] overflow-auto rounded-lg bg-bg-2 p-2 font-mono text-[11.5px] whitespace-pre-wrap">{env.log}</pre>}
+    </div>
+  );
+}
