@@ -57,6 +57,8 @@ class FakeSessions extends EventEmitter {
   made: { key: string; o: any }[] = [];
   status = new Map<string, string>();
   replies = new Map<string, string[]>();
+  /** The tools each session called, as its transcript shows them. */
+  tools = new Map<string, unknown[]>();
   archived = new Set<string>();
   interrupted: string[] = [];
   async create(o: any) {
@@ -74,7 +76,7 @@ class FakeSessions extends EventEmitter {
   }
   async timeline(key: string) {
     const said = this.replies.get(key) ?? [];
-    return { parser: { items: said.map((text, i) => ({ kind: 'assistant', id: `a${i}`, seq: i, text })) }, readMore: async () => {} } as any;
+    return { parser: { items: [...(this.tools.get(key) ?? []), ...said.map((text, i) => ({ kind: 'assistant', id: `a${i}`, seq: i, text }))] }, readMore: async () => {} } as any;
   }
   liveSnapshot() {
     return { live: null, overlay: { items: [], patches: {}, approvals: [] } };
@@ -352,6 +354,112 @@ test('Decide, Repeat and a step that fails: a rule picks the path, rounds go thr
   assert.ok(model.calls.some((c) => c.user === 'Item failed because That page could not be read'), 'the failure says why');
   assert.deepEqual(toolCalls.find((t) => t.tool === 'web_search')!.args, { query: 'about GPUs' });
   assert.ok(!model.calls.some((c) => c.user.includes('never')), 'a rule that does not hold skips its step');
+});
+
+test('If it fails, an agent tries: it gets what the step was given and why it failed, hands in what the flow uses of it, and the run goes on', async () => {
+  model.answer = (_system, user) => (user.startsWith('Sum ') ? JSON.stringify({ line: `Summed: ${user.slice(4)}` }) : '{}');
+  const a = app({
+    name: 'Rescue',
+    answer: [{ id: 'line', label: 'Line', type: 'text', required: true }],
+    flow: {
+      steps: [
+        { id: 'read', do: 'tool', tool: 'read_page', with: { url: 'https://broken.example/{{topic}}' }, failed: 'agent' },
+        { id: 'sum', do: 'model', model: 'fake', instructions: 'Sum {{read.text}}', outputs: { line: 'text' } },
+      ],
+    },
+  });
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'gpus' } });
+  const child = await agentAnswers(r.id, 'read', { text: 'GPUs are fast.' }, 'Read it another way.');
+  const prompt = sessions.made.find((m) => m.key === child.key)!.o.prompt as string;
+  assert.match(prompt, /It calls the tool read_page with:\n.*https:\/\/broken\.example\/gpus/);
+  assert.match(prompt, /It failed: That page could not be read/);
+  assert.match(prompt, /hand in what it would have given: text\./);
+  assert.deepEqual(child.recipe.answer.map((f) => f.id), ['text']);
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.line, 'Summed: GPUs are fast.');
+  const read = flowSteps(r.id).find((st) => st.id === 'read')!;
+  assert.deepEqual([read.status, read.rescued, read.error, read.session], ['done', true, 'That page could not be read', child.key]);
+  // Only a step that is not an agent's, or a person's, hands its work to an agent.
+  assert.match(cleanFlow({ steps: [{ id: 'w', do: 'agent', instructions: 'x', failed: 'agent' }] }).errors.join(), /only a tool, model, code, data or app step can hand its work to an agent/);
+  assert.deepEqual(checkFlow({ fields: a.fields, answer: a.answer, flow: a.flow }).warnings, [], 'its values are there all the same');
+  // When the agent cannot do it either, the run stops and says both.
+  const r2 = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'cpus' } });
+  const c2 = await agentAnswers(r2.id, 'read', null, 'I could not read it either.');
+  await sleep(2200);
+  sessions.end(c2.key!, 'Still nothing.');
+  const d2 = await ended(r2.id);
+  assert.equal(d2.status, 'failed');
+  assert.match(d2.error!, /That page could not be read \(and the agent in its place: it did not hand in text\)/);
+});
+
+/** A tool call as a transcript shows it. */
+const called = (name: string, input: unknown) => ({ kind: 'tool', id: `t-${Math.random().toString(36).slice(2, 8)}`, seq: 0, tool: { name, category: 'other', title: name, status: 'ok', input } });
+
+test('advice: a step an agent had to do the work of, and an agent step that did the same each time, with the steps that could do it (Firm it up)', async () => {
+  const a = app({
+    name: 'Summer',
+    fields: [{ id: 'url', label: 'Link', type: 'url', required: true }],
+    answer: [{ id: 'summary', label: 'Summary', type: 'markdown', required: true }],
+    flow: { steps: [{ id: 'sum', do: 'agent', instructions: 'Read the page at {{url}} and sum it up.', outputs: [{ id: 'summary', label: 'Summary', type: 'markdown', required: true }] }] },
+  });
+  for (const url of ['https://a.example/1', 'https://b.example/2', 'https://c.example/3']) {
+    const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { url } });
+    let child: store.RunRecord | undefined;
+    for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: r.id }).find((x) => x.key)); i++) await sleep(25);
+    sessions.tools.set(child!.key!, [called('ToolSearch', { query: 'select:read_page' }), called(url.includes('c.') ? 'WebFetch' : 'mcp__naget-agent__read_page', { url }), called('mcp__naget-agent__submit_result', {})]);
+    await agentAnswers(r.id, 'sum', { summary: `About ${url}` });
+    assert.equal((await ended(r.id)).status, 'done');
+  }
+  const advice = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/advice` })).json();
+  assert.deepEqual(advice.rescued, []);
+  const f = advice.firm[0];
+  assert.equal(advice.firm.length, 1);
+  assert.deepEqual([f.step, f.runs, f.calls], ['sum', 3, ['read_page']]);
+  assert.deepEqual(
+    f.steps.map((x: any) => [x.id, x.do, x.with, x.failed]),
+    [
+      ['sum_read_page', 'tool', { url: '{{url}}' }, 'agent'],
+      ['sum', 'model', undefined, undefined],
+    ],
+  );
+  assert.equal(f.steps[1].instructions, 'Read the page at {{url}} and sum it up.\n\nWhat read_page gave:\n{{sum_read_page.text}}');
+  assert.deepEqual(f.steps[1].outputs.map((o: any) => o.id), ['summary']);
+  assert.equal(f.inputs.length, 3);
+  // In its place, the steps do the work without an agent.
+  model.answer = (_system, user) => (user.includes('What read_page gave:\nThe page at https://d.example/4 says hello.') ? JSON.stringify({ summary: 'Short.' }) : '{}');
+  const made = sessions.made.length;
+  const r = startRun({ app: a.id, slug: a.slug, recipe: cleanRecipe({ ...a, flow: { steps: f.steps } }), source: 'test', inputs: { url: 'https://d.example/4' } });
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.summary, 'Short.');
+  assert.equal(sessions.made.length, made, 'no agent');
+  // An agent step that used a tool no step can call (a shell) is left to its agent.
+  const b = app({ name: 'Shell', flow: { steps: [{ id: 'look', do: 'agent', instructions: 'Look at {{topic}}.' }] } });
+  for (const topic of ['x', 'y', 'z']) {
+    const rb = startRun({ app: b.id, slug: b.slug, recipe: b, source: 'web', inputs: { topic } });
+    let child: store.RunRecord | undefined;
+    for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: rb.id }).find((x) => x.key)); i++) await sleep(25);
+    sessions.tools.set(child!.key!, [called('Bash', { command: `ls ${topic}` })]);
+    await agentAnswers(rb.id, 'look', null);
+    await ended(rb.id);
+  }
+  assert.deepEqual((await http.inject({ method: 'GET', url: `/api/apps/${b.id}/advice` })).json().firm, []);
+  // A step that failed and had an agent do its work, with why.
+  const c = app({ name: 'Fragile', flow: { steps: [{ id: 'read', do: 'tool', tool: 'read_page', with: { url: 'https://broken.example' }, failed: 'agent' }] } });
+  const rc = startRun({ app: c.id, slug: c.slug, recipe: c, source: 'web', inputs: { topic: 'x' } });
+  await agentAnswers(rc.id, 'read', { text: 'Read it.' });
+  await ended(rc.id);
+  const adv2 = (await http.inject({ method: 'GET', url: `/api/apps/${c.id}/advice` })).json();
+  assert.deepEqual(adv2.rescued.map((x: any) => [x.step, x.runs, x.of, x.error, x.run]), [['read', 1, 1, 'That page could not be read', rc.id]]);
+  // Trying a change on the examples is not their last try.
+  const e = store.saveApp(db, { recipe: cleanRecipe({ ...a, examples: [{ id: 'one', inputs: { url: 'https://d.example/4' }, checks: ['{{answer.summary}} = Short.'] }] }), id: a.id });
+  const tried = (await http.inject({ method: 'POST', url: `/api/apps/${e.id}/examples/run`, payload: { recipe: { ...cleanRecipe(e), flow: { steps: f.steps } }, trial: true } })).json();
+  const t = await ended(tried.runs[0].run.id);
+  assert.equal(t.example, 'trial:one');
+  await sleep(50);
+  assert.deepEqual(store.getRun(db, t.id)!.checks, [{ rule: '{{answer.summary}} = Short.', ok: true }]);
+  assert.equal(store.lastExampleRuns(db, e.id).get('one'), undefined);
 });
 
 test('At the same time, and Repeat until: branches meet after the join; rounds go on until the rule holds, seeing the last round', async () => {

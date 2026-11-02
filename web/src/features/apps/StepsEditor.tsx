@@ -3,11 +3,11 @@
 // the form and the steps before put in from a short menu, and the flow's checks as you go. Agents change
 // the same steps through the API; shared/app-manifest.ts has the format and the checks.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, CodeXml, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, Plus, Repeat, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
+import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, CodeXml, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, MessageSquare, Plus, Repeat, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
 import type { AnswerField, AppDef, AppField, AppRecipe } from '@shared/apps';
 import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
 import type { DataOp, Flow, Step, StepKind } from '@shared/app-manifest';
-import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, STEP_KINDS, STEP_TOOLS, titleOf } from '@shared/app-manifest';
+import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf } from '@shared/app-manifest';
 import { api } from '../../lib/api';
 import { FlowGraph } from './FlowGraph';
 import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch } from '../../components/ui';
@@ -553,6 +553,8 @@ interface Ctx {
   tools: ToolInfo[];
   models: { id: string; label: string }[];
   apps: AppDef[];
+  /** Beside an agent's conversation: puts a question about a step in its message box. */
+  ask?: (s: Step) => void;
 }
 
 function Label({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
@@ -896,7 +898,7 @@ function CommonFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void
   useEffect(() => setName(s.id), [s.id]);
   const on = (k: string) => show.has(k);
   const toggle = (k: string) => setShow((x) => new Set(x.has(k) ? [...x].filter((y) => y !== k) : [...x, k]));
-  const fails = s.failed === 'skip' ? 'skip' : Array.isArray(s.failed) ? 'steps' : 'stop';
+  const fails = s.failed === 'skip' || s.failed === 'agent' ? s.failed : Array.isArray(s.failed) ? 'steps' : 'stop';
   const words: [string, string, boolean][] = [
     ['name', 'Its name', on('name')],
     ['if', 'Only when…', on('if') || s.if !== undefined],
@@ -932,10 +934,18 @@ function CommonFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void
       )}
       {(on('failed') || s.failed !== undefined) && (
         <label className="block">
-          <Label>If it fails</Label>
-          <select className={small} value={fails} onChange={(e) => set({ ...s, failed: e.target.value === 'skip' ? 'skip' : e.target.value === 'steps' ? (Array.isArray(s.failed) ? s.failed : []) : undefined })}>
+          <Label hint={fails === 'agent' ? 'It gets what the step was given and why it failed, and hands in the values the steps after it use' : undefined}>If it fails</Label>
+          <select
+            className={small}
+            value={fails}
+            onChange={(e) => {
+              const v = e.target.value;
+              set({ ...s, failed: v === 'skip' || v === 'agent' ? v : v === 'steps' ? (Array.isArray(s.failed) ? s.failed : []) : undefined });
+            }}
+          >
             <option value="stop">The run stops</option>
             <option value="skip">Go on without its values</option>
+            {RESCUED.has(s.do) && <option value="agent">An agent does its work</option>}
             <option value="steps">Run other steps instead</option>
           </select>
         </label>
@@ -1042,6 +1052,11 @@ function StepCard({ s, list, i, last, ctx }: { s: Step; list: ListPath; i: numbe
               <MenuItem icon={<Copy size={14} />} onClick={act(() => ctx.copy(list, i))}>
                 Duplicate
               </MenuItem>
+              {ctx.ask && (
+                <MenuItem icon={<MessageSquare size={14} />} onClick={act(() => ctx.ask!(s))}>
+                  Ask the agent about it
+                </MenuItem>
+              )}
               <MenuItem icon={<Trash2 size={14} />} danger onClick={act(() => ctx.edit(list, (l) => l.filter((_, j) => j !== i)))}>
                 Remove
               </MenuItem>
@@ -1138,7 +1153,7 @@ function StepList({ steps, list, ctx }: { steps: Step[]; list: ListPath; ctx: Ct
 }
 
 /** The builder's What it does, for a template with steps: the steps, where its answer comes from, and the checks. */
-export function StepsEditor({ recipe, onChange }: { recipe: AppRecipe & { flow: Flow }; onChange: (p: Partial<AppRecipe>) => void }) {
+export function StepsEditor({ recipe, onChange, onAsk }: { recipe: AppRecipe & { flow: Flow }; onChange: (p: Partial<AppRecipe>) => void; onAsk?: (s: Step) => void }) {
   const flow = recipe.flow;
   const [open, setOpen] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'graph'>('list');
@@ -1179,6 +1194,7 @@ export function StepsEditor({ recipe, onChange }: { recipe: AppRecipe & { flow: 
     tools,
     models,
     apps,
+    ask: onAsk,
     update: (list, i, s) => setSteps(editList(flow.steps, list, (l) => l.map((x, j) => (j === i ? s : x)))),
     edit: (list, f) => {
       setOpen(null);

@@ -45,10 +45,17 @@ app_screen; app_guide's templates topic says what each part does, and its API to
 ## 4. Safe and cheap
 
 - Limits: runs a day and the most a run may spend. Tools: only those it needs.
-- A step that may fail says what happens then (If it fails…: go on without it, other steps, or ask the user).
+- A step that may fail says what happens then (If it fails…: go on without it, other steps, or `failed: "agent"`:
+  an agent does a tool, model, code, data or app step's work with what it was given, and the run goes on).
 - Nothing reaches outside data and private data and sends things out in one step without an Ask a person first.
 
-## 5. Hand it over
+## 5. Firm it up later
+
+- app_get's advice says what a template's runs showed: a step that failed and had an agent do its work (fix it so
+  it works by itself), and an agent step that did the same each time, with the fixed steps that could do it.
+  Put those in its place, try them on the examples (app_try with the recipe), compare time and cost, then save.
+
+## 6. Hand it over
 
 - A screen (app_screen) when it will be used often or keeps data: start from the one made from its parts.
 - When it should run by itself, propose a scheduled task that runs it (schedule_task with template).

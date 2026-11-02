@@ -12,6 +12,7 @@ import { tryExamples } from './examples.ts';
 import { stepsOf } from './flow.ts';
 import { appChanged, startRun, waitFor } from './runs.ts';
 import { changeScreen, makeScreen, screensOf } from './screens.ts';
+import { adviceOf } from './advice.ts';
 import { getApp, getRun, lastExampleRuns, listApps, saveApp, type RunRecord } from './store.ts';
 
 /** What saving checks a recipe with, and what follows a save (its packages): from index.ts. */
@@ -124,7 +125,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_get',
       description:
-        "The user's templates (Templates in the app: a form, a task or steps, an answer, data, screens, examples). Without app: each one in a line. With app: the whole template as app_save takes it (its format: app_guide's templates and API topics), its screens, and how its examples last went.",
+        "The user's templates (Templates in the app: a form, a task or steps, an answer, data, screens, examples). Without app: each one in a line. With app: the whole template as app_save takes it (its format: app_guide's templates and API topics), its screens, how its examples last went, and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
       inputSchema: { type: 'object', properties: { app: APP } },
       annotations: { readOnlyHint: true },
       async run(a) {
@@ -133,6 +134,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         // An agent that builds it has seen it as it is now (the user's changes too).
         if (seenBy(db, app.id, ctx.key) !== undefined) noteBuilder(db, app.id, ctx.key);
         const last = lastExampleRuns(db, app.id);
+        const advice = await adviceOf(ctx.deps, app);
         return JSON.stringify(
           {
             id: app.id,
@@ -141,6 +143,18 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
             recipe: cleanRecipe(app),
             screens: screensOf(db, app),
             examples: (app.examples ?? []).map((e) => ({ id: e.id, ...(last.get(e.id) ? { last: runOf(last.get(e.id)!, false) } : {}) })),
+            ...(advice.rescued.length || advice.firm.length
+              ? {
+                  advice: [
+                    ...advice.rescued.map((x) => ({ step: x.step, said: `It failed in ${x.runs} of its last ${x.of} runs and an agent did its work; the last time (run ${x.run}): ${x.error}. Change it so that it works by itself.` })),
+                    ...advice.firm.map((f) => ({
+                      step: f.step,
+                      said: `This agent step did the same in its last ${f.runs} runs (${f.calls.length ? `${f.calls.join(', then ')}, then its answer` : 'its answer, with no tools'}), taking about ${f.agent.seconds} s and $${f.agent.costUsd} a run. These steps could do it in its place: try them on its examples (app_try with the recipe) before you save them.`,
+                      steps: f.steps,
+                    })),
+                  ],
+                }
+              : {}),
           },
           null,
           1,

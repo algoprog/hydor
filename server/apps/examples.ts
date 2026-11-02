@@ -17,9 +17,13 @@ export function scopeOfRun(db: DB, r: RunRecord): Scope {
   return { inputs: r.inputs, steps, vars: { reply: r.reply ?? '', today: new Date().toISOString().slice(0, 10) } };
 }
 
+/** What a trial's example is marked with: a change tried before it is used, which is not the example's last try. */
+export const TRIAL = 'trial:';
+
 /** How an example run's checks went (null: it tried no example, or its example is gone). */
 export function checkRun(db: DB, r: RunRecord): CheckResult[] | null {
-  const ex = r.example ? r.recipe.examples?.find((e) => e.id === r.example) : undefined;
+  const id = r.example?.startsWith(TRIAL) ? r.example.slice(TRIAL.length) : r.example;
+  const ex = id ? r.recipe.examples?.find((e) => e.id === id) : undefined;
   if (!ex) return null;
   const scope = scopeOfRun(db, r);
   return (ex.checks ?? []).map((rule) => {
@@ -38,12 +42,12 @@ export function checkRun(db: DB, r: RunRecord): CheckResult[] | null {
 export const passed = (r: Pick<RunRecord, 'status' | 'checks'>) => r.status === 'done' && (r.checks ?? []).every((c) => c.ok);
 
 /** Starts a test run for each of a template's examples (or those named): the recipe given (the builder's), or as saved. */
-export function tryExamples(o: { app: AppDef | null; recipe: AppRecipe; only?: string[]; slug: string }): { example: AppExample; run?: RunRecord; error?: string }[] {
+export function tryExamples(o: { app: AppDef | null; recipe: AppRecipe; only?: string[]; slug: string; trial?: boolean }): { example: AppExample; run?: RunRecord; error?: string }[] {
   return (o.recipe.examples ?? [])
     .filter((e) => !o.only || o.only.includes(e.id))
     .map((example) => {
       try {
-        const run = startRun({ app: o.app?.id ?? 'test', slug: o.slug, recipe: o.recipe, source: 'test', inputs: example.inputs, ...(example.flow ? { flow: example.flow } : {}), example: example.id });
+        const run = startRun({ app: o.app?.id ?? 'test', slug: o.slug, recipe: o.recipe, source: 'test', inputs: example.inputs, ...(example.flow ? { flow: example.flow } : {}), example: o.trial ? `${TRIAL}${example.id}` : example.id });
         return { example, run };
       } catch (e) {
         return { example, error: (e as Error).message };

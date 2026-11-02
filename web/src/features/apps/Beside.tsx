@@ -54,7 +54,7 @@ export function AppSide({ s }: { s: SessionSummary }) {
         </IconButton>
       </div>
       <div className="min-h-0 flex-1">
-        <BuilderPage key={id} id={id} embedded />
+        <BuilderPage key={id} id={id} embedded session={s.key} />
       </div>
     </aside>
   );

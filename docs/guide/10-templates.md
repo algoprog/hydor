@@ -330,7 +330,7 @@ You make a template with steps in its **Edit**, or by asking an agent. In **Edit
 
 Or ask an agent: "Make a template that reads each link I give it, sums it up with a quick model, and keeps it in a reading list." The agent writes the steps, checks them and tries them, and you can change them in **Edit** after. Agents have tools of their own for this, in any session: they read your templates, save one (checked first, its mistakes said in words; a whole template, a few parts of it, or one step), try its examples and wait for how they went, and give it a screen; before handing a template over, they say what a run costs.
 
-In the conversation, each template the agent saves shows as a card, and on a wide screen the template opens beside the conversation as it is built (**Open beside** on the card opens it again, **Open its page** its own page). What you change and save there reaches the agent with your next message, so it builds on your version: an agent that saves after you changed it reads your version first. When the agent saves while you have changes of your own on screen, a note offers **Load it** or **Keep mine**.
+In the conversation, each template the agent saves shows as a card, and on a wide screen the template opens beside the conversation as it is built (**Open beside** on the card opens it again, **Open its page** its own page). What you change and save there reaches the agent with your next message, so it builds on your version: an agent that saves after you changed it reads your version first. When the agent saves while you have changes of your own on screen, a note offers **Load it** or **Keep mine**. In the steps' **⋯** menu there, **Ask the agent about it** starts a message about that step in the conversation's message box.
 
 The kinds of steps:
 
@@ -345,11 +345,17 @@ The kinds of steps:
 - **Ask a person**: the run waits for your answer, yes or no or a short form: a notice opens the run, where a card asks it, and the Inbox lists it. It waits a week unless you set another limit, then it fails.
 - **Run code**: a short program of yours, in JavaScript or Python, gets the values you give it and gives back the step's values. It runs in a sandbox: no network, and none of this computer's files but the packages the template installs. A template file with code steps says so on its install card.
 
-A step can run only when a rule holds, and say what happens when it fails: other steps instead, or carry on without it.
+A step can run only when a rule holds, and say what happens when it fails: other steps instead, carry on without it, or (for a tool, model, code, data or app step) **An agent does its work**: an agent gets what the step was given and why it failed, hands in the values the steps after it use, and the run goes on. The run's page then says **An agent did its work** beside the step, with why it failed.
 
 While a run works, its page lists the steps as they go. Once it ends, **Steps** shows each one with how it went, how long it took and what it cost; the session button opens an agent step's conversation. A run with steps takes no follow-ups: change the answers and run it again.
 
 Once a run with steps has ended, each of its steps has **Run again from here** (↺): a new run with the same answers, in which the steps before that one give what they gave this time (marked **From the last run**, at no cost) and the rest run as the template is now. A **Test run** in **Edit** has it too, with what is on screen: change a later step and try it again without running the first ones.
+
+### Firm it up
+
+Over the steps in **Edit**, a template's latest runs tell you two things. A step that failed and had an agent do its work says in how many runs that happened, and why it failed the last time; **Ask an agent to fix it** asks the agent beside it (when the template is open beside a conversation) or starts a session with the **App builder**. An agent step that did the same in each of its last runs (it read the page it was given, then answered, say) offers **Firm it up**: fixed steps that could do it for less, a tool step for each call the agent made, with the values it made them with, then a model step with its instructions and what the tools gave. **Try them on its examples** (or **Try them**, with the answers of those runs, when it has no examples) runs them first and shows what a run takes and costs with its agent and with the steps; **Use these steps** puts them in its place on screen, and **Save** keeps them. The tool steps it makes have an agent do their work if they fail, so a run that worked before still works.
+
+Agents that build a template see the same, with the steps to try.
 
 ### What a template keeps
 
@@ -401,3 +407,5 @@ Agents in the app can make and run templates for you through the app's API, with
 - "Add a step to my Competitor watch template that tells me only when something changed."
 - "Install the template in reading-list.naget-app from my Downloads folder."
 - "Give my Reading list a screen with the unread links on top and a button that makes this week's digest."
+- "Firm up my Link digest template, and try it on its examples first."
+- "Make the Look up its title step of my Link digest hand its work to an agent when it fails."

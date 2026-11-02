@@ -41,8 +41,12 @@ interface StepCommon {
   title?: string;
   /** A rule: the step runs only when it holds; otherwise it is skipped and its values are empty. */
   if?: string;
-  /** When it fails: steps to run instead ({{error}} says why), or "skip" to go on without its values. Unset: the run stops. */
-  failed?: Step[] | 'skip';
+  /**
+   * When it fails: steps to run instead ({{error}} says why), "skip" to go on without its values, or "agent": an
+   * agent does its work, with what it was given and why it failed, and hands in the values the flow wants of it
+   * (a tool, model, code, data or app step). Unset: the run stops.
+   */
+  failed?: Step[] | 'skip' | 'agent';
 }
 
 /** A session (Claude Code, Codex, Custom…) works on it and hands in its outputs; the app's agent settings unless set here. */
@@ -383,6 +387,27 @@ export function allSteps(steps: Step[]): Step[] {
   return out;
 }
 
+/** A template's flows with one step (by its id, wherever it is) given way to others, in its place (Firm it up). */
+export function swapStep<R extends { flow?: Flow; flows?: Record<string, NamedFlow> }>(r: R, id: string, by: Step[]): Pick<R, 'flow' | 'flows'> {
+  const next = JSON.parse(JSON.stringify({ flow: r.flow, flows: r.flows })) as Pick<R, 'flow' | 'flows'>;
+  const lists: Step[][] = [];
+  const collect = (steps: Step[] | undefined) => {
+    if (!steps) return;
+    lists.push(steps);
+    for (const s of steps) for (const inner of innerLists(s)) collect(inner);
+  };
+  collect(next.flow?.steps);
+  for (const f of Object.values((next.flows ?? {}) as Record<string, NamedFlow>)) collect(f.steps);
+  for (const list of lists) {
+    const i = list.findIndex((s) => s.id === id);
+    if (i >= 0) {
+      list.splice(i, 1, ...by);
+      break;
+    }
+  }
+  return next;
+}
+
 /** The lists of steps inside a step: a Decide's paths, a Repeat's steps, the branches, what runs when it fails. */
 export function innerLists(s: Step): Step[][] {
   const out: Step[][] = [];
@@ -538,6 +563,9 @@ function cleanSteps(raw: unknown, t: Tidy, depth: number, where: string): Step[]
   return out;
 }
 
+/** The kinds of step an agent can stand in for when one fails (failed: "agent"). */
+export const RESCUED = new Set(['model', 'tool', 'code', 'data', 'app']);
+
 function cleanStep(x: any, t: Tidy, depth: number): Step | null {
   if (!x || typeof x !== 'object' || Array.isArray(x)) {
     t.errors.push('Each step should be an object with "do" (what kind of step it is) and "id"');
@@ -567,10 +595,13 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
   const rule = text(x.if, 2000);
   if (rule) common.if = rule;
   if (x.failed === 'skip') common.failed = 'skip';
-  else if (Array.isArray(x.failed)) {
+  else if (x.failed === 'agent') {
+    if (RESCUED.has(kind)) common.failed = 'agent';
+    else t.errors.push(`${where}: only a tool, model, code, data or app step can hand its work to an agent when it fails`);
+  } else if (Array.isArray(x.failed)) {
     const f = cleanSteps(x.failed, t, depth + 1, `${where}, when it fails`);
     if (f.length) common.failed = f;
-  } else if (x.failed !== undefined && x.failed !== null && x.failed !== 'stop') t.errors.push(`${where}: "failed" is a list of steps to run instead, or "skip"`);
+  } else if (x.failed !== undefined && x.failed !== null && x.failed !== 'stop') t.errors.push(`${where}: "failed" is a list of steps to run instead, "skip", or "agent"`);
 
   switch (kind) {
     case 'agent':
@@ -968,6 +999,16 @@ export function valueOf(v: unknown, s: Scope): unknown {
   return v;
 }
 
+/** The values the rest of a template uses from a step, by name ({{read.text}} and {{read.data[0]}}: text, data). */
+export function usedFrom(r: { flow?: Flow; flows?: Record<string, NamedFlow> }, id: string): string[] {
+  const out = new Set<string>();
+  for (const p of refsIn([r.flow ?? null, ...Object.values(r.flows ?? {})])) {
+    const m = /^([A-Za-z_]\w*)\.([A-Za-z_]\w*)/.exec(p);
+    if (m && m[1] === id) out.add(m[2]);
+  }
+  return [...out];
+}
+
 /** The names a text uses ({{x.y}}, and the x of {{#x}}), each once. */
 export function refsIn(tpl: unknown): string[] {
   const out = new Set<string>();
@@ -1334,7 +1375,8 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
           break;
         }
       }
-      const own = maybe ?? (s.if ? `the rule of “${s.id}” does not hold` : s.failed ? `“${s.id}” fails` : null);
+      // An agent that stands in for a failed step gives its values all the same.
+      const own = maybe ?? (s.if ? `the rule of “${s.id}” does not hold` : s.failed && s.failed !== 'agent' ? `“${s.id}” fails` : null);
       if (Array.isArray(s.failed)) {
         const withError = new Set(names);
         withError.add('error');
