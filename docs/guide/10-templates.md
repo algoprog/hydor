@@ -227,7 +227,7 @@ What the runs may use from the app's own tools: web search, the browser, pages, 
 On your template's page:
 
 - **Edit** opens the builder, titled **Edit** followed by the template's name. Press **Save** when done. Changes apply to the next runs; runs already going keep the version they started with.
-- **More** (⋯) → **Duplicate** makes a copy named with " copy" at the end, at an address of its own. Its public page starts closed and its keys are not copied.
+- **More** (⋯) → **Duplicate** makes a copy named with " copy" at the end, at an address of its own. Its screen comes along as a page of its own; its public page starts closed, and its keys and the records it keeps are not copied.
 - **More** (⋯) → **Delete** asks "Delete …?": its runs, keys and public page go with it, and runs still going are stopped. The sessions it started stay.
 
 ## Call a template from your own programs
