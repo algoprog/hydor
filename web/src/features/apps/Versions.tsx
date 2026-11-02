@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import type { AppDef, AppRecipe } from '@shared/apps';
 import { api, enc } from '../../lib/api';
-import { timeAgo } from '../../lib/format';
+import { ago } from '../../lib/format';
 import { toastError } from '../../lib/store';
 import { Button, Throbber } from '../../components/ui';
 import { money } from './api';
@@ -49,7 +49,7 @@ export function Versions({ app, onBring }: { app: AppDef; onBring: (recipe: AppR
               </div>
               <div className="flex flex-wrap gap-x-2 text-[12px] text-fg-3">
                 <span>{BY[v.by]}</span>
-                <span>{`${timeAgo(v.at)} ago`}</span>
+                <span>{ago(v.at)}</span>
                 {i === 0 && <span className="text-accent">Now</span>}
                 {v.examples && <span className={v.examples.passed === v.examples.tried ? 'text-ok' : 'text-err'}>{`Examples: ${v.examples.passed} of ${v.examples.tried} passed`}</span>}
                 {v.examples && <span>{`${v.examples.seconds} s · ${money(v.examples.costUsd)} a run`}</span>}

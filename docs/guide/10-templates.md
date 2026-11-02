@@ -241,6 +241,10 @@ On your template's page:
 
 Each save that changes what a template does is a version: **Versions**, near the end of its **Edit**, lists them newest first, each with what changed (or what the agent said it did), who saved it (**You**, **An agent**, **Its folder** or **Installed**) and when, and, for the versions its examples were tried with as saved, how many passed and what a run took and cost, so you can see whether a change made it better. **Bring it back** puts an earlier version on screen, and **Save** makes it the newest version again. Moving its steps about in the graph, and its screens (which have versions of their own), make no new version. Each run keeps the version it ran.
 
+### Work on it as files
+
+**Its folder**, near the end of a saved template's **Edit**, puts the template in a folder of files (**Make its folder**; by default in Naget/Templates in your home folder), to change it in any editor or with a coding agent opened on that folder. app.json is the template (what it asks, does and gives back), instructions/ holds each step's instructions in Markdown, steps/ each code step as the function it runs, screens/ its screens, and graph.json where its steps sit; .naget/ has a schema of app.json and the types of a code step, so your editor completes and checks them. Each change you save there comes here as a version by **Its folder**, and the template open in its **Edit** changes with it (or says **It changed in its folder while you changed it here.**); a mistake there is said here and changes nothing. A save here writes the folder again, and **Stop keeping it in step** leaves the files where they are. Its data stays here, not in the folder.
+
 ## Call a template from your own programs
 
 Scripts, shortcuts and other programs can run your template with a key and get its answer back. Open your template → **API & sharing** → **API**.

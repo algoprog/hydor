@@ -38,7 +38,9 @@ import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
 import { adviceOf } from './advice.ts';
-import { appChanged, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
+import { defaultFolder, folderOf, folderSaved, initFolders, linkFolder, unlinkFolder, unwatch } from './folder.ts';
+import { appSchema } from './schema.ts';
+import { appChanged, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -158,6 +160,17 @@ function routes(d: Deps) {
   ensureTables(db);
   ensureDataTables(db);
   initAppEdits(db);
+  // Templates with a folder of files keep in step with it: a change there is a version, a save here writes it.
+  initFolders({
+    db,
+    check: (raw) => problemsOf(db, raw),
+    changed: (a) => appChanged(a, 'folder'),
+    told: (id, error) => d.broadcast({ t: 'feature', id: 'apps', data: { folder: { id, error: error ?? null } } }),
+  });
+  onAppSaved((id, by) => {
+    const a = by === 'folder' ? null : getApp(db, id);
+    if (a) folderSaved(db, a);
+  });
   // Records kept before search by meaning was on (or while it was off) get their vectors when it answers.
   embedSoon(db, 20_000);
   setDeps(d);
@@ -289,6 +302,7 @@ function routes(d: Deps) {
     if (!a) throw new HttpError(404, 'No such template');
     for (const r of listRuns(db, { app: a.id, status: ['queued', 'starting', 'running', 'waiting'], steps: true })) await stopRun(r.id);
     removeScreens(db, a);
+    unwatch(a.id);
     deleteApp(db, a.id);
     deleteRuns(db, a.id);
     clearData(db, a.id);
@@ -415,6 +429,36 @@ function routes(d: Deps) {
     // A trial (a change tried before it is used, as Firm it up does) is not the examples' last try.
     const runs = tryExamples({ app: a, recipe, only, slug: a?.slug ?? 'test', trial: b.trial === true });
     return { runs: runs.map((x) => ({ example: x.example.id, ...(x.run ? { run: runView(x.run) } : {}), ...(x.error ? { error: x.error } : {}) })) };
+  });
+
+  /** The JSON Schema of a template's app.json, for an editor to complete and check it with. */
+  app.get('/api/apps/schema.json', async () => appSchema());
+
+  /** Its folder of files, if it has one (and the mistake in it), and where one would go. */
+  app.get('/api/apps/:id/folder', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such template');
+    return { folder: folderOf(a), suggested: defaultFolder(a.slug) };
+  });
+
+  /** Makes its folder (written out, then kept in step with it): an empty folder, or one of its own. */
+  app.post('/api/apps/:id/folder', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such template');
+    const want = (req.body as { path?: unknown } | undefined)?.path;
+    try {
+      const saved = linkFolder(db, a, typeof want === 'string' && want.trim() ? want.trim() : defaultFolder(a.slug));
+      return { app: saved, folder: folderOf(saved) };
+    } catch (e) {
+      throw new HttpError(400, (e as Error).message);
+    }
+  });
+
+  /** Stops keeping it and its folder in step; the files stay. */
+  app.delete('/api/apps/:id/folder', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such template');
+    return { app: unlinkFolder(db, a) };
   });
 
   /** Its versions, newest first: each save that changed what it is, who saved it and what changed, and how its examples went with it. */

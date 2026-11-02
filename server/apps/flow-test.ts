@@ -27,6 +27,7 @@ import { setHelperModel } from '../helper.ts';
 import { repoRoot } from '../memory/store.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { findRecords } from './data.ts';
+import { folderOf, readFolder } from './folder.ts';
 import { createPage, initPages, listPages, pageInfo, pageSource } from '../pages/store.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as vec from '../memory/vectors.ts';
@@ -644,6 +645,73 @@ test('versions: each save that changes what it does is one, saying who saved it 
   assert.equal(put.statusCode, 200, put.body);
   assert.deepEqual(store.listVersions(db, a.id).slice(0, 1).map((v) => [v.n, v.by, v.line]), [[3, 'you', 'Brought back version 1']]);
   assert.equal((await http.inject({ method: 'GET', url: `/api/apps/${a.id}/versions/9` })).statusCode, 404);
+});
+
+test('a template as a folder: its files written out and read back the same; a change saved there is a version by its folder, a mistake changes nothing, a save here writes it again', async () => {
+  const a = app({
+    name: 'Foldered',
+    answer: [{ id: 'line', label: 'Line', type: 'text', required: true }],
+    flow: {
+      steps: [
+        { id: 'say', title: 'Say', do: 'model', model: 'fake', instructions: 'Say {{topic}}\nin two lines', outputs: { line: 'text' } },
+        { id: 'count', do: 'code', language: 'javascript', code: 'return { n: String(input.line).length };', with: { line: '{{say.line}}' } },
+      ],
+    },
+    graph: { at: { say: { x: 3, y: 4 } } },
+  });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-folder-'));
+  const made = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/folder`, payload: { path: dir } });
+  assert.equal(made.statusCode, 200, made.body);
+  const file = (rel: string) => fs.readFileSync(path.join(dir, rel), 'utf8');
+  const json = JSON.parse(file('app.json'));
+  assert.equal(json.$schema, './.naget/app.schema.json');
+  assert.deepEqual(json.flow.steps[0].instructions, { file: 'instructions/say.md' });
+  assert.equal(file('instructions/say.md'), 'Say {{topic}}\nin two lines\n');
+  assert.match(file('steps/count.js'), /export default async function step\(input\) \{\n {2}return \{ n: String\(input\.line\)\.length \};\n\}\n$/);
+  assert.deepEqual(JSON.parse(file('graph.json')), { at: { say: { x: 3, y: 4 } } });
+  assert.ok(fs.existsSync(path.join(dir, '.naget/app.schema.json')) && fs.existsSync(path.join(dir, '.naget/step.d.ts')) && fs.existsSync(path.join(dir, 'README.md')));
+  // Read back, it is the same template.
+  const back = readFolder(dir);
+  assert.deepEqual(back.errors, []);
+  assert.equal(store.coreOf(cleanRecipe(back.recipe)), store.coreOf(store.getApp(db, a.id)!));
+  const until = async (f: () => boolean) => {
+    for (let i = 0; i < 150 && !f(); i++) await sleep(40);
+    assert.ok(f());
+  };
+  const step = (n: number) => store.getApp(db, a.id)!.flow!.steps[n] as unknown as Record<string, string>;
+  // A change saved in the folder is a version by its folder.
+  fs.writeFileSync(path.join(dir, 'instructions/say.md'), 'Say {{topic}} warmly\n');
+  await until(() => step(0).instructions === 'Say {{topic}} warmly');
+  assert.equal(store.listVersions(db, a.id)[0].by, 'folder');
+  fs.writeFileSync(path.join(dir, 'steps/count.js'), file('steps/count.js').replace('.length', '.length * 2'));
+  await until(() => step(1).code === 'return { n: String(input.line).length * 2 };');
+  // A mistake changes nothing, and says what it is.
+  const before = store.getApp(db, a.id)!.updatedAt;
+  fs.writeFileSync(path.join(dir, 'app.json'), '{ "name": ');
+  await until(() => !!folderOf(store.getApp(db, a.id)!)?.error);
+  assert.match(folderOf(store.getApp(db, a.id)!)!.error!, /^app\.json: /);
+  assert.equal(store.getApp(db, a.id)!.updatedAt, before);
+  // A save here writes the folder again, and the mistake is gone.
+  const put = await http.inject({ method: 'PUT', url: `/api/apps/${a.id}`, payload: { recipe: { ...cleanRecipe(store.getApp(db, a.id)!), name: 'Foldered again' } } });
+  assert.equal(put.statusCode, 200, put.body);
+  assert.equal(JSON.parse(file('app.json')).name, 'Foldered again');
+  assert.equal(folderOf(store.getApp(db, a.id)!)!.error, undefined);
+  await sleep(700);
+  assert.equal(store.listVersions(db, a.id)[0].by, 'you', 'its own write is no change from the folder');
+  // A folder with other files in it is not taken.
+  const busy = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-folder-busy-'));
+  fs.writeFileSync(path.join(busy, 'notes.txt'), 'mine');
+  assert.match((await http.inject({ method: 'POST', url: `/api/apps/${a.id}/folder`, payload: { path: busy } })).json().error, /other files in it/);
+  // Stopped: the files stay, and changes there come no more.
+  await http.inject({ method: 'DELETE', url: `/api/apps/${a.id}/folder` });
+  assert.equal(store.getApp(db, a.id)!.folder, undefined);
+  fs.writeFileSync(path.join(dir, 'instructions/say.md'), 'Never mind\n');
+  await sleep(700);
+  assert.equal(step(0).instructions, 'Say {{topic}} warmly');
+  // The schema an editor checks app.json with.
+  assert.equal((await http.inject({ method: 'GET', url: '/api/apps/schema.json' })).json().title, 'A Naget Agent template (app.json)');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(busy, { recursive: true, force: true });
 });
 
 test('At the same time, and Repeat until: branches meet after the join; rounds go on until the rule holds, seeing the last round', async () => {

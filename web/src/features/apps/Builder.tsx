@@ -28,6 +28,7 @@ import { InstallFromFile } from './Install';
 import { Advice } from './Advice';
 import { ExamplesEditor } from './Examples';
 import { Versions } from './Versions';
+import { FolderBox } from './Folder';
 import { KeepsEditor } from './Keeps';
 import { RunSteps } from './Steps';
 import { StepsEditor } from './StepsEditor';
@@ -369,6 +370,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   // The version on screen as it was loaded or saved here: what differs from it is not saved yet.
   const loaded = useRef('');
   const [newer, setNewer] = useState<AppDef | null>(null);
+  const [newerBy, setNewerBy] = useState<string>('');
   const load = (a: AppDef) => {
     const r = recipeOf(a);
     loaded.current = JSON.stringify(r);
@@ -412,12 +414,15 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   const set = (p: Partial<AppRecipe>) => setRecipe((r) => (r ? { ...r, ...p } : r));
   // Another save (an agent's, or this template open elsewhere): taken at once, or offered while there are changes here.
   useFeatureEvent('apps', ({ data }) => {
-    const a = (data as { app?: { id: string; updatedAt: number } } | undefined)?.app;
+    const a = (data as { app?: { id: string; updatedAt: number; by?: string } } | undefined)?.app;
     // While this page saves, the news is of its own save.
     if (!a || !saved || busy || a.id !== saved.id || a.updatedAt <= saved.updatedAt) return;
     api<{ app: AppDef }>(`/api/apps/${enc(a.id)}`).then((r) => {
-      if (recipe && JSON.stringify(recipe) !== loaded.current) setNewer(r.app);
-      else load(r.app);
+      if (recipe && JSON.stringify(recipe) !== loaded.current) (setNewer(r.app), setNewerBy(a.by ?? ''));
+      else {
+        load(r.app);
+        if (a.by === 'folder') toast('Changed in its folder');
+      }
     }, () => {});
   });
   const used = useMemo(() => new Set(placeholders(recipe?.prompt ?? '')), [recipe?.prompt]);
@@ -538,7 +543,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
           )}
           {newer && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">
-              <span className="min-w-0 flex-1">A newer version was saved (by the agent, or elsewhere) while you changed it here.</span>
+              <span className="min-w-0 flex-1">{newerBy === 'folder' ? 'It changed in its folder while you changed it here.' : 'A newer version was saved (by the agent, or elsewhere) while you changed it here.'}</span>
               <Button size="sm" variant="secondary" onClick={() => load(newer)}>
                 Load it
               </Button>
@@ -757,6 +762,11 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             )}
           </Section>
 
+          {saved && !embedded && (
+            <Section title="Its folder" sub="Work on it as files, in any editor or with a coding agent: what you save there comes here.">
+              <FolderBox app={saved} />
+            </Section>
+          )}
           {saved && (
             <Section title="Versions" sub="Each save that changed what it does (by you, an agent or its folder), and how its examples went with it.">
               <Versions
