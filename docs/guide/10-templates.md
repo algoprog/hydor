@@ -201,6 +201,12 @@ The fields the agent fills in when it is done. They show as a card or a table, a
 
 The app checks what the agent hands in: numbers must be numbers, dates real dates, links full web addresses. When something doesn't fit, the agent is told what to fix. A template can have up to 30 answer fields, and a table up to 12 columns. A new answer field takes its name for programs from its heading when you save; after that the name stays, so programs that read it keep working.
 
+### Examples
+
+Examples are answers to try the template with, and checks on what a run gives back, so you can try a change and notice when the template gets worse. **Add an example** adds one: give it a name if you like, fill in its answers, and **Add a check** for each thing a good run gives. A check is a rule on the run's values, as a step's rule is: `{{answer.unread}} > 0`, `{{find.count}} = 3`, `{{reply}} contains Lisbon`. The **{ }** button puts in a value: the form's answers, what the steps gave, **Its answer** (`{{answer.field}}`) and **Its reply**.
+
+**Try them** runs every example as a test run, with the template as it is on screen, saved or not; the flask button beside one tries only that one. Each shows how its last try went, **Passed**, how many checks failed or **Did not finish**, with how long it took and what it cost; an open example says what each failed check saw ("answer.unread is 2").
+
 ### Who does it
 
 The section reads: "Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits)."
@@ -220,7 +226,7 @@ What the runs may use from the app's own tools: web search, the browser, pages, 
 
 ### Test before you save
 
-**Test run** (on a phone, the flask button) opens a dialog with the form as it is on screen, saved or not. Fill it in and press **Run the test**: the run plays out in the dialog. **Open the session** shows its conversation, and **Test again** returns to the form. Test runs of a saved template show in its **Runs** tab as "Test run".
+**Test run** (on a phone, the flask button) opens a dialog with the form as it is on screen, saved or not. Fill it in and press **Run the test**: the run plays out in the dialog. **Open the session** shows its conversation, and **Test again** returns to the form. Test runs of a saved template show in its **Runs** tab as "Test run". **Keep as an example** keeps a finished test run's answers as a new example, to give checks under **Examples**.
 
 ## Change, copy or delete a template
 

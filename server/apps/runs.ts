@@ -168,6 +168,8 @@ export interface StartInput {
   flow?: string;
   /** Run again from a step: these steps (by id) give what they gave in that run, without running again. */
   reuse?: { run: string; steps: string[] };
+  /** The example it tries (its checks are read when it ends). */
+  example?: string;
 }
 
 /** The questions a run answers: the template's form, or the inputs of the flow it runs. */
@@ -193,7 +195,7 @@ export function startRun(o: StartInput): RunRecord {
     if (typeof f?.data !== 'string' || typeof f.name !== 'string') throw new HttpError(400, 'Send each file as a name and its base64 contents');
     if (f.data.length * 0.75 > maxFile) throw new HttpError(413, `${f.name} is too big (at most ${maxFile >> 20} MB)`);
   }
-  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow });
+  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow, example: o.example });
   // Its first steps replay that run's (before it starts, so its flow finds them).
   if (o.reuse?.steps.length) reuseSteps(d().db, o.reuse.run, r.id, o.reuse.steps);
   if (!o.queued) go(r, o);

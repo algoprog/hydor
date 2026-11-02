@@ -2,7 +2,7 @@
 // filling the prompt from the form, the answer fields (their schema for submit_result and the check
 // of what the agent hands in), and CSV in and out for runs over many rows.
 import type { Agent } from './types.ts';
-import { cleanData, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppScreen, type DataCollection, type Flow, type NamedFlow, type Requires } from './app-manifest.ts';
+import { cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppExample, type AppScreen, type CheckResult, type DataCollection, type Flow, type NamedFlow, type Requires } from './app-manifest.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -110,6 +110,8 @@ export interface AppRecipe {
   flows?: Record<string, NamedFlow>;
   /** Its screens: pages of its own ("main" opens on its page), made with naget.app and the App parts. */
   screens?: Record<string, AppScreen>;
+  /** Saved inputs with checks, to try it and to notice when it gets worse. */
+  examples?: AppExample[];
 }
 
 /** A built-in template: a recipe to run as it is, or to start an app from. */
@@ -160,6 +162,9 @@ export interface AppRun {
   step?: string;
   /** Which of its flows it ran, when not the main one. */
   flow?: string;
+  /** The example it tried, and how that example's checks went once it ended. */
+  example?: string;
+  checks?: CheckResult[];
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
@@ -686,6 +691,7 @@ export function cleanRecipe(raw: any): AppRecipe {
   const requires = cleanRequires(r.requires).requires;
   const flows = cleanFlows(r.flows).flows;
   const screens = cleanScreens(r.screens);
+  const examples = cleanExamples(r.examples).examples;
   return {
     name: str(r.name, 60) || 'Untitled template',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
@@ -710,6 +716,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(requires ? { requires } : {}),
     ...(flows ? { flows } : {}),
     ...(screens ? { screens } : {}),
+    ...(examples ? { examples } : {}),
   };
 }
 

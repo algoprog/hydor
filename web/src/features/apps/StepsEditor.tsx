@@ -152,7 +152,7 @@ interface Val {
   ref: string;
   label: string;
 }
-interface ValGroup {
+export interface ValGroup {
   label: string;
   vals: Val[];
 }
@@ -228,8 +228,15 @@ function ValuesMenu({ anchor, open, onClose, groups, onPick }: { anchor: RefObje
   );
 }
 
+/** The values a check on a run can read: the form's answers, what the steps gave, the answer fields and the reply. */
+export function checkValues(recipe: AppRecipe): ValGroup[] {
+  const groups = recipe.flow ? valuesAt(recipe.flow, [], recipe.flow.steps.length, recipe.fields).filter((g) => g.label !== 'Other') : [{ label: 'The form', vals: recipe.fields.map((f) => ({ ref: f.id, label: f.label || f.id })) }];
+  groups.push({ label: 'Its answer', vals: recipe.answer.map((a) => ({ ref: `answer.${a.id}`, label: a.label || a.id })) }, { label: 'Other', vals: [{ ref: 'reply', label: 'Its reply' }] });
+  return groups.filter((g) => g.vals.length);
+}
+
 /** A text box for words with values in them, and a button to put one in where the cursor is. */
-function RefText({ value, onChange, groups, multiline, placeholder, mono }: { value: string; onChange: (v: string) => void; groups: ValGroup[]; multiline?: boolean; placeholder?: string; mono?: boolean }) {
+export function RefText({ value, onChange, groups, multiline, placeholder, mono }: { value: string; onChange: (v: string) => void; groups: ValGroup[]; multiline?: boolean; placeholder?: string; mono?: boolean }) {
   const box = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);

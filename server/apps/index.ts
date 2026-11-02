@@ -13,7 +13,8 @@ import fs from 'node:fs';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
-import { checkFlow, cleanData, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
+import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
+import { checkRun, tryExamples } from './examples.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -33,7 +34,7 @@ import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
-import { finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
+import { finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -46,6 +47,7 @@ import {
   getBatch,
   getRun,
   KEY_PREFIX,
+  lastExampleRuns,
   listApps,
   listBatches,
   listKeys,
@@ -53,6 +55,7 @@ import {
   revokeKey,
   runView,
   saveApp,
+  updateRun,
   usageSince,
   type RunRecord,
 } from './store.ts';
@@ -88,7 +91,7 @@ function customModels(): { id: string; label: string; provider: string }[] {
 function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
   const src = raw && typeof raw === 'object' ? raw : {};
   const recipe = cleanRecipe(src);
-  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors];
+  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanExamples(src.examples).errors];
   if (!recipe.prompt.trim() && !recipe.flow) errors.push('Write the prompt: it is what the agent is asked to do');
   for (const f of recipe.fields) if (f.type === 'choice' && !f.options?.length) errors.push(`${f.label}: give the choices`);
   const checked = checkFlow(recipe);
@@ -169,6 +172,12 @@ function routes(d: Deps) {
   });
   onFinished((r) => {
     if (r.source === 'task') d.scheduler?.appRunEnded(r.id, taskEnd(r));
+    // A run that tried an example: how its checks went.
+    const checks = checkRun(db, r);
+    if (checks) {
+      updateRun(db, r.id, { checks });
+      noteChanged(r.id);
+    }
   });
   const link = (key: string) => `${d.publicBase()}/s/${encodeURIComponent(key)}`;
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
@@ -371,6 +380,32 @@ function routes(d: Deps) {
       queued: (s?.queue ?? []).map((m) => ({ id: m.id, text: m.text.slice(0, 4000), at: m.at })),
       noAsks: noAsks(r),
     };
+  });
+
+  /** Tries a template's examples (or those named): a test run each, with the recipe sent (the builder's, unsaved) or as saved. */
+  app.post('/api/apps/:id/examples/run', async (req) => {
+    const id = P(req).id;
+    const a = id === 'test' ? null : getApp(db, id);
+    if (!a && id !== 'test') throw new HttpError(404, 'No such template');
+    const b = (req.body ?? {}) as { recipe?: unknown; only?: unknown };
+    let recipe: AppRecipe | null = a;
+    if (b.recipe && typeof b.recipe === 'object') {
+      const { errors } = problemsOf(db, b.recipe);
+      if (errors.length) throw new HttpError(400, errors.length === 1 ? errors[0] : `Fix these first: ${errors.join('; ')}`);
+      recipe = cleanRecipe(b.recipe);
+    }
+    if (!recipe?.examples?.length) throw new HttpError(400, 'It has no examples yet');
+    const only = Array.isArray(b.only) ? b.only.filter((x): x is string => typeof x === 'string') : undefined;
+    const runs = tryExamples({ app: a, recipe, only, slug: a?.slug ?? 'test' });
+    return { runs: runs.map((x) => ({ example: x.example.id, ...(x.run ? { run: runView(x.run) } : {}), ...(x.error ? { error: x.error } : {}) })) };
+  });
+
+  /** A saved template's examples, each with its last run: how it went, its checks, what it cost and how long it took. */
+  app.get('/api/apps/:id/examples', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such template');
+    const last = lastExampleRuns(db, a.id);
+    return { examples: (a.examples ?? []).map((e) => ({ ...e, ...(last.has(e.id) ? { last: runView(last.get(e.id)!) } : {}) })) };
   });
 
   /** The person's answer to the run's Ask a person step: yes or no, or its form's values; the run goes on. */
