@@ -1,7 +1,8 @@
 // A run's steps as its page shows them: how each went, how long it took and what it cost, why it did not
-// finish, and each agent step's session. The builder changes them (StepsEditor.tsx).
+// finish, and each agent step's session; once it has ended, Run again from here on each step (the steps
+// before it give what they gave this time). The builder changes them (StepsEditor.tsx).
 import { useState } from 'react';
-import { ChevronRight, MessageSquareText } from 'lucide-react';
+import { ChevronRight, MessageSquareText, RotateCcw } from 'lucide-react';
 import type { RunStepView } from '@shared/apps';
 import { openSession } from '../../lib/nav';
 import { cx, Throbber } from '../../components/ui';
@@ -14,8 +15,8 @@ const SAID: Record<RunStepView['status'], string> = { done: 'Done', failed: 'Did
 /** How long a step took, from a second up. */
 const took = (s: RunStepView) => (s.startedAt && s.endedAt && s.endedAt - s.startedAt >= 1000 ? `${Math.round((s.endedAt - s.startedAt) / 1000)} s` : '');
 
-/** A run's steps: each with how it went, what it cost, why it did not finish, and its session. */
-export function RunSteps({ steps }: { steps: RunStepView[] }) {
+/** A run's steps: each with how it went, what it cost, why it did not finish, and its session; `onAgain` runs it again from one. */
+export function RunSteps({ steps, onAgain }: { steps: RunStepView[]; onAgain?: (step: string) => void }) {
   const [open, setOpen] = useState(true);
   const shown = steps.filter((s) => s.kind !== 'round');
   if (!shown.length) return null;
@@ -41,12 +42,17 @@ export function RunSteps({ steps }: { steps: RunStepView[] }) {
                       {s.path.split('/').slice(0, -1).join(' › ')}
                     </span>
                   )}
-                  <span className="text-[12px] text-fg-3">{SAID[s.status]}</span>
+                  <span className="text-[12px] text-fg-3">{s.reused ? 'From the last run' : SAID[s.status]}</span>
                   {took(s) && <span className="text-[12px] text-fg-3">{took(s)}</span>}
                   {!!s.costUsd && <span className="text-[12px] text-fg-3">{money(s.costUsd)}</span>}
                 </div>
                 {s.error && s.status !== 'skipped' && <div className="mt-0.5 text-[12.5px] break-words text-err">{s.error}</div>}
               </div>
+              {onAgain && !/[/#]/.test(s.path) && (
+                <button type="button" title="Run again from here" aria-label="Run again from here" className="shrink-0 rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg" onClick={() => onAgain(s.id)}>
+                  <RotateCcw size={14} />
+                </button>
+              )}
               {s.session && (
                 <button
                   type="button"

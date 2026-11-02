@@ -113,7 +113,8 @@ agents that speak ACP and take MCP servers.
   A template can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
   repeat over a list or until something holds, branches side by side, another template, its own data), each
   handing typed values to the next, laid out in its Edit (steps added from a short menu, values put in from the
-  form and the steps before, checks shown as you go) or by an agent, shown step by step on the run's page and
+  form and the steps before, checks shown as you go) or by an agent, shown step by step on the run's page, run
+  again from any step there (the steps before it giving what they gave, also from a test run in its Edit) and
   resumed after a restart; keep records between runs that its steps, its agents and the API share (lists named in
   its Edit, with the fields their records hold); remember across runs in a memory of its own; and install the
   Node and Python packages it needs in a folder of its own. Its steps, its agents and programs search its records

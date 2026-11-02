@@ -33,7 +33,7 @@ import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
-import { finish, followUpsOf, isFlowRun, markOf, noteAgentRun, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
+import { finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -372,6 +372,42 @@ function routes(d: Deps) {
   });
 
   /** A follow-up from the run's page: it goes to the run's session (after the turn running now, if one is). */
+  /**
+   * Run again from a step: the same answers, the template as it is now (or the recipe sent, a test from the
+   * builder), and the steps before that one giving what they gave in this run, without running again.
+   */
+  app.post('/api/apps/runs/:runId/again', async (req) => {
+    const old = getRun(db, P(req).runId);
+    if (!old || old.source === 'step' || old.source === 'app' || old.source === 'public') throw new HttpError(404, 'No such run');
+    if (isActive(old.status)) throw new HttpError(409, 'It is still running');
+    const b = (req.body ?? {}) as { from?: unknown; recipe?: unknown };
+    const a = old.app.startsWith('tpl:') || old.app === 'test' ? null : getApp(db, old.app);
+    let recipe: AppRecipe = a ?? old.recipe;
+    if (b.recipe && typeof b.recipe === 'object') {
+      const { errors } = problemsOf(db, b.recipe);
+      if (errors.length) throw new HttpError(400, errors.length === 1 ? errors[0] : `Fix these first: ${errors.join('; ')}`);
+      recipe = cleanRecipe(b.recipe);
+    }
+    const flow = old.flow ? recipe.flows?.[old.flow] : recipe.flow;
+    if (!flow) throw new HttpError(400, 'It has no steps to run again from');
+    const from = typeof b.from === 'string' ? b.from : '';
+    const k = from ? flow.steps.findIndex((s) => s.id === from) : 0;
+    if (k < 0) throw new HttpError(400, `It has no step “${from}” now`);
+    if (formOf(recipe, old.flow).some((f) => f.type === 'file' && old.inputs[f.id])) throw new HttpError(400, 'Its files do not come along: run it again from its form');
+    const test = old.source === 'test' || !!b.recipe;
+    if (a && !test) checkDaily(db, a);
+    const r = startRun({
+      app: old.app,
+      slug: a?.slug ?? (old.app.startsWith('tpl:') ? old.app.slice(4) : 'test'),
+      recipe,
+      source: test ? 'test' : 'web',
+      inputs: old.inputs,
+      ...(old.flow ? { flow: old.flow } : {}),
+      reuse: { run: old.id, steps: flow.steps.slice(0, k).map((s) => s.id) },
+    });
+    return { run: runView(r) };
+  });
+
   app.post('/api/apps/runs/:runId/ask', async (req) => {
     const r = getRun(db, P(req).runId);
     if (!r) throw new HttpError(404, 'No such run');

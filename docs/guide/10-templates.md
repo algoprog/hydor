@@ -338,6 +338,8 @@ A step can run only when a rule holds, and say what happens when it fails: other
 
 While a run works, its page lists the steps as they go. Once it ends, **Steps** shows each one with how it went, how long it took and what it cost; the session button opens an agent step's conversation. A run with steps takes no follow-ups: change the answers and run it again.
 
+Once a run with steps has ended, each of its steps has **Run again from here** (↺): a new run with the same answers, in which the steps before that one give what they gave this time (marked **From the last run**, at no cost) and the rest run as the template is now. A **Test run** in **Edit** has it too, with what is on screen: change a later step and try it again without running the first ones.
+
 ### What a template keeps
 
 A template can keep data between its runs: lists of records, like the links of a reading list or the clients of a small CRM. Its steps add, find and change them, and so do its agents, with a tool of their own. A list can say what each record holds (a title, a score, a date…), and the app then checks what goes in. In **Edit**, **What it keeps** lists them: **Add a list**, then give it a name and, if you like, the fields its records hold (without fields, any record goes in).

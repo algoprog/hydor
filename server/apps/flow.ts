@@ -679,14 +679,17 @@ async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'st
 export function stepsOf(runId: string, o: { values?: boolean } = {}): RunStepView[] {
   return listSteps(db(), runId).map((st) => {
     const child = st.childRun ? getRun(db(), st.childRun) : null;
-    const cost = st.childRun ? child?.costUsd : st.costUsd;
+    const cost = st.reused ? undefined : st.childRun ? child?.costUsd : st.costUsd;
     const view: RunStepView = { path: st.path, id: st.id, kind: st.kind, title: st.title, status: child && st.status === 'running' && child.status === 'waiting' ? 'waiting' : st.status };
     if (st.error) view.error = st.error;
     if (cost !== undefined) view.costUsd = Math.round(cost * 10000) / 10000;
     if (st.childRun) view.run = st.childRun;
     if (child?.key) view.session = child.key;
-    if (st.startedAt) view.startedAt = st.startedAt;
-    if (st.endedAt) view.endedAt = st.endedAt;
+    if (st.reused) view.reused = true;
+    else {
+      if (st.startedAt) view.startedAt = st.startedAt;
+      if (st.endedAt) view.endedAt = st.endedAt;
+    }
     if (o.values && st.outputs) {
       const s = JSON.stringify(st.outputs);
       view.values = s.length > 6000 ? Object.fromEntries(Object.entries(st.outputs).map(([k, v]) => [k, asText(v, 1500)])) : st.outputs;

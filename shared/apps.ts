@@ -185,6 +185,8 @@ export interface RunStepView {
   endedAt?: number;
   /** What it gave (long values shortened). */
   values?: Record<string, unknown>;
+  /** Taken over from the run it ran again from: what it gave then, not run again. */
+  reused?: true;
 }
 
 /** How a run is getting on, for its page: the latest steps, and what it waits for. */
