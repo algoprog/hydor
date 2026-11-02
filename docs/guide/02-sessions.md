@@ -247,6 +247,8 @@ A wide message box shows small meters on the right of its bottom row:
 
 ## Stop a turn, stop the agent or resume
 
+The Stop button by the message box has a rotating ring while the agent is starting or working. The ring pauses when it needs you, and stays still if your device asks for reduced motion.
+
 - **Stop a turn**: press **Stop** in the header, or the round square button by the message box. (Esc doesn't stop it: it only closes what is open, such as the find bar or a list.) The agent stops what it is doing; the turn shows "Stopped after…". The agent stays ready for your next message, and the queue pauses until you resume it.
 - **Stop the agent process**: the session's menu (⋯) → **More** → **Stop the agent process**, when no turn is running. The agent's program ends; the session and its history stay, and it shows **Stopped**.
 - **Resume**: the header's **Resume** starts the agent again with the whole conversation, or just send a message ("Message to resume this session…"). If the session was written to seconds ago, perhaps from VS Code or a terminal, the app asks first, since two programs writing one session can damage its history.
@@ -395,3 +397,4 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - "Give the session 'Fix upload' the goal: npm test passes and uploads of 2 GB work."
 - "Fork the release-notes session and try a shorter version."
 - "Switch the session 'Data cleanup' to Accept edits and send it: carry on with the next file."
+- "What does the rotating ring on Stop mean?"

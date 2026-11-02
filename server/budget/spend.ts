@@ -28,6 +28,7 @@ export function rowCost(db: DB, r: Row): number | null {
   if (r.agent === 'acp') {
     // Custom's model ids say where they run: ollama/…, vllm/… (here, free), endpoint/<id>/<model>, openrouter/<model>.
     if (/^(ollama|vllm)\//.test(model)) return 0;
+    if (model.startsWith('openrouter/')) return costOf(db, model, t);
     return costOf(db, model, t) ?? costOf(db, model.replace(/^(endpoint\/[^/]+|openrouter)\//, ''), t);
   }
   return costOf(db, model, t);

@@ -22,7 +22,10 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 
 - Start Claude Code, Codex or another [ACP](https://agentclientprotocol.com) agent (Gemini CLI, OpenCode…) in any folder,
   their programs installed and kept up to date for you
-- Follow every step in plain words, approve commands and edits, and see each change as a diff
+- Find every session with activity in the last five minutes in the sidebar’s Active group
+- A rotating ring on the prompt bar’s Stop button makes running sessions easy to spot
+- Follow every step in plain words, approve commands and edits, and see each change as a diff; Custom shows
+  the Naget loading animation while it works
 - Get a notification when a session finishes or needs you (approve right from it), see everything waiting on you
   in one inbox, and carry on from your phone, or talk to it hands-free while you walk
 - Open pull requests on GitHub or Gitea, and review a branch file by file
@@ -31,6 +34,7 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   as a graph, merges and conflicts in plain words), notebooks, scheduled tasks and your plans' limits in the same app
 - Switch between several accounts and machines from the sidebar, and sign in several Claude or Codex plans: when
   one hits its limit, sessions carry on with another
+- OpenRouter costs and token usage appear automatically, with prices fetched from OpenRouter
 - Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
 - Get help with anything, not just code: assistants for research, writing and planning (switch between them
   mid-session), web search (Naget Search by default) and a browser you can watch and take over, documents in and

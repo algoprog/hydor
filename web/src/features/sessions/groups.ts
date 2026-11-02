@@ -6,7 +6,6 @@
 // autoFolders). With grouping off, or while the list shows one space, the rest all go by day.
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
-import { activityOf } from '../../lib/activity';
 import { basename, dayGroup, dirname } from '../../lib/format';
 
 export type GroupKind = 'active' | 'pinned' | 'space' | 'folder' | 'day' | 'snoozed';
@@ -30,6 +29,9 @@ export const FOLDER_MIN = 2;
 export const GROUP_ROWS = 5;
 /** A space or folder group with no session this recent starts folded. */
 export const STALE_MS = 7 * 86400_000;
+/** Active means activity in the last five minutes, not just an agent left open. */
+export const ACTIVE_MS = 5 * 60_000;
+export const lastActivityAt = (s: SessionSummary) => Math.max(s.updatedAt ?? s.createdAt ?? 0, s.doneAt ?? 0, s.live?.startedAt ?? 0, s.live?.turnStartedAt ?? 0, s.external?.since ?? 0);
 
 /** Whether a space or folder group shows folded: as you left it, else when none of its sessions was at work this week. */
 export const isFolded = (g: SessionGroup, folds: Record<string, boolean>, now: number) => folds[g.id] ?? now - (g.items[0]?.updatedAt ?? 0) > STALE_MS;
@@ -90,7 +92,7 @@ export function groupSessions(list: SessionSummary[], o: { now: Date; byFolder: 
     const dir = o.byFolder && !space ? folderOf(s) : undefined;
     // Snoozed ones wait at the bottom until their time (or until they need you).
     if (s.snoozedUntil && s.snoozedUntil > t) put(s, 'snoozed', 'snoozed', 'Snoozed');
-    else if (activityOf(s)) put(s, 'active', 'active', 'Active');
+    else if (lastActivityAt(s) > t - ACTIVE_MS) put(s, 'active', 'active', 'Active');
     else if (s.pinned) put(s, 'pinned', 'pinned', 'Pinned');
     else if (space) put(s, `space:${space.id}`, 'space', space.name, { space });
     else if (dir && (inFolder.get(dir) ?? 0) >= FOLDER_MIN) put(s, `dir:${dir}`, 'folder', basename(dir) || dir, { path: dir });

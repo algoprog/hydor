@@ -1259,7 +1259,7 @@ export interface ModelEntry {
 /** A model in OpenRouter's catalog, with what the search shows about it. */
 export interface OpenRouterModel extends ModelEntry {
   /** Dollars per million tokens, in and out. */
-  price?: { input: number; output: number };
+  price?: ModelPrice;
   /** When OpenRouter listed it (ms). */
   created?: number;
   /** What its maker says it is for, as plain text. */

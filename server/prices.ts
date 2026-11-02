@@ -7,6 +7,7 @@ import type { ModelPrice } from '../shared/types.ts';
 import { config } from './config.ts';
 import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
+import { catalog } from './models/openrouter.ts';
 
 const SOURCE = process.env.PRICES_URL ?? 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 const CACHE = path.join(config.dataDir, 'model-prices.json');
@@ -20,6 +21,28 @@ interface Rate {
 
 let table: Map<string, Rate> | null = null;
 let fetching: Promise<void> | null = null;
+const OR_CACHE = path.join(config.dataDir, 'openrouter-prices.json');
+let router: Record<string, ModelPrice> | undefined;
+let routerAt = 0;
+let routerFetch: Promise<void> | null = null;
+
+/** OpenRouter's own rates, refreshed automatically and kept for offline use. */
+export async function refreshOpenRouterPrices() {
+  if (!router) {
+    try {
+      router = JSON.parse(fs.readFileSync(OR_CACHE, 'utf8'));
+      routerAt = fs.statSync(OR_CACHE).mtimeMs;
+    } catch { router = {}; }
+  }
+  if (Date.now() - routerAt < 3600_000) return;
+  if (!routerFetch) routerFetch = catalog().then((models) => {
+    const prices = Object.fromEntries(models.filter((m) => m.price).map((m) => [m.id.toLowerCase(), m.price!]));
+    router = prices;
+    fs.writeFileSync(OR_CACHE, JSON.stringify(prices));
+    routerAt = Date.now();
+  }).catch(() => { routerAt = Date.now() - 3600_000 + 60_000; }).finally(() => { routerFetch = null; });
+  await routerFetch;
+}
 
 function parseTable(raw: Record<string, any>): Map<string, Rate> {
   const out = new Map<string, Rate>();
@@ -102,6 +125,11 @@ export function rateFor(db: DB, model: string | null | undefined): (ModelPrice &
   const own = priceOverrides(db)[m];
   if (own) return { ...own, source: 'custom' };
   const key = m.toLowerCase().replace(/\[.*\]$/, '');
+  if (key.startsWith('openrouter/')) {
+    void refreshOpenRouterPrices();
+    const r = router?.[key];
+    return r ? { ...r, source: 'table' } : null;
+  }
   if (UNPRICED.has(key)) return null;
   const t = ensureTable();
   const bare = key.replace(/-\d{8}$/, '');

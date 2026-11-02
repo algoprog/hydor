@@ -453,7 +453,7 @@ function InfoPanel({ s }: { s: SessionSummary }) {
             {compact(st.tokensIn + st.tokensCached)} in ({compact(st.tokensCached)} cached) · {compact(st.tokensOut)} out
           </span>
         </InfoRow>
-        {st.costUsd ? <InfoRow label="API cost">{money(st.costUsd)}</InfoRow> : null}
+        {st.costUsd != null ? <InfoRow label="API cost">{money(st.costUsd)}</InfoRow> : null}
         {st.genMs && st.genMs > 0 ? (
           <InfoRow label="Output speed">
             <span title={`${st.tokensOut.toLocaleString()} output tokens over ${Math.round(st.genMs / 1000).toLocaleString()} s of reply generation${s.agent === 'codex' ? ' (per turn, includes tool runs)' : ''}`}>

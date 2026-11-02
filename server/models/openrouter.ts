@@ -38,7 +38,7 @@ export async function catalog(): Promise<OrModel[]> {
       tools: params.includes('tools') ? 'native' : 'text',
       detail: m.id,
       // A negative price means it varies (a router picking the model).
-      price: input >= 0 && output >= 0 ? { input: input * 1e6, output: output * 1e6 } : undefined,
+      price: Number.isFinite(input) && Number.isFinite(output) && input >= 0 && output >= 0 ? { input: input * 1e6, output: output * 1e6, ...(m.pricing?.input_cache_read != null && Number(m.pricing.input_cache_read) >= 0 ? { cacheRead: Number(m.pricing.input_cache_read) * 1e6 } : {}) } : undefined,
       created: Number(m.created) ? Number(m.created) * 1000 : undefined,
       description: plain(m.description),
       maxOutput: Number(m.top_provider?.max_completion_tokens) || undefined,

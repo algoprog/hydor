@@ -548,8 +548,13 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 onClick={interrupt}
                 title="Stop"
                 aria-label="Stop the current turn"
-                className="anim-pop-in ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-fg text-bg transition duration-150 hover:opacity-85 active:scale-90"
+                className="anim-pop-in relative ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-fg transition duration-150 hover:opacity-90 active:scale-90"
               >
+                {live?.status !== 'waiting' && (
+                  <svg viewBox="0 0 36 36" className="pointer-events-none absolute inset-0 h-full w-full animate-spin motion-reduce:animate-none" aria-hidden>
+                    <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="24 71" opacity="0.55" />
+                  </svg>
+                )}
                 <Square size={12} fill="currentColor" strokeWidth={0} />
               </button>
             )}

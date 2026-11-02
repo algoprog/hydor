@@ -200,6 +200,8 @@ Custom keeps each conversation on disk, so it carries on after the app restarts.
 - Models on this computer (Ollama, vLLM): nothing.
 - Other endpoints: the tokens are priced like the other agents' (see [Usage, limits and costs](/guide/usage)).
 
+The session shows API cost and input, cached and output tokens above the message box, even without a spending cap. Charges come from OpenRouter’s response, or its generation record if the streamed charge is missing; its own catalog prices are the fallback. No manual prices are needed.
+
 A [spending cap](/guide/usage#cap-what-a-session-spends) works for Custom sessions too.
 
 ## Settings → Capabilities → Custom
@@ -219,3 +221,4 @@ Custom's models are in [Settings → Agents → Models](/settings?s=models), and
 - "Set a goal on my Custom session 'Upload page': npm test passes and uploads of 2 GB work."
 - "Which helper model does Auto mode use, and can it see images?"
 - "Add Qwen3 Coder from OpenRouter so I can use it with Custom." (once your OpenRouter key is set)
+- "Show my OpenRouter usage and costs without entering model prices."
