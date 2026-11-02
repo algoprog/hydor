@@ -581,6 +581,44 @@ test('Ask a person: the run waits for the answer (its page, the inbox, a notice)
   }
 });
 
+test('Run code: a program in JavaScript or Python gets its input and returns the step’s values, in a sandbox with no network and none of this computer’s files', async () => {
+  const a = app({
+    name: 'Coder',
+    answer: [{ id: 'total', label: 'Total', type: 'number', required: true }],
+    flow: {
+      steps: [
+        { id: 'js', do: 'code', language: 'javascript', code: "console.log('adding');\nreturn { sum: input.a + input.b, words: input.text.split(' ').length };", with: { a: 2, b: 3, text: 'about {{topic}}' } },
+        { id: 'py', do: 'code', language: 'python', code: "print('doubling')\nreturn {'total': input['sum'] * 2}", with: { sum: '{{js.sum}}' } },
+      ],
+      outputs: { total: '{{py.total}}' },
+    },
+  });
+  const done = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'two words' } }).id, 60_000);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.total, 10);
+  const outs = Object.fromEntries(store.listSteps(db, done.id).map((s) => [s.id, s.outputs]));
+  assert.equal(outs.js!.words, 3);
+  assert.match(String(outs.js!.printed), /adding/);
+  assert.match(String(outs.py!.printed), /doubling/);
+  // The sandbox: no network, no home folder, and a time limit.
+  const probe = app({
+    name: 'Probe',
+    flow: {
+      steps: [
+        { id: 'net', do: 'code', language: 'javascript', code: "try { await fetch('https://example.com', { signal: AbortSignal.timeout(4000) }); return { net: 'yes' }; } catch { return { net: 'no' }; }" },
+        { id: 'home', do: 'code', language: 'python', code: `import os\nreturn {'home': os.path.exists(${JSON.stringify(os.homedir())})}` },
+        { id: 'slow', do: 'code', language: 'javascript', code: 'while (true) {}', seconds: 2, failed: 'skip' },
+      ],
+    },
+  });
+  const pr = await ended(startRun({ app: probe.id, slug: probe.slug, recipe: probe, source: 'web', inputs: { topic: 'x' } }).id, 60_000);
+  const ps = Object.fromEntries(store.listSteps(db, pr.id).map((s) => [s.id, s]));
+  assert.equal(ps.net.outputs!.net, 'no');
+  assert.equal(ps.home.outputs!.home, false);
+  assert.equal(ps.slow.status, 'failed');
+  assert.match(ps.slow.error ?? '', /past its 2 seconds/);
+});
+
 test('notify_user: a step tells you something now, and its notice opens the run', async () => {
   const notices: any[] = [];
   const on = (n: unknown) => notices.push(n);

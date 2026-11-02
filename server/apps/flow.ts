@@ -17,7 +17,7 @@ import path from 'node:path';
 import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from '../../shared/apps.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
 import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
-import type { AskStep, DataStep, Flow, RepeatStep, Scope, Step } from '../../shared/app-manifest.ts';
+import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step } from '../../shared/app-manifest.ts';
 import { allSteps, asText, evalRule, fillRefs, FLOW_LIMITS, lookup, STEP_TOOLS, titleOf, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { extractText } from '../documents/extract.ts';
@@ -26,6 +26,7 @@ import { AGENT_FILE } from '../models/config.ts';
 import type { RunCtx } from '../features/types.ts';
 import { helper } from '../helper.ts';
 import { checkDaily } from './api.ts';
+import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
 import { getApp, getRun, getStep, listSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
@@ -151,7 +152,7 @@ async function runList(x: Exec, steps: Step[], scope: Scope, prefix: string) {
   for (const s of steps) await runOne(x, s, scope, prefix);
 }
 
-const LEAF = new Set(['agent', 'model', 'tool', 'app', 'data', 'ask']);
+const LEAF = new Set(['agent', 'model', 'tool', 'app', 'data', 'ask', 'code']);
 
 function record(x: Exec, at: string, s: Step, p: Partial<StepRecord>) {
   const prev = getStep(db(), x.run.id, at);
@@ -229,6 +230,8 @@ async function body(x: Exec, s: Step, scope: Scope, prefix: string, at: string, 
       return dataStep(x, s, scope);
     case 'ask':
       return askStep(x, s, scope, at, before);
+    case 'code':
+      return codeStep(x, s, scope);
     case 'decide':
       return decideStep(x, s, scope, prefix, at, before, cost);
     case 'repeat':
@@ -307,6 +310,13 @@ function syncStatus(x: Exec) {
     updateRun(db(), r.id, { status: want });
     noteChanged(r.id);
   }
+}
+
+/** A short program, run in a sandbox of its own with the values given (server/apps/code.ts). */
+async function codeStep(x: Exec, s: CodeStep, scope: Scope): Promise<Record<string, unknown>> {
+  const input = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
+  const out = await runCode({ language: s.language, code: s.code, input, slug: x.slug, requires: x.run.recipe.requires, seconds: s.seconds ?? 20, signal: x.abort.signal });
+  return out.values;
 }
 
 // ---- Ask a person ------------------------------------------------------------------------------------------

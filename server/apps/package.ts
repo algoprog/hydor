@@ -264,6 +264,9 @@ function intake(db: DB, raw: Record<string, any>, named: string) {
       notes.push(`${named}Its step “${s.id}” asked for every step allowed (${s.mode}): here it starts in Auto`);
       s.mode = undefined;
     }
+  // What runs its code says so before it comes in (each in a sandbox: no network, none of this computer's files).
+  const code = recipe.flow ? allSteps(recipe.flow.steps).filter((s) => s.do === 'code') : [];
+  if (code.length) notes.push(`${named}${code.length === 1 ? 'One of its steps runs' : `${code.length} of its steps run`} a program of its own (${[...new Set(code.map((s) => (s.do === 'code' && s.language === 'python' ? 'Python' : 'JavaScript')))].join(', ')}), in a sandbox with no network and none of this computer's files`);
   if (recipe.assistant && !findAssistant(db, recipe.assistant)) {
     notes.push(`${named}It starts as the assistant “${recipe.assistant}”, which is not here: its runs start without one`);
     recipe.assistant = undefined;

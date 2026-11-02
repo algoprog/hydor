@@ -30,6 +30,7 @@ export const STEP_KINDS = [
   { value: 'app', label: 'Call an app', hint: 'Another of your apps, as one step' },
   { value: 'data', label: 'Keep data', hint: 'Add, find, change or remove records the app keeps' },
   { value: 'ask', label: 'Ask a person', hint: 'Waits for your answer: yes or no, or a short form' },
+  { value: 'code', label: 'Run code', hint: 'A short program in JavaScript or Python, in a sandbox' },
 ] as const;
 export type StepKind = (typeof STEP_KINDS)[number]['value'];
 
@@ -163,7 +164,23 @@ export interface AskStep extends StepCommon {
   waitHours?: number;
 }
 
-export type Step = AgentStep | ModelStep | ToolStep | DecideStep | RepeatStep | ParallelStep | AppStep | DataStep | AskStep;
+/**
+ * A short program the flow runs, in JavaScript (Node) or Python, in a sandbox: no network, nothing of this
+ * computer's files but its template's packages. It gets the values given as `input` and returns its values
+ * (an object's fields, else {{id.result}}); what it prints is {{id.printed}}.
+ */
+export interface CodeStep extends StepCommon {
+  do: 'code';
+  language: 'javascript' | 'python';
+  /** The body of a function of `input` (async in JavaScript): it returns the step's values. */
+  code: string;
+  /** What `input` holds, by name: values, or text with {{values}}. */
+  with?: Record<string, unknown>;
+  /** Most seconds it may take (1 to 120; 20 unless set). */
+  seconds?: number;
+}
+
+export type Step = AgentStep | ModelStep | ToolStep | DecideStep | RepeatStep | ParallelStep | AppStep | DataStep | AskStep | CodeStep;
 
 /** A collection of records an app keeps between runs: its fields' kinds when given (values are checked and tidied to them), any JSON otherwise. */
 export interface DataCollection {
@@ -652,6 +669,15 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
       if ((op === 'get' || op === 'update' || op === 'remove') && !step.record && !(op !== 'get' && step.where)) t.errors.push(`${where}: say which record (record: its id${op === 'get' ? '' : ', or where'})`);
       return step;
     }
+    case 'code': {
+      const language = x.language === 'python' || x.language === 'py' ? 'python' : x.language === undefined || x.language === 'javascript' || x.language === 'js' ? 'javascript' : null;
+      if (!language) t.errors.push(`${where}: its language is javascript or python`);
+      const code = typeof x.code === 'string' ? x.code.slice(0, 50_000) : '';
+      if (!code.trim()) t.errors.push(`${where}: write its program (code)`);
+      const w = cleanWith(x.with, t.errors, where);
+      const secs = Number(x.seconds);
+      return { ...common, do: 'code', language: language ?? 'javascript', code, ...(w ? { with: w } : {}), ...(Number.isFinite(secs) && secs > 0 ? { seconds: Math.min(120, Math.max(1, Math.round(secs))) } : {}) };
+    }
     case 'ask': {
       const question = text(x.question ?? x.ask, 4000);
       if (!question) t.errors.push(`${where}: write what it asks (question)`);
@@ -1108,6 +1134,8 @@ export function givesOf(s: Step): string[] | null {
       return { add: ['record', 'id'], get: ['record', 'found'], find: ['records', 'count', 'first'], search: ['records', 'count', 'first', 'meaning'], update: ['records', 'count'], remove: ['count'] }[s.op];
     case 'ask':
       return s.fields?.length ? s.fields.map((f) => f.id) : ['yes'];
+    case 'code':
+      return null;
     default:
       return null;
   }
@@ -1202,6 +1230,9 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
           break;
         case 'ask':
           checkRefs(where, s.question, seen, names, siblings);
+          break;
+        case 'code':
+          checkRefs(where, s.with, seen, names, siblings);
           break;
         case 'data': {
           const c = r.data?.[s.collection];
