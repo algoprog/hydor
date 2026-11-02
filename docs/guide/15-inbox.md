@@ -23,6 +23,7 @@ Everything an agent is waiting on you for, from every session on this machine, i
 - **A key an agent asked for**: "Asks for a key: OPENWEATHER_KEY", with why it needs it.
 - **A skill an agent suggests**: "Suggests a new skill: …" or "Suggests a change to the … skill", with its reason.
 - **A session waiting for you elsewhere**: "Waiting for you in VS Code" (or in a terminal), for sessions running outside the app.
+- **A template's question**: a run of one of your templates waiting at an **Ask a person** step.
 
 Each item shows which session it waits in (with the agent's icon) and how long it has waited.
 
@@ -45,6 +46,7 @@ The other items are answered where they wait. Each has an icon, what is asked, a
 - **A key** or **a sign-in** opens the session with the card where you enter it ([Connections, keys and tools](/guide/connections)).
 - **A skill suggestion** opens the session with its card to approve or decline, or **Settings → Skill library** when that session is gone ([Skills](/guide/skills)).
 - **A session waiting in VS Code or a terminal** opens it here so you can see what it waits for; answer it in the program it runs in.
+- **A template's question** opens its run, where a card asks it: **Yes** or **No**, or its form and **Send the answer** ([Templates](/guide/templates#templates-with-steps)).
 
 ## Things waiting on your other machines
 

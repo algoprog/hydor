@@ -14,9 +14,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { AnswerField, AppRecipe, RunProgress, RunStepView } from '../../shared/apps.ts';
+import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from '../../shared/apps.ts';
+import type { NotifyEvent } from '../../shared/types.ts';
 import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
-import type { DataStep, Flow, RepeatStep, Scope, Step } from '../../shared/app-manifest.ts';
+import type { AskStep, DataStep, Flow, RepeatStep, Scope, Step } from '../../shared/app-manifest.ts';
 import { allSteps, asText, evalRule, fillRefs, FLOW_LIMITS, lookup, STEP_TOOLS, titleOf, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { extractText } from '../documents/extract.ts';
@@ -150,7 +151,7 @@ async function runList(x: Exec, steps: Step[], scope: Scope, prefix: string) {
   for (const s of steps) await runOne(x, s, scope, prefix);
 }
 
-const LEAF = new Set(['agent', 'model', 'tool', 'app', 'data']);
+const LEAF = new Set(['agent', 'model', 'tool', 'app', 'data', 'ask']);
 
 function record(x: Exec, at: string, s: Step, p: Partial<StepRecord>) {
   const prev = getStep(db(), x.run.id, at);
@@ -226,6 +227,8 @@ async function body(x: Exec, s: Step, scope: Scope, prefix: string, at: string, 
       return appStep(x, s, scope, at, before);
     case 'data':
       return dataStep(x, s, scope);
+    case 'ask':
+      return askStep(x, s, scope, at, before);
     case 'decide':
       return decideStep(x, s, scope, prefix, at, before, cost);
     case 'repeat':
@@ -304,6 +307,63 @@ function syncStatus(x: Exec) {
     updateRun(db(), r.id, { status: want });
     noteChanged(r.id);
   }
+}
+
+// ---- Ask a person ------------------------------------------------------------------------------------------
+
+/** Ask a person steps waiting now (by run and path): an answer ends the wait with its values. */
+const asking = new Map<string, (values: Record<string, unknown>) => void>();
+
+/**
+ * Waits for the person: the run waits (Needs you), a notice opens its page, and the inbox lists it. The
+ * question as it was asked stays on the step's record while it waits, so a restart asks the same.
+ */
+async function askStep(x: Exec, s: AskStep, scope: Scope, at: string, before: StepRecord | null): Promise<Record<string, unknown>> {
+  if (x.pub) throw new Error('A run from a public page cannot ask a person');
+  const again = before?.status === 'waiting' && typeof before.outputs?.question === 'string';
+  const question = again ? String(before!.outputs!.question) : fillRefs(s.question, scope).slice(0, 4000);
+  const since = before?.startedAt ?? Date.now();
+  record(x, at, s, { status: 'waiting', outputs: { question } });
+  const key = `${x.run.id}:${at}`;
+  x.waiting.add(`ask:${at}`);
+  syncStatus(x);
+  if (!again)
+    runDeps().sessions.emit('notify', { key: `app-ask:${key}`, kind: 'waiting', title: x.run.appName, body: question.slice(0, 200), agent: 'claude', at: Date.now(), url: `/apps/runs/${encodeURIComponent(x.run.id)}` } satisfies NotifyEvent);
+  try {
+    return await new Promise<Record<string, unknown>>((resolve, reject) => {
+      const left = (s.waitHours ?? 168) * 3_600_000 - (Date.now() - since);
+      const timer = setTimeout(() => done(() => reject(new Error('Nobody answered in time'))), Math.max(1000, Math.min(left, 2 ** 31 - 1)));
+      const onStop = () => done(() => reject(new Stopped()));
+      const done = (f: () => void) => {
+        clearTimeout(timer);
+        x.abort.signal.removeEventListener('abort', onStop);
+        asking.delete(key);
+        f();
+      };
+      x.abort.signal.addEventListener('abort', onStop, { once: true });
+      asking.set(key, (values) => done(() => resolve(values)));
+    });
+  } finally {
+    x.waiting.delete(`ask:${at}`);
+    syncStatus(x);
+  }
+}
+
+/** A step of a run that asks the person now: where it is, what it asks, and its form (none: yes or no). */
+export function askOf(r: RunRecord): { step: string; question: string; fields?: AppField[]; since: number } | null {
+  const st = listSteps(db(), r.id).find((x) => x.kind === 'ask' && x.status === 'waiting');
+  if (!st) return null;
+  const flow = r.flow ? r.recipe.flows?.[r.flow] : r.recipe.flow;
+  const s = flow ? allSteps(flow.steps).find((x) => x.id === st.id) : undefined;
+  return { step: st.path, question: String(st.outputs?.question ?? ''), ...(s?.do === 'ask' && s.fields?.length ? { fields: s.fields } : {}), since: st.startedAt ?? r.createdAt };
+}
+
+/** The person's answer to a run's waiting step: false when nothing waits for it there (now). */
+export function answerAsk(runId: string, path: string, values: Record<string, unknown>): boolean {
+  const f = asking.get(`${runId}:${path}`);
+  if (!f) return false;
+  f(values);
+  return true;
 }
 
 async function agentStep(x: Exec, s: Extract<Step, { do: 'agent' }>, scope: Scope, at: string, before: StepRecord | null): Promise<Record<string, unknown>> {
@@ -707,8 +767,17 @@ async function flowProgress(r: RunRecord, publicView: boolean): Promise<RunProgr
   const working = [...all].reverse().find((st) => (st.status === 'running' || st.status === 'waiting') && st.run);
   const child = working?.run ? getRun(db(), working.run) : null;
   const inner = child && isActive(child.status) ? await progressOf(child, publicView) : null;
-  const waiting = r.status === 'waiting' ? (publicView ? 'Waiting' : `“${working?.title ?? 'A step'}” ${inner?.waiting ? inner.waiting.replace(/^It /, 'needs you: it ').replace(/ in the session$/, ' in its session') : 'waits for you in its session'}`) : undefined;
-  return { steps, said: publicView ? undefined : inner?.said, waiting };
+  // A step asking the person waits for the answer here, on the run's page; an agent's question waits in its session.
+  const asking = all.find((st) => st.kind === 'ask' && st.status === 'waiting');
+  const waiting =
+    r.status !== 'waiting'
+      ? undefined
+      : publicView
+        ? 'Waiting'
+        : asking
+          ? `“${asking.title}” needs your answer`
+          : `“${working?.title ?? 'A step'}” ${inner?.waiting ? inner.waiting.replace(/^It /, 'needs you: it ').replace(/ in the session$/, ' in its session') : 'waits for you in its session'}`;
+  return { steps, said: publicView ? undefined : inner?.said, waiting, ...(publicView ? {} : { own: true as const }) };
 }
 
 /** What runs flows, for runs.ts. */

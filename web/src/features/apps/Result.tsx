@@ -316,7 +316,9 @@ export function RunStatusCard({ run, progress, publicView, children, followUp }:
           {progress.steps.map((s, i) => (
             <div key={i} className="flex items-center gap-2 text-[12.5px]">
               <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', s.status === 'running' ? 'bg-busy' : s.status === 'error' ? 'bg-err' : 'bg-fg-3/50')} />
-              <span className={cx('min-w-0 truncate', s.status === 'running' ? 'shine text-fg' : 'text-fg-2')}>{s.title}</span>
+              <span className={cx('min-w-0 truncate', s.status === 'running' ? 'shine text-fg' : 'text-fg-2')} translate={progress.own ? 'no' : undefined}>
+                {s.title}
+              </span>
             </div>
           ))}
           {progress.said && <div className="line-clamp-2 pt-1 text-[12.5px] leading-snug text-fg-3 italic">“{progress.said}”</div>}

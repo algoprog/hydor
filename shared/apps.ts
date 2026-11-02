@@ -196,6 +196,8 @@ export interface RunProgress {
   said?: string;
   /** What it waits for (an approval, an answer). */
   waiting?: string;
+  /** Its steps' titles are the template's own words (a run with steps): shown as written. */
+  own?: true;
 }
 
 /**

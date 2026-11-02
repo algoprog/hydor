@@ -3,15 +3,15 @@
 // the form and the steps before put in from a short menu, and the flow's checks as you go. Agents change
 // the same steps through the API; shared/app-manifest.ts has the format and the checks.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, Columns2, Copy, Database, Ellipsis, Plus, Repeat, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
+import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, Plus, Repeat, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
 import type { AnswerField, AppDef, AppField, AppRecipe } from '@shared/apps';
-import { ANSWER_TYPES, COLUMN_TYPES, fieldId } from '@shared/apps';
+import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
 import type { DataOp, Flow, Step, StepKind } from '@shared/app-manifest';
 import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, STEP_KINDS, STEP_TOOLS, titleOf } from '@shared/app-manifest';
 import { api } from '../../lib/api';
 import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch } from '../../components/ui';
 
-const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database };
+const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion };
 const KIND = Object.fromEntries(STEP_KINDS.map((k) => [k.value, k])) as Record<StepKind, (typeof STEP_KINDS)[number]>;
 const OPS: { value: DataOp; label: string }[] = [
   { value: 'add', label: 'Add a record' },
@@ -98,7 +98,7 @@ function copyOf(s: Step, taken: Set<string>): Step {
   return copy;
 }
 
-const WORD: Record<StepKind, string> = { agent: 'agent', model: 'model', tool: 'tool', decide: 'decide', repeat: 'each', parallel: 'together', app: 'call', data: 'data' };
+const WORD: Record<StepKind, string> = { agent: 'agent', model: 'model', tool: 'tool', decide: 'decide', repeat: 'each', parallel: 'together', app: 'call', data: 'data', ask: 'ask' };
 
 function newStep(kind: StepKind, taken: string[], recipe: AppRecipe): Step {
   const id = fieldId(WORD[kind], taken);
@@ -119,6 +119,8 @@ function newStep(kind: StepKind, taken: string[], recipe: AppRecipe): Step {
       return { id, do: 'app', app: '' };
     case 'data':
       return { id, do: 'data', op: 'find', collection: Object.keys(recipe.data ?? {})[0] ?? '' };
+    case 'ask':
+      return { id, do: 'ask', question: '' };
   }
 }
 
@@ -434,6 +436,56 @@ export function FieldChips({ fields, onChange, add, none, plain }: { fields: Ans
   );
 }
 
+/** An Ask a person step's form: a row for each question it asks (no files: an answer is typed). */
+function AskForm({ fields, onChange }: { fields: AppField[]; onChange: (f: AppField[]) => void }) {
+  const ids = fields.map((f) => f.id);
+  const put = (i: number, f: AppField) => onChange(fields.map((x, j) => (j === i ? f : x)));
+  return (
+    <div className="space-y-1.5">
+      {fields.map((f, i) => (
+        <div key={i} className="space-y-1.5 rounded-lg border border-line p-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <input
+              className={cx(bare, 'h-8.5 min-w-[140px] flex-[2] text-[13.5px]')}
+              placeholder="The question, e.g. Which one?"
+              value={f.label}
+              onChange={(e) => put(i, { ...f, label: e.target.value, ...(/^(answer|question)(_\d+)?$/.test(f.id) && e.target.value ? { id: fieldId(e.target.value, ids.filter((_, j) => j !== i)) } : {}) })}
+            />
+            <select className={cx(bare, 'h-8.5 min-w-[110px] flex-1 text-[13.5px]')} value={f.type} onChange={(e) => put(i, { ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined })}>
+              {FIELD_TYPES.filter((t) => t.value !== 'file').map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <label className="flex shrink-0 items-center gap-1.5 text-[12.5px] text-fg-2">
+              <Switch on={!!f.required} onChange={(on) => put(i, { ...f, required: on || undefined })} label="Needed" />
+              Needed
+            </label>
+            <IconButton label="Remove" size="sm" onClick={() => onChange(fields.filter((_, j) => j !== i))} disabled={fields.length < 2}>
+              <X size={14} />
+            </IconButton>
+          </div>
+          {f.type === 'choice' && (
+            <textarea className={cx(small, 'h-auto py-1.5 text-[13px]')} rows={Math.min(5, Math.max(2, (f.options?.length ?? 0) + 1))} placeholder="The choices, one per line" value={(f.options ?? []).join('\n')} onChange={(e) => put(i, { ...f, options: e.target.value.split('\n') })} />
+          )}
+        </div>
+      ))}
+      <button type="button" className="text-[12.5px] text-accent hover:underline" onClick={() => onChange([...fields, { id: fieldId('question', ids), label: '', type: 'text' }])}>
+        Add a question
+      </button>
+    </div>
+  );
+}
+
+const WAITS: [number, string][] = [
+  [1, 'An hour'],
+  [24, 'A day'],
+  [72, 'Three days'],
+  [168, 'A week'],
+  [720, 'Thirty days'],
+];
+
 // ---- each kind's settings --------------------------------------------------------------------------------------
 
 interface Ctx {
@@ -575,6 +627,39 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
     }
     case 'parallel':
       return <div className="text-[12.5px] text-fg-3">Its branches run side by side; the next step starts when they have all ended.</div>;
+    case 'ask': {
+      const form = s.fields !== undefined;
+      const wait = s.waitHours ?? 168;
+      return (
+        <>
+          <div>
+            <Label hint="The run waits for your answer: on its page, in the inbox and from a notice on your phone">The question</Label>
+            <RefText multiline value={s.question} onChange={(question) => set({ ...s, question })} groups={groups} placeholder="e.g. Send this brief to the team? {{brief.summary}}" />
+          </div>
+          <Segmented
+            size="sm"
+            value={form ? 'form' : 'yes'}
+            onChange={(v) => set(v === 'form' ? { ...s, fields: s.fields ?? [{ id: 'answer', label: '', type: 'text', required: true }] } : { ...s, fields: undefined })}
+            options={[
+              { value: 'yes', label: 'Yes or no' },
+              { value: 'form', label: 'A short form' },
+            ]}
+          />
+          {form && <AskForm fields={s.fields!} onChange={(fields) => set({ ...s, fields })} />}
+          <label className="block">
+            <Label hint="Then it fails (If it fails… says what happens next)">It waits at most</Label>
+            <select className={small} value={wait} onChange={(e) => set({ ...s, waitHours: Number(e.target.value) === 168 ? undefined : Number(e.target.value) })}>
+              {WAITS.map(([h, l]) => (
+                <option key={h} value={h}>
+                  {l}
+                </option>
+              ))}
+              {!WAITS.some(([h]) => h === wait) && <option value={wait}>{`${wait} hours`}</option>}
+            </select>
+          </label>
+        </>
+      );
+    }
     case 'app': {
       const target = ctx.apps.find((a) => a.slug === s.app);
       return (
@@ -815,6 +900,8 @@ function summaryOf(s: Step, ctx: Ctx): ReactNode {
           {OPS.find((o) => o.value === s.op)?.label} · <span translate="no">{s.collection}</span>
         </>
       );
+    case 'ask':
+      return first(s.question) ? <span translate="no">{first(s.question)}</span> : 'No question yet';
   }
 }
 

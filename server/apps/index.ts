@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
-import { answerSchema, checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
+import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
@@ -26,7 +26,7 @@ import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
 import { batchCsv, MAX_ROWS, startBatch, startBatches, stopBatch } from './batch.ts';
 import { addRecord, clearData, collectionsOf, embedSoon, ensureDataTables, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { ensureEnv, envLine, envOf, envVars } from './env.ts';
-import { dataChanged, flowRunner, stepsOf } from './flow.ts';
+import { answerAsk, askOf, dataChanged, flowRunner, stepsOf } from './flow.ts';
 import { installPackage, packageOf, previewOf, readPackage, zipPackage, type Catalog } from './package.ts';
 import { changeScreen, makeScreen, removeScreen, removeScreens, screenHtml, screensOf } from './screens.ts';
 import { draftFromSession } from './draft.ts';
@@ -365,13 +365,32 @@ function routes(d: Deps) {
       slug: a?.slug ?? null,
       ...(r.source === 'public' ? { asks: [] } : await followUpsOf(r)),
       ...(isFlowRun(r) ? { steps: stepsOf(r.id, { values: true }) } : {}),
+      // An Ask a person step waiting for the answer, which the page asks for.
+      ...(r.status === 'waiting' && isFlowRun(r) && askOf(r) ? { question: askOf(r) } : {}),
       // Follow-ups typed while the agent works wait their turn in the session's queue.
       queued: (s?.queue ?? []).map((m) => ({ id: m.id, text: m.text.slice(0, 4000), at: m.at })),
       noAsks: noAsks(r),
     };
   });
 
-  /** A follow-up from the run's page: it goes to the run's session (after the turn running now, if one is). */
+  /** The person's answer to the run's Ask a person step: yes or no, or its form's values; the run goes on. */
+  app.post('/api/apps/runs/:runId/answer', async (req) => {
+    const r = getRun(db, P(req).runId);
+    if (!r) throw new HttpError(404, 'No such run');
+    const q = r.status === 'waiting' && isFlowRun(r) ? askOf(r) : null;
+    const b = (req.body ?? {}) as { step?: unknown; yes?: unknown; values?: unknown };
+    if (!q || (typeof b.step === 'string' && b.step !== q.step)) throw new HttpError(409, 'It does not wait for an answer now');
+    let values: Record<string, unknown>;
+    if (q.fields) {
+      const { values: v, errors } = checkInputs(q.fields, b.values && typeof b.values === 'object' ? (b.values as Record<string, unknown>) : {});
+      if (errors.length) throw new HttpError(400, `Check the answer: ${errors.join('; ')}`);
+      values = v;
+    } else if (typeof b.yes === 'boolean') values = { yes: b.yes };
+    else throw new HttpError(400, 'Answer yes or no (yes: true or false)');
+    if (!answerAsk(r.id, q.step, values)) throw new HttpError(409, 'It is not ready for the answer yet: try again in a moment');
+    return { ok: true };
+  });
+
   /**
    * Run again from a step: the same answers, the template as it is now (or the recipe sent, a test from the
    * builder), and the steps before that one giving what they gave in this run, without running again.
@@ -408,6 +427,7 @@ function routes(d: Deps) {
     return { run: runView(r) };
   });
 
+  /** A follow-up from the run's page: it goes to the run's session (after the turn running now, if one is). */
   app.post('/api/apps/runs/:runId/ask', async (req) => {
     const r = getRun(db, P(req).runId);
     if (!r) throw new HttpError(404, 'No such run');
@@ -690,6 +710,12 @@ function dataTool(ctx: RunCtx): RunTool | null {
 export const apps: Feature = {
   id: 'apps',
   routes,
+  /** Templates' runs that wait for the person's answer (an Ask a person step), answered on the run's page. */
+  inbox: (d) =>
+    listRuns(d.db, { status: ['waiting'], limit: 100, steps: true }).flatMap((r) => {
+      const q = isFlowRun(r) ? askOf(r) : null;
+      return q ? [{ id: `app-ask:${r.id}:${q.step}`, kind: q.fields ? ('form' as const) : ('question' as const), title: q.question.slice(0, 200), detail: r.appName, at: q.since, path: `/apps/runs/${encodeURIComponent(r.id)}` }] : [];
+    }),
   tools(ctx) {
     return [submitTool(ctx), dataTool(ctx)].filter((t): t is RunTool => !!t);
   },
