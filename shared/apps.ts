@@ -2,7 +2,7 @@
 // filling the prompt from the form, the answer fields (their schema for submit_result and the check
 // of what the agent hands in), and CSV in and out for runs over many rows.
 import type { Agent } from './types.ts';
-import { cleanData, cleanFlow, cleanRequires, type DataCollection, type Flow, type Requires } from './app-manifest.ts';
+import { cleanData, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppScreen, type DataCollection, type Flow, type NamedFlow, type Requires } from './app-manifest.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -106,6 +106,10 @@ export interface AppRecipe {
   memory?: boolean;
   /** What it needs on this computer: packages installed in an environment of its own (server/apps/env.ts), commands that must be here. */
   requires?: Requires;
+  /** More flows beside the main one, by name: what its screens (and programs) start, each with the inputs it takes. */
+  flows?: Record<string, NamedFlow>;
+  /** Its screens: pages of its own ("main" opens on its page), made with naget.app and the App parts. */
+  screens?: Record<string, AppScreen>;
 }
 
 /** A built-in template: a recipe to run as it is, or to start an app from. */
@@ -126,7 +130,7 @@ export interface AppDef extends AppRecipe {
   updatedAt: number;
 }
 
-export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app';
+export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app' | 'screen';
 export type RunStatus = 'queued' | 'starting' | 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
 
 export interface AppRun {
@@ -154,6 +158,8 @@ export interface AppRun {
   parent?: string;
   /** Where in the parent's flow ("sum", "loop#2/read"). */
   step?: string;
+  /** Which of its flows it ran, when not the main one. */
+  flow?: string;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
@@ -650,11 +656,10 @@ export function cleanAnswer(raw: unknown): AnswerField[] {
   });
 }
 
-/** A recipe from anything (a form, the helper model, an API call): known fields only, within bounds. */
-export function cleanRecipe(raw: any): AppRecipe {
-  const r = raw && typeof raw === 'object' ? raw : {};
+/** A form's questions from anything: known kinds, ids from labels, choices with their options. */
+export function cleanFields(raw: unknown): AppField[] {
   const taken: string[] = [];
-  const fields: AppField[] = (Array.isArray(r.fields) ? r.fields : []).slice(0, 30).flatMap((x: any): AppField[] => {
+  return (Array.isArray(raw) ? raw : []).slice(0, 30).flatMap((x: any): AppField[] => {
     if (!x || typeof x !== 'object') return [];
     const label = str(x.label, 80) || str(x.id, 80);
     if (!label) return [];
@@ -664,11 +669,19 @@ export function cleanRecipe(raw: any): AppRecipe {
     const options = type === 'choice' ? [...new Set<string>((Array.isArray(x.options) ? x.options : []).map((o: unknown) => str(o, 80)).filter(Boolean))].slice(0, 30) : undefined;
     return [{ id, label, type, required: !!x.required || undefined, help: opt(x.help, 240), placeholder: opt(x.placeholder, 160), options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined, default: opt(x.default, 4000) }];
   });
+}
+
+/** A recipe from anything (a form, the helper model, an API call): known fields only, within bounds. */
+export function cleanRecipe(raw: any): AppRecipe {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  const fields = cleanFields(r.fields);
   const answer = cleanAnswer(r.answer);
   const agent: Agent = r.agent === 'codex' || r.agent === 'acp' ? r.agent : 'claude';
   const flow = cleanFlow(r.flow).flow;
   const data = cleanData(r.data).data;
   const requires = cleanRequires(r.requires).requires;
+  const flows = cleanFlows(r.flows).flows;
+  const screens = cleanScreens(r.screens);
   return {
     name: str(r.name, 60) || 'Untitled template',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
@@ -691,6 +704,8 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(data ? { data } : {}),
     ...(r.memory === true ? { memory: true } : {}),
     ...(requires ? { requires } : {}),
+    ...(flows ? { flows } : {}),
+    ...(screens ? { screens } : {}),
   };
 }
 

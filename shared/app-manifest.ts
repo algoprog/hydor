@@ -16,7 +16,7 @@
 // inside functions only, never while the modules load.
 import type { Agent } from './types.ts';
 import type { AnswerField, AppField, AppRecipe } from './apps.ts';
-import { ANSWER_TYPES, cleanAnswer, readDate, readNumber } from './apps.ts';
+import { ANSWER_TYPES, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
 
 // ---- the format ---------------------------------------------------------------------------------------
 
@@ -286,7 +286,39 @@ export interface Flow {
   outputs?: Record<string, string>;
 }
 
-export const FLOW_LIMITS = { steps: 60, depth: 5, branches: 6, atOnce: 6, rounds: 50, items: 200, value: 20_000 };
+export const FLOW_LIMITS = { steps: 60, depth: 5, branches: 6, atOnce: 6, rounds: 50, items: 200, value: 20_000, flows: 20 };
+
+/** A flow beside the main one: what a screen's button or form starts, with the inputs it takes; what it gives back is its outputs, by name. */
+export interface NamedFlow extends Flow {
+  title?: string;
+  inputs?: AppField[];
+}
+
+/** One of an app's screens: a page of its own, which Pages keeps (with versions and its visual editor). */
+export interface AppScreen {
+  page: string;
+  title?: string;
+}
+
+/** What a screen is told of its app: its flows (the main one is "run") with their inputs and what they give back, and what it keeps. */
+export interface AppInfo {
+  id: string;
+  name: string;
+  flows: { id: string; title: string; inputs: AppField[]; outputs: { id: string; label: string; type?: string }[] }[];
+  data: { name: string; fields: AnswerField[] | null }[];
+}
+
+export function appInfo(id: string, r: Pick<AppRecipe, 'name' | 'fields' | 'answer' | 'flows' | 'data'>): AppInfo {
+  return {
+    id,
+    name: r.name,
+    flows: [
+      { id: 'run', title: 'Run', inputs: r.fields, outputs: r.answer.map((f) => ({ id: f.id, label: f.label, type: f.type })) },
+      ...Object.entries(r.flows ?? {}).map(([fid, f]) => ({ id: fid, title: f.title ?? labelOf(fid), inputs: f.inputs ?? [], outputs: Object.keys(f.outputs ?? {}).map((k) => ({ id: k, label: labelOf(k) })) })),
+    ],
+    data: Object.entries(r.data ?? {}).map(([name, c]) => ({ name, fields: c.fields ?? null })),
+  };
+}
 
 /** Tools a step may call on its own, outside a session: they answer without a conversation to answer in. */
 export const STEP_TOOLS = ['web_search', 'read_page', 'http_request', 'read_document', 'generate_image', 'knowledge_search', 'knowledge_read', 'recall'];
@@ -639,6 +671,46 @@ export function cleanFlow(raw: unknown): { flow?: Flow; errors: string[] } {
 }
 
 const COLLECTION = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
+const FLOW_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
+
+/** The flows beside the main one, from anything: each tidied as a flow is, with the inputs it takes. */
+export function cleanFlows(raw: unknown): { flows?: Record<string, NamedFlow>; errors: string[] } {
+  const errors: string[] = [];
+  if (raw === undefined || raw === null) return { errors };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { errors: ['Its other flows ("flows") are a map of names to flows'] };
+  const out: Record<string, NamedFlow> = {};
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (entries.length > FLOW_LIMITS.flows) errors.push(`An app has at most ${FLOW_LIMITS.flows} flows besides its main one`);
+  for (const [name, v] of entries.slice(0, FLOW_LIMITS.flows)) {
+    if (!FLOW_NAME.test(name) || name === 'run') {
+      errors.push(`Flows: “${name.slice(0, 40)}” cannot name a flow (a letter, then letters, digits, - or _; "run" is the main one)`);
+      continue;
+    }
+    const f = cleanFlow(v);
+    errors.push(...f.errors.map((e) => `Flow “${name}”: ${e}`));
+    if (!f.flow) {
+      if (!f.errors.length) errors.push(`Flow “${name}” has no steps`);
+      continue;
+    }
+    const o = v as Record<string, unknown>;
+    const inputs = cleanFields(o.inputs);
+    const title = short(o.title, 80);
+    out[name] = { ...f.flow, ...(title ? { title } : {}), ...(inputs.length ? { inputs } : {}) };
+  }
+  return { flows: Object.keys(out).length ? out : undefined, errors };
+}
+
+/** An app's screens, from anything: names to the pages they are. */
+export function cleanScreens(raw: unknown): Record<string, AppScreen> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: Record<string, AppScreen> = {};
+  for (const [name, v] of Object.entries(raw as Record<string, unknown>).slice(0, 12)) {
+    const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+    if (!FLOW_NAME.test(name) || typeof o.page !== 'string' || !/^[\w-]{1,40}$/.test(o.page)) continue;
+    out[name] = { page: o.page, ...(short(o.title, 80) ? { title: short(o.title, 80) } : {}) };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 /**
  * What an app keeps, from anything: a map of collections, each { fields, description }, or a map of its
@@ -983,6 +1055,8 @@ export interface InstallPreview {
    * `options` lists what could stand in; `use` is the one picked unless you pick another; "" for the agent's default).
    */
   models: { as: string; agent: 'claude' | 'codex' | 'custom'; label: string; status: 'here' | 'matched' | 'missing'; use?: string; options: { value: string; label: string }[] }[];
+  /** Its screens, by name. */
+  screens: string[];
   /** Templates that come with it (those it calls): each installed first, or the one you have used again. */
   bundled: { name: string; from: string; installs: 'new' | 'reuse' }[];
   /** What changes on the way in (its folder, a mode that skips asking). */
@@ -1025,9 +1099,16 @@ interface Seen {
  * words: values it uses that come later, sit inside a Repeat, run at the same time, or name nothing;
  * rules that cannot be read; tools a step cannot call on its own; answer fields nothing gives.
  */
-export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?: Flow; data?: Record<string, DataCollection> }): { errors: string[]; warnings: string[] } {
+export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?: Flow; data?: Record<string, DataCollection>; flows?: Record<string, NamedFlow> }, o: { named?: boolean } = {}): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
+  // Each flow beside the main one: its own form (its inputs), and outputs of its own names.
+  if (!o.named)
+    for (const [name, f] of Object.entries(r.flows ?? {})) {
+      const c = checkFlow({ fields: f.inputs ?? [], answer: [], flow: f, data: r.data }, { named: true });
+      errors.push(...c.errors.map((e) => `Flow “${name}”: ${e}`));
+      warnings.push(...c.warnings.map((w) => `Flow “${name}”: ${w}`));
+    }
   const flow = r.flow;
   if (!flow) return { errors, warnings };
   const all = allSteps(flow.steps);
@@ -1157,7 +1238,7 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
   const answerIds = new Set(r.answer.map((f) => f.id));
   if (flow.outputs) {
     for (const [k, v] of Object.entries(flow.outputs)) {
-      if (!answerIds.has(k)) note(errors, `What it gives back: “${k}” is not one of the answer fields${answerIds.size ? ` (${[...answerIds].join(', ')})` : ' (it has none)'}`);
+      if (!o.named && !answerIds.has(k)) note(errors, `What it gives back: “${k}” is not one of the answer fields${answerIds.size ? ` (${[...answerIds].join(', ')})` : ' (it has none)'}`);
       checkRefs(`What it gives back, ${k},`, v, seen, new Set(), new Set());
     }
   }

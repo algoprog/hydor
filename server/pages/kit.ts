@@ -293,6 +293,386 @@ function bridge(cfg: BridgeCfg) {
 }
 
 /**
+ * A template's screen (server/apps/screens.ts): window.naget.app, its flows and its data through the app
+ * (pages/frame.tsx answers each call for the template the screen belongs to, never another), and the App
+ * parts written on it: <n-form flow>, <n-result flow>, <n-table data>, <n-runs flow>, <n-button flow> and
+ * <n-count data>. Runs after the bridge, in the page; like it, uses only its argument and the browser.
+ */
+function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
+  const P = window.parent;
+  if (!P || P === window || !cfg?.info) return;
+  const L = (k: string, d: string): string => (typeof cfg.labels?.[k] === 'string' ? cfg.labels[k] : d);
+  const send = (m: Record<string, unknown>) => P.postMessage({ ...m, n: cfg.n }, '*');
+  const waits = new Map<number, [(v: any) => void, (e: Error) => void]>();
+  let seq = 0;
+  const heard: { run: Set<(r: any) => void>; data: Set<(c: string) => void> } = { run: new Set(), data: new Set() };
+  addEventListener('message', (e) => {
+    const d = e.data;
+    if (e.source !== P || !d || typeof d !== 'object') return;
+    if (d.type === 'wa-app-reply' && waits.has(d.id)) {
+      const [ok, fail] = waits.get(d.id)!;
+      waits.delete(d.id);
+      if (typeof d.error === 'string') fail(new Error(d.error));
+      else ok(d.value ?? null);
+    } else if (d.type === 'wa-app-event' && d.n === cfg.n) {
+      if (d.kind === 'run')
+        heard.run.forEach((f) => {
+          try {
+            f(d.run);
+          } catch {}
+        });
+      else if (d.kind === 'data')
+        heard.data.forEach((f) => {
+          try {
+            f(String(d.collection));
+          } catch {}
+        });
+    }
+  });
+  const call = (op: string, args: Record<string, unknown> = {}): Promise<any> =>
+    new Promise((ok, fail) => {
+      const id = ++seq;
+      waits.set(id, [ok, fail]);
+      try {
+        send({ type: 'wa-app', id, op, args });
+      } catch (e) {
+        waits.delete(id);
+        fail(e as Error);
+      }
+    });
+  const ACTIVE = ['queued', 'starting', 'running', 'waiting'];
+  const on = (what: 'run' | 'data', fn: (x: any) => void) => {
+    heard[what].add(fn);
+    return () => heard[what].delete(fn);
+  };
+  /** A run once it has ended: { run, steps }. */
+  const wait = (id: string): Promise<any> =>
+    new Promise((ok, fail) => {
+      let off = () => {};
+      let done = false;
+      const look = () =>
+        call('get', { id }).then(
+          (d) => {
+            if (!done && d && !ACTIVE.includes(d.run?.status)) {
+              done = true;
+              off();
+              ok(d);
+            }
+          },
+          (e) => {
+            off();
+            fail(e);
+          },
+        );
+      off = on('run', (r: any) => r && r.id === id && look());
+      look();
+    });
+  const data = (name: string) => ({
+    find: (q: Record<string, unknown> = {}) => call('find', { collection: name, ...q }),
+    search: (query: string, o: Record<string, unknown> = {}) => call('search', { collection: name, query, ...o }),
+    add: (record: Record<string, unknown>) => call('add', { collection: name, record }),
+    update: (id: string, set: Record<string, unknown>) => call('update', { collection: name, id, set }),
+    remove: (id: string) => call('remove', { collection: name, id }),
+    watch: (fn: () => void) => on('data', (c: string) => c === name && fn()),
+  });
+  const api = Object.freeze({
+    id: cfg.info.id,
+    name: cfg.info.name,
+    flows: cfg.info.flows,
+    collections: cfg.info.data,
+    run: (flow = 'run', inputs: Record<string, unknown> = {}) => call('run', { flow, inputs }),
+    get: (id: string) => call('get', { id }),
+    wait,
+    runs: (o: { flow?: string; limit?: number } = {}) => call('runs', o),
+    data,
+    on,
+  });
+  const W = window as any;
+  Object.defineProperty(window, 'naget', { value: Object.freeze({ ...(W.naget ?? {}), app: api }), enumerable: true, configurable: true });
+
+  // ---- the App parts --------------------------------------------------------------------------------
+  if (!window.customElements) return;
+  const h = (tag: string, attrs: Record<string, any> = {}, ...kids: any[]): any => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === 'class') el.className = String(v);
+      else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : String(v));
+    }
+    for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) el.append(k instanceof Node ? k : String(k));
+    return el;
+  };
+  const flowOf = (id: string | null) => cfg.info.flows.find((f: any) => f.id === (id || 'run'));
+  const label = (k: string) => String(k).replace(/[_-]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  const text = (v: any): string =>
+    v === null || v === undefined
+      ? ''
+      : typeof v === 'boolean'
+        ? v
+          ? L('yes', 'Yes')
+          : L('no', 'No')
+        : Array.isArray(v)
+          ? v.map((x) => (x && typeof x === 'object' ? Object.values(x).map(text).join(' · ') : text(x))).join('\n')
+          : typeof v === 'object'
+            ? JSON.stringify(v)
+            : String(v);
+  /** A value as it reads: rows as a table, the rest as text. */
+  const show = (v: any) => {
+    if (Array.isArray(v) && v.length && v.every((x) => x && typeof x === 'object' && !Array.isArray(x))) {
+      const cols = [...new Set(v.flatMap((x) => Object.keys(x)))];
+      return h('div', { class: 'n-app-table' }, h('table', {}, h('thead', {}, h('tr', {}, ...cols.map((c) => h('th', {}, label(c))))), h('tbody', {}, ...v.map((r) => h('tr', {}, ...cols.map((c) => h('td', {}, text(r[c]))))))));
+    }
+    return text(v);
+  };
+  const statusOf = (r: any) =>
+    (({ queued: L('waiting', 'Waiting'), starting: L('starting', 'Starting…'), running: L('working', 'Working…'), waiting: L('needsYou', 'Needs you in the app'), done: L('done', 'Done'), failed: L('failed', 'Did not finish'), stopped: L('stopped', 'Stopped') }) as Record<string, string>)[r?.status] ?? String(r?.status ?? '');
+  const ago = (t: number) => {
+    const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    return s < 60 ? L('now', 'just now') : s < 3600 ? `${Math.round(s / 60)} min` : s < 86400 ? `${Math.round(s / 3600)} h` : new Date(t).toLocaleDateString();
+  };
+  const fieldEl = (f: any) => {
+    if (f.type === 'yesno') return h('label', { class: 'n-app-check' }, h('input', { type: 'checkbox', name: f.id, checked: /^(yes|true)$/i.test(f.default ?? '') }), f.label);
+    let input: any;
+    if (f.type === 'long') input = h('textarea', { name: f.id, rows: 4, placeholder: f.placeholder, required: !!f.required }, f.default ?? '');
+    else if (f.type === 'choice') input = h('select', { name: f.id, required: !!f.required }, ...(f.required ? [] : [h('option', { value: '' }, '')]), ...(f.options ?? []).map((o: string) => h('option', { value: o, selected: o === f.default }, o)));
+    else input = h('input', { name: f.id, type: f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text', step: f.type === 'number' ? 'any' : undefined, placeholder: f.placeholder, required: !!f.required, value: f.default });
+    return h('label', { class: 'n-field' }, `${f.label}${f.required ? ' *' : ''}`, input, f.help ? h('span', { class: 'n-muted' }, f.help) : null);
+  };
+  const json = (s: string | null) => {
+    try {
+      return s ? JSON.parse(s) : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const define = (name: string, c: CustomElementConstructor) => {
+    if (!customElements.get(name)) customElements.define(name, c);
+  };
+
+  /** Runs a flow from a button or a form, saying how it goes; the page hears "n-run" with the run once it ends. */
+  const runIt = async (el: HTMLElement, flow: string, inputs: Record<string, unknown>, status: any, busy: (on: boolean) => void): Promise<any> => {
+    busy(true);
+    status.className = 'n-app-status';
+    status.textContent = L('working', 'Working…');
+    try {
+      const started = await api.run(flow, inputs);
+      const end = await wait(started.id);
+      const ok = end.run.status === 'done';
+      status.className = `n-app-status ${ok ? 'n-app-ok' : 'n-app-err'}`;
+      status.textContent = ok ? L('done', 'Done') : `${statusOf(end.run)}${end.run.error ? `: ${end.run.error}` : ''}`;
+      el.dispatchEvent(new CustomEvent('n-run', { detail: end, bubbles: true }));
+      return end;
+    } catch (err) {
+      status.className = 'n-app-status n-app-err';
+      status.textContent = (err as Error).message;
+      return null;
+    } finally {
+      busy(false);
+    }
+  };
+
+  define(
+    'n-form',
+    class extends HTMLElement {
+      connectedCallback() {
+        if (this.querySelector('form.n-app-form')) return;
+        const f = flowOf(this.getAttribute('flow'));
+        if (!f) return void (this.textContent = `${L('noFlow', 'This template has no flow')}: ${this.getAttribute('flow')}`);
+        const status = h('span', { class: 'n-app-status', role: 'status' });
+        const button = h('button', { class: 'n-btn n-primary', type: 'submit' }, this.getAttribute('submit') || (f.id === 'run' ? L('run', 'Run') : f.title));
+        const form = h('form', { class: 'n-app-form' }, ...f.inputs.filter((x: any) => x.type !== 'file').map(fieldEl), h('div', { class: 'n-row' }, button, status));
+        form.addEventListener('submit', async (e: Event) => {
+          e.preventDefault();
+          const inputs: Record<string, unknown> = {};
+          for (const x of f.inputs) {
+            const el = form.elements.namedItem(x.id);
+            if (el) inputs[x.id] = el.type === 'checkbox' ? (el.checked ? 'Yes' : 'No') : el.value;
+          }
+          const end = await runIt(this, f.id, inputs, status, (on) => (button.disabled = on));
+          if (end?.run.status === 'done' && !this.hasAttribute('keep')) form.reset();
+        });
+        this.replaceChildren(form);
+      }
+    },
+  );
+
+  define(
+    'n-button',
+    class extends HTMLElement {
+      connectedCallback() {
+        if (this.querySelector('button')) return;
+        const f = flowOf(this.getAttribute('flow'));
+        const words = this.textContent?.trim() || (f ? (f.id === 'run' ? L('run', 'Run') : f.title) : L('run', 'Run'));
+        const status = h('span', { class: 'n-app-status', role: 'status' });
+        const button = h('button', { class: `n-btn${this.hasAttribute('plain') ? '' : ' n-primary'}`, type: 'button' }, words);
+        button.addEventListener('click', () => {
+          if (!f) return void (status.textContent = `${L('noFlow', 'This template has no flow')}: ${this.getAttribute('flow')}`);
+          void runIt(this, f.id, json(this.getAttribute('inputs')) ?? {}, status, (on) => (button.disabled = on));
+        });
+        this.replaceChildren(h('span', { class: 'n-row' }, button, status));
+      }
+    },
+  );
+
+  define(
+    'n-result',
+    class extends HTMLElement {
+      off: (() => void) | null = null;
+      connectedCallback() {
+        const flow = this.getAttribute('flow') || 'run';
+        const f = flowOf(flow);
+        const draw = (r: any) => {
+          if (!r) return void this.replaceChildren(h('div', { class: 'n-app-empty' }, L('noRuns', 'No runs yet')));
+          const parts: any[] = [];
+          if (ACTIVE.includes(r.status) || r.status !== 'done') parts.push(h('div', { class: `n-app-status${r.status === 'failed' ? ' n-app-err' : ''}` }, `${statusOf(r)}${r.error ? `: ${r.error}` : ''}`));
+          const res = r.result && typeof r.result === 'object' ? r.result : null;
+          if (res) {
+            const known = (f?.outputs ?? []).map((o: any) => o.id);
+            const keys = [...known.filter((k: string) => k in res), ...Object.keys(res).filter((k) => !known.includes(k))];
+            const name = (k: string) => f?.outputs?.find((o: any) => o.id === k)?.label ?? label(k);
+            parts.push(h('dl', { class: 'n-app-result' }, ...keys.flatMap((k) => [h('dt', {}, name(k)), h('dd', {}, show(res[k]))])));
+          } else if (r.reply) parts.push(h('div', { class: 'n-app-result' }, h('dd', { style: 'grid-column:1/-1' }, r.reply)));
+          this.replaceChildren(...parts);
+        };
+        const load = () => api.runs({ flow, limit: 1 }).then((list: any[]) => draw(list[0] ?? null), () => {});
+        this.off = on('run', (r: any) => r && (r.flow ?? 'run') === flow && !r.parent && draw(r));
+        void load();
+      }
+      disconnectedCallback() {
+        this.off?.();
+      }
+    },
+  );
+
+  define(
+    'n-runs',
+    class extends HTMLElement {
+      off: (() => void) | null = null;
+      connectedCallback() {
+        const flow = this.getAttribute('flow') || undefined;
+        const limit = Math.max(1, Math.min(Number(this.getAttribute('limit')) || 5, 50));
+        const draw = (list: any[]) =>
+          this.replaceChildren(
+            list.length
+              ? h(
+                  'ul',
+                  { class: 'n-app-runs' },
+                  ...list.map((r) =>
+                    h(
+                      'li',
+                      {},
+                      h('span', { class: r.status === 'done' ? 'n-app-ok' : r.status === 'failed' ? 'n-app-err' : '' }, statusOf(r)),
+                      h('span', {}, Object.values(r.inputs ?? {}).filter(Boolean).join(' · ').slice(0, 120)),
+                      h('span', { class: 'n-muted' }, ago(r.createdAt)),
+                    ),
+                  ),
+                )
+              : h('div', { class: 'n-app-empty' }, L('noRuns', 'No runs yet')),
+          );
+        const load = () => api.runs({ flow, limit }).then(draw, () => {});
+        this.off = on('run', (r: any) => r && !r.parent && (!flow || (r.flow ?? 'run') === flow) && load());
+        void load();
+      }
+      disconnectedCallback() {
+        this.off?.();
+      }
+    },
+  );
+
+  define(
+    'n-table',
+    class extends HTMLElement {
+      off: (() => void) | null = null;
+      connectedCallback() {
+        const name = this.getAttribute('data') || '';
+        const c = cfg.info.data.find((x: any) => x.name === name);
+        if (!c) return void (this.textContent = `${L('noData', 'This template keeps no collection')}: ${name}`);
+        const store = data(name);
+        const limit = Math.max(1, Math.min(Number(this.getAttribute('limit')) || 100, 1000));
+        const edit = (this.getAttribute('edit') || '').split(',').map((x) => x.trim()).filter(Boolean);
+        const remove = this.hasAttribute('remove');
+        const where = json(this.getAttribute('where'));
+        const sort = this.getAttribute('sort') || undefined;
+        const named = (this.getAttribute('columns') || '').split(',').map((x) => x.trim()).filter(Boolean);
+        const kinds: Record<string, string> = Object.fromEntries((c.fields ?? []).map((f: any) => [f.id, f.type]));
+        const titles: Record<string, string> = Object.fromEntries((c.fields ?? []).map((f: any) => [f.id, f.label]));
+        let query = '';
+        const box = this.hasAttribute('search') ? h('input', { class: 'n-app-search', type: 'search', placeholder: L('search', 'Search') }) : null;
+        const body = h('div');
+        const draw = (records: any[]) => {
+          const cols = named.length ? named : c.fields ? c.fields.map((f: any) => f.id) : [...new Set(records.flatMap((r) => Object.keys(r).filter((k) => !['id', 'createdAt', 'updatedAt', 'score'].includes(k))))];
+          if (!records.length) return void body.replaceChildren(h('div', { class: 'n-app-table' }, h('div', { class: 'n-app-empty' }, query ? L('nothingFound', 'Nothing found') : L('empty', 'Nothing here yet'))));
+          const cell = (r: any, k: string) => {
+            if (edit.includes(k) && (kinds[k] === 'yesno' || typeof r[k] === 'boolean')) {
+              const box2 = h('input', { type: 'checkbox', checked: !!r[k], 'aria-label': titles[k] ?? label(k) });
+              box2.addEventListener('change', () => void store.update(r.id, { [k]: box2.checked }).catch(() => (box2.checked = !box2.checked)));
+              return box2;
+            }
+            if (kinds[k] === 'url' && typeof r[k] === 'string') return h('a', { href: r[k], target: '_blank', rel: 'noopener' }, r[k]);
+            return text(r[k]);
+          };
+          body.replaceChildren(
+            h(
+              'div',
+              { class: 'n-app-table' },
+              h(
+                'table',
+                {},
+                h('thead', {}, h('tr', {}, ...cols.map((k: string) => h('th', {}, titles[k] ?? label(k))), remove ? h('th', {}) : null)),
+                h(
+                  'tbody',
+                  {},
+                  ...records.map((r) =>
+                    h('tr', {}, ...cols.map((k: string) => h('td', {}, cell(r, k))), remove ? h('td', { style: 'width:1%' }, h('button', { class: 'n-app-x', type: 'button', title: L('remove', 'Remove'), 'aria-label': L('remove', 'Remove'), onclick: () => void store.remove(r.id) }, '×')) : null),
+                  ),
+                ),
+              ),
+            ),
+          );
+        };
+        const load = () => (query ? store.search(query, { limit: Math.min(limit, 100) }) : store.find({ where, sort, limit })).then((x: any) => draw(x.records ?? []), () => {});
+        let t: any = 0;
+        box?.addEventListener('input', () => {
+          clearTimeout(t);
+          t = setTimeout(() => {
+            query = box.value.trim();
+            void load();
+          }, 300);
+        });
+        this.replaceChildren(...(box ? [box] : []), body);
+        this.off = store.watch(load);
+        void load();
+      }
+      disconnectedCallback() {
+        this.off?.();
+      }
+    },
+  );
+
+  define(
+    'n-count',
+    class extends HTMLElement {
+      off: (() => void) | null = null;
+      connectedCallback() {
+        const name = this.getAttribute('data') || '';
+        if (!cfg.info.data.some((x: any) => x.name === name)) return void (this.textContent = `${L('noData', 'This template keeps no collection')}: ${name}`);
+        const store = data(name);
+        const where = json(this.getAttribute('where'));
+        const n = h('div', { class: 'n-app-count' }, '…');
+        this.replaceChildren(n);
+        const load = () => store.find({ where, limit: 1 }).then((x: any) => (n.textContent = String(x.count ?? 0)), () => {});
+        this.off = store.watch(load);
+        void load();
+      }
+      disconnectedCallback() {
+        this.off?.();
+      }
+    },
+  );
+}
+
+/**
  * A function's source for a <script> element: nothing in it may end the element or open an HTML comment
  * there, however the compiler wrote it (it joins '</scr' + 'ipt>' back together). In strings, template
  * strings and patterns alike, \/ is / and \! is !.
@@ -300,6 +680,7 @@ function bridge(cfg: BridgeCfg) {
 export const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
 export const BRIDGE_SRC = scriptSafe(bridge.toString());
+export const APP_SRC = scriptSafe(appKit.toString());
 export const SCHEME_SRC = scriptSafe(scheme.toString());
 
 // The stylesheet goes into a page as text: it must not end the element it sits in.
@@ -330,7 +711,7 @@ export function injectHead(html: string, head: string): string {
  *   are held back, and the page is changed in place (what was there stays), so it grows without
  *   flashing, following its end unless the reader scrolled up.
  */
-function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string) {
+function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string) {
   const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
   const nonce = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
   const theme = (v: unknown) => (v === 'dark' ? 'dark' : 'light');
@@ -443,7 +824,9 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
       html = (m ? m[0] : '') + doc.documentElement.outerHTML;
     } else {
       const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true };
-      head = `<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>`;
+      // A template's screen: its app's flows and data (no more than its parent sent, and not too much of it).
+      const app = d.app && typeof d.app === 'object' && JSON.stringify(d.app).length < 400_000 ? { n: cfg.n, info: d.app.info, labels: d.app.labels } : null;
+      head = `<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}`;
     }
     const at = DOCTYPE.exec(html);
     html = at ? at[0] + head + html.slice(at[0].length) : head + html;
@@ -458,4 +841,4 @@ const asJs = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
 
 /** The document of /htmlframe, where every page renders (sandboxed by PAGE_CSP). */
 export const frameHtml = () =>
-  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)})</script></body></html>`;
+  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)})</script></body></html>`;

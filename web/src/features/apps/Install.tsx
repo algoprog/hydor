@@ -55,6 +55,11 @@ function PreviewCard({ p, picks, onPick }: { p: InstallPreview; picks: Picks; on
       <div className="divide-y divide-line rounded-xl border border-line px-3">
         <Line label="Who does the work">{p.agents.join(', ') || '—'}</Line>
         <Line label="What it does">{p.steps ? `${p.steps} steps` : 'One agent does the task'}</Line>
+        {p.screens.length > 0 && (
+          <Line label="Its screens">
+            <span translate="no">{p.screens.join(', ')}</span>
+          </Line>
+        )}
         <Line label="Tools it may use">{p.tools === null ? 'All of the app’s tools' : p.tools.length ? p.tools.join(', ') : 'None of the app’s tools'}</Line>
         {p.models.length > 0 && (
           <Line label="Models it uses">

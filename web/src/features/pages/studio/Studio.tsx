@@ -12,7 +12,7 @@ import { ChevronDown, ChevronUp, Code2, Eye, Monitor, PenLine, Plus, Redo2, Smar
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, IconButton, MenuItem, Popover, Segmented, Throbber, useConfirm, useMediaQuery } from '../../../components/ui';
 import type { EditorHandle } from '../../../lib/codemirror';
-import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type Device, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
+import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type AppBridge, type Device, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
 import { AddPanel } from './AddPanel';
 import { editorLabels } from './blocks';
 import { PartPanel, type Ctx, type Media } from './Inspector';
@@ -30,6 +30,8 @@ export interface StudioDoc {
   base?: string;
   /** A saved page's storage; a shown page keeps what it stores while on screen. */
   store: Store;
+  /** A template's screen: window.naget.app for it, in Use (the editor holds its scripts back). */
+  app?: AppBridge;
 }
 
 const isDark = () => document.documentElement.classList.contains('dark');
@@ -451,7 +453,7 @@ export function Studio({
         <CodePane key={`${epoch}:${codeView}`} html={code} onChange={setCode} onSave={() => void saveRef.current()} className={cx('min-h-0 flex-1 bg-bg', side ? 'border-r border-line' : 'border-b border-line')} />
         <div className={cx('relative min-h-0', side ? 'flex-1' : 'h-[45%]')}>
           <DeviceStage device={device}>
-            <PageFrame key={`${doc.key}:code:${shown?.n ?? 0}`} html={withBase(shown?.html ?? code, doc.base)} title={doc.title} store={doc.store} />
+            <PageFrame key={`${doc.key}:code:${shown?.n ?? 0}`} html={withBase(shown?.html ?? code, doc.base)} title={doc.title} store={doc.store} app={doc.app} />
           </DeviceStage>
         </div>
       </div>
@@ -459,7 +461,7 @@ export function Studio({
   } else {
     body = (
       <DeviceStage device={device}>
-        <PageFrame key={`${doc.key}:${epoch}:${pending === null ? 'saved' : pending.length}`} html={withBase(html, doc.base)} title={doc.title} store={doc.store} onPick={onPick} />
+        <PageFrame key={`${doc.key}:${epoch}:${pending === null ? 'saved' : pending.length}`} html={withBase(html, doc.base)} title={doc.title} store={doc.store} onPick={onPick} app={doc.app} />
       </DeviceStage>
     );
   }
@@ -541,7 +543,7 @@ export function Studio({
           <span className="ml-1 truncate text-[12px] text-fg-3 max-sm:hidden">
             {sel ? (sel.wordy ? 'Click it again to change its words' : 'Drag the handle to move it, the edges to size it') : 'Click a part of the page'}
           </span>
-          <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} />
+          <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} app={doc.app?.info} />
         </div>
       )}
       <div className="relative min-h-0 flex-1">{body}</div>

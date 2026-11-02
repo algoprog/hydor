@@ -63,8 +63,8 @@ export interface FlowRunner {
 let flows: FlowRunner | null = null;
 export const useFlows = (f: FlowRunner) => (flows = f);
 
-/** Whether a run follows a flow (rather than one agent doing the task in its prompt). */
-export const isFlowRun = (r: Pick<RunRecord, 'recipe' | 'source'>) => !!r.recipe.flow?.steps.length && r.source !== 'step';
+/** Whether a run follows a flow (rather than one agent doing the task in its prompt): its main one, or another by name. */
+export const isFlowRun = (r: Pick<RunRecord, 'recipe' | 'source' | 'flow'>) => r.source !== 'step' && (r.flow ? !!r.recipe.flows?.[r.flow] : !!r.recipe.flow?.steps.length);
 
 /** The agent process (its run id) behind each app run, from the moment it starts. */
 const byAgentRun = new Map<string, string>();
@@ -164,27 +164,34 @@ export interface StartInput {
   /** The run this one is a step of, and where in its flow. */
   parent?: string;
   step?: string;
+  /** Another of its flows than the main one, by name (a screen's form or button). */
+  flow?: string;
 }
 
+/** The questions a run answers: the template's form, or the inputs of the flow it runs. */
+export const formOf = (recipe: AppRecipe, flow?: string) => (flow ? (recipe.flows?.[flow]?.inputs ?? []) : recipe.fields);
+
 /** The checked form, or an error that says what to fix. */
-export function checkedInputs(recipe: AppRecipe, inputs: Record<string, unknown>, isPublic: boolean, files: Record<string, unknown> = {}) {
+export function checkedInputs(recipe: AppRecipe, inputs: Record<string, unknown>, isPublic: boolean, files: Record<string, unknown> = {}, flow?: string) {
   // A file field with a file sent counts as answered.
   const raw = { ...inputs };
-  for (const f of recipe.fields) if (f.type === 'file' && files[f.id]) raw[f.id] = (files[f.id] as { name?: string }).name || 'file';
-  return checkInputs(recipe.fields, raw, { maxLong: isPublic ? 12_000 : 60_000, maxText: isPublic ? 600 : 2000 });
+  const fields = formOf(recipe, flow);
+  for (const f of fields) if (f.type === 'file' && files[f.id]) raw[f.id] = (files[f.id] as { name?: string }).name || 'file';
+  return checkInputs(fields, raw, { maxLong: isPublic ? 12_000 : 60_000, maxText: isPublic ? 600 : 2000 });
 }
 
 /** Creates the run and starts its session in the background (unless it waits in line). */
 export function startRun(o: StartInput): RunRecord {
-  const { values, errors } = checkedInputs(o.recipe, o.inputs, !!o.public, o.files);
+  if (o.flow && !o.recipe.flows?.[o.flow]) throw new HttpError(400, `The template has no flow “${o.flow}”${o.recipe.flows ? ` (it has ${Object.keys(o.recipe.flows).join(', ')})` : ''}`);
+  const { values, errors } = checkedInputs(o.recipe, o.inputs, !!o.public, o.files, o.flow);
   if (errors.length) throw new HttpError(400, `Check the form: ${errors.join('; ')}`);
   const maxFile = o.public ? 3 << 20 : 25 << 20;
   for (const [id, f] of Object.entries(o.files ?? {})) {
-    if (!o.recipe.fields.some((x) => x.id === id && x.type === 'file')) throw new HttpError(400, `There is no file field ${id}`);
+    if (!formOf(o.recipe, o.flow).some((x) => x.id === id && x.type === 'file')) throw new HttpError(400, `There is no file field ${id}`);
     if (typeof f?.data !== 'string' || typeof f.name !== 'string') throw new HttpError(400, 'Send each file as a name and its base64 contents');
     if (f.data.length * 0.75 > maxFile) throw new HttpError(413, `${f.name} is too big (at most ${maxFile >> 20} MB)`);
   }
-  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step });
+  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow });
   if (!o.queued) go(r, o);
   changed(r);
   return r;
@@ -279,7 +286,7 @@ export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appNam
   const lines = [
     r.source === 'step'
       ? `This session does one step ("${r.appName}") of a template that runs on its own (Naget Agent Templates): nobody watches it live, and what you hand in goes on to its next steps. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`
-      : `This session runs the template "${r.appName}" (Naget Agent Templates)${r.source === 'web' || r.source === 'test' ? '' : ': nobody watches it live'}. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`,
+      : `This session runs the template "${r.appName}" (Naget Agent Templates)${r.source === 'web' || r.source === 'test' || r.source === 'screen' ? '' : ': nobody watches it live'}. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`,
   ];
   const kept = Object.entries(r.data ?? {});
   if (kept.length)

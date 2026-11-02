@@ -36,6 +36,8 @@ export interface PageInfo {
   published?: boolean;
   /** Another kind than a page of HTML: slides (shared/slides.ts), a document (shared/docs.ts), a spreadsheet (shared/sheets.ts), LaTeX (shared/latex.ts). */
   kind?: 'slides' | 'doc' | 'sheet' | 'tex';
+  /** A template's screen: the template it belongs to (it is not in the library). */
+  app?: string;
 }
 
 export interface PageVersion {

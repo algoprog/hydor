@@ -319,7 +319,7 @@ for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) =
   for (const s of literals(js)) add(s, f);
 }
 // The names and lines of what ships, and of the choices the server offers (permission modes, the buttons of an approval).
-const NAMED = ['assistants/builtins', 'apps/templates', 'apps/draft', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api'];
+const NAMED = ['assistants/builtins', 'apps/templates', 'apps/draft', 'apps/screens', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api'];
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
   for (const m of src.matchAll(/\b(name|label|description|detail|placeholder|help|title|category)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
