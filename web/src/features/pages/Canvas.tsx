@@ -16,7 +16,7 @@ import { go, showInFiles } from '../../lib/nav';
 import { toast, toastError, useApp, useLive, useTimeline } from '../../lib/store';
 import { nagetTool } from '../registry';
 import { cx, IconButton, MenuItem, MenuSep, Popover, Switch, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
-import { memoryStore, pageStore, type Store } from './frame';
+import { memoryStore, pageFile, pageStore, type Store } from './frame';
 import { CANVAS_MEDIA, onDraftStart, onScreen, savedRef, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { usePicks } from '../session/HtmlPage';
@@ -234,7 +234,8 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
 
   const download = () => {
     const html = loaded?.doc.html ?? draft?.text ?? '';
-    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    // A page takes the kit along; an HTML file goes as it is.
+    const url = URL.createObjectURL(new Blob([kind === 'file' ? html : pageFile(html)], { type: 'text/html' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = kind === 'file' ? title : `${title.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'page'}.html`;

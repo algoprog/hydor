@@ -15,10 +15,12 @@ In a narrower window, on a phone, or with the panel beside the conversation clos
 - the page's title;
 - **Keep**: puts the page in your Pages library (see [Keep a page](#keep-a-page));
 - **Edit** (the pencil): opens it to change (see [Change a page yourself](#change-a-page-yourself));
-- **Save as a file** (the download icon): saves the page as an `.html` file you can open in any browser;
+- **Save as a file** (the download icon): saves the page as an `.html` file you can open in any browser, with its ready-made look;
 - **Full screen** (the expand icon): opens the page over the app. Press Escape, tap the close button (✕) or click beside it to close it.
 
 A page runs in a frame of its own, apart from the app: it can't reach the app, your files or your sign-in. It can load charting and other libraries from the web.
+
+Pages look like part of the app: agents make them in its theme, light or dark as the app is, in your theme's colours (your own ones too) and the app's font, and an open page changes with it when you switch. A page written with light and dark looks of its own shows the one the app is in, whatever your device is set to. Ask for another look when you want one: "in our brand's colours", "a dark page with neon accents".
 
 If you share the session with a read-only link, the person sees its pages too, but can't keep or change them, and what they pick on them goes nowhere ([Share a read-only link](/guide/sessions#share-a-read-only-link)).
 
@@ -78,7 +80,7 @@ The name of a setting turns gold when something is set there; the ✕ beside it 
 **Page** is the whole page:
 
 - **The page**: its **Title** (the name in a browser's tab), **Background**, **Width** (how wide its content runs on a big screen, in the middle: **Full**, **Wide**, **Medium** or **Narrow**), **Inside space** and **Language**.
-- **Colours**: the colours the page names (its CSS variables; for a page made with the app's ready-made look, its **Background**, **Cards**, **Text**, **Accent** and the rest). Change one and everything that uses it changes with it.
+- **Colours**: the colours the page names (its CSS variables; for a page made with the app's ready-made look, its **Background**, **Cards**, **Text**, **Accent** and the rest). They start as your theme's colours. Change one and everything that uses it changes with it, and it stays so in any theme.
 - **Fonts**: the font of its **Text** and of its **Headings**: the device's own, or one of Google's, which the page then loads.
 - **Text styles**: how **Text**, **Heading 1** to **Heading 3**, **Links** and **Buttons** look everywhere in the page. A part you changed on its own keeps its change.
 - **Your CSS**: rules of your own for the whole page, kept in it as they are.

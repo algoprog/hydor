@@ -13,7 +13,7 @@ import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { Throbber, IconButton, cx, useMediaQuery } from '../../components/ui';
 import { openOver, shownStore, showBeside } from '../pages/Canvas';
-import { pageStore, PageFrame, StreamFrame, type Pick } from '../pages/frame';
+import { pageFile, pageStore, PageFrame, StreamFrame, type Pick } from '../pages/frame';
 import { PageOverlay } from '../pages/overlay';
 import { CANVAS_MEDIA, onScreen, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from '../pages/state';
 
@@ -128,7 +128,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
   }
 
   const download = () => {
-    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const url = URL.createObjectURL(new Blob([pageFile(html)], { type: 'text/html' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = `${title.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'page'}.html`;

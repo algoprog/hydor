@@ -38,7 +38,7 @@ import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Tabs, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { SiteLink, VISIBILITY } from './cards';
-import { pageStore, previewStore } from './frame';
+import { pageFile, pageStore, previewStore } from './frame';
 import { absolute, usePagesStore } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { STARTERS } from './templates';
@@ -443,7 +443,7 @@ function PageCard({ page }: { page: PageInfo }) {
     close();
     try {
       const r = await api<{ html: string }>(`/api/pages/${enc(page.id)}`);
-      const url = URL.createObjectURL(new Blob([r.html], { type: 'text/html' }));
+      const url = URL.createObjectURL(new Blob([pageFile(r.html)], { type: 'text/html' }));
       const a = document.createElement('a');
       a.href = url;
       a.download = `${page.title.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'page'}.html`;
@@ -755,7 +755,7 @@ function PageView({ id }: { id: string }) {
   const download = () => {
     setMenu(null);
     if (!data) return;
-    const url = URL.createObjectURL(new Blob([data.html], { type: 'text/html' }));
+    const url = URL.createObjectURL(new Blob([pageFile(data.html)], { type: 'text/html' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = `${data.page.title.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'page'}.html`;

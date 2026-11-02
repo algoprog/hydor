@@ -1706,6 +1706,8 @@ if (fs.existsSync(config.webDist)) {
       reply.header('Content-Security-Policy', CSP);
       if (file.includes(`${path.sep}assets${path.sep}`)) reply.header('Cache-Control', 'public, max-age=31536000, immutable');
       else reply.header('Cache-Control', 'no-cache');
+      // The app's fonts, for the pages agents make (their frames have an origin of their own) to look like the app.
+      if (file.endsWith('.woff2')) reply.header('Access-Control-Allow-Origin', '*');
     },
   });
 }
