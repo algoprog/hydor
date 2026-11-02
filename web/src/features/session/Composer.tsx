@@ -21,6 +21,7 @@ import { QueueList } from './QueueList';
 import { GoalBar } from './GoalBar';
 import { LimitBanner } from '../usage/LimitReset';
 import { FeatureComposerButtons } from '../registry';
+import { SessionAssistantPicker, useSessionAssistant } from '../assistants/AssistantPicker';
 import { putText } from '../../lib/featureEvents';
 
 const HANDOFF_EVENT = 'wa:handoff';
@@ -42,8 +43,9 @@ export function followUpPref(): FollowUp {
 }
 
 /**
- * Where the box is narrow (a phone, a small window): the model, with the effort and permissions when they are
- * set, as one chip, and those three (and the context) in its menu, a sheet from the bottom on a phone.
+ * Where the box is narrow (a phone, a small window): the assistant and the model, with the effort and
+ * permissions when they are set, as one chip, and those four (and the context) in its menu, a sheet from the
+ * bottom on a phone.
  */
 function OptionsChip({ summary, title, children }: { summary: string; title: string; children: ReactNode }) {
   const ref = useRef<HTMLButtonElement>(null);
@@ -187,6 +189,10 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const effort = cfg.effort !== undefined ? cfg.effort : (running ? live?.effort : undefined) ?? s.prefs?.effort ?? null;
   const mode = cfg.mode !== undefined ? cfg.mode : (running ? live?.mode : undefined) ?? s.prefs?.mode ?? cat?.defaultMode ?? null;
 
+  // The assistant the agent works as; switching it can set the model and mode too (the server has, then).
+  const assistant = useSessionAssistant(s);
+  const assistantSet = (p: { model?: string; mode?: string }) => setCfg((c) => ({ ...c, ...p }));
+
   const configure = async (p: { model?: string | null; effort?: string | null; mode?: string | null }) => {
     setCfg((c) => ({ ...c, ...p }));
     try {
@@ -257,13 +263,21 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const ctx = live?.contextTokens && live?.contextWindow ? Math.round((live.contextTokens / live.contextWindow) * 100) : null;
   const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   const canSend = (!!(text.trim() || atts.length) || !!move) && !busy && !locked;
-  // The narrow box's chip: the model, then the effort and permissions when they are not the usual.
+  // The narrow box's chip: the assistant and the model, then the effort and permissions when they are not the usual.
   const on = move ? { c: moveCat, model: move.model, effort: move.effort, mode: move.mode } : { c: cat, model, effort, mode };
+  const assistantOn = !move && assistant ? assistant.name : null;
   const effortOn = on.effort ? on.effort[0].toUpperCase() + on.effort.slice(1) : null;
   const modeOn = on.c && on.mode && on.mode !== on.c.defaultMode ? (on.c.modes.find((m) => m.value === on.mode)?.label ?? null) : null;
   const modeNow = on.c?.modes.find((m) => m.value === (on.mode ?? on.c?.defaultMode))?.label;
-  const summary = [on.c ? modelLabel(on.c, on.model) : '…', effortOn, modeOn].filter(Boolean).join(' · ');
-  const optionsTitle = [`Model: ${on.c ? modelLabel(on.c, on.model) : '…'}`, effortOn ? `Effort: ${effortOn}` : 'Effort: default', modeNow && `Permissions: ${modeNow} (Shift+Tab cycles)`].filter(Boolean).join('\n');
+  const summary = [assistantOn, on.c ? modelLabel(on.c, on.model) : '…', effortOn, modeOn].filter(Boolean).join(' · ');
+  const optionsTitle = [
+    assistantOn && `Assistant: ${assistantOn}`,
+    `Model: ${on.c ? modelLabel(on.c, on.model) : '…'}`,
+    effortOn ? `Effort: ${effortOn}` : 'Effort: default',
+    modeNow && `Permissions: ${modeNow} (Shift+Tab cycles)`,
+  ]
+    .filter(Boolean)
+    .join('\n');
   const compact = async () => {
     const ok = await confirm({ title: 'Compact the conversation?', body: <>The history so far becomes a summary, which frees context. {ctx}% is in use.</>, confirm: 'Compact' });
     if (ok) post(`/api/sessions/${enc(key)}/compact`).then(() => toast('Compacting the conversation…'), toastError);
@@ -412,7 +426,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
           />
           <div className="flex items-center gap-1 px-2.5 pt-0.5 pb-2.5">
             <div className="flex min-w-0 flex-1 items-center gap-0.5">
-              {/* Wide: the model, effort and permissions side by side. Narrow: one chip, the three in its menu. */}
+              {/* Wide: the assistant, model, effort and permissions side by side. Narrow: one chip, the four in its menu. */}
               <span className="hidden @2xl:contents">
                 {move ? (
                   <>
@@ -422,6 +436,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                   </>
                 ) : (
                   <>
+                    <SessionAssistantPicker s={s} onConfig={assistantSet} />
                     <ModelPicker agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
                     <EffortPicker agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
                     <ModePicker agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
@@ -438,6 +453,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                     </>
                   ) : (
                     <>
+                      <SessionAssistantPicker s={s} label="Assistant" onConfig={assistantSet} />
                       <ModelPicker label="Model" agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
                       <EffortPicker label="Effort" agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
                       <ModePicker label="Permissions" agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />

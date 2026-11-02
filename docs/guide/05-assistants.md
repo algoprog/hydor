@@ -1,12 +1,12 @@
 # Assistants
 
-An assistant is a preset you start a session as: it tells the agent who it is for this session and how to go about the work, and can limit what the agent may use, favor some skills, turn on connected apps, and suggest an agent, model and permissions. This topic covers the seven assistants that come with the app, picking one on the start page, making, changing, deleting and importing your own, the task folders a session gets when you pick no folder, and having agents clean up after a task.
+An assistant is a preset a session works as: it tells the agent who it is for this session and how to go about the work, and can limit what the agent may use, favor some skills, turn on connected apps, and suggest an agent, model and permissions. This topic covers the seven assistants that come with the app, picking one on the start page, switching a session to another one, making, changing, deleting and importing your own, the task folders a session gets when you pick no folder, and having agents clean up after a task.
 
 ![Picking an assistant on the start page: General, Researcher, Writer, Coder, Tutor, Planner or Analyst](images/assistants.webp)
 
 ## What an assistant is
 
-When you start a session, you pick an assistant on the start page. Its instructions go on top of the agent's own, so the same agent works as a careful researcher in one session and as a patient tutor in the next. It works with every agent: Claude Code, Codex, Custom (the app's own agent) and the agents that speak ACP (the Agent Client Protocol), such as Gemini CLI or OpenCode.
+When you start a session, you pick an assistant on the start page, and you can switch the session to another one later in its message box. Its instructions go on top of the agent's own, so the same agent works as a careful researcher in one session and as a patient tutor in the next. It works with every agent: Claude Code, Codex, Custom (the app's own agent) and the agents that speak ACP (the Agent Client Protocol), such as Gemini CLI or OpenCode.
 
 An assistant can hold:
 
@@ -117,11 +117,22 @@ The start page opens with the assistant you picked last, on any device you use; 
 
 Picking a space in the folder menu also picks the assistant that space starts its sessions as, when it has one (see [Spaces](/guide/spaces)).
 
-## See which assistant a session started as
+## Switch assistants in a session
 
-Open the session's menu (⋯) → **Session settings**. The **Assistant** item shows the assistant's name; clicking it opens [Settings → Assistants](/settings?s=assistants). The item is there only when the session started with an assistant that still exists.
+A session's message box shows the assistant it works as, and you can switch to another one at any time: from **Researcher** to **Writer** once the facts are in, say.
 
-You pick the assistant when the session starts. To work as another one, start a new session.
+1. In a wide message box, the assistant comes first in the row under the box, before the model: its icon and name. In a narrow box or on a phone, it is the first row of the chip that opens **Options**, and that chip names it first, such as "Researcher · Opus 5.5".
+2. Click it. Under **Switch to**, pick another one: the same menu as on the start page, a grid on a computer and a sheet from the bottom on a phone.
+3. The app says "The agent works as *name* from your next message".
+
+From your next message on, the agent works as the new assistant, and the conversation carries on:
+
+- The agent is told of the switch with your message (the conversation doesn't show this).
+- **Claude Code and Codex** read their instructions when they start, so when the session is free, its agent starts afresh before your message, with the new assistant's instructions and limits; that message takes a moment longer. In the middle of a turn, or while the agent works towards a goal or has work in the background, it gets the new instructions with your message instead, and starts afresh at a later message, once it is free.
+- **Custom** reads its instructions before each turn. Other agents (Gemini CLI, OpenCode…) get the new assistant's instructions with your message.
+- The connected apps the new assistant turns on are on in the session, in place of the previous one's; what you turned on or off for the session yourself stays. If it has a permission mode, the session switches to the matching mode, and to its model when it suggests the session's own agent. The agent itself stays the same: to move the conversation to another one, see [Continue in another agent](/guide/sessions#continue-in-another-agent).
+
+A session started without an assistant (in VS Code or a terminal, or before assistants came to the app) shows **No assistant** there: pick one to give it one. The session's menu (⋯) → **Session settings** → **Assistant** names it too; clicking it opens [Settings → Assistants](/settings?s=assistants).
 
 ## Make your own assistant
 
@@ -188,7 +199,7 @@ This part shows only when you have connected apps (set up in [Settings → Conne
 
 Each assistant has its buttons on its row in [Settings → Assistants](/settings?s=assistants). Built-in ones carry a **Built in** badge; imported ones an **Imported** badge.
 
-- **Edit** (the pencil, your own only): opens the same editor. **Save** keeps the changes ("*name* is saved"). Sessions you start from then on use the new version; Custom also picks the change up in its sessions that are already going, from their next message.
+- **Edit** (the pencil, your own only): opens the same editor. **Save** keeps the changes ("*name* is saved"). Sessions you start from then on use the new version, and so do the sessions with it that are already going, from your next message: Custom reads it before each turn, and Claude Code and Codex start afresh once they are free (the conversation carries on).
 - **Duplicate** (two squares, on every assistant): opens the editor as a new assistant with everything filled in and the name "*name* (copy)". Change what you like and **Save**. This is how you make your own version of a built-in.
 - **Delete** (the bin, your own only): asks "Delete *name*?" first. Sessions started with it keep going without its instructions.
 
@@ -274,5 +285,6 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "Make a copy of the Researcher assistant called Patent scout that favors the research skill and has the web and file reading only."
 - "Import my Claude Code agent file ~/.claude/agents/code-reviewer.md as an assistant."
 - "Which assistants do I have, and what agent and model does each one suggest?"
+- "Switch my session about the Lisbon trip to the Planner assistant."
 - "Put new task folders in ~/Documents/Tasks from now on."
 - "Turn off cleaning up after a task."

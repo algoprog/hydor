@@ -10,7 +10,8 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
   write in a message box, with the files you attach, waits there while you look at other pages. As a
   session starts, the start page becomes it: the box moves down to its place and what you wrote moves up
   as your first message.
-- Switch models mid-session; the model menu lists the session's own agent's models. "Continue in Codex" (or
+- Switch models or assistants mid-session; the model menu lists the session's own agent's models, and another
+  assistant applies from your next message, the conversation carrying on. "Continue in Codex" (or
   Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
 - Fork a session from any reply, or edit an earlier message and go on from there, with the files put back as
   they were. Compact a long session, stop a turn, resume an old one.
@@ -29,8 +30,9 @@ Every agent here gets the same help from the app, whatever its model: Claude Cod
 agents that speak ACP and take MCP servers.
 
 - **Assistants**: start as a Researcher, Writer, Tutor, Planner, Analyst or Coder, or one of your own (its
-  instructions, model, tools and connected apps; import Claude Code's agent files). A task without a folder gets
-  one of its own (`~/Naget/<date>-<task>`).
+  instructions, model, tools and connected apps; import Claude Code's agent files), and switch to another in the
+  session's message box when the work changes. A task without a folder gets one of its own
+  (`~/Naget/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
   how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,
   Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a space, and

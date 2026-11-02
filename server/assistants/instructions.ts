@@ -43,7 +43,7 @@ function skillsLine(skills: string[], t: Target): string {
 }
 
 function assistantBlock(a: Assistant, t: Target): string {
-  const out = [`# Assistant: ${a.name}`, 'The user started this session with this assistant. Work this way throughout; what they ask in the conversation comes first.'];
+  const out = [`# Assistant: ${a.name}`, 'The user picked this assistant for this session. Work this way throughout; what they ask in the conversation comes first.'];
   if (a.instructions.trim()) out.push('', a.instructions.trim());
   const off = toolsOff(a);
   if (off.length) out.push('', limits(off, t));
@@ -57,6 +57,17 @@ export function instructionsFor(a: Assistant | null, tone: string, t: Target): s
   if (a) parts.push(assistantBlock(a, t));
   if (tone.trim()) parts.push(`# How to talk to the user\nIn their own words: ${tone.trim().replace(/\s+/g, ' ')}\nKeep to this in every reply, unless they ask for something else in the conversation.`);
   return parts.join('\n\n');
+}
+
+/**
+ * What the agent hears with the user's next message after they switched the session to assistant `a` (from
+ * `from`, or from none): the switch, and the new assistant's block unless the agent's instructions have it
+ * already (`has`: it started since, or it is Custom, which reads them before each turn).
+ */
+export function switchNote(from: Assistant | null, a: Assistant, t: Target, has: boolean): string {
+  const what = from ? `The user switched this session's assistant from ${from.name} to ${a.name}.` : `The user picked the ${a.name} assistant for this session.`;
+  if (has) return `${what} Its instructions ("# Assistant: ${a.name}") are now in yours: work that way from here on.`;
+  return `${what} From here on, work as below${from ? '; this takes the place of the assistant instructions you had before' : ''}.\n\n${assistantBlock(a, t)}`;
 }
 
 /**

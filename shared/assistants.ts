@@ -1,6 +1,8 @@
 // Assistants: presets that shape a session (Researcher, Writer, Tutor…): who the agent is for it, how it
 // works, what it may use, and the agent, model and mode it suggests. Shared by the server (instructions,
-// Custom's tool limits) and the pages (the start page's picker, Settings → Assistants).
+// Custom's tool limits) and the pages (the pickers on the start page and in a session's message box,
+// Settings → Assistants).
+import type { SessionExtra } from './features.ts';
 import type { Agent } from './types.ts';
 
 /** What an assistant may use, by kind: each agent's own tools fall under one of these. */
@@ -51,6 +53,13 @@ export interface AssistantsState {
   defaultTaskRoot: string;
   /** Agents clean up after a task: what they made along the way and no longer need. */
   cleanUp: boolean;
+}
+
+/** What switching a session's assistant changed: its settings, and the model and mode the assistant set (in the agent's own names). */
+export interface AssistantSwitch {
+  extra: SessionExtra;
+  model?: string;
+  mode?: string;
 }
 
 export const DEFAULT_ASSISTANT = 'general';

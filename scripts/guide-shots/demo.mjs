@@ -392,7 +392,9 @@ export async function seedApi(api, home, now, s) {
 
   const into = { thesis, garden, taxes, checkout: shopSpace };
   for (const [name, id] of Object.entries(into)) if (s[name] && id) await api('PATCH', `/api/sessions/${encodeURIComponent(s[name].key)}/extra`, { space: id });
-  await api('PATCH', `/api/sessions/${encodeURIComponent(s.ebike.key)}/extra`, { assistant: 'researcher' });
+  // The assistant each session works as, as the start page or its space would have picked it.
+  const as = { ebike: 'researcher', checkout: 'coder', settings: 'general', report: 'general', lisbon: 'planner', thesis: 'writer', garden: 'general', taxes: 'analyst', blog: 'coder', brief: 'general' };
+  for (const [name, assistant] of Object.entries(as)) if (s[name]) await api('PATCH', `/api/sessions/${encodeURIComponent(s[name].key)}/extra`, { assistant });
   await api('POST', `/api/sessions/${encodeURIComponent(s.thesis.key)}/flags`, { pinned: true });
 
   const note = (text, scope = 'global', key) => api('POST', '/api/memory/entries', { text, scope, ...(key ? { key } : {}) });
