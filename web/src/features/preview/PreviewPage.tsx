@@ -94,7 +94,7 @@ function Stage({ device, children }: { device: Device; children: ReactNode }) {
   const want = WIDTH[device];
   if (!want)
     return (
-      <div ref={box} className="relative h-full w-full bg-white">
+      <div ref={box} className="relative h-full w-full bg-white dark:bg-[#151412]">
         {children}
       </div>
     );
@@ -103,7 +103,7 @@ function Stage({ device, children }: { device: Device; children: ReactNode }) {
     <div ref={box} className="relative h-full w-full overflow-hidden bg-bg-2">
       {size.w > 0 && (
         <div
-          className="absolute top-4 left-1/2 overflow-hidden rounded-[16px] bg-white shadow-[0_0_0_1px_var(--line-2),0_10px_30px_rgba(0,0,0,.2)]"
+          className="absolute top-4 left-1/2 overflow-hidden rounded-[16px] bg-white dark:bg-[#151412] shadow-[0_0_0_1px_var(--line-2),0_10px_30px_rgba(0,0,0,.2)]"
           style={{ width: want, height: (size.h - 32) / scale, transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'top center' }}
         >
           {children}
@@ -275,7 +275,7 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
         <Stage device={device}>
           {live ? (
             src ? (
-              <iframe ref={frame} key={`${s.port}`} src={src} title={title ?? nameOf(s)} className="block h-full w-full border-0 bg-white" allow="clipboard-read; clipboard-write; fullscreen" />
+              <iframe ref={frame} key={`${s.port}`} src={src} title={title ?? nameOf(s)} className="block h-full w-full border-0 bg-white dark:bg-[#151412]" allow="clipboard-read; clipboard-write; fullscreen" />
             ) : (
               <div className="flex h-full items-center justify-center text-fg-3">
                 <Throbber size={26} />

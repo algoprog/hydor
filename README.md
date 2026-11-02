@@ -33,7 +33,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
 - Get help with anything, not just code: assistants for research, writing and planning, web search (Naget Search by
   default) and a browser you can watch and take over, documents in and out, small tools and pages you keep (watch
-  them being written and change them yourself, by clicking or in their code), and templates for tasks you repeat
+  them being written and change them yourself, in a visual editor that works on phones too, or in their code), and
+  templates for tasks you repeat
 - Give every agent memory of you and your projects, your documents (knowledge bases it searches and cites),
   your apps and services (connected once), skills, child sessions, and tasks that run on a schedule or when
   something changes

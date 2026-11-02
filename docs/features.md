@@ -89,9 +89,12 @@ agents that speak ACP and take MCP servers.
   searches used, and opens the report once it is ready.
 - **Pages and templates**: pages the agents show can answer back (pick an option, fill in a form), stay in a
   library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
-  link. A page shows as the agent writes it (beside the conversation on a wide screen), and you can change it:
-  click a part to rewrite its words, restyle it, move or delete it, add new parts, or edit its HTML with the page
-  beside it, at a computer's, tablet's or phone's width; the agent hears of your changes with your next message.
+  link. A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
+  and you can change it in a visual editor that works on a phone too: click or tap a part to rewrite its words
+  (bold, italic, links), restyle it (this part, every part of its kind or class, on hover, or for tablets and
+  phones only), move, size, copy, wrap or delete it, pick it from its layers, add parts and ready-made sections,
+  set the whole page's colours, fonts, width and the look of its headings, links and buttons, ask the agent about
+  a part, or edit its HTML with the page beside it; the agent hears of your changes with your next message.
   HTML files an agent writes open the same way. Make pages of your own from a blank page, notes, a checklist or
   a tracker, and see or clear the data a page keeps.
   Templates are tasks you repeat, each with a form: ready-made or your own, run from the Templates page, the
