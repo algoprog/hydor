@@ -397,8 +397,40 @@ export function appInfo(id: string, r: Pick<AppRecipe, 'name' | 'fields' | 'answ
 /** Tools a step may call on its own, outside a session: they answer without a conversation to answer in. */
 export const STEP_TOOLS = ['web_search', 'read_page', 'http_request', 'read_document', 'generate_image', 'knowledge_search', 'knowledge_read', 'recall', 'notify_user'];
 
+/**
+ * Values every step can use beside the form's answers and the steps' values: the moment, in the user's time
+ * zone, and the run (what started it). A flow fills them when it starts.
+ */
+export const BUILTIN_VALUES = [
+  { ref: 'today', label: 'Today', hint: 'The date, as 2026-11-02' },
+  { ref: 'now', label: 'Now', hint: 'The date and time, as 2026-11-02 14:30' },
+  { ref: 'weekday', label: 'The day of the week', hint: 'Monday, Tuesday…' },
+  { ref: 'timezone', label: 'The time zone', hint: 'Where those are, as Europe/Athens' },
+  { ref: 'run.source', label: 'What started the run', hint: 'web (its form), test, api, mcp, public, batch, task, screen, chat, app' },
+  { ref: 'run.id', label: 'The run', hint: 'Its id, as its page has it' },
+] as const;
+/** The names those values go by. */
+export const BUILTIN_ROOTS = new Set(['today', 'now', 'weekday', 'timezone', 'run']);
+
+/** The moment's values in a time zone (an IANA name; UTC when it is not one). */
+export function momentOf(timeZone = 'UTC', at = Date.now()): { today: string; now: string; weekday: string; timezone: string } {
+  let tz = timeZone || 'UTC';
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+  } catch {
+    tz = 'UTC';
+  }
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'long' })
+      .formatToParts(at)
+      .map((x) => [x.type, x.value]),
+  );
+  const today = `${p.year}-${p.month}-${p.day}`;
+  return { today, now: `${today} ${p.hour}:${p.minute}`, weekday: p.weekday, timezone: tz };
+}
+
 /** Names values use for other things, which no step may take. */
-const RESERVED = new Set(['inputs', 'item', 'index', 'today', 'error', 'steps', 'run']);
+const RESERVED = new Set(['inputs', 'item', 'index', 'today', 'now', 'weekday', 'timezone', 'error', 'steps', 'run']);
 
 const ID = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 const REF = '[A-Za-z_][\\w-]*(?:\\.[A-Za-z_][\\w-]*|\\[-?\\d+\\])*';
@@ -497,7 +529,7 @@ export function collapseSteps(r: { fields: AppField[]; answer: AnswerField[]; fl
   let body = JSON.stringify(picked);
   for (const ref of refsIn(picked)) {
     const root = rootOf(ref);
-    if (inside.has(root) || root === 'today') continue;
+    if (inside.has(root) || BUILTIN_ROOTS.has(root)) continue;
     const own = root === 'inputs' ? segOf(ref) : form.has(root) ? root : undefined;
     if (own && form.has(own)) {
       // The template's own questions are its block's too, by the same names.
@@ -1089,7 +1121,7 @@ export function lookup(path: string, s: Scope): { found: boolean; value: unknown
   if (root === 'inputs') v = s.inputs;
   else if (Object.prototype.hasOwnProperty.call(s.vars, root)) v = s.vars[root];
   else if (Object.prototype.hasOwnProperty.call(s.steps, root)) v = s.steps[root] ?? {};
-  else if (root === 'today') v = new Date().toISOString().slice(0, 10);
+  else if (BUILTIN_ROOTS.has(root)) v = root === 'run' ? {} : momentOf()[root as 'today'];
   else if (Object.prototype.hasOwnProperty.call(s.inputs, root)) v = s.inputs[root];
   else return { found: false, value: undefined };
   for (const k of rest) {
@@ -1458,7 +1490,11 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
         if (field && !fieldIds.has(field)) note(errors, `${where} uses {{${p}}}: there is no question “${field}” in the form`);
         continue;
       }
-      if (root === 'today' || names.has(root)) continue;
+      if (root === 'run') {
+        if (field && field !== 'id' && field !== 'source') note(errors, `${where} uses {{${p}}}: a run gives id and source`);
+        continue;
+      }
+      if (BUILTIN_ROOTS.has(root) || names.has(root)) continue;
       const at = seen.get(root);
       if (at) {
         const gives = givesOf(at.step);
@@ -1522,10 +1558,11 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
           checkRule(where, s.rule);
           checkRefs(where, [s.rule, s.ask], seen, names, siblings);
           const why = `the decision “${s.id}” goes the other way`;
+          // Within one path its steps run together; only the steps after the decision may find them empty.
           const a = new Map(seen);
-          walk(s.then, a, names, maybe ?? why, siblings);
+          walk(s.then, a, names, maybe, siblings);
           const b = new Map(seen);
-          walk(s.else ?? [], b, names, maybe ?? why, siblings);
+          walk(s.else ?? [], b, names, maybe, siblings);
           for (const inner of [...allSteps(s.then), ...allSteps(s.else ?? [])]) if (!inLoop.has(inner.id) || inLoop.get(inner.id) !== inLoop.get(s.id)) seen.set(inner.id, { step: inner, maybe: maybe ?? why });
           break;
         }
@@ -1538,6 +1575,8 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
           inner.add('index');
           inner.add(`loop:${s.id}`);
           const round = new Map(seen);
+          // Again until something holds: a round sees what its later steps gave in the round before (none in the first).
+          if (s.over === undefined && (s.until || s.untilAsk)) for (const x of allSteps(s.steps)) round.set(x.id, { step: x, maybe: maybe ?? `it is the first round of “${s.id}”` });
           walk(s.steps, round, inner, maybe, siblings);
           // Whether to stop is asked at the end of each round, with that round's values.
           checkRefs(`${where}, until`, [s.until, s.untilAsk], round, inner, siblings);
@@ -1560,7 +1599,7 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
       if (Array.isArray(s.failed)) {
         const withError = new Set(names);
         withError.add('error');
-        walk(s.failed, new Map(seen), withError, maybe ?? `“${s.id}” does not fail`, siblings);
+        walk(s.failed, new Map(seen), withError, maybe, siblings);
         for (const inner of allSteps(s.failed)) seen.set(inner.id, { step: inner, maybe: maybe ?? `“${s.id}” does not fail` });
       }
       seen.set(s.id, { step: s, maybe: own });

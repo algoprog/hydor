@@ -107,15 +107,22 @@ agents that speak ACP and take MCP servers.
   a tracker, and see or clear the data a page keeps. Export a page as a PDF, a Word document (headings, lists,
   tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
-  watch it change as it saves. Apps are tasks you repeat, each with a form: ready-made or your own, run from
-  the Apps page, the API, MCP, a public page, or once for each row of a CSV. Follow-ups refine a run's
+  watch it change as it saves. Apps are tasks you repeat, each with a form: ready-made or your own (described in a
+  box at the top of the Apps page for the App builder to make, or built from scratch, each card saying what it is
+  made of), run from the Apps page, the API, MCP, a public page, or once for each row of a CSV. The ready-made ones
+  work in steps (Deep research plans its questions, searches them a few at a time, ranks the sources in code,
+  reads the best in parallel, searches again for gaps and writes a cited report), and an app's page shows how it
+  works with a way to its graph. Follow-ups refine a run's
   result, asked on its page or in its session, which opens on that result with a switch to the conversation.
   An app can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
   repeat over a list or until something holds, branches side by side, another app, its own data, a question
-  to you that it waits for, a program in JavaScript, TypeScript or Python in a sandbox, which can be the whole
+  to you that it waits for, built-in values (today, now, the day of the week, the time zone where you are, what
+  started the run), a program in JavaScript, TypeScript or Python in a sandbox, which can be the whole
   flow: its ctx calls to models, agents, tools, people, its data and other apps are steps of the run, kept
   and replayed after a restart, and values worked out at once and at no cost: the first, a count, a sum, a field
-  of each, a join, a sort), each handing typed values to the next, laid out in its Edit (steps added from a short
+  of each, a join, a sort), each handing typed values to the next, laid out in its Edit (tabs for what it does, its
+  form, its answer, examples and settings folded to a line each; what it does as one task, a list or a graph, which
+  runs from the form and the built-in values at the top to the answer at the end; steps added from a short
   menu, values put in from the form and the steps before, checks shown as you go, and a graph of nodes and wires
   to build in on a computer: a step's settings beside it, a + on a wire, values wired by dragging from one step
   to another or into empty space for a new step, nodes placed by hand or laid out by Tidy, value wires bent where

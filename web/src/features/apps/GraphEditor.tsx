@@ -20,9 +20,9 @@
 // theirs its answer. Other templates can call it too, and a change to it is a change for all of them.
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AppWindow, Bot, Boxes, CircleDot, CodeXml, Columns2, Database, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Sigma, Snowflake, Sparkles, Split, Wrench, X } from 'lucide-react';
+import { AppWindow, Bot, Boxes, CircleDot, ClipboardCheck, Clock, CodeXml, Columns2, Database, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Sigma, Snowflake, Sparkles, Split, TextCursorInput, Wrench, X } from 'lucide-react';
 import type { Flow, NamedFlow, Step, StepKind } from '@shared/app-manifest';
-import { allSteps, asText, collapseSteps, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
+import { allSteps, asText, BUILTIN_ROOTS, BUILTIN_VALUES, collapseSteps, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
 import type { AppDef, AppGraph, AppRecipe, AppRun, RunProgress, RunStepView } from '@shared/apps';
 import { isActive } from '@shared/apps';
 import { api, enc, post } from '../../lib/api';
@@ -43,6 +43,9 @@ const LABEL = 20;
 const PAD = 16;
 const SLOT_W = 128;
 const SLOT_H = 28;
+/** Room between the steps and the run's ends (the form above, the answer below), and between the form and the built-in values. */
+const IO_GAP = 46;
+const IO_GAP_X = 24;
 
 /** Each kind's colour: the node's stripe and the wires of the values it gives. */
 export const KIND_COLOR: Record<StepKind, string> = {
@@ -301,6 +304,8 @@ export interface GraphEditorProps {
   onFlows: (f: { flow?: Flow; flows?: Record<string, NamedFlow> }) => void;
   Body: ComponentType<{ s: Step; list: ListPath; i: number; ctx: Ctx }>;
   Actions: ComponentType<{ s: Step; list: ListPath; i: number; last: number; ctx: Ctx; done: () => void }>;
+  /** Opens the builder's form or answer (a click on their nodes). */
+  onPart?: (p: 'form' | 'answer') => void;
 }
 
 /** A try of the template as it is on screen: its run, its steps as they go, and what moves it on. */
@@ -354,7 +359,7 @@ const LIT: Record<string, string> = {
   stopped: 'ring-2 ring-fg-3/40',
 };
 
-export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions }: GraphEditorProps) {
+export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions, onPart }: GraphEditorProps) {
   const flow: Flow = ctx.flow;
   const box = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 40, y: 30, k: 1 });
@@ -505,6 +510,51 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
     }
   };
   walkWires(flow.steps, []);
+
+  // ---- the run's ends: the form and the built-in values it starts with (above), and its answer (below) ----
+  const fieldIds = new Set(ctx.recipe.fields.map((f) => f.id));
+  const formUsers = nodes.filter((n) => usesOf(n.s).some((r) => r === 'inputs' || fieldIds.has(r)));
+  const builtUsers = nodes.filter((n) => usesOf(n.s).some((r) => BUILTIN_ROOTS.has(r)));
+  const builtUsed = [...new Set(builtUsers.flatMap((n) => refsIn(JSON.stringify(n.s)).filter((r) => BUILTIN_ROOTS.has(r.split(/[.[]/)[0]))))];
+  const first = entry(flow.steps, []);
+  const lowest = Math.max(0, ...nodes.map((n) => n.y + H), ...slots.map((sl) => sl.y + SLOT_H), ...frames.map((f) => f.y + f.h));
+  const highest = Math.min(0, ...nodes.map((n) => n.y), ...slots.map((sl) => sl.y));
+  const midX = (first?.x ?? laid.cx) - W / 2;
+  const formAt: Pt = { x: midX - (builtUsers.length ? (W + IO_GAP_X) / 2 : 0), y: highest - H - IO_GAP };
+  const builtAt: Pt | null = builtUsers.length ? { x: formAt.x + W + IO_GAP_X, y: formAt.y } : null;
+  const answerAt: Pt = { x: midX, y: lowest + IO_GAP };
+  if (first) wires.push({ d: curve({ x: formAt.x + W / 2, y: formAt.y + H }, first) });
+  for (const e of exits(flow.steps, [])) wires.push({ d: curve(e.pt, { x: answerAt.x + W / 2, y: answerAt.y }), fail: e.fail });
+  // Where each answer field comes from: the flow's outputs, else the last step that gives a value of its name.
+  const outputs = flow.outputs ?? {};
+  const givers = new Set<string>();
+  for (const a of ctx.recipe.answer) {
+    const ref = outputs[a.id];
+    if (ref) for (const r of refsIn(ref)) givers.add(r.split(/[.[]/)[0]);
+    else {
+      const last = [...allSteps(flow.steps)].reverse().find((x) => givesOf(x)?.includes(a.id));
+      if (last) givers.add(last.id);
+    }
+  }
+  const ioWire = (from: Pt, to: Pt, color: string, i: number, key: string, lit: boolean) => {
+    const out = 26 + (i % 6) * 9;
+    const d = `M${from.x} ${from.y} C${Math.max(from.x, to.x) + out} ${from.y} ${Math.max(from.x, to.x) + out} ${to.y} ${to.x} ${to.y}`;
+    return <path key={key} d={d} fill="none" stroke={color} strokeWidth={1.5} strokeOpacity={lit ? 0.9 : 0.18} strokeDasharray="3 3" />;
+  };
+  const ioValues: ReactNode[] = [
+    ...formUsers.map((n, i) => ioWire({ x: formAt.x + W, y: formAt.y + H / 2 }, { x: n.x + W, y: n.y + H / 2 }, 'var(--accent)', i, `f${n.s.id}`, hover === '@form' || hover === n.s.id)),
+    ...(builtAt ? builtUsers.map((n, i) => ioWire({ x: builtAt.x + W, y: builtAt.y + H / 2 }, { x: n.x + W, y: n.y + H / 2 }, '#94a3b8', i, `b${n.s.id}`, hover === '@built' || hover === n.s.id)) : []),
+    ...[...givers].map((id, i) => {
+      const n = pos.get(id);
+      return n ? ioWire({ x: n.x + W, y: n.y + H / 2 }, { x: answerAt.x + W, y: answerAt.y + H / 2 }, KIND_COLOR[n.s.do], i, `a${id}`, givers.size < 4 || hover === '@answer' || hover === id) : null;
+    }),
+  ];
+  const ends = [
+    { key: '@form', at: formAt, Icon: TextCursorInput, label: tr('The form'), line: ctx.recipe.fields.map((f) => f.label || f.id).join(' · ') || tr('No questions'), title: tr('What someone answers before a run: click to change the questions'), open: () => onPart?.('form') },
+    ...(builtAt ? [{ key: '@built', at: builtAt, Icon: Clock, label: tr('Built in'), line: builtUsed.map((r) => `{{${r}}}`).join(' · '), title: BUILTIN_VALUES.map((b) => `{{${b.ref}}}: ${tr(b.label)} (${tr(b.hint)})`).join('\n'), open: undefined }] : []),
+    { key: '@answer', at: answerAt, Icon: ClipboardCheck, label: tr('The answer'), line: ctx.recipe.answer.map((a) => a.label || a.id).join(' · ') || tr('The last step’s reply'), title: tr('What a run gives back: click to change its fields'), open: () => onPart?.('answer') },
+  ];
+
   const values: ReactNode[] = [];
   let k = 0;
   for (const n of nodes)
@@ -585,15 +635,16 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
   const fit = () => {
     const r = box.current?.getBoundingClientRect();
     if (!r) return;
-    const xs = [...nodes.map((n) => n.x), ...slots.map((s) => s.x)];
-    const ys = [...nodes.map((n) => n.y), ...slots.map((s) => s.y)];
+    const xs = [...nodes.map((n) => n.x), ...slots.map((s) => s.x), ...ends.map((b) => b.at.x)];
+    const ys = [...nodes.map((n) => n.y), ...slots.map((s) => s.y), ...ends.map((b) => b.at.y)];
     if (!xs.length) return;
     const x0 = Math.min(...xs) - 30;
     const y0 = Math.min(...ys) - 40;
-    const w = Math.max(...nodes.map((n) => n.x + W), ...slots.map((s) => s.x + SLOT_W)) + 90 - x0;
-    const h = Math.max(...nodes.map((n) => n.y + H), ...slots.map((s) => s.y + SLOT_H)) + 40 - y0;
-    const kk = Math.min(1, Math.max(0.35, Math.min(r.width / w, r.height / h)));
-    setView({ k: kk, x: (r.width - w * kk) / 2 - x0 * kk, y: Math.max(10, (r.height - h * kk) / 2) - y0 * kk });
+    const w = Math.max(...nodes.map((n) => n.x + W), ...slots.map((s) => s.x + SLOT_W), ...ends.map((b) => b.at.x + W)) + 90 - x0;
+    const h = Math.max(...nodes.map((n) => n.y + H), ...slots.map((s) => s.y + SLOT_H), ...ends.map((b) => b.at.y + H)) + 40 - y0;
+    // All of it when it fits at a size that reads; a long flow from its top, at a size that still reads.
+    const kk = Math.min(1, Math.max(0.75, Math.min(r.width / w, r.height / h)));
+    setView({ k: kk, x: (r.width - w * kk) / 2 - x0 * kk, y: (h * kk <= r.height ? Math.max(10, (r.height - h * kk) / 2) : 10) - y0 * kk });
   };
   // Fit once there is a box to fit in.
   useEffect(() => {
@@ -726,7 +777,7 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
   const editor = (
     <>
       {full && <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setFull(false)} />}
-      <div className={cx('flex overflow-hidden rounded-xl border border-line', full ? 'fixed inset-3 z-40 bg-bg shadow-2xl' : 'h-[600px] bg-bg-1')}>
+      <div className={cx('flex overflow-hidden rounded-xl border border-line', full ? 'fixed inset-3 z-40 bg-bg shadow-2xl' : 'h-[min(78vh,860px)] min-h-[520px] bg-bg-1')}>
       <div
         ref={box}
         tabIndex={0}
@@ -756,6 +807,7 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
               <path key={i} d={w.d} fill="none" stroke={w.to && /^(running|waiting|done)$/.test(lit.get(w.to)?.status ?? '') ? 'var(--accent)' : w.fail ? 'var(--err)' : 'var(--fg-3)'} strokeWidth={w.fail || w.loop ? 1.5 : 2} strokeDasharray={w.fail || w.loop ? '5 4' : undefined} />
             ))}
             {values}
+            {ioValues}
             {linking &&
               (() => {
                 const from = pos.get(linking.from);
@@ -787,6 +839,27 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
               </div>
             );
           })}
+          {ends.map((b) => (
+            <button
+              key={b.key}
+              type="button"
+              title={b.title}
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerEnter={() => setHover(b.key)}
+              onPointerLeave={() => setHover((h) => (h === b.key ? null : h))}
+              onClick={b.open}
+              className={cx('absolute flex flex-col justify-center rounded-xl border border-dashed border-line-2 bg-panel px-3 text-left', b.open ? 'cursor-pointer hover:border-fg-3' : 'cursor-help')}
+              style={{ left: b.at.x, top: b.at.y, width: W, height: H }}
+            >
+              <span className="flex items-center gap-1.5 text-[12.5px] font-semibold">
+                <b.Icon size={13} className="shrink-0 text-fg-3" />
+                {b.label}
+              </span>
+              <span className="block truncate text-[11.5px] text-fg-3" translate="no">
+                {b.line}
+              </span>
+            </button>
+          ))}
           {labels.map((l, i) => (
             <div key={i} className={cx('absolute -translate-x-1/2 text-[10.5px] font-medium tracking-wide whitespace-nowrap uppercase', l.fail ? 'text-err' : 'text-fg-3')} style={{ left: l.x, top: l.y - 11 }}>
               {l.text}

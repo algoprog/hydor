@@ -9,7 +9,7 @@ import { tr } from '../../i18n/runtime';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
 import type { Flow } from '@shared/app-manifest';
-import { titleOf } from '@shared/app-manifest';
+import { allSteps, titleOf } from '@shared/app-manifest';
 import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders } from '@shared/apps';
 import { api, enc, post, put } from '../../lib/api';
 import { composeInsert, useFeatureEvent } from '../../lib/featureEvents';
@@ -17,7 +17,7 @@ import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
 import { FolderChip } from '../../components/FolderPicker';
-import { Button, cx, Dialog, IconButton, inputCls, Popover, Section, Switch, Throbber } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, Popover, Section, Segmented, Switch, Tabs, Throbber, useMediaQuery } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
 import { appPath, useRunEvents, type RunDetail } from './api';
@@ -38,6 +38,35 @@ const oneTask = (flow: Flow): string | null => {
   const [s, ...rest] = flow.steps;
   return !rest.length && s?.do === 'agent' && !s.if && !s.failed && !flow.outputs ? s.instructions : null;
 };
+
+/** The builder's parts, one on screen at a time: what it does first. */
+type Part = 'does' | 'form' | 'answer' | 'examples' | 'settings';
+/** How its steps show on a computer, as last picked: the graph unless the list was. */
+const VIEW_KEY = 'naget.apps.view';
+const viewWas = (): 'list' | 'graph' => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'graph';
+  } catch {
+    return 'graph';
+  }
+};
+
+/** A part of Settings, folded to a line that says how it is set until it is opened. */
+function Fold({ title, summary, sub, children }: { title: string; summary?: ReactNode; sub?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="rounded-2xl border border-line bg-panel">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-3 px-5 py-3.5 text-left">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-semibold">{title}</span>
+          <span className="block truncate text-[12.5px] text-fg-3">{open ? sub : summary}</span>
+        </span>
+        <ChevronDown size={16} className={cx('shrink-0 text-fg-3 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && <div className="px-5 pb-4">{children}</div>}
+    </section>
+  );
+}
 
 const BLANK: AppRecipe = {
   name: '',
@@ -243,12 +272,12 @@ function Describe() {
     >
       <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2">
         <Sparkles size={13} className="text-accent" />
-        Or describe the app, and an agent makes it
+        Describe an app, and an agent makes it
       </span>
       <div className="flex gap-2">
         <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Keeps the links I send, sums each up, and lists the unread ones" className={cx(inputCls, 'min-w-0 flex-1')} />
         <Button type="submit" variant="secondary" disabled={!ask.trim()}>
-          Ask
+          Make it
         </Button>
       </div>
     </form>
@@ -390,6 +419,16 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   const prompt = useRef<HTMLTextAreaElement>(null);
   const acpList = useApp((s) => s.boot?.acpAgents) ?? [];
   const [preview, setPreview] = useState(false);
+  const [part, setPart] = useState<Part>('does');
+  // The graph wants room: phones keep the list.
+  const wide = useMediaQuery('(min-width: 1000px)');
+  const [view, setViewNow] = useState<'list' | 'graph'>(viewWas);
+  const setView = (v: 'list' | 'graph') => {
+    setViewNow(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {}
+  };
 
   useEffect(() => {
     if (id)
@@ -510,6 +549,37 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   const sample = Object.fromEntries(recipe.fields.map((f) => [f.id, f.default || `[${f.label || f.id}]`]));
   const back = saved ? appPath(saved.id) : template ? appPath(`tpl:${template}`) : '/apps';
 
+  // What it does, as one task, a list of steps or a graph of them (on a computer): a task becomes a first step.
+  const mode: 'task' | 'list' | 'graph' = !recipe.flow ? 'task' : wide ? view : 'list';
+  const pickMode = (m: 'task' | 'list' | 'graph') => {
+    if (m === 'task') {
+      const task = recipe.flow ? oneTask(recipe.flow) : null;
+      if (task !== null) set({ prompt: task, flow: undefined });
+      return;
+    }
+    if (!recipe.flow) inSteps();
+    setView(m);
+  };
+  const modeSwitch = (
+    <Segmented
+      size="sm"
+      value={mode}
+      onChange={pickMode}
+      options={[
+        ...(!recipe.flow || oneTask(recipe.flow) !== null ? [{ value: 'task' as const, label: 'One task' }] : []),
+        { value: 'list' as const, label: 'List' },
+        ...(wide ? [{ value: 'graph' as const, label: 'Graph' }] : []),
+      ]}
+    />
+  );
+  // Settings, each in a line until it is opened.
+  const agentName = recipe.agent === 'acp' ? (acpList.find((a) => a.id === recipe.acpAgent)?.name ?? recipe.acpAgent ?? 'Agent') : recipe.agent === 'codex' ? 'Codex' : 'Claude Code';
+  const whoLine = [agentName, recipe.model || tr('Default model'), recipe.mode === 'auto' || !recipe.mode ? tr('Auto') : recipe.mode].join(' · ');
+  const lists = Object.keys(recipe.data ?? {}).length;
+  const keepsLine = [lists ? tr(`${lists} list${lists > 1 ? 's' : ''}`) : tr('No lists'), recipe.memory ? tr('remembers across runs') : null].filter(Boolean).join(' · ');
+  const limitsLine =
+    [recipe.limits.runsPerDay ? tr(`${recipe.limits.runsPerDay} runs a day`) : null, recipe.limits.capUsd ? tr(`at most $${recipe.limits.capUsd} a run`) : null].filter(Boolean).join(' · ') || tr('No limits');
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
@@ -535,7 +605,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
         }
       />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[820px] space-y-4 px-4 py-6 pb-24 sm:px-6">
+        <div className={cx('mx-auto space-y-4 px-4 py-6 pb-24 sm:px-6', part === 'does' && mode === 'graph' ? 'max-w-[1240px]' : 'max-w-[820px]')}>
           {note && (
             <div ref={noteBox} className="scroll-mt-16 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">
               {note}
@@ -568,6 +638,20 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             </div>
           </Section>
 
+          <Tabs
+            value={part}
+            onChange={setPart}
+            className="border-b border-line"
+            options={[
+              { value: 'does', label: 'What it does', count: recipe.flow ? allSteps(recipe.flow.steps).length : undefined },
+              { value: 'form', label: 'Form', count: recipe.fields.length },
+              { value: 'answer', label: 'Answer', count: recipe.answer.length },
+              { value: 'examples', label: 'Examples', count: recipe.examples?.length },
+              { value: 'settings', label: 'Settings' },
+            ]}
+          />
+
+          {part === 'form' && (
           <Section title="The form" sub="The questions someone answers before each run.">
             <div className="space-y-2">
               {recipe.fields.map((f, i) => (
@@ -586,22 +670,19 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               </Button>
             </div>
           </Section>
+          )}
 
-          {recipe.flow ? (
+          {part === 'does' && (recipe.flow ? (
             <Section
               title="What it does"
-              sub="Its steps, in order: each can use the form’s answers and what the steps before it gave."
-              actions={
-                oneTask(recipe.flow) && (
-                  <button type="button" onClick={() => set({ prompt: oneTask(recipe.flow!)!, flow: undefined })} className="text-[12.5px] text-fg-3 hover:text-fg">
-                    Back to one task
-                  </button>
-                )
-              }
+              sub="Its steps: each can use the form’s answers, the built-in values (today, now…) and what the steps before it gave."
+              actions={modeSwitch}
             >
               <div className="space-y-3">
                 {saved && <Advice app={saved} recipe={recipe} onChange={set} session={session} />}
                 <StepsEditor
+                  view={mode === 'graph' ? 'graph' : 'list'}
+                  onPart={setPart}
                   recipe={{ ...recipe, flow: recipe.flow }}
                   appId={saved?.id ?? null}
                   onChange={set}
@@ -618,9 +699,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 <button type="button" onClick={() => setPreview((p) => !p)} className="text-[12.5px] text-fg-3 hover:text-fg">
                   {preview ? 'Edit' : 'Preview'}
                 </button>
-                <button type="button" onClick={inSteps} className="text-[12.5px] text-fg-3 hover:text-fg">
-                  Work in steps
-                </button>
+                {modeSwitch}
               </span>
             }
           >
@@ -632,9 +711,11 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                     {f.label || f.id}
                   </button>
                 ))}
-                <button type="button" onClick={() => insert('{{today}}')} className="h-6.5 rounded-md bg-bg-2 px-2 font-mono text-[11.5px] text-fg-3 ring-1 ring-line ring-inset">
-                  today
-                </button>
+                {(['today', 'now', 'weekday'] as const).map((b) => (
+                  <button key={b} type="button" onClick={() => insert(`{{${b}}}`)} className="h-6.5 rounded-md bg-bg-2 px-2 font-mono text-[11.5px] text-fg-3 ring-1 ring-line ring-inset">
+                    {b}
+                  </button>
+                ))}
               </div>
             )}
             {preview ? (
@@ -657,8 +738,9 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               {unusedNeeded.length > 0 && <div className="text-warn">{unusedNeeded.map((f) => f.label || f.id).join(', ')} {unusedNeeded.length > 1 ? 'are' : 'is'} never used in the task.</div>}
             </div>
           </Section>
-          )}
+          ))}
 
+          {part === 'answer' && (
           <Section title="The answer" sub={recipe.flow ? 'What a run gives back: it shows as a card or a table, and comes back as JSON to programs. What it does says where each comes from.' : 'Fields the agent fills in when it is done (with submit_result): they show as a card or a table, and come back as JSON to programs. None: the reply is the answer.'}>
             <div className="space-y-2">
               {recipe.answer.map((a, i) => (
@@ -674,25 +756,19 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               <Button size="sm" variant="subtle" icon={<Plus size={14} />} onClick={addAnswer}>
                 Add an answer field
               </Button>
-              <div className="flex items-center gap-3 border-t border-line pt-3">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px]">A block</span>
-                  <span className="block text-[12px] text-fg-3">Offered when other apps add a step: its form is what it is given, its answer what it gives.</span>
-                </span>
-                <Switch on={!!recipe.block} label="A block" onChange={(on) => set({ block: on || undefined })} />
-              </div>
             </div>
           </Section>
+          )}
 
+          {part === 'examples' && (
           <Section title="Examples" sub="Answers to try it with, and checks on what a run gives: to try a change, and to notice when it gets worse.">
             <ExamplesEditor recipe={recipe} appId={saved?.id ?? null} onChange={set} />
           </Section>
+          )}
 
-          <Section title="What it keeps" sub="Lists of records it keeps between runs, which its steps, its agents and its screen share, and a memory of its own.">
-            <KeepsEditor recipe={recipe} onChange={set} />
-          </Section>
-
-          <Section title="Who does it" sub="The agent, its model and mode. Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits).">
+          {part === 'settings' && (
+          <div className="space-y-3">
+          <Fold title="Who does it" summary={whoLine} sub="The agent, its model and mode. Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits).">
             <div className="flex flex-wrap items-center gap-1">
               <AgentPicker
                 agent={recipe.agent}
@@ -740,9 +816,13 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 </div>
               </div>
             </div>
-          </Section>
+          </Fold>
 
-          <Section title="Tools" sub="What the runs may use from Naget Agent’s own tools (web search, pages, memory…). The agent’s own files and commands follow its mode.">
+          <Fold title="What it keeps" summary={keepsLine} sub="Lists of records it keeps between runs, which its steps, its agents and its screen share, and a memory of its own.">
+            <KeepsEditor recipe={recipe} onChange={set} />
+          </Fold>
+
+          <Fold title="Tools" summary={recipe.tools === null ? tr('All of Naget Agent’s own tools') : tr(`${recipe.tools.length} picked`)} sub="What the runs may use from Naget Agent’s own tools (web search, pages, memory…). The agent’s own files and commands follow its mode.">
             <div className="flex items-center gap-3">
               <span className="min-w-0 flex-1 text-[13.5px]">{recipe.tools === null ? 'All of them' : `${recipe.tools.length} picked`}</span>
               <label className="flex items-center gap-2 text-[12.5px] text-fg-2">
@@ -767,27 +847,9 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 {tools && !tools.length && <div className="text-[12.5px] text-fg-3">No tools to pick from.</div>}
               </div>
             )}
-          </Section>
+          </Fold>
 
-          {saved && !embedded && (
-            <Section title="Its folder" sub="Work on it as files, in any editor or with a coding agent: what you save there comes here.">
-              <FolderBox app={saved} />
-            </Section>
-          )}
-          {saved && (
-            <Section title="Versions" sub="Each save that changed what it does (by you, an agent or its folder), and how its examples went with it.">
-              <Versions
-                app={saved}
-                onBring={(r, n) => {
-                  setRecipe(recipeOf({ ...saved, ...r, screens: saved.screens }));
-                  why.current = tr(`Brought back version ${n}`);
-                  setNote(tr(`Version ${n} is on screen: save to bring it back (it becomes the newest version), or leave without saving.`));
-                  setTimeout(() => noteBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-                }}
-              />
-            </Section>
-          )}
-          <Section title="Limits">
+          <Fold title="Limits" summary={limitsLine} sub="So that it cannot run or spend more than you mean it to.">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-1 block text-[12.5px] text-fg-3">Runs a day (from anywhere)</span>
@@ -798,7 +860,36 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 <input className={cx(inputCls, 'tnum')} inputMode="decimal" placeholder="No cap" defaultValue={recipe.limits.capUsd ?? ''} onBlur={(e) => set({ limits: { ...recipe.limits, capUsd: Number(e.target.value) > 0 ? Number(e.target.value) : undefined } })} />
               </label>
             </div>
-          </Section>
+          </Fold>
+
+          <section className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-5 py-3.5">
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-semibold">A block</span>
+              <span className="block text-[12.5px] text-fg-3">Offered when other apps add a step: its form is what it is given, its answer what it gives.</span>
+            </span>
+            <Switch on={!!recipe.block} label="A block" onChange={(on) => set({ block: on || undefined })} />
+          </section>
+
+          {saved && !embedded && (
+            <Fold title="Its folder" summary={saved.folder ?? tr('Not made yet')} sub="Work on it as files, in any editor or with a coding agent: what you save there comes here.">
+              <FolderBox app={saved} />
+            </Fold>
+          )}
+          {saved && (
+            <Fold title="Versions" summary={tr('Each save that changed what it does, to bring back')} sub="Each save that changed what it does (by you, an agent or its folder), and how its examples went with it.">
+              <Versions
+                app={saved}
+                onBring={(r, n) => {
+                  setRecipe(recipeOf({ ...saved, ...r, screens: saved.screens }));
+                  why.current = tr(`Brought back version ${n}`);
+                  setNote(tr(`Version ${n} is on screen: save to bring it back (it becomes the newest version), or leave without saving.`));
+                  setTimeout(() => noteBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                }}
+              />
+            </Fold>
+          )}
+          </div>
+          )}
         </div>
       </div>
       <TestRun

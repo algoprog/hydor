@@ -20,6 +20,7 @@ import { AppIcon } from './AppIcon';
 import { BatchTab } from './Batch';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { statusBadge } from './Gallery';
+import { FlowStrip } from './FlowStrip';
 import { DownloadDialog, EnvLine } from './Install';
 import { AppScreen } from './Screen';
 import { Schedules } from './Schedules';
@@ -133,7 +134,14 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
         </div>
       </Section>
       <p className="px-1 text-[12.5px] leading-relaxed text-fg-3">
-        A run starts a session with the filled-in task; its result comes back as {recipe.answer.length ? 'a card you can copy or download' : 'the agent’s reply'}. Nobody needs to watch it: it makes sensible assumptions instead of asking.
+        {recipe.flow
+          ? recipe.answer.length
+            ? 'A run goes through its steps with your answers; its result comes back as a card you can copy or download.'
+            : 'A run goes through its steps with your answers; its result is what its last step gives.'
+          : recipe.answer.length
+            ? 'A run starts a session with the filled-in task; its result comes back as a card you can copy or download.'
+            : 'A run starts a session with the filled-in task; its result is the agent’s reply.'}{' '}
+        Nobody needs to watch it: it makes sensible assumptions instead of asking.
       </p>
     </div>
   );
@@ -339,6 +347,11 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
             ) : (
               <>
                 {recipe.description && (tab === 'run' || template) && <p className={cx('mx-auto max-w-[760px] px-5 pt-5 text-[13.5px] leading-relaxed text-fg-2 sm:px-7')}>{recipe.description}</p>}
+                {recipe.flow && (tab === 'run' || template) && (
+                  <div className="mx-auto max-w-[760px] px-5 pt-4 sm:px-7">
+                    <FlowStrip flow={recipe.flow} own={!template} onGraph={() => go(template ? `/apps/new?template=${enc(id.slice(4))}` : `/apps/${enc(id)}/edit`)} />
+                  </div>
+                )}
                 {(tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} />}
               </>
             )}

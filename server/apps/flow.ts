@@ -18,13 +18,14 @@ import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from 
 import type { NotifyEvent } from '../../shared/types.ts';
 import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, readDate, readNumber } from '../../shared/apps.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
-import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, order, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
+import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import type { RunCtx } from '../features/types.ts';
 import { helper } from '../helper.ts';
+import { userTimezone } from '../userPrefs.ts';
 import { checkDaily } from './api.ts';
 import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
@@ -180,7 +181,9 @@ async function pauseAt(x: Exec, at: string) {
 }
 
 async function go(x: Exec, inputs: Record<string, unknown>) {
-  const scope: Scope = { inputs, steps: Object.fromEntries(allSteps(x.flow.steps).map((s) => [s.id, null])), vars: { today: new Date().toISOString().slice(0, 10) } };
+  // The built-in values: the moment, in the user's time zone, and what started the run.
+  const vars = { ...momentOf(userTimezone(runDeps().db)), run: { id: x.run.id, source: x.run.source } };
+  const scope: Scope = { inputs, steps: Object.fromEntries(allSteps(x.flow.steps).map((s) => [s.id, null])), vars };
   try {
     await runList(x, x.flow.steps, scope, '');
     await end(x, scope, 'done');
