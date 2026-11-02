@@ -222,7 +222,28 @@ Saving never writes over a newer version without this question.
 
 - Files over 10 MB: "File is too large to edit here". Download it, or open it in a terminal. (Notebooks may be up to 40 MB.)
 - Binary files (anything that isn't text): "Binary file". Download it to open it on your device.
-- Images, PDFs, video, audio and Office documents show as previews instead, as the next section explains.
+- Word, Excel, CSV and LaTeX files open in editors of their own (the next section); images, PDFs, video, audio and other Office documents show as previews (the one after).
+
+## Edit Word, Excel, CSV and LaTeX files
+
+These files open in the editors [Pages](/guide/pages#documents) has for them, and saving writes the same file again, in its own format:
+
+- **Word documents** (.docx) open in the document editor, as in Word or Google Docs, on a sheet of their paper.
+- **Excel files** (.xlsx), **CSV** and **TSV** files open in the spreadsheet editor, with their sheets and working formulas.
+- **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, each in a tab, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document that reads it, on the chapter's own tab.
+
+Change it as in [Pages](/guide/pages#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
+
+What saving keeps of the file:
+
+- **CSV and TSV**: the rows and cells you didn't change keep their text exactly as it was, and the file its separator, quotes and line ends. A CSV file holds one sheet's values: when you added formulas, sheets or formatting, the first save asks first, and formulas are saved as the values they give.
+- **LaTeX**: only the files you changed are written, each with its own line ends. A file you add in the editor goes into the folder; one you delete goes to the [Trash](#delete-and-put-back).
+- **Word and Excel** files are written again from what the editor holds. Where a file has what the editor doesn't keep (a Word file's headers and footers, footnotes, comments, tracked changes or equations; an Excel file's charts, pivot tables or merged cells), a bar above says so: "Saving replaces the file without what this editor does not keep", and which. The first save asks before replacing the file, and **Save as a copy**, in that bar, writes your changes to a new file beside it instead ("report (edited).docx"). The first time you save a Word or Excel file, the file as it was goes to the [Trash](#delete-and-put-back), where **Put back** brings it back beside the new one.
+- A file too long for the editor shows its start, to read only: **Edit as text** or **Show as a preview** shows all of it.
+
+When an agent or a terminal changes the file while it is open, the editor takes the new version if you changed nothing, or asks, as the text editor does: **Reload (discard mine)** or **Overwrite with mine**.
+
+PowerPoint files, older Office files (.doc, .xls, .ppt), OpenDocument files, RTF and EPUB show as a preview, as the next section explains.
 
 ## See images, PDFs, documents and web pages
 
@@ -231,7 +252,7 @@ The file viewer shows files as they look:
 - **Images** (PNG, JPEG, GIF, WebP, SVG, ICO, BMP, AVIF): shown whole, on a checkerboard where they are see-through.
 - **PDFs**: in your browser's own PDF viewer.
 - **Video** (MP4, WebM, MOV and M4V; MKV and OGV where your browser plays them): in the app's own player (see [Watch a video](#watch-a-video) below). **Audio** (MP3, WAV, OGG) plays in place.
-- **Office documents**: Word (.docx, .doc and the like), Excel (.xlsx, .xls), PowerPoint (.pptx, .ppt), OpenDocument (.odt, .ods, .odp), RTF and EPUB. A switch at the top picks the view:
+- **Office documents**: PowerPoint (.pptx, .ppt), older Word and Excel files (.doc, .xls and the like), OpenDocument (.odt, .ods, .odp), RTF and EPUB; and Word (.docx) and Excel (.xlsx) files from **More** (⋯) → **Show as a preview** in their editors. A switch at the top picks the view:
   - **Pages**: the document as LibreOffice lays it out, page by page ("Laying out the pages…" the first time). This view is there only when LibreOffice is installed on this computer, and not for EPUB books.
   - **Text**: its text, sheets and slides as the app reads them.
 
@@ -593,6 +614,7 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 
 - "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 space."
 - "Which files in ~/code/shop mention the checkout, and what does each do with it?"
+- "Add a column to ~/Documents/people.csv with each person's share of the total."
 - "Open a pull request for this session's branch, with a title and description written from the commits."
 - "Link https://github.com/acme/site/pull/42 to this session."
 - "Have the checks on this session's pull request passed yet?"

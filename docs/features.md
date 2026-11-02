@@ -286,7 +286,12 @@ programs shows each program's version and what is out, with Check now, Update no
   uploaded), add it to a space (a file is copied into its folder, a folder joins those it works with), rename,
   duplicate, move or copy to a folder, download (a folder or several as one .zip), delete to a trash with Undo
   and Put back. One search finds names and text inside files, under a folder you pick, by kind. An editor with
-  Markdown and HTML preview and diffs, quick open, and uploads. Jupyter notebooks open and run. Videos play in the app's own player (seek with a
+  Markdown and HTML preview and diffs, quick open, and uploads. Word, Excel, CSV and LaTeX files open in Pages'
+  editors and save back to the same file: a CSV's untouched rows and cells keep their exact text, a LaTeX file
+  brings the chapters and bibliography it reads and typesets among its folder's pictures (read only to TeX),
+  writing only the files that changed; a Word or Excel file says first what the editor doesn't keep (headers and
+  footers, comments, charts…), offers to save a copy instead, and its first save keeps the old file in the trash.
+  Jupyter notebooks open and run. Videos play in the app's own player (seek with a
   preview of the time, speed, loop, picture in picture, full screen, keyboard shortcuts, double-tap to skip on a
   phone), streamed in parts so they start at once and seek anywhere.
 - Git: your repositories (those sessions worked in, and any you add: a folder on this computer, which can start

@@ -51,13 +51,13 @@ export function pictureType(b: Buffer): string | null {
   return null;
 }
 
-/** Keeps a picture; its sha. */
+/** Keeps a picture; its sha. One kept already counts as just added again (a file opened in an editor shows it). */
 export function putAsset(db: DB, data: Buffer): string {
   if (data.length > MAX_ASSET) throw new HttpError(413, `That picture is over ${MAX_ASSET / 1024 / 1024} MB`);
   const mime = pictureType(data);
   if (!mime) throw new HttpError(415, 'That is not a picture (PNG, JPEG, GIF, WebP or SVG)');
   const sha = crypto.createHash('sha256').update(data).digest('hex').slice(0, 40);
-  db.prepare('insert or ignore into page_assets (sha, mime, data, bytes, created_at) values (?, ?, ?, ?, ?)').run(sha, mime, data, data.length, Date.now());
+  db.prepare('insert into page_assets (sha, mime, data, bytes, created_at) values (?, ?, ?, ?, ?) on conflict(sha) do update set created_at = excluded.created_at').run(sha, mime, data, data.length, Date.now());
   return sha;
 }
 

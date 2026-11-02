@@ -43,4 +43,10 @@ export interface ModelEditorProps<M> {
   onScopes?: (scopes: AskScope[]) => void;
   /** Saves now, if there are changes (before an agent is asked about it): false when it did not. */
   saveNowRef?: MutableRefObject<(() => Promise<boolean>) | null>;
+  /**
+   * A file of this computer's opened from Files rather than a page (the LaTeX editor uses it): the folder it is
+   * typeset in, among its other files (none when TeX may not read it); its main file's own name, shown for main.tex;
+   * and the file to start on.
+   */
+  file?: { folder?: string; main: string; open?: string };
 }

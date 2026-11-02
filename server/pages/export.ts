@@ -78,8 +78,8 @@ async function rasterize(data: Buffer, mime: string, w?: number, h?: number): Pr
   }).catch(() => null);
 }
 
-/** A deck's picture for a PowerPoint file: PNG, JPEG or GIF as it is, SVG and WebP made into PNG where the browser can. */
-async function pictureFor(db: DB, src: string): Promise<Picture | null> {
+/** A deck's (or a document's) picture for an Office file: PNG, JPEG or GIF as it is, SVG and WebP made into PNG where the browser can. */
+export async function pictureFor(db: DB, src: string): Promise<Picture | null> {
   let data: Buffer | null = null;
   let mime: string | null = null;
   if (src.startsWith(ASSET)) {
