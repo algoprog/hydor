@@ -3,6 +3,36 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.13.0 · 2 November 2026
+
+Pictures and short videos from agents, kept in the Library (what Pages became); Word, Excel, CSV and LaTeX files
+edited in Files and saved back to themselves; a sidebar you group and arrange; and agents' programs that keep
+up to date by themselves.
+
+- **Images and videos**: agents make short videos as well as pictures, through OpenRouter, with the model picked in
+  **Settings → Images and video** or one you name. A form in the conversation shows the settings that model takes
+  (shape, resolution, length, sound…) and what it costs, once per model in a session. Videos play in the app's
+  own player.
+- **The Library**: Pages is now the Library, with **Pages**, **Media** and **Published** tabs; old links to Pages
+  still work. **Save to Library** keeps a picture or a video there, titled and described by a model that sees
+  images (pick which under **Captions in the Library**). Each one has a page of its own to play, edit, make again,
+  download or delete, and the search box finds them.
+- **Edit documents in Files**: Word, Excel, CSV and LaTeX files open in the Library's editors, and **Save** writes
+  the same file again. A CSV keeps the cells you didn't touch exactly as they were. A LaTeX file opens with the
+  chapters and bibliography it reads, and its preview uses the pictures in its folder. A Word or Excel file says
+  first what the editor can't keep (headers and footers, comments, charts…), offers **Save as a copy**, and its
+  first save puts the old file in the Trash. Its text or preview is still under **More** (⋯).
+- **The sidebar**: sessions are grouped by the space or the folder they work in, each group folding to a line
+  (**Filter and group sessions** lists them by day again). The tools at the bottom stay in the order you drag
+  them into, the same on every device; right-click one for **Back to the usual order**.
+- **Agents' programs keep up to date**: once a day Claude Code, Codex and the others move to their newest version,
+  your own installs too, and a version that doesn't work here is undone. **Settings → Accounts → Agent programs**
+  shows each one's version, with **Check now**, **Update now** and a switch to turn it off.
+- **Apps**: the ready-made apps work in steps and open in the builder as a graph, steps can use built-in values
+  (today's date, the time, your time zone), and the Apps page has a box to describe a new app for the App builder.
+- **Fixes**: a session started on an added account shows its conversation; a session's steps no longer stay
+  "running" when Claude Code writes its transcript somewhere unexpected; a screenshot fills a phone's width.
+
 ## 0.12.0 · 2 November 2026
 
 Apps: what were Templates are now apps of your own, with steps, data, memory, a screen and a conversation with
