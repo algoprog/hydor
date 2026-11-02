@@ -2320,6 +2320,7 @@
 "Drafted from this session{0} Change anything, try it with a test run, then save.":"根据此会话起草{0} 可以修改任何内容，先试运行一次，然后保存。",
 "Drafting a template from the session…":"正在根据会话起草模板…",
 "Drafts, edits and polishes your writing":"起草、编辑并润色你的文字",
+"Drag a node’s dot to wire a value · Double-click a wire to bend it · Ctrl and the wheel zoom":"拖动节点上的圆点来连接一个值 · 双击连线可以弯折它 · 按住 Ctrl 滚动滚轮可缩放",
 "Drag a node’s dot to wire a value · Ctrl and the wheel zoom":"拖动节点上的圆点来连接一个值 · 按住 Ctrl 滚动滚轮可缩放",
 "Drag one of its values to another step, or to empty space for a new step":"把它的某个值拖到另一个步骤上，或拖到空白处来新建步骤",
 "Drag the handle to move it, the edges to size it":"拖动手柄移动它，拖动边缘调整大小",

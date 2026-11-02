@@ -228,6 +228,8 @@ test('format: a recipe without steps is one agent step; flows, data and memory s
   const g = cleanRecipe({ ...r, graph: { at: { one: { x: 10.4, y: -5 }, gone: { x: 1, y: 1 }, bad: { x: 'a' } }, groups: [{ note: 'The start', steps: ['one', 'gone'] }, { note: 'Empty', steps: ['gone'] }] } }).graph;
   assert.deepEqual(g, { at: { one: { x: 10, y: -5 } }, groups: [{ id: 'g1', note: 'The start', steps: ['one'] }] });
   assert.equal(cleanRecipe({ ...r, graph: { at: { gone: { x: 1, y: 1 } } } }).graph, undefined);
+  // Bends of a value's wire, by its ends: kept for steps that are there.
+  assert.deepEqual(cleanRecipe({ ...r, graph: { bends: { 'one>one': { x: 4.6, y: 5 }, 'one>gone': { x: 1, y: 1 }, bad: { x: 1, y: 1 } } } }).graph, { bends: { 'one>one': { x: 5, y: 5 } } });
 });
 
 test('checks: values from later steps, from inside a Repeat, from another branch; rules, tools and what it keeps', () => {

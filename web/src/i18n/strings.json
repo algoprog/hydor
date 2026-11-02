@@ -2290,7 +2290,7 @@
 "Drafted from this session{0} Change anything, try it with a test run, then save.":"web/src/features/automations/feature.tsx",
 "Drafting a template from the session…":"web/src/features/apps/Builder.tsx",
 "Drafts, edits and polishes your writing":"server/assistants/builtins.ts",
-"Drag a node’s dot to wire a value · Ctrl and the wheel zoom":"web/src/features/apps/GraphEditor.tsx",
+"Drag a node’s dot to wire a value · Double-click a wire to bend it · Ctrl and the wheel zoom":"web/src/features/apps/GraphEditor.tsx",
 "Drag one of its values to another step, or to empty space for a new step":"web/src/features/apps/GraphEditor.tsx",
 "Drag the handle to move it, the edges to size it":"web/src/features/pages/studio/Studio.tsx",
 "Drag to change the order":"web/src/features/session/QueueList.tsx",

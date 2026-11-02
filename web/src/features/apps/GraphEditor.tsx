@@ -7,7 +7,8 @@
 // A click on a node opens its settings beside the graph. A + on a wire puts a new step there. Dragging from
 // the dot on a node's right carries one of its values: let go on another node to put it in one of that step's
 // inputs, or in empty space for a new step that uses it. Shift-click picks several nodes, to group them with a
-// note. The canvas moves by dragging its background, and zooms with Ctrl and the wheel, or its buttons.
+// note. A double-click on a value's wire bends it there (drag the bend; a double-click takes it away). The
+// canvas moves by dragging its background, and zooms with Ctrl and the wheel, or its buttons.
 //
 // Try it runs the template as it is on screen, as a test run, in the graph: each step lights up as it runs
 // and as it ends, the wires into the steps that ran with it, and a value's wire says what it carried. A step
@@ -359,6 +360,7 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
   const [view, setView] = useState({ x: 40, y: 30, k: 1 });
   const [picked, setPicked] = useState<string[]>([]);
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [bending, setBending] = useState<{ key: string; x: number; y: number } | null>(null);
   const [linking, setLinking] = useState<Linking | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -514,7 +516,12 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
       const x2 = n.x + W;
       const y2 = n.y + H / 2;
       const out = 26 + (k++ % 6) * 9;
-      const d = `M${x1} ${y1} C${Math.max(x1, x2) + out} ${y1} ${Math.max(x1, x2) + out} ${y2} ${x2} ${y2}`;
+      // Through its bend, when it has one.
+      const key = `${id}>${n.s.id}`;
+      const bend = bending?.key === key ? bending : graph?.bends?.[key];
+      const d = bend
+        ? `M${x1} ${y1} C${x1 + 50} ${y1} ${bend.x} ${bend.y - 40} ${bend.x} ${bend.y} S${x2 + 50} ${y2} ${x2} ${y2}`
+        : `M${x1} ${y1} C${Math.max(x1, x2) + out} ${y1} ${Math.max(x1, x2) + out} ${y2} ${x2} ${y2}`;
       // What it carried in the try, when there was one.
       const gave = lit.get(id)?.values;
       const said = refsIn(JSON.stringify(n.s))
@@ -527,9 +534,37 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
       values.push(
         <g key={`v${k}`}>
           <path d={d} fill="none" stroke={KIND_COLOR[from.s.do]} strokeWidth={1.5} strokeOpacity={hover && (hover === id || hover === n.s.id) ? 1 : 0.55} />
-          <path d={d} fill="none" stroke="transparent" strokeWidth={10} className="cursor-help">
+          <path
+            d={d}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={10}
+            className="cursor-help"
+            onDoubleClick={(e) => {
+              const p = toCanvas(e);
+              onGraph({ ...graph, bends: { ...graph?.bends, [key]: { x: Math.round(p.x), y: Math.round(p.y) } } });
+            }}
+          >
             <title>{said}</title>
           </path>
+          {bend && (
+            <circle
+              cx={bend.x}
+              cy={bend.y}
+              r={5}
+              fill="var(--panel)"
+              stroke={KIND_COLOR[from.s.do]}
+              strokeWidth={2}
+              className="cursor-move"
+              onPointerDown={(e) => bendStart(e, key)}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                const rest = { ...graph?.bends };
+                delete rest[key];
+                onGraph({ ...graph, bends: Object.keys(rest).length ? rest : undefined });
+              }}
+            />
+          )}
         </g>,
       );
     }
@@ -633,6 +668,25 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
           setDrag(null);
         } else if (ev.shiftKey) setPicked((x) => (x.includes(n.s.id) ? x.filter((y) => y !== n.s.id) : [...x, n.s.id]));
         else setPicked([n.s.id]);
+      },
+    );
+  };
+
+  /** A bend dragged elsewhere. */
+  const bendStart = (e: React.PointerEvent, key: string) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    follow(
+      e,
+      (ev) => {
+        const p = toCanvas(ev);
+        setBending({ key, x: Math.round(p.x), y: Math.round(p.y) });
+      },
+      (ev, moved) => {
+        setBending(null);
+        if (!moved) return;
+        const p = toCanvas(ev);
+        onGraph({ ...graph, bends: { ...graph?.bends, [key]: { x: Math.round(p.x), y: Math.round(p.y) } } });
       },
     );
   };
@@ -828,7 +882,7 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
           <IconButton label="Fit it in" size="sm" onClick={fit}>
             <Maximize size={14} />
           </IconButton>
-          <IconButton label="Tidy: lay it all out again" size="sm" onClick={() => onGraph(graph?.groups ? { groups: graph.groups } : undefined)} disabled={!Object.keys(at).length}>
+          <IconButton label="Tidy: lay it all out again" size="sm" onClick={() => onGraph(graph?.groups ? { groups: graph.groups } : undefined)} disabled={!Object.keys(at).length && !graph?.bends}>
             <LayoutGrid size={14} />
           </IconButton>
           <IconButton label="Try it" size="sm" onClick={() => (setTrying((x) => !x), setPicked([]))}>
@@ -844,7 +898,7 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
             </IconButton>
           )}
         </div>
-        <div className="pointer-events-none absolute right-3 bottom-2.5 text-[11px] text-fg-3">Drag a node’s dot to wire a value · Ctrl and the wheel zoom</div>
+        <div className="pointer-events-none absolute right-3 bottom-2.5 text-[11px] text-fg-3">Drag a node’s dot to wire a value · Double-click a wire to bend it · Ctrl and the wheel zoom</div>
         {menu && <GraphMenu menu={menu} anchor={menuAnchor} ctx={ctx} pos={pos} onClose={() => setMenu(null)} onPick={(id) => setPicked([id])} />}
       </div>
       {one ? (

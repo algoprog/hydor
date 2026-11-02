@@ -124,6 +124,8 @@ export interface AppGraph {
   at?: Record<string, { x: number; y: number }>;
   /** Steps drawn in a frame with a note over them. */
   groups?: { id: string; note: string; steps: string[] }[];
+  /** Where a value's wire bends, by its ends ("find>sum": from the step that gives it to the one that uses it). */
+  bends?: Record<string, { x: number; y: number }>;
 }
 
 /** A built-in template: a recipe to run as it is, or to start an app from. */
@@ -790,8 +792,14 @@ function cleanGraph(raw: any, flow: Flow | undefined, flows: Record<string, Name
     .slice(0, 40)
     .map((g: any, i: number) => ({ id: str(g?.id, 40) || `g${i + 1}`, note: str(g?.note, 300), steps: (Array.isArray(g?.steps) ? g.steps : []).filter((x: unknown) => typeof x === 'string' && ids.has(x)).slice(0, 60) }))
     .filter((g: { steps: string[] }) => g.steps.length);
-  const out: AppGraph = { ...(Object.keys(at).length ? { at } : {}), ...(groups.length ? { groups } : {}) };
-  return out.at || out.groups ? out : undefined;
+  const bends: Record<string, { x: number; y: number }> = {};
+  if (raw.bends && typeof raw.bends === 'object')
+    for (const [k, p] of Object.entries(raw.bends as Record<string, any>).slice(0, 300)) {
+      const [a, b] = k.split('>');
+      if (ids.has(a) && ids.has(b) && p && Number.isFinite(p.x) && Number.isFinite(p.y)) bends[k] = { x: Math.round(Math.max(-20_000, Math.min(20_000, p.x))), y: Math.round(Math.max(-20_000, Math.min(20_000, p.y))) };
+    }
+  const out: AppGraph = { ...(Object.keys(at).length ? { at } : {}), ...(groups.length ? { groups } : {}), ...(Object.keys(bends).length ? { bends } : {}) };
+  return out.at || out.groups || out.bends ? out : undefined;
 }
 
 export const DEFAULT_PUBLIC: PublicSettings = { on: false, perIpPerHour: 5, runsPerDay: 50, spendPerDay: 2, web: true };
