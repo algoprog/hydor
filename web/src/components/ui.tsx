@@ -221,6 +221,7 @@ export function Popover({
   prefer = 'below',
   sheet,
   title,
+  z,
 }: {
   anchor: RefObject<HTMLElement | null>;
   open: boolean;
@@ -234,6 +235,8 @@ export function Popover({
   sheet?: boolean;
   /** What it picks, over a sheet from the bottom (SheetsOnPhone); a popover by its chip says it by where it is. */
   title?: ReactNode;
+  /** Its stacking order, when it opens from a layer over the popovers' own (the search box). */
+  z?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const bottomSheet = useSheets();
@@ -279,7 +282,7 @@ export function Popover({
     // The dimmed page belongs to the sheet: a tap there closes this one, not one it was opened from.
     const kb = !!room && room.bottom > 0;
     return createPortal(
-      <div ref={ref} role="dialog" aria-modal className="fixed inset-0 z-50">
+      <div ref={ref} role="dialog" aria-modal className="fixed inset-0 z-50" style={z ? { zIndex: z } : undefined}>
         <div className="anim-overlay absolute inset-0 touch-none bg-black/40" onClick={onClose} aria-hidden />
         <div
           style={{ bottom: room?.bottom ?? 0, maxHeight: room ? `calc(${room.height}px - var(--safe-top) - 12px)` : undefined }}
@@ -301,11 +304,11 @@ export function Popover({
   const dim = sheet && window.innerWidth < SHEET_BELOW;
   return createPortal(
     <>
-      {dim && <div className="anim-overlay fixed inset-0 z-50 bg-black/30" aria-hidden />}
+      {dim && <div className="anim-overlay fixed inset-0 z-50 bg-black/30" style={z ? { zIndex: z } : undefined} aria-hidden />}
       <div
         ref={ref}
         role="dialog"
-        style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: pos?.width ?? width, maxHeight: pos?.maxH }}
+        style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: pos?.width ?? width, maxHeight: pos?.maxH, zIndex: z }}
         className={cx('anim-pop fixed z-50 overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg', className)}
       >
         {children}

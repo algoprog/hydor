@@ -244,11 +244,13 @@ with npm into the app's folder), and the copies the app installed are kept up to
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
-  every setting, sessions and what was said in them, memory notes, templates, scheduled tasks, assistants, skills,
-  pages, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
+  every setting, sessions and what was said in them, memory notes, spaces, templates, scheduled tasks, assistants,
+  skills, pages, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
   page and points at it, a message opens its session at the words. With search by meaning on (Settings →
   Memory) things also match what they mean, in nine languages; what ships with the app has its vectors made
-  ahead of time, and what you make gets them as you make it. `Ctrl+F` finds within a conversation.
+  ahead of time, and what you make gets them as you make it. Search in, beside the field, looks only in the
+  places you pick (sessions, messages, spaces, pages, files, settings…), the same on every device; with nothing
+  typed it lists what those places hold. `Ctrl+F` finds within a conversation.
 - A short welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter or on this
   computer, other agents) and sets those up, on pages that fill the screen. Then it shows you around as the
   app builds itself up: each part arrives as it is explained, the rest as the tour ends. Help shows it again.

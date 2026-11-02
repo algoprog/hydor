@@ -32,7 +32,7 @@ Each space shows as a card:
 - its name, and under it what it is about, or its folder when it has no description. A group says "Brings together" and the names of its spaces;
 - how many sessions it has, how many documents, and how long ago one of its sessions was last at work.
 
-Click a card to open the space's own page. With no spaces yet, the page says what a space is for; click **New space** to make one.
+Click a card to open the space's own page, or type the space's name in the search box (Ctrl+K) to go straight there. With no spaces yet, the page says what a space is for; click **New space** to make one.
 
 ## Make a space
 

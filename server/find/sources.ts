@@ -1,9 +1,11 @@
 // What the server finds by meaning, each as an id the search box knows ("app:<id>", "s:<session key>") and a
 // short text: what ships with the app (the catalog of shared/find-catalog.ts, app templates, built-in assistants
 // and skills), whose vectors are made ahead of time (npm run find:vectors), and what people make (sessions,
-// apps, scheduled tasks, assistants, learned skills, pages, connected apps), whose vectors are made the moment
-// they are made or changed (index.ts). The guide's sections (docs/guide) ship too.
+// spaces, apps, scheduled tasks, assistants, learned skills, pages, connected apps), whose vectors are made the
+// moment they are made or changed (index.ts). The guide's sections (docs/guide) ship too.
+import type { FindPlace } from '../../shared/find.ts';
 import { catalogItems, catalogText } from '../../shared/find-catalog.ts';
+import { isGroup } from '../../shared/spaces.ts';
 import type { SessionSummary } from '../../shared/types.ts';
 import { listApps } from '../apps/store.ts';
 import { TEMPLATES } from '../apps/templates.ts';
@@ -15,14 +17,29 @@ import type { Deps } from '../features/types.ts';
 import { guideItems } from '../guide/content.ts';
 import { listPages } from '../pages/store.ts';
 import { libraryView } from '../skillpack/proposals.ts';
+import { allSpaces } from '../spaces/index.ts';
 
 export interface Item {
   id: string;
   text: string;
 }
 
-export type Kind = 'catalog' | 'guide' | 'sessions' | 'apps' | 'tasks' | 'assistants' | 'skills' | 'pages' | 'connections';
-export const KINDS: Kind[] = ['catalog', 'guide', 'sessions', 'apps', 'tasks', 'assistants', 'skills', 'pages', 'connections'];
+export type Kind = 'catalog' | 'guide' | 'sessions' | 'spaces' | 'apps' | 'tasks' | 'assistants' | 'skills' | 'pages' | 'connections';
+export const KINDS: Kind[] = ['catalog', 'guide', 'sessions', 'spaces', 'apps', 'tasks', 'assistants', 'skills', 'pages', 'connections'];
+
+/** The places of the search box's Search in menu each kind is in: a search looks only at the kinds of the places asked for. */
+export const KIND_PLACES: Record<Kind, FindPlace[]> = {
+  catalog: ['settings', 'actions'],
+  guide: ['guide'],
+  sessions: ['sessions'],
+  spaces: ['spaces'],
+  apps: ['templates'],
+  tasks: ['tasks'],
+  assistants: ['assistants'],
+  skills: ['skills'],
+  pages: ['pages'],
+  connections: ['connections'],
+};
 
 /** Sessions given vectors: the latest. */
 export const MAX_SESSIONS = 3000;
@@ -55,6 +72,8 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
         .list({ limit: MAX_SESSIONS })
         .sessions.filter((s) => !s.archived)
         .map(sessionItem);
+    case 'spaces':
+      return allSpaces(db).map((s) => ({ id: `space:${s.id}`, text: text(s.name, isGroup(s) ? 'A group of spaces' : 'A space', s.description) }));
     case 'apps':
       return [...listApps(db).map((a) => ({ id: `app:${a.id}`, text: text(a.name, 'A template', a.description) })), ...templates()];
     case 'tasks':
