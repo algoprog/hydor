@@ -164,7 +164,8 @@ with npm into the app's folder), and the copies the app installed are kept up to
 
 ## Following along
 - A readable timeline: the agent's messages read like a chat, and its commands fold into small boxes with
-  plain-words names ("Run the tests", "Read index.ts"), each a click away from its full output.
+  plain-words names ("Run the tests", "Read index.ts"), each a click away from its full output. A reply starts
+  near the top of the screen and stays there as it grows, so you read it from its beginning.
 - Agents can answer with a page (a chart, a report, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen.
 - Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
