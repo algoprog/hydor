@@ -649,7 +649,7 @@ function editor(cfg: EditorCfg) {
     };
     for (const sh of document.styleSheets) {
       // The kit's own colours count only for pages that use its look.
-      if ((sh.ownerNode as Element | null)?.id === 'n-kit' && !document.body.classList.contains('n-page')) continue;
+      if (/^n-(kit|theme)$/.test((sh.ownerNode as Element | null)?.id ?? '') && !document.body.classList.contains('n-page')) continue;
       try {
         walk(sh.cssRules);
       } catch {}
@@ -1284,6 +1284,19 @@ function editor(cfg: EditorCfg) {
       case 'reveal':
         if (el) (el as HTMLElement).scrollIntoView?.({ block: 'center', behavior: 'smooth' });
         return;
+      case 'theme': {
+        // The app's theme changed: the kit's colours, and the page's light-or-dark rules, follow it.
+        const mode = arg?.theme === 'dark' ? 'dark' : 'light';
+        root.setAttribute('data-n-theme', mode);
+        const el = document.getElementById('n-theme');
+        if (el && typeof arg?.css === 'string' && arg.css.length < 40000) el.textContent = arg.css;
+        (window as unknown as { __nScheme?: (m: string) => void }).__nScheme?.(mode);
+        redraw();
+        tellPage();
+        clearTimeout(paletteTimer);
+        paletteTimer = window.setTimeout(() => send({ type: 'wa-ed-palette', colors: palette() }), 300);
+        return;
+      }
       case 'ctx': {
         const media = MEDIAS.includes(arg?.media) ? (arg.media as Media) : '';
         const scope = typeof arg?.scope === 'string' && (arg.scope === 'self' || arg.scope === 'tag' || /^\.[\w-]+$/.test(arg.scope)) ? arg.scope : 'self';

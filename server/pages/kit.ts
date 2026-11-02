@@ -8,63 +8,78 @@
 // The functions below run in the browser, not here: their source is sent as text (Function#toString),
 // so each uses only its arguments and the browser's own globals.
 import { EDITOR_SRC } from './editor.ts';
+import { KIT_CSS } from '../../shared/page-kit.ts';
 
-/** The ready-made classes. Light by default; body.n-page follows the app's dark theme. */
-export const KIT_CSS = `
-:root{--n-bg:#fff;--n-card:#fff;--n-fg:#1d1b17;--n-muted:#675f52;--n-line:#e2ddd2;--n-soft:#f5f3ee;--n-accent:#8a6100;--n-accent-fg:#fff;--n-accent-soft:rgba(176,124,0,.13);--n-ok:#17733a;--n-err:#be2b2b;--n-radius:12px}
-html[data-n-theme=dark] .n-page{--n-bg:#151412;--n-card:#1d1b18;--n-fg:#f2eee7;--n-muted:#a39b8e;--n-line:#36322b;--n-soft:#24211d;--n-accent:#d4b158;--n-accent-fg:#1a1306;--n-accent-soft:rgba(212,177,88,.16);--n-ok:#6dbb84;--n-err:#e57373;color-scheme:dark}
-html[data-n-theme=dark]:has(>body.n-page){color-scheme:dark}
-.n-page{margin:0 auto;padding:20px;background:var(--n-bg);color:var(--n-fg);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
-@media (max-width:480px){.n-page{padding:14px}}
-.n-page h1{font-size:22px;line-height:1.25;margin:0 0 6px;letter-spacing:-.01em}
-.n-page h2{font-size:17px;line-height:1.3;margin:22px 0 8px}
-.n-page a{color:var(--n-accent)}
-.n-muted{color:var(--n-muted)}
-.n-options{display:flex;flex-direction:column;gap:10px;margin:14px 0}
-.n-option{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid var(--n-line);border-radius:var(--n-radius);background:var(--n-card);color:inherit;font:inherit;text-align:left}
-.n-letter{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--n-soft);color:var(--n-muted);font-weight:600;font-size:13px}
-.n-option h3,.n-card h3{margin:0 0 2px;font-size:15px;line-height:1.35}
-.n-option p,.n-card p{margin:0;color:var(--n-muted);font-size:13.5px;line-height:1.45}
-.n-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:12px;margin:14px 0}
-.n-card{position:relative;display:flex;flex-direction:column;padding:0;border:1px solid var(--n-line);border-radius:var(--n-radius);background:var(--n-card);overflow:hidden;color:inherit;font:inherit;text-align:left}
-.n-card>img,.n-media{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:var(--n-soft)}
-.n-body{padding:12px 14px}
-[data-choice]{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:border-color .15s,box-shadow .15s,background-color .15s}
-.n-option:hover,.n-card:hover{border-color:var(--n-accent)}
-[data-choice]:focus-visible{outline:2px solid var(--n-accent);outline-offset:2px}
-.n-selected{border-color:var(--n-accent)!important;box-shadow:0 0 0 3px var(--n-accent-soft)}
-.n-option.n-selected .n-letter{background:var(--n-accent);color:var(--n-accent-fg)}
-.n-card.n-selected::after{content:"✓";position:absolute;top:8px;right:8px;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--n-accent);color:var(--n-accent-fg);font-size:13px;font-weight:700}
-.n-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:14px 0}
-.n-compare{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--n-line);border-radius:var(--n-radius);overflow:hidden;background:var(--n-card);font-size:14px;margin:14px 0}
-.n-scroll>.n-compare{margin:0}
-.n-compare th,.n-compare td{padding:9px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--n-line)}
-.n-compare tr:last-child>*{border-bottom:0}
-.n-compare thead th{background:var(--n-soft);font-weight:600}
-.n-compare tbody th{font-weight:500;color:var(--n-muted)}
-.n-compare .n-selected,.n-best{box-shadow:none;background:var(--n-accent-soft)}
-.n-yes{color:var(--n-ok)}
-.n-no{color:var(--n-err)}
-.n-proscons{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
-@media (max-width:520px){.n-proscons{grid-template-columns:1fr}}
-.n-pros,.n-cons{padding:12px 14px;border-radius:var(--n-radius);background:var(--n-soft)}
-.n-pros h4,.n-cons h4{margin:0 0 6px;font-size:13px;font-weight:600}
-.n-pros h4{color:var(--n-ok)}
-.n-cons h4{color:var(--n-err)}
-.n-pros ul,.n-cons ul{margin:0;padding-left:18px;font-size:14px;line-height:1.5}
-.n-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.n-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border:1px solid var(--n-line);border-radius:10px;background:var(--n-card);color:var(--n-fg);font:inherit;font-size:14px;font-weight:500;text-decoration:none;cursor:pointer}
-.n-btn:hover{background:var(--n-soft)}
-.n-btn.n-primary{border-color:transparent;background:var(--n-accent);color:var(--n-accent-fg)}
-.n-btn.n-primary:hover{filter:brightness(1.07)}
-.n-field{display:flex;flex-direction:column;gap:5px;margin:0 0 12px;font-size:13.5px;font-weight:500}
-.n-field input,.n-field select,.n-field textarea{padding:8px 10px;border:1px solid var(--n-line);border-radius:10px;background:var(--n-card);color:var(--n-fg);font:inherit;font-size:16px;font-weight:400;outline:none}
-.n-field input:focus,.n-field select:focus,.n-field textarea:focus{border-color:var(--n-accent);box-shadow:0 0 0 3px var(--n-accent-soft)}
-.n-row>.n-field{margin:0}
-.n-tag{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--n-soft);color:var(--n-muted);font-size:12px;font-weight:500;line-height:1.6}
-`
-  .trim()
-  .replace(/\n/g, '');
+export { KIT_CSS };
+
+/**
+ * In a frame, a page's light-or-dark rules (prefers-color-scheme) follow the device, not the app: the app in light
+ * on a device in dark would show a page's dark look. This makes them follow the app's mode instead: the page's
+ * own stylesheets as they come (the rules' conditions, not its text), pictures' sources, and what its scripts ask
+ * of matchMedia. `window.__nScheme(mode)` switches it when the app's mode changes.
+ */
+function scheme(mode: 'dark' | 'light') {
+  const W = window as unknown as { __nScheme?: (m: 'dark' | 'light') => void };
+  if (W.__nScheme) return W.__nScheme(mode);
+  let cur = mode;
+  const FEATURE = /\(\s*prefers-color-scheme\s*:\s*(dark|light)\s*\)/gi;
+  // Always true, and never true (no screen is a million pixels wide).
+  const swap = (q: string) => q.replace(FEATURE, (_m, v: string) => (v.toLowerCase() === cur ? '(min-width: 0px)' : '(min-width: 999999px)'));
+  const orig = new WeakMap<object, string>();
+  const fixList = (m: MediaList | null | undefined) => {
+    if (!m) return;
+    const o = orig.get(m) ?? m.mediaText;
+    if (!/prefers-color-scheme/i.test(o)) return;
+    orig.set(m, o);
+    const next = swap(o);
+    if (m.mediaText !== next) m.mediaText = next;
+  };
+  const walk = (rules: CSSRuleList) => {
+    for (const r of Array.from(rules)) {
+      if (r instanceof CSSMediaRule) fixList(r.media);
+      if (r instanceof CSSImportRule) {
+        fixList(r.media);
+        try {
+          if (r.styleSheet) walk(r.styleSheet.cssRules);
+        } catch {}
+      } else if ('cssRules' in r) walk((r as CSSGroupingRule).cssRules);
+    }
+  };
+  const run = () => {
+    for (const sh of Array.from(document.styleSheets)) {
+      fixList(sh.media);
+      try {
+        walk(sh.cssRules);
+      } catch {}
+    }
+    for (const el of Array.from(document.querySelectorAll('source[media]'))) {
+      const o = orig.get(el) ?? el.getAttribute('media') ?? '';
+      if (!/prefers-color-scheme/i.test(o)) continue;
+      orig.set(el, o);
+      el.setAttribute('media', swap(o));
+    }
+  };
+  const mm = window.matchMedia.bind(window);
+  window.matchMedia = (q: string) => mm(swap(String(q)));
+  let queued = 0;
+  const soon = () => {
+    if (!queued) queued = requestAnimationFrame(() => ((queued = 0), run()));
+  };
+  // Styles come as the page is parsed, and some later (added by its scripts).
+  new MutationObserver((ms) => {
+    if (ms.some((m) => Array.from(m.addedNodes).some((n) => /^(STYLE|LINK|SOURCE)$/.test((n as Element).tagName ?? '')))) soon();
+  }).observe(document, { childList: true, subtree: true });
+  addEventListener('DOMContentLoaded', run);
+  addEventListener('load', run);
+  run();
+  W.__nScheme = (m) => {
+    cur = m;
+    run();
+  };
+}
+
+/** The script that runs `scheme` in a page, for the app's mode. */
+export const schemeScript = (mode: 'dark' | 'light', own = false) => `<script${own ? ' data-n-own' : ''}>(${SCHEME_SRC})(${JSON.stringify(mode)})</script>`;
 
 /** What the bridge is told: the number its messages carry, the theme, and the storage limits. */
 export interface BridgeCfg {
@@ -152,6 +167,17 @@ function bridge(cfg: BridgeCfg) {
     addEventListener('DOMContentLoaded', centre);
     addEventListener('load', () => (centre(), size()));
     setTimeout(size, 300);
+    // The app's theme changed while the page is open: its colours (and its light-or-dark rules) follow.
+    addEventListener('message', (e) => {
+      const d = e.data;
+      if (e.source !== P || !d || d.type !== 'wa-html-theme' || d.n !== cfg.n) return;
+      const mode = d.theme === 'dark' ? 'dark' : 'light';
+      root.setAttribute('data-n-theme', mode);
+      const el = document.getElementById('n-theme');
+      if (el && typeof d.css === 'string' && d.css.length < 40000) el.textContent = d.css;
+      (window as unknown as { __nScheme?: (m: string) => void }).__nScheme?.(mode);
+      requestAnimationFrame(size);
+    });
   }
 
   // window.naget.storage: the app keeps a saved page's values; without the app, this page's memory does.
@@ -272,6 +298,7 @@ function bridge(cfg: BridgeCfg) {
 export const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
 export const BRIDGE_SRC = scriptSafe(bridge.toString());
+export const SCHEME_SRC = scriptSafe(scheme.toString());
 
 // The stylesheet goes into a page as text: it must not end the element it sits in.
 if (/<\/style/i.test(KIT_CSS)) throw new Error('The page kit must not close its own element');
@@ -301,7 +328,7 @@ export function injectHead(html: string, head: string): string {
  *   are held back, and the page is changed in place (what was there stays), so it grows without
  *   flashing, following its end unless the reader scrolled up.
  */
-function frame(kit: string, bridgeSrc: string, editorSrc: string) {
+function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string) {
   const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
   const nonce = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
   const theme = (v: unknown) => (v === 'dark' ? 'dark' : 'light');
@@ -361,16 +388,27 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string) {
     const el = document.scrollingElement ?? document.documentElement;
     follow = el.scrollTop + innerHeight >= el.scrollHeight - 48;
   });
-  const stream = (d: { html: string; n?: unknown; theme?: unknown }) => {
+  // The app's theme, as the kit's colours and font: CSS the app wrote (pages/frame.tsx), kept to a style element.
+  const themeText = (v: unknown) => (typeof v === 'string' && v.length < 40000 ? v.replace(/</g, '') : '');
+  // The page's light-or-dark rules follow the app's mode (`scheme`, run in the page; here, in this document).
+  let schemeOn = false;
+  const stream = (d: { html: string; n?: unknown; theme?: unknown; css?: unknown }) => {
     streamN = nonce(d.n);
     const doc = new DOMParser().parseFromString(d.html, 'text/html');
     holdBack(doc);
     const kitEl = doc.createElement('style');
     kitEl.id = 'n-kit';
     kitEl.textContent = kit;
-    doc.head.prepend(kitEl);
+    const themeEl = doc.createElement('style');
+    themeEl.id = 'n-theme';
+    themeEl.textContent = themeText(d.css);
+    doc.head.prepend(kitEl, themeEl);
     doc.documentElement.setAttribute('data-n-theme', theme(d.theme));
     morph(document.documentElement, doc.documentElement);
+    if (!schemeOn) {
+      schemeOn = true;
+      (0, eval)(`(${schemeSrc})`)(theme(d.theme));
+    } else (window as unknown as { __nScheme?: (m: string) => void }).__nScheme?.(theme(d.theme));
     const el = document.scrollingElement ?? document.documentElement;
     const h = Math.max(el.scrollHeight, document.body ? document.body.scrollHeight : 0);
     // Its colour too, once it has one (until then the frame keeps the app's).
@@ -399,11 +437,11 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string) {
       holdBack(doc);
       const labels = d.labels && typeof d.labels === 'object' ? d.labels : {};
       const cfg = { n: nonce(d.n), theme: theme(d.theme), doctype: m ? m[0].trim() : '', labels };
-      head = `<style id="n-kit" data-n-own>${kit}</style><script data-n-own>(${editorSrc})(${js(cfg)})</script>`;
+      head = `<style id="n-kit" data-n-own>${kit}</style><style id="n-theme" data-n-own>${themeText(d.css)}</style><script data-n-own>(${schemeSrc})(${js(cfg.theme)})</script><script data-n-own>(${editorSrc})(${js(cfg)})</script>`;
       html = (m ? m[0] : '') + doc.documentElement.outerHTML;
     } else {
       const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) } };
-      head = `<style id="n-kit">${kit}</style><script>(${bridgeSrc})(${js(cfg)})</script>`;
+      head = `<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>`;
     }
     const at = DOCTYPE.exec(html);
     html = at ? at[0] + head + html.slice(at[0].length) : head + html;
@@ -418,4 +456,4 @@ const asJs = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
 
 /** The document of /htmlframe, where every page renders (sandboxed by PAGE_CSP). */
 export const frameHtml = () =>
-  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)})</script></body></html>`;
+  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)})</script></body></html>`;

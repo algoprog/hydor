@@ -93,7 +93,8 @@ agents that speak ACP and take MCP servers.
 - **Pages and templates**: pages the agents show can answer back (pick an option, fill in a form), stay in a
   library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
   link. A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
-  and you can change it in a visual editor that works on a phone too: click or tap a part to rewrite its words
+  looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
+  ask for another look), and you can change it in a visual editor that works on a phone too: click or tap a part to rewrite its words
   (bold, italic, links), restyle it (this part, every part of its kind or class, on hover, or for tablets and
   phones only), move, size, copy, wrap or delete it, pick it from its layers, add parts and ready-made sections,
   set the whole page's colours, fonts, width and the look of its headings, links and buttons, ask the agent about

@@ -3,6 +3,7 @@
 // that frame, carrying that number, of a known shape and size: the page's height, a choice or a form
 // to put in the message box, and calls of window.naget.storage, which a store answers.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { KIT_CSS } from '@shared/page-kit';
 import { STORAGE_LIMITS } from '@shared/pages';
 import { enc, post } from '../../lib/api';
 import { cx } from '../../components/ui';
@@ -76,6 +77,89 @@ export function formText(name: string, fields: [string, string][]): string {
 
 const nonce = () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
 
+/** The app's light or dark, now. */
+const themeNow = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
+/** The page kit's colours, from the app theme's (lib/theme.ts paints them on the page's root). */
+const KIT_OF: [string, string][] = [
+  ['--n-bg', 'bg'],
+  ['--n-card', 'panel'],
+  ['--n-fg', 'fg'],
+  ['--n-muted', 'fg-3'],
+  ['--n-line', 'line'],
+  ['--n-soft', 'bg-2'],
+  ['--n-accent', 'accent'],
+  ['--n-accent-fg', 'accent-fg'],
+  ['--n-ok', 'ok'],
+  ['--n-warn', 'warn'],
+  ['--n-err', 'err'],
+  ['--n-info', 'info'],
+  // A chart's or a diagram's series.
+  ['--n-c1', 'accent'],
+  ['--n-c2', 'info'],
+  ['--n-c3', 'ok'],
+  ['--n-c4', 'warn'],
+  ['--n-c5', 'claude'],
+  ['--n-c6', 'codex'],
+];
+
+let faces: string | null = null;
+/** The app's own fonts, for a page to load them too (from this server: absolute addresses, as a page has a base of its own). */
+function fontFaces(): string {
+  if (faces !== null) return faces;
+  const out: string[] = [];
+  const walk = (rules: CSSRuleList, href: string) => {
+    for (const r of Array.from(rules)) {
+      if (r instanceof CSSFontFaceRule) {
+        if (/Inter Variable|JetBrains Mono Variable/.test(r.style.getPropertyValue('font-family'))) out.push(r.cssText.replace(/url\((['"]?)([^'")]+)\1\)/g, (_m, _q, u: string) => `url("${new URL(u, href).href}")`));
+      } else if ('cssRules' in r) walk((r as CSSGroupingRule).cssRules, href);
+    }
+  };
+  for (const sh of Array.from(document.styleSheets)) {
+    try {
+      walk(sh.cssRules, sh.href ?? location.href);
+    } catch {}
+  }
+  return (faces = out.join('').replace(/</g, ''));
+}
+
+/**
+ * The app's current theme as the page kit's colours and font (server/pages/kit.ts puts it after the kit), so a
+ * page made with the kit looks like part of the app: its light or dark, and the user's own colours. In the dark
+ * they go to body.n-page only, as the kit's own dark ones do: a page of its own colours keeps its light kit parts.
+ */
+export function themeCss(): string {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (k: string) => cs.getPropertyValue(`--${k}`).trim();
+  const colours = KIT_OF.map(([n, k]) => [n, v(k)]).filter(([, x]) => /^[#\w(),.%\s/-]{1,80}$/.test(x));
+  const accent = v('accent');
+  if (/^[#\w(),.%\s/-]{1,80}$/.test(accent)) colours.push(['--n-accent-soft', `color-mix(in srgb, ${accent} 14%, transparent)`]);
+  const font = (k: string) => v(k).replace(/[;{}<>]/g, '');
+  const fonts = [font('font-sans') && `--n-font:${font('font-sans')}`, font('font-mono') && `--n-mono:${font('font-mono')}`].filter(Boolean).join(';');
+  return `${fontFaces()}:root{${fonts}}${themeNow() === 'dark' ? 'html[data-n-theme] .n-page' : ':root'}{${colours.map(([n, x]) => `${n}:${x}`).join(';')}}`;
+}
+
+/** The app's theme changed (lib/theme.ts): `f` tells the page. */
+function useThemeChange(f: () => void) {
+  const cb = useRef(f);
+  cb.current = f;
+  useEffect(() => {
+    const on = () => cb.current();
+    window.addEventListener('wa:theme', on);
+    return () => window.removeEventListener('wa:theme', on);
+  }, []);
+}
+
+/**
+ * A page as a file to keep: with the kit's stylesheet, so its ready-made classes and colours work wherever it is
+ * opened, light or dark as that device is.
+ */
+export function pageFile(html: string): string {
+  const head = `<style id="n-kit">${KIT_CSS}</style><script>document.documentElement.setAttribute('data-n-theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')</script>`;
+  const d = /^(?:\s|<!--[\s\S]*?-->)*<!doctype[^>]*>/i.exec(html);
+  return d ? d[0] + head + html.slice(d[0].length) : head + html;
+}
+
 /**
  * A frame before its page is drawn shows the app's colour (no white flash in the dark), and has the light
  * scheme pages are written for: of another scheme than its page, the browser would paint a backdrop of its
@@ -117,6 +201,8 @@ export function PageFrame({
   const ref = useRef<HTMLIFrameElement>(null);
   const cb = useRef({ html, store, onHeight, onPick });
   cb.current = { html, store, onHeight, onPick };
+  const nRef = useRef('');
+  useThemeChange(() => nRef.current && ref.current?.contentWindow?.postMessage({ type: 'wa-html-theme', n: nRef.current, theme: themeNow(), css: themeCss() }, '*'));
   // Before the frame can load (it posts "ready" as soon as it does).
   useLayoutEffect(() => {
     let n = '';
@@ -130,8 +216,8 @@ export function PageFrame({
       if (!d || typeof d !== 'object' || Array.isArray(d) || typeof d.type !== 'string') return;
       if (d.type === 'wa-html-ready') {
         n = nonce();
-        const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme, max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value } }, '*');
+        nRef.current = n;
+        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value } }, '*');
         return;
       }
       const { store, onHeight, onPick } = cb.current;
@@ -191,7 +277,6 @@ export function PageFrame({
 }
 
 const SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals';
-const themeNow = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 
 /** A page's relative addresses (its pictures, its styles) resolved against `base`: an HTML file's own folder. */
 export function withBase(html: string, base?: string): string {
@@ -218,8 +303,12 @@ export function StreamFrame({ html, base, title = 'Page', onHeight, className }:
     const w = ref.current?.contentWindow;
     if (!s.ready || !w || s.html === s.sent) return;
     s.sent = s.html;
-    w.postMessage({ type: 'wa-html-stream', html: withBase(s.html, s.base), n: s.n, theme: themeNow() }, '*');
+    w.postMessage({ type: 'wa-html-stream', html: withBase(s.html, s.base), n: s.n, theme: themeNow(), css: themeCss() }, '*');
   };
+  useThemeChange(() => {
+    st.current.sent = '';
+    push();
+  });
   useLayoutEffect(() => {
     const s = st.current;
     const onMessage = (e: MessageEvent) => {
@@ -348,6 +437,7 @@ export const EditFrame = forwardRef<
   cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
+  useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
   useImperativeHandle(handle, () => ({
     cmd: (cmd, arg) => send({ cmd, arg }),
     html: () =>
@@ -372,7 +462,7 @@ export const EditFrame = forwardRef<
       if (!w || e.source !== w || e.origin !== 'null' || !d || typeof d !== 'object' || typeof d.type !== 'string') return;
       if (d.type === 'wa-html-ready') {
         ch.current.n = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
-        w.postMessage({ type: 'wa-html-page', mode: 'edit', html: withBase(cb.current.html, cb.current.base), n: ch.current.n, theme: themeNow(), labels: cb.current.labels }, '*');
+        w.postMessage({ type: 'wa-html-page', mode: 'edit', html: withBase(cb.current.html, cb.current.base), n: ch.current.n, theme: themeNow(), css: themeCss(), labels: cb.current.labels }, '*');
         return;
       }
       if (d.n !== ch.current.n) return;

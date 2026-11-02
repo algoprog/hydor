@@ -63,8 +63,10 @@ const tell = (d: Deps, data: PagesEvent) => d.broadcast({ t: 'feature', id: 'pag
 
 const CHOICES =
   'Choices: a click on an element with data-choice="Blue" puts "Chose: Blue" in the user’s message box (they send it, with anything they add); data-group="Color" on it or a container makes it "Color: Blue"; data-multi on the container lets them pick several. A <form data-choice-form="Trip"> puts its named fields there when submitted. Offer 2 to 4 options at a time.';
+const LOOK =
+  'Its look: unless the user asks for another (their brand, colours of their own, a style), make the page look like part of this app, in its theme: <body class="n-page">, and every colour from the page kit’s variables, which take the app’s current theme, light or dark as the app is, and the user’s own colours: var(--n-bg) the page, --n-card cards, --n-fg text, --n-muted quieter text, --n-line borders, --n-soft quiet fills, --n-accent (with --n-accent-fg on it, --n-accent-soft for tints), --n-ok, --n-warn, --n-err, --n-info, and --n-c1 to --n-c6 for the series of a chart or a diagram (a chart library takes them from getComputedStyle(document.body)); corners var(--n-radius); the app’s font comes with n-page (var(--n-mono) for code). Write no colours of your own and no prefers-color-scheme rules: the kit switches light and dark with the app.';
 const CLASSES =
-  'Ready-made classes, all optional: body.n-page (clean type, follows the app’s light or dark theme), .n-options > .n-option (rows: .n-letter, h3, p), .n-grid > .n-card (an img or .n-media, then .n-body), table.n-compare (.n-yes, .n-no, .n-best; wrap wide ones in .n-scroll), .n-proscons > .n-pros + .n-cons (h4, ul), .n-btn (.n-primary), .n-field (a label around an input), .n-row, .n-tag, .n-muted. A picked choice gets .n-selected.';
+  'Ready-made classes, all optional: .n-options > .n-option (rows: .n-letter, h3, p), .n-grid > .n-card (an img or .n-media, then .n-body), table.n-compare (.n-yes, .n-no, .n-best; wrap wide ones in .n-scroll), .n-proscons > .n-pros + .n-cons (h4, ul), .n-btn (.n-primary), .n-field (a label around an input), .n-row, .n-tag, .n-muted. A picked choice gets .n-selected.';
 
 const SHOW_HTML: RunTool = {
   name: 'show_html',
@@ -73,9 +75,10 @@ const SHOW_HTML: RunTool = {
     'Show the user an HTML page inside the conversation: a report, a chart, a table, a diagram, a mock-up, options to pick from.',
     'Use it when a visual is clearer than text, or when asked for one. The page renders in a sandboxed frame: in the conversation, beside it or',
     'full screen, from a phone’s 360px to a whole screen wide, and grows to its content height. Make it fill whatever width it gets: no max-width or',
-    'fixed width on the body or a wrapper; fluid layouts (grids with auto-fit columns, percentages, wrapping rows). A page that sets no background of its own shows on white. Write a complete, self-contained page: inline CSS and',
+    'fixed width on the body or a wrapper; fluid layouts (grids with auto-fit columns, percentages, wrapping rows). Write a complete, self-contained page: inline CSS and',
     'JavaScript; scripts may load from CDNs (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com). It cannot reach this app or the',
     'user’s files, so embed the data; localStorage keeps nothing. The user sees the page itself; do not repeat its contents in your reply.',
+    LOOK,
     CHOICES,
     CLASSES,
     'For a page the user will come back to (a tracker, a calculator), use save_page instead.',
@@ -99,7 +102,7 @@ const SAVE_PAGE: RunTool = {
   description: [
     'Save a page in the user’s Pages library: a small app or tool they keep and come back to (a tracker, a calculator, a checklist, a planner).',
     'It shows in the conversation, in Pages, and at an address of its own that the user can add to a phone’s home screen.',
-    'The same page rules, choices and classes as show_html, plus storage that lasts, kept by this app for the page:',
+    'The same page rules, look, choices and classes as show_html, plus storage that lasts, kept by this app for the page:',
     'await naget.storage.get(key) (the value, or null), set(key, value) (any JSON), remove(key), keys(); about 2 MB per page. localStorage keeps nothing.',
     'Leave out id to make a new page; give the id of a saved page (get_page lists them) to replace it with a new version:',
     'older versions stay restorable, and its stored data stays.',
@@ -197,7 +200,7 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  'Pages: show_html shows a page in the conversation (a report, a chart, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Pages library, can go on a phone’s home screen, and keeps what it stores with naget.storage on every device (a file’s localStorage stays in one browser). get_page lists saved pages, to change one.';
+  'Pages: show_html shows a page in the conversation (a report, a chart, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Pages library, can go on a phone’s home screen, and keeps what it stores with naget.storage on every device (a file’s localStorage stays in one browser). get_page lists saved pages, to change one. Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
 
 /** What the agent hears once the user decided on its publish_site card. */
 function outcome(r: PublishRequest, base: string): string {
