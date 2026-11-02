@@ -30,7 +30,7 @@ export const pagesFeature: WebFeature = {
   },
   noteViews: { 'page-edit': PageEditNoteView },
   routes: [{ match: isPages, Page: PagesRoute }],
-  nav: [{ path: '/pages', label: 'Pages', icon: <AppWindow size={17} />, match: isPages }],
+  nav: [{ id: 'pages', path: '/pages', label: 'Pages', icon: <AppWindow size={17} />, match: isPages }],
   sessionSide: { useOpen: useCanvasOpen, close: closeCanvas, Panel: CanvasSide },
   // A page opened to change over everything (a phone, a narrow window).
   SessionDock: PageOver,

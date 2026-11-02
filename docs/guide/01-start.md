@@ -80,6 +80,8 @@ The bottom of the sidebar holds the app's tools, four to a row:
 - **Search**: opens the search box (the same as Ctrl+K).
 - **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
 
+That is their usual order. To change it, drag a tool to another place among them (on a phone, hold it a moment first). The tools keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tool on a computer and choose **Back to the usual order** to put them all back.
+
 ### The start page
 
 **New session** opens the start page. It asks "What should we work on?" and holds a large message box with a row of choices under it:
@@ -172,6 +174,7 @@ On an iPhone or iPad, notifications work only in the app added to the home scree
 - The **Menu** button at the top left of each page opens it. It fills the screen.
 - Tapping a session or a tool takes you there and closes the drawer. **Close menu** (the ×) closes it too.
 - Hold a session a moment to pick it up, then drag it (to reorder Active or Pinned sessions, or to pin one).
+- Hold a tool at the bottom a moment to pick it up, then drag it to another place among them.
 - A bin at the end of each row deletes the session, after asking.
 - There is no right-click menu: rename, pin, snooze and the rest are in the session's menu (⋯) at the top right of the session.
 
@@ -239,4 +242,5 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "List my sessions in the sidebar by day, without the folder groups."
 - "Next time I open the start page, have it set to Claude Code with the Researcher assistant."
 - "Make my search box look only in my sessions and pages."
+- "Put Settings and Search first among the tools at the bottom of my sidebar."
 - "What is in my inbox?"

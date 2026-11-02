@@ -6,6 +6,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { SessionExtra, SessionNote } from '@shared/features';
+import type { SidebarTool } from '@shared/sidebar';
 import type { SessionSummary, ToolCategory, ToolInfo, ToolItem } from '@shared/types';
 import { appsFeature } from './apps/feature';
 import { arenaFeature } from './arena/feature';
@@ -81,8 +82,8 @@ export interface WebFeature {
   settings?: FeatureSection[];
   /** Pages of its own. */
   routes?: { match: (path: string) => boolean; Page: ComponentType }[];
-  /** Entries among the sidebar's tools. */
-  nav?: { path: string; label: string; icon: ReactNode; match?: (path: string) => boolean }[];
+  /** Entries among the sidebar's tools; `id` names one in the order you drag them into (shared/sidebar.ts). */
+  nav?: { id: SidebarTool; path: string; label: string; icon: ReactNode; match?: (path: string) => boolean }[];
   /** Items in a session's menu… */
   SessionMenu?: ComponentType<{ s: SessionSummary; close: () => void }>;
   /** …and the part they go in: More unless given, which keeps the main list short. */

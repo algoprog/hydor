@@ -331,6 +331,9 @@ programs shows each program's version and what is out, with Check now, Update no
 ## Everywhere
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
+- The tools at the bottom of the sidebar (Files, Git, Terminal, Pages, Spaces, Apps, Usage, Settings…) stay in
+  the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
+  it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
   every setting, sessions and what was said in them, memory notes, spaces, apps, scheduled tasks, assistants,
   skills, pages, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its

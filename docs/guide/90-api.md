@@ -569,6 +569,11 @@ Agents in a conversation also have their own tools for this: schedule_task and u
 - `GET /api/themes` — the themes the user made (the built-in ones, ids naget-dark, naget-light, midnight and sage, are not listed). Returns: `{ themes: [{ id, name, base: 'dark'|'light', colors: { <colour>: '#rrggbb' } }] }`.
 - `PUT /api/themes` — REPLACES the whole list of the user's themes (read it first, then send every theme to keep, changed or added). Body: `{ themes: [{ id: string — 1–48 lowercase letters, digits and hyphens, unique, not a built-in id; name: string — up to 40 chars; base: 'dark'|'light' — sets code and terminal colours and fills colours left out; colors: { <colour>: hex — '#abc', 'aabbcc' or '#aabbcc' } }] — up to 40 }`. Colours: bg (page), sidebar, panel (cards), elevated (menus and dialogs), bg-1 (fields), bg-2 (hover), bg-3 (selected), fg, fg-2, fg-3 (text, secondary, muted), line, line-2 (borders, strong borders), accent, accent-fg (text on accent), busy, warn, ok, err, info, claude, codex, code-bg, term-bg, term-fg; unknown keys and bad values are dropped. Returns: `{ themes }`; open pages update at once. Which theme shows (dark/light/system and the pick for each) is chosen in each browser, not through the API: tell the user to pick it in Settings → General.
 
+## The sidebar's tools
+
+- `GET /api/sidebar` — the order of the tools at the bottom of the sidebar, as the user dragged them: the same on every device, whichever machine the page shows. Returns: `{ tools: string[] }` (every tool, first to last; the usual order is files, git, terminal, pages, spaces, apps, preview, usage, system, settings, search, help).
+- `PUT /api/sidebar` — sets the order; open pages change at once. Body: `{ tools: string[] — tools first to last, by the names above; the ones left out follow in their usual order, so to move some and keep the rest where the user put them, send the whole list as GET gave it, changed; [] puts every tool back in its usual place }`. Returns: `{ tools }` (every tool, first to last). A name it does not know is refused (400). Preview shows only on this machine's own pages, and keeps its place in the order elsewhere.
+
 ## Language (Settings → App → General → Language)
 
 - `GET /api/me/language` — the language agents are asked to write in. Returns: `{ lang: 'en'|'zh'|'el' }`.

@@ -35,7 +35,7 @@ import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
 import { ChildNest, nestChildren } from '../children/Nest';
-import { AreaTouchSensor, touchDragArea } from '../../lib/dragTouch';
+import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
 
 /**
  * Active sessions keep their places: newest to become active on top, then fixed. Working,
@@ -96,11 +96,6 @@ const orderable = (kind: GroupKind) => kind === 'active' || kind === 'pinned';
 const PIN_ZONE = 'zone:pin';
 /** A drop ends with a click on the row under the pointer; that click is ignored. */
 let lastDragEnd = 0;
-// Made once: new settings on each render gave every row new drag handlers, so each update of the list
-// (four a second while an agent works) redrew all of its rows.
-const MOUSE = { activationConstraint: { distance: 6 } };
-// Touch: hold a moment to pick a row up, so a swipe still scrolls the list.
-const TOUCH = { activationConstraint: { delay: 250, tolerance: 8 } };
 
 /** Rows you dragged keep their places; ones never dragged come first, in their usual order. */
 function byManualOrder(list: SessionSummary[], usual: (l: SessionSummary[]) => SessionSummary[]): SessionSummary[] {
@@ -451,7 +446,7 @@ export function SessionList({ query }: { query: string }) {
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overGroup, setOverGroup] = useState<string | null>(null);
   const [confirm, confirmNode] = useConfirm();
-  const sensors = useSensors(useSensor(MouseSensor, MOUSE), useSensor(AreaTouchSensor, TOUCH));
+  const sensors = useSensors(useSensor(MouseSensor, MOUSE_DRAG), useSensor(AreaTouchSensor, TOUCH_DRAG));
 
   // Child sessions sit under their parent (folded), when it is listed too.
   const shown = (s: SessionSummary) => (filter === 'all' || s.agent === filter) && (!spaceFilter || s.extra?.space === spaceFilter);
