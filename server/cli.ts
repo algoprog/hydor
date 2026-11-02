@@ -5,6 +5,7 @@
 //   node dist/server/cli.js service install     runs the app as a systemd user service (no root needed)
 //   node dist/server/cli.js service uninstall | status | logs
 //   node dist/server/cli.js update              pulls the latest code, builds it and restarts the service
+//   node dist/server/cli.js app …               templates: new, folder, dev, try, export, import (server/apps/cli.ts)
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -113,6 +114,14 @@ if (cmd === 'set-password') {
   process.exit(systemctl('status', '--no-pager', UNIT));
 } else if (cmd === 'service' && sub === 'logs') {
   spawnSync('journalctl', ['--user', '-u', UNIT, '-n', '200', '--no-pager'], { stdio: 'inherit' });
+} else if (cmd === 'app') {
+  const { appCommand } = await import('./apps/cli.ts');
+  try {
+    process.exitCode = await appCommand(process.argv.slice(3));
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exitCode = 1;
+  }
 } else if (cmd === 'update') {
   if (!fs.existsSync(path.join(ROOT, '.git'))) {
     console.error('This copy was not installed from git; download the new version instead.');
@@ -142,5 +151,6 @@ if (cmd === 'set-password') {
   service uninstall   stop and remove that service
   service status      is it running
   service logs        its recent log
-  update              pull the latest version, build it, restart the service`);
+  update              pull the latest version, build it, restart the service
+  app …               your templates: list, new, folder, dev, try, export, import (app help says more)`);
 }
