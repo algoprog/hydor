@@ -321,7 +321,7 @@ export function appInfo(id: string, r: Pick<AppRecipe, 'name' | 'fields' | 'answ
 }
 
 /** Tools a step may call on its own, outside a session: they answer without a conversation to answer in. */
-export const STEP_TOOLS = ['web_search', 'read_page', 'http_request', 'read_document', 'generate_image', 'knowledge_search', 'knowledge_read', 'recall'];
+export const STEP_TOOLS = ['web_search', 'read_page', 'http_request', 'read_document', 'generate_image', 'knowledge_search', 'knowledge_read', 'recall', 'notify_user'];
 
 /** Names values use for other things, which no step may take. */
 const RESERVED = new Set(['inputs', 'item', 'index', 'today', 'error', 'steps', 'run']);

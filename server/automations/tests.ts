@@ -750,8 +750,8 @@ await test('runs started by a schedule cannot schedule more; they report and kee
   noteSpawn('run-sched', { automations: mark });
   const runCtx: RunCtx = { runId: 'run-sched', key, agent: 'claude', cwd: root, deps };
   const names = automationTools(runCtx).map((x) => x.name);
-  assert.deepEqual(names, ['list_tasks', 'report_outcome', 'task_notes']);
-  assert.deepEqual(automationTools(ctx).map((x) => x.name), ['schedule_task', 'update_task', 'list_tasks']);
+  assert.deepEqual(names, ['list_tasks', 'report_outcome', 'task_notes', 'notify_user']);
+  assert.deepEqual(automationTools(ctx).map((x) => x.name), ['schedule_task', 'update_task', 'list_tasks', 'notify_user']);
   // Even if its agent calls it anyway (a run posting into a conversation).
   sessions.add('claude:target', 'idle');
   const tt = scheduler.save({ ...base, name: 'Into', target: 'claude:target' });

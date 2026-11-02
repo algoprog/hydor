@@ -206,6 +206,8 @@ A run tells you how it went with its session's usual notification, titled with t
 - A task that pauses itself sends a notice saying why.
 - A run that posts into one of your conversations leaves that conversation's notices as they are.
 
+An agent can also send you a notification while it works (its notify_user tool), for something that cannot wait for the run's end; so can any agent, and a template's step.
+
 ## Pause, turn on, edit, duplicate or delete a task
 
 - **Pause or turn on**: the switch on the task's row. A paused task does not run or look, and its webhook refuses calls. Turning a task on again clears its count of failures and the reason it paused.

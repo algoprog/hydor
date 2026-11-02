@@ -9,6 +9,7 @@ import { acpAgents } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, RunCtx, RunTool } from '../features/types.ts';
+import type { NotifyEvent } from '../../shared/types.ts';
 import { cleanExtra } from '../scheduler.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { userTimezone } from '../userPrefs.ts';
@@ -465,10 +466,41 @@ const TASK_NOTES: RunTool = {
 };
 
 /** The tools a session gets: a run reports and keeps notes; any other session may propose tasks. */
+/** Notices each session or run sent lately, so a loop cannot flood the user's phone. */
+const sentLately = new Map<string, number[]>();
+
+/** A notice to the user now, in the open pages and on their phone: it opens the session, or what the work is (a template's run). */
+const NOTIFY_USER: RunTool = {
+  name: 'notify_user',
+  description:
+    'Send the user a notification now, in the app and on their phone (when they turned notifications on): something they asked to hear about, or a finding that cannot wait. Not for progress or a final answer: a session or run that ends tells them by itself. At most 5 in 10 minutes.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      message: { type: 'string', description: 'What to tell them, in a sentence or two.' },
+      title: { type: 'string', description: 'A few words above it; default: the session’s or the template’s name.' },
+    },
+    required: ['message'],
+  },
+  async run(a, ctx) {
+    const message = String(a.message ?? '').trim().slice(0, 500);
+    if (!message) throw new Error('Say what to tell them (message)');
+    const now = Date.now();
+    const recent = (sentLately.get(ctx.key) ?? []).filter((t) => t > now - 10 * 60_000);
+    if (recent.length >= 5) throw new Error('Five notifications in ten minutes is the most: put the rest in your answer');
+    sentLately.set(ctx.key, [...recent, now]);
+    const s = ctx.deps.sessions.summary(ctx.key);
+    const title = String(a.title ?? '').trim().slice(0, 80) || ctx.notice?.title || s?.title || 'Naget Agent';
+    // Straight out, not as a session's turn notice (a scheduled run's gate would take it for the run's own).
+    ctx.deps.sessions.emit('notify', { key: ctx.key, kind: 'done', title, body: message, agent: ctx.agent, at: now, ...(ctx.notice ? { url: ctx.notice.url } : s ? {} : { url: '/' }) } satisfies NotifyEvent);
+    return 'Sent.';
+  },
+};
+
 export function automationTools(ctx: RunCtx): RunTool[] {
   const d = ctx.deps;
   const tz = userTimezone(d.db);
   const run = !!runMark(d.db, ctx);
   const target = d.scheduler.targeting(ctx.key).length > 0;
-  return [...(run ? [] : [scheduleTask(tz), updateTask(tz)]), listTasks(tz), ...(run || target ? [REPORT_OUTCOME, TASK_NOTES] : [])];
+  return [...(run ? [] : [scheduleTask(tz), updateTask(tz)]), listTasks(tz), ...(run || target ? [REPORT_OUTCOME, TASK_NOTES] : []), NOTIFY_USER];
 }

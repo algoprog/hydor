@@ -35,6 +35,8 @@ export interface RunCtx {
   deps: Deps;
   /** Aborted when the agent gives up on the call (its request closed): a card waiting on the user goes. */
   signal?: AbortSignal;
+  /** Where a notice about this work opens and what it is called, when that is not its session (a template run's tool step). */
+  notice?: { url: string; title: string };
 }
 
 /** A tool's answer: text, and images for the agents that take them (a screenshot). */

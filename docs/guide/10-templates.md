@@ -327,7 +327,7 @@ The kinds of steps:
 
 - **Ask an agent**: a session works on its part with its tools and hands in what it found. Each has a session of its own, which you can open from the run's page.
 - **Ask a model**: one quick answer from a model, with no tools: sort, pull out, sum up. It costs little, and nothing with a model on this computer.
-- **Use a tool**: one of the app's own tools with set inputs: search the web, read a page, call an address with a saved key, read a document, make a picture.
+- **Use a tool**: one of the app's own tools with set inputs: search the web, read a page, call an address with a saved key, read a document, make a picture, or send you a notification.
 - **Decide**: one way or the other, by a rule ("the price is under 100") or by a question in words that the helper model answers.
 - **Repeat**: its steps once for each item of a list (a few at a time, if you like), or again until something holds.
 - **At the same time**: branches that run side by side; the flow goes on when they have all ended.
