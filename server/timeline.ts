@@ -45,6 +45,8 @@ export class Timeline extends EventEmitter {
   private reading: Promise<void> | null = null;
   private again = false;
   private finished = false;
+  /** When a missing transcript was last looked for elsewhere. */
+  private lookedAt = 0;
   loaded = false;
   lastUsed = Date.now();
   subscribers = 0;
@@ -158,6 +160,7 @@ export class Timeline extends EventEmitter {
     try {
       st = await fs.promises.stat(file);
     } catch {
+      this.relocate(file);
       return;
     }
     this.tryWatch();
@@ -186,6 +189,18 @@ export class Timeline extends EventEmitter {
       await fh.close();
     }
     this.flush();
+  }
+
+  /**
+   * A Claude session's transcript is followed from before the CLI writes it, where it is expected. Should it
+   * turn up elsewhere (another account's folder, a folder named otherwise), it is found by its name there and
+   * followed, so the page never waits on a file that will not come (its steps would show running forever).
+   */
+  private relocate(file: string) {
+    if (this.agent !== 'claude' || Date.now() - this.lookedAt < 1000) return;
+    this.lookedAt = Date.now();
+    const found = findClaudeTranscript(path.basename(file, '.jsonl'));
+    if (found && found !== file) this.setPath(found);
   }
 
   private flush() {
