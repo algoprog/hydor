@@ -103,6 +103,8 @@ export interface Bootstrap {
   /** The app's own data folder (~/.naget-agent, or ~/.web-agent on older installs). */
   dataDir?: string;
   defaultCwd: string;
+  /** Folders no one picks (task folders' place, apps' runs, worktrees, the temporary folder…); missing on older servers. */
+  autoFolders?: string[];
   prefs: Record<string, SessionPrefs>;
   /** What the start page had picked last; missing on servers before it was kept. */
   start?: StartSettings;
@@ -343,14 +345,18 @@ interface UIState {
   agentFilter: 'all' | 'claude' | 'codex';
   /** The space the sidebar lists the sessions of; all when null. */
   spaceFilter: string | null;
+  /** The sidebar groups sessions by the space or the folder they work in (sessions/groups.ts), else only by day. */
+  groupByFolder: boolean;
+  /** The sidebar's space and folder groups you folded (true) or opened (false), by their ids; the others follow sessions/groups.ts. */
+  groupFolds: Record<string, boolean>;
   set: (p: Partial<Omit<UIState, 'set' | 'openTab' | 'closeTab'>>) => void;
   openTab: (t: OpenTab) => void;
   closeTab: (id: string) => void;
 }
 
 const UI_KEY = 'wa.ui.v1';
-/** Folders and open files are each machine's own (Settings → Machines); the rest of the layout is shared. */
-const PER_MACHINE = ['explorerRoot', 'tabs'] as const;
+/** Folders, open files and the sidebar's folded groups are each machine's own (Settings → Machines); the rest of the layout is shared. */
+const PER_MACHINE = ['explorerRoot', 'tabs', 'groupFolds'] as const;
 const read = (k: string): Record<string, unknown> => {
   try {
     return JSON.parse(localStorage.getItem(k) ?? '{}') ?? {};
@@ -385,6 +391,8 @@ export const useUI = create<UIState>((set, get) => ({
   tabs: [],
   agentFilter: 'all',
   spaceFilter: null,
+  groupByFolder: true,
+  groupFolds: {},
   ...loadUI(),
   set: (p) => set(p),
   openTab: (t) => {

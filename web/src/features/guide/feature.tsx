@@ -67,6 +67,7 @@ interface DeviceSettings {
   enter?: 'join' | 'queue';
   terminalSuggestions?: boolean;
   sidebar?: boolean;
+  groupSessions?: boolean;
 }
 
 onFeatureEvent('guide', (e) => {
@@ -87,6 +88,7 @@ onFeatureEvent('guide', (e) => {
     } catch {}
   if (d.terminalSuggestions !== undefined) ui.set({ termSuggest: d.terminalSuggestions });
   if (d.sidebar !== undefined) ui.set({ sideOpen: d.sidebar });
+  if (d.groupSessions !== undefined) ui.set({ groupByFolder: d.groupSessions });
   // Last: switching the language reloads the page.
   if (d.language && isLang(d.language) && d.language !== currentLang()) setLang(d.language);
 });

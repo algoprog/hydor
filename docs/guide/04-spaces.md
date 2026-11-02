@@ -200,10 +200,14 @@ A group's **Knowledge** tab also shows **Also the documents of the spaces it bri
 
 ## Show one space's sessions in the sidebar
 
-1. In the sidebar, click the filter button at the end of the **Search sessions** field. Its label is **Filter by agent or space** once you have spaces.
+The sidebar gives each space a group of its own, under its name and mark, with its newest sessions; the pen at the end of the group's heading starts a new session in the space. See [The session list](/guide/start#the-session-list).
+
+To list only one space's sessions:
+
+1. In the sidebar, click the filter button at the end of the **Search sessions** field (**Filter and group sessions**).
 2. The menu lists **All agents**, **Claude Code** and **Codex**, then **Every space**, up to eight of your spaces, and **Spaces**, which opens the Spaces page. Pick a space.
 
-The session list then shows only the sessions started in that space, and the filter button is coloured while a filter is on. Pick **Every space** to see every session again. The agent filter works at the same time, to show only one agent's sessions in a space. If the space is deleted, the list shows every session again.
+The session list then shows only the sessions started in that space, by day, and the filter button is coloured while a filter is on. Pick **Every space** to see every session again. The agent filter works at the same time, to show only one agent's sessions in a space. If the space is deleted, the list shows every session again.
 
 On a phone, open the sidebar (a drawer) first.
 

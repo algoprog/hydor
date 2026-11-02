@@ -33,7 +33,7 @@ import { Scheduler } from './scheduler.ts';
 import { accountViews, createPr, ghToken, prDescribe, prDraft, prFromUrl, refreshPr, removeAccount, reviewChanges, saveAccount, writeGuide } from './pullrequests.ts';
 import { askCommands, commandHistory, complete, migrateTermHistory, recordCommand } from './termsuggest.ts';
 import { repoInfo, WORKTREES_ROOT } from './worktrees.ts';
-import { taskRoot } from './assistants/store.ts';
+import { DEFAULT_TASK_ROOT, taskRoot } from './assistants/store.ts';
 import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
@@ -227,11 +227,16 @@ app.post('/api/auth/password', async (req) => {
 
 // ---- sessions ---------------------------------------------------------------------------
 
+/** Where the app makes folders by itself: task folders, apps' runs and worktrees. */
+const madeRoots = () => [taskRoot(db), APPS_WORK_DIR, WORKTREES_ROOT];
+
 app.get('/api/bootstrap', async () => ({
   version: config.version,
   home: config.home,
   dataDir: config.dataDir.startsWith(config.home + '/') ? `~${config.dataDir.slice(config.home.length)}` : config.dataDir,
   defaultCwd: config.defaultCwd,
+  // Folders no one picked: the sidebar groups sessions by the folders people pick, never by these.
+  autoFolders: [...new Set([...madeRoots(), DEFAULT_TASK_ROOT, config.dataDir, os.tmpdir(), '/tmp'].map((r) => r.replace(/\/+$/, '')))],
   prefs: { claude: sessions.defaults('claude'), codex: sessions.defaults('codex') },
   start: startSettings(db),
   indexing: indexer.progress,
@@ -1039,7 +1044,7 @@ app.get('/api/fs/diff', async (req) => ({ diff: await files.gitDiff((req.query a
 app.get('/api/fs/recent', async (req) => {
   if ((req.query as Record<string, string>).picked !== '1') return { dirs: sessions.recentDirs() };
   // The start page's recent folders: those picked, not the ones the app made for a task, an app's run or a worktree.
-  const made = [taskRoot(db), APPS_WORK_DIR, WORKTREES_ROOT].map((r) => r.replace(/\/+$/, '') + '/');
+  const made = madeRoots().map((r) => r.replace(/\/+$/, '') + '/');
   return { dirs: sessions.recentDirs(200).filter((d) => !made.some((r) => d.startsWith(r))).slice(0, 12) };
 });
 

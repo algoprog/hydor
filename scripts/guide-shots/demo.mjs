@@ -343,6 +343,9 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     ['garden', path.join(home, 'Naget/Spaces/the-garden'), 50 * HOUR, 'Which vegetables can I still sow in November?', 'In zone 5b, garlic and broad beans go in now; spinach and lettuce under cover.', 'What to sow in November'],
     ['taxes', path.join(home, 'Naget/Spaces/taxes-2026'), 4 * DAY, 'Sort the receipts in this folder by quarter and add them up.', 'Done: 46 receipts in four folders, with a table of the totals.', 'Receipts by quarter'],
     ['blog', blog, 3 * DAY, 'Add an RSS feed to the blog.', 'The feed is at /feed.xml, built with the posts. I added a link to it in the header.', 'RSS feed for the blog'],
+    ['darkmode', blog, 6 * DAY, 'Give the blog a dark mode that follows the system setting.', 'Done: the colours follow your system, with a switch in the footer to override it.', 'Dark mode for the blog'],
+    ['search', shop, 5 * HOUR, 'Product search is slow with more than 1,000 products. Make it faster.', 'Search now uses an index on the product names: 40 ms instead of 1.2 s for 5,000 products.', 'Faster product search'],
+    ['applepay', shop, 2 * DAY, 'Add Apple Pay to the checkout.', 'Apple Pay shows on supported devices, through the payment provider you already use. The tests pass.', 'Apple Pay at checkout'],
     ['brief', tasks, 12 * HOUR, 'Morning brief: the weather in Portland, my calendar and the news I follow, in five lines.', 'Cloudy, 8 °C, rain after 4 pm. Two meetings: design review at 10, dentist at 3.', 'Morning brief'],
   ];
   for (const [name, cwd, ago, ask, answer, title] of plain) {
@@ -390,10 +393,10 @@ export async function seedApi(api, home, now, s) {
   const shopSpace = await space({ name: 'Shop website', color: 'blue', description: 'The online shop’s API and storefront', folder: path.join(home, 'code/shop-api'), assistant: 'coder' });
   await space({ name: 'Home', color: 'pink', description: 'Everything about the house and garden', members: [garden, taxes] });
 
-  const into = { thesis, garden, taxes, checkout: shopSpace };
+  const into = { thesis, garden, taxes, checkout: shopSpace, search: shopSpace, applepay: shopSpace };
   for (const [name, id] of Object.entries(into)) if (s[name] && id) await api('PATCH', `/api/sessions/${encodeURIComponent(s[name].key)}/extra`, { space: id });
   // The assistant each session works as, as the start page or its space would have picked it.
-  const as = { ebike: 'researcher', checkout: 'coder', settings: 'general', report: 'general', lisbon: 'planner', thesis: 'writer', garden: 'general', taxes: 'analyst', blog: 'coder', brief: 'general' };
+  const as = { ebike: 'researcher', checkout: 'coder', settings: 'general', report: 'general', lisbon: 'planner', thesis: 'writer', garden: 'general', taxes: 'analyst', blog: 'coder', darkmode: 'coder', search: 'coder', applepay: 'coder', brief: 'general' };
   for (const [name, assistant] of Object.entries(as)) if (s[name]) await api('PATCH', `/api/sessions/${encodeURIComponent(s[name].key)}/extra`, { assistant });
   await api('POST', `/api/sessions/${encodeURIComponent(s.thesis.key)}/flags`, { pinned: true });
 

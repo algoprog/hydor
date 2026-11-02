@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoute } from 'wouter';
-import { AlarmClock, Archive, CheckCheck, Pencil, Pin, PinOff, Target, Trash2 } from 'lucide-react';
+import { AlarmClock, Archive, CheckCheck, ChevronRight, Folder, Pencil, Pin, PinOff, SquarePen, Target, Trash2 } from 'lucide-react';
 import {
   closestCenter,
   DndContext,
@@ -19,14 +19,18 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import type { SearchHit, SessionSummary } from '@shared/types';
 import { api, del, enc, post } from '../../lib/api';
-import { basename, dayGroup, markRuns, timeAgo } from '../../lib/format';
+import { basename, markRuns, tildify, timeAgo } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { activityOf, inBackground, isBusy, isWorking } from '../../lib/activity';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat } from '../../components/DiffView';
-import { cx, Throbber, MenuItem, Popover, useConfirm, useMediaQuery } from '../../components/ui';
+import { cx, IconButton, Throbber, MenuItem, Popover, useConfirm, useMediaQuery } from '../../components/ui';
 import { Elapsed } from '../session/items';
+import { newSessionIn } from '../files/actions';
+import { SpaceMark, startInSpace } from '../spaces/parts';
+import { useSpaces } from '../spaces/state';
+import { GROUP_ROWS, groupSessions, isFolded, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
@@ -87,8 +91,8 @@ export function StatusDot({ s, className }: { s: SessionSummary; className?: str
   return <span className={cx('inline-block h-2 w-2 shrink-0 rounded-full', tone, isWorking(a) && 'breathe', className)} aria-hidden />;
 }
 
-/** Rows of these groups keep the order you drag them into; the others go by date. */
-const orderable = (label: string) => label === 'Active' || label === 'Pinned';
+/** Rows of these groups keep the order you drag them into; the others go newest first. */
+const orderable = (kind: GroupKind) => kind === 'active' || kind === 'pinned';
 const PIN_ZONE = 'zone:pin';
 /** A drop ends with a click on the row under the pointer; that click is ignored. */
 let lastDragEnd = 0;
@@ -150,6 +154,8 @@ interface RowProps {
   onDelete?: (s: SessionSummary) => void;
   /** Near the top: always drawn, so the list is ready the moment it shows (the drawer opening). */
   eager?: boolean;
+  /** In a space's or a folder's group, which names the folder. */
+  place?: boolean;
 }
 
 /** Asking before a session is deleted: its transcript goes, for every app that shows it. */
@@ -169,7 +175,8 @@ const RowBody = memo(function RowBody({
   onRename,
   onDelete,
   lifted,
-}: Pick<RowProps, 's' | 'active' | 'home' | 'onDelete'> & { renaming?: boolean; onRename?: RowProps['onRename']; lifted?: boolean }) {
+  place,
+}: Pick<RowProps, 's' | 'active' | 'home' | 'onDelete' | 'place'> & { renaming?: boolean; onRename?: RowProps['onRename']; lifted?: boolean }) {
   const a = activityOf(s);
   const running = !!a;
   // A turn finished since the session was last looked at.
@@ -215,10 +222,19 @@ const RowBody = memo(function RowBody({
             <span className="min-w-0 truncate text-ok">Done · {timeAgo(s.doneAt)}</span>
           ) : running ? (
             <ActivityText s={s} className="min-w-0" />
+          ) : place ? (
+            // Its group names the folder; a worktree's branch says which copy of it.
+            s.worktree && (
+              <span className="min-w-0 truncate" translate="no">
+                {s.worktree.branch}
+              </span>
+            )
           ) : (
-            <span className="min-w-0 truncate">{folderName(s.cwd, home) || '—'}</span>
+            <span className="min-w-0 truncate" translate="no">
+              {folderName(s.cwd, home) || '—'}
+            </span>
           )}
-          {!running && <span className="shrink-0">· {timeAgo(s.updatedAt)}</span>}
+          {!running && (place && !s.worktree ? <span className="shrink-0">{timeAgo(s.updatedAt)}</span> : <span className="shrink-0">· {timeAgo(s.updatedAt)}</span>)}
           <span className="flex-1" />
           {!running && <DiffStat added={s.stats.linesAdded} removed={s.stats.linesRemoved} className="text-[11px] opacity-75" compact />}
         </span>
@@ -252,7 +268,7 @@ interface DragBits {
   lifted: boolean;
 }
 
-function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, eager, drag }: RowProps & { drag: DragBits }) {
+function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, eager, place, drag }: RowProps & { drag: DragBits }) {
   return (
     <div
       ref={drag.ref}
@@ -283,7 +299,7 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, eager
         drag.lifted && 'opacity-40',
       )}
     >
-      <RowBody s={s} active={active} home={home} renaming={renaming} onRename={onRename} onDelete={onDelete} />
+      <RowBody s={s} active={active} home={home} renaming={renaming} onRename={onRename} onDelete={onDelete} place={place} />
     </div>
   );
 }
@@ -371,10 +387,54 @@ function SearchResults({ q }: { q: string }) {
   );
 }
 
+/** A turn finished since the session was last looked at. */
+const unreadOf = (s: SessionSummary) => !!s.doneAt && s.doneAt > (s.seenAt ?? 0);
+/** Space and folder groups showing all their sessions, kept while the list redraws. */
+const shownWhole = new Set<string>();
+
+/** A space's or a folder's heading: it folds the group away; its pen starts a new session there. */
+function PlaceHead({ g, folded, home, onFold }: { g: SessionGroup; folded: boolean; home?: string; onFold: () => void }) {
+  const unread = folded && g.items.some(unreadOf);
+  return (
+    <div className="group/head sticky top-0 z-[1] flex items-center gap-0.5 bg-sidebar pt-1 pb-0.5">
+      <button
+        type="button"
+        aria-expanded={!folded}
+        title={g.space ? `The ${g.space.name} space: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : tildify(g.path, home)}
+        onClick={(e) => {
+          // On a phone a tap on a button in the list closes the drawer (it opened a session); this one stays.
+          e.stopPropagation();
+          onFold();
+        }}
+        className="flex h-7 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-left text-[12.5px] font-medium text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg max-md:h-8"
+      >
+        <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
+        <span className="min-w-0 truncate" translate="no">
+          {g.label}
+        </span>
+        {folded && <span className="tnum -ml-1 shrink-0 text-[11.5px] font-normal text-fg-3">{g.items.length}</span>}
+        {unread && <span className="-ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
+        <ChevronRight size={12} className={cx('-ml-1 shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
+      </button>
+      <IconButton
+        size="sm"
+        label={`New session in ${g.label}`}
+        onClick={() => (g.space ? startInSpace(g.space) : newSessionIn(g.path!))}
+        // On hover with a mouse; always on touch screens.
+        className="opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100"
+      >
+        <SquarePen size={13} />
+      </IconButton>
+    </div>
+  );
+}
+
 /**
- * Sessions grouped Active, Pinned, then by day; a search query shows matching sessions instead.
- * Active and Pinned keep the order you drag them into; a dated session dropped on Pinned is pinned
- * there. Double-click a title (or F2, or right-click → Rename) to rename it.
+ * Sessions grouped Active, Pinned, then by space and by folder (./groups.ts), the rest by day; a search
+ * query shows matching sessions instead. Active and Pinned keep the order you drag them into; a session
+ * from the other groups dropped on Pinned is pinned there. A space's or a folder's group shows its newest
+ * few until asked for more, and folds away from its heading. Double-click a title (or F2, or right-click →
+ * Rename) to rename it.
  */
 export function SessionList({ query }: { query: string }) {
   const { byKey, order, loaded } = useSessions();
@@ -396,44 +456,48 @@ export function SessionList({ query }: { query: string }) {
   // Child sessions sit under their parent (folded), when it is listed too.
   const shown = (s: SessionSummary) => (filter === 'all' || s.agent === filter) && (!spaceFilter || s.extra?.space === spaceFilter);
   const nest = useMemo(() => nestChildren(byKey, (s) => !s.archived && shown(s)), [byKey, filter, spaceFilter]);
+  // Spaces and the folders you picked have groups of their own; how you fold them is kept for this machine.
+  const byFolder = useUI((s) => s.groupByFolder);
+  const folds = useUI((s) => s.groupFolds);
+  const spaces = useSpaces();
+  const defaultCwd = useApp((s) => s.boot?.defaultCwd);
+  const autoFolders = useApp((s) => s.boot?.autoFolders);
+  const unpicked = useMemo(() => unpickedFolders(home, defaultCwd, autoFolders), [home, defaultCwd, autoFolders]);
+  const [, redraw] = useState(0);
 
   const groups = useMemo(() => {
-    const out: { label: string; items: SessionSummary[]; keys: string[] }[] = [];
-    const now = new Date();
-    for (const key of order) {
-      const s = byKey[key];
-      if (!s || s.archived) continue;
-      if (!shown(s)) continue;
-      if (nest.under.has(key)) continue;
-      // Snoozed ones wait at the bottom until their time (or until they need you).
-      const label = s.snoozedUntil && s.snoozedUntil > now.getTime() ? 'Snoozed' : activityOf(s) ? 'Active' : s.pinned ? 'Pinned' : dayGroup(s.updatedAt, now);
-      let g = out.find((x) => x.label === label);
-      if (!g) out.push((g = { label, items: [], keys: [] }));
-      g.items.push(s);
-    }
-    const rank = (l: string) => (l === 'Active' ? 0 : l === 'Pinned' ? 1 : l === 'Snoozed' ? 3 : 2);
-    const snz = out.find((g) => g.label === 'Snoozed');
+    const listed = order.map((k) => byKey[k]).filter((s): s is SessionSummary => !!s && !s.archived && shown(s) && !nest.under.has(s.key));
+    // The list showing one space: its sessions go by day.
+    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked });
+    const snz = out.find((g) => g.kind === 'snoozed');
     if (snz) snz.items.sort((a, b) => (a.snoozedUntil ?? 0) - (b.snoozedUntil ?? 0));
-    const act = out.find((g) => g.label === 'Active');
+    const act = out.find((g) => g.kind === 'active');
     pruneActive(new Set(act?.items.map((s) => s.key) ?? []));
     if (act) act.items = byManualOrder(act.items, sortActive);
-    const pin = out.find((g) => g.label === 'Pinned');
+    const pin = out.find((g) => g.kind === 'pinned');
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
     for (const g of out) g.keys = g.items.map((s) => s.key);
-    return out.sort((a, b) => rank(a.label) - rank(b.label));
-  }, [byKey, order, filter, spaceFilter, nest]);
+    return out;
+  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked]);
 
   const groupOf = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const g of groups) for (const s of g.items) m.set(s.key, orderable(g.label) ? g.label : 'dated');
+    const m = new Map<string, 'active' | 'pinned' | 'dated'>();
+    for (const g of groups) for (const s of g.items) m.set(s.key, g.kind === 'active' || g.kind === 'pinned' ? g.kind : 'dated');
     return m;
   }, [groups]);
-  const keysOf = (label: string) => groups.find((g) => g.label === label)?.keys ?? [];
+  const keysOf = (kind: 'active' | 'pinned') => groups.find((g) => g.kind === kind)?.keys ?? [];
+  /** Folds a group or opens it; the 200 changed last are kept. */
+  const fold = (g: SessionGroup) => {
+    const all = useUI.getState().groupFolds;
+    const shut = isFolded(g, all, Date.now());
+    const { [g.id]: _, ...rest } = all;
+    useUI.getState().set({ groupFolds: { ...Object.fromEntries(Object.entries(rest).slice(-199)), [g.id]: !shut } });
+  };
 
   // Active or Pinned: the nearest row of the same group. A dated row: only a Pinned row or the pin zone right under the pointer.
   const collision: CollisionDetection = (args) => {
     const from = groupOf.get(String(args.active.id));
-    if (from === 'dated') return pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id === PIN_ZONE || groupOf.get(String(c.id)) === 'Pinned') });
+    if (from === 'dated') return pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id === PIN_ZONE || groupOf.get(String(c.id)) === 'pinned') });
     return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => groupOf.get(String(c.id)) === from) });
   };
 
@@ -454,14 +518,14 @@ export function SessionList({ query }: { query: string }) {
     if (!over) return;
     const key = String(active.id);
     const from = groupOf.get(key);
-    const to = over.id === PIN_ZONE ? 'Pinned' : groupOf.get(String(over.id));
-    if (from && from === to && orderable(from)) {
+    const to = over.id === PIN_ZONE ? 'pinned' : groupOf.get(String(over.id));
+    if (from && from === to && from !== 'dated') {
       const keys = keysOf(from);
       const a = keys.indexOf(key);
       const b = keys.indexOf(String(over.id));
       if (a >= 0 && b >= 0 && a !== b) saveOrder(arrayMove(keys, a, b));
-    } else if (from === 'dated' && to === 'Pinned') {
-      const keys = keysOf('Pinned');
+    } else if (from === 'dated' && to === 'pinned') {
+      const keys = keysOf('pinned');
       let at = 0;
       if (over.id !== PIN_ZONE) {
         at = Math.max(0, keys.indexOf(String(over.id)));
@@ -514,7 +578,16 @@ export function SessionList({ query }: { query: string }) {
   const dragging = dragKey ? byKey[dragKey] : null;
   const datedDrag = !!dragKey && groupOf.get(dragKey) === 'dated';
   // No Pinned group yet: dragging a dated session shows where to drop it to pin it.
-  const zoneAt = datedDrag && !groups.some((g) => g.label === 'Pinned') ? (groups[0]?.label === 'Active' ? 1 : 0) : -1;
+  const zoneAt = datedDrag && !groups.some((g) => g.kind === 'pinned') ? (groups[0]?.kind === 'active' ? 1 : 0) : -1;
+  // What each group shows: a space's or a folder's newest few (all once asked, none while folded), and the session open.
+  const now = Date.now();
+  const shut = new Set(groups.filter((g) => (g.kind === 'space' || g.kind === 'folder') && isFolded(g, folds, now)).map((g) => g.id));
+  const shownRows = groups.map((g) => {
+    if (g.kind !== 'space' && g.kind !== 'folder') return g.items;
+    const rows = shut.has(g.id) ? [] : shownWhole.has(g.id) ? g.items : g.items.slice(0, GROUP_ROWS);
+    const open = activeKey ? g.items.find((s) => s.key === activeKey) : undefined;
+    return open && !rows.includes(open) ? [...rows, open] : rows;
+  });
   return (
     <DndContext
       sensors={sensors}
@@ -523,7 +596,7 @@ export function SessionList({ query }: { query: string }) {
         setDragKey(String(active.id));
         setMenu(null);
       }}
-      onDragOver={({ over }) => setOverGroup(!over ? null : over.id === PIN_ZONE ? 'Pinned' : (groupOf.get(String(over.id)) ?? null))}
+      onDragOver={({ over }) => setOverGroup(!over ? null : over.id === PIN_ZONE ? 'pinned' : (groupOf.get(String(over.id)) ?? null))}
       onDragEnd={onDragEnd}
       onDragCancel={() => {
         setDragKey(null);
@@ -534,10 +607,12 @@ export function SessionList({ query }: { query: string }) {
       {/* Touches that land on the list may pick a row up (lib/dragTouch). */}
       <div ref={touchDragArea}>
         {groups.map((g, i) => {
-          const sortable = orderable(g.label);
-          const before = groups.slice(0, i).reduce((n, x) => n + x.items.length, 0);
-          const rows = g.items.map((s, k) => {
-            const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined, eager: before + k < 30 };
+          const sortable = orderable(g.kind);
+          const place = g.kind === 'space' || g.kind === 'folder';
+          const visible = shownRows[i];
+          const before = shownRows.slice(0, i).reduce((n, x) => n + x.length, 0);
+          const rows = visible.map((s, k) => {
+            const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined, eager: before + k < 30, place };
             const row = sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
             const kids = nest.byParent.get(s.key);
             if (!kids) return row;
@@ -548,11 +623,19 @@ export function SessionList({ query }: { query: string }) {
               </Fragment>
             );
           });
+          const shutNow = place && shut.has(g.id);
+          // Rows left out, or all of them shown since asked: a line to show them, or fewer again.
+          const more = g.items.length - visible.length;
+          const whole = shownWhole.has(g.id);
           return (
-            <Fragment key={g.label}>
-              {i === zoneAt && <PinZone hot={overGroup === 'Pinned'} />}
-              <div className={cx('px-2 pb-3 transition-colors', datedDrag && g.label === 'Pinned' && overGroup === 'Pinned' && 'rounded-xl bg-accent/[0.06]')}>
-                <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
+            <Fragment key={g.id}>
+              {i === zoneAt && <PinZone hot={overGroup === 'pinned'} />}
+              <div className={cx('px-2 transition-colors', shutNow && !visible.length ? 'pb-1' : 'pb-3', datedDrag && g.kind === 'pinned' && overGroup === 'pinned' && 'rounded-xl bg-accent/[0.06]')}>
+                {place ? (
+                  <PlaceHead g={g} folded={shutNow} home={home} onFold={() => fold(g)} />
+                ) : (
+                  <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
+                )}
                 {sortable ? (
                   <SortableContext items={g.keys} strategy={verticalListSortingStrategy}>
                     {rows}
@@ -560,11 +643,24 @@ export function SessionList({ query }: { query: string }) {
                 ) : (
                   rows
                 )}
+                {place && !shutNow && (whole ? g.items.length > GROUP_ROWS : more > 0) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!shownWhole.delete(g.id)) shownWhole.add(g.id);
+                      redraw((n) => n + 1);
+                    }}
+                    className="flex h-7 w-full items-center rounded-lg pl-[35px] text-left text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2 max-md:h-8"
+                  >
+                    {whole ? 'Show fewer' : `Show ${more} more`}
+                  </button>
+                )}
               </div>
             </Fragment>
           );
         })}
-        {zoneAt === groups.length && <PinZone hot={overGroup === 'Pinned'} />}
+        {zoneAt === groups.length && <PinZone hot={overGroup === 'pinned'} />}
       </div>
       {confirmNode}
       {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : null}</DragOverlay>, document.body)}

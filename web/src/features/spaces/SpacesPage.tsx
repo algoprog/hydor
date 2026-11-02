@@ -15,22 +15,15 @@ import { Button, cx, Empty, inputCls, Switch, Tabs, Throbber, useConfirm, useMed
 import { api, del, enc, patch, post } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
-import { saveStart } from '../../lib/start';
 import { toastError, useApp, useSessions } from '../../lib/store';
 import type { PickedFile } from '../../lib/upload';
 import { PageHeader } from '../layout/PageHeader';
 import { useAssistantsState } from '../assistants/state';
 import { addFiles, BaseCard, DropFiles, MeaningHint, TrySearch, useKnowledge } from '../knowledge/parts';
-import { MemberPicker, memberNames, NewSpaceDialog, SpaceMark, SpacesTabs } from './parts';
+import { MemberPicker, memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace } from './parts';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { loadSpaces, useSpaces } from './state';
-
-/** The start page, with this space picked: its folder, its assistant. */
-function startIn(s: Space) {
-  saveStart({ space: s.id, cwd: s.folder, task: false, ...(s.assistant ? { assistant: s.assistant } : {}) }, true);
-  go('/');
-}
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -403,7 +396,7 @@ function Detail({ id, tab }: { id: string; tab: Tab }) {
             <Button size="sm" variant="ghost" icon={<ArrowLeft size={14} />} onClick={() => go('/spaces')}>
               <span className="max-sm:hidden">All spaces</span>
             </Button>
-            <Button size="sm" icon={<SquarePen size={14} />} onClick={() => startIn(s)}>
+            <Button size="sm" icon={<SquarePen size={14} />} onClick={() => startInSpace(s)}>
               New session
             </Button>
           </>

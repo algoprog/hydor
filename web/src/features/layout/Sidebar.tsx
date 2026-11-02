@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { Activity, Boxes, CircleHelp, FolderTree, Gauge, GitBranch, Inbox, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
+import { Activity, Boxes, CircleHelp, Folders, FolderTree, Gauge, GitBranch, Inbox, ListFilter, MonitorSmartphone, PanelLeftClose, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
 import { activityOf } from '../../lib/activity';
 import { useMachines } from '../../lib/machines';
 import { MOD, pct } from '../../lib/format';
@@ -93,6 +93,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const [q, setQ] = useState('');
   const filter = useUI((s) => s.agentFilter);
   const spaceFilter = useUI((s) => s.spaceFilter);
+  const byFolder = useUI((s) => s.groupByFolder);
   const spaces = useSpaces();
   // A space deleted while the list showed only its sessions: all of them again.
   useEffect(() => {
@@ -171,11 +172,11 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
                 </button>
               )
             )}
-            <IconButton ref={filterRef} label={spaces?.length ? 'Filter by agent or space' : 'Filter by agent'} size="sm" active={filter !== 'all' || !!spaceFilter} onClick={() => setFilterOpen((o) => !o)}>
+            <IconButton ref={filterRef} label="Filter and group sessions" size="sm" active={filter !== 'all' || !!spaceFilter} onClick={() => setFilterOpen((o) => !o)}>
               <ListFilter size={14} className={cx((filter !== 'all' || spaceFilter) && 'text-accent')} />
             </IconButton>
           </span>
-          <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={200}>
+          <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={272}>
             {(
               [
                 ['all', 'All agents', null],
@@ -217,6 +218,10 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
                 </MenuItem>
               </>
             )}
+            <MenuSep />
+            <MenuItem icon={<Folders size={14} />} checked={byFolder} onClick={() => (useUI.getState().set({ groupByFolder: !byFolder }), setFilterOpen(false))}>
+              Group by folder or space
+            </MenuItem>
           </Popover>
         </div>
       </div>
