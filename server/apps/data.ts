@@ -351,6 +351,36 @@ export function collectionsOf(db: DB, app: string, data: Record<string, DataColl
   return Object.entries(data ?? {}).map(([name, c]) => ({ name, count: countRecords(db, app, name), fields: c.fields ?? null, description: c.description ?? null }));
 }
 
+/** One thing done with an app's records, as an agent's app_data asks it (`ops`: what it may do), its answer as text. */
+export async function dataOp(db: DB, app: string, kept: Record<string, DataCollection> | undefined, a: Record<string, unknown>, ops: string[], changed: (collection: string) => void): Promise<string | { text: string; isError: true }> {
+  const coll = String(a.collection ?? '');
+  const q: DataQuery = { id: typeof a.id === 'string' && a.id ? a.id : undefined, where: a.where && typeof a.where === 'object' ? (a.where as Record<string, unknown>) : undefined, search: typeof a.search === 'string' ? a.search : undefined, sort: typeof a.sort === 'string' ? a.sort : undefined, limit: Number(a.limit) || undefined };
+  if (!ops.includes(String(a.op))) return { text: `op is ${ops.join(', ')}`, isError: true };
+  try {
+    let out: unknown;
+    if (a.op === 'search') out = await searchRecords(db, app, kept, coll, String(a.query ?? ''), { limit: Number(a.limit) || 10 });
+    else if (a.op === 'find' || a.op === 'get') {
+      const found = findRecords(db, app, kept, coll, q);
+      out = a.op === 'get' ? (found.records[0] ?? null) : found;
+    } else if (a.op === 'add') {
+      out = { record: addRecord(db, app, kept, coll, a.record && typeof a.record === 'object' ? (a.record as Record<string, unknown>) : {}) };
+      changed(coll);
+    } else if (a.op === 'update') {
+      const records = updateRecords(db, app, kept, coll, q, a.set && typeof a.set === 'object' ? (a.set as Record<string, unknown>) : {});
+      if (records.length) changed(coll);
+      out = { changed: records.length, records };
+    } else {
+      const removed = removeRecords(db, app, kept, coll, q);
+      if (removed) changed(coll);
+      out = { removed };
+    }
+    const text = JSON.stringify(out);
+    return text.length > 60_000 ? `${text.slice(0, 60_000)}… (cut: ask for fewer with limit, or search)` : text;
+  } catch (e) {
+    return { text: (e as Error).message, isError: true };
+  }
+}
+
 /** Forgets what an app keeps (one collection, or all of it). */
 export function clearData(db: DB, app: string, collection?: string): number {
   ensureDataTables(db);

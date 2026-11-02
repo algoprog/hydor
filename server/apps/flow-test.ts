@@ -808,7 +808,7 @@ test('examples: saved inputs with checks; trying them runs each as a test, and i
 test('the builder’s tools: app_save makes and changes a template (whole, a patch, one step), checked first; app_get reads it; app_try runs its examples and waits; app_screen gives it a screen', async () => {
   const ctx: RunCtx = { runId: 'builder-1', key: 'acp:builder-1', agent: 'acp', cwd: os.tmpdir(), deps };
   const tools = Object.fromEntries(apps.tools!(ctx).map((t) => [t.name, t]));
-  assert.ok(tools.app_save && tools.app_get && tools.app_try && tools.app_screen);
+  assert.ok(tools.app_save && tools.app_get && tools.app_try && tools.app_screen && tools.app_data);
   assert.ok(!tools.submit_result, 'a session that is not a run hands in nothing');
   const text = (out: unknown) => (typeof out === 'string' ? out : (out as { text: string }).text);
   const bad = (await tools.app_save.run({ recipe: { name: 'Broken', flow: { steps: [{ id: 'x', do: 'tool', tool: 'bash' }] } } }, ctx)) as { text: string; isError?: boolean };
@@ -852,6 +852,14 @@ test('the builder’s tools: app_save makes and changes a template (whole, a pat
   assert.ok(once.runs[0].result.count >= 2);
   assert.match(text(await tools.app_screen.run({ app: id }, ctx)), /the screen “main”, made from its parts/);
   assert.ok(store.getApp(db, id)!.screens?.main);
+  // Its records: its lists, what its runs kept, one added; changing or removing them is not the builder's.
+  assert.deepEqual(JSON.parse(text(await tools.app_data.run({ app: id, op: 'lists' }, ctx))).lists.map((l: any) => [l.name, l.count]), [['items', 2]]);
+  assert.deepEqual(JSON.parse(text(await tools.app_data.run({ app: id, op: 'find', collection: 'items', sort: 'title' }, ctx))).records.map((r: any) => r.title), ['alpha', 'beta']);
+  const added = JSON.parse(text(await tools.app_data.run({ app: id, op: 'add', collection: 'items', record: { title: 'gamma' } }, ctx)));
+  assert.equal(added.record.title, 'gamma');
+  assert.equal(findRecords(db, id, store.getApp(db, id)!.data, 'items').count, 3);
+  assert.match(text(await tools.app_data.run({ app: id, op: 'remove', collection: 'items', where: {} }, ctx)), /op is find, search, get, add/);
+  assert.match(text(await tools.app_data.run({ app: id, op: 'find', collection: 'nothing' }, ctx)), /keeps no list “nothing”: its lists are items/);
   // A step another one names, removed: saved, with a warning.
   const removed = text(await tools.app_save.run({ app: id, step: { id: 'count', remove: true } }, ctx));
   assert.match(removed, /To look at:[\s\S]*count/);
