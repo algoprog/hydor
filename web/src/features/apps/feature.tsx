@@ -24,6 +24,7 @@ import { GalleryPage } from './Gallery';
 import { ResultView } from './Result';
 import { RunPage } from './RunPage';
 import { AppSessionPane, runOfSession } from './SessionPane';
+import { AppSide, BUILDER_VIEWS, closeAppSide, useAppSideOpen } from './Beside';
 
 function AppsRoutes() {
   const [loc] = useLocation();
@@ -73,7 +74,9 @@ export const appsFeature: WebFeature = {
   id: 'apps',
   routes: [{ match: (p) => p === '/apps' || p.startsWith('/apps/'), Page: AppsRoutes }],
   nav: [{ path: '/apps', label: 'Templates', icon: <LayoutGrid size={17} />, match: (p) => p === '/apps' || p.startsWith('/apps/') }],
-  toolViews: { submit_result: { place: 'answer', Row: SubmitRow } },
+  toolViews: { submit_result: { place: 'answer', Row: SubmitRow }, ...BUILDER_VIEWS },
+  // A template an agent builds, beside its conversation while it is new.
+  sessionSide: { useOpen: useAppSideOpen, close: closeAppSide, Panel: AppSide },
   sessionPane: { label: 'Result', icon: <ClipboardCheck size={13} />, match: (s) => !!runOfSession(s), placeholder: 'Ask for a change to the result…', Body: AppSessionPane },
   SessionMenu: ({ s, close }) => (
     <MenuItem

@@ -15,6 +15,8 @@ import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { builderTools } from './builder.ts';
+import { initAppEdits, noteUserEdit, takeAppEdits } from './edits.ts';
+import { isInternal } from '../internal.ts';
 import { checkRun, tryExamples } from './examples.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
@@ -35,7 +37,7 @@ import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
 import { publicRoutes } from './public.ts';
 import { PUBLIC_RUN_ENV } from './publicRun.ts';
-import { finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
+import { appChanged, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -151,6 +153,7 @@ function routes(d: Deps) {
   const { app, db, sessions } = d;
   ensureTables(db);
   ensureDataTables(db);
+  initAppEdits(db);
   // Records kept before search by meaning was on (or while it was off) get their vectors when it answers.
   embedSoon(db, 20_000);
   setDeps(d);
@@ -255,7 +258,11 @@ function routes(d: Deps) {
     const prev = getApp(db, P(req).id);
     if (!prev) throw new HttpError(404, 'No such template');
     const { warnings, ...b } = saveInput(db, req.body, prev);
-    return { app: prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: prev.screens }, id: prev.id })), warnings };
+    const saved = prepare(saveApp(db, { ...b, recipe: { ...b.recipe, screens: prev.screens }, id: prev.id }));
+    // A change made in its editor (not an agent's, through the API): the agents that built it hear of it.
+    if (!isInternal(req)) noteUserEdit(db, saved.id, saved.name, cleanRecipe(prev), cleanRecipe(saved));
+    appChanged(saved, isInternal(req) ? 'agent' : 'user');
+    return { app: saved, warnings };
   });
 
   /** What a template needs on this computer: how its packages stand, and the commands that are missing. */
@@ -784,6 +791,8 @@ export const apps: Feature = {
     const line = own.slug ? envLine(own, own.slug) : null;
     return { instructions: [[runInstructions({ ...hit.run, ...own }), line].filter(Boolean).join('\n')], ...(env ? { env } : {}) };
   },
+  // Templates the user changed in their editor, for the agents that built them, with the next message.
+  beforeMessage: (key, d) => takeAppEdits(d.db, key),
   start(d) {
     startRuns(d);
     startBatches(d.db, (id) => getApp(d.db, id)?.slug);

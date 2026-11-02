@@ -431,7 +431,8 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
 }
 
 /** The panel's left edge: drag it to make the panel wider or narrower. */
-function Grip() {
+/** The panel's left edge, dragged to resize it (pages and templates beside a conversation share its width). */
+export function Grip() {
   const start = (e: React.PointerEvent) => {
     const box = (e.currentTarget.parentElement?.parentElement as HTMLElement | null)?.getBoundingClientRect();
     if (!box) return;

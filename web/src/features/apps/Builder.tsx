@@ -11,6 +11,7 @@ import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, Run
 import type { Flow } from '@shared/app-manifest';
 import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders } from '@shared/apps';
 import { api, enc, post, put } from '../../lib/api';
+import { useFeatureEvent } from '../../lib/featureEvents';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
@@ -358,9 +359,20 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
   );
 }
 
-export function BuilderPage({ id, template, from }: { id?: string; template?: string; from?: string }) {
+/** `embedded`: beside a session's conversation, where an agent builds it: no way back, and a save stays here. */
+export function BuilderPage({ id, template, from, embedded }: { id?: string; template?: string; from?: string; embedded?: boolean }) {
   const [recipe, setRecipe] = useState<AppRecipe | null>(id || template || from ? null : BLANK);
   const [saved, setSaved] = useState<AppDef | null>(null);
+  // The version on screen as it was loaded or saved here: what differs from it is not saved yet.
+  const loaded = useRef('');
+  const [newer, setNewer] = useState<AppDef | null>(null);
+  const load = (a: AppDef) => {
+    const r = recipeOf(a);
+    loaded.current = JSON.stringify(r);
+    setSaved(a);
+    setRecipe(r);
+    setNewer(null);
+  };
   const [note, setNote] = useState('');
   const [auto, setAuto] = useState<Set<string>>(new Set());
   const [tools, setTools] = useState<{ name: string; description: string }[] | null>(null);
@@ -373,7 +385,7 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
 
   useEffect(() => {
     if (id)
-      api<{ app: AppDef }>(`/api/apps/${enc(id)}`).then((r) => (setSaved(r.app), setRecipe(recipeOf(r.app))), (e) => (toastError(e), go('/apps')));
+      api<{ app: AppDef }>(`/api/apps/${enc(id)}`).then((r) => load(r.app), (e) => (toastError(e), embedded || go('/apps')));
     else if (template) api<{ template: AppTemplate }>(`/api/apps/tpl:${enc(template)}`).then((r) => setRecipe(recipeOf(r.template)), (e) => (toastError(e), setRecipe(BLANK)));
     else if (from)
       post<{ recipe: AppRecipe; note?: string }>('/api/apps/draft', { key: from }).then(
@@ -392,6 +404,16 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
   }, [id, template, from]);
 
   const set = (p: Partial<AppRecipe>) => setRecipe((r) => (r ? { ...r, ...p } : r));
+  // Another save (an agent's, or this template open elsewhere): taken at once, or offered while there are changes here.
+  useFeatureEvent('apps', ({ data }) => {
+    const a = (data as { app?: { id: string; updatedAt: number } } | undefined)?.app;
+    // While this page saves, the news is of its own save.
+    if (!a || !saved || busy || a.id !== saved.id || a.updatedAt <= saved.updatedAt) return;
+    api<{ app: AppDef }>(`/api/apps/${enc(a.id)}`).then((r) => {
+      if (recipe && JSON.stringify(recipe) !== loaded.current) setNewer(r.app);
+      else load(r.app);
+    }, () => {});
+  });
   const used = useMemo(() => new Set(placeholders(recipe?.prompt ?? '')), [recipe?.prompt]);
 
   if (!recipe)
@@ -455,6 +477,12 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
     try {
       const body = { recipe: { ...recipe, answer: cleanAnswer(), fields: recipe.fields.map((f) => ({ ...f, options: f.options?.map((o) => o.trim()).filter(Boolean) })) }, ...(template && !saved ? { template } : {}) };
       const r = saved ? await put<{ app: AppDef }>(`/api/apps/${enc(saved.id)}`, body) : await post<{ app: AppDef }>('/api/apps', body);
+      // Beside the conversation: it stays, and the agent that builds it hears of the change.
+      if (embedded && saved) {
+        load(r.app);
+        toast('Saved: the agent hears of your changes with your next message', 'ok');
+        return;
+      }
       toast(saved ? 'Saved' : `${r.app.name} is ready`);
       go(appPath(r.app.id));
     } catch (e) {
@@ -475,9 +503,11 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
       <PageHeader
         title={
           <span className="flex min-w-0 items-center gap-2.5">
-            <IconButton label="Back" size="sm" onClick={() => go(back)} className="-ml-1">
-              <ArrowLeft size={17} />
-            </IconButton>
+            {!embedded && (
+              <IconButton label="Back" size="sm" onClick={() => go(back)} className="-ml-1">
+                <ArrowLeft size={17} />
+              </IconButton>
+            )}
             <span className="truncate">{saved ? `Edit ${saved.name}` : 'New template'}</span>
           </span>
         }
@@ -495,6 +525,17 @@ export function BuilderPage({ id, template, from }: { id?: string; template?: st
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[820px] space-y-4 px-4 py-6 pb-24 sm:px-6">
           {note && <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">{note}</div>}
+          {newer && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">
+              <span className="min-w-0 flex-1">A newer version was saved (by the agent, or elsewhere) while you changed it here.</span>
+              <Button size="sm" variant="secondary" onClick={() => load(newer)}>
+                Load it
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => (setSaved(newer), setNewer(null))}>
+                Keep mine
+              </Button>
+            </div>
+          )}
           {!saved && !template && !from && (
             <div className="-mt-1 flex flex-wrap items-end gap-x-4 gap-y-2">
               <Describe />

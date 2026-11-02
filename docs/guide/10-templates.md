@@ -330,6 +330,8 @@ You make a template with steps in its **Edit**, or by asking an agent. In **Edit
 
 Or ask an agent: "Make a template that reads each link I give it, sums it up with a quick model, and keeps it in a reading list." The agent writes the steps, checks them and tries them, and you can change them in **Edit** after. Agents have tools of their own for this, in any session: they read your templates, save one (checked first, its mistakes said in words; a whole template, a few parts of it, or one step), try its examples and wait for how they went, and give it a screen; before handing a template over, they say what a run costs.
 
+In the conversation, each template the agent saves shows as a card, and on a wide screen the template opens beside the conversation as it is built (**Open beside** on the card opens it again, **Open its page** its own page). What you change and save there reaches the agent with your next message, so it builds on your version: an agent that saves after you changed it reads your version first. When the agent saves while you have changes of your own on screen, a note offers **Load it** or **Keep mine**.
+
 The kinds of steps:
 
 - **Ask an agent**: a session works on its part with its tools and hands in what it found. Each has a session of its own, which you can open from the run's page.
