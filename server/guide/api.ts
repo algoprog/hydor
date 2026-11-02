@@ -84,9 +84,9 @@ function refusedBody(method: string, path: string, body: Json, own: string): str
 
 // ---- the session's permissions -------------------------------------------------------------------
 
-type Mode = 'read-only' | 'full' | 'custom-full' | 'normal';
+export type Mode = 'read-only' | 'full' | 'custom-full' | 'normal';
 
-function modeOf(ctx: RunCtx): Mode {
+export function modeOf(ctx: RunCtx): Mode {
   const m = ctx.deps.sessions.adapterByRun(ctx.runId)?.state.mode;
   const custom = ctx.agent === 'acp' && ctx.acpAgent === CONSOLE_ID;
   if (m === 'plan' || (ctx.agent === 'codex' && m === 'read-only')) return 'read-only';

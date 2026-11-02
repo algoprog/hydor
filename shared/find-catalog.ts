@@ -166,7 +166,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['images', 'Image model', 'image model flux openrouter', 'The model that makes them'],
   // Capabilities › Connections
   ['connections', 'Marketplace', 'connections apps marketplace notion linear github google', 'Apps every agent can use, to connect once', 'Connections marketplace'],
-  ['connections', 'Add a key', 'api key secret vault token', 'A key agents can use without seeing it', 'Add a key to the vault'],
+  ['connections', 'Add a key', 'api key secret vault token password sign-in login credentials', 'A key agents can use without seeing it', 'Add a key to the vault'],
   // Capabilities › Voice
   ['voice', 'Dictation', 'speech to text dictate microphone voice input', 'Speak a message instead of typing it'],
   ['voice', 'Language you speak', 'language dictation', 'The language dictation listens for'],

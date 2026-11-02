@@ -32,8 +32,9 @@ import { catalog, catalogApp } from './catalog.ts';
 import { connectPlain, finishOAuth, flowResult, startOAuth, testConnection } from './connect.ts';
 import { revoke } from './oauth.ts';
 import { launchSocket, relayRoutes, startLaunchSocket, sweepLinks } from './relay.ts';
-import { onRequestChange, sessionTools } from './tools.ts';
-import { deleteSecret, getRequest, latestRequest, pendingRequests, listSecrets, redact, saveSecret, secretView, settleRequests, useMaskDb, vaultTables } from './vault.ts';
+import { listNames } from './run.ts';
+import { howToUse, onRequestChange, sessionTools } from './tools.ts';
+import { deleteSecret, getRequest, latestRequest, pendingRequests, listSecrets, redact, saveSecret, secretView, setRequestDomains, settleRequests, useMaskDb, vaultTables } from './vault.ts';
 
 const BRIDGE = path.join(APP_ROOT, 'dist/server/connbridge.js');
 const base = () => `http://127.0.0.1:${config.port}/connections`;
@@ -61,7 +62,7 @@ function instructions(apps: Conn[]): string {
       `Connected apps (the user's own accounts, set up in Settings → Connections), each an MCP server of that name: ${apps.map((c) => `${c.id} (${c.entry.name})`).join(', ')}. Use them when a task involves those apps.`,
     );
   lines.push(
-    'Keys: never ask the user to type a password, token or API key into the chat. When a task needs one that is not saved, call request_secret (name, why, domains): the user enters it in a card, and a message tells you when it is saved. Call APIs with a saved key through http_request (auth: NAME); list_connections shows what is connected and saved. You never see the values.',
+    'Keys and sign-ins: never ask the user to type a password, token, API key or other secret into the chat, and never print one you come across. When a task needs one, use what is set up already (list_connections shows the vault and the connected apps; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).',
   );
   return lines.join('\n');
 }
@@ -197,7 +198,16 @@ function routes(d: Deps) {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const name = secretName(String(b.name ?? ''));
     if (secretView(db, name)) throw new HttpError(409, `There is a key named ${name} already: rotate it instead`);
-    const s = saveSecret(db, { name, value: String(b.value ?? ''), domains: b.domains, note: String(b.note ?? ''), header: (b.header as string) ?? null, prefix: (b.prefix as string) ?? null, query: (b.query as string) ?? null });
+    const s = saveSecret(db, {
+      name,
+      value: String(b.value ?? ''),
+      domains: b.domains,
+      commands: b.commands === true,
+      note: String(b.note ?? ''),
+      header: (b.header as string) ?? null,
+      prefix: (b.prefix as string) ?? null,
+      query: (b.query as string) ?? null,
+    });
     changed('secrets');
     return { secret: s };
   });
@@ -209,6 +219,7 @@ function routes(d: Deps) {
       name,
       value: typeof b.value === 'string' && b.value ? b.value : undefined,
       domains: b.domains,
+      commands: typeof b.commands === 'boolean' ? b.commands : undefined,
       note: b.note === undefined ? undefined : String(b.note),
       header: b.header === undefined ? undefined : (b.header as string | null),
       prefix: b.prefix === undefined ? undefined : (b.prefix as string | null),
@@ -232,16 +243,53 @@ function routes(d: Deps) {
   app.post('/api/connections/requests/:id', async (req) => {
     const r = getRequest(db, (req.params as { id: string }).id);
     if (!r) throw new HttpError(404, 'That request is gone');
-    const b = (req.body ?? {}) as { value?: string; domains?: unknown };
+    const b = (req.body ?? {}) as { value?: string; values?: Record<string, unknown>; domains?: unknown; commands?: unknown };
     const domains = cleanDomains(b.domains ?? r.domains);
-    const s = saveSecret(db, { name: r.name, value: String(b.value ?? ''), domains, note: secretView(db, r.name)?.note || r.why.slice(0, 300) });
+    const commands = typeof b.commands === 'boolean' ? b.commands : undefined;
+    const saved: string[] = [];
+    let details: [string, string][] = [];
+    if (r.fields?.length) {
+      // A sign-in: every field is checked before anything is saved, then its keys are saved together.
+      const values = b.values && typeof b.values === 'object' ? b.values : {};
+      const got = (k: string) => String(values[k] ?? '').trim();
+      for (const f of r.fields) {
+        const v = got(f.key);
+        if (!v && !f.optional && !(f.secret && r.have?.[f.key])) throw new HttpError(400, `Fill in ${f.label}`);
+        if (!f.secret && v.length > 1000) throw new HttpError(400, `${f.label} is too long`);
+      }
+      const secrets = r.fields.filter((f) => f.secret);
+      if (!secrets.some((f) => got(f.key) || r.have?.[f.key])) throw new HttpError(400, `Fill in ${(secrets[0] ?? r.fields[0]).label}`);
+      details = r.fields.filter((f) => !f.secret && got(f.key)).map((f) => [f.label, got(f.key).replace(/\s+/g, ' ')]);
+      const told = details.length ? ` (${details.map(([l, v]) => `${l}: ${v}`).join(', ')})` : '';
+      db.transaction(() => {
+        for (const f of secrets) {
+          const old = secretView(db, f.key);
+          if (!got(f.key) && !old) continue;
+          saveSecret(db, { name: f.key, value: got(f.key) || undefined, domains, commands, note: old?.note || `${f.label}: ${r.why}${told}`.slice(0, 300) });
+          saved.push(f.key);
+        }
+      })();
+    } else {
+      const value = String(b.value ?? '').trim();
+      saveSecret(db, { name: r.name, value: value || undefined, domains, commands, note: secretView(db, r.name)?.note || r.why.slice(0, 300) });
+      saved.push(r.name);
+    }
     settleRequests(db, r.key, r.name, 'saved');
+    setRequestDomains(db, r.id, domains);
     changed('secrets');
     d.toSubscribers(r.key, { t: 'feature', id: 'connections', key: r.key, data: { changed: 'request' } });
-    // The agent hears that it is there (never what it is).
-    await d.sessions
-      .deliverOrQueue(r.key, `${r.name} is saved in the vault now${s.domains.length ? `, for ${s.domains.join(', ')}` : ''}. Use it with http_request (auth: "${r.name}"); you never see its value.`)
-      .catch((e) => console.warn(`[connections] could not tell ${r.key} that ${r.name} was saved: ${(e as Error).message}`));
+    // The agent hears that they are there and how to use them (never what they are), and gets the details
+    // that are not secret as typed.
+    const inCommands = saved.some((n) => secretView(db, n)?.commands);
+    const at = [domains.length ? `for ${domains.join(', ')}` : '', inCommands ? 'for commands on this computer' : ''].filter(Boolean).join(' and ');
+    const text = [
+      `${listNames(saved)} ${saved.length > 1 ? 'are' : 'is'} saved in the vault now${at ? `, ${at}` : ''}.`,
+      details.length ? `The details that are not secret: ${details.map(([l, v]) => `${l}: ${v}`).join('; ')}.` : '',
+      howToUse(saved, domains.length > 0, inCommands),
+    ]
+      .filter(Boolean)
+      .join(' ');
+    await d.sessions.deliverOrQueue(r.key, text).catch((e) => console.warn(`[connections] could not tell ${r.key} that ${r.name} was saved: ${(e as Error).message}`));
     return { request: getRequest(db, r.id) };
   });
   app.post('/api/connections/requests/:id/dismiss', async (req) => {
@@ -249,7 +297,8 @@ function routes(d: Deps) {
     if (!r) throw new HttpError(404, 'That request is gone');
     settleRequests(db, r.key, r.name, 'dismissed');
     d.toSubscribers(r.key, { t: 'feature', id: 'connections', key: r.key, data: { changed: 'request' } });
-    await d.sessions.deliverOrQueue(r.key, `I'd rather not give ${r.name} now. Carry on without it, or tell me what else would work.`).catch(() => {});
+    const what = r.fields?.length ? listNames(r.fields.filter((f) => f.secret).map((f) => f.key)) : r.name;
+    await d.sessions.deliverOrQueue(r.key, `I'd rather not give ${what} now. Carry on without it, or tell me what else would work.`).catch(() => {});
     return { request: getRequest(db, r.id) };
   });
 
@@ -278,7 +327,8 @@ export const connections: Feature = {
   inbox: (d) =>
     pendingRequests(d.db).flatMap((r) => {
       const s = d.sessions.summary(r.key);
-      return s ? [{ id: `key:${r.id}`, kind: 'key' as const, title: `Asks for a key: ${r.name}`, detail: r.why, key: r.key, session: s.title, agent: s.agent, at: r.createdAt, path: `/s/${encodeURIComponent(r.key)}` }] : [];
+      const title = r.fields?.length ? `Asks for a sign-in: ${r.name}` : `Asks for a key: ${r.name}`;
+      return s ? [{ id: `key:${r.id}`, kind: 'key' as const, title, detail: r.why, key: r.key, session: s.title, agent: s.agent, at: r.createdAt, path: `/s/${encodeURIComponent(r.key)}` }] : [];
     }),
   start(d) {
     // Sign-ins renew before they end, even for apps no session is using; quiet SSE links close.

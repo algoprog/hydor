@@ -1,6 +1,6 @@
 # Connections, keys and tools
 
-Connect the apps and services you use (Notion, Gmail, GitHub, Stripe, a folder on this computer…) once, and every agent can work with them. Keep API keys in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
+Connect the apps and services you use (Notion, Gmail, GitHub, Stripe, a folder on this computer…) once, and every agent can work with them. Keep API keys and sign-ins in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
 
 ![Settings → Connections: apps to connect, by category](images/connections.webp)
 
@@ -9,7 +9,7 @@ Connect the apps and services you use (Notion, Gmail, GitHub, Stripe, a folder o
 Agents can do more when you give them tools. There are three places to do that:
 
 - **Connections** ([Settings → Connections](/settings?s=connections)): apps and services from a marketplace, connected once for every agent: Claude Code, Codex, Custom and the agents that speak ACP. Each connected app gives the agents its tools.
-- **The vault** (the **Keys** tab of the same page): API keys and tokens. An API key is a password a service gives you so that programs can use your account. Agents call services with these keys but never see them.
+- **The vault** (the **Keys** tab of the same page): API keys, tokens and the passwords of sign-ins. An API key is a password a service gives you so that programs can use your account. Agents use these to call a service, sign in to a site or run a program, but never see them.
 - **MCP servers and plugins** ([Settings → MCP servers](/settings?s=mcp) and [Settings → Plugins](/settings?s=plugins)): tool servers you set up yourself in Claude Code's and Codex's own settings, and add-ons for Claude Code.
 
 MCP (the Model Context Protocol) is the common way an app offers tools to agents. A connected app is an MCP server that Naget Agent sets up and signs in to for every agent. The MCP servers in Settings → Agents are ones you set up by hand, with a command or an address.
@@ -153,15 +153,15 @@ Anyone can add an app to the marketplace, or fix one, with a pull request to Nag
 
 ## Keep keys in the vault
 
-Open [the Keys tab](/settings?s=connections&find=Add%20a%20key). The vault holds API keys and tokens that agents use without seeing them. They are encrypted on this computer and never shown again, here or to an agent: only their last characters.
+Open [the Keys tab](/settings?s=connections&find=Add%20a%20key). The vault holds API keys, tokens and the passwords of sign-ins, which agents use without seeing them. They are encrypted on this computer and never shown again, here or to an agent: only their last characters.
 
-Agents call services with these keys through Naget Agent's own web request tool. The app adds the key to the request itself, and only for the hosts you allow.
+Agents use them through Naget Agent's own tools: its web request tool, its browser, and commands on this computer where you allow that. The app puts the key in itself, and only where you allow.
 
 Each key in the list shows:
 
 - its name and a masked hint of the value (like "…f3a9");
 - its note;
-- the hosts it may be sent to, or **No hosts allowed yet**;
+- the hosts it may be sent to, and **in commands** when commands on this computer may use it (**No hosts allowed yet** when neither);
 - when it was last used ("not used yet" until then), and when it was added or its value last changed.
 
 With no keys yet, the tab says you can add one here or let an agent ask for one.
@@ -172,9 +172,10 @@ With no keys yet, the tab says you can add one here or let an agent ask for one.
 2. **Name**: what agents call it, like WEATHER_API_KEY: capitals, digits and underscores, 2 to 64 characters, starting with a letter. What you type is turned into such a name ("github token" becomes GITHUB_TOKEN), and the field says so.
 3. **Value**: paste the key. It has to be one line, unless it is a block that starts with -----BEGIN (a certificate or private key).
 4. **Hosts it may be sent to**: the service's addresses, separated by commas, like api.example.com (up to 20). The key goes only to those hosts and their subdomains, over https. Until you add one, agents can't use the key.
-5. **Note**: what the key is for. Agents see this note.
-6. **How it is sent** (optional): by default the key goes in the Authorization header, after "Bearer ". You can change the **Header** (like X-Api-Key) and what goes **Before the key** (nothing, for other headers), or send it **Or as a query parameter** instead (like api_key).
-7. Click **Save**.
+5. **Commands on this computer may use it** (off at first): turn it on for a key a program here needs, like a database's password or a token for git. See [Commands that use a key](/guide/connections#commands-that-use-a-key).
+6. **Note**: what the key is for. Agents see this note.
+7. **How it is sent** (optional): by default the key goes in the Authorization header, after "Bearer ". You can change the **Header** (like X-Api-Key) and what goes **Before the key** (nothing, for other headers), or send it **Or as a query parameter** instead (like api_key).
+8. Click **Save**.
 
 A name that is already in the vault is refused: give that key a new value instead.
 
@@ -184,7 +185,7 @@ Click the circular arrow (**New value**) beside the key, paste the new value int
 
 ### Change where a key may go
 
-Click the pencil (**Hosts, note and how it is sent**), change the hosts, the note or how it is sent, and click **Save**. The value stays.
+Click the pencil (**Hosts, note and how it is sent**), change the hosts, whether commands may use it, the note or how it is sent, and click **Save**. The value stays.
 
 ### Delete a key
 
@@ -192,10 +193,12 @@ Click the bin (**Delete**) and confirm. Agents can no longer use the key, and it
 
 ### What agents can and cannot do with a key
 
-- Call a service with it by its name. The app puts the key into the request.
-- Only to the hosts you allowed and their subdomains, only over https, and never to this computer or its local network. A redirect to a host the key may not go to is not followed.
+- Call a service with it by its name. The app puts the key into the request: where it is set up to go, or where the agent writes its name in double braces (like {{GITHUB_TOKEN}}) in the address, a header or the body, or as the user name and password of a basic sign-in.
+- Type it into a site's sign-in page in its browser, by its name: only into a one-line field, on a page of one of the key's hosts, over https (or on this computer). The field then shows dots, and the agent only sees that it was filled from the vault.
+- Give it to a command on this computer, when you turned on **Commands on this computer may use it**, and only once you allow the command (see [Commands that use a key](/guide/connections#commands-that-use-a-key)).
+- On the web, only to the hosts you allowed and their subdomains, only over https, and never to this computer or its local network. A redirect to a host the key may not go to is not followed.
 - Change, for one call, which header or query parameter the key goes in.
-- See the keys' names, hosts and notes. Never their values: answers come back with the key masked.
+- See the keys' names, hosts and notes. Never their values: answers, pages and what commands print come back with the key masked.
 
 ## When an agent asks for a key
 
@@ -210,6 +213,27 @@ The key goes straight to the encrypted vault, never into the conversation. The c
 - **Not now** declines. The agent is told you'd rather not give it now, and to carry on without it or say what else would work. The card then says you did not give it, with **Enter it after all** in case you change your mind.
 - While a card waits, it also shows in the [Inbox](/guide/inbox) as "Asks for a key" with the key's name. **Open** takes you to the session.
 - If a key by that name is already in the vault, the agent is told to use it, and the card only says it's in the vault. When a saved key stopped working, the agent can ask again: the field then says it replaces the saved one.
+- When the agent needs the key in commands on this computer, the card also has **Commands on this computer may use it**, on to start with. Turn it off if you'd rather not; the agent can still use the key on its hosts. For a key that is already saved, the card reads **The agent asks to use a key in commands**: leave the field empty to keep the value, and click **Save to the vault**.
+
+### A sign-in in several fields
+
+To sign in to a site or a service, an agent asks for everything at once: **The agent asks for a sign-in**, with a field for each part, such as an email and a password, or a database's address, user and password. Passwords and other secrets hide as you type; the eye shows them.
+
+1. Fill in the fields. One marked **optional** can stay empty.
+2. Check **Only sent to**: the hosts the sign-in is for.
+3. Click **Save to the vault**.
+
+Each secret goes to the vault as a key of its own, named after the sign-in (a Voltaro password becomes VOLTARO_PASSWORD). A field marked **The agent sees this one** is a detail that isn't secret, like a server's address: the agent gets what you type there, and it isn't kept in the vault. A field the vault already has says so: leave it empty to keep what is saved. Once saved, the card lists the keys, and the agent can sign in with them in its browser, on those hosts only, without seeing them.
+
+## Commands that use a key
+
+Some work needs a password or a token in a program on this computer: pushing to GitHub with a token, reading a database with its password, a script that calls a service. For these, agents have a tool that runs one command with keys from the vault in its environment, each under its own name. What the command prints comes back to the agent with the keys masked.
+
+- Only keys with **Commands on this computer may use it** turned on can go to a command. Turn it on in the key's pencil dialog, or on the card when an agent asks.
+- Before such a command runs, a card shows it: **Run a command with** the keys' names, then the command, with what it is for. **Allow** runs it once. **Allow for this session** also lets this session's later commands with the same keys run without asking, until the app restarts. **Don’t** stops it, and you can tell the agent what to do instead.
+- A session with full access runs these commands without asking, as it does its other commands. In Plan mode none run.
+- A command can do anything a program can, sending the key elsewhere included: allow only commands you understand, and turn this on only for keys a program here needs.
+- A command stops after two minutes, unless the agent gives it longer (up to ten).
 
 ## Fill in a form a connected app asks for
 
@@ -306,7 +330,7 @@ Naget Agent asks Claude Code for the list of plugins at most every 10 minutes, a
 
 ## Ask an agent
 
-Agents can do these for you, with your OK on a card. They can't type a key's value or sign in for you: for a key, they show the card where you paste it.
+Agents can do these for you, with your OK on a card. They never type a key's value into the app: for a key or a sign-in, they show the card where you enter it.
 
 - "Which apps are connected? Test Notion and tell me if it works."
 - "Connect Context7 so agents can look up library docs."
@@ -314,3 +338,5 @@ Agents can do these for you, with your OK on a card. They can't type a key's val
 - "Show me Notion's tools and turn off the ones that delete pages."
 - "Add an MCP server for Claude Code and Codex that runs npx -y @modelcontextprotocol/server-memory, then check that it connects."
 - "Show me the most installed Claude Code plugins, then install the one I pick."
+- "Sign in to my Voltaro account and download this year's bills into this folder." (The first time, it asks for the sign-in on a card.)
+- "Push this branch to GitHub with the token in the vault."

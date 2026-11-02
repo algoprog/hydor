@@ -1,12 +1,13 @@
 // Settings → Connections → Keys: the vault. Each key has a name agents use, a value never shown back
-// (a masked hint only), the hosts http_request may send it to, a note, and how it is sent.
+// (a masked hint only), the hosts http_request may send it to and the browser may type it on, whether
+// commands on this computer may have it, a note, and how it is sent.
 import { useEffect, useState } from 'react';
-import { ChevronDown, KeyRound, LockKeyhole, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronDown, KeyRound, LockKeyhole, Pencil, Plus, RotateCcw, SquareTerminal, Trash2 } from 'lucide-react';
 import { cleanDomains, secretName, type SecretView } from '@shared/connections';
 import { del, enc, patch, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, Dialog, Empty, IconButton, inputCls, Section, Throbber, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Empty, IconButton, inputCls, Section, Switch, Throbber, useConfirm } from '../../components/ui';
 import { SecretInput } from './ConnectDialog';
 import { useConn } from './store';
 
@@ -24,6 +25,7 @@ function KeyDialog({ mode, onClose }: { mode: Mode | null; onClose: () => void }
   const [name, setName] = useState('');
   const [value, setValue] = useState('');
   const [hosts, setHosts] = useState('');
+  const [commands, setCommands] = useState(false);
   const [note, setNote] = useState('');
   const [how, setHow] = useState(false);
   const [header, setHeader] = useState('');
@@ -35,6 +37,7 @@ function KeyDialog({ mode, onClose }: { mode: Mode | null; onClose: () => void }
     setName(s?.name ?? '');
     setValue('');
     setHosts(s?.domains.join(', ') ?? '');
+    setCommands(!!s?.commands);
     setNote(s?.note ?? '');
     setHeader(s?.header ?? '');
     setPrefix(s?.prefix ?? '');
@@ -48,9 +51,9 @@ function KeyDialog({ mode, onClose }: { mode: Mode | null; onClose: () => void }
     setBusy(true);
     try {
       const how = { header: header.trim() || null, prefix: header.trim() || prefix ? prefix || null : null, query: query.trim() || null };
-      if (mode.kind === 'add') await post('/api/connections/secrets', { name: secretName(name), value, domains: hosts, note, ...how });
+      if (mode.kind === 'add') await post('/api/connections/secrets', { name: secretName(name), value, domains: hosts, commands, note, ...how });
       else if (rotate) await patch(`/api/connections/secrets/${enc(mode.s.name)}`, { value });
-      else await patch(`/api/connections/secrets/${enc(mode.s.name)}`, { domains: hosts, note, ...how });
+      else await patch(`/api/connections/secrets/${enc(mode.s.name)}`, { domains: hosts, commands, note, ...how });
       toast(mode.kind === 'add' ? `${secretName(name)} is in the vault` : rotate ? `${mode.s.name} has its new value` : 'Saved', 'ok');
       await useConn.getState().load();
       onClose();
@@ -99,9 +102,16 @@ function KeyDialog({ mode, onClose }: { mode: Mode | null; onClose: () => void }
               <span className="mb-1 block text-fg-2">Hosts it may be sent to</span>
               <input value={hosts} onChange={(e) => setHosts(e.target.value)} placeholder="api.example.com" autoCapitalize="off" autoCorrect="off" spellCheck={false} className={cx(inputCls, 'font-mono text-[16px] sm:text-[13px]')} />
               <span className="mt-1 block text-[12px] leading-snug text-fg-3">
-                {parsed.length ? `Sent only to ${parsed.join(', ')} and their subdomains, over https.` : 'Separated by commas. Until you add one, agents cannot use it.'}
+                {parsed.length ? `Sent only to ${parsed.join(', ')} and their subdomains, over https.` : commands ? 'Separated by commas. Without one, only commands can use it.' : 'Separated by commas. Until you add one, agents cannot use it.'}
               </span>
             </label>
+            <div className="flex items-start gap-2.5">
+              <Switch on={commands} onChange={setCommands} label="Commands on this computer may use it" className="mt-px" />
+              <span className="min-w-0 leading-snug">
+                <span className="block text-fg-2">Commands on this computer may use it</span>
+                <span className="block text-[12px] text-fg-3">A program an agent runs here gets it, after you allow the command (unless the session has full access). A program can send it anywhere, so allow this only for keys a program here needs.</span>
+              </span>
+            </div>
             <label className="block">
               <span className="mb-1 block text-fg-2">Note</span>
               <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What it is for (agents see this)" className={cx(inputCls, 'text-[16px] sm:text-[14px]')} />
@@ -154,7 +164,7 @@ export function Keys() {
     <div className="space-y-4">
       <Section
         title="Keys"
-        sub="Agents call APIs with these through http_request, and only to the hosts you allow. They never see a value."
+        sub="Agents use these by name and never see a value: in requests and sign-ins on the hosts you allow, and in commands where you allow it."
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMode({ kind: 'add' })}>
             Add a key
@@ -179,15 +189,18 @@ export function Keys() {
                   </div>
                   {s.note && <div className="mt-0.5 text-[12.5px] leading-snug text-fg-2">{s.note}</div>}
                   <div className="mt-1 flex flex-wrap items-center gap-1">
-                    {s.domains.length ? (
-                      s.domains.map((d) => (
-                        <span key={d} className="rounded-md bg-bg-2 px-1.5 py-px font-mono text-[11.5px] text-fg-2">
-                          {d}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-[12px] text-warn">No hosts allowed yet</span>
+                    {s.domains.map((d) => (
+                      <span key={d} className="rounded-md bg-bg-2 px-1.5 py-px font-mono text-[11.5px] text-fg-2">
+                        {d}
+                      </span>
+                    ))}
+                    {s.commands && (
+                      <span title="Commands on this computer may use it" className="inline-flex items-center gap-1 rounded-md bg-bg-2 px-1.5 py-px text-[11.5px] text-fg-2">
+                        <SquareTerminal size={11} className="shrink-0" />
+                        in commands
+                      </span>
                     )}
+                    {!s.domains.length && !s.commands && <span className="text-[12px] text-warn">No hosts allowed yet</span>}
                     <span className="ml-1 text-[11.5px] text-fg-3">
                       {s.usedAt ? `used ${ago(s.usedAt)}` : 'not used yet'} · {s.updatedAt !== s.createdAt ? `changed ${ago(s.updatedAt)}` : `added ${ago(s.createdAt)}`}
                     </span>

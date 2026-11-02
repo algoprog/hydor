@@ -42,7 +42,7 @@ Once answered, the item leaves the inbox and the agent goes on. What each choice
 The other items are answered where they wait. Each has an icon, what is asked, a line of detail, the session and the time, and **Open**, which takes you there:
 
 - **A browser that needs you** opens the session, where its browser shows above the message box for you to take over ([Search and the browser](/guide/web)).
-- **A key** opens the session with the card where you enter it ([Connections, keys and tools](/guide/connections)).
+- **A key** or **a sign-in** opens the session with the card where you enter it ([Connections, keys and tools](/guide/connections)).
 - **A skill suggestion** opens the session with its card to approve or decline, or **Settings → Skill library** when that session is gone ([Skills](/guide/skills)).
 - **A session waiting in VS Code or a terminal** opens it here so you can see what it waits for; answer it in the program it runs in.
 

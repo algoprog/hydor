@@ -1,7 +1,8 @@
 // http_request: an agent calls an API with a key from the vault and never sees the key. Public addresses
 // only, checked as each connection is made (so a name cannot point somewhere else in between); the key
 // goes only to the hosts it is allowed for and their subdomains, never along a redirect to another
-// host; the answer comes back with known secrets masked by the caller.
+// host; the answer comes back with known secrets masked by the caller. Keys the caller wrote into the
+// request itself ({{NAME}} in the address, headers or body) follow the same rule, each its own hosts.
 import dns from 'node:dns';
 import http from 'node:http';
 import https from 'node:https';
@@ -24,6 +25,8 @@ export interface HttpCall {
   headers?: Record<string, string>;
   body?: string;
   auth?: HttpAuth;
+  /** Keys already written into the address, headers or body: where each may go. */
+  bound?: { name: string; domains: string[] }[];
 }
 
 export interface HttpResult {
@@ -47,7 +50,7 @@ const SKIP = new Set(['host', 'content-length', 'connection', 'transfer-encoding
 /** Headers worth showing an agent from an answer. */
 const SHOW = /^(content-type|content-length|location|retry-after|link|etag|last-modified|www-authenticate|x-request-id|x-ratelimit-.*|ratelimit-.*)$/;
 
-export const hostAllowed = (url: URL, auth: HttpAuth) => domainAllowed(url.hostname.replace(/^\[|\]$/g, ''), auth.domains);
+export const hostAllowed = (url: URL, key: Pick<HttpAuth, 'domains'>) => domainAllowed(url.hostname.replace(/^\[|\]$/g, ''), key.domains);
 
 /**
  * privateIp, and the IPv6 spellings of IPv4 it misses: mapped addresses written in hex (::ffff:7f00:1,
@@ -121,7 +124,7 @@ export async function httpCall(c: HttpCall, o: { allowPrivate?: boolean; lookup?
     throw new RefusedRequest('url: a full http(s) address');
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new RefusedRequest('Only http and https addresses');
-  if (url.username || url.password) throw new RefusedRequest('Put credentials in auth, not in the address');
+  if (url.username || url.password) throw new RefusedRequest('Put credentials in auth or basic_auth, not in the address');
   const base: Record<string, string> = {};
   for (const [k, v] of Object.entries(c.headers ?? {})) {
     const name = String(k).trim();
@@ -133,10 +136,12 @@ export async function httpCall(c: HttpCall, o: { allowPrivate?: boolean; lookup?
   }
   if (!Object.keys(base).some((k) => k.toLowerCase() === 'user-agent')) base['User-Agent'] = 'Naget Agent';
   const a = c.auth;
-  if (a) {
-    if (!a.domains.length) throw new RefusedRequest(`${a.name} has no hosts it may be sent to yet: the user can add them in Settings → Connections → Keys`);
-    if (!hostAllowed(url, a)) throw new RefusedRequest(`${a.name} may only be sent to ${a.domains.join(', ')} (and their subdomains), not ${url.hostname}`);
-    if (url.protocol !== 'https:' && !o.allowPrivate) throw new RefusedRequest(`${a.name} is only sent over https`);
+  // Every key the request carries, the signing one and those written into it.
+  const keys = [...(a ? [a] : []), ...(c.bound ?? [])];
+  for (const k of keys) {
+    if (!k.domains.length) throw new RefusedRequest(`${k.name} has no hosts it may be sent to yet: the user can add them in Settings → Connections → Keys`);
+    if (!hostAllowed(url, k)) throw new RefusedRequest(`${k.name} may only be sent to ${k.domains.join(', ')} (and their subdomains), not ${url.hostname}`);
+    if (url.protocol !== 'https:' && !o.allowPrivate) throw new RefusedRequest(`${k.name} is only sent over https`);
   }
   const signal = AbortSignal.timeout(o.timeoutMs ?? 60_000);
   let body = c.body;
@@ -160,9 +165,12 @@ export async function httpCall(c: HttpCall, o: { allowPrivate?: boolean; lookup?
     if (r.status >= 300 && r.status < 400 && loc && hop < 5) {
       const next = new URL(String(loc), url);
       if (next.protocol !== 'http:' && next.protocol !== 'https:') return result(r, url, `it leads to a ${next.protocol} address`);
-      // The key goes no further than the hosts it may go to.
+      // The key goes no further than the hosts it may go to; a key written into the request goes with it
+      // (a 307 or 308 sends the body again), so it must be allowed there too.
       if (a && !hostAllowed(next, a)) return result(r, url, `it leads to ${next.hostname}, where ${a.name} may not go`);
-      if (a && next.protocol !== 'https:' && !o.allowPrivate) return result(r, url, 'it leads to a plain http address');
+      const out = c.bound?.find((k) => !hostAllowed(next, k));
+      if (out) return result(r, url, `it leads to ${next.hostname}, where ${out.name} may not go`);
+      if (keys.length && next.protocol !== 'https:' && !o.allowPrivate) return result(r, url, 'it leads to a plain http address');
       if (r.status === 303 || ((r.status === 301 || r.status === 302) && method === 'POST')) {
         method = 'GET';
         body = undefined;

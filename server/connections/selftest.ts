@@ -26,7 +26,7 @@ import { catalog, problem } from './catalog.ts';
 import { finishOAuth, startOAuth, testConnection } from './connect.ts';
 import { connections } from './index.ts';
 import { testHooks } from './tools.ts';
-import { listSecrets, readSecret, redact, rotateVaultKey, saveSecret, seal, unseal } from './vault.ts';
+import { listSecrets, readSecret, redact, rotateVaultKey, saveSecret, seal, unseal, vaultTables } from './vault.ts';
 
 if (!/naget-conn-selftest/.test(config.dataDir)) {
   console.error('Run with DATA_DIR=/tmp/naget-conn-selftest (it is wiped first).');
@@ -202,14 +202,16 @@ const fakeAs = http.createServer(async (req, res) => {
 
 // ---- an echo server for http_request --------------------------------------------------------------------
 
-const seen: { host?: string; auth?: string; url: string }[] = [];
-const echo = http.createServer((req, res) => {
-  seen.push({ host: req.headers.host, auth: req.headers.authorization, url: req.url! });
-  if (req.url!.startsWith('/redirect')) {
-    res.writeHead(302, { location: `http://elsewhere.evil.test:${(echo.address() as { port: number }).port}/echo` });
+const seen: { host?: string; auth?: string; url: string; body?: string; key?: string }[] = [];
+const echo = http.createServer(async (req, res) => {
+  const b = await body(req);
+  seen.push({ host: req.headers.host, auth: req.headers.authorization, url: req.url!, body: b, key: req.headers['x-key'] as string | undefined });
+  if (req.url!.startsWith('/redirect') || req.url!.startsWith('/again')) {
+    // A 307 sends the same body on: keys written into it must not follow to another host.
+    res.writeHead(req.url!.startsWith('/again') ? 307 : 302, { location: `http://elsewhere.evil.test:${(echo.address() as { port: number }).port}/echo` });
     return res.end();
   }
-  json(res, 200, { host: req.headers.host, authorization: req.headers.authorization ?? null, url: req.url });
+  json(res, 200, { host: req.headers.host, authorization: req.headers.authorization ?? null, url: req.url, body: b, key: req.headers['x-key'] ?? null });
 });
 
 // ---- the test -------------------------------------------------------------------------------------------
@@ -223,6 +225,8 @@ const RUN = 'run0selftest';
 const cards: any[] = [];
 let userAnswers: { decision: string; form?: Record<string, string> }[] = [];
 const fakeAdapter = {
+  /** The session's permissions, as Claude Code names them (run_with_secrets reads them). */
+  state: { mode: 'default' },
   async ask(card: any, o: { check?: (a: any) => string | null } = {}) {
     cards.push(card);
     // The user's first try may be wrong: the card says what to fix and stays, as the real one does.
@@ -600,6 +604,121 @@ try {
   const sl = (await app.inject({ method: 'GET', url: `/api/connections/requests?key=${encodeURIComponent(KEY)}&name=SLACK_TOKEN` })).json().request;
   const dis = await app.inject({ method: 'POST', url: `/api/connections/requests/${sl.id}/dismiss` });
   check('"Not now" settles it and tells the agent', dis.json().request.state === 'dismissed' && /rather not give SLACK_TOKEN/.test(delivered.at(-1)!.text));
+  check('the instructions point at sign-ins in the browser and in commands', /"secret": NAME/.test(gem.instructions!.join()) && /run_with_secrets/.test(gem.instructions!.join()));
+
+  section('request_secret, a sign-in in several fields');
+  const signIn = text(
+    await tool('request_secret').run({ name: 'voltaro', why: 'To download the bills.', domains: ['voltaro.example'], fields: [{ name: 'email', label: 'Email', secret: false }, { name: 'password', label: 'Password' }] }, ctx),
+  );
+  check('the tool names the keys it asks for, and the details it will get', /VOLTARO_PASSWORD \(Password\)/.test(signIn) && /Email, which you will get as typed/.test(signIn), signIn);
+  const sv = (await app.inject({ method: 'GET', url: `/api/connections/requests?key=${encodeURIComponent(KEY)}&name=VOLTARO` })).json().request;
+  check(
+    'the card gets its fields, the password hidden as it is typed',
+    sv?.fields?.length === 2 && sv.fields[0].key === 'VOLTARO_EMAIL' && sv.fields[0].secret === false && sv.fields[1].key === 'VOLTARO_PASSWORD' && sv.fields[1].type === 'password',
+    sv?.fields,
+  );
+  const PW = 'voltaro-pw-0123456789';
+  const missing = await app.inject({ method: 'POST', url: `/api/connections/requests/${sv.id}`, payload: { values: { VOLTARO_EMAIL: 'ada@example.com' }, domains: 'voltaro.example' } });
+  check('a needed field left empty is refused, and nothing is saved', missing.statusCode === 400 && /Password/.test(missing.body) && !readSecret(db, 'VOLTARO_PASSWORD'), missing.body);
+  const told0 = delivered.length;
+  const okSave = await app.inject({ method: 'POST', url: `/api/connections/requests/${sv.id}`, payload: { values: { VOLTARO_EMAIL: 'ada@example.com', VOLTARO_PASSWORD: PW }, domains: 'voltaro.example' } });
+  check('saving the sign-in works', okSave.statusCode === 200 && okSave.json().request.state === 'saved' && !!okSave.json().request.have?.VOLTARO_PASSWORD, okSave.body);
+  check('the secret went to the vault, the detail did not', readSecret(db, 'VOLTARO_PASSWORD')?.value === PW && !readSecret(db, 'VOLTARO_EMAIL'));
+  const msg = delivered.at(-1)!.text;
+  check(
+    'the agent got the key’s name, how to use it and the detail, never the password',
+    delivered.length === told0 + 1 && /VOLTARO_PASSWORD is saved/.test(msg) && /Email: ada@example\.com/.test(msg) && /"secret": "VOLTARO_PASSWORD"/.test(msg) && !msg.includes(PW),
+    msg,
+  );
+  check('no answer to the pages carries the password', !okSave.body.includes(PW) && !(await app.inject({ method: 'GET', url: '/api/connections' })).body.includes(PW));
+  check('the password is not in the database as text', !dbBytes().includes(PW));
+  const again3 = text(await tool('request_secret').run({ name: 'VOLTARO', why: 'Again.', fields: [{ name: 'password' }] }, ctx));
+  check('asking for a sign-in already saved says so instead', /already in the vault/.test(again3), again3);
+  let bad = '';
+  try {
+    await tool('request_secret').run({ name: 'X_THING', why: 'For a test.', fields: [{ name: 'host', secret: false }] }, ctx);
+  } catch (e) {
+    bad = (e as Error).message;
+  }
+  check('a form with nothing secret is pointed at ask_form', /ask_form/.test(bad), bad);
+
+  section('run_with_secrets');
+  const R = tool('run_with_secrets');
+  out = text(await R.run({ command: 'echo "$VOLTARO_PASSWORD"' }, ctx));
+  check('a key not allowed in commands is refused, pointing at request_secret', /not allowed in commands/.test(out) && /commands: true/.test(out), out);
+  const perm = text(await tool('request_secret').run({ name: 'VOLTARO_PASSWORD', why: 'To use it in a script.', commands: true }, ctx));
+  check('asking to use a saved key in commands shows a card for that', /let commands on this computer use VOLTARO_PASSWORD/.test(perm), perm);
+  const pr = (await app.inject({ method: 'GET', url: `/api/connections/requests?key=${encodeURIComponent(KEY)}&name=VOLTARO_PASSWORD` })).json().request;
+  const allow = await app.inject({ method: 'POST', url: `/api/connections/requests/${pr.id}`, payload: { domains: 'voltaro.example', commands: true } });
+  check('allowing it keeps the value and lets commands use it', allow.statusCode === 200 && readSecret(db, 'VOLTARO_PASSWORD')?.value === PW && readSecret(db, 'VOLTARO_PASSWORD')?.view.commands === true, allow.body);
+  check('the agent is told it can use it in commands', /run_with_secrets/.test(delivered.at(-1)!.text) && /for commands on this computer/.test(delivered.at(-1)!.text), delivered.at(-1));
+  const lc2 = text(await tool('list_connections').run({}, ctx));
+  check('list_connections says where each key may be used', /VOLTARO_PASSWORD: for voltaro\.example and for commands on this computer/.test(lc2), lc2);
+  const cards0 = cards.length;
+  userAnswers = [{ decision: 'accept' }];
+  out = text(await R.run({ command: 'echo "pw: $VOLTARO_PASSWORD"; printf %s "$VOLTARO_PASSWORD" | base64; echo "${ECHO_KEY:-no other key}"', secrets: ['VOLTARO_PASSWORD'], description: 'Show it' }, ctx));
+  const cmdCard = cards.at(-1);
+  check(
+    'the user is asked first, on a command card naming the key, never its value',
+    cards.length === cards0 + 1 && cmdCard.kind === 'command' && /VOLTARO_PASSWORD/.test(cmdCard.title) && cmdCard.detail.includes('echo "pw: $VOLTARO_PASSWORD"') && !JSON.stringify(cmdCard).includes(PW),
+    cmdCard,
+  );
+  check('the command gets the key, and what it prints comes back masked', /Exit code 0/.test(out) && /pw: \[secret VOLTARO_PASSWORD\]/.test(out) && !out.includes(PW) && !out.includes(Buffer.from(PW).toString('base64').replace(/=+$/, '')), out);
+  check('it gets only the keys it names', /no other key/.test(out), out);
+  userAnswers = [{ decision: 'deny' }];
+  out = text(await R.run({ command: 'touch ran-anyway', secrets: ['VOLTARO_PASSWORD'] }, ctx));
+  check('a no on the card runs nothing', /said no/.test(out) && !fs.existsSync(path.join(config.dataDir, 'ran-anyway')), out);
+  userAnswers = [{ decision: 'always' }];
+  await R.run({ command: 'true', secrets: ['VOLTARO_PASSWORD'] }, ctx);
+  const c1 = cards.length;
+  out = text(await R.run({ command: 'echo again', secrets: ['VOLTARO_PASSWORD'] }, ctx));
+  check('“Allow for this session” lets later commands with that key run without asking', cards.length === c1 && /again/.test(out), out);
+  fakeAdapter.state.mode = 'plan';
+  out = text(await R.run({ command: 'touch ran-in-plan', secrets: ['VOLTARO_PASSWORD'] }, ctx));
+  check('Plan mode runs nothing', /only reads/.test(out) && !fs.existsSync(path.join(config.dataDir, 'ran-in-plan')), out);
+  fakeAdapter.state.mode = 'bypassPermissions';
+  saveSecret(db, { name: 'CMD_TWO', value: 'cmd-two-value-xyz', commands: true });
+  const c2 = cards.length;
+  out = text(await R.run({ command: 'echo "two: $CMD_TWO"' }, ctx));
+  check('full access runs it without a card, with the keys the command names', cards.length === c2 && /two: \[secret CMD_TWO\]/.test(out), out);
+  out = text(await R.run({ command: 'sleep 5; echo late', secrets: ['CMD_TWO'], timeout: 1 }, ctx));
+  check('a command past its time limit is stopped', /Stopped after 1 s/.test(out) && !/late/.test(out), out);
+  saveSecret(db, { name: 'BASH_ENV', value: '/tmp/not-a-script', commands: true });
+  out = text(await R.run({ command: 'echo hi', secrets: ['BASH_ENV'] }, ctx));
+  check('a key named like one of the shell’s own variables is not given to a command', /name the shell itself uses/.test(out), out);
+  out = text(await R.run({ command: 'echo "$BASH_ENV $CMD_TWO"' }, ctx));
+  check('nor taken from the command when the keys are not named', /Exit code 0/.test(out) && /\[secret CMD_TWO\]/.test(out), out);
+  fakeAdapter.state.mode = 'default';
+
+  section('http_request with keys written into it');
+  testHooks.allowPrivate = true;
+  saveSecret(db, { name: 'ECHO_USER', value: 'ada-the-user', domains: ['example.test'] });
+  saveSecret(db, { name: 'ECHO_PASS', value: 'pass-0123456789', domains: ['example.test'] });
+  out = text(await H.run({ url: at('api.example.test'), method: 'POST', body: { user: '{{ECHO_USER}}', password: '{{ECHO_PASS}}' }, headers: { 'X-Key': '{{ECHO_PASS}}' } }, ctx));
+  check('{{NAME}} in a body and a header is filled in by the server', JSON.parse(seen.at(-1)!.body!).password === 'pass-0123456789' && seen.at(-1)!.key === 'pass-0123456789', seen.at(-1));
+  check('and comes back masked', out.includes('[secret ECHO_PASS]') && !out.includes('pass-0123456789') && !out.includes('ada-the-user'), out);
+  const pair = Buffer.from('ada-the-user:pass-0123456789').toString('base64');
+  out = text(await H.run({ url: at('api.example.test'), basic_auth: { username: '{{ECHO_USER}}', password: '{{ECHO_PASS}}' } }, ctx));
+  check('basic_auth signs with a user name and password from the vault, masked on the way back', seen.at(-1)!.auth === `Basic ${pair}` && !out.includes(pair.replace(/=+$/, '')), out);
+  const n2 = seen.length;
+  out = text(await H.run({ url: at('other.example.org'), method: 'POST', body: '{"p":"{{ECHO_PASS}}"}' }, ctx));
+  check('a key written into a request for another host is refused before anything is sent', /ECHO_PASS may only be sent to example\.test/.test(out) && seen.length === n2, out);
+  out = text(await H.run({ url: at('api.example.test', '/again'), method: 'POST', body: { p: '{{ECHO_PASS}}' } }, ctx));
+  check('a 307 to another host is not followed with a key in the body', /not followed: it leads to elsewhere\.evil\.test/.test(out) && !seen.some((x) => x.host?.startsWith('elsewhere.evil.test')), out);
+  out = text(await H.run({ url: at('api.example.test', '/echo?k={{ECHO_PASS}}') }, ctx));
+  check('{{NAME}} in the address goes there, masked on the way back', seen.at(-1)!.url.includes('k=pass-0123456789') && !out.includes('pass-0123456789'), out);
+  out = text(await H.run({ url: at('api.example.test'), method: 'POST', body: '{"a":"{{NO_SUCH_THING}}"}' }, ctx));
+  check('a missing key in {{NAME}} points at request_secret', /request_secret/.test(out), out);
+
+  section('An older vault');
+  const older = openDb(path.join(config.dataDir, 'older.db'));
+  older.exec(`create table conn_secrets (name text primary key, value text not null, hint text not null, domains text not null default '[]', note text not null default '',
+    header text, prefix text, query text, created_at integer not null, updated_at integer not null, used_at integer);
+  create table conn_requests (id text primary key, key text not null, name text not null, why text not null, domains text not null default '[]', state text not null, created_at integer not null, done_at integer);`);
+  vaultTables(older);
+  const colsOf = (t: string) => (older.prepare(`pragma table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
+  check('an older vault gets the new columns', colsOf('conn_secrets').includes('commands') && colsOf('conn_requests').includes('fields') && colsOf('conn_requests').includes('commands'));
+  older.close();
 } catch (e) {
   failed++;
   console.log(`  FAIL the test stopped: ${(e as Error).stack}`);
