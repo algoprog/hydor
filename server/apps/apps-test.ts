@@ -13,6 +13,7 @@ import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import type { AppRecipe } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, fillTemplate, parseCsv, placeholders, toCsv } from '../../shared/apps.ts';
+import { checkFlow, refsIn } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
@@ -170,9 +171,19 @@ test('form: defaults, numbers, dates, choices, yes/no and what to fix', () => {
   assert.match(checkInputs(fields, { n: 1, t: 'x'.repeat(3000) }).errors.join(), /Name: too long/);
 });
 
-test('templates: ten, each prompt fills with no leftover field placeholders, and uses its needed fields', () => {
-  assert.equal(TEMPLATES.length, 10);
-  for (const t of TEMPLATES) {
+test('templates: ten tasks, each prompt fills with no leftover field placeholders and uses its needed fields; five blocks, whose steps check out and use theirs', () => {
+  const tasks = TEMPLATES.filter((t) => !t.block);
+  assert.equal(tasks.length, 10);
+  const blocks = TEMPLATES.filter((t) => t.block);
+  assert.equal(blocks.length, 5);
+  for (const t of blocks) {
+    assert.ok(t.flow && !checkFlow(t).errors.length, `${t.id}: its steps check out`);
+    const used = new Set(refsIn(t.flow).map((r) => r.split(/[.[]/)[0]));
+    for (const f of t.fields.filter((x) => x.required)) assert.ok(used.has(f.id), `${t.id}: ${f.id} unused`);
+    assert.ok(t.answer.length >= 1 && t.description.length > 30, `${t.id}: written out`);
+    assert.deepEqual(cleanRecipe(t).fields, t.fields, `${t.id}: tidy as written`);
+  }
+  for (const t of tasks) {
     const values = Object.fromEntries(t.fields.map((f) => [f.id, f.type === 'yesno' ? 'Yes' : `[${f.id}]`]));
     const out = fillTemplate(t.prompt, values, { known: t.fields.map((f) => f.id) });
     for (const f of t.fields) assert.ok(!out.includes(`{{${f.id}}}`), `${t.id}: {{${f.id}}} left over`);

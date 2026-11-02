@@ -74,7 +74,7 @@ export function withStep(raw: Record<string, any>, change: Record<string, unknow
 /** A template in a few lines, for a list. */
 const lineOf = (a: AppDef) => {
   const steps = a.flow ? allSteps(a.flow.steps).length : 0;
-  return { id: a.id, name: a.name, address: a.slug, description: a.description || undefined, steps: steps || undefined, examples: a.examples?.length || undefined, screens: a.screens ? Object.keys(a.screens) : undefined, link: `/apps/${a.id}` };
+  return { id: a.id, name: a.name, address: a.slug, description: a.description || undefined, steps: steps || undefined, examples: a.examples?.length || undefined, screens: a.screens ? Object.keys(a.screens) : undefined, ...(a.block ? { block: true } : {}), link: `/apps/${a.id}` };
 };
 
 /** A step's values, each kept short: long text and big values as the start of their text. */

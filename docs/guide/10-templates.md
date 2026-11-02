@@ -22,8 +22,9 @@ Open the Templates page from the **Templates** tile at the bottom of the sidebar
 The page is headed **Templates**, with a **New template** button at the top. Below it:
 
 - **Your templates**: a card for each template you made, with its icon, name and description, the agent that runs it, a **Public** badge when its public page is open, and how many times it ran today. With none yet, the page suggests starting from a ready-made one, building one from scratch, or using **More → Save as template** in a session's menu.
+- **Your blocks**: the templates you made to be steps of others (those marked **A block**), which **Add a step** offers in every template's steps.
 - **Latest runs**: your last six runs, with the answers they were given, how they stand, and when they ended. Runs from rows of a CSV and from public pages stay under their own template instead. Click one to open it.
-- **Ready-made**: the templates that come with the app. Chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning** and **Build**. Each card shows its kind and how many questions it asks.
+- **Ready-made**: the templates that come with the app. Chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning**, **Build** and **Blocks**. Each card shows its kind and how many questions it asks.
 
 A run's state shows as a badge: **Waiting** (in line), **Starting**, **Working**, **Needs you** (it waits for an approval or an answer), **Done**, **Failed** or **Stopped**.
 
@@ -356,7 +357,7 @@ The kinds of steps:
 - **Decide**: one way or the other, by a rule ("the price is under 100") or by a question in words that the helper model answers.
 - **Repeat**: its steps once for each item of a list (a few at a time, if you like), or again until something holds.
 - **At the same time**: branches that run side by side; the flow goes on when they have all ended.
-- **Call an app**: another of your templates, as one step.
+- **Call an app**: another of your templates, as one step. Under the kinds, **Add a step** offers blocks: templates made to be steps of others, yours (those marked **A block**, under a template's answer fields, and those Collapse to a block makes) and the ready-made ones (**Sum up a page**, **Translate**, **Answer from the web**, **Sort into kinds** and **Pull out the facts**, each made yours as it goes in). A block goes in as a call with its form to fill in, its questions the template's own form has by the same name given already; a change to a block is a change for every template that calls it.
 - **Keep data**: add, find, change or remove the records the template keeps (see below).
 - **Ask a person**: the run waits for your answer, yes or no or a short form: a notice opens the run, where a card asks it, and the Inbox lists it. It waits a week unless you set another limit, then it fails.
 - **Run code**: a program of yours, in JavaScript, TypeScript or Python, gets the values you give it and gives back the step's values (**What it gives** names them, for the steps after it). It runs in a sandbox: no network, and none of this computer's files but the packages the template installs. It reaches out only through `ctx`, each call a step of the run: `ctx.model` asks a model, `ctx.agent` an agent, `ctx.tool` uses one of the app's tools, `ctx.ask` waits for your answer, `ctx.data` keeps records and `ctx.app` runs another template. So a whole flow can be one program, with ifs and loops of its own; its calls show on the run's page like steps, and when the run starts again after a restart, the program runs again and the calls it made before give what they gave then, without running again. A template file with code steps says so on its install card.

@@ -495,6 +495,146 @@ Work in steps: plan the screens and the data, build it, then check it: open the 
       { id: 'next', label: 'Ideas for next', type: 'list' },
     ],
   },
+  // Blocks: small templates made to be steps of others (Add a step offers them), each a few cheap steps.
+  {
+    id: 'sum-up-page',
+    name: 'Sum up a page',
+    icon: 'file-search',
+    color: 'teal',
+    category: 'Blocks',
+    block: true,
+    description: 'Reads the page at a link and sums it up: a step for other templates, or on its own.',
+    fields: [
+      { id: 'url', label: 'Link', type: 'text', required: true, placeholder: 'https://…' },
+      { id: 'length', label: 'How long', type: 'choice', options: ['A line', 'A paragraph', 'Key points'], default: 'A paragraph' },
+    ],
+    prompt: '',
+    flow: {
+      steps: [
+        { id: 'read', title: 'Read the page', do: 'tool', tool: 'read_page', with: { url: '{{url}}' }, failed: 'agent' },
+        { id: 'sum', title: 'Sum it up', do: 'model', instructions: 'Sum up the page below as {{length}}, in plain words: what it says, leaving out menus, ads and links. Give its title too.\n\n{{read.text}}', outputs: [{ id: 'title', label: 'Title', type: 'text' }, { id: 'summary', label: 'Summary', type: 'markdown', required: true }] },
+      ],
+    },
+    answer: [
+      { id: 'title', label: 'Title', type: 'text' },
+      { id: 'summary', label: 'Summary', type: 'markdown', required: true },
+    ],
+  },
+  {
+    id: 'translate',
+    name: 'Translate',
+    icon: 'languages',
+    color: 'indigo',
+    category: 'Blocks',
+    block: true,
+    description: 'Puts a text into another language, keeping its meaning, names and layout.',
+    fields: [
+      { id: 'text', label: 'The text', type: 'long', required: true },
+      { id: 'language', label: 'Into', type: 'text', required: true, placeholder: 'e.g. French' },
+      { id: 'tone', label: 'Tone', type: 'choice', options: ['As it is', 'Plainer', 'More formal'], default: 'As it is' },
+    ],
+    prompt: '',
+    flow: {
+      steps: [
+        {
+          id: 'put',
+          title: 'Translate it',
+          do: 'model',
+          instructions: 'Translate the text below into {{language}}. Keep its meaning, names, numbers and layout (lists, headings, line breaks); tone: {{tone}}. Give only the translation.\n\n{{text}}',
+          outputs: [{ id: 'translation', label: 'Translation', type: 'markdown', required: true }],
+        },
+      ],
+    },
+    answer: [{ id: 'translation', label: 'Translation', type: 'markdown', required: true }],
+  },
+  {
+    id: 'web-answer',
+    name: 'Answer from the web',
+    icon: 'globe',
+    color: 'blue',
+    category: 'Blocks',
+    block: true,
+    description: 'Searches the web for a question and answers it in a few lines, with the links it used.',
+    fields: [{ id: 'question', label: 'The question', type: 'long', required: true, placeholder: 'e.g. What is the population of Lisbon?' }],
+    prompt: '',
+    flow: {
+      steps: [
+        { id: 'search', title: 'Search the web', do: 'tool', tool: 'web_search', with: { query: '{{question}}' }, failed: 'agent' },
+        {
+          id: 'answer',
+          title: 'Answer it',
+          do: 'model',
+          instructions: 'Answer the question from the search results below, in a few plain lines. Say where they disagree or do not say, and do not add what they do not hold. Give the links you used.\n\nQuestion: {{question}}\n\nResults:\n{{search.text}}',
+          outputs: [
+            { id: 'answer', label: 'Answer', type: 'markdown', required: true },
+            { id: 'sources', label: 'Sources', type: 'list' },
+          ],
+        },
+      ],
+    },
+    answer: [
+      { id: 'answer', label: 'Answer', type: 'markdown', required: true },
+      { id: 'sources', label: 'Sources', type: 'list' },
+    ],
+  },
+  {
+    id: 'sort-into-kinds',
+    name: 'Sort into kinds',
+    icon: 'list-checks',
+    color: 'amber',
+    category: 'Blocks',
+    block: true,
+    description: 'Says which of your kinds a text is (a bug or a question, say), and why in a sentence.',
+    fields: [
+      { id: 'text', label: 'The text', type: 'long', required: true },
+      { id: 'kinds', label: 'The kinds', type: 'text', required: true, placeholder: 'e.g. bug, question, sales, other' },
+    ],
+    prompt: '',
+    flow: {
+      steps: [
+        {
+          id: 'sort',
+          title: 'Sort it',
+          do: 'model',
+          instructions: 'Which one of these kinds is the text below: {{kinds}}? Give the kind word for word as written there, and why in one sentence.\n\n{{text}}',
+          outputs: [
+            { id: 'kind', label: 'Kind', type: 'text', required: true },
+            { id: 'why', label: 'Why', type: 'text' },
+          ],
+        },
+      ],
+    },
+    answer: [
+      { id: 'kind', label: 'Kind', type: 'text', required: true },
+      { id: 'why', label: 'Why', type: 'text' },
+    ],
+  },
+  {
+    id: 'pull-out-facts',
+    name: 'Pull out the facts',
+    icon: 'scroll-text',
+    color: 'green',
+    category: 'Blocks',
+    block: true,
+    description: 'Lists the facts in a text that you ask for (names, dates, amounts…), each as it is written.',
+    fields: [
+      { id: 'text', label: 'The text', type: 'long', required: true },
+      { id: 'what', label: 'Which facts', type: 'text', placeholder: 'e.g. names, dates and amounts' },
+    ],
+    prompt: '',
+    flow: {
+      steps: [
+        {
+          id: 'pull',
+          title: 'Pull them out',
+          do: 'model',
+          instructions: 'From the text below, list {{#what}}these facts: {{what}}{{/what}}{{^what}}the facts that matter{{/what}}. One short line each, as the text has it; nothing it does not say.\n\n{{text}}',
+          outputs: [{ id: 'facts', label: 'Facts', type: 'list', required: true }],
+        },
+      ],
+    },
+    answer: [{ id: 'facts', label: 'Facts', type: 'list', required: true }],
+  },
 ];
 
 /** The templates, tidied like any recipe. They run with Claude Code unless their page picks another agent. */

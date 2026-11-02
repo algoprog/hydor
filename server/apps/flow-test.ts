@@ -1090,6 +1090,32 @@ test('Work out a value: the first or last, how many, a sum or average of a field
   assert.match(cleanFlow({ steps: [{ id: 'p', do: 'value', of: '{{x}}', op: 'guess' }] }).errors.join(), /one of first, last, count/);
 });
 
+test('blocks: templates made to be steps of others; the ready-made ones check out, become yours, and run as a step of another', async () => {
+  const g = (await http.inject({ method: 'GET', url: '/api/apps' })).json();
+  const ready = g.templates.filter((t: { block?: boolean }) => t.block);
+  assert.deepEqual(
+    ready.map((t: { id: string }) => t.id),
+    ['sum-up-page', 'translate', 'web-answer', 'sort-into-kinds', 'pull-out-facts'],
+  );
+  for (const t of ready) assert.deepEqual(checkFlow(t).errors, [], t.id);
+  const made = (await http.inject({ method: 'POST', url: '/api/apps', payload: { recipe: ready.find((t: { id: string }) => t.id === 'sort-into-kinds'), template: 'sort-into-kinds' } })).json().app;
+  assert.equal(made.block, true);
+  model.answer = (_system, user) => (user.startsWith('Which one of these kinds') ? JSON.stringify({ kind: 'bug', why: 'It crashes.' }) : '{}');
+  const caller = app({
+    name: 'Triage by block',
+    answer: [{ id: 'kind', label: 'Kind', type: 'text', required: true }],
+    flow: { steps: [{ id: 'sorted', do: 'app', app: made.slug, with: { text: 'The app crashes on start', kinds: 'bug, question' } }], outputs: { kind: '{{sorted.kind}}' } },
+  });
+  const done = await ended(startRun({ app: caller.id, slug: caller.slug, recipe: caller, source: 'web', inputs: { topic: 'x' } }).id, 60_000);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.kind, 'bug');
+  // Agents see which of their templates are blocks.
+  const ctx: RunCtx = { runId: 'blocks-1', key: 'acp:blocks-1', agent: 'acp', cwd: os.tmpdir(), deps };
+  const get = Object.fromEntries(apps.tools!(ctx).map((x) => [x.name, x])).app_get;
+  const list = JSON.parse(String(await get.run({}, ctx))).templates;
+  assert.equal(list.find((x: { id: string }) => x.id === made.id).block, true);
+});
+
 test('examples: saved inputs with checks; trying them runs each as a test, and its checks are read against what it gave', async () => {
   const a = app({
     name: 'Counted',
