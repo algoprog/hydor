@@ -1,5 +1,6 @@
-// Pages (/pages): the pages and slide decks kept from conversations, saved by agents and made here, each with
-// its picture, and the sites published from them or from a project's build. A page opens at its own place
+// The Library (/library): the pages and slide decks kept from conversations, saved by agents and made here, each
+// with its picture; the images and videos you kept (Media, media/); and the sites published from pages or from a
+// project's build. /pages, its old address, opens it. A page opens at its own place
 // (/pages/<id>) to use, edit (visually or as code) and save, a deck to edit and present (/pages/<id>/show is the
 // audience's window of a presentation), with versions (view one, bring it back), Export (PDF, Word, PowerPoint,
 // a web page), the data it keeps, its own address for a phone's home screen, Publish, and Ask: an agent changes
@@ -60,11 +61,18 @@ import { EDITORS, preloadEditors } from './editors';
 import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
 import { AudienceView } from './slides/Present';
+import { MediaGrid } from '../media/MediaGrid';
+import { useMedia } from '../media/state';
 import { SlideThumb } from './slides/Thumb';
 
 export function PagesRoute() {
   const [loc] = useLocation();
+  const search = useSearch();
   const show = /^\/pages\/([a-f0-9]{10})\/show$/.exec(loc)?.[1];
+  // The Library's old address (and its tabs, "New page"…) opens the Library.
+  useEffect(() => {
+    if (loc === '/pages') go(`/library${search ? `?${search}` : ''}`, true);
+  }, [loc, search]);
   if (show) return <AudienceView id={show} />;
   const id = /^\/pages\/([a-f0-9]{10})$/.exec(loc)?.[1];
   return id ? <PageView id={id} /> : <Library />;
@@ -243,7 +251,7 @@ function ShareMenu({ page, link, anchor, open, onClose, onPublish, onReset }: { 
         {page.published ? 'Publish it again, at another link' : 'Publish at a link others can open'}
       </MenuItem>
       {page.published && (
-        <MenuItem icon={<Globe size={14} />} onClick={() => (onClose(), go('/pages?tab=published'))}>
+        <MenuItem icon={<Globe size={14} />} onClick={() => (onClose(), go('/library?tab=published'))}>
           See where it is published
         </MenuItem>
       )}
@@ -351,11 +359,11 @@ function DataDialog({ page, open, onClose }: { page: PageInfo; open: boolean; on
 type NewKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex';
 const NEW_TITLE: Record<NewKind, string> = { page: '', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document' };
 const ASK_FOR: Record<NewKind, string> = {
-  page: 'Make me a page and keep it in Pages: ',
-  slides: 'Make me slides and keep them in Pages: ',
-  doc: 'Write me a document and keep it in Pages: ',
-  sheet: 'Make me a spreadsheet and keep it in Pages: ',
-  tex: 'Write me a LaTeX document and keep it in Pages: ',
+  page: 'Make me a page and keep it in my Library: ',
+  slides: 'Make me slides and keep them in my Library: ',
+  doc: 'Write me a document and keep it in my Library: ',
+  sheet: 'Make me a spreadsheet and keep it in my Library: ',
+  tex: 'Write me a LaTeX document and keep it in my Library: ',
 };
 const OPENS: Partial<Record<NewKind, string>> = { doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip' };
 const KIND_TILES: { value: NewKind; label: string; icon: ReactNode }[] = [
@@ -702,7 +710,7 @@ function SiteRow({ site }: { site: SiteInfo }) {
   );
 }
 
-type Tab = 'saved' | 'published';
+type Tab = 'saved' | 'media' | 'published';
 type Sort = 'changed' | 'name' | 'made';
 const SORTS: { value: Sort; label: string }[] = [
   { value: 'changed', label: 'Last changed' },
@@ -712,7 +720,9 @@ const SORTS: { value: Sort; label: string }[] = [
 
 function Library() {
   const search = useSearch();
-  const tab: Tab = new URLSearchParams(search).get('tab') === 'published' ? 'published' : 'saved';
+  const tabAsked = new URLSearchParams(search).get('tab');
+  const tab: Tab = tabAsked === 'published' || tabAsked === 'media' ? tabAsked : 'saved';
+  const media = useMedia((s) => s.items);
   const pages = usePagesStore((s) => s.pages);
   const sites = usePagesStore((s) => s.sites);
   const [publish, setPublish] = useState(false);
@@ -724,6 +734,7 @@ function Library() {
   useEffect(() => {
     usePagesStore.getState().loadPages().catch(toastError);
     usePagesStore.getState().loadSites().catch(toastError);
+    useMedia.getState().ensure();
     preloadEditors();
   }, []);
   // The search box's "New page", "New slides"… open here with the dialog.
@@ -731,7 +742,7 @@ function Library() {
   useEffect(() => {
     if (!asked) return;
     setMaking(asked === 'slides' || asked === 'doc' || asked === 'sheet' || asked === 'tex' ? asked : 'page');
-    go('/pages', true);
+    go('/library', true);
   }, [asked]);
   useEffect(() => localStorage.setItem('wa.pages.sort', sort), [sort]);
   const list = useMemo(() => {
@@ -744,32 +755,35 @@ function Library() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
-        title="Pages"
-        sub="Small tools and pages agents made for you, and what you published"
+        title="Library"
+        sub="Small tools and pages agents made for you, the images and videos you kept, and what you published"
         actions={
           tab === 'published' ? (
             <Button size="sm" variant="secondary" icon={<Upload size={14} />} onClick={() => setPublish(true)}>
               Publish a folder
             </Button>
-          ) : (
+          ) : tab === 'saved' ? (
             <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
               New page
             </Button>
-          )
+          ) : undefined
         }
       >
         <Tabs<Tab>
           value={tab}
-          onChange={(t) => go(t === 'published' ? '/pages?tab=published' : '/pages', true)}
+          onChange={(t) => go(t === 'saved' ? '/library' : `/library?tab=${t}`, true)}
           options={[
-            { value: 'saved', label: 'Saved', count: pages?.length },
+            { value: 'saved', label: 'Pages', count: pages?.length },
+            { value: 'media', label: 'Media', count: media?.length },
             { value: 'published', label: 'Published', count: sites?.length },
           ]}
         />
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-5">
-          {tab === 'saved' ? (
+          {tab === 'media' ? (
+            <MediaGrid />
+          ) : tab === 'saved' ? (
             !pages ? (
               <div className="flex justify-center py-10 text-fg-3">
                 <Throbber size={28} />
@@ -946,7 +960,7 @@ function PageView({ id }: { id: string }) {
     try {
       await del(`/api/pages/${enc(id)}`);
       closePageAsk();
-      go('/pages');
+      go('/library');
     } catch (e) {
       toastError(e);
     }
@@ -999,11 +1013,11 @@ function PageView({ id }: { id: string }) {
   if (error && !data) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <PageHeader title="Pages" />
+        <PageHeader title="Library" />
         <Empty icon={<AppWindow size={22} />} title="This page is not here">
           {error}.{' '}
-          <button className="text-accent underline-offset-2 hover:underline" onClick={() => go('/pages')}>
-            Back to Pages
+          <button className="text-accent underline-offset-2 hover:underline" onClick={() => go('/library')}>
+            Back to the Library
           </button>
         </Empty>
       </div>
@@ -1021,7 +1035,7 @@ function PageView({ id }: { id: string }) {
   const lead = (
     <>
       {!mobile && <NavButton />}
-      <IconButton label="All pages" onClick={() => (closePageAsk(), go('/pages'))}>
+      <IconButton label="The Library" onClick={() => (closePageAsk(), go('/library'))}>
         <ArrowLeft size={18} />
       </IconButton>
       <button type="button" className="ml-0.5 min-w-0 text-left" onClick={() => page && setDialog('rename')} title="Rename">

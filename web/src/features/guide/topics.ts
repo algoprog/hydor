@@ -2,7 +2,6 @@
 // Help's first page, and a line on what it is for. The titles and the text come from docs/guide; a topic
 // missing here still shows, under "More".
 import {
-  AppWindow,
   Bot,
   Boxes,
   Braces,
@@ -27,6 +26,7 @@ import {
   Telescope,
   WandSparkles,
   BookOpen,
+  LibraryBig,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -62,8 +62,8 @@ const LOOKS: Record<string, TopicLook> = {
   connections: { icon: PlugZap, group: 'yours', blurb: 'Your apps and accounts, and keys kept safe' },
   web: { icon: Globe, group: 'abilities', blurb: 'Web searches, and a browser you can take over' },
   research: { icon: Telescope, group: 'abilities', blurb: 'Deep research, second opinions and teams of agents' },
-  'documents-voice': { icon: FileText, group: 'abilities', blurb: 'Documents and pictures in and out, and talking' },
-  pages: { icon: AppWindow, group: 'abilities', blurb: 'Pages, slides, documents and spreadsheets agents make' },
+  'documents-voice': { icon: FileText, group: 'abilities', blurb: 'Documents, pictures and videos in and out, and talking' },
+  library: { icon: LibraryBig, group: 'abilities', blurb: 'Pages and documents agents make, and the images and videos you keep' },
   apps: { icon: LayoutGrid, group: 'abilities', blurb: 'Fill in a short form, and an agent does the job' },
   tasks: { icon: CalendarClock, group: 'abilities', blurb: 'Work that starts by itself, when you say' },
   'agents-models': { icon: Cpu, group: 'setup', blurb: 'Claude Code, Codex and others, their accounts and models' },

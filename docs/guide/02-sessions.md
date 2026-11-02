@@ -105,7 +105,7 @@ In every mode Custom asks you before risky commands. In Ask, Accept edits and Pl
 - **Attach a screenshot** (the screen icon, on computers): your browser asks which screen, window or tab, and one picture of it is attached.
 - **@**: type @ and part of a file's name to list matching files in the folder; ↑ ↓ to move, Enter or Tab to insert it, Esc to close.
 - **/**: at the very start of the message, / lists the agent's commands and skills (Claude Code's), with what each does.
-- The microphone (dictate your message) and the headphones (hands-free voice mode) sit by the paperclip when your browser or this computer can recognize speech. See [Documents, images and voice](/guide/documents-voice).
+- The microphone (dictate your message) and the headphones (hands-free voice mode) sit by the paperclip when your browser or this computer can recognize speech. See [Documents, images, videos and voice](/guide/documents-voice).
 
 ### What the start page remembers
 

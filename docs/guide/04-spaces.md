@@ -66,7 +66,7 @@ The start page remembers the space for your next session, on any device you use.
 
 On a phone, the menu opens as a sheet from the bottom of the screen, titled "Space or folder to work in", and the keyboard waits until you tap the field.
 
-When the space's folder is a Git repository, the end of the menu offers **New worktree**, as for any folder in a repository: the session then works on a branch of its own, in a separate copy of the repository (see [Sessions](/guide/sessions)). Sessions you start by voice in hands-free mode start in the space picked last on the start page (see [Documents, images and voice](/guide/documents-voice)).
+When the space's folder is a Git repository, the end of the menu offers **New worktree**, as for any folder in a repository: the session then works on a branch of its own, in a separate copy of the repository (see [Sessions](/guide/sessions)). Sessions you start by voice in hands-free mode start in the space picked last on the start page (see [Documents, images, videos and voice](/guide/documents-voice)).
 
 ## A space's own page
 

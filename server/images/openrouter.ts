@@ -1,9 +1,11 @@
-// Images through OpenRouter: its image models (the catalog filtered to models whose output includes
-// images), and one generation: a chat completion asking for images (modalities), with pictures to
-// change or follow given as data URLs, and the images it sends back saved into the session's folder.
+// Images through OpenRouter: its image models (the catalog filtered to models whose output includes images,
+// with the settings each takes from its image API's own list), and one generation: a request to its images
+// API (/images), with pictures to change or follow given as data URLs, and the images it sends back saved into
+// the session's folder. A model that endpoint does not take is asked through a chat completion instead.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ImageModel } from '../../shared/images.ts';
+import type { MediaParam } from '../../shared/media.ts';
 
 /** The app's choice, first one OpenRouter still lists. */
 export const PREFERRED = ['google/gemini-3.1-flash-image', 'google/gemini-2.5-flash-image', 'google/gemini-3.1-flash-image-preview', 'openai/gpt-image-1-mini', 'black-forest-labs/flux.2-pro'];
@@ -11,34 +13,66 @@ export const PREFERRED = ['google/gemini-3.1-flash-image', 'google/gemini-2.5-fl
 export const ASPECTS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9'];
 export const SIZES = ['1K', '2K', '4K'];
 
+export const HEADERS = { 'HTTP-Referer': 'https://github.com/Naget-Inc/naget-agent', 'X-Title': 'Naget Agent' };
+
 let cache: { at: number; list: ImageModel[] } | null = null;
 
-/** OpenRouter's image models, kept for an hour (the list needs no key). */
+/** The settings a model takes, from OpenRouter's supported_parameters ({ resolution: { type: "enum", values } }). */
+export function paramsOf(sp: unknown): MediaParam[] {
+  const out: MediaParam[] = [];
+  if (!sp || typeof sp !== 'object') return out;
+  for (const [id, v] of Object.entries(sp as Record<string, any>)) {
+    if (!v || typeof v !== 'object' || !/^[a-z_]{1,40}$/.test(id)) continue;
+    if (v.type === 'enum' && Array.isArray(v.values)) {
+      const values = v.values.map(String).filter((x: string) => x.trim());
+      if (values.length) out.push({ id, kind: 'enum', values });
+    } else if (v.type === 'range' && (typeof v.min === 'number' || typeof v.max === 'number')) out.push({ id, kind: 'range', ...(typeof v.min === 'number' ? { min: v.min } : {}), ...(typeof v.max === 'number' ? { max: v.max } : {}) });
+    else if (v.type === 'boolean') out.push({ id, kind: 'boolean' });
+  }
+  return out;
+}
+
+/** OpenRouter's image models, kept for an hour (the lists need no key): its catalog for prices, its image API's list for settings. */
 export async function imageModels(base: string): Promise<ImageModel[]> {
   if (cache && Date.now() - cache.at < 3600_000) return cache.list;
-  const r = await fetch(`${base}/models?output_modalities=image`, { signal: AbortSignal.timeout(20_000) });
+  const [r, api] = await Promise.all([
+    fetch(`${base}/models?output_modalities=image`, { signal: AbortSignal.timeout(20_000) }),
+    fetch(`${base}/images/models`, { signal: AbortSignal.timeout(20_000) }).catch(() => null),
+  ]);
   if (!r.ok) throw new Error(`OpenRouter answered ${r.status}`);
   const d: any = await r.json();
-  const list: ImageModel[] = (d.data ?? [])
+  const settings = new Map<string, any>();
+  try {
+    if (api?.ok) for (const m of ((await api.json()) as any).data ?? []) if (m?.id) settings.set(String(m.id), m);
+  } catch {}
+  const listed: ImageModel[] = (d.data ?? [])
     .filter((m: any) => (m.architecture?.output_modalities ?? []).includes('image') && !String(m.id).startsWith('openrouter/'))
-    .map((m: any): ImageModel => {
-      const name = String(m.name ?? m.id);
-      const textOut = (m.architecture?.output_modalities ?? []).includes('text');
-      const perToken = Number(m.pricing?.image_output ?? m.pricing?.image_token);
-      return {
-        id: String(m.id),
-        label: name.replace(/^[^:]+:\s*/, ''),
-        org: name.includes(':') ? name.slice(0, name.indexOf(':')).trim() : undefined,
-        description: typeof m.description === 'string' ? m.description.replace(/\s+/g, ' ').slice(0, 300) : undefined,
-        created: Number(m.created) ? Number(m.created) * 1000 : undefined,
-        // Image tokens per picture: about 1,290 for models that also write (Gemini, GPT), 4,096 per megapixel for the others.
-        perImage: perToken > 0 ? perToken * (textOut ? 1290 : 4096) : undefined,
-        textOut,
-        edits: (m.architecture?.input_modalities ?? []).includes('image'),
-      };
-    });
-  cache = { at: Date.now(), list };
-  return list;
+    .map((m: any) => imageModel(m, settings.get(String(m.id))));
+  // A model only the image API lists still makes images.
+  for (const [id, m] of settings) if (!listed.some((x) => x.id === id) && !id.startsWith('openrouter/')) listed.push(imageModel(m, m));
+  cache = { at: Date.now(), list: listed };
+  return listed;
+}
+
+function imageModel(m: any, api?: any): ImageModel {
+  const name = String(m.name ?? m.id);
+  const textOut = (m.architecture?.output_modalities ?? []).includes('text');
+  const perToken = Number(m.pricing?.image_output ?? m.pricing?.image_token);
+  const params = paramsOf(api?.supported_parameters);
+  const refs = params.find((p) => p.id === 'input_references');
+  return {
+    id: String(m.id),
+    label: name.replace(/^[^:]+:\s*/, ''),
+    org: name.includes(':') ? name.slice(0, name.indexOf(':')).trim() : undefined,
+    description: typeof m.description === 'string' ? m.description.replace(/\s+/g, ' ').slice(0, 300) : undefined,
+    created: Number(m.created) ? Number(m.created) * 1000 : undefined,
+    // Image tokens per picture: about 1,290 for models that also write (Gemini, GPT), 4,096 per megapixel for the others.
+    perImage: perToken > 0 ? perToken * (textOut ? 1290 : 4096) : undefined,
+    textOut,
+    edits: refs ? (refs.max ?? 1) > 0 : (m.architecture?.input_modalities ?? api?.architecture?.input_modalities ?? []).includes('image'),
+    ...(refs?.max ? { maxRefs: refs.max } : {}),
+    ...(params.length ? { params: params.filter((p) => p.id !== 'input_references') } : {}),
+  };
 }
 
 export interface Reference {
@@ -75,15 +109,52 @@ export interface Ask {
   prompt: string;
   refs?: Reference[];
   aspect?: string;
+  /** The resolution: 1K, 2K, 4K (and 512, 768, 1.5K for some models). */
   size?: string;
+  quality?: string;
+  background?: string;
+  /** How many images (the images API; the chat completion makes one). */
+  count?: number;
+  seed?: number;
   /** The model writes text with its images (Gemini, GPT): it is asked for both. */
   textOut?: boolean;
+}
+
+const dataUrl = (r: Reference) => `data:${r.mime};base64,${r.data.toString('base64')}`;
+
+/** The images API's request: only the settings given, as that API names them. */
+export function buildImagesRequest(a: Ask): Record<string, unknown> {
+  return {
+    model: a.model,
+    prompt: a.prompt,
+    ...(a.aspect ? { aspect_ratio: a.aspect } : {}),
+    ...(a.size ? { resolution: a.size } : {}),
+    ...(a.quality ? { quality: a.quality } : {}),
+    ...(a.background ? { background: a.background } : {}),
+    ...(a.count && a.count > 1 ? { n: Math.min(10, Math.round(a.count)) } : {}),
+    ...(Number.isInteger(a.seed) ? { seed: a.seed } : {}),
+    ...(a.background === 'transparent' ? { output_format: 'png' } : {}),
+    ...(a.refs?.length ? { input_references: a.refs.map((r) => ({ type: 'image_url', image_url: { url: dataUrl(r) } })) } : {}),
+  };
+}
+
+/** The images in the images API's answer ({ data: [{ b64_json, media_type }], usage }). */
+export function parseImagesAnswer(j: any): { images: Made[]; text: string; cost?: number } {
+  const images: Made[] = [];
+  for (const d of Array.isArray(j?.data) ? j.data.slice(0, 10) : []) {
+    if (typeof d?.b64_json !== 'string' || !d.b64_json) continue;
+    const data = Buffer.from(d.b64_json, 'base64');
+    const mime = typeof d.media_type === 'string' && d.media_type.startsWith('image/') ? d.media_type : (MIME_BY_MAGIC.find(([, is]) => data.length > 12 && is(data))?.[0] ?? 'image/png');
+    if (data.length) images.push({ mime, data });
+  }
+  const cost = Number(j?.usage?.cost);
+  return { images, text: '', cost: Number.isFinite(cost) && cost > 0 ? cost : undefined };
 }
 
 /** The chat completion that asks for the image. */
 export function buildRequest(a: Ask): Record<string, unknown> {
   const content: unknown[] = [{ type: 'text', text: a.prompt }];
-  for (const r of a.refs ?? []) content.push({ type: 'image_url', image_url: { url: `data:${r.mime};base64,${r.data.toString('base64')}` } });
+  for (const r of a.refs ?? []) content.push({ type: 'image_url', image_url: { url: dataUrl(r) } });
   const imageConfig: Record<string, string> = {};
   if (a.aspect && ASPECTS.includes(a.aspect)) imageConfig.aspect_ratio = a.aspect;
   if (a.size && SIZES.includes(a.size)) {
@@ -208,18 +279,25 @@ export async function saveImages(images: Made[], dir: string, name: string): Pro
   return out;
 }
 
-/** One generation, start to end; throws with OpenRouter's own words when it refuses. */
+/** OpenRouter's words when it refuses, as the user and the agent should read them. */
+function refusal(status: number, j: any): Error {
+  const why = j?.error?.message ?? `OpenRouter answered ${status}`;
+  return new Error(status === 401 ? `OpenRouter did not take the key (${why}). The user can check it in Settings → Models.` : status === 402 ? `The OpenRouter account is out of credits (${why}).` : String(why));
+}
+
+/** The images API does not serve this model (so the chat completion may). */
+const notServed = (status: number, j: any) => status === 404 || status === 405 || (status === 400 && /not (?:a |an )?(?:supported|available|image)|does not support image|no endpoints?/i.test(String(j?.error?.message ?? '')));
+
+/** One generation, start to end: the images API, else a chat completion; throws with OpenRouter's own words when it refuses. */
 export async function generate(o: Ask & { base: string; key: string; timeoutMs?: number }): Promise<{ images: Made[]; text: string; cost?: number }> {
-  const r = await fetch(`${o.base}/chat/completions`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${o.key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/Naget-Inc/naget-agent', 'X-Title': 'Naget Agent' },
-    body: JSON.stringify(buildRequest(o)),
-    signal: AbortSignal.timeout(o.timeoutMs ?? 300_000),
-  });
+  const headers = { Authorization: `Bearer ${o.key}`, 'Content-Type': 'application/json', ...HEADERS };
+  const signal = AbortSignal.timeout(o.timeoutMs ?? 300_000);
+  const r = await fetch(`${o.base}/images`, { method: 'POST', headers, body: JSON.stringify(buildImagesRequest(o)), signal });
   const j: any = await r.json().catch(() => null);
-  if (!r.ok || j?.error) {
-    const why = j?.error?.message ?? `OpenRouter answered ${r.status}`;
-    throw new Error(r.status === 401 ? `OpenRouter did not take the key (${why}). The user can check it in Settings → Models.` : r.status === 402 ? `The OpenRouter account is out of credits (${why}).` : String(why));
-  }
-  return parseAnswer(j);
+  if (r.ok && !j?.error) return parseImagesAnswer(j);
+  if (!notServed(r.status, j)) throw refusal(r.status, j);
+  const c = await fetch(`${o.base}/chat/completions`, { method: 'POST', headers, body: JSON.stringify(buildRequest(o)), signal });
+  const cj: any = await c.json().catch(() => null);
+  if (!c.ok || cj?.error) throw refusal(c.status, cj);
+  return parseAnswer(cj);
 }

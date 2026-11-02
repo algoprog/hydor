@@ -22,12 +22,14 @@ Everything is optional. Set these in the environment (or in `.env` for Docker Co
 | `NAGET_EMBED_DEVICE` | the GPU with the most free memory, else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`…); Settings → Memory can also keep it on the CPU |
 | `NAGET_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
 | `NAGET_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
+| `NAGET_FFMPEG`, `NAGET_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills with |
 
 ## What it stores
 
 In `DATA_DIR`: the password hash (`auth.json`), the session index and search database (`naget-agent.db`, `web-agent.db` in older installs),
 the agents' programs the app installed (`clients/`), logs of running agents (`runs/`), attachments waiting to be sent (`uploads/`), files deleted in the file
-browser (`trash/`), notebook kernels and the terminal server, and, once search by meaning is turned on in
+browser (`trash/`), the Library's images and videos with their stills and frames (`media/`), notebook kernels and the
+terminal server, and, once search by meaning is turned on in
 Settings → Memory, its private Python environment (`memory/venv`). Its model goes to Hugging Face's cache
 (`~/.cache/huggingface`, or `memory/hf` in Docker). Conversations themselves stay where the agents
 write them (`~/.claude/projects`, `~/.codex/sessions`); the app only reads them.

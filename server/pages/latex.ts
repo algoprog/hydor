@@ -1712,7 +1712,7 @@ export function texForAgent(text: string): string {
 }
 
 const LATEX_HELP = [
-  'Make or change a LaTeX document, kept in the user’s Pages: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in Pages as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
+  'Make or change a LaTeX document, kept in the user’s Library: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the Library as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
   'source: the whole of main.tex, from \\documentclass to \\end{document}. files: the other files it reads, by the names it gives them ({"refs.bib": "…", "chapters/intro.tex": "…"}, or [{name, text}], or {name, path} for a file of this session); names are letters, digits, - _ . and / between folders. Or folder: a LaTeX project folder of this session, taken in whole.',
   'pictures: what \\includegraphics shows, each by the name it uses: [{"name": "figures/plot.png", "src": "plots/plot.png"}] with src a PNG or JPEG file of this session, a public https address, or a picture of the document already (naget-asset:…); a path alone is its own name. A PDF picture becomes a PNG of it.',
   'engine: pdflatex (the default), xelatex (Unicode text and this computer’s fonts with fontspec: Greek, Chinese and other scripts), or lualatex. Packages: those of a standard TeX Live (amsmath, graphicx, hyperref, geometry, tikz, pgfplots, booktabs, beamer, natbib…); for a bibliography, a .bib file with \\bibliography and BibTeX (biblatex and biber may be missing). Nothing that runs programs (minted, svg, shell escape): it is turned off.',
@@ -1726,7 +1726,7 @@ export const SAVE_LATEX_SCHEMA = {
   type: 'object',
   properties: {
     id: { type: 'string', description: 'A saved LaTeX document’s id, to save a new version of it.' },
-    title: { type: 'string', description: 'Its name in Pages: "Thesis", "CV".' },
+    title: { type: 'string', description: 'Its name in the Library: "Thesis", "CV".' },
     source: { type: 'string', description: 'The whole of main.tex, from \\documentclass to \\end{document}.' },
     files: {
       description: 'The other files it reads, by name: {"refs.bib": "…"} or [{"name": "chapters/intro.tex", "text": "…"}] ({"name", "path"} for a file of this session).',

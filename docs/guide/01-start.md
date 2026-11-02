@@ -70,7 +70,7 @@ The bottom of the sidebar holds the app's tools, four to a row:
 - **Files**: browse, open and edit files on this computer. See [Files, Git, Terminal and Preview](/guide/files-git).
 - **Git**: your repositories, their changes, branches and history.
 - **Terminal**: shells on this computer that keep running when you leave the page.
-- **Pages**: small tools and pages agents made for you, and the ones you published. See [Pages and published sites](/guide/pages).
+- **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
 - **Spaces**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Spaces and knowledge](/guide/spaces).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
 - **Preview**: look at a web app's development server running on this computer. It shows only on this machine's own pages, not while you look at another machine.
@@ -120,7 +120,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 
 ### What it finds
 
-- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Spaces, Shared knowledge, Pages, Published pages, Preview, Usage and limits, Model arena, Activity, System and Settings.
+- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Spaces, Shared knowledge, Library, Images and videos, Published pages, Preview, Usage and limits, Model arena, Activity, System and Settings.
 - **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or space, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.
@@ -128,14 +128,14 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
 - **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
 - **Spaces**: your spaces, by name and description. Opening one opens the space.
-- **Apps**, **Scheduled tasks**, **Assistants**, **Skills**, **Pages** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
+- **Apps**, **Scheduled tasks**, **Assistants**, **Skills**, **Pages**, **Images and videos** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
 - **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
 
 ### Choose where it looks
 
-**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Spaces**, **Pages**, **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Assistants**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions) and **Guide**.
+**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Spaces**, **Library** (pages, images and videos), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Assistants**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions) and **Guide**.
 
-- Tick one or more, and the box looks only there. The button names them ("Sessions, Pages", or "3 places") in the accent colour. Click a place again to take it out, or **Everywhere** to look in all of them again.
+- Tick one or more, and the box looks only there. The button names them ("Sessions, Library", or "3 places") in the accent colour. Click a place again to take it out, or **Everywhere** to look in all of them again.
 - With nothing typed, it lists what the places you picked hold, the ones you use most first: your recent sessions, spaces and pages, the sections of Settings, the topics of the guide. Messages, memory notes and files wait for your words.
 - What you pick is kept on every device until you change it. When nothing is found, **Search everywhere** under the message looks in every place again.
 - On a phone, **Search in** is the filter icon beside **Cancel** (it names the places once you pick some), and its list opens from the bottom of the screen.

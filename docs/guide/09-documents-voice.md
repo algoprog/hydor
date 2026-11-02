@@ -1,6 +1,6 @@
-# Documents, images and voice
+# Documents, images, videos and voice
 
-Agents in Naget Agent read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures, or change yours, with an image model. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
+Agents in Naget Agent read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures and short videos, or change yours, with image and video models, and you can keep what they make in your Library. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
 
 ![An agent that read a report and made a one-page Word summary and a spreadsheet with a chart](images/documents-voice.webp)
 
@@ -139,32 +139,73 @@ If LibreOffice can't lay a file out, the viewer says so and its text is still un
 
 ## Let agents make images
 
-Ask any agent for a picture ("make a logo for my bakery", "turn this photo into a watercolour") and it makes it with an image model through OpenRouter, saves it in the session's folder and shows it with its reply. Set it up in **[Settings → Capabilities → Images](/settings?s=images)** (on a phone: Settings, then **Images**).
+Ask any agent for a picture ("make a logo for my bakery", "turn this photo into a watercolour") and it makes it with an image model through OpenRouter, saves it in the session's folder and shows it with its reply. Set it up in **[Settings → Capabilities → Images and video](/settings?s=images)** (on a phone: Settings, then **Images and video**).
 
 - **[Making images](/settings?s=images&find=Making%20images)**: the switch **Let agents make images** gives every agent the tool for it. It is on unless you turn it off; off, agents are not offered the tool.
-- **The OpenRouter key**: image models are reached through OpenRouter, and each image is paid for with your OpenRouter key. Without one, this section says so, with **Get one at openrouter.ai** and **Add the key**, which opens [Settings → Agents → Models → OpenRouter](/settings?s=models&find=OpenRouter) where the key goes (see [Agents, accounts and models](/guide/agents-models)). With a key, it says "On: agents can make images with your OpenRouter key."
-- **[Image model](/settings?s=images&find=Image%20model)**: the model that makes the images. Until you pick one, it is the app's choice ("The app's choice, until you pick one"): the first of a short list of Google Gemini, OpenAI and FLUX image models that OpenRouter still offers. To pick one:
-  1. Search OpenRouter's image models by name ("flux", "gemini", "recraft"), and sort them **Newest** or **Cheapest**.
-  2. Each row shows the maker, the name, about what one image costs (for a picture of about a megapixel), the month OpenRouter listed it and its id, with tags: **New** (listed in the last 30 days), **Edits** (it takes pictures to change or follow) and **Text too** (it writes text with its images).
+- **The OpenRouter key**: image and video models are reached through OpenRouter, and each image or video is paid for with your OpenRouter key. Without one, this section says so, with **Get one at openrouter.ai** and **Add the key**, which opens [Settings → Agents → Models → OpenRouter](/settings?s=models&find=OpenRouter) where the key goes (see [Agents, accounts and models](/guide/agents-models)).
+- **[Image model](/settings?s=images&find=Image%20model)**: the model that makes the images, shown with its maker, about what one image costs (for a picture of about a megapixel), the month OpenRouter listed it and its id, with tags: **New** (listed in the last 30 days), **Edits** (it takes pictures to change or follow) and **Text too** (it writes text with its images). Until you pick one, it is the app's choice ("The app’s choice, until you pick one"): the first of a short list of Google Gemini, OpenAI and FLUX image models that OpenRouter still offers. To pick one:
+  1. Click **Change**: a list of OpenRouter's image models opens.
+  2. Search it by name ("flux", "gemini", "recraft"), and sort it **Newest** or **Cheapest**.
   3. Click a row to use that model. **Let the app choose instead** goes back to the app's choice.
 
-The list comes from OpenRouter and needs no key; when it can't be reached, the section says so.
+The lists come from OpenRouter and need no key; when they can't be reached, the list says so.
+
+## Let agents make videos
+
+Agents can make short videos too ("ten seconds of waves at dusk", "make this photo of my dog run through a field"), with a video model through OpenRouter, in the same section, **[Settings → Capabilities → Images and video](/settings?s=images)**:
+
+- **[Making videos](/settings?s=images&find=Making%20videos)**: the switch **Let agents make videos** gives every agent the tool for it. It is on unless you turn it off.
+- **[Video model](/settings?s=images&find=Video%20model)**: the model that makes them, shown with its maker, what a second of video costs (from its lowest resolution without sound to its highest with sound, as "$0.03 to $0.08 a second"), the lengths it makes ("4 to 8 s"), its highest resolution ("up to 1080p") and the month OpenRouter listed it, with tags: **Sound** (it makes sound with the picture), **From a picture** (it can start from a picture you give) and **Edits videos** (it changes a video you give it instead of making one from words). Until you pick one, it is the app's choice: the first of a short list of cheap, quick models with sound (Google Veo 3.1 Lite first) that OpenRouter still offers. **Change** opens the list to search ("veo", "kling", "seedance") and sort **Newest** or **Cheapest**.
+
+Videos cost far more than pictures: from a few cents to dollars a second, and a video of 8 seconds with sound from a top model can cost several dollars. Each one is paid for with your OpenRouter key, and you see its price on a form before anything is made.
+
+## Check the settings before anything is made
+
+Before an agent makes a picture or a video, a short form shows in the conversation with the settings that model takes and what the result costs, filled in with what you asked for and the app's defaults:
+
+- for a picture: **Shape** (square, wide, tall…, as many as the model takes), **Resolution** (1K, 2K, 4K…), **Quality**, **How many pictures** (for models that make several at once) and **Transparent background** (for a logo or an icon);
+- for a video: **Video length** (the lengths the model makes, or **Length, in seconds**), **Shape**, **Resolution** and **Sound**.
+
+Above the fields are the model's name, its price ("about $0.08 an image", "$0.03 to $0.08 a second, by resolution and sound"; for a video, what it comes to with the settings shown) and what the agent will ask for, in its own words. Change what you like and click **Make it**; **Not now** closes the form, and nothing is made or spent. The form shows only the settings the model offers.
+
+The form comes once per model in a session: later pictures and videos in that session use the settings you picked, unless you ask for others ("now a tall one"). Say "show me the settings again" for the form, or "go ahead, choose for me" for the agent to make it without one. Scheduled tasks and apps' runs make theirs without a form, with the app's defaults, since nobody is there to answer.
 
 ## Ask for a picture, or have one changed
 
 Describe what you want: the subject, the setting, the style (a photo, an illustration, a watercolour), the colours, the light, and any words that should appear in it. The agent can also:
 
-- **change or combine your pictures**: up to 4 picture files on this computer (PNG, JPEG, WebP or GIF, up to 20 MB each), in the session's folder or by their path; say what to change. (A picture attached to a message goes to the model to look at; for the image model to work from it, it needs to be a file: upload it on the Files page.) This needs a model with the **Edits** tag; with another, the agent is told to describe the change in words or to have you pick a model that edits pictures;
-- **pick a shape**: square (the default), 16:9 wide, 9:16 tall, and 4:3, 3:4, 3:2, 2:3, 5:4, 4:5 or 21:9;
-- **ask for a size**, where the model offers a choice: 1K (the default), 2K or 4K, which take longer and cost more.
+- **change or combine your pictures**: picture files on this computer (PNG, JPEG, WebP or GIF, up to 20 MB each; most models take up to 4, some more), in the session's folder or by their path; say what to change. (A picture attached to a message goes to the model to look at; for the image model to work from it, it needs to be a file: upload it on the Files page.) This needs a model with the **Edits** tag; with another, the agent is told to describe the change in words or to have you pick a model that edits pictures;
+- **use another model** for one picture, when you name it ("make it with FLUX 2 Pro"), without changing Settings.
 
 Pictures are saved in an **images** folder inside the session's folder, named after what they show, and never over a file that is already there.
 
 In the conversation:
 
 - While the model works, a placeholder in the shape asked for says "Making an image" with the time so far, and the description under it.
-- Then the pictures show with the reply, with the description and the model's name under them. Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a space**, **Copy path**) appear when you point at it (on a phone they are always there).
+- Then the pictures show with the reply, with the description and the model's name under them, and **Save to Library** (see [Keep a picture or a video](#keep-a-picture-or-a-video)). Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a space**, **Copy path**) appear when you point at it (on a phone they are always there); with several pictures, **Save to Library** is there too.
 - Without an OpenRouter key you see "Images need an OpenRouter key", with **Add an OpenRouter key**. When the model makes nothing, you see "No image this time" with its reason.
+
+## Ask for a video
+
+Describe the scene, what moves and how, the camera ("a slow push-in", "it follows the cyclist"), the style and the light, and any sound or words spoken. The agent can also:
+
+- **start from a picture**: a picture file to be the video's first frame ("make this photo come alive"), and for some models one to end on, for models with the **From a picture** tag;
+- **follow pictures**: up to 4 pictures of a character, a product or a style for the video to keep to, without being its frames;
+- **change a video**: a video file (MP4, WebM or MOV, up to 40 MB) for a model with the **Edits videos** tag to edit, extend or sharpen.
+
+A video takes from under a minute to several. The agent waits for it, about nine minutes at most; when it takes longer, the app keeps it coming and saves it when it is ready, and the agent shows it once it checks again. Nothing more is spent by waiting.
+
+Videos are saved in a **videos** folder inside the session's folder, named after what they show.
+
+In the conversation:
+
+- While the model works, a placeholder in the video's shape says "Making a video" with the time so far.
+- Then the video shows with the reply, ready to play (full screen too, from its controls), with the description and the model's name under it, and **Save to Library**. Over it, **Show in the files**, **Download** and **More** (⋯) appear when you point at it.
+- "Still being made" means the agent stopped waiting before the video was ready: it shows once the agent checks again (ask it to, if it does not). "No video this time" gives the reason: you closed the form, or the model refused (its words say why).
+
+## Keep a picture or a video
+
+**Save to Library**, under a picture or a video an agent made, keeps a copy of it in your [Library](/guide/library#images-and-videos-in-the-library), where a model writes a title and a description for it, and where it stays after the session's folder is cleaned up. The button then reads **In your Library** and opens it there.
 
 ## Dictate a message
 
@@ -289,3 +330,6 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Which image model do agents use now, and about what does one image cost?"
 - "Switch the image model to the cheapest one that can edit pictures."
 - "Stop agents from making images."
+- "Which video models make sound, and what does a second cost with each?"
+- "Make agents use Kling for videos."
+- "Stop agents from making videos."

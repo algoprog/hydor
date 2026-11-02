@@ -14,6 +14,9 @@ How to run Naget Agent with Docker or as a service of your user, and keep it up 
   in a sandbox of its own (on Debian or Ubuntu `sudo apt install texlive-latex-extra texlive-xetex latexmk
   poppler-utils bubblewrap`; LuaLaTeX runs only in that sandbox). The Docker image leaves TeX out; build it with
   `--build-arg LATEX=true` to add it (about 500 MB more; pdfLaTeX and XeLaTeX).
+- Optional: [ffmpeg](https://ffmpeg.org/) (`sudo apt install ffmpeg`), for the Library to take a video's frames,
+  which its title and description are written from, and stills of videos. Without it, a video's description comes
+  from the words it was made from. The Docker image has it (`--build-arg FFMPEG=false` leaves it out).
 
 ## With Docker
 

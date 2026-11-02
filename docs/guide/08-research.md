@@ -44,14 +44,14 @@ Researchers search with the app's own web search and read pages with its page re
 
 ### Follow it in the session
 
-A bar above the lead session's message box shows what the research is doing: **Deep research** · "Planning", then "Round 1 of 2 · 4 researchers at work", "Reading the reports" between rounds, "Checking the sources" while researchers check the key claims, "Writing the report", and at the end "Report ready" · and how much of the budget is used ("12 of 60 searches"). Once the report is there, **Open report** at the right of the bar opens it: the page in Pages, or the Word document. Point at the bar to see the research's settings and what the report will be.
+A bar above the lead session's message box shows what the research is doing: **Deep research** · "Planning", then "Round 1 of 2 · 4 researchers at work", "Reading the reports" between rounds, "Checking the sources" while researchers check the key claims, "Writing the report", and at the end "Report ready" · and how much of the budget is used ("12 of 60 searches"). Once the report is there, **Open report** at the right of the bar opens it: the page in the Library, or the Word document. Point at the bar to see the research's settings and what the report will be.
 
 Each researcher shows as a card marked "Researcher" in the lead's conversation and sits under the lead in the sidebar, like any [child session](/guide/research#follow-child-sessions). What each one reports back shows as a line, "Reply from" and its title, with the start of what it found: click the line to read it. Open a researcher to watch it work: its bar says "Researching for" and the lead's title, with **Lead** to go back.
 
 ### The report
 
-- **Page**: the report is saved as a page you keep. It shows in the conversation and stays in your Pages library ([Pages and published sites](/guide/pages)).
-- **Word**: the report is a Word document (.docx) in the session's folder, made with the app's **word-documents** skill, and shows as a file card you can open or download ([Documents, images and voice](/guide/documents-voice#open-or-download-the-files-an-agent-made)).
+- **Page**: the report is saved as a page you keep. It shows in the conversation and stays in your Library ([Library: pages, images, videos and sites](/guide/library)).
+- **Word**: the report is a Word document (.docx) in the session's folder, made with the app's **word-documents** skill, and shows as a file card you can open or download ([Documents, images, videos and voice](/guide/documents-voice#open-or-download-the-files-an-agent-made)).
 
 A deep research runs many agents at once. Set a spending cap in the same Options menu before you start: it covers the lead and all its researchers ([Put a spending cap on a session](/guide/research#put-a-spending-cap-on-a-session)).
 

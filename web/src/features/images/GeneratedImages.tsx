@@ -1,6 +1,6 @@
 // Images an agent made (generate_image), with its reply: while the model works a placeholder of the
-// shape asked for; then the pictures, a tap away from full size (the lightbox) and download. Without
-// an OpenRouter key, or with the tool turned off, a way to Settings.
+// shape asked for; then the pictures, a tap away from full size (the lightbox), download, and keeping them
+// in the Library. Without an OpenRouter key, or with the tool turned off, a way to Settings.
 import { useEffect, useState } from 'react';
 import { Download, FolderOpen, ImageOff, KeyRound, Sparkles } from 'lucide-react';
 import type { ToolItem } from '@shared/types';
@@ -11,6 +11,7 @@ import { go, showInFiles } from '../../lib/nav';
 import { Button, cx, IconButton } from '../../components/ui';
 import { download } from '../documents/FileCards';
 import { FileMore } from '../files/SpaceMenu';
+import { KeepButton, KeepIcon } from '../media/Keep';
 
 interface Pic {
   path: string;
@@ -53,7 +54,7 @@ function Working({ since, aspect, prompt }: { since?: number; aspect?: string; p
   );
 }
 
-export function GeneratedImages({ item }: { item: ToolItem; sessionKey: string }) {
+export function GeneratedImages({ item, sessionKey }: { item: ToolItem; sessionKey: string }) {
   const t = item.tool;
   const input = (t.input ?? {}) as { prompt?: unknown; aspect_ratio?: unknown };
   const prompt = typeof input.prompt === 'string' ? input.prompt : undefined;
@@ -104,18 +105,28 @@ export function GeneratedImages({ item }: { item: ToolItem; sessionKey: string }
                 <IconButton label="Download" size="sm" onClick={() => download(p.path)} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white">
                   <Download size={14} />
                 </IconButton>
+                {pics.length > 1 && <KeepIcon path={p.path} prompt={prompt} model={model} sessionKey={sessionKey} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white" />}
                 <FileMore path={p.path} inFiles={false} small iconSize={14} className="bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 hover:text-white" />
               </div>
             )}
           </div>
         ))}
       </div>
-      {(prompt || model) && (
-        <figcaption className="mt-1.5 max-w-[40rem] px-0.5 text-[12.5px] leading-snug text-fg-3">
-          {prompt && <span className="line-clamp-2">{prompt}</span>}
-          {model && <span className="text-[11.5px] text-fg-3/80">{model}</span>}
-        </figcaption>
-      )}
+      <figcaption className="mt-1.5 flex max-w-[40rem] items-start gap-3 px-0.5 text-[12.5px] leading-snug text-fg-3">
+        <span className="min-w-0 flex-1">
+          {prompt && (
+            <span className="line-clamp-2" translate="no">
+              {prompt}
+            </span>
+          )}
+          {model && (
+            <span className="text-[11.5px] text-fg-3/80" translate="no">
+              {model}
+            </span>
+          )}
+        </span>
+        {pics.length === 1 && !broken.has(pics[0].path) && <KeepButton path={pics[0].path} prompt={prompt} model={model} sessionKey={sessionKey} className="shrink-0" />}
+      </figcaption>
     </figure>
   );
 }

@@ -72,7 +72,7 @@ When a session finishes, fails or needs you, the app tells you in the way that f
 - **The app is open in a tab you are not looking at**: a notification from your system, once you turned on **Notify this device**.
 - **The app is closed**, or the phone is in your pocket: a push notification, once you turned on **Notify this device** on that device.
 
-You get no notice about the session you are looking at right now. A session you snoozed that needs you comes back from its snooze at once. In hands-free mode, the app also says out loud when the session it follows finishes or needs you ([Documents, images and voice](/guide/documents-voice)).
+You get no notice about the session you are looking at right now. A session you snoozed that needs you comes back from its snooze at once. In hands-free mode, the app also says out loud when the session it follows finishes or needs you ([Documents, images, videos and voice](/guide/documents-voice)).
 
 ## What each notification says
 

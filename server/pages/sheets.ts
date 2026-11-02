@@ -224,7 +224,7 @@ export function bookForAgent(text: string): string {
 }
 
 const SHEET_HELP = [
-  'Make or change a spreadsheet, kept in the user’s Pages, where they edit it as in Excel or Google Sheets (formulas, formats, sorting, several sheets) and export it to Excel (.xlsx), CSV or PDF. Use it whenever the user wants a spreadsheet, a budget, a tracker, a schedule, an invoice, a plan or any table of numbers they will work with, rather than writing an .xlsx or .csv file (unless they ask for a file, or work on one they have). It shows in the conversation as a table.',
+  'Make or change a spreadsheet, kept in the user’s Library, where they edit it as in Excel or Google Sheets (formulas, formats, sorting, several sheets) and export it to Excel (.xlsx), CSV or PDF. Use it whenever the user wants a spreadsheet, a budget, a tracker, a schedule, an invoice, a plan or any table of numbers they will work with, rather than writing an .xlsx or .csv file (unless they ask for a file, or work on one they have). It shows in the conversation as a table.',
   'The workbook: { title, sheets: [{ name, rows: [[…], …] }] }. rows fill the sheet from A1 (or from start: "B2"), an array per row; a value is a number, words, true or false, null for an empty cell, or a formula: "=SUM(B2:B9)". Words are read as a person types them: "12%" is a percent, "$1,200" an amount, "2026-01-31" a date, "007" stays words; start with \' to keep words as they are. Cells by name, instead or as well: cells: { "B2": 12, "C2": "=B2*2", "D2": { "v": "Paid", "s": { "b": true } } } (as an object, v is taken as it is and f holds a formula, without "=").',
   'Formulas work as in Excel: + - * / ^ & = <> < > <= >=, 50%, references (A1, $A$1, A1:B5, A:A, Sheet2!A1, \'My sheet\'!A1:B2) and functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, COUNTIF(S), SUMIF(S), AVERAGEIF(S), MAXIFS, MINIFS, SUMPRODUCT, PRODUCT, MEDIAN, STDEV, LARGE, SMALL, RANK, ROUND, ROUNDUP, ROUNDDOWN, INT, ABS, SQRT, POWER, MOD, IF, IFS, IFERROR, IFNA, AND, OR, NOT, SWITCH, CHOOSE, VLOOKUP, HLOOKUP, XLOOKUP, INDEX, MATCH, XMATCH, OFFSET, INDIRECT, CONCAT, TEXTJOIN, LEFT, RIGHT, MID, LEN, UPPER, LOWER, PROPER, TRIM, SUBSTITUTE, FIND, SEARCH, TEXT, VALUE, TODAY, NOW, DATE, YEAR, MONTH, DAY, WEEKDAY, EOMONTH, EDATE, DATEDIF, NETWORKDAYS, WORKDAY, PMT, FV, PV, NPER, RATE, NPV, IRR and more. Dates are Excel’s day numbers.',
   'How it looks: header: true makes the first row bold and keeps it in view as the sheet scrolls; formats per column: { "B": "currency", "C:D": "percent", "E": "date", "F": { "fmt": "number", "dp": 1 } } (general, number, percent, currency with cur: "€", date, text; dp: decimals); widths: { "A": 180 } in px (100 otherwise); heights: { "1": 32 } by row number; freeze: { rows: 1, cols: 1 }; styles over ranges: { "A10:D10": { "b": true, "fill": "#fff3cd" } }. A style: b, i, u, s (struck through), color and fill (#hex), align (left, center, right), valign (top, middle, bottom), wrap, fmt, dp, cur, size (pt).',
@@ -239,7 +239,7 @@ export const SAVE_SHEET_SCHEMA = {
   type: 'object',
   properties: {
     id: { type: 'string', description: 'A saved spreadsheet’s id, to save a new version of it.' },
-    title: { type: 'string', description: 'Its name in Pages: "2027 budget".' },
+    title: { type: 'string', description: 'Its name in the Library: "2027 budget".' },
     sheets: { type: 'array', items: { type: 'object' }, description: 'The sheets, in order: { name, rows, cells, header, formats, widths, heights, freeze, styles, file }.' },
     file: { type: 'string', description: 'Instead of sheets: an .xlsx, .ods or .csv file of this session to make the whole workbook from.' },
   },
@@ -1309,7 +1309,7 @@ export function bookPage(book: Workbook, title: string, mode: 'viewer' | 'print'
     const cols = Math.min(e.cols, VIEW_COLS);
     // At least a screen's worth of empty grid, so a short sheet still looks like one.
     const table = tableHtml(sh, si, calc, { rows: Math.max(rows, Math.min(VIEW_ROWS, 20)), cols: Math.max(cols, Math.min(VIEW_COLS, 6)), heads: true, sticky: true, k: 1, thead: 0 }, cls);
-    const more = e.rows > rows || e.cols > cols ? `<div class="nb-note">Showing the first ${rows.toLocaleString('en')} rows and ${cols} columns of ${e.rows.toLocaleString('en')} × ${e.cols}. Open it in Pages to see it all.</div>` : '';
+    const more = e.rows > rows || e.cols > cols ? `<div class="nb-note">Showing the first ${rows.toLocaleString('en')} rows and ${cols} columns of ${e.rows.toLocaleString('en')} × ${e.cols}. Open it in the Library to see it all.</div>` : '';
     sections.push(`<section class="nb-sheet" data-i="${si}"${si ? ' hidden' : ''}><div class="nb-scroll">${table}</div>${more}</section>`);
   });
   const tabs =

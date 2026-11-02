@@ -1,19 +1,19 @@
-# Pages and published sites
+# Library: pages, images, videos and sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They can also make slides, documents, spreadsheets and LaTeX documents you edit as in PowerPoint, Word, Excel or Overleaf. This topic covers watching a page as it is written, changing it yourself, keeping it in your Pages library (with its versions, its data and an address for your phone), making your own or opening your files, saving them as PDF, Word, PowerPoint, Excel, CSV, Markdown or LaTeX files, asking an agent to change what you have open, and publishing a page or a website at a link.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets and LaTeX documents you edit as in PowerPoint, Word, Excel or Overleaf. What you keep goes in your Library, with the images and videos you saved, each with a title and a description written for it. This topic covers watching a page as it is written, changing it, keeping it (with its versions, its data and an address for your phone), keeping images and videos, making your own pages, exporting files, asking an agent to change what you have open, and publishing at a link.
 
-![A page in the editor: its heading picked, with its words and look beside it](images/pages.webp)
+![The Library's Media tab: images and videos kept from conversations, each with its title and description](images/library.webp)
 
 ## Pages in the conversation
 
 When a picture says more than words, an agent shows a page: a report, a chart, a table, a diagram, a mock-up, or options to pick from. Any agent in the app can do this; ask for it in plain words ("show me this as a chart", "compare the three laptops in a table").
 
-On a wide screen the page opens beside the conversation as the agent starts writing it (see [Watch a page as it is written](#watch-a-page-as-it-is-written)), and the conversation keeps a small card for it: its title, what it is ("A page · 24 KB", "Kept in Pages · version 2") and **Open**, or **Beside** for the one shown there. Click a card to show its page beside the conversation.
+On a wide screen the page opens beside the conversation as the agent starts writing it (see [Watch a page as it is written](#watch-a-page-as-it-is-written)), and the conversation keeps a small card for it: its title, what it is ("A page · 24 KB", "Kept in the Library · version 2") and **Open**, or **Beside** for the one shown there. Click a card to show its page beside the conversation.
 
 In a narrower window, on a phone, or with the panel beside the conversation closed, the page sits in the reply, as wide as the conversation, and grows to fit what it holds. A very tall page stops at a set height and shows **See the whole page** at its bottom edge. The bar above the page has:
 
 - the page's title;
-- **Keep**: puts the page in your Pages library (see [Keep a page](#keep-a-page));
+- **Keep**: puts the page in your Library (see [Keep a page](#keep-a-page));
 - **Edit** (the pencil): opens it to change (see [Change a page yourself](#change-a-page-yourself));
 - **Save as a file** (the download icon): saves the page as an `.html` file you can open in any browser, with its ready-made look;
 - **Full screen** (the expand icon): opens the page over the app. Press Escape, tap the close button (✕) or click beside it to close it.
@@ -34,7 +34,7 @@ The panel also opens for an HTML file an agent writes whole (a static site's `in
 
 - Drag the panel's left edge to make it wider or narrower; the app remembers the width on this device.
 - When a conversation has several pages, click the page's title in the panel to switch to another.
-- **More** (⋯) in the panel has **Open in Pages** (a saved page), **Show in Files** (an HTML file), **Save as a file** (or, for a saved page or slides, **Download as** a PDF, a Word document, a PowerPoint file or a web page), and **Open pages here as they are written**: turn it off, and pages wait for you to open them from their cards.
+- **More** (⋯) in the panel has **Open in the Library** (a saved page), **Show in Files** (an HTML file), **Save as a file** (or, for a saved page or slides, **Download as** a PDF, a Word document, a PowerPoint file or a web page), and **Open pages here as they are written**: turn it off, and pages wait for you to open them from their cards.
 - Slides open in the panel in the slides editor ([Edit slides](#edit-slides)).
 - ✕ closes the panel. **Details** in the session's header opens the session's details in its place.
 
@@ -99,7 +99,7 @@ Changes on hover, for a size of screen and for every part of a kind go in a styl
 Once you changed something, a bar at the bottom says **Not saved yet**, with **Discard** and **Save** (Ctrl+S, also from inside the page). Switching between **Use**, **Edit** and **Code** keeps your changes.
 
 - A saved page (in your library) gets a new version: the agent's versions stay, and you can go back to any of them ([Go back to an earlier version](#go-back-to-an-earlier-version)). If the page was saved again while you changed it (by an agent, say), the app asks before putting yours on top; the other stays among the versions.
-- A page shown in the conversation and not kept yet says **Keep with changes**: it goes into Pages, the agent's page as version 1 and yours as version 2.
+- A page shown in the conversation and not kept yet says **Keep with changes**: it goes into the Library, the agent's page as version 1 and yours as version 2.
 - An HTML file is saved in its place. If it changed on disk since you opened it, the app says so instead of writing over it.
 
 ### The agent hears of your changes
@@ -122,16 +122,16 @@ While a page is full screen, your picks wait and go into the message box when yo
 A page shown in the conversation lasts as long as the conversation. To come back to it later, keep it:
 
 1. Click **Keep** in the bar above the page.
-2. "Kept in Pages" confirms it. The button now reads **Kept**; click it to open the page in Pages.
+2. "Kept in the Library" confirms it. The button now reads **Kept**; click it to open the page in the Library.
 
 Changing a shown page and saving it keeps it too (**Keep with changes**, see [Save or discard](#save-or-discard)).
 
 What you entered on the page while it was in the conversation goes with it. Before you keep it, a page remembers what you enter only while it is on screen; once kept, it keeps its data for good (see [The data a page keeps](#the-data-a-page-keeps)).
 
-You can also ask an agent for something to keep from the start: "make me a habit tracker I can use on my phone", "a checklist for moving house". The agent saves it in Pages itself, and a card shows in the conversation with:
+You can also ask an agent for something to keep from the start: "make me a habit tracker I can use on my phone", "a checklist for moving house". The agent saves it in the Library itself, and a card shows in the conversation with:
 
-- the page's title and **Saved in Pages · version 2** (the version this reply saved);
-- **Open**, which opens it in Pages, **Edit** (the pencil) and **Full screen**;
+- the page's title and **Saved in the Library · version 2** (the version this reply saved);
+- **Open**, which opens it in the Library, **Edit** (the pencil) and **Full screen**;
 - the page itself, working, with its data, right in the card.
 
 On a wide screen, while pages show beside the conversation, the card stays small and its page opens beside it.
@@ -142,33 +142,70 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 ## Find your pages
 
-**Pages** in the sidebar ([/pages](/pages)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page by its title in the search box (Ctrl+K, ⌘K on a Mac).
+**Library** in the sidebar ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, an image or a video by its words in the search box (Ctrl+K, ⌘K on a Mac).
 
-The page has two tabs, each with a count:
+The Library has three tabs, each with a count:
 
-- **Saved**: your pages, slides, documents, spreadsheets and LaTeX documents, each as a card with a picture of it (a page as it opens, with its data; slides by their first slide; the others by the top of their first page or sheet; until the picture is taken, its first letter shows), its title, when it last changed and its version, a sign for slides, documents, spreadsheets and LaTeX, a globe when it is published and a cylinder when it keeps data. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Rename**, **Duplicate** (a copy without its data), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**.
-- **Published**: the pages and folders you published, with their links (see [See and unpublish what you published](#see-and-unpublish-what-you-published)). [Open the Published tab](/pages?tab=published).
+- **Pages**: your pages, slides, documents, spreadsheets and LaTeX documents, each as a card with a picture of it (a page as it opens, with its data; slides by their first slide; the others by the top of their first page or sheet; until the picture is taken, its first letter shows), its title, when it last changed and its version, a sign for slides, documents, spreadsheets and LaTeX, a globe when it is published and a cylinder when it keeps data. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Rename**, **Duplicate** (a copy without its data), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**.
+- **Media**: the images and videos you kept (see [Images and videos in the Library](#images-and-videos-in-the-library)). [Open the Media tab](/library?tab=media).
+- **Published**: the pages and folders you published, with their links (see [See and unpublish what you published](#see-and-unpublish-what-you-published)). [Open the Published tab](/library?tab=published).
 
 With more than four pages, **Find a page** above the cards narrows them by title, and the button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
 
-With nothing kept yet, the Saved tab says "No pages yet", with **New page** and **New slides**.
+With nothing kept yet, the Pages tab says "No pages yet", with **New page** and **New slides**.
+
+## Images and videos in the Library
+
+Pictures and videos agents make for you stay in the session's folder (see [Ask for a picture, or have one changed](/guide/documents-voice#ask-for-a-picture-or-have-one-changed) and [Ask for a video](/guide/documents-voice#ask-for-a-video)). To keep one, click **Save to Library** under it in the conversation: a copy goes into your Library, where it stays after the session's folder is cleaned up, and a model writes its title and description (see [Titles and descriptions](#titles-and-descriptions)). The button then reads **In your Library** and opens it there.
+
+The **Media** tab ([Open the Media tab](/library?tab=media)) shows them, the newest first, each as a card with a still of it, its title and its description (while it is being written, "Writing its title…"); a video's card shows its length on the still. Click a card to open it (see [Open an image or a video](#open-an-image-or-a-video)). Its **More** (⋯) has **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
+
+- With both images and videos kept, **All**, **Images** and **Videos** above the cards show one kind or both.
+- With more than four kept, **Find an image or a video** narrows them by the words in their titles, descriptions and the words they were made from, and the button beside it sorts them **Newest** or by **Name**.
+- With nothing kept yet, the tab says "No images or videos yet", with **Settings for images and video**.
+
+The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF) and videos (MP4, WebM, MOV), up to 1 GB each and 5,000 in all, in the app's data folder. Agents can work from what you kept: ask "use the boat picture from my Library for a birthday card", and the agent finds it there.
+
+## Titles and descriptions
+
+Each image or video you keep gets a title and a description written by a model that sees images: it looks at the picture, or at ten frames of the video spread from its start to its end, put together on one picture, with the words it was made from as a hint. They are written in the app's language.
+
+Pick the model in **[Settings → Capabilities → Images and video → Captions in the Library](/settings?s=images&find=Captions%20in%20the%20Library)**:
+
+- **Where it runs**: **Automatic** (a cheap model through OpenRouter when you have an OpenRouter key, Google's Gemini Flash Lite first; else Claude Haiku through your Claude Code sign-in), **OpenRouter** (any model in its catalog that sees images: **Pick a model** opens the list to search), **Claude** (**Claude Haiku**, **Claude Sonnet** or **Claude Opus**, through your Claude Code sign-in), **Ollama** or **vLLM** (a model on this computer that sees images, from [Settings → Models](/settings?s=models)), or **Your endpoints** (an OpenAI-compatible endpoint's model; whether it sees images is not known, so it says "may not see images").
+- **Model**: for Claude, Ollama, vLLM and your endpoints, the model to use.
+- Under them, "Written by" and the model in use, or why no model can write them now.
+
+Writing them costs a fraction of a cent through OpenRouter, and nothing on a model on this computer. A video's frames need ffmpeg on the computer the app runs on; without it, the section says so, and videos get their title and description from the words they were made from, and show without a still.
+
+When no model could write them, they come from the words the image or video was made from (or its file's name), and its page says so, with **Try again** and **Pick the model**. You can also write your own: **Edit the title and description** on its page. What you write stays, until you choose **Write them again**.
+
+## Open an image or a video
+
+An image or a video opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s images and videos**), its title with "An image" or "A video" and its length under it, **Download** and **More** (⋯): **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from) and **Delete**.
+
+Below, the picture (click it for full size) or the video, to play, and beside it (under it on a phone):
+
+- its title and description, with the pencil to change them, and the model that wrote them;
+- **Made with** (the model that made it), **From the words** (what it was made from), its **Size**, its **Length** (a video), its **File** size and when it was **Kept**;
+- for a video, **The frames its description was written from**: the ten frames the model saw (click for full size).
 
 ## Make a page
 
-**New page**, at the top right of the Saved tab ([or from the search box](/pages?new=1)), makes a page of your own. At the top, pick what to make: **A page**, **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet** or **LaTeX** (see [Documents](#documents), [Spreadsheets](#spreadsheets) and [LaTeX documents](#latex-documents)). For a page:
+**New page**, at the top right of the Pages tab ([or from the search box](/library?new=1)), makes a page of your own. At the top, pick what to make: **A page**, **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet** or **LaTeX** (see [Documents](#documents), [Spreadsheets](#spreadsheets) and [LaTeX documents](#latex-documents)). For a page:
 
 1. Pick where it starts: **Blank page** (a heading and some words, to build on), **Notes** (a page to write in, kept as you type), **Checklist** (things to do, ticked off as you go) or **Tracker** (a number a day, with the last 30 days drawn).
 2. Change **Its name** if you like, and click **Make it**. A blank page opens in **Edit**; the others open ready to use.
 
 A document, a spreadsheet or a LaTeX document starts empty but for its name (a LaTeX document with a short article to build on), or from a file of yours: **Open a Word or text file** (.docx, .md, .txt or .html), **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv) or **Open a .tex or .zip file** (one LaTeX file, or a whole project in a .zip). The file becomes a page of its kind; the file itself stays as it was. To change the file itself, open it in Files: it opens in the same editor and saves back to the file (see [Edit Word, Excel, CSV and LaTeX files](/guide/files-git#edit-word-excel-csv-and-latex-files)).
 
-Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking", "a monthly budget for two") and click **Ask**: the start page opens with your words, for an agent to make it and keep it in Pages.
+Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking", "a monthly budget for two") and click **Ask**: the start page opens with your words, for an agent to make it and keep it in your Library.
 
 ## Open a page
 
-A page opens full screen inside the app, at its own place in Pages. The bar at the top has:
+A page opens full screen inside the app, at its own place in the Library. The bar at the top has:
 
-- the back arrow (**All pages**) to the list;
+- the back arrow (**The Library**) to the list;
 - the page's title, and under it its version, when it last changed and how much data it keeps. Click the title to rename the page;
 - **Use**, **Edit** and **Code**, and the **Computer**, **Tablet** and **Phone** sizes (see [Change a page yourself](#change-a-page-yourself));
 - **Versions** (the clock): its earlier versions (see [Go back to an earlier version](#go-back-to-an-earlier-version));
@@ -199,12 +236,12 @@ Agents can export too: ask "send me the deck as a PowerPoint file", "make a PDF 
 
 ## Slides
 
-Slides are kept in Pages too, with versions, a picture in the list and an address of their own. You edit them as in PowerPoint or Google Slides, present them full screen or with a presenter's view, and save them as PowerPoint or PDF files.
+Slides are kept in the Library too, with versions, a picture in the list and an address of their own. You edit them as in PowerPoint or Google Slides, present them full screen or with a presenter's view, and save them as PowerPoint or PDF files.
 
 ### Make slides
 
-- **Ask an agent**: "make me 8 slides on our first year, with a chart of the sales", "turn this report into a short talk with speaker notes". The agent makes the deck in Pages and it shows in the conversation as a slideshow.
-- **New page** in Pages, then **Slides** at the top ([or New slides from the search box](/pages?new=slides)): pick a look (**Daylight**, **Midnight**, **Ember**, **Forest**, **Ocean**, **Noir**, **Blossom** or **Slate**), **Wide (16:9)** or **Standard (4:3)**, a name, and **Make it**. Or describe the talk under **Or describe it, and an agent makes it**.
+- **Ask an agent**: "make me 8 slides on our first year, with a chart of the sales", "turn this report into a short talk with speaker notes". The agent makes the deck in the Library and it shows in the conversation as a slideshow.
+- **New page** in the Library, then **Slides** at the top ([or New slides from the search box](/library?new=slides)): pick a look (**Daylight**, **Midnight**, **Ember**, **Forest**, **Ocean**, **Noir**, **Blossom** or **Slate**), **Wide (16:9)** or **Standard (4:3)**, a name, and **Make it**. Or describe the talk under **Or describe it, and an agent makes it**.
 
 ### Edit slides
 
@@ -243,9 +280,9 @@ Slides also present from their own address on a phone or from a published link, 
 
 ## Documents
 
-Documents are kept in Pages too, with versions, a picture in the list and an address of their own. You write and edit them as in Word or Google Docs, on a page the size of their paper, and save them as Word, PDF or Markdown files.
+Documents are kept in the Library too, with versions, a picture in the list and an address of their own. You write and edit them as in Word or Google Docs, on a page the size of their paper, and save them as Word, PDF or Markdown files.
 
-- **Make one**: ask an agent ("write me a cover letter for this job ad", "turn my notes into a two-page report"), or **New page** in Pages, then **Document** ([or New document from the search box](/pages?new=doc)): empty, or from a file of yours with **Open a Word or text file**.
+- **Make one**: ask an agent ("write me a cover letter for this job ad", "turn my notes into a two-page report"), or **New page** in the Library, then **Document** ([or New document from the search box](/library?new=doc)): empty, or from a file of yours with **Open a Word or text file**.
 - **The toolbar**: **Undo** and **Redo**; the paragraph's style (**Normal text**, **Title**, **Subtitle**, **Heading 1** to **Heading 4**, **Quote** or **Code**); the font and its size; **Bold**, **Italic** and **Underline**; **Text colour** and **Highlight**; **Link** (Ctrl+K); **Alignment**; **Bullets**, **Numbers** and **Checklist**; **Insert**: **A picture from this device**, **A picture from the web**, **A table** (pick its size on the grid), **A line across** or **A page break**; **Table**, while you are in one: **Insert a row above** or **below**, **Insert a column on the left** or **on the right**, **Header row**, and deleting the row, the column or the table; and **More formatting**: **Strikethrough**, **Superscript**, **Subscript**, **Less indent**, **More indent** and **Clear the formatting**. On a phone it scrolls sideways.
 - **Keys**: Ctrl+B, Ctrl+I and Ctrl+U; Ctrl+Alt+1 to 4 for a heading and Ctrl+Alt+0 for normal text; Ctrl+Shift+7, 8 and 9 for numbers, bullets and a checklist; Tab and Shift+Tab to indent a list (in a table: the next cell, with a new row after the last); Ctrl+Enter for a page break. At the start of a line, `# `, `- `, `1. `, `[] ` and `> ` make a heading, a list, a checklist or a quote.
 - **Pictures**: click one to pick it and drag a corner to size it; its bar puts it **On the left**, **In the middle** or **On the right**, gives it a **Caption** and a **Description** (for people who can't see it), puts **Another picture** in its place, or deletes it. A picture pasted or dropped on the page goes where you drop it.
@@ -256,9 +293,9 @@ Pick some words and **Ask the agent about it** shows above them. Changes stay un
 
 ## Spreadsheets
 
-Spreadsheets are kept in Pages too, with versions, a picture in the list and an address of their own. You work in them as in Excel or Google Sheets, with formulas, and save them as Excel, CSV or PDF files.
+Spreadsheets are kept in the Library too, with versions, a picture in the list and an address of their own. You work in them as in Excel or Google Sheets, with formulas, and save them as Excel, CSV or PDF files.
 
-- **Make one**: ask an agent ("make me a monthly budget for two, with totals", "put these numbers in a spreadsheet and add a column with each one's share"), or **New page** in Pages, then **Spreadsheet** ([or New spreadsheet from the search box](/pages?new=sheet)): empty, or from a file of yours with **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv).
+- **Make one**: ask an agent ("make me a monthly budget for two, with totals", "put these numbers in a spreadsheet and add a column with each one's share"), or **New page** in the Library, then **Spreadsheet** ([or New spreadsheet from the search box](/library?new=sheet)): empty, or from a file of yours with **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv).
 - **Cells**: click one, or drag across several (Shift-click adds to the range; click a column's letter or a row's number to pick it all). Type to replace what a cell holds, or double-click it (or F2) to change it; Enter goes down, Tab right, Esc cancels. A value that starts with = is a formula: `=SUM(B2:B9)`, `=B2*C2`, `=IF(C2>100,"high","ok")` (Excel's functions, about two hundred of them, from SUM, AVERAGE and IF to VLOOKUP, XLOOKUP, SUMIFS, TEXT, the dates and the loans). While you type one, click cells to put them in, and the names of functions that match show below it.
 - **The name box** at the top left shows the cell picked; type a cell or a range (C12, B2:D9) and press Enter to go there. Beside it, the cell's formula or value, to change it there too.
 - **The toolbar**: **Undo** and **Redo**; **How numbers show** (**Automatic**, **Number**, **Percent**, **Currency** in dollars, pounds or euros, **Date** or **Text**), with **Fewer decimals** and **More decimals**; **Type size**; **Bold**, **Italic**, **Underline** and **Strikethrough**; **Text colour** and **Fill colour**; **Align left**, **Align centre** and **Align right**; **Wrap words in the cell**; **Keep in view (freeze)**: **Nothing frozen**, **The first row**, **The first column**, or the rows or columns up to the cell picked; **Sort A to Z** and **Sort Z to A**, by the cell's column; and **Rows and columns**, to insert rows above or below, columns left or right, or delete them.
@@ -272,7 +309,7 @@ With several numbers picked, the bar at the bottom shows their **Sum**, **Averag
 
 A LaTeX document is its source (the main file, main.tex, and any others it reads, such as a .bib of references) and its pictures, typeset into pages by LaTeX on the computer the app runs on. You edit the source beside its typeset pages, as in Overleaf, and save the PDF, the .tex file or the whole project.
 
-- **Make one**: ask an agent ("write up these results as a short paper in LaTeX, with the equations numbered"), or **New page** in Pages, then **LaTeX** ([or New LaTeX document from the search box](/pages?new=tex)): a short article to build on, or your own with **Open a .tex or .zip file** (one file, or a project's folder in a .zip; PDF pictures in it become PNG ones).
+- **Make one**: ask an agent ("write up these results as a short paper in LaTeX, with the equations numbered"), or **New page** in the Library, then **LaTeX** ([or New LaTeX document from the search box](/library?new=tex)): a short article to build on, or your own with **Open a .tex or .zip file** (one file, or a project's folder in a .zip; PDF pictures in it become PNG ones).
 - **The source** has a tab for each file and one for **Pictures** (to add, rename, put in a figure or remove them); **Add a file or a picture** (+) has **A new file**, **A file from this device** and **A picture**, and a file's tab renames or deletes it. As you type `\cite{`, `\ref{` or `\includegraphics{`, the document's own references, labels and pictures are offered.
 - **The toolbar**: **Insert** (a section, a subsection, bold or italic words, a bulleted or numbered list, a figure with a picture, a table, an equation, aligned equations, a citation, a footnote or a link, where the cursor is), **Bold** and **Italic**, **Section heading**, **Equation**, **Figure with a picture**, **Outline**, **Find and replace** (Ctrl+F), **Show this line in the PDF** and **Ask the agent**.
 - **Typesetting**: the pages follow what you type, a moment after you stop. **Recompile** (Ctrl+Enter) typesets at once, and its arrow has **Recompile as you type** (to turn that off), **Show the log** and **Open the PDF**. The engine at the top is **pdfLaTeX** (the usual one), **XeLaTeX** (any language, and this computer's fonts) or **LuaLaTeX**. The pages zoom in and out and **Fit the width**; double-click a place on a page to go to its line in the source.
@@ -313,7 +350,7 @@ A page keeps its newest 40 versions. Older ones go first, also when the versions
 
 ## The data a page keeps
 
-A small tool needs to remember things: the workouts you logged, the boxes you ticked, your budget's entries. A kept page stores them with the app, on the computer it runs on, not in one browser. So it shows the same data wherever you open it: in Pages, in its card in the conversation, and at its own address on your phone.
+A small tool needs to remember things: the workouts you logged, the boxes you ticked, your budget's entries. A kept page stores them with the app, on the computer it runs on, not in one browser. So it shows the same data wherever you open it: in the Library, in its card in the conversation, and at its own address on your phone.
 
 - The list and the page's top bar show how much it keeps (`keeps 14 KB`).
 - A page can keep about 2 MB in all, up to 512 KB in one entry and up to 1,000 entries. Past that, it can't save more.
@@ -350,7 +387,7 @@ Add the new address to your home screen again where you want it.
 
 Use **More** (⋯) → **Delete** on its card or in the open page, and confirm. The page goes with all its versions, the data it keeps and any published copy of it. Its address stops working.
 
-Pages holds up to 1,000 pages and slides. One page's HTML can be up to 2 MB; slides' words up to 3 MB, their pictures apart (up to 12 MB each).
+The Library holds up to 1,000 pages and slides. One page's HTML can be up to 2 MB; slides' words up to 3 MB, their pictures apart (up to 12 MB each).
 
 ## Publish a page
 
@@ -371,7 +408,7 @@ The link starts with the address you reach the app at, so people can open it onl
 
 You can also publish a website that a project builds, such as an app made with Vite or a static site generator: the folder its build writes, with an `index.html` in it.
 
-1. Open [Pages → Published](/pages?tab=published) and click **Publish a folder**.
+1. Open [Library → Published](/library?tab=published) and click **Publish a folder**.
 2. Pick **The folder**: a built site with an `index.html` (`dist/`, `build/` or `out/` after the build).
 3. The **Name** fills in from the folder's name; change it if you like.
 4. Pick **Private link** or **Public link**, then click **Publish**.
@@ -396,7 +433,7 @@ Built sites that load their files from the root of the address (`/assets/…`) d
 Agents can publish too, but only with your yes. Ask "publish my site" or "put the trip plan online", and the agent shows a card in the conversation:
 
 - **Publish "Trip plan"?**, with what it would publish: the saved page, or the folder with its number of files and size;
-- **Private link** or **Public link** to pick, with what each means: "It opens in a sandbox, apart from this app; unpublish it any time in Pages.";
+- **Private link** or **Public link** to pick, with what each means: "It opens in a sandbox, apart from this app; unpublish it any time in the Library.";
 - **Publish** and **Not now**.
 
 Nothing is published until you click **Publish**. The agent then gets a message with the outcome and the link. The card changes to **Published "Trip plan"** with the link to copy or open, to **Not published: "Trip plan"** when you clicked **Not now**, or to **"Trip plan" was not published** with the reason when it failed.
@@ -405,7 +442,7 @@ An agent can have up to five requests to publish waiting in one session.
 
 ## See and unpublish what you published
 
-[Pages → Published](/pages?tab=published) lists everything published, the newest first. Each shows its name, **Private link** or **Public link**, what it serves (a page's title or a folder's path) and when it was published, with the link to copy or open.
+[Library → Published](/library?tab=published) lists everything published, the newest first. Each shows its name, **Private link** or **Public link**, what it serves (a page's title or a folder's path) and when it was published, with the link to copy or open.
 
 To take one down:
 
@@ -418,9 +455,9 @@ With nothing published, the tab says "Nothing published". **Publish a folder** i
 
 ## Ask an agent
 
-Agents can read and change your pages for you, with your OK on a card. A few things to try:
+Agents can read and change what is in your Library for you, with your OK on a card. A few things to try:
 
-- "Make me a workout log I can use on my phone, and keep it in Pages."
+- "Make me a workout log I can use on my phone, and keep it in my Library."
 - "I changed the headings on the trip page; now add a map under them."
 - "My budget tracker looked better yesterday: bring back the version from before your last change."
 - "What did I log in my habit tracker this week? Sum it up."
@@ -431,7 +468,10 @@ Agents can read and change your pages for you, with your OK on a card. A few thi
 - "Make me 10 slides for a talk on our first year, with a chart of sales and speaker notes."
 - "On my 'Launch plan' slides, make every title shorter and add a closing slide."
 - "Send me the 'Launch plan' slides as a PowerPoint file, and the report page as a PDF."
-- "Write me a cover letter for this job ad and keep it in Pages: I'll change it myself."
+- "Write me a cover letter for this job ad and keep it in my Library: I'll change it myself."
 - "In my 'Household budget' spreadsheet, add a column with each item's share of the total."
 - "Turn these notes into a short paper in LaTeX, with the equations numbered."
 - "Send me the 'Household budget' spreadsheet as an Excel file."
+- "Which images did I keep in my Library this month? List their titles."
+- "Rename the boat video in my Library to 'Lake test', and write its description again."
+- "Make a birthday card with the tram picture from my Library."

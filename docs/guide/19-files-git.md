@@ -226,13 +226,13 @@ Saving never writes over a newer version without this question.
 
 ## Edit Word, Excel, CSV and LaTeX files
 
-These files open in the editors [Pages](/guide/pages#documents) has for them, and saving writes the same file again, in its own format:
+These files open in the editors the [Library](/guide/library#documents) has for them, and saving writes the same file again, in its own format:
 
 - **Word documents** (.docx) open in the document editor, as in Word or Google Docs, on a sheet of their paper.
 - **Excel files** (.xlsx), **CSV** and **TSV** files open in the spreadsheet editor, with their sheets and working formulas.
 - **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, each in a tab, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document that reads it, on the chapter's own tab.
 
-Change it as in [Pages](/guide/pages#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
+Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
 
 What saving keeps of the file:
 

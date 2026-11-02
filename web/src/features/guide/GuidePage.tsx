@@ -49,6 +49,8 @@ const RENAMED: Record<string, Record<string, string>> = {
 
 /** Topics renamed since links to them were made: an old address opens the new one, at the same section. */
 const MOVED: Record<string, { to: string; sections: Record<string, string> }> = {
+  // Pages became the Library, with the images and videos kept there (2 November 2026); its sections kept their names.
+  pages: { to: 'library', sections: {} },
   // Templates became Apps (2 November 2026).
   templates: {
     to: 'apps',

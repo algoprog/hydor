@@ -81,7 +81,16 @@ agents that speak ACP and take MCP servers.
   turns that off.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
-  Images can be made and edited through OpenRouter.
+- **Images and videos**: agents make pictures (or change yours) and short videos (from words, from a picture to
+  start or end on, or by changing a video) with OpenRouter's image and video models, the ones picked in Settings →
+  Images and video or one you name. First a form in the conversation shows the settings that model takes (shape,
+  resolution, quality, how many, length, sound) and what the result costs; it comes once per model in a session,
+  and scheduled tasks and apps' runs go without it. A video is a job the app follows to its end, also after the
+  agent stops waiting, and plays in the app's own player. **Save to Library** keeps one in the Library, where a
+  model that sees images writes its title and description (a video's from ten of its frames on one picture, with
+  ffmpeg): the app's choice, any of OpenRouter's vision models, Claude through Claude Code, or a model of your own
+  (Ollama, vLLM, an endpoint). The Library's Media tab finds, plays, downloads and edits them, and agents can work
+  from them.
 - **Connections**: a marketplace of apps and services (Notion, Linear, GitHub, Google, Stripe and more), signed
   in once for every agent; anyone can add one with a pull request to `catalog/`. Keys and sign-ins live in an
   encrypted vault: when a task needs one that isn't there, the agent asks with a card (one key, or a sign-in's
@@ -96,8 +105,8 @@ agents that speak ACP and take MCP servers.
   sources, and delivers a cited report as a page or a Word document. How many researchers at a time, how many
   rounds and how many searches in all are yours to set; a bar in the session says what it is doing and the
   searches used, and opens the report once it is ready.
-- **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in a
-  library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
+- **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in the
+  Library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
   link. A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too: click or tap a part to rewrite its words
@@ -156,12 +165,12 @@ agents that speak ACP and take MCP servers.
   it. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases are
   searched. An app can have a screen of its own in place of its form: a page made from its parts (its form,
   its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
-  edited in Pages' editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
+  edited in the Library's page editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
   flows and a conversation with its agent, who finds and changes its records and runs its flows for you (the
   latest conversation shows on return; earlier ones a click away). Apps travel as one file (.naget-app or .json, with their records, screens and the apps they
   call), installed after a card that says what they will do here and offers one of your models for any it asks
   for that is not set up here.
-- **Slides**: decks kept in Pages, made by an agent (save_slides, from layouts or parts placed by position) or
+- **Slides**: decks kept in the Library, made by an agent (save_slides, from layouts or parts placed by position) or
   from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
   layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and
   charts (column, bar, line, area, pie, doughnut), snapping guides, alignment, stacking, undo, copy and paste;
@@ -170,7 +179,7 @@ agents that speak ACP and take MCP servers.
   and a presenter's view with notes, the next slide, a timer and an audience window that follows it. They export
   as PowerPoint (every part still editable, native charts, notes, transitions and animations), PDF or a web page
   that presents itself, and open as a slideshow at their own address or a published link.
-- **Documents, spreadsheets and LaTeX**: kept in Pages beside slides, each with versions, a picture in the list,
+- **Documents, spreadsheets and LaTeX**: kept in the Library beside slides, each with versions, a picture in the list,
   its own address and an agent that changes it on request. Documents (save_doc, written in Markdown, or opened from
   a Word, Markdown, text or HTML file) are edited as in Word or Google Docs on a page of their paper: paragraph
   styles, fonts, sizes, colours and highlights, links, alignment, bullets, numbers and checklists, tables, pictures
@@ -286,8 +295,8 @@ programs shows each program's version and what is out, with Check now, Update no
   uploaded), add it to a space (a file is copied into its folder, a folder joins those it works with), rename,
   duplicate, move or copy to a folder, download (a folder or several as one .zip), delete to a trash with Undo
   and Put back. One search finds names and text inside files, under a folder you pick, by kind. An editor with
-  Markdown and HTML preview and diffs, quick open, and uploads. Word, Excel, CSV and LaTeX files open in Pages'
-  editors and save back to the same file: a CSV's untouched rows and cells keep their exact text, a LaTeX file
+  Markdown and HTML preview and diffs, quick open, and uploads. Word, Excel, CSV and LaTeX files open in the
+  Library's editors and save back to the same file: a CSV's untouched rows and cells keep their exact text, a LaTeX file
   brings the chapters and bibliography it reads and typesets among its folder's pictures (read only to TeX),
   writing only the files that changed; a Word or Excel file says first what the editor doesn't keep (headers and
   footers, comments, charts…), offers to save a copy instead, and its first save keeps the old file in the trash.
@@ -336,12 +345,12 @@ programs shows each program's version and what is out, with Check now, Update no
 ## Everywhere
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The tools at the bottom of the sidebar (Files, Git, Terminal, Pages, Spaces, Apps, Usage, Settings…) stay in
+- The tools at the bottom of the sidebar (Files, Git, Terminal, Library, Spaces, Apps, Usage, Settings…) stay in
   the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
   it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
   every setting, sessions and what was said in them, memory notes, spaces, apps, scheduled tasks, assistants,
-  skills, pages, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
+  skills, the Library's pages, images and videos, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
   page and points at it, a message opens its session at the words. With search by meaning on (Settings →
   Memory) things also match what they mean, in nine languages; what ships with the app has its vectors made
   ahead of time, and what you make gets them as you make it. Search in, beside the field, looks only in the

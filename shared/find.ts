@@ -263,6 +263,8 @@ export function placeOf(pathname: string, search: string, pagePaths: Record<stri
   if (a && a[1] !== 'new') return `app:${decodeURIComponent(a[1])}`;
   const pg = /^\/pages\/([^/]+)$/.exec(pathname);
   if (pg) return `page:${decodeURIComponent(pg[1])}`;
+  const md = /^\/media\/([^/]+)$/.exec(pathname);
+  if (md) return `media:${decodeURIComponent(md[1])}`;
   // A space, on any of its tabs (its files, knowledge, skills, settings).
   const sp = /^\/spaces\/([^/]+)/.exec(pathname);
   if (sp) return `space:${decodeURIComponent(sp[1])}`;

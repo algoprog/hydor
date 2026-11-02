@@ -151,7 +151,7 @@ function soon(d: D, kind: Kind) {
 }
 
 /** The pages hear of each feature's list changing by its id. */
-const FEATURE_KIND: Record<string, Kind> = { apps: 'apps', assistants: 'assistants', skillpack: 'skills', pages: 'pages', connections: 'connections', spaces: 'spaces' };
+const FEATURE_KIND: Record<string, Kind> = { apps: 'apps', assistants: 'assistants', skillpack: 'skills', pages: 'pages', media: 'pages', connections: 'connections', spaces: 'spaces' };
 let wasOn: boolean | null = null;
 
 /** An event went to the pages: what it changed gets its vector now. */
