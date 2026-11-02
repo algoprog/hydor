@@ -9,6 +9,7 @@ import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
 import type { DataOp, Flow, Step, StepKind } from '@shared/app-manifest';
 import { allSteps, checkFlow, cleanFlow, givesOf, labelOf, STEP_KINDS, STEP_TOOLS, titleOf } from '@shared/app-manifest';
 import { api } from '../../lib/api';
+import { FlowGraph } from './FlowGraph';
 import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch } from '../../components/ui';
 
 const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml };
@@ -67,6 +68,19 @@ function listsOf(s: Step): { key: string; label: string }[] {
   if (s.do === 'parallel') s.branches.forEach((_, n) => out.push({ key: `b${n}`, label: `Branch ${n + 1}` }));
   if (Array.isArray(s.failed)) out.push({ key: 'failed', label: 'If it fails, instead' });
   return out;
+}
+
+/** Where a step is in the flow, as the list's open card names it (null: not there). */
+function keyOf(steps: Step[], id: string, list: ListPath = []): string | null {
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    if (s.id === id) return JSON.stringify([...list, i]);
+    for (const { key } of listsOf(s)) {
+      const k = keyOf(childList(s, key), id, [...list, i, key]);
+      if (k) return k;
+    }
+  }
+  return null;
 }
 
 const refRe = (id: string) => new RegExp(`(\\{\\{\\s*[#^/]?\\s*)${id}(?=[.\\[}\\s])`, 'g');
@@ -1120,6 +1134,7 @@ function StepList({ steps, list, ctx }: { steps: Step[]; list: ListPath; ctx: Ct
 export function StepsEditor({ recipe, onChange }: { recipe: AppRecipe & { flow: Flow }; onChange: (p: Partial<AppRecipe>) => void }) {
   const flow = recipe.flow;
   const [open, setOpen] = useState<string | null>(null);
+  const [view, setView] = useState<'list' | 'graph'>('list');
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [models, setModels] = useState<{ id: string; label: string }[]>([]);
   const [apps, setApps] = useState<AppDef[]>([]);
@@ -1194,7 +1209,30 @@ export function StepsEditor({ recipe, onChange }: { recipe: AppRecipe & { flow: 
 
   return (
     <div className="space-y-4">
-      <StepList steps={flow.steps} list={[]} ctx={ctx} />
+      {flow.steps.length > 1 && (
+        <div className="-mt-1 flex justify-end">
+          <Segmented
+            size="sm"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'list', label: 'List' },
+              { value: 'graph', label: 'Graph' },
+            ]}
+          />
+        </div>
+      )}
+      {view === 'graph' && flow.steps.length > 1 ? (
+        <FlowGraph
+          flow={flow}
+          onPick={(id) => {
+            setView('list');
+            setOpen(keyOf(flow.steps, id));
+          }}
+        />
+      ) : (
+        <StepList steps={flow.steps} list={[]} ctx={ctx} />
+      )}
       {recipe.answer.length > 0 && (
         <div>
           <div className="mb-1.5 text-[12.5px] font-medium text-fg-2">Where its answer comes from</div>
