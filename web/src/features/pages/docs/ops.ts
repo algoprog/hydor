@@ -1,0 +1,756 @@
+// The editing of a document, as changes to its model: where a place in it is (a block, a table's cell, how far into
+// its words), and what each edit does: typing, Enter, Backspace at a block's start and Delete at its end, taking
+// out what is selected, pasting blocks, the look of words, a paragraph's style, lists and indents, alignment,
+// tables' rows and columns, pictures. Pure functions of the model: the editor (engine.ts) maps the browser's
+// selection to places and draws what they return.
+import {
+  docText,
+  listInfo,
+  lookOf,
+  mergeRuns,
+  newId,
+  runsText,
+  type Align,
+  type Block,
+  type Cell,
+  type Doc,
+  type ImageBlock,
+  type ItemBlock,
+  type ListKind,
+  type Look,
+  type ParaBlock,
+  type ParaStyle,
+  type Run,
+  type TableBlock,
+  type TextBlock,
+} from '@shared/docs';
+
+/** A place in a document: in a block's words (or a table's cell's: row, column), `o` characters in. */
+export interface Pos {
+  b: string;
+  c?: [number, number];
+  o: number;
+}
+
+export interface Edit {
+  doc: Doc;
+  /** Where the caret goes. */
+  at: Pos;
+  /** A picture (or a line, a page break) to pick instead. */
+  pick?: string;
+}
+
+export const isText = (b: Block | undefined): b is TextBlock => !!b && (b.type === 'p' || b.type === 'li');
+export const sameCell = (a?: [number, number], b?: [number, number]) => (!a && !b) || (!!a && !!b && a[0] === b[0] && a[1] === b[1]);
+/** In the same words: the same block, and the same cell of it. */
+export const sameBox = (a: Pos, b: Pos) => a.b === b.b && sameCell(a.c, b.c);
+export const samePos = (a: Pos, b: Pos) => sameBox(a, b) && a.o === b.o;
+
+const indexes = new WeakMap<Block[], Map<string, number>>();
+
+/** Where a block is in the document (-1 when it is not). */
+export function indexOf(doc: Doc, id: string): number {
+  let m = indexes.get(doc.blocks);
+  if (!m) {
+    m = new Map(doc.blocks.map((b, i) => [b.id, i]));
+    indexes.set(doc.blocks, m);
+  }
+  return m.get(id) ?? -1;
+}
+
+export const blockOf = (doc: Doc, id: string): Block | undefined => doc.blocks[indexOf(doc, id)];
+
+/** Which of two places comes first (negative when `p` does). */
+export function cmp(doc: Doc, p: Pos, q: Pos): number {
+  const a = indexOf(doc, p.b);
+  const b = indexOf(doc, q.b);
+  if (a !== b) return a - b;
+  const pc = p.c ? p.c[0] * 4096 + p.c[1] : -1;
+  const qc = q.c ? q.c[0] * 4096 + q.c[1] : -1;
+  return pc !== qc ? pc - qc : p.o - q.o;
+}
+
+/** Two places, the first first. */
+export const ordered = (doc: Doc, a: Pos, f: Pos): [Pos, Pos] => (cmp(doc, a, f) <= 0 ? [a, f] : [f, a]);
+
+/** A block with no field left that says nothing (style: undefined). */
+function tidy<T extends Block>(b: T): T {
+  const o = b as unknown as Record<string, unknown>;
+  for (const k of Object.keys(o)) if (o[k] === undefined || (k === 'lvl' && o[k] === 0)) delete o[k];
+  return b;
+}
+
+/** An id no block of the document has. */
+export function freshId(doc: Doc): string {
+  let id = newId();
+  while (indexOf(doc, id) >= 0) id = newId();
+  return id;
+}
+
+const withBlocks = (doc: Doc, blocks: Block[]): Doc => ({ ...doc, blocks });
+
+/** The document with `count` blocks from `i` replaced by `list`. */
+export function splice(doc: Doc, i: number, count: number, list: Block[]): Doc {
+  return withBlocks(doc, [...doc.blocks.slice(0, i), ...list, ...doc.blocks.slice(i + count)]);
+}
+
+function withBlock(doc: Doc, i: number, b: Block): Doc {
+  const blocks = doc.blocks.slice();
+  blocks[i] = b;
+  return withBlocks(doc, blocks);
+}
+
+/** A document ends with words to write in (a caret has no place after a last picture or table). */
+export function fixDoc(doc: Doc): Doc {
+  const last = doc.blocks[doc.blocks.length - 1];
+  return isText(last) ? doc : withBlocks(doc, [...doc.blocks, { id: freshId(doc), type: 'p', runs: [] }]);
+}
+
+// ---- runs --------------------------------------------------------------------------------------------------
+
+export const lenOf = (runs: Run[]) => runs.reduce((n, r) => n + r.t.length, 0);
+
+/** Runs cut at `o` characters in. */
+export function splitAt(runs: Run[], o: number): [Run[], Run[]] {
+  const left: Run[] = [];
+  const right: Run[] = [];
+  let at = 0;
+  for (const r of runs) {
+    const end = at + r.t.length;
+    if (end <= o) left.push(r);
+    else if (at >= o) right.push(r);
+    else {
+      left.push({ ...r, t: r.t.slice(0, o - at) });
+      right.push({ ...r, t: r.t.slice(o - at) });
+    }
+    at = end;
+  }
+  return [left, right];
+}
+
+export const sliceRuns = (runs: Run[], from: number, to: number) => splitAt(splitAt(runs, to)[0], from)[1];
+
+/** How words typed at `o` look: as the character before (or, at the start, after); a link does not go on past its end. */
+export function lookAt(runs: Run[], o: number): Look {
+  let at = 0;
+  for (const r of runs) {
+    const end = at + r.t.length;
+    if (o > at && o <= end) {
+      const look = lookOf(r);
+      if (o === end && look.link) delete look.link;
+      return look;
+    }
+    at = end;
+  }
+  const first = runs[0] ? lookOf(runs[0]) : {};
+  delete first.link;
+  return first;
+}
+
+/** The word around `o` (letters and digits), or null where there is none (between spaces). */
+export function wordAt(runs: Run[], o: number): [number, number] | null {
+  const t = runsText(runs);
+  const w = /[\p{L}\p{N}_'’-]/u;
+  let a = o;
+  let b = o;
+  while (a > 0 && w.test(t[a - 1])) a--;
+  while (b < t.length && w.test(t[b])) b++;
+  return b > a && a < o && o < b ? [a, b] : null;
+}
+
+// ---- the words of a place ----------------------------------------------------------------------------------
+
+/** The runs of the words a place is in (a text block's, or a cell's), or null. */
+export function boxRuns(doc: Doc, b: string, c?: [number, number]): Run[] | null {
+  const blk = blockOf(doc, b);
+  if (!blk) return null;
+  if (c) return blk.type === 'table' ? (blk.rows[c[0]]?.[c[1]]?.runs ?? null) : null;
+  return isText(blk) ? blk.runs : null;
+}
+
+/** The document with those words' runs replaced. */
+export function setBox(doc: Doc, b: string, c: [number, number] | undefined, runs: Run[]): Doc {
+  const i = indexOf(doc, b);
+  const blk = doc.blocks[i];
+  if (!blk) return doc;
+  if (c && blk.type === 'table') return withBlock(doc, i, { ...blk, rows: blk.rows.map((r, ri) => (ri !== c[0] ? r : r.map((cell, ci) => (ci !== c[1] ? cell : { ...cell, runs })))) });
+  if (!c && isText(blk)) return withBlock(doc, i, { ...blk, runs });
+  return doc;
+}
+
+/** Each set of words a stretch passes through (text blocks, a table's cells), and how much of them. */
+export function boxesIn(doc: Doc, s: Pos, e: Pos): { b: string; c?: [number, number]; from: number; to: number }[] {
+  const out: { b: string; c?: [number, number]; from: number; to: number }[] = [];
+  const si = indexOf(doc, s.b);
+  const ei = indexOf(doc, e.b);
+  for (let i = si; i <= ei && i >= 0; i++) {
+    const B = doc.blocks[i];
+    if (isText(B)) out.push({ b: B.id, from: i === si ? s.o : 0, to: i === ei ? e.o : lenOf(B.runs) });
+    else if (B.type === 'table') {
+      const cols = B.rows[0]?.length ?? 0;
+      const first = i === si && s.c ? s.c[0] * cols + s.c[1] : 0;
+      const last = i === ei && e.c ? e.c[0] * cols + e.c[1] : B.rows.length * cols - 1;
+      for (let k = first; k <= last; k++) {
+        const c: [number, number] = [Math.floor(k / cols), k % cols];
+        const len = lenOf(B.rows[c[0]][c[1]].runs);
+        out.push({ b: B.id, c, from: k === first && i === si && s.c ? s.o : 0, to: k === last && i === ei && e.c ? e.o : len });
+      }
+    }
+  }
+  return out;
+}
+
+/** The words between two places, as plain text (blocks on lines of their own, cells apart by tabs). */
+export function textBetween(doc: Doc, s: Pos, e: Pos): string {
+  const parts: string[] = [];
+  let last = '';
+  for (const bx of boxesIn(doc, s, e)) {
+    const t = runsText(sliceRuns(boxRuns(doc, bx.b, bx.c) ?? [], bx.from, bx.to));
+    if (parts.length) parts.push(bx.b === last && bx.c ? (bx.c[1] === 0 ? '\n' : '\t') : '\n');
+    parts.push(t);
+    last = bx.b;
+  }
+  return parts.join('');
+}
+
+// ---- typing and taking out ---------------------------------------------------------------------------------
+
+/** A table with the words between two of its places (null: its start, or its end) taken out of its cells. */
+function clearCells(t: TableBlock, from: Pos | null, to: Pos | null): TableBlock {
+  const cols = t.rows[0]?.length ?? 0;
+  const a = from?.c ? from.c[0] * cols + from.c[1] : 0;
+  const z = to?.c ? to.c[0] * cols + to.c[1] : t.rows.length * cols - 1;
+  return {
+    ...t,
+    rows: t.rows.map((r, ri) =>
+      r.map((cell, ci) => {
+        const k = ri * cols + ci;
+        if (k < a || k > z) return cell;
+        const len = lenOf(cell.runs);
+        const lo = k === a && from?.c ? from.o : 0;
+        const hi = k === z && to?.c ? to.o : len;
+        return lo >= hi ? cell : { ...cell, runs: mergeRuns([...splitAt(cell.runs, lo)[0], ...splitAt(cell.runs, hi)[1]]) };
+      }),
+    ),
+  };
+}
+
+/** What is between two places taken out: the words between them, and the blocks wholly between. */
+export function deleteRange(doc: Doc, a: Pos, f: Pos): Edit {
+  const [s, e] = ordered(doc, a, f);
+  if (samePos(s, e)) return { doc, at: s };
+  const si = indexOf(doc, s.b);
+  const ei = indexOf(doc, e.b);
+  const S = doc.blocks[si];
+  const E = doc.blocks[ei];
+  if (si === ei) {
+    if (sameCell(s.c, e.c)) {
+      const runs = boxRuns(doc, s.b, s.c) ?? [];
+      return { doc: setBox(doc, s.b, s.c, mergeRuns([...splitAt(runs, s.o)[0], ...splitAt(runs, e.o)[1]])), at: s };
+    }
+    return { doc: S.type === 'table' ? withBlock(doc, si, clearCells(S, s, e)) : doc, at: s };
+  }
+  const head: Block | null = isText(S) ? { ...S, runs: splitAt(S.runs, s.o)[0] } : S.type === 'table' ? clearCells(S, s, null) : null;
+  const tail: Block | null = isText(E) ? { ...E, runs: splitAt(E.runs, e.o)[1] } : E.type === 'table' ? clearCells(E, null, e) : null;
+  const out: Block[] = [];
+  // Words on both sides join in the first block (its kind, its style).
+  if (head && tail && isText(head) && isText(tail)) out.push({ ...head, runs: mergeRuns([...head.runs, ...tail.runs]) });
+  else {
+    if (head) out.push(head);
+    if (tail) out.push(tail);
+  }
+  return { doc: splice(doc, si, ei - si + 1, out), at: s };
+}
+
+/** Words typed at a place (looking as `look`, else as the words there). */
+export function insertText(doc: Doc, at: Pos, text: string, look?: Look): Edit {
+  const runs = boxRuns(doc, at.b, at.c);
+  if (!runs || !text) return { doc, at };
+  const [l, r] = splitAt(runs, at.o);
+  return { doc: setBox(doc, at.b, at.c, mergeRuns([...l, { ...(look ?? lookAt(runs, at.o)), t: text }, ...r])), at: { ...at, o: at.o + text.length } };
+}
+
+/** Runs put in at a place, as they look. */
+export function insertRuns(doc: Doc, at: Pos, ins: Run[]): Edit {
+  const runs = boxRuns(doc, at.b, at.c);
+  if (!runs) return { doc, at };
+  const [l, r] = splitAt(runs, at.o);
+  return { doc: setBox(doc, at.b, at.c, mergeRuns([...l, ...ins, ...r])), at: { ...at, o: at.o + lenOf(ins) } };
+}
+
+/** A new block of the kind of `b`, empty (a heading's next one, at its end, is normal text). */
+function like(doc: Doc, b: TextBlock, atEnd: boolean): TextBlock {
+  if (b.type === 'li') return tidy({ id: freshId(doc), type: 'li', list: b.list, lvl: b.lvl, align: b.align, runs: [] } as ItemBlock);
+  // After a heading (or the title) comes normal text, aligned as normal text is.
+  const reset = atEnd && (b.style === 'title' || b.style === 'subtitle' || /^h\d$/.test(b.style ?? ''));
+  return tidy({ id: freshId(doc), type: 'p', style: reset ? undefined : b.style, align: reset ? undefined : b.align, lvl: b.lvl, runs: [] } as ParaBlock);
+}
+
+/** A list item made a paragraph (its indent kept). */
+const toPara = (b: ItemBlock): ParaBlock => tidy({ id: b.id, type: 'p', align: b.align, lvl: b.lvl, runs: b.runs } as ParaBlock);
+
+/** Enter: the block split at the caret (a list's empty item ends the list; code takes a line break instead). */
+export function enter(doc: Doc, at: Pos): Edit {
+  if (at.c) return insertText(doc, at, '\n');
+  const i = indexOf(doc, at.b);
+  const B = doc.blocks[i];
+  if (!isText(B)) return { doc, at };
+  const text = runsText(B.runs);
+  if (B.type === 'p' && B.style === 'code') {
+    // An empty line at its end ends it: what is typed next is normal text.
+    if (at.o === text.length && text.endsWith('\n')) {
+      const np: ParaBlock = { id: freshId(doc), type: 'p', runs: [] };
+      return { doc: splice(doc, i, 1, [{ ...B, runs: splitAt(B.runs, text.length - 1)[0] }, np]), at: { b: np.id, o: 0 } };
+    }
+    return insertText(doc, at, '\n');
+  }
+  if (!text) {
+    if (B.type === 'li') return { doc: withBlock(doc, i, B.lvl ? tidy({ ...B, lvl: B.lvl - 1 }) : toPara(B)), at };
+    if (B.style === 'quote') return { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at };
+  }
+  if (at.o === 0 && text) {
+    // At its start: an empty block before it, its words where they are.
+    return { doc: splice(doc, i, 0, [like(doc, B, false)]), at };
+  }
+  const [l, r] = splitAt(B.runs, at.o);
+  const second = { ...like(doc, B, !r.length), runs: r } as TextBlock;
+  return { doc: splice(doc, i, 1, [{ ...B, runs: l }, second]), at: { b: second.id, o: 0 } };
+}
+
+/** Backspace at a block's start: a list item's mark goes, an indent comes back, a quote is normal text; else it joins the block before. */
+export function backspace(doc: Doc, at: Pos): Edit {
+  if (at.c) return { doc, at };
+  const i = indexOf(doc, at.b);
+  const B = doc.blocks[i];
+  if (!isText(B)) return { doc, at };
+  if (B.type === 'li') return { doc: withBlock(doc, i, toPara(B)), at };
+  if (B.lvl) return { doc: withBlock(doc, i, tidy({ ...B, lvl: B.lvl - 1 })), at };
+  if (B.style === 'quote' || B.style === 'code') return { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at };
+  const P = doc.blocks[i - 1];
+  if (!P) return B.style ? { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at } : { doc, at };
+  if (isText(P)) return { doc: splice(doc, i - 1, 2, [{ ...P, runs: mergeRuns([...P.runs, ...B.runs]) }]), at: { b: P.id, o: lenOf(P.runs) } };
+  if (P.type === 'table') {
+    const c: [number, number] = [P.rows.length - 1, (P.rows[0]?.length ?? 1) - 1];
+    const end: Pos = { b: P.id, c, o: lenOf(P.rows[c[0]][c[1]].runs) };
+    return { doc: !B.runs.length && i < doc.blocks.length - 1 ? splice(doc, i, 1, []) : doc, at: end };
+  }
+  // A picture is picked first (the next Backspace takes it out); a line across or a page break goes.
+  if (P.type === 'image') return { doc: !B.runs.length && i < doc.blocks.length - 1 ? splice(doc, i, 1, []) : doc, at, pick: P.id };
+  return { doc: splice(doc, i - 1, 1, []), at };
+}
+
+/** Delete at a block's end: the block after joins it (a picture is picked, a line or page break goes). */
+export function deleteForward(doc: Doc, at: Pos): Edit {
+  if (at.c) return { doc, at };
+  const i = indexOf(doc, at.b);
+  const B = doc.blocks[i];
+  const N = doc.blocks[i + 1];
+  if (!isText(B) || !N) return { doc, at };
+  if (isText(N)) return { doc: splice(doc, i, 2, [{ ...B, runs: mergeRuns([...B.runs, ...N.runs]) }]), at };
+  if (N.type === 'table') return { doc: B.runs.length ? doc : splice(doc, i, 1, []), at: { b: N.id, c: [0, 0], o: 0 } };
+  if (N.type === 'image') return { doc, at, pick: N.id };
+  return { doc: splice(doc, i + 1, 1, []), at };
+}
+
+/** A block's words, for putting blocks in a table's cell. */
+function runsOf(b: Block): Run[] {
+  if (isText(b)) return b.runs;
+  if (b.type === 'table') return b.rows.flatMap((r, ri) => [...(ri ? [{ t: '\n' }] : []), ...r.flatMap((c, ci) => [...(ci ? [{ t: '\t' }] : []), ...c.runs])]);
+  if (b.type === 'image') return b.caption || b.alt ? [{ t: b.caption || b.alt || '' }] : [];
+  return [];
+}
+
+/**
+ * Blocks put in at a place (pasted, or a picture, a table, a line, a page break): one block of words goes in among
+ * the words; others split the block there, the first joining the words before and the last the words after.
+ */
+export function insertBlocks(doc: Doc, at: Pos, list: Block[]): Edit {
+  if (!list.length) return { doc, at };
+  if (at.c) {
+    const runs: Run[] = [];
+    list.forEach((b) => {
+      const r = runsOf(b);
+      if (runs.length && r.length) runs.push({ t: '\n' });
+      runs.push(...r);
+    });
+    return insertRuns(doc, at, mergeRuns(runs));
+  }
+  const i = indexOf(doc, at.b);
+  const T = doc.blocks[i];
+  if (!isText(T)) return { doc, at };
+  const first = list[0];
+  if (list.length === 1 && isText(first)) {
+    // An empty block takes the pasted one's kind.
+    if (!T.runs.length) return { doc: withBlock(doc, i, { ...first, id: T.id }), at: { b: T.id, o: lenOf(first.runs) } };
+    return insertRuns(doc, at, first.runs);
+  }
+  const [l, r] = splitAt(T.runs, at.o);
+  const out: Block[] = [];
+  let mid = list;
+  let idFree = true;
+  if (l.length) {
+    if (isText(first)) {
+      out.push({ ...T, runs: mergeRuns([...l, ...first.runs]) });
+      mid = mid.slice(1);
+    } else out.push({ ...T, runs: l });
+    idFree = false;
+  } else if (isText(first)) {
+    out.push({ ...first, id: T.id });
+    mid = mid.slice(1);
+    idFree = false;
+  }
+  const last = mid[mid.length - 1];
+  if (mid.length && isText(last)) {
+    out.push(...mid.slice(0, -1), { ...last, runs: mergeRuns([...last.runs, ...r]) });
+    return { doc: splice(doc, i, 1, out), at: { b: last.id, o: lenOf(last.runs) } };
+  }
+  out.push(...mid);
+  const next = doc.blocks[i + 1];
+  // Nothing after the caret, and words to write in next already: the caret goes there.
+  if (!r.length && isText(next) && !idFree) return { doc: splice(doc, i, 1, out), at: { b: next.id, o: 0 } };
+  const tail = { ...like(doc, T, !r.length), runs: r } as TextBlock;
+  if (idFree) tail.id = T.id;
+  out.push(tail);
+  return { doc: splice(doc, i, 1, out), at: { b: tail.id, o: 0 } };
+}
+
+/** A block taken out; the caret goes to the words after it (or before; or an empty paragraph made for it). */
+export function removeBlock(doc: Doc, id: string): Edit {
+  const i = indexOf(doc, id);
+  if (i < 0) return { doc, at: firstPos(doc) };
+  let d = splice(doc, i, 1, []);
+  if (!d.blocks.length) d = withBlocks(d, [{ id: freshId(doc), type: 'p', runs: [] }]);
+  d = fixDoc(d);
+  return { doc: d, at: nearPos(d, Math.min(i, d.blocks.length - 1)) };
+}
+
+/** The first place for words in the document. */
+export function firstPos(doc: Doc): Pos {
+  return nearPos(doc, 0);
+}
+
+/** The place for words nearest block `i` (its start, or the next block's, or the end of one before). */
+export function nearPos(doc: Doc, i: number, back = false): Pos {
+  const at = (k: number): Pos | null => {
+    const b = doc.blocks[k];
+    if (isText(b)) return { b: b.id, o: back ? lenOf(b.runs) : 0 };
+    if (b?.type === 'table' && b.rows.length) {
+      const c: [number, number] = back ? [b.rows.length - 1, b.rows[0].length - 1] : [0, 0];
+      return { b: b.id, c, o: back ? lenOf(b.rows[c[0]][c[1]].runs) : 0 };
+    }
+    return null;
+  };
+  for (let k = i; k < doc.blocks.length && k >= 0; back ? k-- : k++) {
+    const p = at(k);
+    if (p) return p;
+  }
+  for (let k = i; k < doc.blocks.length && k >= 0; back ? k++ : k--) {
+    const p = at(k);
+    if (p) return p;
+  }
+  return { b: doc.blocks[0]?.id ?? '', o: 0 };
+}
+
+/** The end of a block's words. */
+export function endOf(doc: Doc, id: string): Pos {
+  return nearPos(doc, indexOf(doc, id), true);
+}
+
+// ---- how words look ------------------------------------------------------------------------------------------
+
+/** The words between two places, each run changed by `f`. */
+export function mapLook(doc: Doc, s: Pos, e: Pos, f: (r: Run) => Run): Doc {
+  let d = doc;
+  for (const bx of boxesIn(doc, s, e)) {
+    if (bx.from >= bx.to) continue;
+    const runs = boxRuns(d, bx.b, bx.c) ?? [];
+    const [l, rest] = splitAt(runs, bx.from);
+    const [m, r] = splitAt(rest, bx.to - bx.from);
+    d = setBox(d, bx.b, bx.c, mergeRuns([...l, ...m.map(f), ...r]));
+  }
+  return d;
+}
+
+/** The runs between two places (pieces of them where they are cut). */
+export function runsBetween(doc: Doc, s: Pos, e: Pos): Run[] {
+  return boxesIn(doc, s, e).flatMap((bx) => sliceRuns(boxRuns(doc, bx.b, bx.c) ?? [], bx.from, bx.to));
+}
+
+type Flag = 'b' | 'i' | 'u' | 's' | 'code' | 'sup' | 'sub';
+
+/** Whether all the words between two places have a look (spaces aside). */
+export function allHave(doc: Doc, s: Pos, e: Pos, k: Flag): boolean {
+  const runs = runsBetween(doc, s, e).filter((r) => r.t.trim());
+  return runs.length > 0 && runs.every((r) => r[k]);
+}
+
+/** A look on (or off) for the words between two places: bold, italic… (raised and lowered words are one or the other). */
+export function setFlag(doc: Doc, s: Pos, e: Pos, k: Flag, on: boolean): Doc {
+  return mapLook(doc, s, e, (r) => {
+    const n: Run = { ...r };
+    if (on) n[k] = true;
+    else delete n[k];
+    if (on && k === 'sup') delete n.sub;
+    if (on && k === 'sub') delete n.sup;
+    return n;
+  });
+}
+
+/** A colour, highlight, size, font or link for the words between two places (undefined takes it off). */
+export function setValue(doc: Doc, s: Pos, e: Pos, k: 'color' | 'hl' | 'size' | 'font' | 'link', v: string | number | undefined): Doc {
+  return mapLook(doc, s, e, (r) => {
+    const n: Record<string, unknown> = { ...r };
+    if (v === undefined || v === '') delete n[k];
+    else n[k] = v;
+    return n as unknown as Run;
+  });
+}
+
+/** The words between two places with no look of their own but their links. */
+export function clearLook(doc: Doc, s: Pos, e: Pos): Doc {
+  return mapLook(doc, s, e, (r) => (r.link ? { t: r.t, link: r.link } : { t: r.t }));
+}
+
+/** What the words between two places share: each value they all have. */
+export function commonLook(doc: Doc, s: Pos, e: Pos): Look {
+  const runs = runsBetween(doc, s, e).filter((r) => r.t.trim());
+  if (!runs.length) return lookAt(boxRuns(doc, s.b, s.c) ?? [], s.o);
+  const out: Look = {};
+  for (const k of ['b', 'i', 'u', 's', 'code', 'sup', 'sub', 'color', 'hl', 'size', 'font', 'link'] as const) {
+    const v = runs[0][k];
+    if (v !== undefined && runs.every((r) => r[k] === v)) (out as Record<string, unknown>)[k] = v;
+  }
+  return out;
+}
+
+/** A link's stretch around a place: the run of words with the same address. */
+export function linkAt(doc: Doc, at: Pos): { from: number; to: number; link: string } | null {
+  const runs = boxRuns(doc, at.b, at.c);
+  if (!runs) return null;
+  let o = 0;
+  for (let k = 0; k < runs.length; k++) {
+    const r = runs[k];
+    const end = o + r.t.length;
+    if (r.link && at.o >= o && at.o <= end && (at.o < end || at.o > o)) {
+      let from = o;
+      let to = end;
+      for (let j = k - 1; j >= 0 && runs[j].link === r.link; j--) from -= runs[j].t.length;
+      for (let j = k + 1; j < runs.length && runs[j].link === r.link; j++) to += runs[j].t.length;
+      return { from, to, link: r.link };
+    }
+    o = end;
+  }
+  return null;
+}
+
+// ---- paragraphs ------------------------------------------------------------------------------------------------
+
+/** The text blocks between two places (and the block of each). */
+export function textBlocksIn(doc: Doc, s: Pos, e: Pos): number[] {
+  const out: number[] = [];
+  for (let i = indexOf(doc, s.b); i <= indexOf(doc, e.b) && i >= 0; i++) if (isText(doc.blocks[i])) out.push(i);
+  return out;
+}
+
+const mapBlocks = (doc: Doc, idx: number[], f: (b: TextBlock) => Block): Doc => {
+  const blocks = doc.blocks.slice();
+  for (const i of idx) blocks[i] = f(blocks[i] as TextBlock);
+  return withBlocks(doc, blocks);
+};
+
+/** A paragraph style for the text blocks between two places (a list's items become paragraphs, but for normal text). */
+export function setStyle(doc: Doc, s: Pos, e: Pos, style: ParaStyle): Doc {
+  const idx = textBlocksIn(doc, s, e);
+  let d = mapBlocks(doc, idx, (b) => {
+    if (b.type === 'li') return style === 'normal' ? b : tidy({ id: b.id, type: 'p', style, align: b.align, runs: b.runs } as ParaBlock);
+    const head = style === 'title' || style === 'subtitle' || /^h\d$/.test(style);
+    return tidy({ ...b, style: style === 'normal' ? undefined : style, lvl: head ? undefined : b.lvl });
+  });
+  // Code made of several paragraphs is one block of lines.
+  if (style === 'code' && idx.length > 1) {
+    const first = idx[0];
+    const joined: Run[] = [];
+    idx.forEach((i, k) => {
+      if (k) joined.push({ t: '\n' });
+      joined.push(...(d.blocks[i] as TextBlock).runs.map((r) => ({ t: r.t })));
+    });
+    const keep = { ...(d.blocks[first] as ParaBlock), runs: mergeRuns(joined) };
+    const gone = new Set(idx.slice(1));
+    d = withBlocks(
+      d,
+      d.blocks.flatMap((b, i) => (i === first ? [keep] : gone.has(i) ? [] : [b])),
+    );
+  }
+  return d;
+}
+
+/** Bullets, numbers or a checklist for the text blocks between two places; off again when they all are already. */
+export function toggleList(doc: Doc, s: Pos, e: Pos, kind: ListKind): Doc {
+  const idx = textBlocksIn(doc, s, e);
+  const all = idx.length > 0 && idx.every((i) => doc.blocks[i].type === 'li' && (doc.blocks[i] as ItemBlock).list === kind);
+  return mapBlocks(doc, idx, (b) => {
+    if (all && b.type === 'li') return toPara(b);
+    if (b.type === 'li') return tidy({ ...b, list: kind, checked: kind === 'check' ? b.checked : undefined });
+    return tidy({ id: b.id, type: 'li', list: kind, lvl: b.style ? undefined : b.lvl, align: b.align, runs: b.runs } as ItemBlock);
+  });
+}
+
+/** A step more (or less) indent: a list's items a level deeper, paragraphs further in. */
+export function indent(doc: Doc, s: Pos, e: Pos, by: 1 | -1): Doc {
+  return mapBlocks(doc, textBlocksIn(doc, s, e), (b) => {
+    if (b.type === 'p' && (b.style === 'title' || b.style === 'subtitle' || /^h\d$/.test(b.style ?? ''))) return b;
+    return tidy({ ...b, lvl: Math.max(0, Math.min(4, (b.lvl ?? 0) + by)) });
+  });
+}
+
+/** Alignment for the text blocks between two places, and the cells of tables between them. */
+export function setAlign(doc: Doc, s: Pos, e: Pos, align: Align): Doc {
+  const a = align === 'left' ? undefined : align;
+  let d = mapBlocks(doc, textBlocksIn(doc, s, e), (b) => tidy({ ...b, align: a }));
+  for (const bx of boxesIn(doc, s, e)) {
+    if (!bx.c) continue;
+    const i = indexOf(d, bx.b);
+    const t = d.blocks[i] as TableBlock;
+    d = withBlock(d, i, { ...t, rows: t.rows.map((r, ri) => r.map((c, ci) => (ri === bx.c![0] && ci === bx.c![1] ? (a ? { ...c, align: a } : { runs: c.runs }) : c))) });
+  }
+  return d;
+}
+
+/** A checklist's item ticked, or not. */
+export function toggleCheck(doc: Doc, id: string): Doc {
+  const i = indexOf(doc, id);
+  const b = doc.blocks[i];
+  return b?.type === 'li' && b.list === 'check' ? withBlock(doc, i, tidy({ ...b, checked: b.checked ? undefined : true })) : doc;
+}
+
+/** A block replaced by itself changed (a picture's size, its caption). */
+export function patchBlock<T extends Block>(doc: Doc, id: string, f: (b: T) => T): Doc {
+  const i = indexOf(doc, id);
+  return i < 0 ? doc : withBlock(doc, i, tidy(f(doc.blocks[i] as T)));
+}
+
+// ---- tables --------------------------------------------------------------------------------------------------------
+
+export type TableOp = 'rowAbove' | 'rowBelow' | 'colLeft' | 'colRight' | 'delRow' | 'delCol' | 'delTable' | 'head';
+
+/** A new table: `rows` × `cols` empty cells, its first row a header when it has more than one. */
+export function newTable(doc: Doc, rows: number, cols: number): TableBlock {
+  const t: TableBlock = { id: freshId(doc), type: 'table', rows: Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({ runs: [] }) as Cell)) };
+  if (rows > 1) t.head = true;
+  return t;
+}
+
+const share = (cols: number[] | undefined) => {
+  if (!cols) return undefined;
+  const sum = cols.reduce((a, b) => a + b, 0);
+  return sum > 0 ? cols.map((c) => Math.round((c / sum) * 10000) / 10000) : undefined;
+};
+
+/** A change to a table's rows or columns, at a cell of it; where the caret goes. */
+export function tableOp(doc: Doc, id: string, cell: [number, number], op: TableOp): Edit {
+  const i = indexOf(doc, id);
+  const t = doc.blocks[i];
+  if (t?.type !== 'table') return { doc, at: firstPos(doc) };
+  const [r, c] = cell;
+  const n = t.rows[0]?.length ?? 0;
+  const empty = (align?: Align): Cell => (align ? { runs: [], align } : { runs: [] });
+  let next: TableBlock = t;
+  let at: Pos = { b: id, c: cell, o: 0 };
+  switch (op) {
+    case 'rowAbove':
+    case 'rowBelow': {
+      const k = op === 'rowAbove' ? r : r + 1;
+      const row = t.rows[r].map((x) => empty(x.align));
+      next = { ...t, rows: [...t.rows.slice(0, k), row, ...t.rows.slice(k)] };
+      at = { b: id, c: [k, c], o: 0 };
+      break;
+    }
+    case 'colLeft':
+    case 'colRight': {
+      const k = op === 'colLeft' ? c : c + 1;
+      next = tidy({ ...t, rows: t.rows.map((row) => [...row.slice(0, k), empty(row[c]?.align), ...row.slice(k)]), cols: t.cols ? share([...t.cols.slice(0, k), 1 / (n + 1), ...t.cols.slice(k)]) : undefined });
+      at = { b: id, c: [r, k], o: 0 };
+      break;
+    }
+    case 'delRow':
+      if (t.rows.length <= 1) return removeBlock(doc, id);
+      next = tidy({ ...t, rows: t.rows.filter((_, k) => k !== r), head: r === 0 && t.rows.length === 2 ? undefined : t.head });
+      at = { b: id, c: [Math.min(r, next.rows.length - 1), c], o: 0 };
+      break;
+    case 'delCol':
+      if (n <= 1) return removeBlock(doc, id);
+      next = tidy({ ...t, rows: t.rows.map((row) => row.filter((_, k) => k !== c)), cols: t.cols ? share(t.cols.filter((_, k) => k !== c)) : undefined });
+      at = { b: id, c: [r, Math.min(c, n - 2)], o: 0 };
+      break;
+    case 'delTable':
+      return removeBlock(doc, id);
+    case 'head':
+      next = tidy({ ...t, head: t.head ? undefined : true });
+      at = { b: id, c: cell, o: 0 };
+      break;
+  }
+  return { doc: withBlock(doc, i, next), at };
+}
+
+/** Tab in a table: the next cell (a new row after the last), or with Shift the one before. */
+export function nextCell(doc: Doc, at: Pos, back: boolean): Edit {
+  const t = blockOf(doc, at.b);
+  if (t?.type !== 'table' || !at.c) return { doc, at };
+  const n = t.rows[0].length;
+  const k = at.c[0] * n + at.c[1] + (back ? -1 : 1);
+  if (k < 0) return { doc, at: { ...at, c: [0, 0], o: 0 } };
+  if (k >= t.rows.length * n) {
+    const e = tableOp(doc, t.id, [t.rows.length - 1, 0], 'rowBelow');
+    return { doc: e.doc, at: { b: t.id, c: [t.rows.length, 0], o: 0 } };
+  }
+  const c: [number, number] = [Math.floor(k / n), k % n];
+  return { doc, at: { b: t.id, c, o: lenOf(t.rows[c[0]][c[1]].runs) } };
+}
+
+// ---- copying -------------------------------------------------------------------------------------------------------
+
+/** What is between two places, as blocks of its own (fresh ids): to copy, or to drag. */
+export function sliceBlocks(doc: Doc, s: Pos, e: Pos): Block[] {
+  const si = indexOf(doc, s.b);
+  const ei = indexOf(doc, e.b);
+  const out: Block[] = [];
+  for (let i = si; i <= ei && i >= 0; i++) {
+    const B = doc.blocks[i];
+    if (isText(B)) {
+      const from = i === si ? s.o : 0;
+      const to = i === ei ? e.o : lenOf(B.runs);
+      out.push({ ...B, id: newId(), runs: sliceRuns(B.runs, from, to) });
+    } else if (B.type === 'table') {
+      // The rows it covers, whole; within one cell, its words alone.
+      if (si === ei && s.c && e.c && sameCell(s.c, e.c)) out.push({ id: newId(), type: 'p', runs: sliceRuns(B.rows[s.c[0]][s.c[1]].runs, s.o, e.o) });
+      else {
+        const r0 = i === si && s.c ? s.c[0] : 0;
+        const r1 = i === ei && e.c ? e.c[0] : B.rows.length - 1;
+        out.push(tidy({ ...B, id: newId(), rows: B.rows.slice(r0, r1 + 1), head: B.head && r0 === 0 ? true : undefined }));
+      }
+    } else out.push({ ...B, id: newId() });
+  }
+  return out;
+}
+
+/** A model as a document, for blocks alone (to draw or write them as one). */
+export const asDoc = (doc: Doc, blocks: Block[]): Doc => ({ ...doc, blocks });
+
+/** Plain text of blocks: a line each, items with their marks, a table's cells apart by tabs. */
+export function blocksPlain(blocks: Block[]): string {
+  const { labels } = listInfo(blocks);
+  return blocks
+    .map((b, i) => {
+      if (b.type === 'li') return `${'    '.repeat(b.lvl ?? 0)}${b.list === 'check' ? (b.checked ? '☑ ' : '☐ ') : `${labels[i]} `}${runsText(b.runs)}`;
+      if (isText(b)) return runsText(b.runs);
+      if (b.type === 'table') return b.rows.map((r) => r.map((c) => runsText(c.runs).replace(/\n/g, ' ')).join('\t')).join('\n');
+      if (b.type === 'image') return b.caption ?? b.alt ?? '';
+      return '';
+    })
+    .join('\n');
+}
+
+/** Whether two documents keep the same text (the editor's change, made again, came back to what was saved). */
+export const sameDoc = (a: Doc, b: Doc) => a === b || docText(a) === docText(b);
+
+export type { ImageBlock };

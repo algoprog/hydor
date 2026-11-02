@@ -19,6 +19,11 @@ import { cx, IconButton, MenuItem, MenuSep, Popover, Switch, useConfirm, useIsMo
 import { memoryStore, pageFile, pageStore, type Store } from './frame';
 import { CANVAS_MEDIA, onDraftStart, onScreen, savedRef, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
+import { exportFile } from './exportFile';
+import { EXPORTS } from './exports';
+import { EDITORS } from './editors';
+import type { ModelDoc } from './kinds';
+import type { Deck } from '@shared/slides';
 import { usePicks } from '../session/HtmlPage';
 import { ReviewPane, shotsOfTurn } from '../shots/Review';
 
@@ -33,6 +38,8 @@ export function pageCall(t: ToolInfo | undefined): PageCall | null {
   if (!t) return null;
   const bare = nagetTool(t.name);
   if (bare === 'show_html' || bare === 'save_page') return bare;
+  // A deck, a document or a spreadsheet is a saved page too, opened by its id.
+  if (bare === 'save_slides' || bare === 'save_doc' || bare === 'save_sheet' || bare === 'save_latex') return 'save_page';
   const p = (t.input as { file_path?: unknown } | undefined)?.file_path;
   return t.name === 'Write' && typeof p === 'string' && /\.html?$/i.test(p) ? 'file' : null;
 }
@@ -95,6 +102,10 @@ export function showBeside(key: string, t: CanvasTarget): boolean {
 
 interface Loaded {
   doc: StudioDoc;
+  /** Another kind (a deck, a document, a spreadsheet), edited in its own editor instead. */
+  kind?: NonNullable<PageInfo['kind']>;
+  model?: ModelDoc<unknown>;
+  saveModel?: (model: unknown, force?: boolean) => Promise<boolean>;
   /** What the second line under the title says. */
   sub: string;
   /** Saves; a saved page refuses (409) when a newer version came meanwhile, unless `force`. */
@@ -110,7 +121,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
   const keptMap = usePagesStore((x) => x.kept[key]);
   const pagesVersion = usePagesStore((x) => x.pages);
   const draft = useDrafts((x) => (target.kind === 'item' ? x.byKey[key]?.[target.id] : undefined));
-  const [page, setPage] = useState<{ info: PageInfo; html: string } | null>(null);
+  const [page, setPage] = useState<{ info: PageInfo; html?: string; model?: unknown } | null>(null);
   const [file, setFile] = useState<{ content: string; mtime: number; base: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -121,9 +132,9 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
   const pageId = target.kind === 'page' ? target.id : kind === 'save_page' ? savedRef(item?.tool.output)?.id : kind === 'show_html' ? kept : undefined;
   const loadPage = () => {
     if (!pageId) return;
-    api<{ page: PageInfo; html: string }>(`/api/pages/${enc(pageId)}`)
+    api<{ page: PageInfo; html?: string; model?: unknown }>(`/api/pages/${enc(pageId)}`)
       .then((r) => {
-        setPage({ info: r.page, html: r.html });
+        setPage({ info: r.page, html: r.html, model: r.model });
         setError(null);
       })
       .catch((e) => setError((e as Error).message));
@@ -164,8 +175,20 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
       const id = page.info.id;
       return {
         pageId: id,
-        doc: { key: `page:${id}:${page.info.version}`, title: page.info.title, html: page.html, store: pageStore(id) },
-        sub: `In Pages · version ${page.info.version}`,
+        doc: { key: `page:${id}:${page.info.version}`, title: page.info.title, html: page.html ?? '', store: pageStore(id) },
+        ...(page.info.kind && page.model !== undefined
+          ? {
+              kind: page.info.kind,
+              model: { key: `page:${id}:${page.info.version}`, title: page.info.title, model: page.model },
+              saveModel: async (model: unknown, force?: boolean) => {
+                await post(`/api/pages/${enc(id)}/versions`, { model, base: page.info.version, sessionKey: key, force: !!force });
+                toast('Saved. The agent sees your changes with your next message.', 'ok');
+                loadPage();
+                return true;
+              },
+            }
+          : {}),
+        sub: `${page.info.kind === 'slides' ? 'Slides in Pages' : page.info.kind === 'doc' ? 'A document in Pages' : page.info.kind === 'sheet' ? 'A spreadsheet in Pages' : page.info.kind === 'tex' ? 'LaTeX in Pages' : 'In Pages'} · version ${page.info.version}`,
         save: async (html, force) => {
           await post(`/api/pages/${enc(id)}/versions`, { html, base: page.info.version, sessionKey: key, force: !!force });
           toast('Saved. The agent sees your changes with your next message.', 'ok');
@@ -281,9 +304,17 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
             Show in Files
           </MenuItem>
         )}
-        <MenuItem icon={<Download size={14} />} onClick={() => (setMenu(null), download())}>
-          Save as a file
-        </MenuItem>
+        {loaded?.pageId ? (
+          EXPORTS(loaded.kind).map((x) => (
+            <MenuItem key={x.format} icon={x.icon} onClick={() => (setMenu(null), void exportFile(loaded.pageId!, x.format, { deck: loaded.kind === 'slides' ? (loaded.model?.model as Deck) : undefined }).catch(toastError))}>
+              {`Download as ${x.label}`}
+            </MenuItem>
+          ))
+        ) : (
+          <MenuItem icon={<Download size={14} />} onClick={() => (setMenu(null), download())}>
+            Save as a file
+          </MenuItem>
+        )}
         {layout === 'panel' && (
           <>
             <MenuSep />
@@ -340,6 +371,39 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
     else dirty.delete(key);
     return () => void dirty.delete(key);
   }, [isDirty, key]);
+
+  const Editor = loaded?.kind ? EDITORS[loaded.kind] : undefined;
+  if (loaded?.kind && loaded.model && loaded.saveModel && Editor) {
+    const saveModel = loaded.saveModel;
+    return (
+      <>
+        {confirmNode}
+        <Editor
+          doc={loaded.model}
+          pageId={loaded.pageId!}
+          layout={layout}
+          onSave={async (model: unknown) => {
+            try {
+              return await saveModel(model);
+            } catch (e) {
+              if ((e as { status?: number }).status !== 409) throw e;
+              if (!(await confirm({ title: 'A newer version is there', body: 'It was saved again while you changed it (by the agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
+                return false;
+              return saveModel(model, true);
+            }
+          }}
+          onDirty={setDirty}
+          lead={lead}
+          tail={tail}
+          savedNote="the agent sees your changes with your next message"
+          onAsk={(text) => {
+            composeInsert(text, key);
+            if (layout === 'sheet') onClose();
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <>

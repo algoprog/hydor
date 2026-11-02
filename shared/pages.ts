@@ -34,6 +34,8 @@ export interface PageInfo {
   thumb?: string;
   /** Published at a link. */
   published?: boolean;
+  /** Another kind than a page of HTML: slides (shared/slides.ts), a document (shared/docs.ts), a spreadsheet (shared/sheets.ts), LaTeX (shared/latex.ts). */
+  kind?: 'slides' | 'doc' | 'sheet' | 'tex';
 }
 
 export interface PageVersion {

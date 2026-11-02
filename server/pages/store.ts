@@ -1,11 +1,15 @@
 // Saved pages: the Pages library in SQLite. Each save is a new version (the oldest go past a count and
 // a size); each page keeps its own small storage (window.naget.storage) and has a link of its own,
-// signed with the app's key, that opens it on any device without the app's sign-in.
+// signed with the app's key, that opens it on any device without the app's sign-in. A page of another kind
+// (slides, a document, a spreadsheet: kinds.ts) keeps its model's text in place of HTML, and its own page is made
+// from it when it shows; its pictures are kept apart (assets.ts).
 import crypto from 'node:crypto';
 import { STORAGE_LIMITS, VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { signWithKey } from '../links.ts';
+import { dropRefs, initAssets, noteRefs } from './assets.ts';
+import { kindOf, mustKind, type PageKind, type PageMode } from './kinds.ts';
 
 export const MAX_PAGE = 2 * 1024 * 1024;
 const MAX_PAGES = 1000;
@@ -45,6 +49,9 @@ export function initPages(db: DB) {
   // Its picture in Pages: which version and data it shows (thumbs.ts).
   const cols = (db.prepare('pragma table_info(pages)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('thumb')) db.exec('alter table pages add column thumb text');
+  // A slide deck, a document or a spreadsheet (kinds.ts), or a page of HTML (null).
+  if (!cols.includes('kind')) db.exec('alter table pages add column kind text');
+  initAssets(db);
 }
 
 const newId = () => crypto.randomBytes(5).toString('hex');
@@ -75,6 +82,7 @@ interface Row {
   session_key: string | null;
   link_nonce: string;
   thumb: string | null;
+  kind: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -98,6 +106,7 @@ const toInfo = (r: Row): PageInfo => ({
   sessionKey: r.session_key ?? undefined,
   by: r.by ?? undefined,
   thumb: r.thumb ?? undefined,
+  ...(kindOf(r.kind) ? { kind: r.kind as PageKind } : {}),
 });
 
 export function listPages(db: DB): PageInfo[] {
@@ -121,12 +130,31 @@ export function versionsOf(db: DB, id: string): PageVersion[] {
   );
 }
 
-/** A version's page (the current one when `version` is left out). */
-export function pageHtml(db: DB, id: string, version?: number): { title: string; html: string; version: number } | null {
-  const v = version ?? (db.prepare('select version from pages where id = ?').get(id) as { version: number } | undefined)?.version;
-  if (v === undefined) return null;
+/** A version as it is kept: a page's HTML, or another kind's text (the current version when `version` is left out). */
+export function pageSource(db: DB, id: string, version?: number): { title: string; text: string; version: number; kind: 'page' | PageKind } | null {
+  const p = db.prepare('select version, kind from pages where id = ?').get(id) as { version: number; kind: string | null } | undefined;
+  const v = version ?? p?.version;
+  if (!p || v === undefined) return null;
   const r = db.prepare('select title, html, version from page_versions where page_id = ? and version = ?').get(id, v) as { title: string; html: string; version: number } | undefined;
-  return r ?? null;
+  return r ? { title: r.title, text: r.html, version: r.version, kind: kindOf(p.kind) ? (p.kind as PageKind) : 'page' } : null;
+}
+
+/**
+ * A version's page as HTML to show (the current one when `version` is left out): another kind's own page, to
+ * click through, every page of it to print, or its first page still.
+ */
+export async function pageHtml(db: DB, id: string, version?: number, mode: PageMode = 'viewer'): Promise<{ title: string; html: string; version: number } | null> {
+  const src = pageSource(db, id, version);
+  if (!src) return null;
+  if (src.kind === 'page') return { title: src.title, html: src.text, version: src.version };
+  return { title: src.title, html: await mustKind(src.kind).page(db, src.text, src.title, mode), version: src.version };
+}
+
+/** A version's model (another kind than a page of HTML), for its editor. */
+export function pageModel(db: DB, id: string, version?: number): unknown {
+  const src = pageSource(db, id, version);
+  if (!src || src.kind === 'page') return null;
+  return mustKind(src.kind).read(src.text);
 }
 
 /** Keeps the newest versions within the limits; the current one always stays. */
@@ -139,17 +167,42 @@ function prune(db: DB, id: string) {
   });
   const del = db.prepare('delete from page_versions where page_id = ? and version = ?');
   for (const v of drop) del.run(id, v.version);
+  if (drop.length) dropRefs(db, id, drop.map((v) => v.version));
 }
 
-export function createPage(db: DB, p: { title: unknown; html: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string }): PageInfo {
-  const html = checkHtml(p.html);
-  const title = cleanTitle(p.title);
+/** What a new version keeps: a page's HTML, or another kind's text (checked, its new pictures kept apart). */
+function contentOf(db: DB, kind: 'page' | PageKind, p: { html?: unknown; model?: unknown }): { text: string; sources: string[] } {
+  if (kind === 'page') {
+    if (p.model !== undefined && p.html === undefined) throw new HttpError(400, 'This is a page of HTML: send its html.');
+    return { text: checkHtml(p.html), sources: [] };
+  }
+  const k = mustKind(kind);
+  if (p.model === undefined) throw new HttpError(400, `This page is a ${k.noun}: send its model.`);
+  const out = k.keep(db, typeof p.model === 'string' ? safeJson(p.model) : p.model);
+  if (Buffer.byteLength(out.text) > k.max) throw new HttpError(413, `The ${k.noun} is over ${Math.round(k.max / 1024 / 1024)} MB without its pictures; make it smaller.`);
+  return out;
+}
+
+const safeJson = (s: string) => {
+  try {
+    return JSON.parse(s);
+  } catch {
+    throw new HttpError(400, 'The model is not valid JSON');
+  }
+};
+
+const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet' };
+
+export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string }): PageInfo {
+  const kind = p.kind ?? 'page';
+  const { text: html, sources } = contentOf(db, kind, p);
+  const title = cleanTitle(p.title, DEFAULT_TITLE[kind] ?? 'Page');
   if ((db.prepare('select count(*) as n from pages').get() as { n: number }).n >= MAX_PAGES) throw new HttpError(409, `Pages holds at most ${MAX_PAGES} pages; delete some first.`);
   const now = Date.now();
   let id = newId();
   while (db.prepare('select 1 from pages where id = ?').get(id)) id = newId();
   db.transaction(() => {
-    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce) values (?, ?, 1, ?, ?, ?, ?, ?)').run(
+    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind) values (?, ?, 1, ?, ?, ?, ?, ?, ?)').run(
       id,
       title,
       now,
@@ -157,22 +210,25 @@ export function createPage(db: DB, p: { title: unknown; html: unknown; by: PageV
       p.sessionKey ?? null,
       p.sourceItem ?? null,
       nonce(),
+      kind === 'page' ? null : kind,
     );
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by) values (?, 1, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by);
+    noteRefs(db, id, 1, sources);
   })();
   return pageInfo(db, id)!;
 }
 
 /** A new version of a page: it becomes the current one, and its title the page's. */
-export function addVersion(db: DB, id: string, p: { title?: unknown; html: unknown; by: PageVersion['by'] }): PageInfo {
+export function addVersion(db: DB, id: string, p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by'] }): PageInfo {
   const cur = mustPage(db, id);
-  const html = checkHtml(p.html);
+  const { text: html, sources } = contentOf(db, cur.kind ?? 'page', p);
   const title = p.title === undefined || p.title === null || !String(p.title).trim() ? cur.title : cleanTitle(p.title);
   const now = Date.now();
   db.transaction(() => {
     const next = ((db.prepare('select max(version) as v from page_versions where page_id = ?').get(id) as { v: number | null }).v ?? 0) + 1;
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by) values (?, ?, ?, ?, ?, ?, ?)').run(id, next, title, html, Buffer.byteLength(html), now, p.by);
     db.prepare('update pages set title = ?, version = ?, updated_at = ? where id = ?').run(title, next, now, id);
+    noteRefs(db, id, next, sources);
     prune(db, id);
   })();
   return pageInfo(db, id)!;
@@ -180,17 +236,17 @@ export function addVersion(db: DB, id: string, p: { title?: unknown; html: unkno
 
 /** Brings an older version back, as a new version (nothing is lost). */
 export function restoreVersion(db: DB, id: string, version: number): PageInfo {
-  const old = pageHtml(db, id, version);
+  const old = pageSource(db, id, version);
   if (!old) throw new HttpError(404, 'That version is no longer kept');
-  return addVersion(db, id, { title: old.title, html: old.html, by: 'restore' });
+  return addVersion(db, id, old.kind === 'page' ? { title: old.title, html: old.text, by: 'restore' } : { title: old.title, model: mustKind(old.kind).read(old.text), by: 'restore' });
 }
 
 /** A copy of a page's current version, as a page of its own (its data stays with the original). */
 export function copyPage(db: DB, id: string): PageInfo {
   const p = mustPage(db, id);
-  const cur = pageHtml(db, id)!;
+  const cur = pageSource(db, id)!;
   const title = cleanTitle(`${p.title} (copy)`);
-  return createPage(db, { title, html: cur.html, by: 'made' });
+  return createPage(db, cur.kind === 'page' ? { title, html: cur.text, by: 'made' } : { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), by: 'made' });
 }
 
 export function renamePage(db: DB, id: string, title: unknown): PageInfo {
@@ -201,6 +257,7 @@ export function renamePage(db: DB, id: string, title: unknown): PageInfo {
 
 export function deletePage(db: DB, id: string) {
   db.prepare('delete from pages where id = ?').run(id);
+  dropRefs(db, id);
 }
 
 /** Which show_html calls of a session were kept, and as which page. */

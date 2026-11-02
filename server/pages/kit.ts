@@ -90,6 +90,8 @@ export interface BridgeCfg {
   bare?: boolean;
   /** Without a parent: what storage starts with (JSON text by key), for a picture of the page with its data. */
   seed?: Record<string, string>;
+  /** The page fills a window of its own (its own address), rather than a frame that grows with it. */
+  fill?: boolean;
 }
 
 /**
@@ -228,8 +230,8 @@ function bridge(cfg: BridgeCfg) {
     remove: (k: unknown) => new Promise((ok) => ok(keyOf(k))).then((key) => call('remove', key as string)),
     keys: () => call('keys'),
   };
-  // Configurable, so a page's own top-level `let naget` still works.
-  Object.defineProperty(window, 'naget', { value: Object.freeze({ storage: Object.freeze(storage) }), enumerable: true, configurable: true });
+  // Configurable, so a page's own top-level `let naget` still works. `fill`: whether the page has a window to fill.
+  Object.defineProperty(window, 'naget', { value: Object.freeze({ storage: Object.freeze(storage), fill: !P || cfg.fill === true }), enumerable: true, configurable: true });
 
   // Choices: a click on [data-choice] selects it in its group and tells the app.
   const BOX = '[data-group],[data-multi],.n-options,.n-grid,.n-compare,form';
@@ -440,7 +442,7 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
       head = `<style id="n-kit" data-n-own>${kit}</style><style id="n-theme" data-n-own>${themeText(d.css)}</style><script data-n-own>(${schemeSrc})(${js(cfg.theme)})</script><script data-n-own>(${editorSrc})(${js(cfg)})</script>`;
       html = (m ? m[0] : '') + doc.documentElement.outerHTML;
     } else {
-      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) } };
+      const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true };
       head = `<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>`;
     }
     const at = DOCTYPE.exec(html);

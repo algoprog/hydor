@@ -1,8 +1,11 @@
 // Pages: HTML pages agents make. show_html shows one in the conversation (the page is the call's own
 // input, so it lives in the agent's transcript); the user's clicks on its choices come back to the
 // message box. save_page keeps one in the Pages library, with versions and storage of its own, and an
-// address of its own for a phone's home screen. publish_site asks the user to put a folder (a
-// project's build) or a saved page at a link; nothing is published until they confirm on the card.
+// address of its own for a phone's home screen. save_slides keeps a slide deck there (slides.ts), to edit,
+// present and export; save_doc, save_sheet and save_latex keep documents, spreadsheets and LaTeX documents
+// (docs.ts, sheets.ts, latex.ts; kinds.ts says what each kind does). export_page makes a file of any of them (a
+// PDF, a Word document, a PowerPoint deck, an Excel file…) for the agent to hand over. publish_site asks the user to put a folder (a project's build) or a saved page at a
+// link; nothing is published until they confirm on the card.
 //
 // While an agent writes a page, the pages showing its session watch it grow (drafts.ts); the user can
 // change a page in the editor (visual or code), and the agent hears of it with their next message
@@ -12,7 +15,8 @@
 //   GET/POST /api/pages, GET/PATCH/DELETE /api/pages/:id, GET /api/pages/kept?key=, GET /api/pages/drafts?key=
 //   POST /api/pages/:id/versions, GET /api/pages/:id/versions/:v, POST …/restore, POST /api/pages/:id/copy
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
-//   POST /api/pages/file-edit
+//   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/assets, GET /api/pages/assets/:sha
+//   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
 //   GET/POST /api/sites, DELETE /api/sites/:id, GET/POST /api/sites/requests/:id
 // Routes whose token is the permission (no sign-in, never the app's cookies at work):
 //   GET /pg/:token (the page's own address), /pg/:token/html, /pg/:token/manifest.webmanifest, POST /pg/:token/storage
@@ -25,10 +29,18 @@ import type { PagesEvent, PublishRequest } from '../../shared/pages.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
-import type { Deps, Feature, RunTool } from '../features/types.ts';
+import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { setCaptureDb } from '../capture/index.ts';
 import { draftsOf, endDrafts, feedDraft, type ToolStream } from './drafts.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
+import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
+import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
+import { fontFile, fontsCss } from './fonts.ts';
+import { agentDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
+import { agentBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
+import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
+import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
 import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage } from './sites.ts';
 import {
@@ -45,6 +57,8 @@ import {
   pageByToken,
   pageHtml,
   pageInfo,
+  pageModel,
+  pageSource,
   pageToken,
   putValues,
   renamePage,
@@ -60,6 +74,12 @@ import { dropThumbs, enableThumbs, refreshThumbs, thumbFile } from './thumbs.ts'
 export { MAX_PAGE } from './store.ts';
 
 const tell = (d: Deps, data: PagesEvent) => d.broadcast({ t: 'feature', id: 'pages', data });
+
+/** A kind a request names, checked. */
+const mustKindName = (k: string): PageKind => {
+  mustKind(k);
+  return k as PageKind;
+};
 
 const CHOICES =
   'Choices: a click on an element with data-choice="Blue" puts "Chose: Blue" in the user’s message box (they send it, with anything they add); data-group="Color" on it or a container makes it "Color: Blue"; data-multi on the container lets them pick several. A <form data-choice-form="Trip"> puts its named fields there when submitted. Offer 2 to 4 options at a time.';
@@ -119,6 +139,8 @@ const SAVE_PAGE: RunTool = {
   async run(a, ctx) {
     const db = ctx.deps.db;
     const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
+    const other = id ? kindOf(mustPage(db, id).kind) : null;
+    if (other) throw new Error(`Page ${id} is a ${other.noun}: change it with ${other.tool}.`);
     const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', sessionKey: ctx.key });
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
@@ -130,22 +152,147 @@ const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
   description:
-    'The user’s saved pages (Pages). With no id: each page’s id, title, version and last change. With an id: that page’s current HTML and the data it stores, to change it with save_page or to answer questions about it.',
+    'The user’s saved pages, slide decks, documents, spreadsheets and LaTeX documents (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML and the data it stores (to change it with save_page), or a deck’s slides, a document, a spreadsheet or a LaTeX project as it is kept (to change it with save_slides, save_doc, save_sheet or save_latex), or to answer questions about it.',
   inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'A saved page’s id.' } } },
   async run(a, ctx) {
     const db = ctx.deps.db;
     const id = typeof a.id === 'string' ? a.id.trim() : '';
     if (!id) {
       const list = listPages(db);
-      return list.length ? list.map((p) => `- ${p.id} · ${p.title} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`).join('\n') : 'No saved pages yet.';
+      return list.length ? list.map((p) => `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`).join('\n') : 'No saved pages yet.';
     }
     const p = mustPage(db, id);
-    const html = pageHtml(db, id)!.html;
+    const k = kindOf(p.kind);
+    if (k) {
+      const by = p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
+      return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by} ${k.forAgent(pageSource(db, id)!.text)}`;
+    }
+    const html = (await pageHtml(db, id))!.html;
     const data = storageText(db, id);
     const by = p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
     // Agents' tool output is cut further on anyway: say so here rather than lose the end unnoticed.
     const cut = html.length > 100_000 ? `${html.slice(0, 100_000)}\n… (cut: the page is ${Math.round(html.length / 1024)} KB; write the whole page anew to change it)` : html;
     return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}HTML:\n${cut}`;
+  },
+};
+
+/** The page an agent's save_slides, save_doc… names to change (it must be of that kind), or null to make a new one. */
+function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): string | null {
+  const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
+  if (id && mustPage(db, id).kind !== kind) {
+    throw new Error(`Page ${id} is not a ${mustKind(kind).noun}: change it with ${kindOf(mustPage(db, id).kind)?.tool ?? 'save_page'}, or leave out id to make a new one.`);
+  }
+  return id;
+}
+
+/** Keeps what an agent made: a new version of the page it named, or a new page of its session. */
+function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown) {
+  const db = ctx.deps.db;
+  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key });
+  tell(ctx.deps, { what: 'pages' });
+  refreshThumbs(ctx.deps, [p.id]);
+  return p;
+}
+
+const SAVE_SLIDES: RunTool = {
+  name: 'save_slides',
+  description: SAVE_SLIDES_DESCRIPTION,
+  inputSchema: SAVE_SLIDES_SCHEMA,
+  async run(a, ctx) {
+    const id = changing(ctx.deps.db, a, 'slides');
+    const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides }, ctx.cwd);
+    const p = keepModel(ctx, id, 'slides', a.title, deck);
+    const n = deck.slides.length;
+    return [
+      `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} slide${n === 1 ? '' : 's'}. It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it, present it and export it to PowerPoint or PDF.`,
+      ...notes,
+    ].join(' ');
+  },
+};
+
+const SAVE_DOC: RunTool = {
+  name: 'save_doc',
+  description: SAVE_DOC_DESCRIPTION,
+  inputSchema: SAVE_DOC_SCHEMA,
+  async run(a, ctx) {
+    const id = changing(ctx.deps.db, a, 'doc');
+    const { id: _id, title: _title, ...rest } = a;
+    // The version it changes: what the agent leaves out (paper, font) stays, and unchanged blocks keep their ids.
+    const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, id ? pageSource(ctx.deps.db, id)?.text : undefined);
+    const p = keepModel(ctx, id, 'doc', a.title, doc);
+    return [
+      `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
+      ...notes,
+    ].join(' ');
+  },
+};
+
+const SAVE_SHEET: RunTool = {
+  name: 'save_sheet',
+  description: SAVE_SHEET_DESCRIPTION,
+  inputSchema: SAVE_SHEET_SCHEMA,
+  async run(a, ctx) {
+    const id = changing(ctx.deps.db, a, 'sheet');
+    const { id: _id, title: _title, ...rest } = a;
+    const { book, notes } = await agentBook(rest, ctx.cwd);
+    const p = keepModel(ctx, id, 'sheet', a.title, book);
+    const n = book.sheets.length;
+    return [
+      `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} sheet${n === 1 ? '' : 's'}. It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Excel or Google Sheets and export it as an Excel file, a CSV or a PDF.`,
+      ...notes,
+    ].join(' ');
+  },
+};
+
+const SAVE_LATEX: RunTool = {
+  name: 'save_latex',
+  description: SAVE_LATEX_DESCRIPTION,
+  inputSchema: SAVE_LATEX_SCHEMA,
+  async run(a, ctx) {
+    const db = ctx.deps.db;
+    const id = changing(db, a, 'tex');
+    const { id: _id, title: _title, ...rest } = a;
+    // The version it changes: the files and pictures the agent leaves out stay.
+    const { doc, notes } = await agentTex(db, rest, ctx.cwd, id ? readTex(pageSource(db, id)!.text) : undefined);
+    // Typeset first: the agent hears of errors to fix, and the picture in the list comes from this run.
+    const r = await compileTex(db, doc);
+    const p = keepModel(ctx, id, 'tex', a.title, doc);
+    return [
+      [
+        `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in Pages (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit the source beside its typeset pages and export it as a PDF, its .tex source or the project as a .zip.`,
+        ...notes,
+      ].join(' '),
+      compileSummary(r),
+    ].join('\n\n');
+  },
+};
+
+const EXPORT_PAGE: RunTool = {
+  name: 'export_page',
+  description: [
+    'Save a page, slide deck, document, spreadsheet or LaTeX document of the user’s Pages as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
+    'a deck as PowerPoint (pptx) or a PDF (a slide a page), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
+    'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip); any of them as a web page (html) that works on its own.',
+    'The file goes in this session’s folder unless you give a path.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'The page’s or deck’s id (get_page lists them).' },
+      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html'] },
+      path: { type: 'string', description: 'Where to write it: a file name or a path, from the session’s folder or absolute.' },
+    },
+    required: ['id', 'format'],
+  },
+  async run(a, ctx) {
+    const format = String(a.format) as ExportFormat;
+    if (!EXPORT_TYPES[format]) throw new Error(`format is one of ${Object.keys(EXPORT_TYPES).join(', ')}.`);
+    const f = await exportPage(ctx.deps.db, String(a.id ?? ''), { format });
+    const dest = typeof a.path === 'string' && a.path.trim() ? fromSession(ctx.cwd, a.path.trim()) : path.join(ctx.cwd || config.defaultCwd, f.name);
+    const file = fs.existsSync(dest) && fs.statSync(dest).isDirectory() ? path.join(dest, f.name) : dest;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, f.data);
+    return `Wrote ${file} (${Math.max(1, Math.round(f.data.length / 1024))} KB). Hand it to the user with present_files.`;
   },
 };
 
@@ -200,7 +347,26 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  'Pages: show_html shows a page in the conversation (a report, a chart, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Pages library, can go on a phone’s home screen, and keeps what it stores with naget.storage on every device (a file’s localStorage stays in one browser). get_page lists saved pages, to change one. Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
+  'Pages: show_html shows a page in the conversation (a report, a chart, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Pages library, can go on a phone’s home screen, and keeps what it stores with naget.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in Pages) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, and anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, unless they ask for a file made another way. get_page lists all of these, to change one. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown or LaTeX). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
+
+/** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
+function askInstructions(db: Deps['db'], v: unknown): string | null {
+  const id = typeof v === 'string' ? v : v && typeof v === 'object' ? String((v as { id?: unknown }).id ?? '') : '';
+  const p = id ? pageInfo(db, id) : null;
+  if (!p) return null;
+  const k = kindOf(p.kind);
+  const how: Record<string, string> = {
+    slides: 'Read it with get_page (each slide and part has its id; slides are numbered from 1 in the order they show), change what they ask, and save it with save_slides and that id. "This slide" or "slide 3" means the one they name; "every slide" means all of them.',
+    doc: 'Read it with get_page, change what they ask (a section is a heading and what follows it, up to the next heading of its level), and save the whole document with save_doc and that id.',
+    sheet: 'Read it with get_page, change what they ask (cells and ranges as A1 or B2:D9, on the sheet they name), and save the whole workbook with save_sheet and that id; keep formulas as formulas.',
+    tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (what you leave out stays); it is typeset again, and you hear of any errors: fix them.',
+  };
+  return [
+    `The user is asking from their ${k?.noun ?? 'page'} "${p.title}" (saved page ${p.id}), open in front of them in Pages: their messages are about changing it.`,
+    k ? how[p.kind!] : 'Read it with get_page and save the whole changed page with save_page and that id. When they name a part, change that part, and the rest only as needed.',
+    'What they look at updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',
+  ].join(' ');
+}
 
 /** What the agent hears once the user decided on its publish_site card. */
 function outcome(r: PublishRequest, base: string): string {
@@ -229,6 +395,7 @@ function routes(d: Deps) {
   initPages(db);
   initSites(db);
   initEdits(db);
+  texRoutes(app, db);
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
   const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
   const key = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 300) : undefined);
@@ -262,7 +429,10 @@ function routes(d: Deps) {
     const fresh = !page;
     if (!page) {
       const data = b.data && typeof b.data === 'object' && !Array.isArray(b.data) ? Object.entries(b.data as Record<string, unknown>).map(([k, v]) => [k, JSON.stringify(v)] as [string, string]) : [];
-      page = createPage(db, { title: b.title, html: b.html, by: item ? 'user' : 'made', sessionKey, sourceItem: item });
+      page =
+        typeof b.kind === 'string' && b.kind !== 'page'
+          ? createPage(db, { title: b.title, kind: mustKindName(b.kind), model: b.model ?? mustKind(b.kind).fresh(typeof b.title === 'string' && b.title.trim() ? b.title.trim() : ''), by: 'made', sessionKey })
+          : createPage(db, { title: b.title, html: b.html, by: item ? 'user' : 'made', sessionKey, sourceItem: item });
       try {
         if (data.length) putValues(db, page.id, data.filter(([, v]) => v !== undefined));
       } catch (e) {
@@ -280,7 +450,27 @@ function routes(d: Deps) {
   });
   app.get('/api/pages/:id', async (req) => {
     const p = mustPage(db, P(req).id);
-    return { page: p, html: pageHtml(db, p.id)!.html, versions: versionsOf(db, p.id), link: `/pg/${pageToken(db, p.id)}` };
+    const extra = p.kind ? { model: pageModel(db, p.id) } : { html: (await pageHtml(db, p.id))!.html };
+    return { page: p, ...extra, versions: versionsOf(db, p.id), link: `/pg/${pageToken(db, p.id)}` };
+  });
+  /** A file someone opens (a Word document, a spreadsheet, a CSV): made into a page of its kind. */
+  app.post('/api/pages/import', { bodyLimit: 40 * 1024 * 1024 }, async (req) => {
+    const b = B(req);
+    const name = typeof b.name === 'string' ? b.name.slice(0, 300) : '';
+    const kind = kindForFile(name);
+    if (!kind || typeof b.data !== 'string') {
+      throw new HttpError(400, 'Send a file’s name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, or a .tex file or a LaTeX project’s .zip.');
+    }
+    const k = mustKind(kind);
+    let got: Awaited<ReturnType<NonNullable<typeof k.fromFile>>>;
+    try {
+      got = await k.fromFile!(Buffer.from(b.data, 'base64'), name);
+    } catch (e) {
+      throw new HttpError(422, `That file could not be read: ${(e as Error).message}`);
+    }
+    const page = createPage(db, { title: typeof b.title === 'string' && b.title.trim() ? b.title : name.replace(/\.[^.]+$/, ''), kind, model: got.model, by: 'made', sessionKey: key(b.sessionKey) });
+    changed(page.id);
+    return { page, notes: got.notes ?? [] };
   });
   app.patch('/api/pages/:id', async (req) => {
     const page = renamePage(db, P(req).id, B(req).title);
@@ -301,21 +491,24 @@ function routes(d: Deps) {
    * saved meanwhile it is refused (409) unless `force`. The agents of `sessionKey` and of the session that
    * made the page hear of it with the user's next message.
    */
-  app.post('/api/pages/:id/versions', { bodyLimit: 6 * 1024 * 1024 }, async (req) => {
+  app.post('/api/pages/:id/versions', { bodyLimit: 12 * 1024 * 1024 }, async (req) => {
     const b = B(req);
     const id = P(req).id;
     const cur = mustPage(db, id);
     const base = Number(b.base);
     if (Number.isInteger(base) && base > 0 && base !== cur.version && b.force !== true) throw new HttpError(409, `Version ${cur.version} was saved after the one you changed (${base}).`);
-    const page = addVersion(db, id, { title: b.title, html: b.html, by: 'edit' });
+    const page = addVersion(db, id, { title: b.title, html: b.html, model: b.model, by: 'edit' });
     noteEdit(db, [key(b.sessionKey), cur.sessionKey], id, Number.isInteger(base) && base > 0 ? base : cur.version, page.version);
     changed(id);
     return { page };
   });
+  /** A version: its page as HTML (another kind's own page), or with ?model=1 another kind's model. */
   app.get('/api/pages/:id/versions/:v', async (req) => {
-    const v = pageHtml(db, P(req).id, Number(P(req).v));
-    if (!v) throw new HttpError(404, 'That version is no longer kept');
-    return v;
+    const id = P(req).id;
+    const src = pageSource(db, id, Number(P(req).v));
+    if (!src) throw new HttpError(404, 'That version is no longer kept');
+    if (src.kind !== 'page' && (req.query as { model?: string }).model === '1') return { title: src.title, version: src.version, model: mustKind(src.kind).read(src.text) };
+    return pageHtml(db, id, src.version);
   });
   app.post('/api/pages/:id/versions/:v/restore', async (req) => {
     const page = restoreVersion(db, P(req).id, Number(P(req).v));
@@ -355,6 +548,62 @@ function routes(d: Deps) {
   });
   /** A new address for the page; the old one stops working. */
   app.post('/api/pages/:id/link', async (req) => ({ link: `/pg/${resetPageLink(db, P(req).id)}` }));
+  /** The page as a file: a PDF, a Word document or (a deck) a PowerPoint file, or a web page that works on its own. */
+  app.get('/api/pages/:id/export', async (req, reply) => {
+    const q = req.query as { format?: string; v?: string; paper?: string };
+    const format = String(q.format ?? '') as ExportFormat;
+    if (!EXPORT_TYPES[format]) throw new HttpError(400, `format is one of ${Object.keys(EXPORT_TYPES).join(', ')}`);
+    const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4' });
+    return reply
+      .header('Cache-Control', 'no-store')
+      .header('Content-Disposition', `attachment; filename="${f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(f.name)}`)
+      .type(f.type)
+      .send(f.data);
+  });
+
+  // ---- a deck's pictures and fonts ---------------------------------------------------------------
+  /** A picture for a deck (the editor's upload, or one at an address on the web): kept, and its source. */
+  app.post('/api/pages/assets', { bodyLimit: Math.ceil(MAX_ASSET * 1.4) + 4096 }, async (req) => {
+    const b = B(req);
+    if (typeof b.data === 'string') {
+      const m = /^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=]+)$/i.exec(b.data);
+      if (!m) throw new HttpError(400, 'data is a data: address of a picture');
+      return { src: `naget-asset:${putAsset(db, Buffer.from(m[1], 'base64'))}` };
+    }
+    if (typeof b.url === 'string' && /^https?:\/\//i.test(b.url)) {
+      const notes: string[] = [];
+      const src = await takeIn(db, b.url, { notes });
+      if (!src.startsWith('naget-asset:')) throw new HttpError(422, notes[0] ?? 'That picture could not be fetched');
+      return { src };
+    }
+    throw new HttpError(400, 'Send data (a data: address) or url');
+  });
+  app.get('/api/pages/assets/:sha', async (req, reply) => {
+    const a = getAsset(db, P(req).sha);
+    if (!a) return reply.code(404).send({ error: 'No such picture' });
+    // A picture of its own address is the same picture for ever; SVG runs nothing as a picture, and is kept from running as a page.
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox").type(a.mime).send(a.data);
+  });
+  /** A picture on the web, for a deck shown inside the app (whose own pages load no picture from the web). */
+  app.get('/api/pages/picture', async (req, reply) => {
+    const url = String((req.query as { url?: string }).url ?? '');
+    if (!/^https?:\/\//i.test(url)) throw new HttpError(400, 'url is an http(s) address');
+    const notes: string[] = [];
+    const src = await takeIn(db, url, { notes });
+    const a = src.startsWith('naget-asset:') ? getAsset(db, src.slice('naget-asset:'.length)) : null;
+    if (!a) return reply.code(404).send({ error: notes[0] ?? 'Not a picture' });
+    return reply.header('Cache-Control', 'private, max-age=86400').header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox").type(a.mime).send(a.data);
+  });
+  /** Google's fonts for decks shown in the app, through this server (the app's pages load no font from elsewhere). */
+  app.get('/api/pages/fonts.css', async (req, reply) => {
+    const css = await fontsCss(String((req.query as { f?: string }).f ?? ''));
+    return reply.header('Cache-Control', 'private, max-age=86400').type('text/css; charset=utf-8').send(css);
+  });
+  app.get('/api/pages/fonts/*', async (req, reply) => {
+    const f = await fontFile(String((req.params as Record<string, string>)['*'] ?? ''));
+    if (!f) return reply.code(404).send({ error: 'No such font' });
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').type(f.type).send(f.data);
+  });
 
   // ---- published sites ---------------------------------------------------------------------------
   app.get('/api/sites', async () => ({ sites: listSites(db) }));
@@ -403,7 +652,7 @@ function routes(d: Deps) {
     const p = byToken(req);
     reply.header('Cache-Control', 'no-store');
     if (!p) return reply.code(404).send({ error: 'Not found' });
-    return { title: p.title, html: pageHtml(db, p.id)!.html };
+    return { title: p.title, html: (await pageHtml(db, p.id))!.html };
   });
   app.get('/pg/:token/manifest.webmanifest', async (req, reply) => {
     const p = byToken(req);
@@ -428,8 +677,11 @@ function routes(d: Deps) {
 export const pages: Feature = {
   id: 'pages',
   routes,
-  tools: () => [SHOW_HTML, SAVE_PAGE, GET_PAGE, PUBLISH_SITE],
-  spawn: () => ({ instructions: [INSTRUCTIONS] }),
+  tools: () => [SHOW_HTML, SAVE_PAGE, SAVE_SLIDES, SAVE_DOC, SAVE_SHEET, SAVE_LATEX, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE],
+  spawn: (s, d) => {
+    const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
+    return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };
+  },
   // The pages the user changed in the editor, with their next message.
   beforeMessage: (key, d) => takeEdits(d.db, key),
   start(d) {
@@ -441,5 +693,7 @@ export const pages: Feature = {
     });
     enableThumbs();
     setTimeout(() => refreshThumbs(d), 30_000).unref();
+    // Pictures no deck shows any more, once a day.
+    setInterval(() => sweepAssets(d.db), 86_400_000).unref();
   },
 };

@@ -151,7 +151,18 @@ function waitFor(s: CdpSession, method: string, ms: number, test: (p: any) => bo
   });
 }
 
-async function take(o: CaptureOpts): Promise<Captured> {
+/** What a job gets of the tab it works in: the protocol session, and the page's title, address and height once it settled. */
+export interface Tab {
+  s: CdpSession;
+  info: { t?: string; u?: string; h?: number };
+  /** Runs `expression` in the page; its value, which must be JSON (a promise is waited for). */
+  evaluate<T>(expression: string, timeoutMs?: number): Promise<T>;
+}
+
+type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate'>;
+
+/** Opens a page in a fresh context, waits for it to load and settle, and hands it to `job`; the context goes after. */
+async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
   const c = await browser();
   const { browserContextId } = await c.send('Target.createBrowserContext', { disposeOnDetach: true });
   try {
@@ -191,8 +202,21 @@ async function take(o: CaptureOpts): Promise<Captured> {
     // Quiet network, at most a few seconds: dev servers keep a socket open for hot reload.
     await waitFor(s, 'Page.lifecycleEvent', 4000, (p) => p.name === 'networkIdle' || p.name === 'networkAlmostIdle');
     await sleep(o.settleMs ?? 500);
-    const meta = await s.send('Runtime.evaluate', { expression: 'JSON.stringify({ t: document.title, u: location.href, h: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0) })', returnByValue: true });
-    const info = JSON.parse(String(meta.result?.value ?? '{}')) as { t?: string; u?: string; h?: number };
+    const evaluate = async <T,>(expression: string, timeoutMs = 20_000): Promise<T> => {
+      const r = await s.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, timeoutMs);
+      if (r.exceptionDetails) throw new Error(String(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text ?? 'The page’s script failed').split('\n')[0]);
+      return r.result?.value as T;
+    };
+    const info = JSON.parse(String((await evaluate<string>('JSON.stringify({ t: document.title, u: location.href, h: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0) })')) ?? '{}')) as Tab['info'];
+    return await job({ s, info, evaluate });
+  } finally {
+    await c.send('Target.disposeBrowserContext', { browserContextId }).catch(() => {});
+  }
+}
+
+async function take(o: CaptureOpts): Promise<Captured> {
+  return inTab(o, async ({ s, info }) => {
+    const url = o.html !== undefined ? DOC_URL : o.url!;
     const height = o.fullPage ? Math.max(o.height, Math.min(Math.ceil(info.h ?? o.height), o.maxHeight ?? 8000)) : o.height;
     const out = o.outWidth && o.outWidth < o.width * (o.scale ?? 1) ? o.outWidth / (o.width * (o.scale ?? 1)) : 1;
     const shot = await s.send(
@@ -223,17 +247,12 @@ async function take(o: CaptureOpts): Promise<Captured> {
       title: String(info.t ?? '').slice(0, 200),
       url: o.html !== undefined ? '' : String(info.u ?? url),
     };
-  } finally {
-    await c.send('Target.disposeBrowserContext', { browserContextId }).catch(() => {});
-  }
+  });
 }
 
-/** A picture of a page; one at a time, the browser closing when nothing was asked for a while. */
-export function capture(o: CaptureOpts): Promise<Captured> {
-  const run = queue.then(
-    () => take(o),
-    () => take(o),
-  );
+/** One job at a time in the browser, which closes when nothing was asked of it for a while. */
+function queued<T>(f: () => Promise<T>): Promise<T> {
+  const run = queue.then(f, f);
   queue = run.catch(() => {});
   const done = () => {
     if (idle) clearTimeout(idle);
@@ -242,6 +261,41 @@ export function capture(o: CaptureOpts): Promise<Captured> {
   };
   run.then(done, done);
   return run;
+}
+
+/**
+ * A page opened as capture() opens one, for a job of its own: printing it as a PDF, reading what it shows, taking
+ * pictures of parts of it. One at a time, with the pictures.
+ */
+export function withTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
+  return queued(() => inTab(o, job));
+}
+
+/** A tab's page as a PDF (Chromium's print), with its backgrounds. Sizes in inches. */
+export async function printPdf(s: CdpSession, o: { paperWidth: number; paperHeight: number; margin?: number; landscape?: boolean; cssPageSize?: boolean }): Promise<Buffer> {
+  const m = o.margin ?? 0;
+  const r = await s.send(
+    'Page.printToPDF',
+    {
+      paperWidth: o.paperWidth,
+      paperHeight: o.paperHeight,
+      marginTop: m,
+      marginBottom: m,
+      marginLeft: m,
+      marginRight: m,
+      landscape: !!o.landscape,
+      printBackground: true,
+      preferCSSPageSize: !!o.cssPageSize,
+      generateDocumentOutline: true,
+    },
+    120_000,
+  );
+  return Buffer.from(r.data, 'base64');
+}
+
+/** A picture of a page; one at a time, the browser closing when nothing was asked for a while. */
+export function capture(o: CaptureOpts): Promise<Captured> {
+  return queued(() => take(o));
 }
 
 process.once('exit', closeCapture);

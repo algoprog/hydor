@@ -164,6 +164,10 @@ const CLASSY = /^[!-]?[a-z0-9@&\[\]:._\/()%#,'"=*+>~-]+$/;
  * Whether a string reads as words someone is shown. `jsx`: a piece of JSX text, or a pattern around values,
  * where a single lowercase word is text too ("{0} prompts", " more files").
  */
+const HTML_TAGS = new Set(
+  'a abbr address article aside b blockquote body br caption center code dd details div dl dt em fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html i img legend li main nav ol p pre s section span strong sub summary sup table tbody td tfoot th thead tr u ul'.split(' '),
+);
+
 function isText(s, jsx = false) {
   const t = s.replace(/\s+/g, ' ').trim();
   if (t.length < 2 || t.length > 2000 || !/[A-Za-z]/.test(t)) return false;
@@ -175,13 +179,25 @@ function isText(s, jsx = false) {
   if (/=>|===|!==|&&|\|\||\$\(|\bfunction\b|\breturn\b|^\w+\(|\)\s*\{|@__PURE__|\bjsxs?\(|className:|children:|;\s*(const|let|var|if|for)\b/.test(t)) return false;
   // An SVG path has numbers in it: "All" and "Call" are made of its letters too.
   if (/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/.test(t) && /\d/.test(t)) return false;
-  if (/^(color-mix|translate|rgba?|hsla?|var|calc|url|linear-gradient)\(/.test(t)) return false;
+  if (/^(color-mix|translate|rgba?|hsla?|var|calc|url|linear-gradient|radial-gradient|conic-gradient|repeating-[a-z-]+|drop-shadow|blur)\(/.test(t)) return false;
+  // An SVG path built from values ("M{0},{1}L{2}…"), and an id made of a few letters and a value ("gx{0}").
+  if ((/^[MmLlHhVvCcSsQqTtAaZz0-9 .,{}-]+$/.test(t) && /\{\d+\}/.test(t) && /^[Mm]/.test(t)) || /^[a-z]{1,4}\{\d+\}$/.test(t)) return false;
+  // CSS: a rule's declarations anywhere in it, values made of lengths and colours ("0 10px 28px rgba(0,0,0,.2)",
+  // "{0}px {1}px"), and a list of fonts ending in a family ("Georgia, serif").
+  if (/\{\s*[a-z-]+\s*:(?:[^{}]|\{\d+\})*\}/.test(t) || /^[a-z-]+\s*:\s*[^;]+;\s*[a-z-]+\s*:/.test(t)) return false;
+  if (/^(?:(?:-?[\d.]+|\{\d+\})+(?:px|em|rem|%|deg|ms|s|vh|vw|fr|ch|ex|pt|mm|cm)?|rgba?\([^)]*\)|hsla?\([^)]*\)|var\([^)]*\)|calc\([^)]*\)|#[0-9a-f]{3,8}|solid|dashed|dotted|none|inset|auto)(?:[\s,]+(?:(?:-?[\d.]+|\{\d+\})+(?:px|em|rem|%|deg|ms|s|vh|vw|fr|ch|ex|pt|mm|cm)?|rgba?\([^)]*\)|hsla?\([^)]*\)|var\([^)]*\)|calc\([^)]*\)|#[0-9a-f]{3,8}|solid|dashed|dotted|none|inset|auto|\{\d+\}))*$/i.test(t) && /\d/.test(t)) return false;
+  if (/,\s*(sans-serif|serif|monospace|system-ui|cursive)\s*$/.test(t)) return false;
+  // LaTeX and BibTeX source an editor writes (\section{…}, a % comment, @book{…}), a code editor's keys ("Mod-b"),
+  // markup and its attributes, and lists of HTML tags or selectors ("pre code", ".nd-table thead th").
+  if (/^\\[a-zA-Z]|^%%|^% [A-Z]|^\$\d|^@[a-z]+\{|^Mod-[a-zA-Z]|^<[a-z{]/.test(t) || /^[a-z-]+="[^"]*"(?:\s+[a-z-]+="[^"]*")*$/.test(t)) return false;
+  if (/^(?:\.?[a-z][\w-]*)(?:\s*,?\s+(?:\.?[a-z][\w-]*))+$/.test(t) && t.split(/[\s,]+/).every((w) => w.startsWith('.') || HTML_TAGS.has(w))) return false;
   // Commands, a browser's name for itself, CSS transitions, and ids made from a word and a value ("ac-{0}").
   if (/^(curl|df|npm|npx|node|git|sudo|pip|python3?|brew|apt|ssh|uv|docker)\s.*(\s--?[a-zA-Z]|\||\/)/.test(t) || /^Mozilla\/\d/.test(t)) return false;
   if (/\b(left|top|width|height|opacity|transform)\s+\d+m?s\b/.test(t)) return false;
   if ((/^[a-z0-9{}\-:._]+$/.test(t) && /[-:.]\{\d+\}|\{\d+\}[-:.]/.test(t)) || /^\{\d+\}[a-z]+\{\d+\}$/.test(t)) return false;
   // SQL, and a log's lines ("[restore] …").
-  if (/^(select|insert|update|delete|create|drop|alter|pragma|with)\b.*\b(from|into|set|table|index|where|values)\b/i.test(t) || /^\[[a-z-]+\] /.test(t)) return false;
+  // SQL, in lower or upper case: a sentence that starts with a capital ("Delete the table") is words.
+  if (/^(?:select|insert|update|delete|create|drop|alter|pragma|with|SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|PRAGMA|WITH)\b.*\b(?:from|into|set|table|index|where|values|FROM|INTO|SET|TABLE|INDEX|WHERE|VALUES)\b/.test(t) || /^\[[a-z-]+\] /.test(t)) return false;
   if (/^[a-z_.]+ (=|is|<|>|in) [?(\d]|^\{\d+\} (where|and|or) .*[=?]/.test(t)) return false;
   const tokens = bare.split(' ').filter(Boolean);
   // A list of classes (Tailwind's): lowercase tokens, most of them utilities (a dash, colon or bracket inside

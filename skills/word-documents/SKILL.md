@@ -1,9 +1,16 @@
 ---
 name: word-documents
-description: Use when the user wants a Word document (.docx) made or changed (a report, letter, CV, memo, contract, form, handout or notes to open in Word, Google Docs or Pages), or wants an existing .docx, .doc or .odt read, summarised or edited.
+description: Use when the user wants a Word file (.docx) made or changed from code (a report, letter, CV, memo, contract, form, handout or notes to open in Word, Google Docs or Pages), or wants an existing .docx, .doc or .odt read, summarised or edited. For a new document to read, edit and print in the app, write it with save_doc instead.
 ---
 
 # Word documents
+
+First, the app's own documents: for a new document, write it with the `save_doc` tool (naget-agent),
+in Markdown. It shows in the conversation, the user edits it in Pages (as in Word or Google Docs), and
+`export_page` writes it as a .docx, PDF or Markdown file to hand over with `present_files`. Use this
+skill for what those documents lack (headers and footers, page numbers, a table of contents, tracked
+changes, the user's own template), for a .docx of the user's own, or when they ask for a file made
+this way.
 
 You write the document with **python-docx**, in a short Python script, and hand it over as a file.
 The scripts in `scripts/` (next to this file) do the setup and the checking:

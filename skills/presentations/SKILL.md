@@ -1,9 +1,15 @@
 ---
 name: presentations
-description: Use when the user wants slides or a presentation (.pptx) made or changed (a pitch deck, talk, lesson, report or summary to show in PowerPoint, Keynote or Google Slides), or wants an existing .pptx, .ppt or .odp read, summarised or edited.
+description: Use when the user wants a PowerPoint file (.pptx) made or changed from code (a pitch deck, talk, lesson, report or summary to show in PowerPoint, Keynote or Google Slides), or wants an existing .pptx, .ppt or .odp read, summarised or edited. For new slides to edit and present in the app, make a deck with save_slides instead.
 ---
 
 # Presentations
+
+First, the app's own slides: for a new deck, make it with the `save_slides` tool (naget-agent). It
+shows in the conversation as a slideshow, the user edits and presents it in Pages (as in PowerPoint
+or Google Slides), and `export_page` writes it as a .pptx or PDF to hand over with `present_files`.
+Use this skill for a .pptx built from code in a folder, a .pptx of the user's own, or when they ask
+for a file made this way.
 
 You build the slides with **python-pptx**, through the small `deck.py` helper here, and hand them
 over as a file. The scripts in `scripts/` (next to this file):

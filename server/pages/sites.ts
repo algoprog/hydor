@@ -15,7 +15,7 @@ import type { DB } from '../db.ts';
 import { pageMimeFor } from '../files.ts';
 import { inside, signWithKey } from '../links.ts';
 import { injectHead, kitHead, storageShim } from './kit.ts';
-import { cleanTitle, pageHtml, pageInfo } from './store.ts';
+import { cleanTitle, pageHtml, pageInfo, pageSource } from './store.ts';
 
 /** A folder to publish holds at most this much. */
 const MAX_FILES = 5000;
@@ -259,9 +259,9 @@ export function createRequest(db: DB, p: { sessionKey: string; name: unknown; fo
   let bytes = 0;
   let folder: string | null = null;
   if (p.pageId) {
-    const page = pageHtml(db, p.pageId);
+    const page = pageSource(db, p.pageId);
     if (!page) throw new HttpError(404, 'No saved page with that id (get_page lists them)');
-    bytes = Buffer.byteLength(page.html);
+    bytes = Buffer.byteLength(page.text);
   } else {
     const f = inspectFolder(p.folder!);
     ({ folder, files, bytes } = f);
@@ -344,7 +344,7 @@ export async function serveSite(db: DB, req: FastifyRequest, reply: FastifyReply
   const rest = prm['*'] ?? '';
   if (site.kind === 'page') {
     if (rest && rest !== 'index.html') return text(reply, 404, 'Not found');
-    const page = site.page_id ? pageHtml(db, site.page_id) : null;
+    const page = site.page_id ? await pageHtml(db, site.page_id) : null;
     if (!page) return text(reply, 404, 'The page this site showed was deleted.');
     reply.header('Cache-Control', 'no-cache');
     return reply.type('text/html; charset=utf-8').send(injectHead(page.html, kitHead({ n: '', theme: 'auto', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value } })));

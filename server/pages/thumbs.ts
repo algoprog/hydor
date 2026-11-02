@@ -9,7 +9,8 @@ import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { injectHead, kitHead } from './kit.ts';
-import { dataStamp, pageHtml, pageInfo, storageMap } from './store.ts';
+import { dataStamp, pageHtml, pageInfo, pageSource, storageMap } from './store.ts';
+import { mustKind } from './kinds.ts';
 
 const DIR = path.join(config.dataDir, 'pages', 'thumbs');
 const fileOf = (id: string, stamp: string) => path.join(DIR, `${id}-${stamp}.webp`);
@@ -70,11 +71,20 @@ async function next(d: Deps) {
 async function take(d: Deps, id: string) {
   const { db } = d;
   const stamp = stampOf(db, id);
-  const page = pageHtml(db, id);
-  if (!stamp || !page || fs.existsSync(fileOf(id, stamp))) return;
-  // The kit with the page's data to read, nothing to write it to, and no parent to talk to.
-  const head = kitHead({ n: '', theme: 'light', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: storageMap(db, id) });
-  const shot = await capture({ html: injectHead(page.html, head), width: 880, height: 550, outWidth: 528, format: 'webp', quality: 74, settleMs: 700, blockPrivate: true });
+  const info = pageInfo(db, id);
+  if (!stamp || !info || fs.existsSync(fileOf(id, stamp))) return;
+  let shot;
+  if (info.kind) {
+    // A deck's first slide, a document's first page, a spreadsheet's first cells: alone.
+    const page = (await pageHtml(db, id, undefined, 'still'))!;
+    const size = mustKind(info.kind).still(pageSource(db, id)!.text);
+    shot = await capture({ html: page.html, width: size.width, height: size.height, outWidth: 528, format: 'webp', quality: 78, settleMs: 700, blockPrivate: true });
+  } else {
+    const page = (await pageHtml(db, id))!;
+    // The kit with the page's data to read, nothing to write it to, and no parent to talk to.
+    const head = kitHead({ n: '', theme: 'light', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: storageMap(db, id) });
+    shot = await capture({ html: injectHead(page.html, head), width: 880, height: 550, outWidth: 528, format: 'webp', quality: 74, settleMs: 700, blockPrivate: true });
+  }
   fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
   // Only one picture per page: the others are out of date.
   for (const f of fs.readdirSync(DIR)) if (f.startsWith(`${id}-`)) fs.rmSync(path.join(DIR, f), { force: true });

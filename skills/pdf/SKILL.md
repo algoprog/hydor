@@ -29,7 +29,10 @@ Pick the way that suits the document:
 - **Mostly text with headings, or the user will want to edit it**: make a Word document (word-
   documents skill), then `soffice --headless --convert-to pdf file.docx` where LibreOffice is here.
 - **Laid out exactly (invoices, certificates, tickets, forms)**: reportlab, below.
-- **Slides or a sheet as PDF**: make them with their skill, then convert with soffice.
+- **A paper, a thesis, maths, or anything the user wants in LaTeX**: `save_latex` (naget-agent) keeps it
+  in Pages, typeset, and `export_page` with format pdf writes its PDF.
+- **Slides or a sheet as PDF**: make them with their skill, then convert with soffice; or, for the app's
+  own slides, document or spreadsheet, `export_page` with format pdf.
 
 ```python
 from reportlab.lib import colors
