@@ -42,6 +42,16 @@ export function followUpPref(): FollowUp {
   }
 }
 
+/** What the box says while the agent works (also on a session's page while it starts: StartingSession.tsx). */
+export function workingPlaceholder(touch: boolean): string {
+  return followUpPref() === 'queue'
+    ? `Queue a message for when this turn ends${touch ? '' : ' · Ctrl+Enter sends it now'}`
+    : `Send a follow-up into the running turn${touch ? '' : ' · Ctrl+Enter queues it'}`;
+}
+
+/** A finger rather than a mouse: Enter makes a new line, and no keyboard shortcuts are offered. */
+export const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
 /**
  * The assistant and the model, with the effort and permissions when they are not the usual, as one chip; those
  * four and the context in its menu (a sheet from the bottom on a phone), so the box shows little at once.
@@ -315,7 +325,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
 
   const tasks = (running ? live!.backgroundTasks : ext?.backgroundTasks) ?? [];
   const ctx = live?.contextTokens && live?.contextWindow ? Math.round((live.contextTokens / live.contextWindow) * 100) : null;
-  const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+  const touch = isTouch();
   const canSend = (!!(text.trim() || atts.length) || !!move) && !busy && !locked;
   // The options chip: the assistant and the model, then the effort and permissions when they are not the usual.
   const on = move ? { c: moveCat, model: move.model, effort: move.effort, mode: move.mode } : { c: cat, model, effort, mode };
@@ -467,9 +477,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 : takeover
                   ? `Open in ${ext!.client} — sending moves it here`
                   : working
-                    ? followUpPref() === 'queue'
-                      ? `Queue a message for when this turn ends${touch ? '' : ' · Ctrl+Enter sends it now'}`
-                      : `Send a follow-up into the running turn${touch ? '' : ' · Ctrl+Enter queues it'}`
+                    ? workingPlaceholder(touch)
                     : hint
                       ? hint
                       : running
