@@ -9150,5 +9150,7 @@
 "unknown step:":"未知的步骤：",
 "Which permission: accessibility or screen":"哪个权限：accessibility 还是 screen",
 "You stopped the agent using your Mac. Let it go on?":"你让智能体停止使用你的 Mac。要让它继续吗？",
-"Stopped: agents no longer use your Mac until you allow it again":"已停止：在你再次允许之前，智能体不会再使用你的 Mac"
+"Stopped: agents no longer use your Mac until you allow it again":"已停止：在你再次允许之前，智能体不会再使用你的 Mac",
+"Pages, slides, documents, pictures and videos agents made for you to keep, each space’s together, and the sites you published.":"智能体为你做的、供你保留的页面、幻灯片、文档、图片和视频，每个空间的放在一起，还有你发布的网站。",
+"Small tools that find things out and show them clearly. Open one here, or just ask for what it does in any chat.":"帮你查明情况、清楚呈现的小工具。在这里打开，或者直接在任何对话中提出它能做的事。"
 }

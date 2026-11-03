@@ -115,11 +115,11 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   library: {
     title: 'Your Library',
-    body: 'Pages, slides, documents, pictures and videos agents made for you to keep, and the sites you published.',
+    body: 'Pages, slides, documents, pictures and videos agents made for you to keep, each space’s together, and the sites you published.',
   },
   apps: {
     title: 'Apps',
-    body: 'Run a ready-made app, or describe your own: an agent makes it, with its form and its task, and tries it before handing it over.',
+    body: 'Small tools that find things out and show them clearly. Open one here, or just ask for what it does in any chat.',
   },
   spaces: {
     title: 'Spaces',
