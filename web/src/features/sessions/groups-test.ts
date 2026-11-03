@@ -132,6 +132,19 @@ test('sessions awaiting auto-resume stay Active beyond five minutes, until the s
   assert.equal(cleared.find((g) => g.kind === 'pinned')?.items[0].key, overdue.key);
 });
 
+test('sessions with background agents or commands still running stay Active, here or elsewhere, until they end', () => {
+  n = 0;
+  const task = { id: 't1', description: 'Review the change', kind: 'local_agent', status: 'running' } as const;
+  const live = (backgroundTasks: (typeof task)[], status = 'idle') =>
+    ({ status, startedAt: now.getTime() - 2 * H, pendingApprovals: 0, backgroundTasks }) as unknown as SessionSummary['live'];
+  const here = ses(HOME, H, { live: live([task]) });
+  const elsewhere = ses(HOME, H, { external: { status: 'idle', client: 'VS Code', pid: 1, since: now.getTime() - 2 * H, backgroundTasks: [task] } as SessionSummary['external'] });
+  const done = ses(HOME, H, { live: live([]) });
+  const exited = ses(HOME, H, { live: live([task], 'exited') });
+  const gs = group([here, elsewhere, done, exited]);
+  assert.deepEqual(gs.find((g) => g.kind === 'active')?.items.map((s) => s.key), [here.key, elsewhere.key]);
+});
+
 test('recent starts, turns, completions and external activity count; seen sessions do not', () => {
   const ts = now.getTime() - 1000;
   const live = { status: 'idle', startedAt: now.getTime() - H, pendingApprovals: 0 } as const;
