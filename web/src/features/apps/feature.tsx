@@ -1,6 +1,7 @@
-// Apps: reusable tasks with a form, a gallery, and public pages. People see them as Templates.
+// Apps: reusable tasks with a form, a gallery, and public pages; beside them, the services agents connect to.
 //
-//   /apps                 the gallery: your apps, the latest runs, templates
+//   /apps                 Agent apps: your apps, the latest runs, the ready-made ones
+//   /apps/connected       Connected apps: services every agent can use, their marketplace, the keys (?tab=market|keys)
 //   /apps/<id>            an app: its form and Run, runs, rows of a CSV, API and sharing
 //   /apps/t/<template>    a template, run as it is
 //   /apps/new, …/edit     the builder (?template=… to start from one, ?from=<session> from a session)
@@ -35,6 +36,7 @@ function AppsRoutes() {
   const tab = q.get('tab');
   let m: RegExpExecArray | null;
   if (loc === '/apps/new') return <BuilderPage key={search} template={q.get('template') ?? undefined} from={q.get('from') ?? undefined} />;
+  if (loc === '/apps/connected') return <GalleryPage key="connected" tab="connected" />;
   if ((m = /^\/apps\/runs\/([^/]+)$/.exec(loc))) return <RunPage key={m[1]} id={decodeURIComponent(m[1])} />;
   if ((m = /^\/apps\/t\/([^/]+)$/.exec(loc))) return <AppPage key={m[1]} id={`tpl:${decodeURIComponent(m[1])}`} tab="run" again={q.get('again')} />;
   if ((m = /^\/apps\/([^/]+)\/edit$/.exec(loc))) return <BuilderPage key={m[1]} id={decodeURIComponent(m[1])} />;

@@ -143,7 +143,7 @@ async function launch() {
         if (m.method === 'initialize') m.params = { ...(m.params ?? {}), capabilities: { ...(m.params?.capabilities ?? {}), elicitation: { form: {}, url: {} } } };
         // The agent gave up on a call: a form it was waiting on ends.
         if (m.method === 'notifications/cancelled') for (const ac of asking) ac.abort();
-        if (off(m) && m.id != null) out({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `${spec.name}'s ${m.params?.name} tool is turned off (Settings → Connections).` }], isError: true } });
+        if (off(m) && m.id != null) out({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `${spec.name}'s ${m.params?.name} tool is turned off (Apps → Connected apps).` }], isError: true } });
         if (m.method === 'tools/list' && m.id != null) listing.add(String(m.id));
       });
       let rest = Array.isArray(v) ? v.filter((m) => !(m && typeof m === 'object' && off(m as Msg))) : off(v as Msg) ? null : v;

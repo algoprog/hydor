@@ -20,6 +20,7 @@ import { checkDaily } from './api.ts';
 import { builtinsForAgents } from './builtins.ts';
 import { startRun, waitFor } from './runs.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
+import { missingSecrets } from './secrets.ts';
 
 /** One app agents may run: the name they give it by, its run's app ("tpl:<id>" for a ready-made one), and what it is. */
 export interface Usable {
@@ -150,8 +151,10 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
   if (!adapter) return { why: 'nobody' };
   const fields = u.recipe.fields;
   const asked = fields.filter((f) => !(f.id in got.values || f.id in got.files) || !fine(f, got.values, got.files));
-  // Everything answered already (ask: true on a form the request filled in): nothing to show.
-  if (!asked.length) return { values: got.values, files: got.files };
+  // Keys it needs that the vault does not have: the card asks for them too (they go straight to the vault).
+  const keys = missingSecrets(ctx.deps.db, u.recipe);
+  // Everything answered already (ask: true on a form the request filled in) and every key there: nothing to show.
+  if (!asked.length && !keys.length) return { values: got.values, files: got.files };
   const given = fields.filter((f) => !asked.includes(f));
   const card: ApprovalRequest = {
     id: `app-${crypto.randomBytes(6).toString('hex')}`,
@@ -171,7 +174,14 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
         return { ...f, ...(keep ? { default: checkInputs([f], { [f.id]: said }).values[f.id] } : {}), ...(note ? { help: [note, f.help].filter(Boolean).join(' · ') } : {}) };
       }),
     },
-    app: { id: u.app, name: u.recipe.name, icon: u.recipe.icon, color: u.recipe.color, given: given.map((f) => ({ label: f.label, value: shown(f, got.values[f.id] ?? '') })).filter((g) => g.value) },
+    app: {
+      id: u.app,
+      name: u.recipe.name,
+      icon: u.recipe.icon,
+      color: u.recipe.color,
+      given: given.map((f) => ({ label: f.label, value: shown(f, got.values[f.id] ?? '') })).filter((g) => g.value),
+      ...(keys.length ? { secrets: keys.map(({ name, label, help, url }) => ({ name, label, ...(help ? { help } : {}), ...(url ? { url } : {}) })) } : {}),
+    },
     createdAt: Date.now(),
   };
   const merged = (a: ApprovalAnswer) => {
@@ -195,6 +205,9 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
   };
   const check = (a: ApprovalAnswer) => {
     if (a.decision !== 'accept') return null;
+    // The card saves the keys to the vault before it answers.
+    const still = missingSecrets(ctx.deps.db, u.recipe);
+    if (still.length) return `${still[0].label}: needed`;
     const m = merged(a);
     const wrong = fields.find((f) => !fine(f, m.values, m.files));
     if (!wrong) return null;
@@ -326,7 +339,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
       const raw = args.inputs && typeof args.inputs === 'object' && !Array.isArray(args.inputs) ? (args.inputs as Record<string, unknown>) : {};
       let got = intake(u.recipe.fields, raw, c.cwd);
       // What it needs and lacks (or the user may add to, when asked): the app's card.
-      if (u.recipe.fields.some((f) => !fine(f, got.values, got.files)) || args.ask === true) {
+      if (u.recipe.fields.some((f) => !fine(f, got.values, got.files)) || args.ask === true || missingSecrets(db, u.recipe).length) {
         const a = await askUser(c, u, got, raw, CALL_MS - 60_000);
         if ('why' in a) {
           if (a.why === 'declined') return `The user closed ${u.recipe.name}'s card without running it. Ask in words if you still need it, or go on without it.`;

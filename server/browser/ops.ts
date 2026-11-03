@@ -483,7 +483,7 @@ async function typeSecret(b: SessionBrowser, t: Tab, s: ActStep, ref: ElRef, wha
     return { line: `Could not read ${name} from the vault: ${(e as Error).message}.`, failed: true };
   }
   if (!k) return { line: `There is no key named ${name} in the vault: ask the user for it with request_secret.`, failed: true };
-  if (!k.domains.length) return { line: `${name} has no hosts it may be typed on yet: the user adds them in Settings → Connections → Keys.`, failed: true };
+  if (!k.domains.length) return { line: `${name} has no hosts it may be typed on yet: the user adds them in Apps → Connected apps → Keys.`, failed: true };
   // The field's own page: a frame from another site counts as that site.
   const href = await t.onElement<string>(ref, 'function () { return String(this.ownerDocument.location.href); }').catch(() => '');
   let u: URL;

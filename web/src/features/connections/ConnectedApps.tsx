@@ -1,5 +1,7 @@
-// Settings → Connections: the marketplace (search, categories, featured apps), the connected apps
-// (status, test, on or off for every session, their tools, disconnect) and the keys in the vault.
+// Apps → Connected apps (/apps/connected): the services you connected (status, test, on or off for every session,
+// their tools, disconnect), the marketplace to connect more (search, categories, featured ones) and the keys in the
+// vault. Its tab is in the address (?tab=market, ?tab=keys), so a link can open any of them.
+// (It was Settings → Connections; /settings?s=connections comes here.)
 import { useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, ChevronDown, CircleAlert, CircleCheck, ExternalLink, GitPullRequest, PlugZap, RefreshCw, Search, Store, Unplug } from 'lucide-react';
 import { CONNECTION_CATEGORIES, type CatalogApp, type ConnectionCategory, type ConnectionView } from '@shared/connections';
@@ -13,7 +15,8 @@ import { ConnectDialog, FLOW_KEY } from './ConnectDialog';
 import { Keys } from './Keys';
 import { AppIcon, authLabel, REPO_CATALOG, useConn } from './store';
 
-type Tab = 'market' | 'connected' | 'keys';
+export type ConnTab = 'market' | 'connected' | 'keys';
+type Tab = ConnTab;
 
 /** The browser came back from signing in (?flow=…): says how it went, then tidies the address. */
 function useSignInReturn(onDone: () => void) {
@@ -30,7 +33,8 @@ function useSignInReturn(onDone: () => void) {
     }
     sessionStorage.removeItem(FLOW_KEY);
     q.delete('flow');
-    go(`/settings?${q}`, true);
+    q.delete('s');
+    go(`/apps/connected${q.size ? `?${q}` : ''}`, true);
     api<{ result: { app: string; name: string; ok: boolean; error?: string } | null }>(`/api/connections/flows/${enc(flow)}`)
       .then((r) => {
         if (!r.result) return;
@@ -292,10 +296,13 @@ function Connected({ onBrowse, onReconnect }: { onBrowse: () => void; onReconnec
   );
 }
 
-export function ConnectionsSettings() {
+/** The Connected apps part of the Apps page; `tab` from the address (none: what is connected, or the marketplace when nothing is). */
+export function ConnectedApps({ tab: asked, onTab }: { tab?: ConnTab | null; onTab: (t: ConnTab) => void }) {
   const connections = useConn((s) => s.connections);
   const secrets = useConn((s) => s.secrets);
-  const [tab, setTab] = useState<Tab | null>(null);
+  const [first, setFirst] = useState<Tab | null>(null);
+  const tab = asked ?? first;
+  const setTab = (t: Tab) => onTab(t);
   const [open, setOpen] = useState<CatalogApp | null>(null);
   useEffect(() => {
     void useConn.getState().loadCatalog();
@@ -303,8 +310,8 @@ export function ConnectionsSettings() {
   }, []);
   // The first look: what is connected, or the marketplace when nothing is.
   useEffect(() => {
-    if (tab === null && connections) setTab(connections.length ? 'connected' : 'market');
-  }, [connections, tab]);
+    if (!asked && first === null && connections) setFirst(connections.length ? 'connected' : 'market');
+  }, [connections, asked, first]);
   useFeatureEvent('connections', (e) => {
     const d = e.data as { changed?: string };
     if (d?.changed === 'apps' || d?.changed === 'secrets') void useConn.getState().load();
@@ -321,14 +328,30 @@ export function ConnectionsSettings() {
   });
   const current = tab ?? 'market';
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-[1120px] space-y-5 px-4 py-6 sm:px-6 sm:py-8">
+      <section className="flex flex-col gap-3 rounded-3xl border border-line bg-panel px-5 py-5 sm:flex-row sm:items-center sm:px-7">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent/12 text-accent">
+          <PlugZap size={21} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[17px] leading-tight font-semibold tracking-tight">Your services, ready for every agent</h2>
+          <p className="mt-1 max-w-[680px] text-[13.5px] leading-relaxed text-fg-2">
+            Connect an account once (mail, calendar, Notion, GitHub…) and every agent and app can work with it. Keys you save (API keys, tokens) stay in your vault: agents use them by name and never see them.
+          </p>
+        </div>
+        {current !== 'market' && (
+          <Button variant="primary" size="sm" icon={<Store size={14} />} onClick={() => setTab('market')} className="self-start sm:self-center">
+            Connect a service
+          </Button>
+        )}
+      </section>
       <Tabs
         value={current}
         onChange={setTab}
-        className="-mt-1 border-b border-line"
+        className="border-b border-line"
         options={[
-          { value: 'market', label: 'Marketplace' },
           { value: 'connected', label: 'Connected', count: connections?.length },
+          { value: 'market', label: 'Marketplace' },
           { value: 'keys', label: 'Keys', count: secrets?.length },
         ]}
       />

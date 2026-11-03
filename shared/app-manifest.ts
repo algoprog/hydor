@@ -17,6 +17,7 @@
 import type { Agent } from './types.ts';
 import type { AnswerField, AppField, AppRecipe } from './apps.ts';
 import type { AppSummary } from './app-summary.ts';
+import type { AppSecretState } from './app-secrets.ts';
 import { ANSWER_TYPES, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
 
 // ---- the format ---------------------------------------------------------------------------------------
@@ -1416,6 +1417,14 @@ export interface InstallPreview {
   screens: string[];
   /** Templates that come with it (those it calls): each installed first, or the one you have used again. */
   bundled: { name: string; from: string; installs: 'new' | 'reuse' }[];
+  /** The keys it (and what comes with it) needs, and whether the vault has each already. */
+  secrets: AppSecretState[];
+  /** Its own files (pictures, videos, data its view shows), with their types and sizes. */
+  files: { name: string; mime: string; bytes: number }[];
+  /** What its view runs of its own: its widgets' names, and the libraries they load ("three 0.170.0"). */
+  view: { widgets: string[]; libs: string[] };
+  /** A ready-made app's file: which, and whether it is installed here (then this makes a copy of your own). */
+  builtin?: { id: string; installed: boolean };
   /** What changes on the way in (its folder, a mode that skips asking). */
   notes: string[];
   warnings: string[];

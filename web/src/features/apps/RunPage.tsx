@@ -115,6 +115,7 @@ export function RunView({ d, statusExtra, onAsked }: { d: RunDetail; statusExtra
   return (
     <>
       <RunBody
+        assets={d.recipe.assets}
         run={r}
         progress={progress}
         answer={d.recipe.answer}
@@ -124,7 +125,7 @@ export function RunView({ d, statusExtra, onAsked }: { d: RunDetail; statusExtra
         followUp={d.asks.at(-1) && { updated: d.asks.at(-1)!.updated && d.recipe.answer.length > 0 }}
         view={
           d.recipe.ui ? (
-            <AppView ui={d.recipe.ui} name={d.recipe.name} appId={r.app} run={r} answer={d.recipe.answer} view={d.view} can={viewCan(d)} translate={r.app.startsWith('tpl:')} onAsked={onAsked} />
+            <AppView ui={d.recipe.ui} name={d.recipe.name} appId={r.app} run={r} answer={d.recipe.answer} view={d.view} can={viewCan(d)} translate={r.app.startsWith('tpl:')} onAsked={onAsked} assets={d.recipe.assets} />
           ) : undefined
         }
       />

@@ -104,7 +104,7 @@
 
 ### MCP 服务器
 
-[设置 → MCP 服务器](/settings?s=mcp)：智能体可以调用的工具。详见[连接、密钥和工具](/guide/connections)。
+[设置 → MCP 服务器](/settings?s=mcp)：智能体可以调用的工具。详见[已连接的应用、密钥和工具](/guide/connections)。
 
 - [**添加服务器**](/settings?s=mcp&find=Add%20server)：供 Claude Code 或 Codex 使用的工具服务器。
 - [**检查连接**](/settings?s=mcp&find=Check%20connections)：查看每个 MCP 服务器是否有响应。
@@ -117,7 +117,7 @@
 
 ### 插件
 
-[设置 → 插件](/settings?s=plugins)：Claude Code 扩展，打包了技能、命令、智能体和 MCP 服务器。详见[连接、密钥和工具](/guide/connections)。
+[设置 → 插件](/settings?s=plugins)：Claude Code 扩展，打包了技能、命令、智能体和 MCP 服务器。详见[已连接的应用、密钥和工具](/guide/connections)。
 
 - [**已安装**](/settings?s=plugins&find=Installed)：Claude Code 拥有的插件。
 - [**浏览**](/settings?s=plugins&find=Browse)：查找可安装的插件。
@@ -198,13 +198,6 @@
 - [**视频生成**](/settings?s=images&find=Making%20videos)：允许智能体生成视频。
 - [**视频模型**](/settings?s=images&find=Video%20model)：生成视频的模型。
 - [**资料库中的标题和说明**](/settings?s=images&find=Captions%20in%20the%20Library)：为你保存的图片和视频撰写标题和说明的模型。
-
-### 连接
-
-[设置 → 连接](/settings?s=connections)：每个智能体都能使用的服务（来自人人都能添加的市场），以及存放密钥的保险库。详见[连接、密钥和工具](/guide/connections)。
-
-- [**市场**](/settings?s=connections&find=Marketplace)：每个智能体都能使用的服务，只需连接一次。
-- [**添加密钥**](/settings?s=connections&find=Add%20a%20key)：智能体可以使用但看不到的密钥。
 
 ### 语音
 

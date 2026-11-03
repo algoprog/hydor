@@ -8,6 +8,7 @@
 // The function below runs in the browser, not here: its source is sent as text (Function#toString), so it uses
 // only its arguments (its settings, and the template engine, made from uiEngine's source) and the browser's globals.
 import { uiEngine } from '../../shared/app-ui.ts';
+import { MEDIA_CSS, type MediaKitApi } from './media-kit.ts';
 
 /** A function's source for a <script> element (as kit.ts writes its own): nothing in it may end the element. */
 const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
@@ -51,6 +52,7 @@ const UI_CSS = `
 .n-ui-table{overflow-x:auto;border:1px solid var(--n-line);border-radius:var(--n-radius);background:var(--n-card)}
 .n-ui-table tr:last-child td{border-bottom:0}
 .n-ui-table td.n-ui-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.n-ui-thumb{display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;background:var(--n-soft);cursor:zoom-in}
 .n-ui-list{margin:0;padding-left:20px;font-size:15px;line-height:1.55}
 .n-ui-list li{margin:3px 0}
 .n-ui-checklist{list-style:none;margin:0;padding:0;border:1px solid var(--n-line);border-radius:var(--n-radius);background:var(--n-card)}
@@ -77,7 +79,7 @@ const UI_CSS = `
  * last, view: what it keeps, answer: the answer's fields), what it may ask of the app (can), the app's words
  * (labels) and language (lang); `E`: the template engine. Runs after the bridge (and the app kit, on an app's own page).
  */
-function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Record<string, string>; lang: string; css: string; start?: string }, E: any) {
+function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Record<string, string>; lang: string; css: string; start?: string; libs?: MediaKitApi['libs'] }, E: any, media?: (k: MediaKitApi) => void) {
   const P = window.parent;
   if (!P || P === window || !cfg?.def || !Array.isArray(cfg.def.pages)) return;
   const def = cfg.def;
@@ -203,6 +205,97 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     return list;
   };
   const tick = (path: string) => `ticks.${String(path || 'list').replace(/[^\w-]+/g, '-').slice(0, 60)}`;
+  // ---- pictures, videos and sounds ---------------------------------------------------------------------------------
+  /**
+   * An address as the view shows it: one of the app's own files by its name (asset:cover.jpg), a copy the app keeps
+   * (/app-media/…), the web, or a picture written out (data:image/…); '' for anything else (a path on this computer).
+   */
+  const mediaUrl = (src: unknown): string => {
+    const v = String(src ?? '').trim();
+    if (v.startsWith('asset:')) {
+      const name = v.slice(6);
+      const a = isObj(ctx.assets) ? ctx.assets[name] : null;
+      return isObj(a) && /^[a-f0-9]{40}$/.test(String(a.sha)) ? `/app-media/${a.sha}/${encodeURIComponent(name)}` : '';
+    }
+    if (/^https?:\/\/[^\s"'<>]+$/i.test(v) || /^\/app-media\/[a-f0-9]{40}\/[^\s"'<>/?#]+$/.test(v) || /^data:image\/(png|jpe?g|gif|webp|avif);base64,[A-Za-z0-9+/=]+$/i.test(v)) return v;
+    return '';
+  };
+  /** A YouTube or Vimeo address as its player's, or ''. */
+  const embedOf = (src: string): string => {
+    let u: URL;
+    try {
+      u = new URL(src);
+    } catch {
+      return '';
+    }
+    const host = u.hostname.replace(/^www\.|^m\./, '');
+    let id = '';
+    if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+    else if (host === 'youtube.com' || host === 'youtube-nocookie.com') id = u.searchParams.get('v') ?? (/^\/(?:embed|shorts|live)\/([\w-]{6,20})/.exec(u.pathname)?.[1] ?? '');
+    if (id && /^[\w-]{6,20}$/.test(id)) {
+      const t = Number((u.searchParams.get('t') ?? u.searchParams.get('start') ?? '0').replace(/s$/, ''));
+      return `https://www.youtube-nocookie.com/embed/${id}${t > 0 ? `?start=${Math.floor(t)}` : ''}`;
+    }
+    const vm = host === 'vimeo.com' ? /^\/(\d{4,12})/.exec(u.pathname)?.[1] : host === 'player.vimeo.com' ? /^\/video\/(\d{4,12})/.exec(u.pathname)?.[1] : undefined;
+    return vm ? `https://player.vimeo.com/video/${vm}` : '';
+  };
+  const KIND: Record<string, RegExp> = { image: /\.(png|jpe?g|gif|webp|avif|svg|bmp)(?:$|[?#])/i, video: /\.(mp4|m4v|webm|mov|ogv)(?:$|[?#])/i, audio: /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|weba)(?:$|[?#])/i };
+  const kindOf = (x: any): string => (['image', 'video', 'audio', 'file'].includes(x.kind) ? x.kind : /^data:image\//i.test(x.src) ? 'image' : embedOf(x.src) ? 'video' : (Object.keys(KIND).find((k) => KIND[k].test(x.src)) ?? 'file'));
+  /** What fills a picture, video or sound: addresses, items with a caption, or rows with the field named in with.src. */
+  const mediaItems = (v: unknown, w: Record<string, any>): { src: string; caption: string; kind?: string; poster?: string; name?: string }[] => {
+    const list = Array.isArray(v) ? v : v === null || v === undefined || v === '' ? [] : [v];
+    return list
+      .map((x: any) => {
+        if (typeof x === 'string') return { src: x, caption: '' };
+        if (!isObj(x)) return { src: '', caption: '' };
+        const src = typeof w.src === 'string' ? x[w.src] : (x.src ?? x.url ?? x.image ?? x.photo ?? x.picture ?? x.video ?? x.audio ?? x.file);
+        const cap = typeof w.caption === 'string' ? x[w.caption] : (x.caption ?? x.title ?? x.alt);
+        return { src: String(src ?? ''), caption: cap === null || cap === undefined ? '' : E.show(cap, { root: {}, stack: [] }), kind: x.kind, poster: typeof x.poster === 'string' ? x.poster : undefined, name: typeof x.name === 'string' ? x.name : undefined };
+      })
+      .filter((x) => x.src);
+  };
+  const cssLen = (h: unknown, d = '') => (typeof h === 'number' && h > 0 && h < 4000 ? `${h}px` : typeof h === 'string' && /^\d{1,4}(\.\d+)?(px|vh|em|rem|%)$/.test(h) ? h : d);
+  const images = (items: { src: string; caption: string }[], w: Record<string, any>) => {
+    const ok = items.map((x) => ({ ...x, url: mediaUrl(x.src) })).filter((x) => x.url);
+    if (!ok.length) return '';
+    const cols = typeof w.columns === 'number' ? Math.max(1, Math.min(6, Math.round(w.columns))) : ok.length === 1 ? 1 : 0;
+    const style = [cols ? `--n-cols:${cols}` : '', cssLen(w.height) ? `--n-h:${cssLen(w.height)}` : ok.length > 1 && !cols ? '--n-h:180px' : '', w.fit === 'contain' ? '--n-fit:contain' : ''].filter(Boolean).join(';');
+    return `<div class="n-ui-images${cols ? '' : ' n-ui-auto'}"${style ? ` style="${esc(style)}"` : ''}>${ok.map((x) => `<figure class="n-ui-fig"><img src="${esc(x.url)}" alt="${esc(x.caption)}" loading="lazy" data-n-zoom>${x.caption ? `<figcaption>${esc(x.caption)}</figcaption>` : ''}</figure>`).join('')}</div>`;
+  };
+  const videos = (items: { src: string; caption: string; poster?: string }[], w: Record<string, any>) =>
+    items
+      .map((x) => {
+        const embed = embedOf(x.src);
+        const url = embed ? '' : mediaUrl(x.src);
+        if (!embed && !url) return '';
+        const poster = x.poster ? mediaUrl(x.poster) : typeof w.poster === 'string' ? mediaUrl(w.poster) : '';
+        const player = embed ? `<n-embed src="${esc(embed)}" title="${esc(x.caption || 'Video')}"></n-embed>` : `<video controls playsinline preload="metadata" src="${esc(url)}"${poster ? ` poster="${esc(poster)}"` : ''}></video>`;
+        return `<div class="n-ui-video">${player}${x.caption ? `<div class="n-ui-cap">${esc(x.caption)}</div>` : ''}</div>`;
+      })
+      .join('');
+  const sounds = (items: { src: string; caption: string }[]) =>
+    items
+      .map((x) => {
+        const url = mediaUrl(x.src);
+        return url ? `<div class="n-ui-audio">${x.caption ? `<div class="n-ui-cap">${esc(x.caption)}</div>` : ''}<audio controls preload="metadata" src="${esc(url)}"></audio></div>` : '';
+      })
+      .join('');
+  const fileLinks = (items: { src: string; caption: string; name?: string }[]) =>
+    items
+      .map((x) => {
+        const url = mediaUrl(x.src);
+        const label = x.caption || x.name || decodeURIComponent(url.split('/').pop() ?? '') || url;
+        return url ? `<a class="n-ui-file" href="${esc(url)}" target="_blank" rel="noopener noreferrer" download><span aria-hidden="true">↓</span> <span>${esc(label)}</span></a>` : '';
+      })
+      .join(' ');
+  /** A mix of files (a media answer): pictures together, then videos, sounds and other files. */
+  const mediaMix = (v: unknown, w: Record<string, any> = {}) => {
+    const items = mediaItems(v, w);
+    const of = (k: string) => items.filter((x) => kindOf(x) === k);
+    return [images(of('image'), w), videos(of('video'), w), sounds(of('audio')), of('file').length ? `<div>${fileLinks(of('file'))}</div>` : ''].filter(Boolean).join('');
+  };
+  /** A part drawn by a script (a map, a plot, a widget): what fills it, and its settings, in one attribute. */
+  const scripted = (tag: string, v: unknown, w: Record<string, any>, extra = '') => `<${tag}${extra} data-n-v="${esc(JSON.stringify({ v: v === undefined ? null : v, w }))}"></${tag}>`;
   /** A built-in element, filled with v. */
   const builtIn = (name: string, v: unknown, b: any, s: any): string => {
     const w = isObj(b.with) ? b.with : {};
@@ -237,6 +330,10 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
           const t = c.type ?? f?.columns?.find((y: any) => y.id === c.id)?.type;
           if (t === 'url' && typeof x === 'string' && /^https?:\/\//.test(x)) return `<a href="${esc(x)}" target="_blank" rel="noopener noreferrer">${esc(E.evaluate('.|host', { ...s, stack: [{ v: x }] }))}</a>`;
           if (t === 'date') return esc(E.evaluate('.|date', { ...s, stack: [{ v: x }] }));
+          if (t === 'image') {
+            const url = mediaUrl(x);
+            return url ? `<img class="n-ui-thumb" src="${esc(url)}" alt="" loading="lazy" data-n-zoom>` : '';
+          }
           return esc(E.show(x, s));
         };
         return `<div class="n-ui-table"><table><thead><tr>${cols.map((c) => `<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows
@@ -261,11 +358,33 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
         return `<div class="n-ui-answer">${fields
           .filter((x) => E.given(res[x.id]) || res[x.id] === 0)
           .map((x) => {
-            const body = x.type === 'table' ? builtIn('table', res[x.id], { data: `result.${x.id}` }, s) : x.type === 'list' ? builtIn('list', res[x.id], {}, s) : x.type === 'markdown' ? builtIn('markdown', res[x.id], {}, s) : `<div>${esc(E.show(res[x.id], s))}</div>`;
+            const body =
+              x.type === 'table'
+                ? builtIn('table', res[x.id], { data: `result.${x.id}` }, s)
+                : x.type === 'list'
+                  ? builtIn('list', res[x.id], {}, s)
+                  : x.type === 'markdown'
+                    ? builtIn('markdown', res[x.id], {}, s)
+                    : x.type === 'media'
+                      ? mediaMix(res[x.id])
+                      : `<div>${esc(E.show(res[x.id], s))}</div>`;
             return `<section><h3 class="n-ui-title">${esc(x.label)}</h3>${body}</section>`;
           })
           .join('')}</div>`;
       }
+      // Each takes its own kind of file from what fills it (a mix of pictures and videos shows each in its place).
+      case 'image':
+        return images(mediaItems(v, w).filter((x) => !['video', 'audio'].includes(kindOf(x)) && (!x.kind || x.kind === 'image')), w);
+      case 'video':
+        return videos(mediaItems(v, w).filter((x) => kindOf(x) === 'video' || (!x.kind && kindOf(x) === 'file')), w);
+      case 'audio':
+        return sounds(mediaItems(v, w).filter((x) => kindOf(x) === 'audio' || (!x.kind && kindOf(x) === 'file')));
+      case 'media':
+        return mediaMix(v, w);
+      case 'map':
+        return scripted('n-map', v, w);
+      case 'plot':
+        return scripted('n-plot', v, w);
       case 'form':
       case 'runs':
       case 'chat': {
@@ -279,7 +398,7 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
         return '';
     }
   };
-  const BUILT = new Set(['text', 'markdown', 'list', 'checklist', 'table', 'chart', 'answer', 'form', 'runs', 'chat']);
+  const BUILT = new Set(['text', 'markdown', 'list', 'checklist', 'table', 'chart', 'answer', 'form', 'runs', 'chat', 'image', 'video', 'audio', 'map', 'plot']);
   /** One element: its template filled, in a box of its own that remembers what filled it. */
   const element = (b: any, stack: any[], key: string): string => {
     const s = scope(stack);
@@ -288,7 +407,11 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     try {
       if (b.html) html = E.render(b.html, s);
       else if (b.text) html = `<div class="n-ui-text n-ui-md">${E.md(E.fill(b.text, s))}</div>`;
-      else if (b.element && !BUILT.has(b.element)) {
+      else if (b.element && isObj(def.widgets) && isObj(def.widgets[b.element])) {
+        // One of the view's widgets: drawn by its own script, with what fills it and the block's settings.
+        name = b.element;
+        html = scripted('n-widget', stack.length ? stack[stack.length - 1].v : undefined, isObj(b.with) ? b.with : {}, ` name="${esc(b.element)}"`);
+      } else if (b.element && !BUILT.has(b.element)) {
         name = b.element;
         const el = def.elements?.[b.element];
         const p = el ? E.parse(el.html) : null;
@@ -368,6 +491,12 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
         else if (['href', 'src', 'action', 'formaction', 'xlink:href', 'poster', 'background'].includes(n)) {
           const v = a.value.replace(/[\u0000- \u007f-\u009f]/g, '').toLowerCase();
           if (/^(javascript|vbscript):/.test(v) || (/^data:/.test(v) && !(n === 'src' && /^data:image\/(png|jpe?g|gif|webp|avif)/.test(v)))) el.removeAttribute(a.name);
+          // One of the app's own files, by its name.
+          else if (v.startsWith('asset:')) {
+            const url = mediaUrl(a.value.trim());
+            if (url) el.setAttribute(a.name, url);
+            else el.removeAttribute(a.name);
+          }
         }
       }
   };
@@ -617,6 +746,14 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     }
     const back = t?.closest?.('[data-n-back]');
     if (back && mine(back)) return void act({ do: 'back' }, scope(), '');
+    // A picture opens large, with the others beside it.
+    const zoom = t?.closest?.('img[data-n-zoom]') as HTMLImageElement | null;
+    if (zoom && mine(zoom) && !zoom.closest('[data-event]')) {
+      const group = zoom.closest('.n-ui-images,.n-ui-table') ?? zoom.parentElement;
+      const all = [...(group?.querySelectorAll('img[data-n-zoom]') ?? [zoom])] as HTMLImageElement[];
+      e.preventDefault();
+      return void call('media', { images: all.map((x) => ({ src: x.currentSrc || x.src, name: x.alt })), at: Math.max(0, all.indexOf(zoom)) }).catch(() => {});
+    }
     const el = t?.closest?.('[data-event]');
     if (!el || !mine(el)) return;
     if (el.tagName === 'FORM' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !['button', 'submit', 'image'].includes((el as HTMLInputElement).type))) return;
@@ -694,8 +831,13 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     style.id = 'n-ui-style';
     style.textContent = `${cfg.css || ''}\n${Object.entries(def.elements ?? {})
       .map(([k, e]: [string, any]) => (e?.css ? `.n-el-${k}{${String(e.css).replace(/<\/?style/gi, '')}}` : ''))
+      .join('\n')}\n${Object.entries(isObj(def.widgets) ? def.widgets : {})
+      .map(([k, e]: [string, any]) => (e?.css ? `.n-widget-${k}{${String(e.css).replace(/<\/?style/gi, '')}}` : ''))
       .join('\n')}\n${String(def.style ?? '').replace(/<\/?style/gi, '')}`;
     document.head.appendChild(style);
+    // Maps, plots, videos from YouTube or Vimeo, and the view's own widgets.
+    if (typeof media === 'function' && cfg.libs)
+      media({ libs: cfg.libs, esc, L, url: mediaUrl, fire: (n, el, ev) => void fire(n, el, ev), play: (src, title) => void call('media', { video: src, title }).catch(() => {}), setAt, draw, state: () => state, lang: cfg.lang || 'en', widgets: isObj(def.widgets) ? def.widgets : {} });
     new MutationObserver(() => {
       for (const x of box.querySelectorAll('[data-event]:not(button):not(a):not(input):not(select):not(textarea):not(form):not([tabindex])')) {
         x.setAttribute('tabindex', '0');
@@ -712,4 +854,4 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
 
 export const UI_SRC = scriptSafe(uiKit.toString());
 export const ENGINE_SRC = scriptSafe(uiEngine.toString());
-export const UI_KIT_CSS = UI_CSS.replace(/\n/g, '');
+export const UI_KIT_CSS = `${UI_CSS}\n${MEDIA_CSS}`.replace(/\n/g, '');

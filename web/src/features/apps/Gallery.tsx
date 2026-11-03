@@ -1,9 +1,12 @@
-// The Apps page (/apps): a box to describe a new app (with a few ideas to start from), your apps (your own, then the
-// ready-made ones, which come installed) with when each last ran, the runs to pick up again, and the ready-made apps
-// you uninstalled, each showing what you get from it (the pages of its view), to install again. Building blocks,
-// apps made to be steps of others, wait folded at the end.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, ChevronRight, FilePlus2, FileUp, Globe, LayoutGrid, Plus, Puzzle, Sparkles } from 'lucide-react';
+// The Apps page, in two parts. Agent apps (/apps): a box to describe a new app (with a few ideas to start from), your
+// apps (your own, then the ready-made ones, which come installed) with when each last ran, the runs to pick up
+// again, and the ready-made apps you uninstalled, each showing what you get from it (the pages of its view), to
+// install again; building blocks, apps made to be steps of others, wait folded at the end. An app file dropped on
+// it opens the card that installs it, and each app's card downloads it as a file. Connected apps (/apps/connected):
+// the services every agent can use, connected once, their marketplace and the keys in the vault.
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useSearch } from 'wouter';
+import { ArrowRight, ChevronDown, ChevronRight, Download, FilePlus2, FileUp, Globe, LayoutGrid, MoreHorizontal, Plus, Puzzle, Sparkles } from 'lucide-react';
 import type { AppDef, AppRun } from '@shared/apps';
 import { APP_COLORS, inputsLine, isActive } from '@shared/apps';
 import { pagesFor } from '@shared/app-ui';
@@ -12,12 +15,14 @@ import { api, enc } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
-import { Badge, Button, cx, Empty, MenuItem, Popover, Throbber } from '../../components/ui';
+import { Badge, Button, cx, Empty, IconButton, MenuItem, Popover, Tabs, Throbber } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
+import { ConnectedApps, type ConnTab } from '../connections/ConnectedApps';
+import { useConn } from '../connections/store';
 import { InstallReadyDialog } from './About';
 import { appPath, runPath, useRunEvents, type Gallery, type ReadyApp } from './api';
 import { AppIcon } from './AppIcon';
-import { InstallFromFile } from './Install';
+import { DownloadDialog, InstallFromFile, type InstallHandle } from './Install';
 
 const STATUS: Record<AppRun['status'], { label: string; tone: 'neutral' | 'ok' | 'err' | 'warn' | 'info' }> = {
   queued: { label: 'Waiting', tone: 'neutral' },
@@ -125,15 +130,55 @@ function NewAppMenu() {
   );
 }
 
+/** An app's card's More: open it, or download it as a file to keep or to install elsewhere. */
+function CardMenu({ a, ready }: { a: AppDef | ReadyApp; ready?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  // A ready-made app downloads by its id ("tpl:<id>"), as a file named after it.
+  const asFile = (ready ? { ...a, id: `tpl:${(a as ReadyApp).id}`, slug: (a as ReadyApp).id } : a) as AppDef;
+  return (
+    <>
+      <IconButton
+        ref={btn}
+        label="More"
+        size="sm"
+        onClick={(e) => (e.stopPropagation(), setOpen((o) => !o))}
+        className="absolute top-2.5 right-2.5 bg-panel/80 opacity-100 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 sm:opacity-0 [@media(hover:none)]:opacity-100"
+      >
+        <MoreHorizontal size={16} />
+      </IconButton>
+      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} align="end" width={220}>
+        <MenuItem icon={<ArrowRight size={15} />} onClick={() => (setOpen(false), go(appPath(asFile.id)))}>
+          Open
+        </MenuItem>
+        <MenuItem icon={<Download size={15} />} onClick={() => (setOpen(false), setSaving(true))}>
+          Download as a file
+        </MenuItem>
+      </Popover>
+      <DownloadDialog app={asFile} open={saving} onClose={() => setSaving(false)} />
+    </>
+  );
+}
+
 /** One of your apps (or a ready-made one installed): what it is, and when it last ran. */
 function YourApp({ a, ready }: { a: (AppDef & { lastRunAt?: number }) | ReadyApp; ready?: boolean }) {
+  return (
+    <div className="group relative">
+      <AppCard a={a} ready={ready} />
+      <CardMenu a={a} ready={ready} />
+    </div>
+  );
+}
+
+function AppCard({ a, ready }: { a: (AppDef & { lastRunAt?: number }) | ReadyApp; ready?: boolean }) {
   const own = !ready ? (a as AppDef) : null;
   const view = !!own && (pagesFor(own.ui, 'run').length > 0 || pagesFor(own.ui, 'app').length > 0);
   const path = appPath(ready ? `tpl:${(a as ReadyApp).id}` : a.id);
   // A ready-made app's words are the app's own (translated); yours are yours.
   const mine = ready ? undefined : 'no';
   return (
-    <button type="button" onClick={() => go(path)} className="group flex min-h-[132px] flex-col rounded-2xl border border-line bg-panel p-4 text-left transition-colors hover:border-line-2 hover:bg-bg-1">
+    <button type="button" onClick={() => go(path)} className="flex h-full min-h-[132px] w-full flex-col rounded-2xl border border-line bg-panel p-4 pr-10 text-left transition-colors hover:border-line-2 hover:bg-bg-1">
       <div className="flex w-full items-start gap-3">
         <AppIcon icon={a.icon} color={a.color} size={42} />
         <div className="min-w-0 flex-1">
@@ -215,15 +260,43 @@ function RecentRun({ r, a }: { r: AppRun; a?: { icon: string; color: string; fie
   );
 }
 
-export function GalleryPage() {
+export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) {
   const [g, setG] = useState<Gallery | null>(null);
   const [cat, setCat] = useState('All');
   const [blocksOpen, setBlocksOpen] = useState(false);
   const [adding, setAdding] = useState<ReadyApp | null>(null);
   const load = () => api<Gallery>('/api/apps').then(setG, toastError);
   useEffect(() => {
-    load();
+    if (tab === 'agent') load();
+  }, [tab]);
+  // The connected services, for their tab's count (and the part itself).
+  const connections = useConn((s) => s.connections);
+  useEffect(() => {
+    void useConn.getState().loadCatalog();
+    void useConn.getState().load();
   }, []);
+  const connTab = new URLSearchParams(useSearch()).get('tab');
+  // An app file dropped anywhere on the page: the card that installs it.
+  const installer = useRef<InstallHandle>(null);
+  const [dropping, setDropping] = useState(false);
+  const files = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes('Files');
+  const drop = {
+    onDragOver: (e: DragEvent) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      setDropping(true);
+    },
+    onDragLeave: (e: DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+    },
+    onDrop: (e: DragEvent) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      setDropping(false);
+      const f = e.dataTransfer.files[0];
+      if (f) installer.current?.open(f);
+    },
+  };
   // A run changing shows in the latest runs; a new one from a form joins them.
   useRunEvents((run) =>
     setG((x) => {
@@ -244,10 +317,46 @@ export function GalleryPage() {
   const shown = (category?: string) => !sorting || cat === 'All' || (category ?? 'Other') === cat;
   const faces = useMemo(() => Object.fromEntries([...(g?.apps ?? []).map((a) => [a.id, a] as const), ...(g?.templates ?? []).map((t) => [`tpl:${t.id}`, t] as const)]), [g]);
 
+  const header = (
+    <PageHeader
+      title="Apps"
+      tip={tab === 'connected' ? 'connections' : 'apps'}
+      sub={tab === 'connected' ? 'Services every agent can use, connected once, and the keys they use' : 'Small tools made of agents: you fill in a few answers, they come back with the finished work'}
+      actions={tab === 'agent' ? <NewAppMenu /> : undefined}
+    >
+      <Tabs
+        value={tab}
+        onChange={(t) => go(t === 'agent' ? '/apps' : '/apps/connected')}
+        options={[
+          { value: 'agent', label: 'Agent apps', count: g ? own.length + ready.length : undefined },
+          { value: 'connected', label: 'Connected apps', count: connections?.length || undefined },
+        ]}
+      />
+    </PageHeader>
+  );
+  if (tab === 'connected')
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        {header}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <ConnectedApps tab={connTab === 'market' || connTab === 'keys' || connTab === 'connected' ? (connTab as ConnTab) : null} onTab={(t) => go(`/apps/connected?tab=${t}`, true)} />
+        </div>
+      </div>
+    );
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Apps" tip="apps" sub="Small tools made of agents: you fill in a few answers, they come back with the finished work" actions={<NewAppMenu />} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {header}
+      <div className="relative min-h-0 flex-1 overflow-y-auto" {...drop}>
+        {dropping && (
+          <div className="pointer-events-none absolute inset-3 z-10 grid place-items-center rounded-3xl border-2 border-dashed border-accent bg-accent/8 backdrop-blur-[1px]">
+            <div className="text-center">
+              <FileUp size={28} className="mx-auto text-accent" />
+              <div className="mt-2 text-[15px] font-semibold">Drop an app file to install it</div>
+              <div className="text-[13px] text-fg-3">A .naget-app or .json: you see what it does before anything is installed</div>
+            </div>
+          </div>
+        )}
         {!g ? (
           <div className="flex justify-center py-20 text-fg-3">
             <Throbber size={28} />
@@ -357,6 +466,7 @@ export function GalleryPage() {
         )}
       </div>
       {adding && <InstallReadyDialog t={adding} open onClose={() => setAdding(null)} />}
+      <InstallFromFile ref={installer} trigger={() => null} />
     </div>
   );
 }

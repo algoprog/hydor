@@ -14,6 +14,7 @@
 // checks views and tries them with a run's values with it, and the page kit sends its source into the sandboxed
 // frame where views are drawn (server/pages/kit.ts).
 import type { AppRecipe } from './apps.ts';
+import { cleanLibs } from './app-media.ts';
 
 // ---- the format -------------------------------------------------------------------------------------------------
 
@@ -26,6 +27,32 @@ export interface AppUi {
   events?: Record<string, UiAction[]>;
   /** CSS for the whole view (its own classes, @keyframes, fonts). */
   style?: string;
+  /**
+   * Its widgets, by name: elements drawn by a script of their own (a 3D scene, a chart library, a game, an editor),
+   * placed by blocks as elements are. Each is a module whose default export draws into an element it is given.
+   */
+  widgets?: Record<string, UiWidget>;
+  /**
+   * The libraries its widgets import, at exact versions from npm (loaded from jsDelivr): what they import by
+   * ("three", "chart.js/auto", "leaflet/dist/leaflet.css" for a stylesheet) → the version ("0.170.0").
+   */
+  libs?: Record<string, string>;
+}
+
+/**
+ * A widget: an ES module (`code`) whose default export draws it, `export default function (el, value, view) { … }`:
+ * el is the element to draw in, value what fills it (the block's data, as for an element), and view what it may do
+ * (view.with, view.theme, view.lang, view.asset(name), view.media(src), view.event(name, item), view.set(name, value),
+ * view.state, view.resize()). It may return a function that cleans up. It imports what libs names.
+ */
+export interface UiWidget {
+  code: string;
+  /** Its style, for what it draws (& for the widget itself). */
+  css?: string;
+  /** What it shows, in a line. */
+  description?: string;
+  /** Its height while it has none of its own (CSS: "360px", "60vh"); 320px unless set. */
+  height?: string;
 }
 
 /** A custom element: HTML with {{values}}, drawn again whenever what fills it changes. */
@@ -139,6 +166,11 @@ export const BUILTIN_ELEMENTS = [
   { value: 'checklist', hint: 'A list to tick off, the ticks kept with the run (with: label)' },
   { value: 'table', hint: 'Rows as a table (with: columns, the fields to show)' },
   { value: 'chart', hint: 'Rows as bars (with: label and value, the fields to draw)' },
+  { value: 'image', hint: 'A picture, or several side by side: an address, a file the app keeps, or asset:<name> (with: caption, fit: cover|contain, height, columns)' },
+  { value: 'video', hint: 'A video: a file, an address of one, or a YouTube or Vimeo link (with: poster, height)' },
+  { value: 'audio', hint: 'A sound or a recording, to play (with: caption)' },
+  { value: 'map', hint: 'Places on a map, from rows with a latitude and longitude (with: lat, lng, label, popup, line: true to join them in order, zoom, height)' },
+  { value: 'plot', hint: 'A chart drawn with Plotly, 2D or 3D, from rows (with: kind line|bar|scatter|area|pie|histogram|heatmap|scatter3d|surface|line3d, x, y, z, series, title, height), or a Plotly figure { data, layout } as its value' },
   { value: 'answer', hint: 'The whole answer, as the plain card shows it' },
   { value: 'form', hint: 'A form that runs one of its flows (with: flow); the app’s own page' },
   { value: 'runs', hint: 'Its latest runs (with: flow, limit); the app’s own page' },
@@ -149,7 +181,7 @@ const BUILTIN = new Set<string>(BUILTIN_ELEMENTS.map((e) => e.value));
 /** The names a view's values start from. */
 export const UI_ROOTS = ['result', 'inputs', 'run', 'app', 'state', 'page', 'data', 'last', 'item', 'event', 'today', 'now'] as const;
 
-export const UI_LIMITS = { pages: 12, blocks: 40, elements: 40, events: 60, actions: 8, html: 40_000, css: 20_000, style: 40_000, total: 300_000, state: 64 * 1024, stateKeys: 500 };
+export const UI_LIMITS = { pages: 12, blocks: 40, elements: 40, events: 60, actions: 8, html: 40_000, css: 20_000, style: 40_000, total: 300_000, state: 64 * 1024, stateKeys: 500, widgets: 12, code: 60_000 };
 
 export const UI_FORMATS = [
   { value: 'date', hint: '2026-11-20 as Fri, Nov 20, 2026' },
@@ -995,6 +1027,53 @@ export function cleanUi(raw: unknown): { ui?: AppUi; errors: string[] } {
     if (r.style.length > UI_LIMITS.style) errors.push(`Its view’s style is over ${UI_LIMITS.style.toLocaleString('en-US')} characters`);
     ui.style = r.style.slice(0, UI_LIMITS.style);
   }
+  // Widgets: elements drawn by a script of their own.
+  if (r.widgets !== undefined) {
+    if (!r.widgets || typeof r.widgets !== 'object' || Array.isArray(r.widgets)) errors.push('Its view’s widgets are a map of names to { "code": "export default function (el, value, view) { … }" }');
+    else {
+      const entries = Object.entries(r.widgets as Record<string, unknown>);
+      if (entries.length > UI_LIMITS.widgets) errors.push(`A view has at most ${UI_LIMITS.widgets} widgets`);
+      const ws: Record<string, UiWidget> = {};
+      for (const [name, v] of entries.slice(0, UI_LIMITS.widgets)) {
+        const where = `Widget “${name.slice(0, 40)}”`;
+        if (!ELEMENT.test(name)) {
+          errors.push(`${where}: a name is small letters, digits and -, starting with a letter (“globe”)`);
+          continue;
+        }
+        if (BUILTIN.has(name) || ui.elements?.[name]) {
+          errors.push(`${where}: an element has that name already`);
+          continue;
+        }
+        const o = (typeof v === 'string' ? { code: v } : v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+        const code = typeof o.code === 'string' ? o.code : '';
+        if (!code.trim()) {
+          errors.push(`${where}: give its code, a module: export default function (el, value, view) { … }`);
+          continue;
+        }
+        if (code.length > UI_LIMITS.code) errors.push(`${where}: its code is over ${UI_LIMITS.code.toLocaleString('en-US')} characters`);
+        if (!/\bexport\s+default\b|\bexport\s*\{[^}]*\bdefault\b/.test(code)) errors.push(`${where}: its code exports the function that draws it: export default function (el, value, view) { … }`);
+        const w: UiWidget = { code: code.slice(0, UI_LIMITS.code) };
+        const css = typeof o.css === 'string' ? o.css : '';
+        if (css.length > UI_LIMITS.css) errors.push(`${where}: its css is over ${UI_LIMITS.css.toLocaleString('en-US')} characters`);
+        if (css.trim()) w.css = css.slice(0, UI_LIMITS.css);
+        const description = str(o.description, 300);
+        if (description) w.description = description;
+        const height = str(o.height, 20);
+        if (height) {
+          if (/^\d{1,4}(\.\d+)?(px|vh|em|rem|%)$/.test(height)) w.height = height;
+          else errors.push(`${where}: its height is a CSS length, like "360px" or "60vh"`);
+        }
+        ws[name] = w;
+      }
+      if (Object.keys(ws).length) ui.widgets = ws;
+    }
+  }
+  const libs = cleanLibs(r.libs);
+  errors.push(...libs.errors);
+  if (libs.libs) {
+    if (!ui.widgets) errors.push('Its view loads libraries (libs) but has no widgets to use them');
+    ui.libs = libs.libs;
+  }
   if (JSON.stringify(ui).length > UI_LIMITS.total) errors.push(`Its view is over ${UI_LIMITS.total.toLocaleString('en-US')} characters in all: keep it smaller`);
   return ui.pages.length ? { ui, errors } : { errors };
 }
@@ -1071,8 +1150,10 @@ export function checkUi(r: Pick<AppRecipe, 'ui' | 'answer' | 'fields' | 'flow' |
     page.blocks.forEach((b, j) => {
       const where = `Page “${page.id}”, block ${j + 1}`;
       if (b.element) {
-        if (!BUILTIN.has(b.element) && !els[b.element]) errors.push(`${where}: there is no element “${b.element}” (its elements: ${Object.keys(els).join(', ') || 'none yet'}; built in: ${[...BUILTIN].join(', ')})`);
+        if (!BUILTIN.has(b.element) && !els[b.element] && !ui.widgets?.[b.element]) errors.push(`${where}: there is no element “${b.element}” (its elements: ${[...Object.keys(els), ...Object.keys(ui.widgets ?? {})].join(', ') || 'none yet'}; built in: ${[...BUILTIN].join(', ')})`);
         else used.add(b.element);
+        if (b.element === 'map' && b.each) warnings.push(`${where}: a map draws a whole list at once: leave out each`);
+        if (b.element === 'plot' && b.each) warnings.push(`${where}: a plot draws a whole list (or a figure) at once: leave out each`);
         if ((b.element === 'form' || b.element === 'runs') && typeof b.with?.flow === 'string' && !flows.has(b.with.flow)) errors.push(`${where}: it has no flow “${b.with.flow}” (${[...flows].join(', ')})`);
         if ((b.element === 'form' || b.element === 'runs' || b.element === 'chat') && on !== 'app') warnings.push(`${where}: a ${b.element} shows on the app's own page only (a page with on: "app")`);
       }
@@ -1084,6 +1165,9 @@ export function checkUi(r: Pick<AppRecipe, 'ui' | 'answer' | 'fields' | 'flow' |
     });
   }
   for (const name of Object.keys(els)) if (!used.has(name)) warnings.push(`Element “${name}” is on no page`);
+  // A widget may also be placed by a template (<n-widget name="…">).
+  const placed = Object.values(els).map((e) => e.html).concat(ui.pages.flatMap((p) => p.blocks.map((b) => b.html ?? ''))).join('\n');
+  for (const name of Object.keys(ui.widgets ?? {})) if (!used.has(name) && !new RegExp(`<n-widget[^>]*name=["']?${name}\\b`).test(placed)) warnings.push(`Widget “${name}” is on no page`);
   for (const ev of sent) if (!events[ev] && !ev.startsWith('@')) warnings.push(`Its elements send the event “${ev}”, which does nothing: add it to events`);
   const oneTask = !r.flow;
   for (const [name, acts] of Object.entries(events)) {

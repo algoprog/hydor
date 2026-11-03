@@ -102,8 +102,9 @@ agents that speak ACP and take MCP servers.
   ffmpeg): the app's choice, any of OpenRouter's vision models, Claude through Claude Code, or a model of your own
   (Ollama, vLLM, an endpoint). The Library's Media tab finds, plays, downloads and edits them, **Start a session with it** opens a new
   session with one in the message box, and agents can work from them.
-- **Connections**: a marketplace of apps and services (Notion, Linear, GitHub, Google, Stripe and more), signed
-  in once for every agent; anyone can add one with a pull request to `catalog/`. Keys and sign-ins live in an
+- **Connected apps**: on the Apps page beside your agent apps (Apps → Connected apps, which was Settings →
+  Connections), a marketplace of services (Notion, Linear, GitHub, Google, Stripe and more), signed
+  in once for every agent and app; anyone can add one with a pull request to `catalog/`. Keys and sign-ins live in an
   encrypted vault: when a task needs one that isn't there, the agent asks with a card (one key, or a sign-in's
   fields), and uses it by name without ever seeing it, in API calls and site sign-ins on the hosts you allow, and
   in commands on this computer that you allow (what they print comes back masked). When an app needs something from
@@ -153,7 +154,18 @@ agents that speak ACP and take MCP servers.
   made-up answer, what to fix listed under it; asked of an agent, started from its answer, or changed as code)
   or by an agent, checked when it is saved, drawn in the pages' sandbox, shown on the run's page (Plain answer
   shows the card and tables), in its session and on its public page (where nothing reaches the app), and kept in
-  its versions, its file and its folder. Follow-ups refine a run's
+  its versions, its file and its folder. Views show media too: pictures (side by side, opening large), videos
+  (files, YouTube, Vimeo) and sounds, maps of the places in an answer (Leaflet and OpenStreetMap, numbered and
+  joined in order) and plots in 2D and 3D (Plotly: lines, stacked bars, areas, scatter, pies, histograms, boxes,
+  heatmaps, 3D points, lines and surfaces); and widgets, elements drawn by a script of their own that imports
+  npm packages at exact versions from jsDelivr (a 3D scene with three.js, a chart library, a game), reaching the
+  app only through the view's events. An answer can hold pictures, videos and files (a media field, a picture
+  column): what an agent hands in from this computer, a picture it found on the web or one it drew is kept as a
+  copy, served at an address nobody can guess that never runs as a page of the app. An app has files of its own
+  too (pictures, videos, data, added in its Design tab or by app_save), shown by name in its view and travelling
+  in its file. An app names the keys it needs (API keys, tokens) and never their values: they are asked for on
+  its form, on its install card or on its card in a session when an agent runs it, and kept in the vault, where
+  its runs use them by name; a run without one does not start. Follow-ups refine a run's
   result, asked on its page or in its session, which opens on that result with a switch to the conversation.
   An app can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
   repeat over a list or until something holds, branches side by side, another app, its own data, a question
@@ -198,9 +210,10 @@ agents that speak ACP and take MCP servers.
   its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
   edited in the Library's page editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
   flows and a conversation with its agent, who finds and changes its records and runs its flows for you (the
-  latest conversation shows on return; earlier ones a click away). Apps travel as one file (.naget-app or .json, with their records, screens and the apps they
-  call), installed after a card that says what they ask, give and do, in plain words, then what they will use here
-  (folded), offering one of your models for any they ask for that is not set up here; uninstalling one deletes it.
+  latest conversation shows on return; earlier ones a click away). Apps travel as one file (.naget-app or .json, with their records, screens, own files and the apps they
+  call; the keys they need by name only), downloaded from an app's page or its card's More, the ready-made ones too (a ready-made app's file brings it
+  back where it was uninstalled), and installed from New app or by dropping the file on the Apps page, after a card that says what they ask, give and do, in plain words, with the keys they need,
+  then what they will use here (folded: their files, their view's scripts and libraries, models, packages), offering one of your models for any they ask for that is not set up here; uninstalling one deletes it.
 - **Slides**: decks kept in the Library, made by an agent (save_slides, from layouts or parts placed by position) or
   from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
   layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and

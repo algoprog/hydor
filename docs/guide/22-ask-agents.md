@@ -54,7 +54,7 @@ A card for a change can carry a form too: "Make a space" can show the name, desc
 Some things stay yours. An agent that tries gets told where you do it:
 
 - your password and signing in and out ([Settings → Password](/settings?s=security), [Accounts](/settings?s=accounts));
-- the values of keys and sign-ins: an agent asks for them with a card where you type them into the vault, and never sees them ([Connections, keys and tools](/guide/connections));
+- the values of keys and sign-ins: an agent asks for them with a card where you type them into the vault, and never sees them ([Connected apps, keys and tools](/guide/connections));
 - making access tokens for other machines or agents, and an app's API keys;
 - answering approval cards, its own or another session's, and deciding on cards that ask you (a proposed skill, a scheduled task, publishing);
 - a session's permissions and its spending cap;

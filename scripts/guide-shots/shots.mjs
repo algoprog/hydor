@@ -181,7 +181,15 @@ export const SHOTS = [
   settingsShot('memory', 'memory', { height: 900 }),
   settingsShot('tasks', 'tasks', { until: cardWith('Water the greenhouse reminder') }),
   settingsShot('skills', 'skillpack'),
-  settingsShot('connections', 'connections'),
+  {
+    // Apps → Connected apps: the services connected for every agent, the marketplace and the keys, as tabs.
+    id: 'connections',
+    async take(p, ctx) {
+      await ctx.go('/apps/connected?tab=market', { settle: 1800 });
+      await p.park();
+      return p.shot(ctx.file, { clip: await main(p) });
+    },
+  },
   settingsShot('custom', 'models', { height: 900 }),
   settingsShot('app', 'general', { until: button('Import') }),
 ];

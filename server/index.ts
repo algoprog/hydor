@@ -1546,7 +1546,8 @@ const CSP = [
   `connect-src 'self' ws: wss:${PREVIEW_PORT ? ` http://*:${PREVIEW_PORT} https://*:${PREVIEW_PORT}` : ''}${PREVIEW_ORIGIN ? ` ${PREVIEW_ORIGIN}` : ''}`,
   "media-src 'self' blob:",
   // The preview port too: the Preview page shows a dev server inside it.
-  `frame-src 'self' blob:${PREVIEW_PORT ? ` http://*:${PREVIEW_PORT} https://*:${PREVIEW_PORT}` : ''}${PREVIEW_ORIGIN ? ` ${PREVIEW_ORIGIN}` : ''}`,
+  // …and the players of YouTube (its no-cookie address) and Vimeo, for videos in apps' answers and views.
+  `frame-src 'self' blob: https://www.youtube-nocookie.com https://player.vimeo.com${PREVIEW_PORT ? ` http://*:${PREVIEW_PORT} https://*:${PREVIEW_PORT}` : ''}${PREVIEW_ORIGIN ? ` ${PREVIEW_ORIGIN}` : ''}`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",

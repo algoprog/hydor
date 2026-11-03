@@ -189,7 +189,7 @@ When the question comes as an approval card instead, its buttons are **Send answ
 
 ## Fill in forms a service asks for
 
-When a service you connected needs something from you partway through a task (a date, a choice, a page to approve on), its form shows as a card, whichever agent is working: "Linear asks you to fill in a form", "… asks you to open a page" or "… asks to go ahead". Fill in the fields and press **Send** (or **Open it**, which opens the page, or **Allow**), or press **Decline** or **Not now**. Codex's own tool servers ask the same way. See [Connections, keys and tools](/guide/connections).
+When a service you connected needs something from you partway through a task (a date, a choice, a page to approve on), its form shows as a card, whichever agent is working: "Linear asks you to fill in a form", "… asks you to open a page" or "… asks to go ahead". Fill in the fields and press **Send** (or **Open it**, which opens the page, or **Allow**), or press **Decline** or **Not now**. Codex's own tool servers ask the same way. See [Connected apps, keys and tools](/guide/connections).
 
 ## Message the agent while it works
 
@@ -380,7 +380,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - **Session settings** (a submenu):
   - **Memory**, with **On** or **Off** beside it: turns memory on or off for this session ("Off for all" when memory is off in Settings). See [Memory](/guide/memory).
   - **Spending cap**, with the cap beside it: set, change or raise it. See [Usage, limits and costs](/guide/usage).
-  - **Connected accounts**: turn each connected account on or off for this session only. See [Connections, keys and tools](/guide/connections).
+  - **Connected accounts**: turn each connected account on or off for this session only. See [Connected apps, keys and tools](/guide/connections).
   - **Assistant**, with its name beside it: opens Settings → Assistants (sessions with an assistant). The message box switches it.
 - **More** (a submenu):
   - **Open a browser** / **Show the browser**: the agents' browser for this session, which you can watch and take over. See [Search and the browser](/guide/web).

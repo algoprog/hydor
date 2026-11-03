@@ -13,7 +13,7 @@ An assistant can hold:
 - **Instructions**: who the agent is for the session and how it works. The agent is told to work this way throughout, but what you ask in the conversation comes first.
 - **What it may use**: reading files, creating and changing files, running commands, using the web, and other tools. Leave all of them on, or switch some off.
 - **Skills to favor**: skills the agent loads before it starts when they fit the task (see [Skills](/guide/skills)).
-- **Connections**: connected accounts to turn on in its sessions (see [Connections, keys and tools](/guide/connections)).
+- **Connections**: connected accounts to turn on in its sessions (see [Connected apps, keys and tools](/guide/connections)).
 - **An agent, model and permission mode** to suggest: picked with it on the start page, and still yours to change before you start.
 - **Where its sessions start** when you pick no folder: a new task folder of their own, or the folder shown on the start page.
 
@@ -203,7 +203,7 @@ Type a skill's name and press Enter (or a comma) to add it. The field suggests C
 
 ### Connections
 
-This part shows only when you have connected accounts (set up in [Settings → Connections](/settings?s=connections)). Each one has a switch: on means it is on in this assistant's sessions. One that is already on for every session says "On for every session" instead. If an account the assistant names is no longer connected, it shows as "(not connected)" with a button to remove it. See [Connections, keys and tools](/guide/connections).
+This part shows only when you have connected accounts (set up in [Apps → Connected apps](/apps/connected)). Each one has a switch: on means it is on in this assistant's sessions. One that is already on for every session says "On for every session" instead. If an account the assistant names is no longer connected, it shows as "(not connected)" with a button to remove it. See [Connected apps, keys and tools](/guide/connections).
 
 ## Change, duplicate or delete an assistant
 

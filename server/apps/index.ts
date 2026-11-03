@@ -16,7 +16,10 @@ import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
+import { cleanSecrets } from '../../shared/app-secrets.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
+import { ASSET_NAME, MEDIA_LIMITS, type AppAsset } from '../../shared/app-media.ts';
+import { secretsLine } from '../../shared/app-secrets.ts';
 import { builderTools } from './builder.ts';
 import { initAppEdits, noteUserEdit, takeAppEdits } from './edits.ts';
 import { isInternal } from '../internal.ts';
@@ -34,7 +37,7 @@ import { batchCsv, MAX_ROWS, startBatch, startBatches, stopBatch } from './batch
 import { addRecord, clearData, collectionsOf, dataOp, embedSoon, ensureDataTables, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { ensureEnv, envLine, envOf, envVars } from './env.ts';
 import { answerAsk, askOf, dataChanged, flowRunner, goOn, stepsOf } from './flow.ts';
-import { installPackage, packageOf, previewOf, readPackage, zipPackage, type Catalog } from './package.ts';
+import { installPackage, MAX_PACKAGE, packageJson, packageOf, previewOf, readPackage, zipPackage, type Catalog } from './package.ts';
 import { changeScreen, makeScreen, removeScreen, removeScreens, screenHtml, screensOf } from './screens.ts';
 import { draftFromSession } from './draft.ts';
 import { Limiter } from './limits.ts';
@@ -77,8 +80,12 @@ import {
 import { templateById } from './templates.ts';
 import { agentsMay, builtinsOf, isInstalled, setAgents, setInstalled } from './builtins.ts';
 import { tellAsker, useAppTool, useNote } from './use.ts';
+import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
+import { saveAppSecrets, secretsOf } from './secrets.ts';
 
 const keyLimiter = new Limiter();
+/** The largest request that installs an app: its file, as base64. */
+const INSTALL_BODY = Math.ceil(MAX_PACKAGE * 1.37) + (1 << 20);
 
 /** An app by id or address, or a template run as it is ("tpl:<id>"). */
 function recipeOf(db: Deps['db'], id: string): { app: AppDef | null; template: AppTemplate | null } {
@@ -137,7 +144,9 @@ function customModels(): { id: string; label: string; provider: string }[] {
 function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
   const src = raw && typeof raw === 'object' ? raw : {};
   const recipe = cleanRecipe(src);
-  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanExamples(src.examples).errors, ...cleanUi(src.ui).errors];
+  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanSecrets(src.secrets).errors, ...cleanExamples(src.examples).errors, ...cleanUi(src.ui).errors];
+  // Its files are kept here already (app_save's assets, or a page's upload, keeps a new one).
+  for (const [name, a] of Object.entries(recipe.assets ?? {})) if (!hasMedia(db, a.sha)) errors.push(`Its file “${name}” is not kept here: add it again (assets)`);
   if (!recipe.prompt.trim() && !recipe.flow) errors.push('Write the prompt: it is what the agent is asked to do');
   for (const f of recipe.fields) if (f.type === 'choice' && !f.options?.length) errors.push(`${f.label}: give the choices`);
   const checked = checkFlow(recipe);
@@ -200,6 +209,8 @@ function routes(d: Deps) {
   const { app, db, sessions } = d;
   ensureTables(db);
   ensureDataTables(db);
+  // The pictures, videos and files apps show, at addresses a view's frame (and a public page) can reach.
+  mediaRoutes(app, db);
   initAppEdits(db);
   // Templates with a folder of files keep in step with it: a change there is a version, a save here writes it.
   initFolders({
@@ -244,6 +255,8 @@ function routes(d: Deps) {
     }
   });
   const link = (key: string) => `${d.publicBase()}/s/${encodeURIComponent(key)}`;
+  /** The vault changed: its pages (Keys) hear of it. */
+  const keysChanged = () => d.broadcast({ t: 'feature', id: 'connections', data: { changed: 'secrets' } });
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
 
   // ---- the gallery and apps ----
@@ -310,20 +323,27 @@ function routes(d: Deps) {
       return [];
     }
   };
-  app.post('/api/apps/install/check', { bodyLimit: 30 * 1024 * 1024 }, async (req) => ({ preview: (await previewOf(db, readPackage((req.body ?? {}) as Record<string, any>), catalog)).preview }));
+  app.post('/api/apps/install/check', { bodyLimit: INSTALL_BODY }, async (req) => ({ preview: (await previewOf(db, readPackage((req.body ?? {}) as Record<string, any>), catalog)).preview }));
 
-  app.post('/api/apps/install', { bodyLimit: 30 * 1024 * 1024 }, async (req) => {
+  app.post('/api/apps/install', { bodyLimit: INSTALL_BODY }, async (req) => {
     const b = (req.body ?? {}) as Record<string, any>;
-    return installPackage(db, readPackage(b), { models: b.models && typeof b.models === 'object' ? b.models : undefined, catalog, agents: typeof b.agents === 'boolean' ? b.agents : undefined });
+    const out = await installPackage(db, readPackage(b), { models: b.models && typeof b.models === 'object' ? b.models : undefined, catalog, agents: typeof b.agents === 'boolean' ? b.agents : undefined });
+    // The keys given on its card go to the vault (those of the apps that came with it too).
+    if (b.secrets && typeof b.secrets === 'object') {
+      const made = out.builtin ? [templateById(out.builtin)] : [out.app, ...out.bundled.map((x) => getApp(db, x.slug))];
+      const saved = made.filter((x): x is AppDef | AppTemplate => !!x).flatMap((a) => saveAppSecrets(db, a, b.secrets, { allow: Array.isArray(b.allow) ? b.allow : [] }));
+      if (saved.length) keysChanged();
+    }
+    return out;
   });
 
   app.get('/api/apps/:id', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
-    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id) };
+    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template) };
     const today = dayStart();
     // Its own page in its view: what that page keeps.
     const own = pagesFor(a!.ui, 'app').length ? { view: getView(db, `app:${a!.id}`) } : {};
-    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), ...own };
+    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...own };
   });
 
   /** One value its own page's view keeps: null removes it. Gives all it keeps now. */
@@ -377,6 +397,8 @@ function routes(d: Deps) {
   /** A ready-made app ("tpl:<id>") installed again: back among your apps, and agents may run it unless you said no. */
   app.post('/api/apps/:id/install', async (req) => {
     const t = builtinOf(P(req).id);
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (b.secrets && saveAppSecrets(db, t, b.secrets, { allow: Array.isArray(b.allow) ? (b.allow as string[]) : [] }).length) keysChanged();
     setInstalled(db, t.id, true);
     return { template: t, installed: true, agents: agentsMay(db, t.id) };
   });
@@ -404,6 +426,52 @@ function routes(d: Deps) {
     return { agents: saved.agents, made: madeForSessions(saved) };
   });
 
+  // ---- the keys it needs, and its own files ----
+
+  /** The keys it needs and how the vault has them; values given (by name) are saved there first. `allow`: names of keys the vault has that may now go to its hosts. */
+  app.get('/api/apps/:id/secrets', async (req) => {
+    const { app: a, template } = recipeOf(db, P(req).id);
+    return { secrets: secretsOf(db, (a ?? template)!) };
+  });
+  app.post('/api/apps/:id/secrets', async (req) => {
+    const { app: a, template } = recipeOf(db, P(req).id);
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (saveAppSecrets(db, (a ?? template)!, b.values, { allow: Array.isArray(b.allow) ? (b.allow as string[]) : [] }).length) keysChanged();
+    return { secrets: secretsOf(db, (a ?? template)!) };
+  });
+
+  /** Keeps a file for an app being edited: its entry for the app's assets, which its editor saves with it (nothing changes until then). */
+  app.post('/api/apps/assets', { bodyLimit: Math.ceil(MEDIA_LIMITS.asset * 1.37) + (1 << 20) }, async (req) => {
+    const b = (req.body ?? {}) as { name?: unknown; data?: unknown; url?: unknown; caption?: unknown };
+    const name = String(b.name ?? '').trim();
+    return { name, asset: await putAsset(db, name, typeof b.data === 'string' ? { data: Buffer.from(b.data, 'base64') } : { url: typeof b.url === 'string' ? b.url : undefined }, typeof b.caption === 'string' ? b.caption : undefined) };
+  });
+
+  /** Adds one of its files (a picture, a video, a sound, data its view shows as asset:<name>), or replaces the one by that name. */
+  app.post('/api/apps/:id/assets', { bodyLimit: Math.ceil(MEDIA_LIMITS.asset * 1.37) + (1 << 20) }, async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such app');
+    const b = (req.body ?? {}) as { name?: unknown; data?: unknown; url?: unknown; caption?: unknown };
+    const name = String(b.name ?? '').trim();
+    const assets: Record<string, AppAsset> = { ...(a.assets ?? {}) };
+    if (!assets[name] && Object.keys(assets).length >= MEDIA_LIMITS.count) throw new HttpError(400, `An app has at most ${MEDIA_LIMITS.count} files`);
+    assets[name] = await putAsset(db, name, typeof b.data === 'string' ? { data: Buffer.from(b.data, 'base64') } : { url: typeof b.url === 'string' ? b.url : undefined }, typeof b.caption === 'string' ? b.caption : undefined);
+    if (Object.values(assets).reduce((n, x) => n + x.bytes, 0) > MEDIA_LIMITS.assets) throw new HttpError(413, `An app's files are at most ${MEDIA_LIMITS.assets >> 20} MB together`);
+    const saved = saveApp(db, { id: a.id, recipe: { ...a, assets }, by: isInternal(req) ? 'agent' : 'you', why: `Added the file ${name}.` });
+    appChanged(saved, isInternal(req) ? 'agent' : 'user');
+    return { app: saved };
+  });
+  app.delete('/api/apps/:id/assets/:name', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such app');
+    const name = P(req).name;
+    if (!ASSET_NAME.test(name) || !a.assets?.[name]) throw new HttpError(404, 'It has no file by that name');
+    const { [name]: _gone, ...rest } = a.assets;
+    const saved = saveApp(db, { id: a.id, recipe: { ...a, assets: Object.keys(rest).length ? rest : undefined }, by: isInternal(req) ? 'agent' : 'you', why: `Removed the file ${name}.` });
+    appChanged(saved, isInternal(req) ? 'agent' : 'user');
+    return { app: saved };
+  });
+
   // ---- its screens ----
 
   app.get('/api/apps/:id/screens', async (req) => ({ screens: screensOf(db, own(req)) }));
@@ -425,7 +493,7 @@ function routes(d: Deps) {
     const q = req.query as Record<string, string>;
     const pkg = packageOf(db, a ?? template!, q.data === '1' || q.data === 'true');
     const name = (a?.slug ?? template!.id).replace(/[^\w-]/g, '');
-    if (q.as === 'json') return reply.header('Content-Type', 'application/json; charset=utf-8').header('Content-Disposition', `attachment; filename="${name}.json"`).send(`${JSON.stringify(pkg, null, 2)}\n`);
+    if (q.as === 'json') return reply.header('Content-Type', 'application/json; charset=utf-8').header('Content-Disposition', `attachment; filename="${name}.json"`).send(packageJson(pkg));
     return reply.header('Content-Type', 'application/zip').header('Content-Disposition', `attachment; filename="${name}.naget-app"`).send(zipPackage(pkg));
   });
 
@@ -447,6 +515,8 @@ function routes(d: Deps) {
     if (!recipe.prompt.trim() && !recipe.flow) throw new HttpError(400, 'The prompt is empty');
     installedOr409(db, template);
     if (a) checkDaily(db, a);
+    // Keys it needs, given on its form: to the vault first.
+    if (b.secrets && typeof b.secrets === 'object' && saveAppSecrets(db, recipe, b.secrets, { allow: Array.isArray(b.allow) ? b.allow : [] }).length) keysChanged();
     const r = startRun({
       app: a?.id ?? (template ? `tpl:${template.id}` : 'test'),
       slug: a?.slug ?? template?.id ?? 'test',
@@ -523,10 +593,12 @@ function routes(d: Deps) {
     const a = r.app.startsWith('tpl:') ? null : getApp(db, r.app);
     const s = r.key ? sessions.summary(r.key) : null;
     const ui = viewOfRun(db, r);
+    // Its app's own files, as the app has them now (what asset:<name> in its view and answer shows).
+    const assets = (a ? a.assets : r.app.startsWith('tpl:') ? templateById(r.app.slice(4))?.assets : undefined) ?? r.recipe.assets;
     return {
       run: runView(r),
       progress: isActive(r.status) ? await progressOf(r, false) : { steps: [] },
-      recipe: { name, icon, color, fields, answer, agent, acpAgent, model, ...(ui ? { ui } : {}), ...(r.flow ? {} : { steps: !!r.recipe.flow }) },
+      recipe: { name, icon, color, fields, answer, agent, acpAgent, model, ...(ui ? { ui } : {}), ...(assets ? { assets } : {}), ...(r.flow ? {} : { steps: !!r.recipe.flow }) },
       // What its view keeps for it (ticks, values its events kept).
       ...(ui ? { view: getView(db, `run:${r.id}`) } : {}),
       slug: a?.slug ?? null,
@@ -907,9 +979,14 @@ function submitTool(ctx: RunCtx): RunTool | null {
       const ids = new Set(answer.map((f) => f.id));
       const keys = Object.keys(args ?? {});
       if (keys.length === 1 && !ids.has(keys[0]) && args[keys[0]] && typeof args[keys[0]] === 'object') raw = args[keys[0]];
-      const checked = checkAnswer(now.run.recipe.answer, raw);
+      // A public run's answer may only point at the web: nothing on this computer.
+      const local = !(now.mark.public || now.run.source === 'public');
+      const checked = checkAnswer(now.run.recipe.answer, raw, { local });
       if (!checked.ok) return { text: `The result does not fit the answer fields yet:\n${checked.errors.map((e) => `- ${e}`).join('\n')}\nFix these and call submit_result again with all the fields.`, isError: true };
-      saveResult(now.run.id, checked.value);
+      // Files on this computer it points at (and pictures as data: addresses): a copy kept, shown by its address.
+      const taken = await takeInAnswer(c.deps.db, now.run.recipe.answer, checked.value, { cwd: c.cwd, local });
+      if (taken.errors.length) return { text: `Some of its files could not be kept:\n${taken.errors.map((e) => `- ${e}`).join('\n')}\nFix these (a path that is there, or an https:// address) and call submit_result again with all the fields.`, isError: true };
+      saveResult(now.run.id, taken.value);
       return 'Saved: the person sees this result now. Finish with a short reply (a sentence or two); no need to repeat the result.';
     },
   };
@@ -918,10 +995,10 @@ function submitTool(ctx: RunCtx): RunTool | null {
 // ---- the data an app keeps, on its runs' own MCP server ----
 
 /** The app a run belongs to, as it is now: a run of a step goes by its parent's. */
-function appOfRun(db: Deps['db'], r: RunRecord): { data?: AppRecipe['data']; memory?: boolean; requires?: AppRecipe['requires']; slug?: string } {
+function appOfRun(db: Deps['db'], r: RunRecord): { data?: AppRecipe['data']; memory?: boolean; requires?: AppRecipe['requires']; secrets?: AppRecipe['secrets']; slug?: string } {
   const top = r.parent && r.source === 'step' ? (getRun(db, r.parent) ?? r) : r;
   const now = top.app.startsWith('tpl:') ? null : getApp(db, top.app);
-  return { data: now?.data ?? top.recipe.data, memory: now?.memory ?? top.recipe.memory, requires: now?.requires ?? top.recipe.requires, slug: now?.slug };
+  return { data: now?.data ?? top.recipe.data, memory: now?.memory ?? top.recipe.memory, requires: now?.requires ?? top.recipe.requires, secrets: now?.secrets ?? top.recipe.secrets, slug: now?.slug };
 }
 
 function dataTool(ctx: RunCtx): RunTool | null {
@@ -1040,7 +1117,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Apps (the Apps page in Naget Agent) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, and events for what a click does), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
+  "Apps (the Apps page in Naget Agent) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
 
 export const apps: Feature = {
   id: 'apps',
@@ -1079,7 +1156,9 @@ export const apps: Feature = {
     // Its template's packages, within reach: their commands first on PATH.
     const env = own.slug ? envVars(own, own.slug) : undefined;
     const line = own.slug ? envLine(own, own.slug) : null;
-    return { instructions: [[runInstructions({ ...hit.run, ...own }), line].filter(Boolean).join('\n')], ...(env ? { env } : {}) };
+    // Its keys, by name: how to use each (never a value).
+    const keys = secretsLine(secretsOf(d.db, own));
+    return { instructions: [[runInstructions({ ...hit.run, ...own }), line, keys].filter(Boolean).join('\n')], ...(env ? { env } : {}) };
   },
   // Templates the user changed in their editor, for the agents that built them, with the next message.
   beforeMessage: (key, d) => takeAppEdits(d.db, key),

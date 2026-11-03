@@ -1,6 +1,6 @@
 // Connecting one app: what it is and how it connects, then what it takes. Nothing (Connect), a key, a
 // few fields, or a sign-in in the browser: a window on a computer, this tab on a phone, coming back
-// to Settings → Connections either way.
+// to Apps → Connected apps either way.
 import { useEffect, useRef, useState } from 'react';
 import { BadgeCheck, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff, LockKeyhole } from 'lucide-react';
 import { CONNECTION_CATEGORIES, type CatalogApp, type CatalogField, type ConnectionView } from '@shared/connections';

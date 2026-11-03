@@ -34,6 +34,7 @@ import { FolderBox } from './Folder';
 import { KeepsEditor } from './Keeps';
 import { RunSteps } from './Steps';
 import { StepsEditor } from './StepsEditor';
+import { FilesEditor, SecretsEditor } from './Needs';
 
 /** A flow that is only the task (one agent step, as Work in steps makes it): its instructions, to go back to one task. */
 const oneTask = (flow: Flow): string | null => {
@@ -85,8 +86,8 @@ const BLANK: AppRecipe = {
 
 // Every part of the recipe, so a save keeps what this page does not show yet (its data, memory, needs, other flows).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, ui, examples, graph, block } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, ui, examples, graph, block };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions };
 };
 
 /** A text box that grows with what is written in it, and with how narrow it is. */
@@ -387,11 +388,12 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
             />
           )}
           <RunBody
+            assets={recipe.assets}
             run={run.run}
             progress={run.progress}
             answer={recipe.answer}
             name={recipe.name}
-            view={recipe.ui ? <AppView ui={recipe.ui} name={recipe.name} appId={appId ?? 'test'} run={run.run} answer={recipe.answer} can={['keep', 'run', ...(appId ? (['data'] as const) : [])]} /> : undefined}
+            view={recipe.ui ? <AppView ui={recipe.ui} name={recipe.name} appId={appId ?? 'test'} run={run.run} answer={recipe.answer} can={['keep', 'run', ...(appId ? (['data'] as const) : [])]} assets={recipe.assets} /> : undefined}
           />
         </div>
       ) : (
@@ -789,6 +791,12 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
           </Section>
           )}
 
+          {part === 'design' && (
+          <Fold title="Its own files" summary={Object.keys(recipe.assets ?? {}).length ? tr(`${Object.keys(recipe.assets ?? {}).length} files`) : tr('None yet')} sub="Pictures, videos, sounds and data that come with it, for its view to show.">
+            <FilesEditor recipe={recipe} onChange={set} />
+          </Fold>
+          )}
+
           {part === 'examples' && (
           <Section title="Examples" sub="Answers to try it with, and checks on what a run gives: to try a change, and to notice when it gets worse.">
             <ExamplesEditor recipe={recipe} appId={saved?.id ?? null} onChange={set} />
@@ -845,6 +853,10 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 </div>
               </div>
             </div>
+          </Fold>
+
+          <Fold title="Keys it needs" summary={recipe.secrets?.length ? recipe.secrets.map((s) => s.label || s.name).join(', ') : tr('None')} sub="API keys and tokens its runs use, kept in your vault, never in the app.">
+            <SecretsEditor recipe={recipe} onChange={set} />
           </Fold>
 
           <Fold title="What it keeps" summary={keepsLine} sub="Lists of records it keeps between runs, which its steps, its agents and its screen share, and a memory of its own.">

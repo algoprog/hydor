@@ -14,6 +14,7 @@ import { AppIcon } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { RunBody } from './Result';
 import { AppView } from './View';
+import { Lightbox, VideoBox } from '../../components/Lightbox';
 
 interface PublicApp {
   slug: string;
@@ -25,6 +26,8 @@ interface PublicApp {
   answer: AnswerField[];
   /** Its view, as a public page shows it (only what a click does on the page itself). */
   ui?: AppUi;
+  /** Its own files, by name (what asset:<name> shows). */
+  assets?: Record<string, { sha: string }>;
 }
 
 async function call<T>(path: string, body?: unknown): Promise<T> {
@@ -123,6 +126,9 @@ export default function PublicAppPage({ slug }: { slug: string }) {
   const going = runs.some((r) => isActive(r.status));
   return (
     <div ref={top} className="h-full overflow-y-auto bg-bg pt-[var(--safe-top)] pb-[max(24px,var(--safe-bottom))]">
+      {/* A picture its view opens large, or a video from YouTube or Vimeo. */}
+      <Lightbox />
+      <VideoBox />
       <div className="mx-auto max-w-[720px] px-4 sm:px-6">
         <header className="flex items-start gap-3.5 pt-8 pb-5 sm:pt-12">
           <AppIcon icon={app.icon} color={app.color} size={52} />
@@ -161,12 +167,13 @@ export default function PublicAppPage({ slug }: { slug: string }) {
         {shown && (
           <div id="the-run" className="mt-5 scroll-mt-4">
             <RunBody
+              assets={app.assets}
               run={shown.run}
               progress={shown.progress}
               answer={app.answer}
               publicView
               name={app.name}
-              view={app.ui ? <AppView ui={app.ui} name={app.name} appId="public" run={shown.run} answer={app.answer} can={[]} publicView /> : undefined}
+              view={app.ui ? <AppView ui={app.ui} name={app.name} appId="public" run={shown.run} answer={app.answer} can={[]} publicView assets={app.assets} /> : undefined}
             />
           </div>
         )}

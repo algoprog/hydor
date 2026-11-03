@@ -32,6 +32,8 @@ export interface UiBridge {
   /** The page it opens on. */
   start?: string;
   lang?: string;
+  /** The libraries its widgets import: an import map's entries (jsDelivr only), and stylesheets. */
+  libs?: { imports: Record<string, string>; css: string[] };
   onOp: (op: string, args: Record<string, unknown>) => Promise<unknown>;
 }
 
@@ -45,6 +47,12 @@ const uiLabels = () => ({
   ownPage: tr('This shows on the app’s own page.'),
   noElement: tr('No element'),
   copied: tr('Copied'),
+  libFailed: tr('Its library could not be loaded: is this device online?'),
+  noPlaces: tr('No places to show on the map.'),
+  noData: tr('Nothing to draw yet.'),
+  noVideo: tr('This video cannot be shown here.'),
+  noWidget: tr('No widget'),
+  play: tr('Play'),
 });
 
 /** The App parts' words, in the app's language. */
@@ -407,7 +415,7 @@ export function PageFrame({
         nRef.current = n;
         const appInfo = cb.current.app ? { info: cb.current.app.info, labels: appLabels() } : undefined;
         const v = cb.current.ui;
-        const uiInfo = v ? { def: v.def, ctx: v.ctx, can: v.can, labels: uiLabels(), lang: v.lang ?? 'en', ...(v.start ? { start: v.start } : {}) } : undefined;
+        const uiInfo = v ? { def: v.def, ctx: v.ctx, can: v.can, labels: uiLabels(), lang: v.lang ?? 'en', ...(v.start ? { start: v.start } : {}), ...(v.libs ? { libs: v.libs } : {}) } : undefined;
         if (v) sentCtx.current = v.ctx;
         w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, app: appInfo, ui: uiInfo }, '*');
         return;

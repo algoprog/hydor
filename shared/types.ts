@@ -78,7 +78,15 @@ export interface ApprovalRequest {
    * One of the user's apps an agent runs for them (use_app), asking for what the request left out: the card shows
    * as the app (its icon and name), with what the request said already; its form's fields are the questions left.
    */
-  app?: { id: string; name: string; icon: string; color: string; given: { label: string; value: string }[] };
+  app?: {
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+    given: { label: string; value: string }[];
+    /** Keys it needs that the vault does not have yet: the card saves them there (POST /api/apps/:id/secrets) before it answers. */
+    secrets?: { name: string; label: string; help?: string; url?: string }[];
+  };
   createdAt: number;
 }
 

@@ -2,9 +2,11 @@
 // result (short fields as a card, long text, lists, and tables, which on a phone become a card a row
 // when they would not fit), and the agent's own reply. The owner's pages and the public page show the same.
 import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
-import { Check, ChevronRight, CircleAlert, Clock, Copy, Download, Hand, PanelsTopLeft, Square, Table2 } from 'lucide-react';
+import { Check, ChevronRight, CircleAlert, Clock, Copy, Download, ExternalLink, FileDown, Hand, PanelsTopLeft, Play, Square, Table2 } from 'lucide-react';
 import type { AnswerColumn, AnswerField, AppRun, RunProgress } from '@shared/apps';
 import { cellText, isActive, toCsv } from '@shared/apps';
+import { mediaKind, mediaSrc, videoEmbed, type AppAsset, type MediaItem } from '@shared/app-media';
+import { openLightbox, openVideo } from '../../components/Lightbox';
 import { duration } from '../../lib/format';
 import { Markdown } from '../../components/Markdown';
 import { cx, Throbber } from '../../components/ui';
@@ -13,8 +15,100 @@ import { LOCALE } from '../../i18n/locale';
 
 const humanize = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' ');
 
+/** Files that show here: the app's own copies and pictures written out (this page loads nothing from other sites). */
+const ownFile = (u: string) => u.startsWith('/app-media/') || /^data:image\//i.test(u);
+const nameOfUrl = (u: string) => {
+  try {
+    return decodeURIComponent(new URL(u, location.href).pathname.split('/').pop() || u);
+  } catch {
+    return u;
+  }
+};
+
+/**
+ * Pictures, videos, sounds and files in an answer: pictures in a grid that opens large, videos and sounds to play, the
+ * rest to download. What is on another site (a video on YouTube, a picture an agent linked to) opens there.
+ */
+export function MediaList({ items, assets }: { items: MediaItem[]; assets?: Record<string, Pick<AppAsset, 'sha'>> }) {
+  const list = items.map((x) => ({ ...x, url: mediaSrc(x.src, assets), kind: x.kind ?? mediaKind(x.src) })).filter((x) => x.url);
+  if (!list.length) return <div className="text-[13px] text-fg-3">Nothing here.</div>;
+  const pics = list.filter((x) => x.kind === 'image' && ownFile(x.url));
+  const rest = list.filter((x) => !pics.includes(x));
+  return (
+    <div className="space-y-3">
+      {pics.length > 0 && (
+        <div className={cx('grid gap-2', pics.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3')}>
+          {pics.map((p, i) => (
+            <figure key={`${p.url}:${i}`} className="m-0 min-w-0">
+              <button type="button" className="block w-full cursor-zoom-in overflow-hidden rounded-xl bg-bg-2" onClick={() => openLightbox(pics.map((x) => ({ src: x.url, name: x.caption ?? x.name })), i)}>
+                <img src={p.url} alt={p.caption ?? ''} loading="lazy" className={cx('block w-full object-cover', pics.length === 1 ? 'max-h-[70vh]' : 'aspect-[4/3]')} />
+              </button>
+              {p.caption && (
+                <figcaption className="mt-1 text-[12.5px] leading-snug text-fg-3" translate="no">
+                  {p.caption}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+      )}
+      {rest.map((x, i) => {
+        const own = ownFile(x.url);
+        const caption = x.caption && (
+          <div className="mt-1 text-[12.5px] leading-snug text-fg-3" translate="no">
+            {x.caption}
+          </div>
+        );
+        if (own && x.kind === 'video')
+          return (
+            <div key={i}>
+              <video controls playsInline preload="metadata" src={x.url} poster={x.poster ? mediaSrc(x.poster, assets) || undefined : undefined} className="block aspect-video w-full rounded-xl bg-black" />
+              {caption}
+            </div>
+          );
+        if (own && x.kind === 'audio')
+          return (
+            <div key={i}>
+              <audio controls preload="metadata" src={x.url} className="block w-full" />
+              {caption}
+            </div>
+          );
+        const player = videoEmbed(x.url);
+        const watch = x.kind === 'video' && !!player;
+        if (watch && player)
+          return (
+            <button key={i} type="button" onClick={() => openVideo(player, x.caption ?? '')} className="flex w-full items-center gap-2.5 rounded-xl border border-line px-3 py-2 text-left text-[13.5px] hover:border-line-2 hover:bg-bg-1">
+              <Play size={15} className="shrink-0 text-fg-3" />
+              <span className="min-w-0 flex-1 truncate" translate="no">
+                {x.caption || x.name || nameOfUrl(x.url)}
+              </span>
+              <span className="shrink-0 text-[12px] text-fg-3">Watch</span>
+            </button>
+          );
+        return (
+          <a key={i} href={x.url} target="_blank" rel="noopener noreferrer" {...(own ? { download: x.name ?? '' } : {})} className="flex items-center gap-2.5 rounded-xl border border-line px-3 py-2 text-[13.5px] hover:border-line-2 hover:bg-bg-1">
+            {own ? <FileDown size={15} className="shrink-0 text-fg-3" /> : watch || x.kind === 'video' ? <Play size={15} className="shrink-0 text-fg-3" /> : <ExternalLink size={15} className="shrink-0 text-fg-3" />}
+            <span className="min-w-0 flex-1 truncate" translate="no">
+              {x.caption || x.name || nameOfUrl(x.url)}
+            </span>
+            <span className="shrink-0 text-[12px] text-fg-3">{own ? 'Download' : watch ? 'Watch' : 'Open'}</span>
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
 function Value({ v, type }: { v: unknown; type?: string }) {
   if (v === null || v === undefined || v === '') return <span className="text-fg-3">—</span>;
+  if (type === 'image' && typeof v === 'string') {
+    if (!ownFile(v)) return /^https?:\/\//.test(v) ? <a href={v} target="_blank" rel="noopener noreferrer" className="break-all text-accent hover:underline">{nameOfUrl(v)}</a> : <span className="text-fg-3">—</span>;
+    return (
+      <button type="button" className="block cursor-zoom-in" onClick={() => openLightbox([{ src: v }], 0)}>
+        <img src={v} alt="" loading="lazy" className="h-14 w-14 rounded-lg bg-bg-2 object-cover" />
+      </button>
+    );
+  }
   if (typeof v === 'boolean') return <span className={cx('inline-flex h-5 items-center rounded px-1.5 text-[12px] font-medium', v ? 'bg-ok/15 text-ok' : 'bg-bg-3 text-fg-2')}>{v ? 'Yes' : 'No'}</span>;
   if (type === 'url' || (typeof v === 'string' && /^https?:\/\/\S+$/.test(v))) {
     const s = String(v);
@@ -197,7 +291,7 @@ export function ResultTable({ f, rows }: { f: AnswerField; rows: Row[] }) {
 const SHORT = new Set(['text', 'number', 'yesno', 'date', 'url']);
 
 /** The answer fields: short ones together as a card, the rest each under its heading. */
-export function ResultView({ answer, result, name }: { answer: AnswerField[]; result: Record<string, unknown>; name?: string }) {
+export function ResultView({ answer, result, name, assets }: { answer: AnswerField[]; result: Record<string, unknown>; name?: string; assets?: Record<string, Pick<AppAsset, 'sha'>> }) {
   // Fields the recipe does not name (an agent's extra keys) are left out; a result from an older recipe shows by its keys.
   const fields: AnswerField[] = answer.length ? answer : Object.keys(result).map((id) => ({ id, label: humanize(id), type: Array.isArray(result[id]) ? (typeof (result[id] as unknown[])[0] === 'object' ? 'table' : 'list') : 'text' }));
   const short = fields.filter((f) => SHORT.has(f.type) && !(typeof result[f.id] === 'string' && (result[f.id] as string).length > 160));
@@ -241,6 +335,8 @@ export function ResultView({ answer, result, name }: { answer: AnswerField[]; re
             </div>
             {f.type === 'table' ? (
               <ResultTable f={f} rows={rows} />
+            ) : f.type === 'media' ? (
+              <MediaList items={Array.isArray(v) ? (v as MediaItem[]).map((x) => (typeof x === 'string' ? { src: x } : x)) : typeof v === 'string' && v ? [{ src: v }] : []} assets={assets} />
             ) : f.type === 'list' ? (
               Array.isArray(v) && v.length ? (
                 <ul className="list-disc space-y-1 pl-5 text-[14px] leading-relaxed marker:text-fg-3">
@@ -364,6 +460,7 @@ export function RunBody({
   reply,
   followUp,
   view,
+  assets,
 }: {
   run: AppRun;
   progress?: RunProgress;
@@ -375,6 +472,8 @@ export function RunBody({
   followUp?: { updated: boolean };
   /** The app's view of its answer (View.tsx), shown in place of the plain card; Plain answer shows that instead. */
   view?: ReactNode;
+  /** The app's own files, by name (asset:<name> in its answer). */
+  assets?: Record<string, Pick<AppAsset, 'sha'>>;
 }) {
   const hasResult = !!run.result && Object.keys(run.result).length > 0;
   const text = reply ?? run.reply;
@@ -391,7 +490,7 @@ export function RunBody({
           </button>
         )}
       </RunStatusCard>
-      {hasResult && (inView ? view : <ResultView answer={answer} result={run.result!} name={name} />)}
+      {hasResult && (inView ? view : <ResultView answer={answer} result={run.result!} name={name} assets={assets} />)}
       {text && (reply !== undefined || !isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={text} folded={hasResult} />}
     </div>
   );

@@ -18,7 +18,7 @@ export interface Template {
   title: string;
   blurb: string;
   fields: TemplateField[];
-  /** A connection it needs (Settings → Connections). */
+  /** A connection it needs (Apps → Connected apps). */
   needs?: string;
   build(v: Record<string, string>): Pick<TaskDraft, 'name' | 'prompt' | 'schedule'> & Partial<Pick<TaskDraft, 'cwd'>>;
 }

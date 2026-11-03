@@ -7,6 +7,7 @@ import type { CheckResult } from '../../shared/app-manifest.ts';
 import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
+import { dropMediaRefs, dropRunMediaOfApp, refMedia, shasOfAssets } from './media.ts';
 import { changesOf } from './edits.ts';
 
 export const newId = (n = 8) => crypto.randomBytes(n).toString('hex');
@@ -186,6 +187,8 @@ export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: App
     const line = input.why?.trim() || (before ? changesOf(before, cleanRecipe(data)).join(' ') : 'Made it.') || 'Saved again.';
     db.prepare('insert into app_versions (app_id, n, at, by, line, recipe) values (?, ?, ?, ?, ?, ?)').run(id, (last?.n ?? 0) + 1, now, input.by ?? 'you', line.slice(0, 500), JSON.stringify(cleanRecipe(data)));
   }
+  // Its files stay while it does (those of its earlier versions too, to go back to one).
+  if (data.assets) refMedia(db, `app:${id}`, null, { keep: true, shas: shasOfAssets(data.assets) });
   return getApp(db, id)!;
 }
 
@@ -224,6 +227,7 @@ export function setAppFlags(db: DB, id: string, flags: { agents?: boolean }): Ap
 }
 
 export function deleteApp(db: DB, id: string) {
+  dropMediaRefs(db, [`app:${id}`]);
   db.prepare('delete from apps where id = ?').run(id);
   db.prepare('delete from app_versions where app_id = ?').run(id);
   db.prepare('delete from app_keys where app_id = ?').run(id);
@@ -477,6 +481,7 @@ export function usageSince(db: DB, app: string, since: number, source?: RunSourc
 }
 
 export function deleteRuns(db: DB, app: string) {
+  dropRunMediaOfApp(db, app);
   db.prepare('delete from app_steps where run_id in (select id from app_runs where app_id = ?)').run(app);
   db.prepare("delete from app_views where owner in (select 'run:' || id from app_runs where app_id = ?)").run(app);
   db.prepare('delete from app_runs where app_id = ?').run(app);
@@ -489,6 +494,7 @@ export function deleteRun(db: DB, id: string) {
   db.prepare('delete from app_steps where run_id = ?').run(id);
   db.prepare('delete from app_runs where id = ?').run(id);
   db.prepare('delete from app_views where owner = ?').run(`run:${id}`);
+  dropMediaRefs(db, [`run:${id}`]);
 }
 
 // ---- the steps of runs with steps ----------------------------------------------------------------------

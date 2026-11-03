@@ -13,6 +13,7 @@ import { go } from '../../lib/nav';
 import { tr } from '../../i18n/runtime';
 import { Button, cx, Segmented, useConfirm } from '../../components/ui';
 import { AppView } from './View';
+import { mediaKind } from '@shared/app-media';
 
 /** A short number for a text, to draw the preview again whenever the view changes (the frame takes it once). */
 const hashOf = (t: string) => {
@@ -23,21 +24,42 @@ const hashOf = (t: string) => {
 
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** A made-up answer in the shape of its answer fields, to see a view with before it has run. */
-function sampleResult(answer: AnswerField[]): Record<string, unknown> {
+/**
+ * A made-up answer in the shape of its answer fields, to see a view with before it has run: its own files stand in
+ * for pictures and videos, and columns named for a latitude and longitude get places near one another.
+ */
+function sampleResult(answer: AnswerField[], assets: AppRecipe['assets'] = {}): Record<string, unknown> {
   const day = (n: number) => isoDay(new Date(Date.now() + n * 86_400_000));
-  const cell = (type: string, label: string, n: number): unknown =>
-    type === 'number' ? 10 * n : type === 'yesno' ? n % 2 === 1 : type === 'date' ? day(n) : type === 'url' ? `https://example.com/${n}` : `${label} ${n}`;
+  const files = Object.entries(assets);
+  const pics = files.filter(([n, a]) => mediaKind(n, a.mime) === 'image').map(([n]) => `asset:${n}`);
+  const cell = (type: string, label: string, n: number, id = ''): unknown =>
+    type === 'number' && /^(lat|latitude)$/i.test(id)
+      ? Math.round((38.712 - n * 0.006) * 1e4) / 1e4
+      : type === 'number' && /^(lng|lon|long|longitude)$/i.test(id)
+        ? Math.round((-9.14 - n * 0.018) * 1e4) / 1e4
+        : type === 'number'
+          ? 10 * n
+          : type === 'yesno'
+            ? n % 2 === 1
+            : type === 'date'
+              ? day(n)
+              : type === 'url'
+                ? `https://example.com/${n}`
+                : type === 'image'
+                  ? (pics[(n - 1) % Math.max(1, pics.length)] ?? '')
+                  : `${label} ${n}`;
   return Object.fromEntries(
     answer.map((f) => [
       f.id,
       f.type === 'table'
-        ? [1, 2, 3].map((n) => Object.fromEntries((f.columns ?? []).map((c) => [c.id, cell(c.type, c.label, n)])))
+        ? [1, 2, 3].map((n) => Object.fromEntries((f.columns ?? []).map((c) => [c.id, cell(c.type, c.label, n, c.id)])))
         : f.type === 'list'
           ? [1, 2, 3].map((n) => `${f.label} ${n}`)
           : f.type === 'markdown'
             ? `**${f.label}**: a few sentences of it, as a run would give them.\n\n- One point\n- Another point`
-            : cell(f.type, f.label, 1),
+            : f.type === 'media'
+              ? files.slice(0, 4).map(([n, a]) => ({ src: `asset:${n}`, caption: a.caption ?? n, kind: mediaKind(n, a.mime) }))
+              : cell(f.type, f.label, 1, f.id),
     ]),
   );
 }
@@ -56,8 +78,8 @@ export function DesignEditor({ recipe, appId, template, session, onChange }: { r
     api<{ runs: AppRun[] }>(`/api/apps/${enc(id)}/runs`).then((r) => setLatest(r.runs.find((x) => x.status === 'done' && !x.flow && !x.parent && x.result && Object.keys(x.result).length) ?? null), () => {});
   }, [appId, template]);
   const sample = useMemo<AppRun>(
-    () => ({ id: 'sample', app: appId ?? 'test', appName: recipe.name, source: 'test', status: 'done', inputs: Object.fromEntries(recipe.fields.map((f) => [f.id, f.default || f.placeholder?.replace(/^e\.g\.\s*/i, '') || f.label])), result: sampleResult(recipe.answer), createdAt: Date.now() }),
-    [recipe.answer, recipe.fields, recipe.name, appId],
+    () => ({ id: 'sample', app: appId ?? 'test', appName: recipe.name, source: 'test', status: 'done', inputs: Object.fromEntries(recipe.fields.map((f) => [f.id, f.default || f.placeholder?.replace(/^e\.g\.\s*/i, '') || f.label])), result: sampleResult(recipe.answer, recipe.assets), createdAt: Date.now() }),
+    [recipe.answer, recipe.fields, recipe.name, recipe.assets, appId],
   );
   const run = source === 'run' && latest ? latest : sample;
   const checked = useMemo(() => (ui ? checkUi(recipe) : { errors: [], warnings: [] }), [recipe]);
@@ -127,7 +149,7 @@ export function DesignEditor({ recipe, appId, template, session, onChange }: { r
             </div>
             <div className="bg-bg px-4 pt-4 pb-2 sm:px-6 sm:pt-5">
               {pages.length ? (
-                <AppView key={`${run.id}:${hashOf(JSON.stringify(ui))}`} ui={ui} name={recipe.name} appId={appId ?? 'test'} run={run} answer={recipe.answer} can={[]} />
+                <AppView key={`${run.id}:${hashOf(JSON.stringify(ui))}`} ui={ui} name={recipe.name} appId={appId ?? 'test'} run={run} answer={recipe.answer} can={[]} assets={recipe.assets} />
               ) : (
                 <p className="py-6 text-center text-[13px] text-fg-3">Its pages show on the app’s own page, in place of its form.</p>
               )}

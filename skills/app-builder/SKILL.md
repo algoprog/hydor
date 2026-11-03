@@ -16,7 +16,12 @@ topic says what each part does, and its API topic gives the format.
 ## 1. Pin down the job
 
 - What goes in: the form's questions, few, each of the kind that fits (number, date, choice, yes or no, file).
-- What comes out: answer fields with types (a table when there are rows, a list for short items).
+- What comes out: answer fields with types (a table when there are rows, a list for short items, `media` for
+  pictures, videos or files the agent finds or makes: an https:// address, or a file's path on this computer, of
+  which a copy is kept; a table's `image` column for a picture in each row).
+- What it needs: keys for the services it calls (an API key, a token) go in `secrets` by name, with the hosts each
+  may go to and where to get one, never a value: the user gives them when installing it or before its first run,
+  and its runs use them by name (http_request `auth: NAME`). Check list_connections for a key already saved.
 - What makes a run good: the checks you will write. Ask only what changes the design; assume the rest and say so.
 
 ## 2. Pick the steps: the cheapest that works
@@ -69,7 +74,17 @@ not a plain card. The format is in app_guide's API topic (Apps: views).
   (`var(--n-card)`, `--n-line`, `--n-muted`, `--n-accent`, `--n-accent-soft`, `--n-ok`, `--n-warn`, `--n-err`,
   `--n-radius`), so it fits the app in light and dark; no fixed widths; no animations; text people read at 14–15px.
   Built-in elements save work: text (Markdown with values), markdown, list, checklist (ticks kept with the run),
-  table, chart.
+  table, chart (bars), and for media: image (pictures side by side, opening large), video (a file, YouTube,
+  Vimeo), audio, map (rows with `lat` and `lng`: `with: { label, popup, line: true, numbered: true }`; the agent
+  must hand in coordinates) and plot (Plotly from rows: `with: { kind: line|bar|area|scatter|pie|histogram|
+  heatmap|scatter3d|surface, x, y, series, stacked }`, or a Plotly figure as the value).
+- **Widgets**, for what no element draws (a 3D scene, a game, a chart library's own look): `ui.widgets.<name>.code`
+  is an ES module, `export default function (el, value, view) { … }`, placed by a block as an element is; it
+  imports the npm packages `ui.libs` names at exact versions (`"three": "0.170.0"`), loaded from jsDelivr. Use
+  the built-in map and plot first; a widget reaches the app only through `view.event(name, item)` and `view.set`.
+- **Its own files** (pictures, a logo, sample videos, a data file): app_save's `assets` (a name → a path or an
+  https:// address); a view shows one as `asset:<name>` (an image block's value, or a template's `src`). They
+  travel in its .naget-app.
 - **Events** make it useful: `data-event="name"` on a button, mapped to actions. Go to a detail page with the item;
   tick something off and keep it (`toggle`, `name: "done.@key"`, `keep: true`); filter with `set` and a block's
   `where`; copy the part people paste elsewhere; run it again with one answer changed (`again`: a slower pace,

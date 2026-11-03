@@ -1,4 +1,4 @@
-// The vault: keys the person saved (Settings → Connections → Keys, or a card an agent asked with) and the
+// The vault: keys the person saved (Apps → Connected apps → Keys, or a card an agent asked with) and the
 // apps' sign-ins, encrypted at rest with AES-256-GCM under a key file in the data folder (mode 0600).
 // Each sealed value names the key that sealed it, so the key can be replaced and everything sealed
 // again. Values only leave for the server's own use (a request, an app's sign-in); pages get masked

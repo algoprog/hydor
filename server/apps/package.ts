@@ -15,6 +15,8 @@ import { cleanRecipe, slugify } from '../../shared/apps.ts';
 import type { InstallPreview, ModelNeed } from '../../shared/app-manifest.ts';
 import { appSummary } from '../../shared/app-summary.ts';
 import { allSteps, checkFlow, cleanData, cleanFlow, cleanRequires, DATA_LIMITS, modelsUsed } from '../../shared/app-manifest.ts';
+import { ASSET_NAME, MEDIA_LIMITS, type AppAsset } from '../../shared/app-media.ts';
+import { cleanSecrets } from '../../shared/app-secrets.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { findAssistant } from '../assistants/store.ts';
@@ -26,11 +28,15 @@ import { ensureEnv, hasCommand } from './env.ts';
 import { screensForFile } from './screens.ts';
 import { getApp, saveApp } from './store.ts';
 import { createPage } from '../pages/store.ts';
+import { isInstalled, setInstalled } from './builtins.ts';
+import { mediaBytes, putMediaBuffer } from './media.ts';
+import { secretsOf } from './secrets.ts';
+import { templateById } from './templates.ts';
 
 /** The newest package format this server reads. */
 export const PACKAGE_FORMAT = 1;
-/** Largest file a template can be installed from. */
-export const MAX_PACKAGE = 20 << 20;
+/** Largest file a template can be installed from (its own files, pictures and videos, travel in it). */
+export const MAX_PACKAGE = 160 << 20;
 /** Most templates one file brings along. */
 const MAX_BUNDLED = 10;
 
@@ -46,6 +52,20 @@ export interface AppPackage {
   records?: Record<string, Record<string, unknown>[]>;
   /** The templates its steps call (and those they call), each a package of its own. */
   apps?: AppPackage[];
+  /** Its own files' bytes, by their names in its assets (assets/<name> in a .naget-app; base64 in a .json). */
+  files?: Record<string, Buffer>;
+  /** A ready-made app's id: installing its file brings that one back (or makes a copy of your own when you have it). */
+  builtin?: string;
+}
+
+/** An app's own files, from the copies kept here. */
+function filesOf(db: DB, assets: Record<string, AppAsset> | undefined): Record<string, Buffer> | undefined {
+  const out: Record<string, Buffer> = {};
+  for (const [name, a] of Object.entries(assets ?? {})) {
+    const b = mediaBytes(db, a.sha);
+    if (b) out[name] = b;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Modes that do everything without asking: an installed template starts in Auto instead. */
@@ -90,6 +110,10 @@ export function packageOf(db: DB, a: AppRecipe & { id?: string; slug?: string },
   if (screens) recipe.screens = screens;
   else delete recipe.screens;
   const pkg: AppPackage = { naget: 'app', format: PACKAGE_FORMAT, exported: new Date().toISOString(), ...(a.slug ? { slug: a.slug } : {}), app: recipe };
+  // A ready-made app says which it is, to come back as itself where it was uninstalled.
+  if (!a.slug && a.id && templateById(a.id)) pkg.builtin = a.id;
+  const files = filesOf(db, a.assets);
+  if (files) pkg.files = files;
   if (withData && a.id && a.data) pkg.records = Object.fromEntries(Object.keys(a.data).map((name) => [name, allRecords(db, a.id!, name).map(({ createdAt: _a, updatedAt: _b, ...r }) => r)]));
   // The templates it calls, and those they call, once each.
   const bundled: AppPackage[] = [];
@@ -104,7 +128,8 @@ export function packageOf(db: DB, a: AppRecipe & { id?: string; slug?: string },
       const shown = screensForFile(db, other);
       if (shown) app.screens = shown;
       else delete app.screens;
-      bundled.push({ naget: 'app', format: PACKAGE_FORMAT, slug: other.slug, app });
+      const theirs = filesOf(db, other.assets);
+      bundled.push({ naget: 'app', format: PACKAGE_FORMAT, slug: other.slug, app, ...(theirs ? { files: theirs } : {}) });
       walk(other);
     }
   };
@@ -166,12 +191,28 @@ export function zipOf(files: { name: string; data: Buffer }[]): Buffer {
   return Buffer.concat([...parts, dir, end]);
 }
 
-/** A template as a .naget-app: app.json, its records under data/, the templates it calls under apps/, and a line on what the file is. */
+/** A package as one JSON text: its files' bytes as base64. */
+export function packageJson(pkg: AppPackage): string {
+  const b64 = (f?: Record<string, Buffer>) => (f ? Object.fromEntries(Object.entries(f).map(([n, d]) => [n, d.toString('base64')])) : undefined);
+  const plain = (p: AppPackage): Record<string, unknown> => ({ ...p, files: b64(p.files), ...(p.apps ? { apps: p.apps.map(plain) } : {}) });
+  return `${JSON.stringify(plain(pkg), null, 2)}\n`;
+}
+
+/**
+ * A template as a .naget-app: app.json, its records under data/, its own files under assets/, the templates it
+ * calls under apps/ (their files under apps/<address>/), and a line on what the file is.
+ */
 export function zipPackage(pkg: AppPackage): Buffer {
-  const { records, apps, ...rest } = pkg;
-  const files = [{ name: 'app.json', data: Buffer.from(`${JSON.stringify(rest, null, 2)}\n`) }];
+  const { records, apps, files: own, ...rest } = pkg;
+  const files: { name: string; data: Buffer }[] = [{ name: 'app.json', data: Buffer.from(`${JSON.stringify(rest, null, 2)}\n`) }];
   for (const [name, list] of Object.entries(records ?? {})) files.push({ name: `data/${name}.json`, data: Buffer.from(`${JSON.stringify(list, null, 1)}\n`) });
-  (apps ?? []).forEach((p, i) => files.push({ name: `apps/${(p.slug ?? `app-${i + 1}`).replace(/[^\w-]/g, '')}.json`, data: Buffer.from(`${JSON.stringify(p, null, 2)}\n`) }));
+  for (const [name, data] of Object.entries(own ?? {})) files.push({ name: `assets/${name}`, data });
+  (apps ?? []).forEach((p, i) => {
+    const slug = (p.slug ?? `app-${i + 1}`).replace(/[^\w-]/g, '');
+    const { files: theirs, ...json } = p;
+    files.push({ name: `apps/${slug}.json`, data: Buffer.from(`${JSON.stringify(json, null, 2)}\n`) });
+    for (const [name, data] of Object.entries(theirs ?? {})) files.push({ name: `apps/${slug}/${name}`, data });
+  });
   files.push({ name: 'README.txt', data: Buffer.from(`An app for Naget Agent: “${String(rest.app.name ?? 'App')}”.\nInstall it in Naget Agent: Apps → New app → Install from a file.\n`) });
   return zipOf(files);
 }
@@ -190,7 +231,7 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
     if (buf[0] === 0x50 && buf[1] === 0x4b) {
       let zip: Zip;
       try {
-        zip = new Zip(buf, 100 << 20);
+        zip = new Zip(buf, MAX_PACKAGE * 2);
       } catch {
         throw new HttpError(400, 'This file could not be read as a zip');
       }
@@ -211,16 +252,30 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
       pkg = json(main);
       if (!pkg || typeof pkg !== 'object') throw new HttpError(400, 'Its app.json is not an app');
       const records: Record<string, unknown[]> = {};
-      const apps: unknown[] = [];
+      const apps: { slug: string; pkg: any }[] = [];
+      const own: Record<string, Buffer> = {};
+      const theirs: Record<string, Record<string, Buffer>> = {};
+      const bytes = (n: string) => {
+        const b = zip.read(n, MEDIA_LIMITS.asset + 1);
+        if (!b) throw new HttpError(400, `Its ${n} could not be read`);
+        if (zip.cut.has(n) || b.length > MEDIA_LIMITS.asset) throw new HttpError(400, `Its ${n} is over ${MEDIA_LIMITS.asset >> 20} MB, more than one of an app's files may be`);
+        return b;
+      };
       for (const n of zip.names()) {
         const d = new RegExp(`^${base}data/([A-Za-z][A-Za-z0-9_]{0,39})\\.json$`).exec(n);
+        const a = new RegExp(`^${base}apps/([\\w-]{1,80})\\.json$`).exec(n);
+        const f = new RegExp(`^${base}assets/([^/]{1,100})$`).exec(n);
+        const g = new RegExp(`^${base}apps/([\\w-]{1,80})/([^/]{1,100})$`).exec(n);
         if (d) {
           const list = json(n);
           if (Array.isArray(list)) records[d[1]] = list;
-        } else if (new RegExp(`^${base}apps/[\\w-]{1,80}\\.json$`).test(n)) apps.push(json(n));
+        } else if (a) apps.push({ slug: a[1], pkg: json(n) });
+        else if (f && ASSET_NAME.test(f[1])) own[f[1]] = bytes(n);
+        else if (g && ASSET_NAME.test(g[2])) (theirs[g[1]] ??= {})[g[2]] = bytes(n);
       }
       if (Object.keys(records).length) pkg.records = { ...(pkg.records ?? {}), ...records };
-      if (apps.length) pkg.apps = [...(Array.isArray(pkg.apps) ? pkg.apps : []), ...apps];
+      if (Object.keys(own).length) pkg.files = own;
+      if (apps.length) pkg.apps = [...(Array.isArray(pkg.apps) ? pkg.apps : []), ...apps.map((x) => (theirs[x.slug] && x.pkg && typeof x.pkg === 'object' ? { ...x.pkg, files: theirs[x.slug] } : x.pkg))];
     } else {
       try {
         pkg = JSON.parse(buf.toString('utf8').replace(/^﻿/, ''));
@@ -239,7 +294,25 @@ function asPackage(pkg: any, depth = 0): AppPackage {
   if (!pkg || typeof pkg !== 'object' || !pkg.app || typeof pkg.app !== 'object' || Array.isArray(pkg.app)) throw new HttpError(400, 'This is not a Naget Agent app');
   if (Number(pkg.format) > PACKAGE_FORMAT) throw new HttpError(400, 'This app was made by a newer Naget Agent: update to install it');
   const apps = depth === 0 && Array.isArray(pkg.apps) ? pkg.apps.slice(0, MAX_BUNDLED).map((p: unknown) => asPackage(p, 1)) : undefined;
-  return { naget: 'app', format: Number(pkg.format) || 1, ...(typeof pkg.slug === 'string' ? { slug: pkg.slug } : {}), app: pkg.app, ...(pkg.records ? { records: pkg.records } : {}), ...(apps?.length ? { apps } : {}) };
+  // Its own files: bytes from a zip, or base64 in a .json.
+  const files: Record<string, Buffer> = {};
+  if (pkg.files && typeof pkg.files === 'object' && !Array.isArray(pkg.files))
+    for (const [name, v] of Object.entries(pkg.files as Record<string, unknown>).slice(0, MEDIA_LIMITS.count)) {
+      if (!ASSET_NAME.test(name) || name.includes('..')) continue;
+      if (Buffer.isBuffer(v)) files[name] = v;
+      else if (typeof v === 'string') files[name] = Buffer.from(v, 'base64');
+    }
+  const builtin = depth === 0 && typeof pkg.builtin === 'string' && templateById(pkg.builtin) ? pkg.builtin : undefined;
+  return {
+    naget: 'app',
+    format: Number(pkg.format) || 1,
+    ...(typeof pkg.slug === 'string' ? { slug: pkg.slug } : {}),
+    app: pkg.app,
+    ...(pkg.records ? { records: pkg.records } : {}),
+    ...(apps?.length ? { apps } : {}),
+    ...(Object.keys(files).length ? { files } : {}),
+    ...(builtin ? { builtin } : {}),
+  };
 }
 
 const AGENT_NAME: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', acp: 'Custom' };
@@ -252,10 +325,19 @@ function sameAs(db: DB, slug: string | undefined, recipe: AppRecipe): AppDef | n
 }
 
 /** One recipe as it would come in: tidied, its mode and assistant made safe here, and what changed or cannot work, in words. */
-function intake(db: DB, raw: Record<string, any>, named: string) {
-  const problems = [...cleanFlow(raw.flow).errors, ...cleanData(raw.data).errors, ...cleanRequires(raw.requires).errors].map((p) => named + p);
+function intake(db: DB, raw: Record<string, any>, named: string, files?: Record<string, Buffer>) {
+  const problems = [...cleanFlow(raw.flow).errors, ...cleanData(raw.data).errors, ...cleanRequires(raw.requires).errors, ...cleanSecrets(raw.secrets).errors].map((p) => named + p);
   const notes: string[] = [];
   const recipe = cleanRecipe({ ...raw, cwd: undefined });
+  // Its own files come in its package: one it names that is not there shows nothing.
+  for (const name of Object.keys(recipe.assets ?? {}))
+    if (!files?.[name]) {
+      notes.push(`${named}Its file “${name}” is not in the package: it is left out, and what shows it shows nothing`);
+      delete recipe.assets![name];
+    }
+  if (recipe.assets && !Object.keys(recipe.assets).length) delete recipe.assets;
+  const total = Object.entries(files ?? {}).reduce((n, [name, b]) => n + (recipe.assets?.[name] ? b.length : 0), 0);
+  if (total > MEDIA_LIMITS.assets) problems.push(`${named}Its files are ${Math.round(total / 1048576)} MB together, over the ${MEDIA_LIMITS.assets >> 20} MB an app may have`);
   if (typeof raw.cwd === 'string' && raw.cwd.trim()) notes.push(`${named}It worked in the folder ${raw.cwd.trim()} where it was made: here each run gets a folder of its own`);
   if (recipe.mode && SKIP_ASKING.has(recipe.mode)) {
     notes.push(`${named}It asked to run with every step allowed (${recipe.mode}): here it starts in Auto, which goes ahead with routine steps and asks about the rest; change it in its settings if you trust it`);
@@ -332,14 +414,14 @@ function remapModels(r: AppRecipe, picked: Map<string, string>) {
 /** What a template will do here and what changes on the way in, before anything is made. */
 export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Promise<{ recipe: AppRecipe; bundled: { pkg: AppPackage; recipe: AppRecipe; reuse: AppDef | null }[]; preview: InstallPreview }> {
   const raw = pkg.app as Record<string, any>;
-  const main = intake(db, raw, '');
+  const main = intake(db, raw, '', pkg.files);
   const recipe = main.recipe;
   const problems = [...main.problems];
   const notes = [...main.notes];
   const warnings: string[] = [];
   // The templates that come with it: installed first, or the one you have when it is the same.
   const bundled = (pkg.apps ?? []).map((p) => {
-    const b = intake(db, p.app as Record<string, any>, `${String(p.app.name ?? p.slug ?? 'An app it calls')}: `);
+    const b = intake(db, p.app as Record<string, any>, `${String(p.app.name ?? p.slug ?? 'An app it calls')}: `, p.files);
     problems.push(...b.problems);
     notes.push(...b.notes);
     return { pkg: p, recipe: b.recipe, reuse: sameAs(db, p.slug, b.recipe) };
@@ -386,6 +468,15 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
   for (const m of models) if (m.status === 'missing') warnings.push(m.options.length ? `It asks for ${m.label}, which is not set up here: pick another to stand in, or its agent's default is used` : m.agent === 'custom' ? `It asks for ${m.label}, and Custom has no models here: add one in Settings → Models first` : `It asks for ${m.label}, and ${AGENT_NAME[m.agent]} is not set up here`);
   const screens = Object.keys(raw.screens && typeof raw.screens === 'object' ? (raw.screens as Record<string, unknown>) : {});
   const summary = appSummary(recipe);
+  // The keys it (and what comes with it) needs, each once, and whether the vault has them.
+  const secrets = [recipe, ...bundled.filter((b) => !b.reuse).map((b) => b.recipe)].flatMap((r) => secretsOf(db, r)).filter((x, i, all) => all.findIndex((y) => y.name === x.name) === i);
+  // Its own files, and what its view runs of its own.
+  const files = Object.entries(recipe.assets ?? {}).map(([name, a]) => ({ name, mime: a.mime, bytes: pkg.files?.[name]?.length ?? a.bytes }));
+  const view = recipe.ui ? { widgets: Object.keys(recipe.ui.widgets ?? {}), libs: Object.entries(recipe.ui.libs ?? {}).map(([k, v]) => `${k} ${v}`) } : { widgets: [], libs: [] };
+  if (view.widgets.length) notes.push(`Its view runs ${view.widgets.length === 1 ? 'a script' : `${view.widgets.length} scripts`} of its own to draw (${view.widgets.join(', ')}), in the same sandbox as every page: it cannot reach this computer or your other apps${view.libs.length ? `, and loads ${view.libs.join(', ')} from the web (jsDelivr)` : ''}`);
+  // A ready-made app's file: it comes back as itself where it was uninstalled; where it is installed, as a copy of your own.
+  const builtin = pkg.builtin ? templateById(pkg.builtin) : undefined;
+  if (builtin) notes.push(isInstalled(db, builtin.id) ? `This is the ready-made app ${builtin.name}, which you have: it installs as a copy of your own, to change as you like` : `This is the ready-made app ${builtin.name}, which you uninstalled: installing brings it back`);
   const preview: InstallPreview = {
     name: recipe.name,
     description: recipe.description,
@@ -404,6 +495,10 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
     models,
     screens,
     bundled: bundled.map((b) => ({ name: b.recipe.name, from: b.pkg.slug ?? '', installs: b.reuse ? 'reuse' : 'new' })),
+    secrets,
+    files,
+    view,
+    ...(builtin ? { builtin: { id: builtin.id, installed: isInstalled(db, builtin.id) } } : {}),
     notes,
     warnings: [...new Set(warnings)],
     problems: [...new Set(problems)],
@@ -434,9 +529,30 @@ function retarget(r: AppRecipe, moved: Map<string, string>) {
  * Installs a template as previewOf showed: the templates that come with it first (or the ones you have),
  * then it, its records added, its public page closed and no keys; the packages it needs start installing.
  */
-export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Record<string, unknown>; catalog?: Catalog; agents?: boolean } = {}): Promise<{ app: AppDef; notes: string[]; records: number; skipped: number; bundled: { name: string; slug: string; reused: boolean }[] }> {
+export async function installPackage(
+  db: DB,
+  pkg: AppPackage,
+  o: { models?: Record<string, unknown>; catalog?: Catalog; agents?: boolean } = {},
+): Promise<{ app?: AppDef; builtin?: string; notes: string[]; records: number; skipped: number; bundled: { name: string; slug: string; reused: boolean }[] }> {
   const { recipe, bundled, preview } = await previewOf(db, pkg, o.catalog);
   if (preview.problems.length) throw new HttpError(400, `This app cannot be installed: ${preview.problems.join('; ')}`);
+  // A ready-made app you uninstalled comes back as itself.
+  const builtin = pkg.builtin ? templateById(pkg.builtin) : undefined;
+  if (builtin && !isInstalled(db, builtin.id)) {
+    setInstalled(db, builtin.id, true);
+    return { builtin: builtin.id, notes: preview.notes, records: 0, skipped: 0, bundled: [] };
+  }
+  // Its own files, and those of the apps that come with it: a copy kept here, by their names.
+  const keep = (r: AppRecipe, files?: Record<string, Buffer>) => {
+    for (const [name, a] of Object.entries(r.assets ?? {})) {
+      const b = files?.[name];
+      if (!b) continue;
+      const m = putMediaBuffer(db, b, name, a.mime);
+      r.assets![name] = { sha: m.sha, mime: m.mime, bytes: m.bytes, ...(a.caption ? { caption: a.caption } : {}) };
+    }
+  };
+  keep(recipe, pkg.files);
+  for (const b of bundled) if (!b.reuse) keep(b.recipe, b.pkg.files);
   // Each model as picked on the card, else as the preview found it.
   const picked = new Map<string, string>();
   for (const m of preview.models) {
