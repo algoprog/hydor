@@ -302,7 +302,10 @@ programs shows each program's version and what is out, with Check now, Update no
   uploaded), add it to a space (a file is copied into its folder, a folder joins those it works with), rename,
   duplicate, move or copy to a folder, download (a folder or several as one .zip), delete to a trash with Undo
   and Put back. One search finds names and text inside files, under a folder you pick, by kind. An editor with
-  Markdown and HTML preview and diffs, quick open, and uploads. Word, Excel, CSV and LaTeX files open in the
+  Markdown and HTML preview and diffs, quick open, and uploads. Ask, beside an open file, has an agent change it
+  or answer about it: unsaved changes are saved first, the conversation stays beside the file, and the editor
+  takes in each change as it is written (every second while an agent works), the changed lines tinted for a
+  moment and your place kept. Word, Excel, CSV and LaTeX files open in the
   Library's editors and save back to the same file: a CSV's untouched rows and cells keep their exact text, a LaTeX file
   brings the chapters and bibliography it reads and typesets among its folder's pictures (read only to TeX),
   writing only the files that changed; a Word or Excel file says first what the editor doesn't keep (headers and

@@ -12,10 +12,12 @@ import {
 } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 import { highlightSelectionMatches, openSearchPanel, search, searchKeymap } from '@codemirror/search';
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorState, RangeSetBuilder, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 import {
   crosshairCursor,
+  Decoration,
+  type DecorationSet,
   drawSelection,
   dropCursor,
   EditorView,
@@ -32,7 +34,12 @@ export interface EditorHandle {
   view: EditorView;
   setDark: (dark: boolean) => void;
   setWrap: (wrap: boolean) => void;
-  setDoc: (doc: string) => void;
+  /**
+   * Puts in the text as it is now on disk: only the part that differs changes, so the place you read, the cursor and
+   * the scroll stay. `flash`, for a change that came in by itself: those lines show tinted for a moment, and it is not
+   * something to undo (Reload, which discards yours, is).
+   */
+  setDoc: (doc: string, o?: { flash?: boolean }) => void;
   gotoLine: (line: number) => void;
   /** Opens the find bar: phones have no keyboard shortcut for it. */
   find: () => void;
@@ -139,6 +146,44 @@ const phoneTheme = EditorView.theme({
   '.cm-panel.cm-search [name=close]': { top: '9px', width: '32px', height: '32px' },
 });
 
+// Lines changed from outside (an agent, a terminal): tinted for a moment as they come in.
+const flashOn = StateEffect.define<{ from: number; to: number }>();
+const flashOff = StateEffect.define<null>();
+const flashLine = Decoration.line({ class: 'cm-changed-line' });
+const flashField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(flashOff)) deco = Decoration.none;
+      if (e.is(flashOn)) {
+        const b = new RangeSetBuilder<Decoration>();
+        const doc = tr.state.doc;
+        const first = doc.lineAt(Math.min(e.value.from, doc.length)).number;
+        const last = doc.lineAt(Math.min(e.value.to, doc.length)).number;
+        for (let n = first; n <= last && n - first < 2000; n++) b.add(doc.line(n).from, doc.line(n).from, flashLine);
+        deco = b.finish();
+      }
+    }
+    return deco;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+const flashTheme = EditorView.baseTheme({
+  '.cm-changed-line': { backgroundColor: 'color-mix(in srgb, var(--accent) 16%, transparent)', transition: 'background-color 0.6s' },
+});
+
+/** The one span where two texts differ: the same start and end are left as they are. */
+function diffSpan(a: string, b: string): { from: number; to: number; insert: string } | null {
+  if (a === b) return null;
+  let start = 0;
+  const max = Math.min(a.length, b.length);
+  while (start < max && a.charCodeAt(start) === b.charCodeAt(start)) start++;
+  let end = 0;
+  while (end < max - start && a.charCodeAt(a.length - 1 - end) === b.charCodeAt(b.length - 1 - end)) end++;
+  return { from: start, to: a.length - end, insert: b.slice(start, b.length - end) };
+}
+
 /** `phone`: no fold markers (too small to tap), no completions popping up while typing (Return would take one). */
 export async function createEditor(
   parent: HTMLElement,
@@ -191,6 +236,8 @@ export async function createEditor(
         phrases(),
         theme.of(themeExt(o.dark)),
         wrap.of(o.wrap ? EditorView.lineWrapping : []),
+        flashField,
+        flashTheme,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) o.onChange(u.state.doc.toString());
         }),
@@ -198,18 +245,31 @@ export async function createEditor(
     }),
   });
 
+  let flashTimer: ReturnType<typeof setTimeout> | undefined;
   return {
     view,
     setDark: (dark) => view.dispatch({ effects: theme.reconfigure(themeExt(dark)) }),
     setWrap: (w) => view.dispatch({ effects: wrap.reconfigure(w ? EditorView.lineWrapping : []) }),
-    setDoc: (doc) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } }),
+    setDoc: (doc, so) => {
+      const d = diffSpan(view.state.doc.toString(), doc);
+      if (!d) return;
+      view.dispatch({
+        changes: d,
+        annotations: so?.flash ? [Transaction.addToHistory.of(false)] : [],
+        effects: so?.flash ? flashOn.of({ from: d.from, to: d.from + d.insert.length }) : [],
+      });
+      if (so?.flash) {
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(() => view.dispatch({ effects: flashOff.of(null) }), 2500);
+      }
+    },
     gotoLine: (line) => {
       const l = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));
       view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: 'center' }) });
       view.focus();
     },
     find: () => openSearchPanel(view),
-    destroy: () => view.destroy(),
+    destroy: () => (clearTimeout(flashTimer), view.destroy()),
   };
 }
 
@@ -299,6 +359,8 @@ export async function createCellEditor(
         support ?? [],
         o.lang === 'markdown' ? EditorView.lineWrapping : [],
         theme.of(themeExt(o.dark)),
+        flashField,
+        flashTheme,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) o.onChange(u.state.doc.toString());
         }),

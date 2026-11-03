@@ -8284,5 +8284,18 @@
 "The characters did not match the picture. Here is a new one.":"字符与图片不符，已换一张新的。",
 "Too many failed sign-ins from this address. Try again in {0} minute{1}.":"此地址登录失败次数过多。请在 {0} 分钟后重试。",
 "Too many failed sign-ins. Try again later.":"登录失败次数过多。请稍后再试。",
-"Too many new pictures from this address. Try again in {0} minute{1}.":"此地址获取的新图片过多。请在 {0} 分钟后重试。"
+"Too many new pictures from this address. Try again in {0} minute{1}.":"此地址获取的新图片过多。请在 {0} 分钟后重试。",
+"Say what to change in {0}, or ask about it. An agent works on the file, and you see each change here as soon as it is written.":"说说 {0} 要改什么，或者问一个关于它的问题。智能体会直接修改这个文件，每处改动一写入，你就会在这里看到。",
+"Say what to change in":"说说要改什么：",
+", or ask about it. An agent works on the file, and you see each change here as soon as it is written.":"，或者问一个关于它的问题。智能体会直接修改这个文件，每处改动一写入，你就会在这里看到。",
+"Add comments where it is hard to follow":"在难懂的地方加上注释",
+"Explain what this file does":"解释这个文件是做什么的",
+"Find and fix any bugs":"找出并修复错误",
+"Find any mistakes in the numbers":"找出数字中的错误",
+"Make it shorter and clearer":"写得更短、更清楚",
+"Make it simpler without changing what it does":"在不改变功能的前提下把它写得更简单",
+"See the file":"查看文件",
+"What does this say, in a few lines?":"用几句话说说这里写了什么？",
+"What should change in the file?":"文件里要改什么？",
+"What stands out in this data?":"这些数据里有什么值得注意的？"
 }

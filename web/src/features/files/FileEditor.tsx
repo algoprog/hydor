@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, MessageSquarePlus, RotateCcw, Save, Search, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle } from '../../lib/codemirror';
@@ -13,6 +13,7 @@ import { mu } from '../../lib/machine';
 import { isPreviewable } from '@shared/documents';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { useSpaceMenu } from './SpaceMenu';
+import { useWatchMs } from './FileAsk';
 
 // Word, Excel, PowerPoint and other documents open as a preview (features/documents).
 const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) => ({ default: m.OfficePreview })));
@@ -57,6 +58,9 @@ function isDark() {
  * (it would open behind the dialog). A dialog opens Markdown and HTML straight into editing, unless
  * `preview` shows them as they look first, as the Files page does. `actions` go in the toolbar. `fileMenu`
  * (the Files page): a menu with what else can be done with the file (a session with it, a space, its folder).
+ * `saveFirst` is given a way to save unsaved changes (true when there were none, or they are saved), for an agent
+ * asked about the file to work on them. Changes made to the file elsewhere (an agent, a terminal) come into the
+ * editor as they land, while nothing is changed here, their lines tinted for a moment; asked about otherwise.
  */
 export function FileEditor({
   path,
@@ -67,6 +71,7 @@ export function FileEditor({
   onSaved,
   actions,
   fileMenu,
+  saveFirst,
 }: {
   path: string;
   line?: number;
@@ -76,6 +81,7 @@ export function FileEditor({
   onSaved?: () => void;
   actions?: ReactNode;
   fileMenu?: boolean;
+  saveFirst?: MutableRefObject<(() => Promise<boolean>) | null>;
 }) {
   const home = useApp((s) => s.boot?.home);
   const mobile = useIsMobile();
@@ -107,6 +113,8 @@ export function FileEditor({
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<EditorHandle | null>(null);
   const doc = useRef('');
+  // The text as last read or saved: the editor's differs while there are unsaved changes.
+  const base = useRef('');
   const mtime = useRef(0);
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   const media = MEDIA[ext];
@@ -133,6 +141,7 @@ export function FileEditor({
       const f = await api<FileData>(`/api/fs/read?path=${encodeURIComponent(path)}`);
       setFile(f);
       doc.current = f.content ?? '';
+      base.current = f.content ?? '';
       mtime.current = f.mtime;
       setDirty(false);
       setChangedOnDisk(false);
@@ -151,9 +160,10 @@ export function FileEditor({
     load();
   }, [path, load, isMd, isHtml, embedded, preview]);
 
-  // Mount CodeMirror once the text is loaded.
+  // Mount CodeMirror once the text is loaded; reading it again later (a change from elsewhere, a save) keeps it.
+  const editable = !!file && !file.binary && !file.tooLarge && file.content != null;
   useEffect(() => {
-    if (!file || file.binary || file.tooLarge || file.content == null || mode !== 'edit' || !host.current) return;
+    if (!editable || mode !== 'edit' || !host.current) return;
     let alive = true;
     let handle: EditorHandle | null = null;
     import('../../lib/codemirror').then(async ({ createEditor }) => {
@@ -166,7 +176,7 @@ export function FileEditor({
         phone: mobile,
         onChange: (d) => {
           doc.current = d;
-          setDirty(d !== (file.content ?? ''));
+          setDirty(d !== base.current);
         },
         onSave: () => saveRef.current(),
       });
@@ -183,51 +193,65 @@ export function FileEditor({
       editor.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file, mode, path]);
+  }, [editable, mode, path]);
 
   useEffect(() => {
     editor.current?.setWrap(wrap);
     localStorage.setItem(wrapKey, wrap ? '1' : '0');
   }, [wrap, wrapKey]);
 
-  const save = async (force = false) => {
-    if (!file || saving) return;
+  const save = async (force = false): Promise<boolean> => {
+    if (!file || saving) return false;
     setSaving(true);
     try {
-      const r = await put<{ mtime: number; size: number }>('/api/fs/write', { path, content: doc.current, expectedMtime: force ? undefined : mtime.current });
+      const content = doc.current;
+      const r = await put<{ mtime: number; size: number }>('/api/fs/write', { path, content, expectedMtime: force ? undefined : mtime.current });
       mtime.current = r.mtime;
-      setFile((f) => (f ? { ...f, content: doc.current, mtime: r.mtime, size: r.size } : f));
-      setDirty(false);
+      base.current = content;
+      setFile((f) => (f ? { ...f, content, mtime: r.mtime, size: r.size } : f));
+      setDirty(doc.current !== content);
       setChangedOnDisk(false);
       toast(`Saved ${basename(path)}`, 'ok');
       onSaved?.();
+      return true;
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setChangedOnDisk(true);
       else toastError(e);
+      return false;
     } finally {
       setSaving(false);
     }
   };
   const saveRef = useRef(save);
   saveRef.current = save;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  if (saveFirst) saveFirst.current = async () => (dirtyRef.current ? saveRef.current() : true);
 
-  // Pick up edits made by agents or terminals.
+  // Pick up edits made by agents or terminals, every second while an agent is at work.
+  const watchMs = useWatchMs();
+  const loaded = !!file;
   useEffect(() => {
-    if (!file || media) return;
+    if (!loaded || media) return;
+    let busy = false;
     const t = setInterval(async () => {
-      if (document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== 'visible' || busy) return;
+      busy = true;
       try {
         const st = await api<{ exists: boolean; mtime: number }>(`/api/fs/stat?path=${encodeURIComponent(path)}`);
         if (!st.exists || st.mtime === mtime.current) return;
-        if (dirty) setChangedOnDisk(true);
+        if (dirtyRef.current) setChangedOnDisk(true);
         else {
           const f = await load();
-          if (f?.content != null) editor.current?.setDoc(f.content);
+          if (f?.content != null) editor.current?.setDoc(f.content, { flash: true });
         }
-      } catch {}
-    }, 3000);
+      } catch {
+      } finally {
+        busy = false;
+      }
+    }, watchMs);
     return () => clearInterval(t);
-  }, [file, dirty, path, load, media]);
+  }, [loaded, path, load, media, watchMs]);
 
   useEffect(() => {
     if (mode !== 'diff') return;

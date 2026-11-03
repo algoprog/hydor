@@ -177,7 +177,7 @@ function Start({ page, scopes, beforeSend }: { page: PageInfo; scopes: AskScope[
   );
 }
 
-function Starting({ text }: { text: string }) {
+export function Starting({ text }: { text: string }) {
   return (
     <div className="min-h-0 flex-1 px-4 pt-5">
       <div translate="no" className="ml-auto w-fit max-w-[85%] rounded-[18px] bg-bg-2 px-3.5 py-2 text-[14px] leading-relaxed whitespace-pre-wrap">

@@ -5,7 +5,7 @@
 // time it is saved over; a Word or Excel file's first save puts the file as it was in the Trash. Changes made to the
 // file meanwhile (an agent, a terminal) come in while nothing is changed here, and are asked about otherwise. Its text,
 // or its preview, is in the ⋯ menu, as the file showed before.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileCode2, FolderOpen, MessageSquarePlus, RotateCcw, SquareTerminal, TriangleAlert } from 'lucide-react';
 import { editorKindOf, type FileOpened, type FileSaved } from '@shared/documents';
 import { TEX_MAIN } from '@shared/latex';
@@ -20,6 +20,7 @@ import { EDITORS } from '../pages/editors';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { useSpaceMenu } from './SpaceMenu';
+import { useWatchMs } from './FileAsk';
 
 /** What of a Word file the document editor does not keep, in words (the server's keys). */
 const DOC_LOST: Record<string, string> = {
@@ -78,7 +79,25 @@ const Band = ({ tone = 'warn', children }: { tone?: 'warn' | 'quiet'; children: 
  * `onText`: show the file as before (its text, or its preview), when asked to or when the editor cannot take it.
  * `embedded`: in a dialog (no Back, no terminal). `fileMenu`: the Files page's ⋯ (a session with it, a space, its folder).
  */
-export function FileInEditor({ path, embedded, onDirty, onText, fileMenu }: { path: string; embedded?: boolean; onDirty?: (dirty: boolean) => void; onText: () => void; fileMenu?: boolean }) {
+export function FileInEditor({
+  path,
+  embedded,
+  onDirty,
+  onText,
+  fileMenu,
+  actions,
+  saveFirst,
+}: {
+  path: string;
+  embedded?: boolean;
+  onDirty?: (dirty: boolean) => void;
+  onText: () => void;
+  fileMenu?: boolean;
+  /** More buttons, before Download (the Files page's Ask). */
+  actions?: ReactNode;
+  /** Given a way to save unsaved changes first (true when there were none, or they are saved). */
+  saveFirst?: MutableRefObject<(() => Promise<boolean>) | null>;
+}) {
   const home = useApp((s) => s.boot?.home);
   const mobile = useIsMobile();
   const kind = editorKindOf(path)!;
@@ -96,6 +115,7 @@ export function FileInEditor({ path, embedded, onDirty, onText, fileMenu }: { pa
   const moreRef = useRef<HTMLButtonElement>(null);
   const [confirm, confirmNode] = useConfirm();
   const saveNow = useRef<(() => Promise<boolean>) | null>(null);
+  if (saveFirst) saveFirst.current = async () => (dirtyRef.current ? ((await saveNow.current?.()) ?? false) : true);
   // The times the file (a LaTeX project's files) had when read or last saved here: a newer one was changed elsewhere.
   const times = useRef<{ mtime: number; files?: Record<string, number> }>({ mtime: 0 });
   const saving = useRef(false);
@@ -133,7 +153,8 @@ export function FileInEditor({ path, embedded, onDirty, onText, fileMenu }: { pa
     void load();
   }, [path, embedded, load]);
 
-  // Changes made elsewhere: read again while nothing is changed here, else asked about.
+  // Changes made elsewhere: read again while nothing is changed here, else asked about; every second while an agent works.
+  const watchMs = useWatchMs();
   useEffect(() => {
     if (!opened) return;
     const tex = opened.tex;
@@ -151,9 +172,9 @@ export function FileInEditor({ path, embedded, onDirty, onText, fileMenu }: { pa
           return;
         } catch {}
       }
-    }, 3000);
+    }, watchMs);
     return () => clearInterval(t);
-  }, [opened, path, load]);
+  }, [opened, path, load, watchMs]);
 
   useEffect(() => {
     const before = (e: BeforeUnloadEvent) => {
@@ -304,6 +325,7 @@ export function FileInEditor({ path, embedded, onDirty, onText, fileMenu }: { pa
 
   const tail = (
     <>
+      {actions}
       {!mobile && (
         <IconButton label="Download" onClick={download}>
           <Download size={16} />
