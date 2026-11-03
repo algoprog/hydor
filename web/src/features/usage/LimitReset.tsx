@@ -88,6 +88,7 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
   const reset = useLimitReset(agent, account);
   const spare = useSpareAccount(agent, account);
   const autoSwitch = useAppSettings((s) => s.autoSwitch);
+  const autoResume = useAppSettings((s) => s.autoResume);
   useEffect(() => void useAppSettings.getState().load(), []);
   // Another account has usage left and Switch accounts at a limit is on: the session (or a new one) just moves there.
   const lim = session?.busy || (spare && autoSwitch) ? null : u?.limited;
@@ -95,6 +96,32 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
   useTicking(!!lim || !!resumeAt);
   if (!lim && !resumeAt) return null;
   const cancel = () => del(`/api/sessions/${enc(session!.key)}/resume-at`).catch(toastError);
+  const usable = usableResets(u);
+  // In a session with Resume after usage limits on, a turn the limit stopped continues by itself: no warning,
+  // only when (and a reset, if there is one). Not known yet whether it is on: nothing, rather than a flash.
+  if (session && autoResume !== false) {
+    if (!resumeAt || autoResume === null) return null;
+    return (
+      <div className={cx('flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
+        <Clock3 size={15} className="shrink-0 text-busy" />
+        <span className="min-w-0 flex-1">
+          {lim && <span className="text-fg-2">{lim.label} · </span>}
+          Continues by itself <span className="font-medium">{untilText(resumeAt)}</span>.
+        </span>
+        <span className="flex items-center gap-1">
+          {lim && usable.length > 0 && (
+            <Button size="sm" variant="secondary" icon={<RotateCcw size={14} />} disabled={reset.busy} onClick={() => reset.use()}>
+              {reset.busy ? 'Resetting…' : 'Use a reset'}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={cancel}>
+            Cancel
+          </Button>
+        </span>
+        {reset.node}
+      </div>
+    );
+  }
   const turnOnSwitch = async () => {
     useAppSettings.getState().set({ autoSwitch: true });
     try {
@@ -108,7 +135,7 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
   // Usage is back (or the session is going again): only the continue still to come.
   if (!lim)
     return (
-      <div className={cx('anim-expand flex items-center gap-3 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
+      <div className={cx('flex items-center gap-3 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
         <Clock3 size={15} className="shrink-0 text-busy" />
         <span className="min-w-0 flex-1">
           Continues by itself <span className="font-medium">{untilText(resumeAt)}</span>.
@@ -118,7 +145,6 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
         </Button>
       </div>
     );
-  const usable = usableResets(u);
   const left = u?.resetCredits?.available ?? 0;
   // The server continues a minute after the reset; told apart only when the two disagree.
   const withReset = !!resumeAt && !!lim.resetsAt && Math.abs(resumeAt - lim.resetsAt - 60_000) < 3 * 60_000;
