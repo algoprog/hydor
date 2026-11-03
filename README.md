@@ -67,7 +67,8 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 On a Mac (macOS 12 or newer, Apple silicon or Intel): download the Mac app from the
 [latest release](https://github.com/Naget-Inc/naget-agent/releases/latest) (`…-arm64-mac.dmg` or `…-x64-mac.dmg`),
 drag it to Applications and open it. It brings everything it needs, opens in its own window, stays in the menu bar
-and keeps itself up to date. See [the Mac app](docs/install.md#the-mac-app).
+and keeps itself up to date: a new version installs itself a minute after it says so (or later, if you like). See
+[the Mac app](docs/install.md#the-mac-app).
 
 With Docker, on Linux, macOS or Windows (the image runs on Intel/AMD and ARM):
 

@@ -2,13 +2,21 @@
 // that comes inside it too), shows the app in a window of its own, stays in the menu bar when the window is
 // closed, and starts the server again whenever it exits: agents carry on meanwhile, as with the Linux service.
 //
-// Updates: the server finds, downloads and checks a new version (server/updates.ts) and sends it here with
-// { type: 'install' }. The app then stops the server, moves itself aside (to previous.app in its Application
-// Support folder), puts the new version where it was, and opens it. If the new version's server does not start
-// (it stops three times before it is up, or is not up in three minutes), the version before comes back and the
-// server is told why, so Settings says it, and that version is not installed by itself again.
+// Updates: the server finds, downloads and checks a new version (server/updates.ts). Downloaded by itself, it waits:
+// { type: 'update' } puts Restart to Update in the menus and, when its minute starts, shows a notification from the
+// Mac (clicking it opens the app, where a note counts down with Restart now and Later; its button installs at once).
+// Then the server sends { type: 'install' }: the app stops the server, moves itself aside (to previous.app in its
+// Application Support folder), puts the new version where it was, and opens it. If the new version's server does
+// not start (it stops three times before it is up, or is not up in three minutes), the version before comes back and
+// the server is told why, so Settings says it, and that version is not installed by itself again.
+//
+// Computer use (server/computer/): agents see the screen and use the mouse and keyboard through programs the server
+// starts, which macOS counts as this app's doing, so the permissions (Accessibility, Screen Recording) are this
+// app's: the server asks here what macOS allows and to ask you for the rest ({ type: 'ask' }, answered with
+// { type: 'reply' }). While an agent acts ({ type: 'computer' }), the menu bar says so, with Stop, and ⌘⇧Esc stops it
+// too ({ type: 'computer-stop' } to the server).
 'use strict';
-const { app, BrowserWindow, Menu, Tray, dialog, nativeImage, nativeTheme, session, shell, systemPreferences } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, nativeImage, nativeTheme, session, shell, systemPreferences } = require('electron');
 const { spawn, execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -187,6 +195,8 @@ function startServer() {
     if (server === child) server = null;
     fs.rmSync(PIDFILE, { force: true });
     if (quitting || installing) return;
+    // What it showed here goes with it: the next one says again what waits.
+    forgetShown();
     const quick = Date.now() - startedAt < 60_000;
     failures = quick ? failures + 1 : 0;
     if (verifying && failures >= 3) return rollBack(`it stopped as it started (${signal ?? `exit ${code}`})`);
@@ -228,6 +238,128 @@ function onMessage(m) {
     rebuildTray();
   } else if (m.type === 'install' && typeof m.app === 'string') {
     void install(m);
+  } else if (m.type === 'update') {
+    onUpdate(m);
+  } else if (m.type === 'computer') {
+    onComputer(m);
+  } else if (m.type === 'ask' && typeof m.id === 'string') {
+    void answer(m);
+  }
+}
+
+/** To the server, while it runs. */
+function toServer(m) {
+  try {
+    if (server && server.connected) server.send(m);
+  } catch {}
+}
+
+// ---- what the server shows here: a new version waiting, an agent using the Mac ------------------------------------
+
+/** A new version downloaded and waiting (its version), for Restart to Update in the menus. */
+let updateReady = null;
+/** An agent using the Mac (computer use) while it acts: { title } of its session. */
+let computerActive = null;
+/** Notifications on screen, kept so they are still there to click. */
+const notices = new Set();
+const STOP_KEYS = 'Command+Shift+Escape';
+
+function onUpdate(m) {
+  updateReady = typeof m.version === 'string' && m.version ? m.version : null;
+  rebuildTray();
+  appMenu();
+  if (updateReady && m.notice) notify(m.notice);
+}
+
+const updateNow = () => toServer({ type: 'update-now' });
+
+/** A notification from the Mac: clicking it opens the app (its note counts down, with Later); its button installs now. */
+function notify(n) {
+  if (!Notification.isSupported()) return;
+  const note = new Notification({ title: String(n.title || 'Naget Agent'), body: String(n.body || ''), actions: n.action ? [{ type: 'button', text: String(n.action) }] : [] });
+  notices.add(note);
+  const done = () => notices.delete(note);
+  note.on('click', () => {
+    done();
+    go();
+  });
+  note.on('action', () => {
+    done();
+    updateNow();
+  });
+  note.on('close', done);
+  note.show();
+}
+
+function onComputer(m) {
+  const was = !!computerActive;
+  computerActive = m.active ? { title: typeof m.title === 'string' ? m.title : '' } : null;
+  // ⌘⇧Esc stops it, only while an agent acts (the keys stay the other apps' otherwise).
+  if (computerActive && !was) {
+    try {
+      if (!globalShortcut.register(STOP_KEYS, stopComputer)) console.error('[naget] ⌘⇧Esc is taken by another app');
+    } catch {}
+  } else if (!computerActive && was) {
+    try {
+      globalShortcut.unregister(STOP_KEYS);
+    } catch {}
+  }
+  rebuildTray();
+}
+
+/** Stop (the menu bar, ⌘⇧Esc): the agent's actions end, and no agent uses the Mac until you allow it again. */
+function stopComputer() {
+  toServer({ type: 'computer-stop' });
+  onComputer({ active: false });
+}
+
+/** The server stopped: what it showed here goes until the next one says it again. */
+function forgetShown() {
+  if (computerActive) onComputer({ active: false });
+  if (updateReady) {
+    updateReady = null;
+    rebuildTray();
+    appMenu();
+  }
+}
+
+// ---- computer use: macOS's permissions, which are this app's ---------------------------------------------------
+
+const PANES = {
+  accessibility: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+  screen: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
+};
+
+/** What macOS lets this app (and the programs its server starts) do: use the mouse and keyboard, see the screen. */
+function permissions() {
+  let screen = 'unknown';
+  try {
+    screen = systemPreferences.getMediaAccessStatus('screen');
+  } catch {}
+  return { accessibility: systemPreferences.isTrustedAccessibilityClient(false), screen };
+}
+
+/** The server asks: what macOS allows, or to ask you for a permission (macOS's own prompt, then its settings). */
+async function answer(m) {
+  const reply = (r) => toServer({ type: 'reply', id: m.id, ok: true, ...r });
+  try {
+    if (m.what === 'permissions') return reply(permissions());
+    if (m.what === 'request' && m.which === 'accessibility') {
+      // macOS asks once ("Naget Agent would like to control this computer"); its settings list the app from then on.
+      if (!systemPreferences.isTrustedAccessibilityClient(true)) await shell.openExternal(PANES.accessibility);
+      return reply(permissions());
+    }
+    if (m.what === 'request' && m.which === 'screen') {
+      if (permissions().screen !== 'granted') {
+        // Looking at the screen once makes macOS ask, and list the app under Screen Recording.
+        await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1, height: 1 } }).catch(() => {});
+        await shell.openExternal(PANES.screen);
+      }
+      return reply(permissions());
+    }
+    toServer({ type: 'reply', id: m.id, ok: false, error: `the app does not know "${m.what}"` });
+  } catch (e) {
+    toServer({ type: 'reply', id: m.id, ok: false, error: String((e && e.message) || e) });
   }
 }
 
@@ -428,13 +560,27 @@ function rebuildTray() {
     tray = new Tray(icon);
     tray.setToolTip('Naget Agent');
   }
+  // While an agent uses the Mac, the menu bar says so beside the icon, and its menu starts with Stop.
+  const agent = computerActive
+    ? [
+        { label: 'An agent is using your Mac', enabled: false },
+        ...(computerActive.title ? [{ label: `In “${computerActive.title.slice(0, 60)}”`, enabled: false }] : []),
+        { label: 'Stop', accelerator: STOP_KEYS, click: stopComputer },
+        { type: 'separator' },
+      ]
+    : [];
+  tray.setTitle(computerActive ? 'Agent using your Mac' : '');
+  tray.setToolTip(computerActive ? 'Naget Agent: an agent is using your Mac' : 'Naget Agent');
   tray.setContextMenu(
     Menu.buildFromTemplate([
+      ...agent,
       { label: 'Open Naget Agent', click: () => go() },
       { label: 'Open in Browser', enabled: !!serverUrl, click: () => serverUrl && shell.openExternal(serverUrl) },
       { type: 'separator' },
       { label: 'Settings…', enabled: !!serverUrl, click: () => go('/settings') },
-      { label: 'Check for Updates…', enabled: !!serverUrl, click: () => go('/settings?s=general&find=Check%20now') },
+      updateReady
+        ? { label: `Restart to Update to ${updateReady}`, click: updateNow }
+        : { label: 'Check for Updates…', enabled: !!serverUrl, click: () => go('/settings?s=general&find=Check%20now') },
       { type: 'separator' },
       { label: 'Quit Naget Agent', click: () => app.quit() },
     ]),
@@ -448,7 +594,7 @@ function appMenu() {
         label: app.name,
         submenu: [
           { role: 'about' },
-          { label: 'Check for Updates…', click: () => go('/settings?s=general&find=Check%20now') },
+          updateReady ? { label: `Restart to Update to ${updateReady}`, click: updateNow } : { label: 'Check for Updates…', click: () => go('/settings?s=general&find=Check%20now') },
           { type: 'separator' },
           { label: 'Settings…', accelerator: 'Cmd+,', click: () => go('/settings') },
           { type: 'separator' },
@@ -532,3 +678,5 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   // Stays in the menu bar.
 });
+
+app.on('will-quit', () => globalShortcut.unregisterAll());

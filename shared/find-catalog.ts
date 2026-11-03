@@ -71,7 +71,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['general', 'Resume after usage limits', 'limit reset continue automatically plan', 'Continues a session a minute after a plan’s limit resets'],
   ['general', 'Delete inactive sessions', 'delete old sessions clean up retention history keep conversations inactive year months', 'Deletes sessions nobody used for a year, or as long as you choose; until then every conversation is kept'],
   ['general', 'Start when this computer starts', 'boot startup login service autostart systemd', 'Starts the app when the computer starts'],
-  ['general', 'Update automatically', 'updates upgrade auto update new version', 'Updates itself when you have not used it for a while'],
+  ['general', 'Update automatically', 'updates upgrade auto update new version restart install', 'Installs new versions by itself: the Mac app as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while'],
   ['general', 'Take the tour', 'tour help guide onboarding welcome', 'See what each part of the app does', 'Welcome tour'],
   ['general', 'Tips', 'tips hints help onboarding introduce features skip guide', 'Points out a part of the app the first time you come to it, after the welcome tour'],
   ['general', 'Check now', 'update upgrade new version about', 'Look for a newer version now', 'Check for updates'],

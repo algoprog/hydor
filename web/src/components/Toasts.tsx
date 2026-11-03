@@ -1,11 +1,13 @@
 // Short messages at the bottom of the screen. A session that finished, failed or needs you gets a
 // small card like its row in the sidebar: its name on one line, the status and a hint of the reply
-// under it; the card opens the session. A toast under the pointer stays until the pointer leaves.
+// under it; the card opens the session. A toast under the pointer stays until the pointer leaves. Above them, the
+// Mac app's new version about to install (UpdateNotice).
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { noticeLine } from '@shared/notice';
 import { useToasts, type Toast, type ToastNotice } from '../lib/store';
 import { AgentIcon } from './AgentIcon';
+import { UpdateNotice } from './UpdateNotice';
 import { cx } from './ui';
 
 const TONE: Record<ToastNotice['kind'], { dot: string; text: string }> = {
@@ -53,6 +55,7 @@ export function Toasts() {
   const hold = useToasts((s) => s.hold);
   return createPortal(
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(88px+var(--safe-bottom))] z-[60] flex flex-col items-center gap-2 px-3 md:bottom-16 md:items-end md:px-5">
+      <UpdateNotice />
       {list.map((t) => (
         <div
           key={t.id}

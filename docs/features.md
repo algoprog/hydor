@@ -396,8 +396,10 @@ programs shows each program's version and what is out, with Check now, Update no
 ## Everywhere
 - A Mac app (macOS 12+, Apple silicon or Intel): the server, Node.js and tmux in one app, in a window of its own,
   in the menu bar when the window is closed, opening at login. It shows notifications itself, finds your programs
-  through your login shell's PATH, and updates itself release by release: it downloads and checks the new build,
-  swaps it in with agents carrying on, and goes back to the version before if the new one does not start.
+  through your login shell's PATH, and updates itself release by release: it looks every 4 hours, downloads and
+  checks a new build as soon as it is out, says so (a notification from the Mac, and a note in every open page that
+  counts down a minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the menu
+  bar), swaps it in with agents carrying on, and goes back to the version before if the new one does not start.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
 - The tools at the bottom of the sidebar (Files, Git, Terminal, Library, Spaces, Apps, Usage, Settings…) stay in
