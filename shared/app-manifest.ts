@@ -1412,7 +1412,7 @@ export interface InstallPreview {
    * The models it asks for: here as they are, the same one under another name here, or not here (then
    * `options` lists what could stand in; `use` is the one picked unless you pick another; "" for the agent's default).
    */
-  models: { as: string; agent: 'claude' | 'codex' | 'custom'; label: string; status: 'here' | 'matched' | 'missing'; use?: string; options: { value: string; label: string }[] }[];
+  models: { as: string; agent: 'claude' | 'codex' | 'custom'; label: string; status: 'here' | 'matched' | 'provider' | 'missing'; use?: string; options: { value: string; label: string }[] }[];
   /** Its screens, by name. */
   screens: string[];
   /** Templates that come with it (those it calls): each installed first, or the one you have used again. */

@@ -29,13 +29,15 @@ export interface Space {
   createdAt: number;
 }
 
-/** A space with how many sessions it has, when one was last at work, how many documents its knowledge holds, and its skills. */
+/** A space with how many sessions it has, when one was last at work, how many documents its knowledge holds, its skills, and what it holds in the Library. */
 export interface SpaceView extends Space {
   sessions: number;
   lastAt?: number;
   docs: number;
   /** How many skills of its own it has (its Skills tab). */
   skills: number;
+  /** How many things it holds in the Library: pages, slides, documents, pictures and videos. */
+  library: number;
 }
 
 /** A space's colour, by name (as templates have theirs). */

@@ -5,8 +5,8 @@
 //
 // Routes, signed in:
 //   GET  /api/media                      every item, newest first
-//   POST /api/media                      keeps a file: { path, prompt?, model?, sessionKey? }
-//   GET/PATCH/DELETE /api/media/:id      one item; PATCH { title?, description? }
+//   POST /api/media                      keeps a file: { path, prompt?, model?, sessionKey?, space? }
+//   GET/PATCH/DELETE /api/media/:id      one item; PATCH { title?, description?, space? }
 //   POST /api/media/:id/caption          writes its title and description again
 //   GET  /api/media/:id/file             the file (?download=1 to save it), in parts for a video player
 //   GET  /api/media/:id/still            a still to show it by; GET /api/media/:id/frames a video's frames
@@ -24,7 +24,8 @@ import { byteRange, resolvePath } from '../files.ts';
 import { dimensions, slug } from '../images/openrouter.ts';
 import { captionModels, captionSettings, setCaptionChoice, titleFrom, writeCaption } from './caption.ts';
 import { frameGrid, hasFfmpeg, probe, still } from './frames.ts';
-import { addMedia, deleteMedia, editMedia, filesOf, initMedia, listMedia, mustMedia, savedFrom, setCaption } from './store.ts';
+import { addMedia, deleteMedia, editMedia, filesOf, initMedia, listMedia, mustMedia, savedFrom, setCaption, setMediaSpace } from './store.ts';
+import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 
 const TYPES: Record<string, { kind: MediaKind; mime: string }> = {
   png: { kind: 'image', mime: 'image/png' },
@@ -80,7 +81,7 @@ function caption(d: Deps, id: string) {
 
 // ---- keeping a file ------------------------------------------------------------------------------------------
 
-export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; model?: unknown; sessionKey?: unknown }): Promise<{ item: MediaItem; existed: boolean }> {
+export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; model?: unknown; sessionKey?: unknown; space?: unknown }): Promise<{ item: MediaItem; existed: boolean }> {
   if (typeof b.path !== 'string' || !b.path.trim()) throw new HttpError(400, 'path: the image or video to keep');
   const file = resolvePath(b.path);
   const st = await fs.promises.stat(file).catch(() => null);
@@ -92,6 +93,8 @@ export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; m
   const had = savedFrom(d.db, file, st.size);
   if (had) return { item: had, existed: true };
   const str = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : undefined);
+  // The space picked, or (not asked) the session's.
+  const space = spaceChoice(d.db, b.space, sessionSpace(d.db, str(b.sessionKey, 200)));
   const prompt = str(b.prompt, 4000);
   let size: { width?: number; height?: number; duration?: number } = {};
   if (type.kind === 'video') {
@@ -123,6 +126,7 @@ export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; m
     prompt,
     model: str(b.model, 120),
     sessionKey: str(b.sessionKey, 200),
+    space,
   });
   // A still to show it by: a tenth of the way into a video; a smaller copy of a large picture.
   const f = filesOf(item);
@@ -181,7 +185,11 @@ export const media: Feature = {
     });
     app.get('/api/media/:id', async (req) => ({ item: mustMedia(db, (req.params as { id: string }).id) }));
     app.patch('/api/media/:id', async (req) => {
-      const item = editMedia(db, (req.params as { id: string }).id, (req.body ?? {}) as Record<string, unknown>);
+      const id = (req.params as { id: string }).id;
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      // Moved to a space (or out of one), and/or its own title and description.
+      let item = b.space !== undefined ? setMediaSpace(db, id, spaceChoice(db, b.space)) : mustMedia(db, id);
+      if (b.title !== undefined || b.description !== undefined) item = editMedia(db, id, b);
       tell(d, { what: 'media', item });
       return { item };
     });

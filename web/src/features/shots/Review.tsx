@@ -5,7 +5,7 @@
 // with a slider to sweep between them, or both side by side, on a computer's screen or a phone's, with a way
 // to the reply's other screens. "Looks good" and "Change something" put a line in the message box.
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { ArrowLeftRight, ChevronLeft, ChevronRight, Columns2, Image as ImageIcon, Maximize2, Monitor, Smartphone, X } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, ChevronLeft, ChevronRight, Columns2, Image as ImageIcon, Maximize2, Monitor, Smartphone, X } from 'lucide-react';
 import type { UiShot } from '@shared/shots';
 import type { TimelineItem, ToolItem } from '@shared/types';
 import { api, enc } from '../../lib/api';
@@ -13,7 +13,7 @@ import { mu } from '../../lib/machine';
 import { composeInsert } from '../../lib/featureEvents';
 import { openLightbox } from '../../components/Lightbox';
 import { tr } from '../../i18n/runtime';
-import { Button, cx, IconButton, Segmented, Throbber } from '../../components/ui';
+import { Button, cx, IconButton, Segmented, Throbber, useMediaQuery } from '../../components/ui';
 import { PageOverlay } from '../pages/overlay';
 import { CANVAS_MEDIA, onScreen, useCanvas } from '../pages/state';
 
@@ -296,10 +296,15 @@ function Tile({ item, active, onOpen, bare }: { item: ToolItem; active: boolean;
   );
 }
 
-/** The reply's screenshots: one card of small pictures; a picture opens its review. */
+/**
+ * The reply's screenshots: one card of small pictures; a picture opens its review. More than a row of them shows the
+ * first row, with Show all under it, so a reply with many screens does not fill the conversation.
+ */
 export function ShotCard({ item, sessionKey, more }: { item: ToolItem; sessionKey: string; more?: ToolItem[] }) {
   const all = useMemo(() => [item, ...(more ?? [])], [item, more]);
   const [over, setOver] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const wide = useMediaQuery('(min-width: 640px)');
   const shownId = useCanvas((x) => {
     const t = x.open[sessionKey];
     return t?.kind === 'review' ? t.id : null;
@@ -321,6 +326,11 @@ export function ShotCard({ item, sessionKey, more }: { item: ToolItem; sessionKe
   const phases = new Set(all.map(phaseOf));
   const title = phases.has('after') ? PHASE.after : phases.size === 1 && phases.has('before') ? PHASE.before : all.length > 1 ? 'Screenshots' : PHASE.check;
   const one = all.length === 1;
+  // A row: one picture, two side by side, else three (two on a phone). The one open in the review stays in view.
+  const perRow = one ? 1 : all.length === 2 || !wide ? 2 : 3;
+  const openAt = shownId ? all.findIndex((it) => it.id === shownId) : -1;
+  const folded = all.length > perRow && !expanded && openAt < perRow;
+  const shown = folded ? all.slice(0, perRow) : all;
   return (
     <div className={cx('tl-item my-1.5 rounded-xl border border-line bg-panel p-2', one && 'sm:max-w-[22rem]')}>
       <div className="flex items-center gap-2 px-1 pb-2">
@@ -337,10 +347,21 @@ export function ShotCard({ item, sessionKey, more }: { item: ToolItem; sessionKe
         {!one && <span className="shrink-0 text-[12px] text-fg-3">{`${all.length} screens`}</span>}
       </div>
       <div className={cx('grid gap-2', one ? 'grid-cols-1' : all.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3')}>
-        {all.map((it, i) => (
+        {shown.map((it, i) => (
           <Tile key={it.id} item={it} active={shownId === it.id} onOpen={() => open(i)} bare={one} />
         ))}
       </div>
+      {all.length > perRow && (folded || expanded) && (
+        <button
+          type="button"
+          aria-expanded={!folded}
+          onClick={() => setExpanded(folded)}
+          className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-[12.5px] font-medium text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
+        >
+          {folded ? tr(`Show all ${all.length}`) : 'Show fewer'}
+          <ChevronDown size={14} className={cx('transition-transform', !folded && 'rotate-180')} />
+        </button>
+      )}
       {over !== null && all[over] && (
         <PageOverlay title={labelOf(all[over])} onClose={() => setOver(null)} actions={<Steps at={over} count={all.length} onGo={setOver} />}>
           <div className="h-full overflow-y-auto">

@@ -11,7 +11,10 @@ import { api, post } from '../../lib/api';
 import { composeInsert } from '../../lib/featureEvents';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
+import { tr } from '../../i18n/runtime';
 import { Throbber, IconButton, cx, useMediaQuery } from '../../components/ui';
+import { useKeepIn } from '../spaces/SpacePick';
+import { useSpacesStore } from '../spaces/state';
 import { openOver, shownStore, showBeside } from '../pages/Canvas';
 import { pageFile, pageStore, PageFrame, StreamFrame, type Pick } from '../pages/frame';
 import { PageOverlay } from '../pages/overlay';
@@ -122,6 +125,23 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
     if (kept && !usePagesStore.getState().pages) usePagesStore.getState().loadPages().catch(() => {});
   }, [kept]);
 
+  // With spaces, Keep asks which one it goes in (this session's first); with none, it keeps at once.
+  const keepIn = async (space: string | null) => {
+    if (!sessionKey) return;
+    setKeeping(true);
+    try {
+      const r = await post<{ page: PageInfo }>('/api/pages', { title, html, sessionKey, item: item.id, data: memory.dump(), space });
+      usePagesStore.getState().setKept(sessionKey, item.id, r.page.id);
+      const name = space ? useSpacesStore.getState().list?.find((x) => x.id === space)?.name : undefined;
+      toast(name ? tr(`Kept in the Library, in ${name}`) : 'Kept in the Library', 'ok');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setKeeping(false);
+    }
+  };
+  const keepMenu = useKeepIn(sessionKey, (space) => void keepIn(space));
+
   if (sessionKey && wide && besideOpen) {
     const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : kept ? `Kept in the Library${keptInfo && keptInfo.version > 1 ? ` · version ${keptInfo.version}` : ''}` : `A page · ${kb(html.length)}`;
     return <SmallPageCard sessionKey={sessionKey} item={item} title={title} sub={sub} writing={writing} />;
@@ -135,19 +155,10 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const keep = async () => {
+  const keep = (el: HTMLElement) => {
     if (!sessionKey) return;
     if (kept) return go(`/pages/${kept}`);
-    setKeeping(true);
-    try {
-      const r = await post<{ page: PageInfo }>('/api/pages', { title, html, sessionKey, item: item.id, data: memory.dump() });
-      usePagesStore.getState().setKept(sessionKey, item.id, r.page.id);
-      toast('Kept in the Library', 'ok');
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setKeeping(false);
-    }
+    keepMenu.ask(el);
   };
   // A kept page that was changed since shows as it is now; the frame starts over when its storage moves to Pages.
   const changed = !!keptInfo && keptInfo.version > 1;
@@ -165,7 +176,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
             {sessionKey && (
               <button
                 type="button"
-                onClick={keep}
+                onClick={(e) => keep(e.currentTarget)}
                 disabled={keeping}
                 title={kept ? 'Open it in the Library' : 'Keep this page in the Library, with its own address and storage'}
                 className={cx(
@@ -224,6 +235,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
           <KeptOrShown key={frameKey} kept={changed ? kept : undefined} html={html} title={title} store={store} onPick={onPick} />
         </PageOverlay>
       )}
+      {keepMenu.menu}
     </div>
   );
 }

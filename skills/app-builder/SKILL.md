@@ -6,6 +6,13 @@ triggers: [make a template, build a template, make an app, build an app, an app 
 
 # Building apps
 
+An app is a small tool for one job that helps people see and find information: a few questions in, the looking up
+and working out done by its steps, and the answer shown clearly in a view of its own (a map, a chart, a table,
+cards). It opens on its own page, and agents run it for the user in any chat (they find it by its name and
+description, so make those say plainly what it does). Keep it to one job, quick and cheap to run; when asked for
+something big (a whole product, many jobs at once), propose the one or two small apps that matter most, or a
+project in a session instead.
+
 An app is what it asks (a form), what it does (one agent's task, or steps), what it gives back
 (answer fields), how its answer looks (a view: pages, elements, events), what it keeps (lists of records, a
 memory), its own page (a screen, or view pages for it), when it runs (its form, a schedule, a webhook, a watcher)

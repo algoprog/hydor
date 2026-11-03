@@ -2,7 +2,7 @@
 
 A space keeps one project together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows, skills of its own and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using spaces and groups of spaces, giving a space skills of its own, and adding, searching and managing the documents agents search.
 
-![The Spaces page: each project’s sessions, documents and guidelines in one place](images/spaces.webp)
+![The Spaces page: a card for each project, with what it holds and New session](images/spaces.webp)
 
 ## What a space is
 
@@ -28,13 +28,14 @@ The page has two tabs:
 
 Each space shows as a card:
 
-- its mark: a rounded square in its colour with the first letter of its name (a group's mark has a second square behind it);
+- a band of its colour with its mark: a rounded square in its colour with the first letter of its name (a group's mark has a second square behind it, and **Group** on its band);
 - its name, and under it what it is about, or its folder when it has no description. A group says "Brings together" and the names of its spaces;
-- how many sessions it has, how many documents, and how long ago one of its sessions was last at work.
+- what it holds: how many sessions, how many things in the Library, documents and skills;
+- how long ago one of its sessions was last at work, and **New session**, which starts a session in it at once.
 
-Click a card to open the space's own page, or type the space's name in the search box (Ctrl+K) to go straight there. With no spaces yet, the page says what a space is for; click **New space** to make one.
+Click a card to open the space's own page, or type the space's name in the search box (Ctrl+K) to go straight there. With no spaces yet, the page says what a space is for in three short parts, with **Make a space**.
 
-Under the spaces, **Folders you work in, not in a space yet** lists folders your sessions used lately that could become spaces (see [Folders you work in, not in a space yet](#folders-you-work-in-not-in-a-space-yet)).
+Under the spaces, **Folders you work in** lists folders your sessions used lately that could become spaces (see [Folders you work in, not in a space yet](#folders-you-work-in-not-in-a-space-yet)).
 
 ## Make a space
 
@@ -60,7 +61,7 @@ In the **New space** window, pick **In a folder I already have** under **Where i
 
 ### Folders you work in, not in a space yet
 
-Under your spaces on the [Spaces page](/spaces), the app lists up to six folders you could make spaces for: folders your sessions worked in over the last 90 days, or changed files in while working somewhere else, that no space has yet. The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project. Each row shows the folder's name, where it is, how many sessions used it and when one last did.
+Under your spaces on the [Spaces page](/spaces), the app lists up to six folders you could make spaces for: folders your sessions worked in over the last 90 days, or changed files in while working somewhere else, that no space has yet. The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project. Each card shows the folder's name, where it is, how many sessions used it and when one last did.
 
 - **Make a space** opens the **New space** window with that folder picked and its name filled in.
 - ✕ (**Not a project**) stops suggesting that folder. The folder itself is untouched.
@@ -71,7 +72,7 @@ Your home folder, hidden folders, temporary ones and the folders the app makes f
 
 There are two ways:
 
-- **From the space**: on its page, click **New session**. The start page opens with the space picked, and with its assistant when it has one.
+- **From the space**: click **New session** on its card on the Spaces page, or on its own page (its **Overview** has **New session in** and its name too). The start page opens with the space picked, and with its assistant when it has one.
 - **From the start page**: open the folder chip in the row under the message box. Its menu lists your spaces first, then the folder in use and the ones you used last, then **New task folder** and **New space**. Until you type, it shows the three spaces at work most recently (and the one picked, if it isn't among them). Type part of a name in the field at the top to find any space, or any folder. Each space shows its mark, its name and what it is about.
 
 When you pick a space, the chip shows its mark and name instead of a folder, and the session will work in the space's folder. If the space starts its sessions as an assistant, the **Assistant** chip changes to it, with any agent, model and permissions that assistant suggests. You can still change any of them before you start. Then type your message and click **Start**.
@@ -84,16 +85,19 @@ When the space's folder is a Git repository, the end of the menu offers **New wo
 
 ## A space's own page
 
-Click a space on the Spaces page to open it. At the top are its mark and name, what it is about, and two buttons: **All spaces** goes back to the list (on a phone only its arrow shows), and **New session** starts a session in the space. Below them are five tabs: **Sessions**, **Files**, **Knowledge**, **Skills** and **Settings**. **Sessions**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out to fit.
+Click a space on the Spaces page to open it. At the top are its mark and name, what it is about, and two buttons: **All spaces** goes back to the list (on a phone only its arrow shows), and **New session** starts a session in the space. Below them are six tabs: **Overview**, **Library**, **Files**, **Knowledge**, **Skills** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out to fit.
 
-### Sessions
+### Overview
 
-- **Its files** opens the **Files** tab.
-- **What agents remember** opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the space are listed under its folder.
-- Next to them, the folder's path.
-- Below, the sessions started in the space, the one at work most recently first, each with its agent's icon, its title and how long ago it was at work. Click one to open it.
+The space at a glance:
 
-With no sessions yet, the tab says that **New session** starts one here, with the space's folder, assistant, guidelines and skills.
+- **Sessions**: **New session in** and the space's name, then the sessions started in the space, the one at work most recently first, each with its agent's icon, its title and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the space's folder, with its guidelines, documents and skills.
+- **In the Library**: what the space holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there.
+- Beside them (under them on a phone), what the space is: **Works in** (its folder, and how many more it works with: click for the **Files** tab), **What its agents follow** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Its sessions start as** (its assistant) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the space are listed under its folder).
+
+### Library
+
+Everything the space holds in the Library: the pages, slides, documents, spreadsheets and LaTeX documents agents saved in its sessions, and what you kept there or moved there (see [Sort it by space](/guide/library#sort-it-by-space)). Each card opens it, and its **More** (⋯) has what it has in the Library. **Open in the Library** shows the space's things there, with the Library's search and kinds. With nothing yet, the tab says so, with **New page** and **New slides**, made in the space.
 
 ### Files
 
@@ -116,13 +120,14 @@ The space's own skills, which only its sessions get, with your skill library. Se
 
 ### Settings
 
-Everything about the space itself:
+Everything about the space itself, in four parts:
 
-- **Name**, **What it is about** and the **Agent Guidelines**, as when you made it.
+- **The space**: its **Name**, **What it is about** and **Its colour**.
+- **What every agent in it follows**: its **Agent Guidelines**, as when you made it.
+- **How its sessions start**: **Its sessions start as** **The assistant picked on the start page** (the default: picking the space leaves the start page's assistant as it is), or any of your assistants, built in or your own. Picking the space on the start page then picks that assistant too.
 - **The spaces it brings together**: pick spaces here to turn this space into a group (see [Bring spaces together in a group](#bring-spaces-together-in-a-group)).
-- **Its sessions start as**: **The assistant picked on the start page** (the default: picking the space leaves the start page's assistant as it is), or any of your assistants, built in or your own. Picking the space on the start page then picks that assistant too.
-- The colour dots.
-- **Save**, which turns on once you change something, and **Delete the space**.
+
+At the bottom: **Save**, which turns on once you change something, **Undo changes**, and **Delete the space**.
 
 ## Give a space skills of its own
 
@@ -177,6 +182,7 @@ Deleting a space keeps everything that was in it:
 
 - **Its folder** and the files in it stay where they are, and so do the folders it worked with.
 - **Its sessions** stay, and no longer belong to a space.
+- **What it holds in the Library** stays there, in no space.
 - **Its documents** move to the shared knowledge, so every session can search them from then on. To keep them apart, move their knowledge base into another space (see [Rename, move, read again or delete a knowledge base](#rename-move-read-again-or-delete-a-knowledge-base)).
 - **Its skills** move to your skill library, so every session gets them from then on. One with the name of a skill the library has already takes the space's name after its own: the Thesis space's `research` becomes `research-thesis`.
 - **What agents remember** about its folder stays: notes belong to the folder, not to the space.
@@ -332,6 +338,7 @@ The knowledge tools never bring up another space's documents, not even when an a
 
 - "Make a space called Taxes 2026 for my receipts and tax return. Its sessions should start as the Researcher, and every agent in it should know that amounts are in EUR."
 - "Make a space called Shop for my project in ~/code/shop."
+- "What does my Thesis space hold in the Library? Move the reading tracker into it."
 - "Which folders have I been working in that aren't in a space yet? Make spaces for the two I use most."
 - "Copy ~/Downloads/contract.pdf into my Taxes 2026 space, and have it work with ~/Documents/Receipts too."
 - "Group my Thesis and Reading notes spaces into one called Everything for the thesis."

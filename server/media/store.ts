@@ -42,6 +42,9 @@ export function initMedia(db: DB) {
     );
     create index if not exists media_source on media(source);
   `);
+  // The space it belongs to (shared/spaces.ts), or none, as the Library's pages have.
+  const cols = (db.prepare('pragma table_info(media)').all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes('space')) db.exec('alter table media add column space text');
 }
 
 interface Row {
@@ -62,6 +65,7 @@ interface Row {
   caption: CaptionStatus;
   caption_error: string | null;
   caption_by: string | null;
+  space: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -83,6 +87,7 @@ const toItem = (r: Row): MediaItem => ({
   caption: r.caption,
   ...(r.caption_error ? { captionError: r.caption_error } : {}),
   ...(r.caption_by ? { captionBy: r.caption_by } : {}),
+  ...(r.space ? { space: r.space } : {}),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   file: path.join(MEDIA_DIR, r.file),
@@ -137,6 +142,8 @@ export interface NewMedia {
   prompt?: string;
   model?: string;
   sessionKey?: string;
+  /** The space it goes in (an id checked by the caller), or none. */
+  space?: string | null;
 }
 
 /** Copies the file in and adds its row, its title and description to be written (caption "pending"). */
@@ -150,8 +157,8 @@ export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
   await fs.promises.copyFile(n.from, path.join(MEDIA_DIR, name), fs.constants.COPYFILE_EXCL);
   const now = Date.now();
   db.prepare(
-    `insert into media (id, kind, title, description, file, mime, bytes, width, height, duration, prompt, model, session_key, source, caption, created_at, updated_at)
-     values (@id, @kind, @title, @description, @file, @mime, @bytes, @width, @height, @duration, @prompt, @model, @session, @source, 'pending', @now, @now)`,
+    `insert into media (id, kind, title, description, file, mime, bytes, width, height, duration, prompt, model, session_key, source, caption, space, created_at, updated_at)
+     values (@id, @kind, @title, @description, @file, @mime, @bytes, @width, @height, @duration, @prompt, @model, @session, @source, 'pending', @space, @now, @now)`,
   ).run({
     id,
     kind: n.kind,
@@ -167,6 +174,7 @@ export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
     model: n.model ? cleanText(n.model, 120) : null,
     session: n.sessionKey ?? null,
     source: n.from,
+    space: n.space ?? null,
     now,
   });
   return getMedia(db, id)!;
@@ -193,6 +201,13 @@ export function editMedia(db: DB, id: string, p: { title?: unknown; description?
   const title = p.title !== undefined ? cleanText(p.title, 120) : m.title;
   if (!title) throw new HttpError(400, 'A title, please');
   return setCaption(db, id, { title, description: p.description !== undefined ? cleanText(p.description, 2000) : m.description, caption: 'edited', error: null })!;
+}
+
+/** Puts an item in a space (its id, checked by the caller), or in none. */
+export function setMediaSpace(db: DB, id: string, space: string | null): MediaItem {
+  mustMedia(db, id);
+  db.prepare('update media set space = ? where id = ?').run(space, id);
+  return getMedia(db, id)!;
 }
 
 export async function deleteMedia(db: DB, id: string) {

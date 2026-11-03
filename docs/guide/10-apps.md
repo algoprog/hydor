@@ -6,6 +6,8 @@ An app is a task you run again and again: you fill in a short form, press Run, a
 
 ## What an app is
 
+An app is a small tool for one job that helps you see and find information: you answer a few questions, its steps look things up and work them out, and the answer shows in a view made for it (maps, charts, tables, cards). You use it two ways: open it on the Apps page, or just ask for what it does in any session, and the agent runs it for you there. Apps are small on purpose: each answers one kind of question well, rather than being a big program.
+
 An app holds everything a task needs except the details that change each time:
 
 - **The form**: the questions someone answers before each run ("Where to?", "How many days").
@@ -21,9 +23,11 @@ Open the Apps page from the **Apps** tile at the bottom of the sidebar, or go to
 
 The page is headed **Apps**, with two tabs: **Agent apps**, the apps this topic is about, and **Connected apps**, the services every agent can use, connected once, with the keys they use ([Open Connected apps](/guide/connections#open-connected-apps)). Each tab counts what it has. On **Agent apps**, **New app** is at the top: its menu has **Describe it to an agent**, **Start from scratch** and **Install from a file**. Below it:
 
-- **What should your next app do?**: say it in a sentence and press **Make it** (or Enter); a session starts as the **App builder**, which makes the app, tries it and shows it to you. The ideas under the box put one in it with a click.
-- **Your apps**: your own apps, then the ready-made ones, which come installed. Each card has its icon, name and description, when it last ran (**Not run yet** before its first run), **Ready-made** on the ones that come with Naget Agent, **Has a view** when your own app's answer opens in a view of its own, and **Public** when its public page is open. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open** and **Download as a file**. With more than six, chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning**, **Build**, and your own apps' kinds. With none, the page says how to get one.
-- **Pick up where you left off**: your last six runs, with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
+- A short note on what apps are, in three parts: **Open it here**, **Or just ask in any chat** and **One job each**. **Got it** (✕) puts it away; **What are apps?**, beside the search box, brings it back.
+- **Find an app**: a box that narrows the apps by their names, descriptions and kinds as you type, and under it chips for their kinds (**All**, then each kind, the ready-made apps' first).
+- **Pick up where you left off**: your latest runs (four, with **All** for up to six), with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
+- **Your own apps**: the ones you made or installed from a file.
+- **Ready-made apps**: the ones that come with Naget Agent, installed, under their kinds (**Research**, **Planning**, **Shopping** and the rest). Each card, yours too, has its icon, name and description, **Its own view** when its answer opens in a view of its own (maps, charts, tables), **Works in chats** when agents run it for you in your sessions, **Public** when its public page is open, and when it last ran. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open** and **Download as a file**. When nothing matches what you typed, the page says "No app does that yet", with **Describe it to an agent**, which starts the App builder with your words.
 - **Ready-made apps to install**: there once you uninstall a ready-made app. Each card shows its kind, what it does and what you get from it (the pages of its view, such as the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**), and **Install** (see [Install or uninstall a ready-made app](#install-or-uninstall-a-ready-made-app)).
 - **Building blocks** (folded): small apps made to be steps of your own (sum up a page, translate, answer from the web, sort into kinds, pull out the facts), with the blocks you made yourself; **Add a step** offers them in every app's steps.
 
@@ -101,6 +105,8 @@ Some apps work with a service that wants a key: an API key or a token (a weather
 
 A run without a key it needs doesn't start: on its form you are asked for it ("Needed to run it"); from the API, a schedule or rows of a CSV, the run is refused and says which key to add (on its page, or in **Apps → Connected apps → Keys** under that name). When a key you saved already may not go to a site the app sends it to, its row says so, with **Allow it**.
 
+Some apps use a model through OpenRouter (one that draws pictures, say). Those ask for your **OpenRouter API key** the same way, with **Get one**: it is kept in [Settings → Models](/settings?s=models) rather than the vault, for your other apps and Custom too, and the model is added to your models by itself when the app first runs. A model that runs on Ollama, vLLM or an endpoint is set up by hand in Settings → Models: until it is, a run is refused and says which model and how.
+
 ### Where a run works
 
 Each run gets a new folder of its own, inside a `naget-apps` folder in your home folder, named after the app and the time. An app can name a folder instead (see [Who does it](#who-does-it)); then every run works there.
@@ -111,7 +117,7 @@ The session of a run you start from the form shows in the sidebar's session list
 
 You don't have to open an app to use it: ask for what it does in any session ("Plan a 4-day trip to Lisbon in May for the two of us"), and the agent runs it there.
 
-1. The agent picks the app that does what you asked, and puts in what you said: the place, the days, who's going.
+1. The agent finds the app that does what you asked, and puts in what you said: the place, the days, who's going. With many apps, it searches them by what they do (by words, and by meaning when search by meaning is on) and picks from the twenty that fit best.
 2. When the app needs something you didn't say, its card appears in the conversation, with the app's icon and name, **From your message:** and what it took from your words, and the questions left. A key it needs that you haven't given yet is asked for there too: it goes to your vault, not into the conversation. Fill in the ones marked with a red **\***, and leave the optional ones empty if you don't mind. A question it could not take as you said it ("in May" for a date) shows your words under it. **Run it** runs the app; **Not now** closes the card and runs nothing. While the card waits, the session shows **Needs you**, and the inbox lists it.
 3. The app's card stays in the conversation, under the agent's reply, and follows the run: where it stands and the steps going by, then its answer as the app shows it (its view, with its pages and buttons; **Plain answer** shows the card and tables). A question one of its steps asks (a "Let me…" one) waits there too. **Open** goes to the run's page, and the app's name to the app.
 4. The agent then says in a line or two what came of it. A long run goes on after the agent stops waiting: its card keeps following it, and the agent hears its answer when it ends.
@@ -119,6 +125,8 @@ You don't have to open an app to use it: ask for what it does in any session ("P
 Its runs show **From a session** in the app's runs.
 
 Each app's page has **In your sessions** beside its form, with the switch **Agents can use it** (your own apps have it under **API & sharing** too). Turn it off, and agents no longer run that app; turn it on again whenever you like. Every app starts with it on. Building blocks, and apps made to be used on their own page (with a screen, or a view of what they keep), say so there instead, and agents don't run them. When an app of yours does the same as a ready-made one, agents prefer yours.
+
+However many apps you have, each session is told only of the few you run most; agents find the others when a request calls for one.
 
 ## Follow a run and read its result
 
@@ -490,7 +498,7 @@ A screen is a page of the app's own: it does not show in your Library, it goes w
 An app can travel as one file, to keep or to install on another Naget Agent.
 
 - **To download one**: open the app, then **More** (⋯) → **Download as a file**, or use **More** (⋯) on its card on the Apps page. Ready-made apps download the same way. The file (`.naget-app`) holds everything it does and needs, its own files (pictures, videos, data), and the apps its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here: the keys it needs travel by their names only, and are asked for where it is installed.
-- **To install one**: press **New app** on the Apps page, then **Install from a file**, and pick a `.naget-app`, `.zip` or `.json` file (up to 160 MB); or drop the file on the Apps page. Before anything is made, a card shows what it is, in plain words: its name and what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works**, **Agents can use it**, with a switch to keep agents from running it, and **A key it needs** (or **Keys it needs**), to give now or at its first run. **What it uses here** (folded, and open by itself when something needs a look) lists who does the work, its steps, its own files, its view's scripts and the libraries they load, its screens, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
+- **To install one**: press **New app** on the Apps page, then **Install from a file**, and pick a `.naget-app`, `.zip` or `.json` file (up to 160 MB); or drop the file on the Apps page. Before anything is made, a card shows what it is, in plain words: its name and what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works**, **Agents can use it**, with a switch to keep agents from running it, and **A key it needs** (or **Keys it needs**), to give now or at its first run. **What it uses here** (folded, and open by itself when something needs a look) lists who does the work, its steps, its own files, its view's scripts and the libraries they load, its screens, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, through OpenRouter (added to your models when it first runs, its key asked for with the app's keys), or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
 
 Some things change on the way in, and the card says which: a folder it worked in elsewhere is left out (each run gets one of its own), a mode that allows every step without asking starts as **Auto** instead, and an assistant this computer lacks is dropped. An app that comes with it and is the same as one you have is used again; otherwise it installs beside yours. Its public page starts closed, and it has no API keys.
 

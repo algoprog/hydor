@@ -3,10 +3,12 @@
 // (one a newer version brings) follow, in their usual order.
 
 /**
- * Every tool, in its usual order. A capability's tool (Pages, Spaces, Apps) gives its name with its entry
- * (WebFeature.nav). Orders kept on the server name them, so a name stays when its tool's page or label changes.
+ * Every tool, in its usual order: the Library, Spaces, Apps and Usage first, then Files, Git, Terminal and System,
+ * then Preview, Settings, Search and Help, four to a row. A capability's tool (Library, Spaces, Apps) gives its name
+ * with its entry (WebFeature.nav). Orders kept on the server name them, so a name stays when its tool's page or label
+ * changes.
  */
-export const SIDEBAR_TOOLS = ['files', 'git', 'terminal', 'pages', 'spaces', 'apps', 'preview', 'usage', 'system', 'settings', 'search', 'help'] as const;
+export const SIDEBAR_TOOLS = ['pages', 'spaces', 'apps', 'usage', 'files', 'git', 'terminal', 'system', 'preview', 'settings', 'search', 'help'] as const;
 export type SidebarTool = (typeof SIDEBAR_TOOLS)[number];
 
 export const isSidebarTool = (v: unknown): v is SidebarTool => (SIDEBAR_TOOLS as readonly unknown[]).includes(v);

@@ -4,6 +4,8 @@
 // then it runs. Its card in the conversation (an "app-run" note, AppRunNote in the pages) follows the run and shows
 // its answer as the app shows it. The call waits for the answer; a longer run carries on, and its answer comes to
 // the session as a message when it ends. Which apps: those installed whose page lets agents use them, made for it.
+// There may be very many: agents are told of the few the user runs most, and find the others with find_apps
+// (search.ts: the best twenty for a few words on what the user wants, by words and by meaning).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -19,6 +21,7 @@ import { opensTurn } from '../opinion/turns.ts';
 import { checkDaily } from './api.ts';
 import { builtinsForAgents } from './builtins.ts';
 import { startRun, waitFor } from './runs.ts';
+import { FIND_K, FIND_MAX, findApps } from './search.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
 import { missingSecrets } from './secrets.ts';
 
@@ -57,13 +60,30 @@ function appLine(u: Usable, asks: boolean): string {
   return `- "${u.ref}": ${head}${form && !/[.!?…]$/.test(head) ? '.' : ''}${form}`;
 }
 
+/** Up to this many apps, the start-up note names them all; past it, the ones run most lately, and find_apps finds the rest. */
+const NAMED = 10;
+
+/** The apps by when they last ran (the user's own first among those never run). */
+function byUse(db: DB, list: Usable[]): Usable[] {
+  let last = new Map<string, number>();
+  try {
+    last = new Map((db.prepare("select app_id as id, max(created_at) as at from app_runs where source not in ('step', 'chat') group by app_id").all() as { id: string; at: number }[]).map((r) => [r.id, r.at]));
+  } catch {}
+  return [...list].sort((a, b) => (last.get(b.app) ?? 0) - (last.get(a.app) ?? 0) || Number(b.own) - Number(a.own));
+}
+
 /** What every session (not an app's own run) is told of the apps it may run, when there are some. */
 export function useNote(db: DB): string | null {
   const list = usableApps(db);
   if (!list.length) return null;
+  const head =
+    "The user's apps (the Apps page) do jobs for them: small tools that look things up, work them out and show the answer in a view of their own (a forecast, a trip plan, a comparison, a quiz…). When the user asks for something an app does, run it with use_app instead of doing that work yourself: it asks them for what is missing on the app's own card and shows its answer in the conversation as the app shows it. Prefer their own apps to the ready-made ones that do the same.";
+  if (list.length <= NAMED) return [head, ...list.map((u) => appLine(u, false))].join('\n');
   return [
-    "The user's apps (the Apps page) can do some jobs for them. When they ask for what one of these does, run it with use_app instead of doing that work yourself: it asks them for what is missing on the app's own card and shows its answer in the conversation as the app shows it. Prefer their own apps to the ready-made ones that do the same.",
-    ...list.slice(0, 30).map((u) => appLine(u, false)),
+    `${head} There are ${list.length}: when a request might be one of their jobs, call find_apps with a few words on what the user wants to get the best fits (with their forms), then pick one. Those they run most:`,
+    ...byUse(db, list)
+      .slice(0, 6)
+      .map((u) => appLine(u, false)),
   ].join('\n');
 }
 
@@ -302,22 +322,59 @@ async function waitAndSay(ctx: RunCtx, id: string, ms: number): Promise<string> 
 
 // ---- the tool -------------------------------------------------------------------------------------------------
 
+/** find_apps: the apps most likely to do what the user asks, best first, with their forms, for use_app. */
+export function findAppsTool(ctx: RunCtx): RunTool | null {
+  const { db } = ctx.deps;
+  if (!usableApps(db).length) return null;
+  return {
+    name: 'find_apps',
+    annotations: { readOnlyHint: true },
+    description: [
+      "Finds the user's apps that may do what they ask (a weather outlook, a recipe from what is in the fridge, a trip plan, a comparison, a quiz…), best first, each with what its form asks, so you can run the best fit with use_app.",
+      `Give query: what the user wants, in a few words with a synonym or two, in English (the ready-made apps' language) and in the user's own words too if they wrote in another language ("weather forecast rain this weekend Lisbon"). It searches by words and, when search by meaning is on, by meaning; you get the best ${FIND_K} (k for more or fewer). If none fits, do the work yourself.`,
+    ].join(' '),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What the user wants, in a few words.' },
+        k: { type: 'number', description: `How many to get (1 to ${FIND_MAX}; ${FIND_K} unless set).` },
+      },
+      required: ['query'],
+    },
+    async run(args) {
+      const list = usableApps(db);
+      const query = String(args.query ?? '').trim();
+      if (!query) return { text: 'Give query: what the user wants, in a few words.', isError: true };
+      const { found, matched } = await findApps(db, list, query, Number(args.k) || FIND_K);
+      if (!found.length) return 'The user has no apps agents can run.';
+      const lines = found.map((f) => appLine(f.u, true));
+      const head = matched
+        ? `The apps that may do it, best first (${found.length} of ${list.length}; ? marks a question an app can do without). Run the one that fits with use_app; if none does, do the work yourself.`
+        : `No app's words or meaning matched “${query}”. The user's apps, the ones run lately first (${found.length} of ${list.length}): run one with use_app only if it does what they asked; otherwise do the work yourself.`;
+      return [head, ...lines].join('\n');
+    },
+  };
+}
+
 export function useAppTool(ctx: RunCtx): RunTool | null {
   const { db } = ctx.deps;
   const list = usableApps(db);
   if (!list.length) return null;
+  const many = list.length > NAMED;
   return {
     name: 'use_app',
     description: [
-      "Runs one of the user's apps for them, here in the conversation: use it when they ask for what one of these apps does, instead of doing that work yourself.",
+      "Runs one of the user's apps for them, here in the conversation: use it when they ask for what one of their apps does, instead of doing that work yourself.",
       'Give app and inputs, the answers to its form: only what the user said or clearly meant (dates as YYYY-MM-DD, numbers, true or false for yes/no, a choice word for word, a file by its path). Leave out what they did not say: the user fills in what the app needs on its card here, and may leave its optional questions empty. ask: true shows the card even when nothing it needs is missing, to let them add the optional details.',
       'It runs once they have, and its answer shows in the conversation as the app shows it. The call waits for that answer (wait, in seconds: 300 unless set); a longer run comes back still running, and its answer comes to you as a message when it ends. Then reply in a sentence or two: the user sees the answer itself in its card.',
-      `The apps (? marks a question it can do without):\n${list.map((u) => appLine(u, true)).join('\n')}`,
+      many
+        ? `The user has ${list.length} apps: find the one to run with find_apps, which gives each one's name to use here and what its form asks.`
+        : `The apps (? marks a question it can do without):\n${list.map((u) => appLine(u, true)).join('\n')}`,
     ].join('\n\n'),
     inputSchema: {
       type: 'object',
       properties: {
-        app: { type: 'string', enum: list.map((u) => u.ref), description: 'Which app, as listed.' },
+        app: { type: 'string', ...(many ? {} : { enum: list.map((u) => u.ref) }), description: many ? 'Which app, by the name find_apps gives it (in quotes there).' : 'Which app, as listed.' },
         inputs: { type: 'object', description: 'The answers to its form that the user gave, by the names listed.' },
         ask: { type: 'boolean', description: 'Show its card even when nothing it needs is missing.' },
         wait: { type: 'number', description: 'Most seconds to wait for its answer (1 to 540; 300 unless set).' },
@@ -335,7 +392,11 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
       }
       const now = usableApps(db);
       const u = findApp(now, String(args.app ?? ''));
-      if (!u) return { text: `There is no app “${String(args.app ?? '')}” for agents to run here. The apps: ${now.map((x) => `"${x.ref}" (${x.recipe.name})`).join(', ') || 'none'}.`, isError: true };
+      if (!u) {
+        // Too many to list: the nearest by name, and find_apps for the rest.
+        const near = now.length > NAMED ? (await findApps(db, now, String(args.app ?? ''), 8)).found.map((f) => f.u) : now;
+        return { text: `There is no app “${String(args.app ?? '')}” for agents to run here. ${now.length > NAMED ? 'Some with names like it' : 'The apps'}: ${near.map((x) => `"${x.ref}" (${x.recipe.name})`).join(', ') || 'none'}.${now.length > NAMED ? ' find_apps finds the others.' : ''}`, isError: true };
+      }
       const raw = args.inputs && typeof args.inputs === 'object' && !Array.isArray(args.inputs) ? (args.inputs as Record<string, unknown>) : {};
       let got = intake(u.recipe.fields, raw, c.cwd);
       // What it needs and lacks (or the user may add to, when asked): the app's card.

@@ -73,7 +73,10 @@ agents that speak ACP and take MCP servers.
   together, like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a
   folder: its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
-  guidelines and its own skills and start as its assistant. Its Files tab shows its folders; files come in from
+  guidelines and its own skills and start as its assistant. The Spaces page shows each as a card in its colour with
+  what it holds (sessions, things in the Library, documents, skills) and New session; a space's Overview has its
+  latest sessions, what it holds in the Library and, at a glance, where it works, what its agents follow, its
+  documents, skills, assistant and memory, and its Library tab everything it holds there. Its Files tab shows its folders; files come in from
   Files, a file's window or an agent's file cards with Add to a space. Its Skills tab holds skills only its
   sessions get, with the skill library: written there, copied from the library to change for the space alone, or
   proposed by an agent working in it and kept for the space when you approve. A group brings several spaces
@@ -100,7 +103,7 @@ agents that speak ACP and take MCP servers.
   agent stops waiting, and plays in the app's own player. **Save to Library** keeps one in the Library, where a
   model that sees images writes its title and description (a video's from ten of its frames on one picture, with
   ffmpeg): the app's choice, any of OpenRouter's vision models, Claude through Claude Code, or a model of your own
-  (Ollama, vLLM, an endpoint). The Library's Media tab finds, plays, downloads and edits them, **Start a session with it** opens a new
+  (Ollama, vLLM, an endpoint). The Library shows them among its other things (Pictures and videos shows them alone), and finds, plays, downloads and edits them; **Start a session with it** opens a new
   session with one in the message box, and agents can work from them.
 - **Connected apps**: on the Apps page beside your agent apps (Apps → Connected apps, which was Settings →
   Connections), a marketplace of services (Notion, Linear, GitHub, Google, Stripe and more), signed
@@ -119,7 +122,11 @@ agents that speak ACP and take MCP servers.
   searches used, and opens the report once it is ready.
 - **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in the
   Library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
-  link. A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
+  link. The Library is sorted by space: what an agent saves goes in its session's space, Keep and Save to Library
+  ask which space when there are spaces (the session's first), New makes it in the space you look at, and More →
+  Move to a space moves anything; its places (Everything, each space's things under its name, Not in a space,
+  Published) sit beside the cards, with Find by name, sorting and kind chips (Pages, Slides, Documents,
+  Spreadsheets, LaTeX, Pictures and videos). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too: click or tap a part to rewrite its words
   (bold, italic, links), restyle it (this part, every part of its kind or class, on hover, or for tablets and
@@ -130,13 +137,20 @@ agents that speak ACP and take MCP servers.
   a tracker, and see or clear the data a page keeps. Export a page as a PDF, a Word document (headings, lists,
   tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
-  watch it change as it saves. Apps are tasks you repeat, each with a form: ready-made or your own (described in
-  a sentence at the top of the Apps page for the App builder to make, with ideas to start from, built from
-  scratch, or installed from a file, all under one New app menu; your apps, the ready-made ones among them, say
-  when each last ran, the runs to pick up again come next, and ready-made apps you uninstalled wait to be installed
-  again, each showing what you get from it), run from the Apps page, the API, MCP, a public page, or once for each
-  row of a CSV. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
-  that says in plain words what it asks, gives and does. Agents in any session run your apps for you (use_app):
+  watch it change as it saves. Apps are small tools for one job that find things out and show them clearly, each
+  with a form and a view of its answer: ready-made or your own (described to the App builder, built from scratch,
+  or installed from a file, all under one New app menu). The Apps page says what apps are in three parts (open one
+  here, or just ask in any chat; one job each) until you put the note away, finds apps by name, description and
+  kind, and lists the runs to pick up again, your own apps, the ready-made ones under their kinds (each card saying
+  whether it has its own view and works in chats) and the ready-made apps you uninstalled, to install again. They run
+  from the Apps page, the API, MCP, a public page, or once for each row of a CSV. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
+  that says in plain words what it asks, gives and does. However many apps there are, a session is told only of
+  the few run most, and agents find the right one with find_apps: a few words on what the user wants, searched by
+  words (BM25 over names, kinds, descriptions and form questions, plurals and word starts matching) and by meaning
+  (the search box's vectors), fused by rank, the user's own and those run lately lifted, the best twenty with
+  their forms. An app that needs a model through OpenRouter asks for OpenRouter's key with its other keys (kept
+  in Settings → Models) and adds the model by itself when it first runs; one for Ollama, vLLM or an endpoint is
+  refused until it is set up. Agents in any session run your apps for you (use_app):
   ask to plan a trip and the Trip planner runs there, the questions your message left out asked on the app's own
   card (the optional ones may stay empty), its run and its view shown in the conversation; each app's Agents can
   use it switch keeps agents from running it, and blocks and apps made for their own page stay out. An app's page has its form beside what you get, its latest
@@ -315,8 +329,8 @@ programs shows each program's version and what is out, with Check now, Update no
   beside it on a wide screen.
 - Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
   from before and after, on a computer's or a phone's screen: a reply's screenshots as one card of small
-  pictures, each opening a review (beside the conversation, or over the app on a phone) with a slider or side by
-  side, and arrows to the reply's other screens.
+  pictures (a row of them, with Show all, when there are more), each opening a review (beside the conversation, or
+  over the app on a phone) with a slider or side by side, and arrows to the reply's other screens.
 - Every file a turn changed, with its diff, and the commits it made, each opening to its message and diff. Screenshots you attach show in the conversation and open full size.
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - Message the agent while it works: your note joins the running turn, or waits in a queue you can reorder and
@@ -400,7 +414,7 @@ programs shows each program's version and what is out, with Check now, Update no
   swaps it in with agents carrying on, and goes back to the version before if the new one does not start.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The tools at the bottom of the sidebar (Files, Git, Terminal, Library, Spaces, Apps, Usage, Settings…) stay in
+- The tools at the bottom of the sidebar (Library, Spaces, Apps, Usage, Files, Git, Terminal, Settings…) stay in
   the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
   it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,

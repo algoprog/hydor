@@ -1,8 +1,8 @@
 # Library: pages, images, videos and sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets and LaTeX documents you edit as in PowerPoint, Word, Excel or Overleaf. What you keep goes in your Library, with the images and videos you saved, each with a title and a description written for it. This topic covers watching a page as it is written, changing it, keeping it (with its versions, its data and an address for your phone), keeping images and videos, making your own pages, exporting files, asking an agent to change what you have open, and publishing at a link.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets and LaTeX documents you edit as in PowerPoint, Word, Excel or Overleaf. What you keep goes in your Library, sorted by space, with the pictures and videos you saved, each with a title and a description written for it. This topic covers watching a page as it is written, changing it, keeping it (with its versions, its data and an address for your phone), keeping images and videos, making your own pages, exporting files, asking an agent to change what you have open, and publishing at a link.
 
-![The Library's Media tab: images and videos kept from conversations, each with its title and description](images/library.webp)
+![The Library: everything kept, each space's things together, with its places beside them](images/library.webp)
 
 ## Pages in the conversation
 
@@ -121,14 +121,14 @@ While a page is full screen, your picks wait and go into the message box when yo
 
 A page shown in the conversation lasts as long as the conversation. To come back to it later, keep it:
 
-1. Click **Keep** in the bar above the page.
-2. "Kept in the Library" confirms it. The button now reads **Kept**; click it to open the page in the Library.
+1. Click **Keep** in the bar above the page. When you have spaces, a short menu asks where it goes (**Keep it in**): the session's own space first, marked **This session’s**, then your other spaces, and **No space**.
+2. "Kept in the Library" confirms it ("Kept in the Library, in Thesis" in a space). The button now reads **Kept**; click it to open the page in the Library.
 
 Changing a shown page and saving it keeps it too (**Keep with changes**, see [Save or discard](#save-or-discard)).
 
 What you entered on the page while it was in the conversation goes with it. Before you keep it, a page remembers what you enter only while it is on screen; once kept, it keeps its data for good (see [The data a page keeps](#the-data-a-page-keeps)).
 
-You can also ask an agent for something to keep from the start: "make me a habit tracker I can use on my phone", "a checklist for moving house". The agent saves it in the Library itself, and a card shows in the conversation with:
+You can also ask an agent for something to keep from the start: "make me a habit tracker I can use on my phone", "a checklist for moving house". The agent saves it in the Library itself (in the session's space, when the session is in one), and a card shows in the conversation with:
 
 - the page's title and **Saved in the Library · version 2** (the version this reply saved);
 - **Open**, which opens it in the Library, **Edit** (the pencil) and **Full screen**;
@@ -142,27 +142,43 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 ## Find your pages
 
-**Library** in the sidebar ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, an image or a video by its words in the search box (Ctrl+K, ⌘K on a Mac).
+**Library** in the sidebar ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, a picture or a video by its words in the search box (Ctrl+K, ⌘K on a Mac).
 
-The Library has three tabs, each with a count:
+Beside the cards are the Library's places, each with how many things it holds (in a narrower window or on a phone, a row of chips above the cards):
 
-- **Pages**: your pages, slides, documents, spreadsheets and LaTeX documents, each as a card with a picture of it (a page as it opens, with its data; slides by their first slide; the others by the top of their first page or sheet; until the picture is taken, its first letter shows), its title, when it last changed and its version, a sign for slides, documents, spreadsheets and LaTeX, a globe when it is published and a cylinder when it keeps data. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Rename**, **Duplicate** (a copy without its data), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**.
-- **Media**: the images and videos you kept (see [Images and videos in the Library](#images-and-videos-in-the-library)). [Open the Media tab](/library?tab=media).
-- **Published**: the pages and folders you published, with their links (see [See and unpublish what you published](#see-and-unpublish-what-you-published)). [Open the Published tab](/library?tab=published).
+- **Everything**: all you kept. With spaces, each space's things show together under its name, the one changed most lately first, each with **See all** to show only that space, then those **Not in a space**.
+- Your **Spaces**, each by its mark and name: what agents saved in its sessions and what you put there (see [Sort it by space](#sort-it-by-space)). **Open the space**, beside its name, goes to the space's own page.
+- **Not in a space**: what belongs to no space (there once you have spaces).
+- **Published**: the pages and folders you published, with their links (see [See and unpublish what you published](#see-and-unpublish-what-you-published)). [Open Published](/library?tab=published).
 
-With more than four pages, **Find a page** above the cards narrows them by title, and the button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
+With no spaces yet, a note under the places says what spaces do for the Library, with a way to **Spaces**.
 
-With nothing kept yet, the Pages tab says "No pages yet", with **New page** and **New slides**.
+Each thing is a card with a picture of it (a page as it opens, with its data; slides by their first slide; a document, a spreadsheet or LaTeX by the top of its first page or sheet; a picture or a video by a still; until the picture is taken, its first letter shows), its kind on the picture (**Slides**, **Document**, **Spreadsheet**, **LaTeX** or **Picture**; a video shows its length), its title and when it last changed, with a globe when it is published and a cylinder when it keeps data. While you search Everything, each card names its space too. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Rename**, **Move to a space**, **Duplicate** (a copy without its data), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**; a picture's or a video's has **Start a session with it**, **Move to a space**, **Download**, **Write its title and description again** and **Delete**.
+
+Above the cards:
+
+- **Find by name** narrows them by their titles (and a picture's description).
+- The button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
+- When a place holds more than one kind, **All**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX** and **Pictures and videos** show one kind at a time. [Show the pictures and videos](/library?kind=media).
+
+With nothing kept yet, the Library says "Your Library is empty", with **New page** and **New slides**.
+
+## Sort it by space
+
+Everything in the Library belongs to one space, or to none (see [Spaces and knowledge](/guide/spaces)):
+
+- What an agent saves (a page, slides, a document, a spreadsheet, a LaTeX document) goes in its session's space, when the session is in one.
+- What you keep yourself (**Keep** on a page, **Save to Library** under a picture or a video) asks where it goes when you have spaces, with the session's own space first; with no spaces, it is kept at once.
+- **New**, at the top right of the Library, makes it in the space you are looking at; pick another under **In a space** (see [Make a page](#make-a-page)).
+- To move something, open its **More** (⋯) → **Move to a space**, on its card or on its own page, and pick a space or **No space**. "Moved to Thesis" confirms it. Moving it changes nothing else: its versions, its data and its addresses stay.
+
+A space's own page shows what it holds in the Library too, on its **Overview** and **Library** tabs (see [A space's own page](/guide/spaces#a-spaces-own-page)). Deleting a space keeps what it held in the Library, in no space.
 
 ## Images and videos in the Library
 
-Pictures and videos agents make for you stay in the session's folder (see [Ask for a picture, or have one changed](/guide/documents-voice#ask-for-a-picture-or-have-one-changed) and [Ask for a video](/guide/documents-voice#ask-for-a-video)). To keep one, click **Save to Library** under it in the conversation: a copy goes into your Library, where it stays after the session's folder is cleaned up, and a model writes its title and description (see [Titles and descriptions](#titles-and-descriptions)). The button then reads **In your Library** and opens it there.
+Pictures and videos agents make for you stay in the session's folder (see [Ask for a picture, or have one changed](/guide/documents-voice#ask-for-a-picture-or-have-one-changed) and [Ask for a video](/guide/documents-voice#ask-for-a-video)). To keep one, click **Save to Library** under it in the conversation (with spaces, pick the one it goes in): a copy goes into your Library, where it stays after the session's folder is cleaned up, and a model writes its title and description (see [Titles and descriptions](#titles-and-descriptions)). The button then reads **In your Library** and opens it there.
 
-The **Media** tab ([Open the Media tab](/library?tab=media)) shows them, the newest first, each as a card with a still of it, its title and its description (while it is being written, "Writing its title…"); a video's card shows its length on the still. Click a card to open it (see [Open an image or a video](#open-an-image-or-a-video)). Its **More** (⋯) has **Start a session with it**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
-
-- With both images and videos kept, **All**, **Images** and **Videos** above the cards show one kind or both.
-- With more than four kept, **Find an image or a video** narrows them by the words in their titles, descriptions and the words they were made from, and the button beside it sorts them **Newest** or by **Name**.
-- With nothing kept yet, the tab says "No images or videos yet", with **Settings for images and video**.
+They show among the Library's other things; **Pictures and videos** above the cards shows them alone ([Show the pictures and videos](/library?kind=media)). Each is a card with a still of it and its title (while it is being written, "Writing its title…"); a video's card shows its length on the still. Click a card to open it (see [Open an image or a video](#open-an-image-or-a-video)). Its **More** (⋯) has **Start a session with it**, **Move to a space**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
 
 The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF) and videos (MP4, WebM, MOV), up to 1 GB each and 5,000 in all, in the app's data folder. Agents can work from what you kept: ask "use the boat picture from my Library for a birthday card", and the agent finds it there.
 
@@ -182,7 +198,7 @@ When no model could write them, they come from the words the image or video was 
 
 ## Open an image or a video
 
-An image or a video opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s images and videos**), its title with "An image" or "A video" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Download** and **More** (⋯): **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from) and **Delete**.
+An image or a video opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures and videos**), its title with "An image" or "A video" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Download** and **More** (⋯): **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from), **Move to a space** (the space it is in shows beside it) and **Delete**.
 
 Below, the picture (click it for full size) or the video, to play, and beside it (under it on a phone):
 
@@ -192,14 +208,14 @@ Below, the picture (click it for full size) or the video, to play, and beside it
 
 ## Make a page
 
-**New page**, at the top right of the Pages tab ([or from the search box](/library?new=1)), makes a page of your own. At the top, pick what to make: **A page**, **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet** or **LaTeX** (see [Documents](#documents), [Spreadsheets](#spreadsheets) and [LaTeX documents](#latex-documents)). For a page:
+**New**, at the top right of the Library (or **New page** [from the search box](/library?new=1)), makes a page of your own. At the top, pick what to make: **A page**, **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet** or **LaTeX** (see [Documents](#documents), [Spreadsheets](#spreadsheets) and [LaTeX documents](#latex-documents)). For a page:
 
 1. Pick where it starts: **Blank page** (a heading and some words, to build on), **Notes** (a page to write in, kept as you type), **Checklist** (things to do, ticked off as you go) or **Tracker** (a number a day, with the last 30 days drawn).
-2. Change **Its name** if you like, and click **Make it**. A blank page opens in **Edit**; the others open ready to use.
+2. Change **Its name** if you like. With spaces, **In a space** beside it says where it goes (the space you are looking at, or **No space**): click it to pick another. Click **Make it**. A blank page opens in **Edit**; the others open ready to use.
 
 A document, a spreadsheet or a LaTeX document starts empty but for its name (a LaTeX document with a short article to build on), or from a file of yours: **Open a Word or text file** (.docx, .md, .txt or .html), **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv) or **Open a .tex or .zip file** (one LaTeX file, or a whole project in a .zip). The file becomes a page of its kind; the file itself stays as it was. To change the file itself, open it in Files: it opens in the same editor and saves back to the file (see [Edit Word, Excel, CSV and LaTeX files](/guide/files-git#edit-word-excel-csv-and-latex-files)).
 
-Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking", "a monthly budget for two") and click **Ask**: the start page opens with your words, for an agent to make it and keep it in your Library.
+Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking", "a monthly budget for two") and click **Ask**: the start page opens with your words, for an agent to make it and keep it in your Library (with a space picked under **In a space**, the start page has that space picked too, so it lands there).
 
 ## Open a page
 
@@ -212,7 +228,7 @@ A page opens full screen inside the app, at its own place in the Library. The ba
 - **Export**: the page as a PDF, a Word document or a web page (see [Export to a file](#export-to-a-file));
 - **Share**: its own address for your phone, and publishing it at a link (see [Use a page on your phone](#use-a-page-on-your-phone) and [Publish a page](#publish-a-page));
 - **Ask**: an agent changes the page while you watch (see [Change it by asking an agent](#change-it-by-asking-an-agent));
-- **More** (⋯): **What it keeps** (see [The data a page keeps](#the-data-a-page-keeps)), **Rename**, **Duplicate**, **Open in a new tab** (opens the page at its own address) and **Delete**.
+- **More** (⋯): **What it keeps** (see [The data a page keeps](#the-data-a-page-keeps)), **Rename**, **Duplicate**, **Move to a space** (with spaces; the space it is in shows beside it), **Open in a new tab** (opens the page at its own address) and **Delete**.
 
 On a phone, **Use**, **Edit** and **Code** are icons, **Share** is the share icon, **Ask** is the sparkles icon, **Export** is under **More** (⋯) as **Download as**, and the sizes are left out (the phone is the size).
 
@@ -451,13 +467,14 @@ To take one down:
 
 You can publish it again later; a private link is then a new one. Deleting a kept page also unpublishes it. Up to 200 sites can be published at a time.
 
-With nothing published, the tab says "Nothing published". **Publish a folder** is at the top right of this tab.
+With nothing published, it says "Nothing published", with **Publish a folder**, which is also at the top right while **Published** is open.
 
 ## Ask an agent
 
 Agents can read and change what is in your Library for you, with your OK on a card. A few things to try:
 
 - "Make me a workout log I can use on my phone, and keep it in my Library."
+- "Move my packing list into the Trip space."
 - "I changed the headings on the trip page; now add a map under them."
 - "My budget tracker looked better yesterday: bring back the version from before your last change."
 - "What did I log in my habit tracker this week? Sum it up."

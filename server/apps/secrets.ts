@@ -1,32 +1,41 @@
 // The keys an app needs (shared/app-secrets.ts), as the vault has them: which are there and which are missing, the
 // hosts an app sends one to that the key is not allowed to go to yet, and saving the values the person gives (on the
 // app's form, the card that installs it, or its card in a session). A new key goes to the vault with the hosts and
-// settings the app says; a key the vault has keeps the person's own, and only its value changes.
+// settings the app says; a key the vault has keeps the person's own, and only its value changes. An app whose models
+// run through OpenRouter (models.ts) needs OpenRouter's key too: asked for the same way, and kept with Settings → Models.
 import type { AppRecipe } from '../../shared/apps.ts';
 import type { AppSecretState } from '../../shared/app-secrets.ts';
 import { domainAllowed } from '../../shared/connections.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { saveSecret, secretView } from '../connections/vault.ts';
+import { providerKey, saveProviderKey } from './models.ts';
 
-/** A key as an app's pages show it: whether the vault has it, its masked end, and what the vault does not allow yet. */
-export type SecretStateView = AppSecretState & { blocked?: string[]; noCommands?: boolean };
+/**
+ * A key as an app's pages show it: whether the vault has it, its masked end, and what the vault does not allow yet.
+ * `provider`: a provider's own key (OpenRouter's), kept with Settings → Models rather than in the vault.
+ */
+export type SecretStateView = AppSecretState & { blocked?: string[]; noCommands?: boolean; provider?: 'openrouter' };
 
-/** The keys a recipe needs, each with how the vault has it. */
-export function secretsOf(db: DB, recipe: Pick<AppRecipe, 'secrets'>): SecretStateView[] {
-  return (recipe.secrets ?? []).map((s) => {
+type Recipe = Pick<AppRecipe, 'secrets'> & Partial<Pick<AppRecipe, 'name' | 'requires' | 'flow' | 'flows' | 'agent' | 'acpAgent' | 'model'>>;
+
+/** The keys a recipe needs, each with how the vault has it; OpenRouter's last, when its models run there. */
+export function secretsOf(db: DB, recipe: Recipe): SecretStateView[] {
+  const own: SecretStateView[] = (recipe.secrets ?? []).map((s) => {
     const v = secretView(db, s.name);
     if (!v) return { ...s, have: false };
     const blocked = (s.domains ?? []).filter((d) => !domainAllowed(d, v.domains));
     return { ...s, have: true, hint: v.hint, ...(blocked.length ? { blocked } : {}), ...(s.commands && !v.commands ? { noCommands: true } : {}) };
   });
+  const p = providerKey(recipe);
+  return p && !own.some((s) => s.name === p.name) ? [...own, p] : own;
 }
 
-/** The keys it needs and the vault does not have (not those it can do without). */
-export const missingSecrets = (db: DB, recipe: Pick<AppRecipe, 'secrets'>) => secretsOf(db, recipe).filter((s) => !s.have && !s.optional);
+/** The keys it needs and does not have (not those it can do without). */
+export const missingSecrets = (db: DB, recipe: Recipe) => secretsOf(db, recipe).filter((s) => !s.have && !s.optional);
 
 /** Refuses a run that needs keys the vault does not have, saying which; the pages ask for them on seeing `secrets`. */
-export function needSecrets(db: DB, recipe: Pick<AppRecipe, 'secrets' | 'name'>) {
+export function needSecrets(db: DB, recipe: Recipe) {
   const miss = missingSecrets(db, recipe);
   if (!miss.length) return;
   const names = miss.map((s) => s.label).join(', ');
@@ -41,9 +50,17 @@ export function needSecrets(db: DB, recipe: Pick<AppRecipe, 'secrets' | 'name'>)
  * Saves the values given for an app's keys (by name; others are ignored). Gives the names saved. With `allow`,
  * a key the vault has may also go to the app's hosts, and be used in commands when the app needs that.
  */
-export function saveAppSecrets(db: DB, recipe: Pick<AppRecipe, 'secrets' | 'name'>, values: unknown, o: { allow?: string[] } = {}): string[] {
+export function saveAppSecrets(db: DB, recipe: Recipe, values: unknown, o: { allow?: string[] } = {}): string[] {
   const given = values && typeof values === 'object' && !Array.isArray(values) ? (values as Record<string, unknown>) : {};
   const saved: string[] = [];
+  // OpenRouter's key, for an app whose models run there: kept with Settings → Models (unless the app names a vault key so).
+  const p = providerKey(recipe);
+  const pv = p ? given[p.name] : undefined;
+  if (p && !(recipe.secrets ?? []).some((s) => s.name === p.name) && typeof pv === 'string' && pv.trim()) {
+    if (pv.length > 16_000) throw new HttpError(400, `${p.label}: that is too long for a key`);
+    saveProviderKey(pv.trim());
+    saved.push(p.name);
+  }
   for (const s of recipe.secrets ?? []) {
     const v = given[s.name];
     const old = secretView(db, s.name);

@@ -38,6 +38,8 @@ export interface PageInfo {
   kind?: 'slides' | 'doc' | 'sheet' | 'tex';
   /** A template's screen: the template it belongs to (it is not in the library). */
   app?: string;
+  /** The space it is in (the Library shows each space's together); none when unset. */
+  space?: string;
 }
 
 export interface PageVersion {

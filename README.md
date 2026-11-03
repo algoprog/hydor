@@ -43,12 +43,14 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   works on phones too, or in their code), slides to edit and present as in PowerPoint or Google Slides, documents,
   spreadsheets and LaTeX to edit as in Word, Excel and Overleaf (or opened from your files), PDF, Word, PowerPoint,
   Excel and LaTeX exports, an agent that changes what you have open, pictures and short videos made with
-  OpenRouter's models once you check their settings and price, all kept in your Library (each image and video with
-  a title and a description a model writes for it), and apps for tasks you repeat: one agent, or steps with data, a
+  OpenRouter's models once you check their settings and price, all kept in your Library, sorted by space (each
+  image and video with a title and a description a model writes for it), and apps: small tools for one job that
+  find things out and show them clearly, one agent or steps with data, a
   memory and a screen of their own, their answers in views made for them (pages, elements, buttons that act,
   maps, 2D and 3D plots, pictures, videos and widgets of their own), the keys they need asked for once and kept
   in the vault, shared as one file with their own pictures and videos (ready-made ones too); ask for what one
-  does in any session and the agent runs it there, asking you for what is missing on the app's own card
+  does in any session and the agent finds the right one among many (by words and by meaning) and runs it there,
+  asking you for what is missing on the app's own card
 - Give every agent memory of you and your projects, your documents (knowledge bases it searches and cites),
   your services (connected once, beside your apps), keys and sign-ins it uses without ever seeing them, skills, child
   sessions, and tasks that run on a schedule or when something changes

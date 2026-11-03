@@ -56,7 +56,9 @@ const text = (...parts: (string | undefined)[]) =>
 export const sessionItem = (s: Pick<SessionSummary, 'key' | 'title' | 'firstPrompt'>): Item => ({ id: `s:${s.key}`, text: text(s.title, s.firstPrompt && s.firstPrompt !== s.title ? s.firstPrompt : undefined) });
 
 const catalog = (): Item[] => catalogItems().map((it) => ({ id: it.id, text: catalogText(it) }));
-const templates = (): Item[] => TEMPLATES.map((t) => ({ id: `app:tpl:${t.id}`, text: text(t.name, 'A ready-made app', t.description) }));
+/** An app's text for its vector: the search box finds apps by it, and agents' find_apps (apps/search.ts) by the same vector. */
+export const appItemText = (name: string, own: boolean, description?: string) => text(name, own ? 'An app' : 'A ready-made app', description);
+const templates = (): Item[] => TEMPLATES.map((t) => ({ id: `app:tpl:${t.id}`, text: appItemText(t.name, false, t.description) }));
 const assistant = (a: { id: string; name: string; description?: string }): Item => ({ id: `asst:${a.id}`, text: text(a.name, 'An assistant', a.description) });
 const skill = (s: { name: string; description: string }): Item => ({ id: `skill:${s.name}`, text: text(s.name.replace(/-/g, ' '), 'A skill', s.description) });
 
@@ -76,7 +78,7 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
     case 'spaces':
       return allSpaces(db).map((s) => ({ id: `space:${s.id}`, text: text(s.name, isGroup(s) ? 'A group of spaces' : 'A space', s.description) }));
     case 'apps':
-      return [...listApps(db).map((a) => ({ id: `app:${a.id}`, text: text(a.name, 'An app', a.description) })), ...templates()];
+      return [...listApps(db).map((a) => ({ id: `app:${a.id}`, text: appItemText(a.name, true, a.description) })), ...templates()];
     case 'tasks':
       return d.scheduler.list().map((t) => ({ id: `task:${t.id}`, text: text(t.name, 'A scheduled task', t.prompt.slice(0, 300)) }));
     case 'assistants':

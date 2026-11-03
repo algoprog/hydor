@@ -1706,10 +1706,16 @@ test('the models a template asks for: said portably in its file, found here by p
   const p = (await http.inject({ method: 'POST', url: '/api/apps/install/check', payload: { package: theirs } })).json().preview;
   const by = Object.fromEntries(p.models.map((m: any) => [`${m.agent}:${m.as}`, m]));
   assert.deepEqual([by['custom:their-fake'].status, by['custom:their-fake'].use], ['matched', 'fake']);
-  assert.equal(by['custom:big-one'].status, 'missing');
+  // An OpenRouter model this computer lacks is added to Settings → Models by itself when the app first runs (its key asked for with its keys).
+  assert.deepEqual([by['custom:big-one'].status, by['custom:big-one'].use], ['provider', 'openrouter/example/big-1']);
   assert.deepEqual(by['custom:big-one'].options.map((o: any) => o.value), ['fake']);
   assert.equal(by['claude:opus'].status, 'missing', 'this stand-in has no catalog for Claude Code');
-  assert.ok(p.warnings.some((w: string) => /example\/big-1 \(OpenRouter\), which is not set up here/.test(w)), p.warnings.join('\n'));
+  assert.ok(!p.warnings.some((w: string) => /example\/big-1/.test(w)), p.warnings.join('\n'));
+  // As it is, its step asks for the OpenRouter model by the name Settings → Models gives it.
+  const kept = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: theirs, models: { 'claude:opus': '' } } })).json();
+  assert.deepEqual(store.getApp(db, kept.app.id)!.flow!.steps.map((s: any) => s.model), ['fake', 'openrouter/example/big-1', undefined]);
+  store.deleteApp(db, kept.app.id);
+  // Or one picked here stands in.
   const got = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: theirs, models: { 'custom:big-one': 'fake', 'claude:opus': '' } } })).json();
   const b = store.getApp(db, got.app.id)!;
   assert.deepEqual(b.flow!.steps.map((s: any) => s.model), ['fake', 'fake', undefined]);

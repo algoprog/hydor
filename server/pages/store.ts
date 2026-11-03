@@ -53,6 +53,8 @@ export function initPages(db: DB) {
   if (!cols.includes('kind')) db.exec('alter table pages add column kind text');
   // A template's screen belongs to the template (server/apps): its pages are its own, not the library's.
   if (!cols.includes('app')) db.exec('alter table pages add column app text');
+  // The space it belongs to (shared/spaces.ts), or none: the Library shows each space's pages together.
+  if (!cols.includes('space')) db.exec('alter table pages add column space text');
   initAssets(db);
 }
 
@@ -86,6 +88,7 @@ interface Row {
   thumb: string | null;
   kind: string | null;
   app: string | null;
+  space: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -111,6 +114,7 @@ const toInfo = (r: Row): PageInfo => ({
   thumb: r.thumb ?? undefined,
   ...(kindOf(r.kind) ? { kind: r.kind as PageKind } : {}),
   ...(r.app ? { app: r.app } : {}),
+  ...(r.space ? { space: r.space } : {}),
 });
 
 /** The library's pages: a template's screens stay with their template. */
@@ -203,7 +207,7 @@ const safeJson = (s: string) => {
 
 const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet' };
 
-export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string }): PageInfo {
+export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null }): PageInfo {
   const kind = p.kind ?? 'page';
   const { text: html, sources } = contentOf(db, kind, p);
   const title = cleanTitle(p.title, DEFAULT_TITLE[kind] ?? 'Page');
@@ -212,7 +216,7 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
   let id = newId();
   while (db.prepare('select 1 from pages where id = ?').get(id)) id = newId();
   db.transaction(() => {
-    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app, space) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       title,
       now,
@@ -222,6 +226,7 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
       nonce(),
       kind === 'page' ? null : kind,
       p.app ?? null,
+      p.app ? null : (p.space ?? null),
     );
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by) values (?, 1, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by);
     noteRefs(db, id, 1, sources);
@@ -257,12 +262,20 @@ export function copyPage(db: DB, id: string): PageInfo {
   const p = mustPage(db, id);
   const cur = pageSource(db, id)!;
   const title = cleanTitle(`${p.title} (copy)`);
-  return createPage(db, cur.kind === 'page' ? { title, html: cur.text, by: 'made' } : { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), by: 'made' });
+  return createPage(db, cur.kind === 'page' ? { title, html: cur.text, by: 'made', space: p.space } : { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), by: 'made', space: p.space });
 }
 
 export function renamePage(db: DB, id: string, title: unknown): PageInfo {
   mustPage(db, id);
   db.prepare('update pages set title = ?, updated_at = ? where id = ?').run(cleanTitle(title), Date.now(), id);
+  return pageInfo(db, id)!;
+}
+
+/** Puts a page in a space (its id, checked by the caller), or in none. Moving it is not a change to the page. */
+export function setPageSpace(db: DB, id: string, space: string | null): PageInfo {
+  const p = mustPage(db, id);
+  if (p.app) throw new HttpError(400, 'An app’s screen stays with its app');
+  db.prepare('update pages set space = ? where id = ?').run(space, id);
   return pageInfo(db, id)!;
 }
 

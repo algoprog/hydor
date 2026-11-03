@@ -67,6 +67,11 @@ export class ModelManager {
 
   // ---- what the agent and the pickers see ----------------------------------------------------------
 
+  /** OpenRouter's key is set (apps that need an OpenRouter model add it by themselves then). */
+  hasOpenRouterKey(): boolean {
+    return !!this.cfg.openrouter.apiKey;
+  }
+
   agentModels(): AgentModel[] {
     const c = this.cfg;
     const out: AgentModel[] = [];
