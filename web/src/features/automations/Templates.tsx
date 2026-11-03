@@ -11,7 +11,7 @@ import { FolderChip } from '../../components/FolderPicker';
 import { Button, cx, Dialog, inputCls, Section } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { boxCls, Field } from './parts';
-import { TEMPLATES, type Template, type TemplateField } from './templates';
+import { TEMPLATES, type Template, type TemplateField } from './taskTemplates';
 
 const small = cx(boxCls, 'h-9 text-[13.5px]');
 
