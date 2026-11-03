@@ -27,7 +27,7 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
   OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
-  shows its own usage and limits. With **Switch accounts at a limit** on, the app uses them all: a session whose
+  shows its own usage and limits. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
   account runs out of usage moves, with its history, to another account with usage left and carries on.
 
 ## Help with anything

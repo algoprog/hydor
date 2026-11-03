@@ -337,6 +337,8 @@ Once linked, its state and checks show as a badge in the sidebar and the header,
 
 When a Claude Code or Codex plan runs out of usage, a banner above the message box says "You've hit the Claude Code usage limit", which limit, and when it resets.
 
+When another of that agent's accounts still has usage left, you see no banner while **Switch accounts at a limit** is on: the session moves to that account and carries on (new sessions start there). With it off, the banner names that account and offers **Turn on**.
+
 - **Resume at reset** continues the session by itself a minute after the limit resets, with the message "Continue where you left off." The banner then says when, with **Cancel**.
 - **Use a reset**: when your account holds limit resets, the banner says how many, and this uses one now.
 - [Resume after usage limits](/settings?s=general&find=Resume%20after%20usage%20limits) in Settings → App → General does this for every session a limit stops.

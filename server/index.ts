@@ -43,7 +43,7 @@ import { clients as agentClients, clientUpdates, ensureCommand, install as insta
 import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
-import { addAccount, addedAccounts, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
+import { addAccount, addedAccounts, autoSwitchOn, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { devServerShot, listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
@@ -541,7 +541,7 @@ app.delete('/api/sessions/:key/resume-at', async (req) => {
   return { ok: true };
 });
 /** App-wide switches kept on the server (they act while no browser is open). */
-const appSettings = () => ({ autoResume: kvGet(db, 'auto_resume') === '1', autoSwitch: kvGet(db, 'auto_switch') === '1' });
+const appSettings = () => ({ autoResume: kvGet(db, 'auto_resume') === '1', autoSwitch: autoSwitchOn(db) });
 app.get('/api/app-settings', async () => appSettings());
 app.put('/api/app-settings', async (req) => {
   const b = (req.body ?? {}) as any;

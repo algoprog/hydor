@@ -99,6 +99,11 @@ function codexHomeOf(db: DB, id: string | null | undefined): string {
 }
 
 /** Every account an agent can run as: the CLI's own (undefined), then the added ones. */
+/** Switch accounts at a limit: on until you turn it off. */
+export function autoSwitchOn(db: DB): boolean {
+  return kvGet(db, 'auto_switch') !== '0';
+}
+
 export function accountPool(db: DB, agent: Agent): (string | undefined)[] {
   return [undefined, ...stored(db).filter((a) => a.agent === agent).map((a) => a.id)];
 }

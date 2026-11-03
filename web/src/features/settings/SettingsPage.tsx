@@ -10,7 +10,7 @@ import type { AccountStatus, Agent, AgentAccount, ClientInfo, ClientUpdateItem, 
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toast, toastError, useApp, useLogins, useUI } from '../../lib/store';
+import { toast, toastError, useApp, useAppSettings, useLogins, useUI } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { FolderChip } from '../../components/FolderPicker';
 import { CopyButton } from '../../components/Markdown';
@@ -656,12 +656,8 @@ function AutoResumeSetting() {
 
 /** A session whose account runs out of usage moves to another account of its agent with usage left. Kept on the server. */
 function AutoSwitchSetting() {
-  const [on, setOn] = useState<boolean | null>(null);
-  useEffect(() => {
-    api<{ autoSwitch: boolean }>('/api/app-settings')
-      .then((r) => setOn(r.autoSwitch))
-      .catch(() => setOn(false));
-  }, []);
+  const on = useAppSettings((s) => s.autoSwitch);
+  useEffect(() => void useAppSettings.getState().load(), []);
   return (
     <SettingRow label="Switch accounts at a limit" hint="When a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on. New sessions skip an account at its limit.">
       {on === null ? (
@@ -671,8 +667,8 @@ function AutoSwitchSetting() {
           on={on}
           label="Switch accounts at a limit"
           onChange={(v) => {
-            setOn(v);
-            put('/api/app-settings', { autoSwitch: v }).catch((e) => (setOn(!v), toastError(e)));
+            useAppSettings.getState().set({ autoSwitch: v });
+            put('/api/app-settings', { autoSwitch: v }).catch((e) => (useAppSettings.getState().set({ autoSwitch: !v }), toastError(e)));
           }}
         />
       )}

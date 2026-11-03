@@ -8096,7 +8096,7 @@
 "Your introduction goes here.":"shared/latex.ts",
 "Your last run is still going: wait for it to finish first.":"server/apps/public.ts",
 "Your last run is still going.":"web/src/features/apps/PublicPage.tsx",
-"your main {0} account":"server/sessions.ts",
+"your main {0} account":"web/src/features/usage/LimitReset.tsx",
 "Your models":"web/src/features/settings/ModelsSettings.tsx",
 "Your new key. Copy it now: it is not shown again.":"web/src/features/apps/Share.tsx",
 "Your next message continues this conversation in":"web/src/features/session/Composer.tsx",
@@ -8134,5 +8134,8 @@
 "Zip64 archives are not supported":"server/browser/chrome.ts",
 "Zoom":"web/src/features/pages/slides/Inspector.tsx",
 "Zoom in":"web/src/features/apps/GraphEditor.tsx",
-"Zoom out":"web/src/features/apps/GraphEditor.tsx"
+"Zoom out":"web/src/features/apps/GraphEditor.tsx",
+"{0} still has usage left. Turn on Switch accounts at a limit and new sessions start there.":"web/src/features/usage/LimitReset.tsx",
+"{0} still has usage left. Turn on Switch accounts at a limit and this session carries on there.":"web/src/features/usage/LimitReset.tsx",
+"Switch accounts at a limit is on":"web/src/features/usage/LimitReset.tsx"
 }
