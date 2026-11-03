@@ -84,3 +84,50 @@ export function Lightbox() {
     document.body,
   );
 }
+
+/** A video from YouTube or Vimeo, played over the page: their players cannot run inside a view's sandbox. */
+const useVideo = create<{ src: string; title: string }>(() => ({ src: '', title: '' }));
+/** Only their players' own addresses play here (the page's policy allows those two and no other site). */
+const PLAYER = /^https:\/\/(www\.youtube-nocookie\.com\/embed\/[\w-]{6,20}|player\.vimeo\.com\/video\/\d{4,12})(\?start=\d+)?$/;
+export const openVideo = (src: string, title = '') => PLAYER.test(src) && useVideo.setState({ src, title });
+const closeVideo = () => useVideo.setState({ src: '', title: '' });
+/** What a player may use: autoplay, encrypted media, picture in picture, full screen. */
+const PLAYER_ALLOW = ['autoplay', 'encrypted-media', 'picture-in-picture', 'fullscreen'].join('; ');
+
+export function VideoBox() {
+  const { src, title } = useVideo();
+  useEffect(() => {
+    if (!src) return;
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      closeVideo();
+    };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  }, [src]);
+  if (!src) return null;
+  return createPortal(
+    <div className="anim-overlay scrim fixed inset-0 z-[70] flex flex-col [--scrim-blur:14px] [--scrim:0.85]" onPointerDown={(e) => e.target === e.currentTarget && closeVideo()}>
+      <div className="flex shrink-0 items-center gap-2 px-3 pt-[max(8px,var(--safe-top))] pb-2 text-[13px] text-white/80">
+        <span className="min-w-0 flex-1 truncate" translate="no">
+          {title}
+        </span>
+        <button onClick={closeVideo} className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white" title="Close (Esc)" aria-label="Close">
+          <X size={18} />
+        </button>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center px-3 pb-6" onPointerDown={(e) => e.target === e.currentTarget && closeVideo()}>
+        <iframe
+          src={`${src}${src.includes('?') ? '&' : '?'}autoplay=1`}
+          title={title || 'Video'}
+          allow={PLAYER_ALLOW}
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+          className="anim-pop aspect-video max-h-full w-full max-w-[1100px] rounded-xl bg-black shadow-2xl"
+        />
+      </div>
+    </div>,
+    document.body,
+  );
+}

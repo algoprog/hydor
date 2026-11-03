@@ -1,32 +1,32 @@
-# Connections, keys and tools
+# Connected apps, keys and tools
 
-Connect the services you use (Notion, Gmail, GitHub, Stripe, a folder on this computer…) once, and every agent can work with them. Keep API keys and sign-ins in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
+Connect the services you use (Notion, Gmail, GitHub, Stripe, a folder on this computer…) once, on the Apps page's **Connected apps**, and every agent and app can work with them. Keep API keys and sign-ins in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
 
-![Settings → Connections: services to connect, by category](images/connections.webp)
+![Apps → Connected apps: the services you connected, the marketplace and your keys](images/connections.webp)
 
 ## What connections, keys and tools are
 
 Agents can do more when you give them tools. There are three places to do that:
 
-- **Connections** ([Settings → Connections](/settings?s=connections)): services from a marketplace, connected once for every agent: Claude Code, Codex, Custom and the agents that speak ACP. Each connected account gives the agents its tools.
+- **Connected apps** ([Apps → Connected apps](/apps/connected)): services from a marketplace, connected once for every agent: Claude Code, Codex, Custom and the agents that speak ACP, and the apps they run. Each connected account gives the agents its tools.
 - **The vault** (the **Keys** tab of the same page): API keys, tokens and the passwords of sign-ins. An API key is a password a service gives you so that programs can use your account. Agents use these to call a service, sign in to a site or run a program, but never see them.
 - **MCP servers and plugins** ([Settings → MCP servers](/settings?s=mcp) and [Settings → Plugins](/settings?s=plugins)): tool servers you set up yourself in Claude Code's and Codex's own settings, and add-ons for Claude Code.
 
 MCP (the Model Context Protocol) is the common way a service offers tools to agents. A connected account is an MCP server that Naget Agent sets up and signs in to for every agent. The MCP servers in Settings → Agents are ones you set up by hand, with a command or an address.
 
-## Open Connections
+## Open Connected apps
 
-Go to [Settings → Capabilities → Connections](/settings?s=connections). It has three tabs:
+Open **Apps** from the sidebar and pick its **Connected apps** tab, or go to [Apps → Connected apps](/apps/connected). (They were in Settings before, as Connections: an old link to them comes here.) Under a line on what they are for, with **Connect a service**, it has three tabs:
 
+- **Connected**: the accounts you connected, and how each one is doing. The number on the tab counts them; the **Connected apps** tab counts them too.
 - **Marketplace**: every service you can connect.
-- **Connected**: the accounts you connected, and how each one is doing. The number on the tab counts them.
 - **Keys**: the vault. The number on the tab counts your keys.
 
-The page opens on **Connected** when you have connected something, and on **Marketplace** when you haven't. On a phone, Settings is a list of sections: tap **Connections** and it opens on its own page. Dialogs rise from the bottom of the screen.
+The page opens on **Connected** when you have connected something, and on **Marketplace** when you haven't; each tab has an address of its own (`/apps/connected?tab=market`, `?tab=keys`). On a phone the tabs scroll sideways, and dialogs rise from the bottom of the screen.
 
 ## Find a service in the marketplace
 
-Open [the Marketplace tab](/settings?s=connections&find=Marketplace).
+Open [the Marketplace tab](/apps/connected?tab=market).
 
 - The search box ("Search … services: mail, Notion, invoices…") looks in names, descriptions, keywords and categories. Every word you type has to match.
 - The chips under it show one category at a time, each with how many services it has: **All**, **Notes & docs**, **Tasks & projects**, **Mail, chat & meetings**, **Calendar & scheduling**, **Files & storage**, **Design & media**, **Developer tools**, **Cloud & hosting**, **Databases & data**, **Analytics & monitoring**, **Sales, marketing & support**, **Payments & finance**, **Websites & shops**, **Search & the web**, **AI & automation**, **Travel & everyday** and **On this computer**. On a phone they scroll sideways.
@@ -79,7 +79,7 @@ The key goes into the vault, encrypted. From then on you only see its last chara
 1. Click **Sign in to** and the service's name.
 2. On a computer, a small window opens. On a phone, the service's sign-in page opens in the same tab instead.
 3. Sign in and allow access. While you do, the dialog says "Waiting for you to finish signing in…".
-4. When you are done, a notice says the account is connected. On a phone you come back to Settings → Connections.
+4. When you are done, a notice says the account is connected. On a phone you come back to Apps → Connected apps.
 
 The tokens stay encrypted on this computer and renew by themselves; agents never see them. A sign-in has to be finished within 15 minutes; after that, start again. If you refuse access, you're told "You did not allow access".
 
@@ -129,7 +129,7 @@ Every session gets the connected accounts whose **Every session** switch is on. 
 2. Turn accounts on or off for this session. Each one says where it stands: "On, as in every session", "Off, as in every session", "On here only" or "Off here only".
 3. Click **Done**.
 
-Services on the internet follow the change at once. Those that run on this computer follow it when the agent next starts. With nothing connected yet, the dialog offers **Open Settings → Connections**.
+Services on the internet follow the change at once. Those that run on this computer follow it when the agent next starts. With nothing connected yet, the dialog offers **Open Connected apps**.
 
 An assistant can also turn accounts on for the sessions that start as it: see [Assistants](/guide/assistants).
 
@@ -153,7 +153,7 @@ Anyone can add a service to the marketplace, or fix one, with a pull request to 
 
 ## Keep keys in the vault
 
-Open [the Keys tab](/settings?s=connections&find=Add%20a%20key). The vault holds API keys, tokens and the passwords of sign-ins, which agents use without seeing them. They are encrypted on this computer and never shown again, here or to an agent: only their last characters.
+Open [the Keys tab](/apps/connected?tab=keys). The vault holds API keys, tokens and the passwords of sign-ins, which agents use without seeing them. They are encrypted on this computer and never shown again, here or to an agent: only their last characters.
 
 Agents use them through Naget Agent's own tools: its web request tool, its browser, and commands on this computer where you allow that. The app puts the key in itself, and only where you allow.
 
@@ -165,6 +165,8 @@ Each key in the list shows:
 - when it was last used ("not used yet" until then), and when it was added or its value last changed.
 
 With no keys yet, the tab says you can add one here or let an agent ask for one.
+
+Apps can need keys too (a weather service's, a maps provider's): an app names the keys it needs, and you give each one on its page, on the card that installs it, or on its card in a session ([Give it the keys it needs](/guide/apps#give-it-the-keys-it-needs)). They are kept here, under the names the app gives them, with the hosts it says, and the note names the app.
 
 ### Add a key
 

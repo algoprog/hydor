@@ -70,8 +70,8 @@ each change you save comes to Naget Agent as a new version of it, and a mistake 
 - instructions/: each step's instructions (and the task of an app without steps), in Markdown.
 - steps/: each code step, as the function it runs (.naget/step.d.ts says what it gets and gives).
 - screens/: its screens, as pages that use naget.app.
-- ui/: its view's elements (name.html, with name.css beside it) and style.css; its pages and events are in
-  app.json, under ui.
+- ui/: its view's elements (name.html, with name.css beside it) and style.css, and its widgets' code
+  (widgets/name.js, with name.css beside it); its pages, events and libraries are in app.json, under ui.
 - graph.json: where its steps sit in the graph (leave it out, and they are laid out by themselves).
 `;
 
@@ -122,6 +122,18 @@ export function filesOf(db: DB, a: AppDef): Files {
       files['ui/style.css'] = `${r.ui.style.replace(/\n$/, '')}\n`;
       out.ui.style = { file: 'ui/style.css' };
     }
+    // Its widgets' code, as modules an editor checks.
+    for (const [name, w] of Object.entries(r.ui.widgets ?? {})) {
+      files[`ui/widgets/${name}.js`] = `${w.code.replace(/\n$/, '')}\n`;
+      const ref: Record<string, unknown> = { code: { file: `ui/widgets/${name}.js` } };
+      if (w.css) {
+        files[`ui/widgets/${name}.css`] = `${w.css.replace(/\n$/, '')}\n`;
+        ref.css = { file: `ui/widgets/${name}.css` };
+      }
+      if (w.description) ref.description = w.description;
+      if (w.height) ref.height = w.height;
+      out.ui.widgets[name] = ref;
+    }
   }
   if (r.graph) files['graph.json'] = `${JSON.stringify(r.graph, null, 2)}\n`;
   files[APP_FILE] = `${JSON.stringify({ $schema: './.naget/app.schema.json', ...out }, null, 2)}\n`;
@@ -167,6 +179,11 @@ export function readFolder(dir: string): { recipe: Record<string, any>; screens:
       if (isRef(el.css)) el.css = (read(el.css.file) ?? '').replace(/\n$/, '');
     }
     if (isRef(recipe.ui.style)) recipe.ui.style = (read(recipe.ui.style.file) ?? '').replace(/\n$/, '');
+    for (const w of Object.values((recipe.ui.widgets ?? {}) as Record<string, Record<string, unknown>>)) {
+      if (!w || typeof w !== 'object') continue;
+      if (isRef(w.code)) w.code = (read(w.code.file) ?? '').replace(/\n$/, '');
+      if (isRef(w.css)) w.css = (read(w.css.file) ?? '').replace(/\n$/, '');
+    }
   }
   const screens: Record<string, { html: string; title?: string }> = {};
   for (const [name, sc] of Object.entries((recipe.screens ?? {}) as Record<string, unknown>)) {
@@ -310,7 +327,7 @@ function filesOn(dir: string): Files {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.name.startsWith('.')) continue;
       if (e.isDirectory()) walk(r);
-      else if (/^(app\.json|graph\.json|instructions\/.+\.md|steps\/.+\.(js|ts|py)|screens\/.+\.html|ui\/.+\.(html|css))$/.test(r)) out[r] = fs.readFileSync(path.join(dir, r), 'utf8');
+      else if (/^(app\.json|graph\.json|instructions\/.+\.md|steps\/.+\.(js|ts|py)|screens\/.+\.html|ui\/.+\.(html|css)|ui\/widgets\/.+\.(js|css))$/.test(r)) out[r] = fs.readFileSync(path.join(dir, r), 'utf8');
     }
   };
   try {

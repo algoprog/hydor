@@ -6,6 +6,8 @@
 import { useMemo, useState } from 'react';
 import type { AppUi } from '@shared/app-ui';
 import { translateUi } from '@shared/app-ui';
+import { libsHead, type AppAsset } from '@shared/app-media';
+import { openLightbox, openVideo } from '../../components/Lightbox';
 import type { AnswerField, AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
 import { api, enc, post, put } from '../../lib/api';
@@ -46,6 +48,7 @@ export function AppView({
   onAsked,
   publicView,
   info,
+  assets,
 }: {
   ui: AppUi;
   name: string;
@@ -71,6 +74,8 @@ export function AppView({
   publicView?: boolean;
   /** The app's own page: its flows and lists, for the form, runs and chat elements (the App parts). */
   info?: AppInfo;
+  /** Its own files, by name: what asset:<name> shows. */
+  assets?: Record<string, Pick<AppAsset, 'sha'>>;
 }) {
   const [height, setHeight] = useState(240);
   const lang = LOCALE ?? (typeof navigator !== 'undefined' ? navigator.language : 'en');
@@ -91,10 +96,13 @@ export function AppView({
       last: last ? { result: last.result ?? {}, inputs: last.inputs, run: runOf(last) } : {},
       view: view ?? {},
       answer,
+      assets: assets ?? {},
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- by what they hold: a page that reloads its run sends new copies of the same
-    [on, runKey, lastKey, name, description, JSON.stringify(answer)],
+    [on, runKey, lastKey, name, description, JSON.stringify(answer), JSON.stringify(assets ?? {})],
   );
+  // What its widgets import, from jsDelivr: an import map, and the stylesheets among them.
+  const libs = useMemo(() => (def.libs ? libsHead(def.libs) : undefined), [def]);
   const allowed = useMemo(() => new Set(can), [can.join(',')]);
   const onOp = async (op: string, a: Record<string, unknown>): Promise<unknown> => {
     const need = (what: ViewCan) => {
@@ -164,6 +172,32 @@ export function AppView({
         case 'say':
           if (a.text) toast(text(a.text, 300), a.error ? 'error' : 'info');
           return null;
+        case 'media': {
+          // A video from YouTube or Vimeo: played over the page (their players cannot run inside the view's sandbox).
+          if (typeof a.video === 'string') {
+            openVideo(a.video, text(a.title, 200));
+            return null;
+          }
+          // A picture opened large, with the others beside it: those kept here (this page loads nothing from other
+          // sites); one on the web opens there.
+          const all = (Array.isArray(a.images) ? a.images : []).slice(0, 200).map((x) => ({ src: String((x as { src?: unknown })?.src ?? ''), name: String((x as { name?: unknown })?.name ?? '').slice(0, 200) }));
+          const here = (u: string) => {
+            try {
+              return /^data:image\//i.test(u) || new URL(u).origin === location.origin;
+            } catch {
+              return false;
+            }
+          };
+          const at = all[Math.min(Math.max(0, Number(a.at) || 0), Math.max(0, all.length - 1))];
+          if (!at) return null;
+          if (!here(at.src)) {
+            if (/^https?:\/\//i.test(at.src)) window.open(at.src, '_blank', 'noopener,noreferrer');
+            return null;
+          }
+          const list = all.filter((x) => here(x.src));
+          openLightbox(list, Math.max(0, list.indexOf(at)));
+          return null;
+        }
         default:
           throw new Error('That is not something a view can do');
       }
@@ -172,7 +206,7 @@ export function AppView({
       throw e;
     }
   };
-  const bridge: UiBridge = { def, ctx, can: [...allowed], appId: appId.startsWith('tpl:') ? appId.slice(4) : appId, start, lang, onOp };
+  const bridge: UiBridge = { def, ctx, can: [...allowed], appId: appId.startsWith('tpl:') ? appId.slice(4) : appId, start, lang, onOp, ...(libs ? { libs } : {}) };
   return (
     <div style={{ height: Math.max(height, 40) }} className={cx('relative', className)}>
       <PageFrame html={html} title={name} store={store} onHeight={setHeight} ui={bridge} app={info ? { info } : undefined} className="!bg-transparent" />

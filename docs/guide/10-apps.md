@@ -1,6 +1,6 @@
 # Apps
 
-An app is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result, in a view made for it (pages you click through, tick off and act on) or as a card and tables. This topic covers the ready-made apps (they come installed), running one and working with its result, having an agent run one for you in any session, making your own (with steps, a view, data, memory and a screen of its own too), sharing one through an API key, other agents, a public page or a spreadsheet of rows, and passing one on as a file.
+An app is a task you run again and again: you fill in a short form, press Run, and an agent does the job and hands back the result, in a view made for it (pages to click through and act on, with maps, charts, pictures and videos) or as a card and tables. This topic covers the ready-made apps, running one, the keys an app needs, having an agent run one for you in any session, making your own (steps, a view, its own files, data, memory, a screen), sharing one (an API key, other agents, a public page, rows of a CSV) and passing one on as a file. The services agents connect to are beside the apps: see [Connected apps, keys and tools](/guide/connections).
 
 ![Apps: your own and the ready-made ones, which come installed](images/apps.webp)
 
@@ -19,15 +19,17 @@ Open the Apps page from the **Apps** tile at the bottom of the sidebar, or go to
 
 ## Find your way around the Apps page
 
-The page is headed **Apps**, with **New app** at the top: its menu has **Describe it to an agent**, **Start from scratch** and **Install from a file**. Below it:
+The page is headed **Apps**, with two tabs: **Agent apps**, the apps this topic is about, and **Connected apps**, the services every agent can use, connected once, with the keys they use ([Open Connected apps](/guide/connections#open-connected-apps)). Each tab counts what it has. On **Agent apps**, **New app** is at the top: its menu has **Describe it to an agent**, **Start from scratch** and **Install from a file**. Below it:
 
 - **What should your next app do?**: say it in a sentence and press **Make it** (or Enter); a session starts as the **App builder**, which makes the app, tries it and shows it to you. The ideas under the box put one in it with a click.
-- **Your apps**: your own apps, then the ready-made ones, which come installed. Each card has its icon, name and description, when it last ran (**Not run yet** before its first run), **Ready-made** on the ones that come with Naget Agent, **Has a view** when your own app's answer opens in a view of its own, and **Public** when its public page is open. With more than six, chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning**, **Build**, and your own apps' kinds. With none, the page says how to get one.
+- **Your apps**: your own apps, then the ready-made ones, which come installed. Each card has its icon, name and description, when it last ran (**Not run yet** before its first run), **Ready-made** on the ones that come with Naget Agent, **Has a view** when your own app's answer opens in a view of its own, and **Public** when its public page is open. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open** and **Download as a file**. With more than six, chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning**, **Build**, and your own apps' kinds. With none, the page says how to get one.
 - **Pick up where you left off**: your last six runs, with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
 - **Ready-made apps to install**: there once you uninstall a ready-made app. Each card shows its kind, what it does and what you get from it (the pages of its view, such as the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**), and **Install** (see [Install or uninstall a ready-made app](#install-or-uninstall-a-ready-made-app)).
 - **Building blocks** (folded): small apps made to be steps of your own (sum up a page, translate, answer from the web, sort into kinds, pull out the facts), with the blocks you made yourself; **Add a step** offers them in every app's steps.
 
 A run's state shows as a badge: **Waiting** (in line), **Starting**, **Working**, **Needs you** (it waits for an approval or an answer), **Done**, **Failed** or **Stopped**.
+
+Drop an app's file (`.naget-app` or `.json`) anywhere on the page to install it: the card that says what it is opens first (see [Share an app as a file](#share-an-app-as-a-file)).
 
 On a phone the cards stack in one column and the kind chips scroll sideways.
 
@@ -89,6 +91,16 @@ This browser remembers your last pick for the next ready-made app you run.
 
 A file question shows **Choose a file**, or you can drop a file on it (on a computer). Each file may be up to 25 MB. The file is saved in the run's folder and the agent gets its path, so it can read PDFs, Word documents, spreadsheets and other files the way it reads any file. The **×** next to a chosen file removes it.
 
+### Give it the keys it needs
+
+Some apps work with a service that wants a key: an API key or a token (a weather service, a maps provider, an account of yours somewhere). An app names the keys it needs, never their values: you give each one once, and it is kept in your vault ([Keep keys in the vault](/guide/connections#keep-keys-in-the-vault)), where agents use it by name without seeing it.
+
+- On the app's page, **A key it needs** (or **Keys it needs**) under the form lists each one: what it is, its name in the vault, a line on how to get it, a box to paste it into, and **Get one**, which opens the page where you get it. Press **Run**: the key goes to the vault first, then the run starts. A key the vault has already shows as **Saved**, with its last characters and **Change**; one the app can do without is marked **optional**.
+- When you install an app from a file, its card asks for its keys too: give them then, or at its first run.
+- When an agent runs it for you in a session, its card there asks for a key it lacks; the key goes straight to the vault, never into the conversation.
+
+A run without a key it needs doesn't start: on its form you are asked for it ("Needed to run it"); from the API, a schedule or rows of a CSV, the run is refused and says which key to add (on its page, or in **Apps → Connected apps → Keys** under that name). When a key you saved already may not go to a site the app sends it to, its row says so, with **Allow it**.
+
 ### Where a run works
 
 Each run gets a new folder of its own, inside a `naget-apps` folder in your home folder, named after the app and the time. An app can name a folder instead (see [Who does it](#who-does-it)); then every run works there.
@@ -100,7 +112,7 @@ The session of a run you start from the form shows in the sidebar's session list
 You don't have to open an app to use it: ask for what it does in any session ("Plan a 4-day trip to Lisbon in May for the two of us"), and the agent runs it there.
 
 1. The agent picks the app that does what you asked, and puts in what you said: the place, the days, who's going.
-2. When the app needs something you didn't say, its card appears in the conversation, with the app's icon and name, **From your message:** and what it took from your words, and the questions left. Fill in the ones marked with a red **\***, and leave the optional ones empty if you don't mind. A question it could not take as you said it ("in May" for a date) shows your words under it. **Run it** runs the app; **Not now** closes the card and runs nothing. While the card waits, the session shows **Needs you**, and the inbox lists it.
+2. When the app needs something you didn't say, its card appears in the conversation, with the app's icon and name, **From your message:** and what it took from your words, and the questions left. A key it needs that you haven't given yet is asked for there too: it goes to your vault, not into the conversation. Fill in the ones marked with a red **\***, and leave the optional ones empty if you don't mind. A question it could not take as you said it ("in May" for a date) shows your words under it. **Run it** runs the app; **Not now** closes the card and runs nothing. While the card waits, the session shows **Needs you**, and the inbox lists it.
 3. The app's card stays in the conversation, under the agent's reply, and follows the run: where it stands and the steps going by, then its answer as the app shows it (its view, with its pages and buttons; **Plain answer** shows the card and tables). A question one of its steps asks (a "Let me…" one) waits there too. **Open** goes to the run's page, and the app's name to the app.
 4. The agent then says in a line or two what came of it. A long run goes on after the agent stops waiting: its card keeps following it, and the agent hears its answer when it ends.
 
@@ -122,7 +134,8 @@ The status card at the top says where it stands:
 Below it comes the result. An app with a view shows it there (see [Its view](#its-view)); **Plain answer**, in the status card, shows it as the plain card and tables instead, and **Its view** goes back. Without a view:
 
 - Short answer fields (text, numbers, dates, links, yes or no) sit together in one card.
-- Long text, lists and tables each get a card under their heading. Long text has a **Copy** button; tables have **Copy** and **CSV** (a download).
+- Long text, lists and tables each get a card under their heading. Long text has a **Copy** button; tables have **Copy** and **CSV** (a download), and a column of pictures shows them small (a click opens one large).
+- Pictures, videos, sounds and files: pictures in a grid (a click opens one large, and the arrows go through the others), videos and sounds to play, other files to download. One on another site (a video on YouTube, a page) opens there.
 - On a phone, a table too wide for the screen shows as a card for each row.
 
 The agent's own reply follows. It is open, under **Answer**, when the app has no answer fields; otherwise it is folded under **The agent's reply**. **What was asked** (folded) lists the answers the run was given.
@@ -142,6 +155,7 @@ An app's view is made for its answer: pages that show it in elements of their ow
 - **Buttons that run it again**: **Relaxed** or **+ One more day** on a trip, **Formal** on a letter, a box of new questions about the same document. Each asks first, then starts a new run with your other answers as they were (its files too) and opens it.
 - **Buttons that start another app**: **Research** on a news story or a trip's area, **Dig deeper** on a finding: each asks first, then starts that app's run and opens it.
 - **Copy**: a part to paste elsewhere (an email, a letter, the questions to ask).
+- **Maps, plots, pictures and videos**: a map of the places in its answer (drag and zoom it; a place shows its name, and a click on it can open its page), a chart or a 3D plot (point at a bar or a point to read it, zoom in, turn a 3D one), pictures that open large, and videos and sounds to play, from a file or from YouTube or Vimeo. Maps, plots and a view's own drawings load their libraries (and maps their tiles, from OpenStreetMap) from the web, so they need this device online.
 - On an app of your own, a view can also ask its agent for a change (an app without steps), run one of its other flows, or keep a record in what it keeps.
 
 A view shows on the run's page, in its session's **Result**, and on the app's public page, where its pages and ticks work but nothing reaches the app (no run again, no new runs, nothing kept).
@@ -230,10 +244,12 @@ The fields the agent fills in when it is done. They show as a card or a table, a
 **Add an answer field** adds a row with:
 
 - A heading ("Recommendation").
-- Its kind: **Text**, **Long text** (formatted text), **Number**, **Yes / no**, **Date**, **Link**, **List** or **Table**.
+- Its kind: **Text**, **Long text** (formatted text), **Number**, **Yes / no**, **Date**, **Link**, **List**, **Table** or **Pictures, videos or files**.
 - **Needed**: the agent must fill it in.
 - **What goes here, for the agent (optional)**: a hint for the agent.
-- For a **Table**: its **Columns**, each with a name and a kind (**Text**, **Number**, **Yes / no**, **Date** or **Link**). **Add a column** adds one; a table keeps at least one.
+- For a **Table**: its **Columns**, each with a name and a kind (**Text**, **Number**, **Yes / no**, **Date**, **Link** or **Picture**). **Add a column** adds one; a table keeps at least one.
+
+A **Pictures, videos or files** field (and a **Picture** column) takes what the agent found or made: an address on the web, or a file on this computer (a photo in your Pictures folder, a chart it drew, a recording), each with a caption. Naget Agent keeps a copy of a file on this computer, and of a picture on the web (up to 15 MB), so it shows wherever the answer does; videos on the web stay links. A public page's runs may only point at the web.
 
 Naget Agent checks what the agent hands in: numbers must be numbers, dates real dates, links full web addresses. When something doesn't fit, the agent is told what to fix. An app can have up to 30 answer fields, and a table up to 12 columns. A new answer field takes its name for programs from its heading when you save; after that the name stays, so programs that read it keep working.
 
@@ -254,6 +270,10 @@ The section reads: "Runs go ahead without anyone watching, so pick a mode that d
 ### Tools
 
 What the runs may use from Naget Agent's own tools: web search, the browser, pages, memory and the rest. **All** is on at first. Turn it off to see a list with each tool's name and what it does, and tick the ones runs may use. The agent's own file and command tools follow its mode, not this list.
+
+### Keys it needs
+
+**Keys it needs** (in **Settings**) lists the keys its runs use, by their names in your vault: each with what it is, **Where it may go (hosts)**, **Where to get one**, a line on how, and switches for **It can run without it** and **Commands on this computer use it**. **Add a key it needs** adds one. Its runs are told each key's name and how to use it; whoever installs the app gives the values (see [Give it the keys it needs](#give-it-the-keys-it-needs)), which are never part of the app or its file.
 
 ### Limits
 
@@ -441,6 +461,18 @@ In an app's **Edit**, the **Design** tab shows its view with its latest run's an
 
 A view's events can go to a page (with the item clicked), tick something off or set a filter (kept with the run when it says so), copy, open an address, ask the run's agent for a change (an app without steps), run one of its other flows, run it again with some answers changed, start another app, and add, change or remove a record it keeps. Pages marked for the app's own page show there in place of its form, with what it keeps and its latest run. A view is part of the app: it has versions with it, travels in its file, and its elements are files of its own in its folder (ui/).
 
+Besides its own elements, a view has built-in ones: text, lists to tick off, tables and bar charts, and these for media:
+
+- **Pictures**: one, or several side by side, each with its caption.
+- **Videos**: a file, played in the view, or a link to YouTube or Vimeo, which shows its still and plays over the page when you click it.
+- **Sounds**: a recording or a song to play.
+- **Maps**: the places in its answer, from their latitude and longitude, numbered and joined in order when the view says so.
+- **Plots**: line, bar (stacked too), area, scatter, pie, histogram, box and heatmap, and in 3D points, lines and surfaces, drawn with Plotly.
+
+A view can also have **widgets**: elements drawn by a script of their own (a 3D scene, a game, a chart from a library of your choice), which load the libraries they name, each at an exact version, from the web (jsDelivr). Everything in a view draws in the same sandbox as pages: it cannot reach this computer, your sign-in or your other apps, only do what its events allow.
+
+**Its own files**, under the **Design** tab, holds pictures, videos, sounds and data that come with the app: **Add files** adds them (up to 100 MB each, 150 MB in all), a picture opens large, and the copy button gives the name a view shows it by (`asset:tram.jpg`, in a picture, video or sound block, or a template's `src`). They travel in its file. The preview fills the view with its latest run, or with a made-up answer whose pictures and videos are its own files.
+
 ## Give an app a screen
 
 An app can have a screen of its own: a page in place of its form, that runs it and shows what it keeps. A reading list can show its links in a table you search and tidy, a small CRM its clients with a button that drafts a follow-up, a tracker a count of what it logged. The screen works live: what you send in its form runs the app, its answer shows when it is ready, and its tables change as its steps and agents change the records.
@@ -457,10 +489,12 @@ A screen is a page of the app's own: it does not show in your Library, it goes w
 
 An app can travel as one file, to keep or to install on another Naget Agent.
 
-- **To download one**: open your app, then **More** (⋯) → **Download as a file**. The file (`.naget-app`) holds everything it does and needs, and the apps its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here.
-- **To install one**: press **New app** on the Apps page, then **Install from a file**, and pick a `.naget-app`, `.zip` or `.json` file. Before anything is made, a card shows what it is, in plain words: its name and what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works**, and **Agents can use it**, with a switch to keep agents from running it. **What it uses here** (folded, and open by itself when something needs a look) lists who does the work, its steps, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
+- **To download one**: open the app, then **More** (⋯) → **Download as a file**, or use **More** (⋯) on its card on the Apps page. Ready-made apps download the same way. The file (`.naget-app`) holds everything it does and needs, its own files (pictures, videos, data), and the apps its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here: the keys it needs travel by their names only, and are asked for where it is installed.
+- **To install one**: press **New app** on the Apps page, then **Install from a file**, and pick a `.naget-app`, `.zip` or `.json` file (up to 160 MB); or drop the file on the Apps page. Before anything is made, a card shows what it is, in plain words: its name and what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works**, **Agents can use it**, with a switch to keep agents from running it, and **A key it needs** (or **Keys it needs**), to give now or at its first run. **What it uses here** (folded, and open by itself when something needs a look) lists who does the work, its steps, its own files, its view's scripts and the libraries they load, its screens, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
 
 Some things change on the way in, and the card says which: a folder it worked in elsewhere is left out (each run gets one of its own), a mode that allows every step without asking starts as **Auto** instead, and an assistant this computer lacks is dropped. An app that comes with it and is the same as one you have is used again; otherwise it installs beside yours. Its public page starts closed, and it has no API keys.
+
+A ready-made app's file says which app it is: where you uninstalled that app, installing the file brings it back (**Installed again**); where you have it, the file installs as a copy of your own, to change as you like.
 
 ## Ask an agent
 
@@ -478,6 +512,10 @@ Agents in Naget Agent can make and run apps for you through its API, with your O
 - "Make an app with steps that reads each link I send, sums it up with a quick model and keeps it in a reading list."
 - "Add a step to my Competitor watch app that tells me only when something changed."
 - "Install the app in reading-list.naget-app from my Downloads folder."
+- "Make an app that sums up the weather for a city from OpenWeather. It needs my OpenWeather API key."
+- "Add a map of the stops and a chart of what each day costs to my City break app's view."
+- "Add the photos in ~/Pictures/Lisbon to my City break app, and show them on its first page."
+- "Give my Weekly report app's view a 3D chart of the numbers, as a widget with three.js."
 - "Give my Reading list a screen with the unread links on top and a button that makes this week's digest."
 - "Design a view for my Weekly report app: a page with the summary and the numbers on top, and a page that shows each change as a card I can tick off."
 - "In my Price check app's view, add a button on each shop that runs it again for that shop only."

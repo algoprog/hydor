@@ -23,7 +23,7 @@ export function howToUse(names: string[], hosts: boolean, commands: boolean): st
   if (hosts) ways.push(`in http_request (auth: "${n}", or {{${n}}} in the address, headers or body)`, `in the browser (a browser_act type step with "secret": "${n}")`);
   if (commands) ways.push(`in commands through run_with_secrets (as $${n})`);
   const it = names.length > 1 ? 'them' : 'it';
-  if (!ways.length) return `${names.length > 1 ? 'They have' : 'It has'} no hosts to go to and ${names.length > 1 ? 'are' : 'is'} not allowed in commands, so the user has to allow that first (Settings → Connections → Keys).`;
+  if (!ways.length) return `${names.length > 1 ? 'They have' : 'It has'} no hosts to go to and ${names.length > 1 ? 'are' : 'is'} not allowed in commands, so the user has to allow that first (Apps → Connected apps → Keys).`;
   return `You never see ${names.length > 1 ? 'their values' : 'its value'}: use ${it} by name, ${ways.length > 1 ? `${ways.slice(0, -1).join(', ')} or ${ways[ways.length - 1]}` : ways[0]}.`;
 }
 
@@ -317,16 +317,16 @@ const LIST_CONNECTIONS: RunTool = {
       out.push('Connected accounts (their tools come from the MCP server of the same name):');
       for (const c of on) {
         const tools = c.tools?.filter((t) => toolOn(c, t.name)).map((t) => t.name);
-        const state = c.status === 'signin' ? ' — needs the user to connect it again (Settings → Connections)' : c.status === 'error' ? ` — not working: ${c.error ?? 'unknown error'}` : '';
+        const state = c.status === 'signin' ? ' — needs the user to connect it again (Apps → Connected apps)' : c.status === 'error' ? ` — not working: ${c.error ?? 'unknown error'}` : '';
         out.push(`- ${c.id}: ${c.entry.name}, ${c.entry.description}${tools?.length ? ` Tools: ${tools.slice(0, 40).join(', ')}${tools.length > 40 ? '…' : ''}.` : ''}${isRemote(c.entry) ? '' : ' (runs on this computer)'}${state}`);
       }
-    } else out.push('No accounts are connected for this session. The user connects them in Settings → Connections.');
+    } else out.push('No accounts are connected for this session. The user connects them in Apps → Connected apps.');
     if (off.length) out.push('', `Off for this session (the user can turn them on in the session's menu, under Session settings → Connected accounts): ${off.map((c) => `${c.id} (${c.entry.name})`).join(', ')}.`);
     const keys = listSecrets(db);
     out.push('');
     if (keys.length) {
       out.push('Keys in the vault, used by name: http_request (auth: NAME, or {{NAME}}), browser_act (type with "secret": NAME) on their hosts, and run_with_secrets ($NAME) for those allowed in commands:');
-      for (const k of keys) out.push(`- ${k.name}: ${where(k) || 'not usable yet (the user adds hosts, or allows commands, in Settings → Connections → Keys)'}${k.note ? `. ${k.note}` : ''}`);
+      for (const k of keys) out.push(`- ${k.name}: ${where(k) || 'not usable yet (the user adds hosts, or allows commands, in Apps → Connected apps → Keys)'}${k.note ? `. ${k.note}` : ''}`);
     } else out.push('No keys are saved. If a task needs one, ask with request_secret.');
     return redact(out.join('\n'));
   },

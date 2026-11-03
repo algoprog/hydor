@@ -50,7 +50,6 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['memory', 'Memory', 'Capabilities', 'What agents remember about you, your projects and each session, and when it was written'],
   ['children', 'Child sessions', 'Capabilities', 'Agents handing parts of a job to other agents, and swarms for hard problems'],
   ['images', 'Images and video', 'Capabilities', 'Pictures and videos agents make for you through OpenRouter, and who writes their captions in the Library'],
-  ['connections', 'Connections', 'Capabilities', 'Services every agent can use, from a marketplace anyone can add to, and a vault for keys'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
   ['assistants', 'Assistants', 'Capabilities', 'Presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go'],
   ['skillpack', 'Skill library', 'Capabilities', 'Skills that come with the app, and the ones agents learned with your approval'],
@@ -172,8 +171,6 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['images', 'Video model', 'video model veo kling seedance wan openrouter price a second', 'The model that makes videos'],
   ['images', 'Captions in the Library', 'caption title description vision model library media frames provider claude ollama', 'The model that writes the titles and descriptions of the images and videos you keep', 'Captions for images and videos'],
   // Capabilities › Connections
-  ['connections', 'Marketplace', 'connections apps services accounts marketplace notion linear github google', 'Services every agent can use, to connect once', 'Connections marketplace'],
-  ['connections', 'Add a key', 'api key secret vault token password sign-in login credentials', 'A key agents can use without seeing it', 'Add a key to the vault'],
   // Capabilities › Voice
   ['voice', 'Dictation', 'speech to text dictate microphone voice input', 'Speak a message instead of typing it'],
   ['voice', 'Language you speak', 'language dictation', 'The language dictation listens for'],
@@ -211,7 +208,10 @@ const PAGES: [string, string, string, string, string][] = [
   ['files-trash', 'Trash', '/files?place=trash', 'trash deleted files put back restore undelete recycle bin empty', 'What you deleted in Files, to put back or delete for good'],
   ['git', 'Git', '/git', 'repositories commits branches push pull sync diff merge conflicts rebase stash clone tags history graph', 'Repositories, changes, branches and history'],
   ['terminal', 'Terminal', '/terminal', 'shell console command line bash', 'Shells on this computer'],
-  ['apps', 'Apps', '/apps', 'app apps gallery templates ready-made tasks tools forms install uninstall', 'Tasks you run again and again: fill in a form, and an agent does the job'],
+  ['apps', 'Apps', '/apps', 'app apps agent apps gallery templates ready-made tasks tools forms install uninstall download file', 'Tasks you run again and again: fill in a form, and an agent does the job'],
+  ['connected', 'Connected apps', '/apps/connected', 'connections connected accounts services integrations notion linear github google gmail slack calendar sign in oauth mcp', 'Services every agent can use, connected once'],
+  ['connections-market', 'Connect a service', '/apps/connected?tab=market', 'marketplace services connect add catalog notion linear github google', 'The marketplace of services agents can use, to connect once'],
+  ['keys', 'Keys', '/apps/connected?tab=keys', 'api key secret vault token password sign-in login credentials add a key', 'Keys agents use without seeing them: your vault'],
   ['new-app', 'New app', '/apps/new', 'create build make new template app apps form tool', 'An app anyone can run from a form'],
   ['spaces', 'Spaces', '/spaces', 'spaces projects workspace group sessions files documents knowledge memory guidelines instructions skills folder', 'Each project’s sessions, documents and guidelines, together'],
   ['knowledge', 'Shared knowledge', '/knowledge', 'knowledge base documents folder pdf files search rag library cite sources', 'Documents every session can search and cite'],

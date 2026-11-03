@@ -61,11 +61,12 @@ export function AppRunNote({ note }: { note: SessionNote; sessionKey: string }) 
       ) : (
         <>
           <RunBody
+            assets={d.recipe.assets}
             run={d.run}
             progress={d.progress}
             answer={d.recipe.answer}
             name={d.recipe.name}
-            view={d.recipe.ui ? <AppView ui={d.recipe.ui} name={d.recipe.name} appId={d.run.app} run={d.run} answer={d.recipe.answer} view={d.view} can={can} translate={ready} /> : undefined}
+            view={d.recipe.ui ? <AppView ui={d.recipe.ui} name={d.recipe.name} appId={d.run.app} run={d.run} answer={d.recipe.answer} view={d.view} can={can} translate={ready} assets={d.recipe.assets} /> : undefined}
           />
           {d.question && <AnswerCard runId={d.run.id} q={d.question} />}
         </>

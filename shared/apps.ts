@@ -4,6 +4,8 @@
 import type { Agent } from './types.ts';
 import { allSteps, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppExample, type AppScreen, type CheckResult, type DataCollection, type Flow, type NamedFlow, type Requires, type Step } from './app-manifest.ts';
 import { cleanUi, type AppUi } from './app-ui.ts';
+import { cleanAssets, cleanMedia, type AppAsset } from './app-media.ts';
+import { cleanSecrets, type AppSecret } from './app-secrets.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -24,8 +26,8 @@ export interface AppField {
   default?: string;
 }
 
-export type AnswerType = 'text' | 'markdown' | 'number' | 'yesno' | 'date' | 'url' | 'list' | 'table';
-export type ColumnType = 'text' | 'number' | 'yesno' | 'date' | 'url';
+export type AnswerType = 'text' | 'markdown' | 'number' | 'yesno' | 'date' | 'url' | 'list' | 'table' | 'media';
+export type ColumnType = 'text' | 'number' | 'yesno' | 'date' | 'url' | 'image';
 
 export interface AnswerColumn {
   id: string;
@@ -107,6 +109,13 @@ export interface AppRecipe {
   memory?: boolean;
   /** What it needs on this computer: packages installed in an environment of its own (server/apps/env.ts), commands that must be here. */
   requires?: Requires;
+  /**
+   * The keys it needs (API keys, tokens), by their names in the vault (shared/app-secrets.ts): asked for when it is
+   * installed, or before it runs without them. Values never travel with the app.
+   */
+  secrets?: AppSecret[];
+  /** Files that come with it (pictures, videos, sounds, data), by name: its view and answers show them as asset:<name>. */
+  assets?: Record<string, AppAsset>;
   /** More flows beside the main one, by name: what its screens (and programs) start, each with the inputs it takes. */
   flows?: Record<string, NamedFlow>;
   /** Its screens: pages of its own ("main" opens on its page), made with naget.app and the App parts. */
@@ -331,9 +340,10 @@ export const ANSWER_TYPES: { value: AnswerType; label: string }[] = [
   { value: 'url', label: 'Link' },
   { value: 'list', label: 'List' },
   { value: 'table', label: 'Table' },
+  { value: 'media', label: 'Pictures, videos or files' },
 ];
 
-export const COLUMN_TYPES = ANSWER_TYPES.filter((t) => t.value !== 'markdown' && t.value !== 'list' && t.value !== 'table') as { value: ColumnType; label: string }[];
+export const COLUMN_TYPES = [...ANSWER_TYPES.filter((t) => t.value !== 'markdown' && t.value !== 'list' && t.value !== 'table' && t.value !== 'media'), { value: 'image', label: 'Picture' }] as { value: ColumnType; label: string }[];
 
 /** Icons an app can wear (lucide names; the pages draw them). */
 export const APP_ICONS = [
@@ -358,7 +368,7 @@ export const APP_COLORS: Record<string, string> = {
 };
 
 /** Addresses the app's own routes use, which no app may take as its name. */
-export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data']);
+export const RESERVED_SLUGS = new Set(['runs', 'batches', 'tools', 'draft', 'models', 'new', 't', 'templates', 'run', 'test', 'check', 'install', 'export', 'data', 'connected', 'media', 'assets']);
 
 // ---- names -----------------------------------------------------------------------------------------
 
@@ -513,8 +523,23 @@ function columnSchema(t: ColumnType, description?: string): Record<string, unkno
   if (t === 'yesno') return { type: 'boolean', ...d };
   if (t === 'date') return { type: 'string', ...d, description: `${description ? `${description}. ` : ''}A date, YYYY-MM-DD.` };
   if (t === 'url') return { type: 'string', ...d, description: `${description ? `${description}. ` : ''}A full https:// address.` };
+  if (t === 'image') return { type: 'string', ...d, description: `${description ? `${description}. ` : ''}A picture: its https:// address, or the path of a file on this computer.` };
   return { type: 'string', ...d };
 }
+
+/** What a media field takes: pictures, videos, sounds or other files, each an address or a path, with a caption. */
+const MEDIA_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      src: { type: 'string', description: 'Where it is: an https:// address, or the path of a file on this computer (a copy is kept)' },
+      caption: { type: 'string', description: 'A line under it' },
+      kind: { type: 'string', enum: ['image', 'video', 'audio', 'file'], description: 'What it is, when its address does not say' },
+    },
+    required: ['src'],
+  },
+};
 
 /** The JSON schema of submit_result's input: one property per answer field. */
 export function answerSchema(answer: AnswerField[]): Record<string, unknown> {
@@ -530,6 +555,7 @@ export function answerSchema(answer: AnswerField[]): Record<string, unknown> {
         items: { type: 'object', properties: Object.fromEntries(cols.map((c) => [c.id, columnSchema(c.type, [c.label, c.description].filter(Boolean).join(': '))])), required: cols.map((c) => c.id) },
       };
     } else if (f.type === 'markdown') properties[f.id] = { type: 'string', description: `${description}. Markdown.` };
+    else if (f.type === 'media') properties[f.id] = { ...MEDIA_SCHEMA, description: `${description}. Pictures, videos, sounds or files: one object each.` };
     else properties[f.id] = columnSchema(f.type, description);
   }
   return { type: 'object', properties, required: answer.filter((f) => f.required).map((f) => f.id) };
@@ -537,9 +563,14 @@ export function answerSchema(answer: AnswerField[]): Record<string, unknown> {
 
 const empty = (v: unknown) => v === undefined || v === null || (typeof v === 'string' && !v.trim());
 
-/** One value as a column of `t` wants it, or an error in words. */
-function cell(t: ColumnType | 'markdown', v: unknown): { v: unknown } | { e: string } {
+/** One value as a column of `t` wants it, or an error in words. `local`: a picture may be a file on this computer. */
+function cell(t: ColumnType | 'markdown', v: unknown, local = true): { v: unknown } | { e: string } {
   switch (t) {
+    case 'image': {
+      const m = cleanMedia(typeof v === 'string' ? v.trim() : v, { local });
+      if (m.errors.length || m.items.length !== 1) return { e: m.errors[0] ?? 'should be one picture' };
+      return { v: m.items[0].src };
+    }
     case 'number': {
       const n = readNumber(v);
       return n === null ? { e: 'should be a number' } : { v: n };
@@ -587,7 +618,8 @@ function unwrap(v: unknown): unknown {
  * What the agent handed in, checked against the answer fields: values in their plain form (numbers as
  * numbers, dates as YYYY-MM-DD), unknown keys dropped. Errors say what to fix, field by field.
  */
-export function checkAnswer(answer: AnswerField[], raw: unknown): { ok: true; value: Record<string, unknown> } | { ok: false; errors: string[] } {
+export function checkAnswer(answer: AnswerField[], raw: unknown, o: { local?: boolean } = {}): { ok: true; value: Record<string, unknown> } | { ok: false; errors: string[] } {
+  const local = o.local !== false;
   const obj = unwrap(raw);
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { ok: false, errors: [`Send one object with the fields ${answer.map((f) => f.id).join(', ')}.`] };
   const src = obj as Record<string, unknown>;
@@ -597,10 +629,14 @@ export function checkAnswer(answer: AnswerField[], raw: unknown): { ok: true; va
     let v = unwrap(src[f.id]);
     if (empty(v) || (Array.isArray(v) && !v.length)) {
       if (f.required) errors.push(`${f.id}: missing (${ANSWER_TYPES.find((t) => t.value === f.type)?.label.toLowerCase() ?? f.type})`);
-      else value[f.id] = f.type === 'list' || f.type === 'table' ? [] : null;
+      else value[f.id] = f.type === 'list' || f.type === 'table' || f.type === 'media' ? [] : null;
       continue;
     }
-    if (f.type === 'list') {
+    if (f.type === 'media') {
+      const m = cleanMedia(v, { local });
+      if (m.errors.length) errors.push(...m.errors.map((e) => `${f.id}: ${e}`));
+      else value[f.id] = m.items;
+    } else if (f.type === 'list') {
       if (typeof v === 'string') v = v.split('\n').map((x) => x.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
       if (!Array.isArray(v)) {
         errors.push(`${f.id}: should be a list of short texts`);
@@ -626,7 +662,7 @@ export function checkAnswer(answer: AnswerField[], raw: unknown): { ok: true; va
             out[c.id] = null;
             continue;
           }
-          const r2 = cell(c.type, x);
+          const r2 = cell(c.type, x, local);
           if ('e' in r2) errors.push(`${f.id} row ${i + 1}, ${c.id}: ${r2.e}`);
           else out[c.id] = r2.v;
         }
@@ -634,7 +670,7 @@ export function checkAnswer(answer: AnswerField[], raw: unknown): { ok: true; va
       });
       value[f.id] = rows;
     } else {
-      const r = cell(f.type === 'markdown' ? 'markdown' : f.type, v);
+      const r = cell(f.type === 'markdown' ? 'markdown' : f.type, v, local);
       if ('e' in r) errors.push(`${f.id}: ${r.e}`);
       else value[f.id] = r.v;
     }
@@ -772,6 +808,8 @@ export function cleanRecipe(raw: any): AppRecipe {
   const examples = cleanExamples(r.examples).examples;
   const graph = cleanGraph(r.graph, flow, flows);
   const ui = cleanUi(r.ui).ui;
+  const secrets = cleanSecrets(r.secrets).secrets;
+  const assets = cleanAssets(r.assets);
   return {
     name: str(r.name, 60) || 'Untitled app',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
@@ -794,6 +832,8 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(data ? { data } : {}),
     ...(r.memory === true ? { memory: true } : {}),
     ...(requires ? { requires } : {}),
+    ...(secrets ? { secrets } : {}),
+    ...(assets ? { assets } : {}),
     ...(flows ? { flows } : {}),
     ...(screens ? { screens } : {}),
     ...(ui ? { ui } : {}),

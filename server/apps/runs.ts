@@ -26,6 +26,8 @@ import { costOf, rateFor } from '../prices.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { ensureEnv } from './env.ts';
+import { refMedia } from './media.ts';
+import { needSecrets } from './secrets.ts';
 import { getRun, insertRun, listRuns, reuseSteps, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
 
 /** Where an app's runs keep their files when the app names no folder: outside the app's data, which Custom treats as private. */
@@ -205,6 +207,8 @@ export function startRun(o: StartInput): RunRecord {
   if (o.flow && !o.recipe.flows?.[o.flow]) throw new HttpError(400, `The app has no flow “${o.flow}”${o.recipe.flows ? ` (it has ${Object.keys(o.recipe.flows).join(', ')})` : ''}`);
   const { values, errors } = checkedInputs(o.recipe, o.inputs, !!o.public, o.files, o.flow);
   if (errors.length) throw new HttpError(400, `Check the form: ${errors.join('; ')}`);
+  // The keys it needs, before it starts (an agent step's run goes by its app's; a public run cannot use them).
+  if (!o.public && o.source !== 'step') needSecrets(d().db, o.recipe);
   const maxFile = o.public ? 3 << 20 : 25 << 20;
   for (const [id, f] of Object.entries(o.files ?? {})) {
     if (!formOf(o.recipe, o.flow).some((x) => x.id === id && x.type === 'file')) throw new HttpError(400, `There is no file field ${id}`);
@@ -299,7 +303,19 @@ function modeFor(agent: Agent, acpAgent: string | undefined, mode: string | unde
 
 /** One answer field as the agent is told it: "- summary (text, Markdown, required): Summary — what goes there". */
 export function fieldLine(f: AnswerField): string {
-  const kind = f.type === 'table' ? `table: a list of rows, each with ${(f.columns ?? []).map((c) => `${c.id} (${c.type})`).join(', ')}` : f.type === 'list' ? 'list of short texts' : f.type === 'markdown' ? 'text, Markdown' : f.type === 'yesno' ? 'true or false' : f.type;
+  const col = (c: { id: string; type: string }) => `${c.id} (${c.type === 'image' ? 'picture: an https:// address or a file’s path' : c.type})`;
+  const kind =
+    f.type === 'table'
+      ? `table: a list of rows, each with ${(f.columns ?? []).map(col).join(', ')}`
+      : f.type === 'list'
+        ? 'list of short texts'
+        : f.type === 'markdown'
+          ? 'text, Markdown'
+          : f.type === 'yesno'
+            ? 'true or false'
+            : f.type === 'media'
+              ? 'pictures, videos, sounds or files: a list of { src, caption }, src an https:// address or the path of a file on this computer (a copy is kept)'
+              : f.type;
   return `- ${f.id} (${kind}${f.required ? ', required' : ''}): ${f.label}${f.description ? ` — ${f.description}` : ''}`;
 }
 
@@ -643,6 +659,8 @@ export function finish(id: string, status: RunStatus, error?: string, got?: { re
       error ??= 'The agent ended without an answer';
     }
     updateRun(db, id, { status, endedAt: Date.now(), ...(got?.result ? { result: got.result } : {}), ...(reply ? { reply } : {}), ...(cost !== undefined ? { costUsd: Math.round(cost * 10000) / 10000 } : {}), ...(error ? { error } : {}) });
+    // The files its answer shows stay while the run does (a flow's come from its steps' runs).
+    if (got?.result) refMedia(db, `run:${id}`, got.result);
     ending.delete(id);
     const next = getRun(db, id)!;
     cache.delete(id);
@@ -714,6 +732,7 @@ export async function stopRun(id: string) {
 export function saveResult(id: string, value: Record<string, unknown>) {
   reopen(id);
   updateRun(d().db, id, { result: value });
+  refMedia(d().db, `run:${id}`, value);
   const t = followed.get(id);
   if (t?.ask) t.ask.submitted = true;
   cache.delete(id);

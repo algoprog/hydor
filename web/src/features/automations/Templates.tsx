@@ -128,7 +128,7 @@ function TemplateDialog({ template, onClose, onMore }: { template: Template; onC
     >
       <p className="mb-3 text-[13px] leading-relaxed text-fg-3">
         {template.blurb}
-        {template.needs && ` It needs ${template.needs} (Settings → Connections).`}
+        {template.needs && ` It needs ${template.needs} (Apps → Connected apps).`}
       </p>
       <div className="space-y-3">
         {template.fields.map((f) => (

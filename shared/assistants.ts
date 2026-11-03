@@ -29,7 +29,7 @@ export interface Assistant {
   model?: string;
   /** What it may use; none means everything. Tools the app itself adds (pages, memory…) stay on. */
   tools?: ToolKind[];
-  /** Connections on in its sessions, by id (Settings → Connections). */
+  /** Connections on in its sessions, by id (Apps → Connected apps). */
   connections?: string[];
   /** Skills it favors, by name. */
   skills?: string[];

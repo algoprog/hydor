@@ -1,7 +1,7 @@
 // Connections: apps and services (Notion, Linear, GitHub, a folder on this computer…) signed in once for
 // every agent, from a catalog anyone can add to (catalog/connections/), and a vault for keys.
 //
-//   Settings → Connections   the marketplace, the connected apps (test, on or off, disconnect), the keys
+//   Apps → Connected apps    the marketplace, the connected services (test, on or off, disconnect), the keys
 //   every agent              gets each connected app as an MCP server (relay.ts: no key in its settings),
 //                            and request_secret, http_request and list_connections (tools.ts)
 //   /connections/callback    where a browser sign-in comes back to, at the app's own address (a phone too)
@@ -59,7 +59,7 @@ function instructions(apps: Conn[]): string {
   const lines: string[] = [];
   if (apps.length)
     lines.push(
-      `Connected accounts (the user's own, in other services, set up in Settings → Connections), each an MCP server of that name: ${apps.map((c) => `${c.id} (${c.entry.name})`).join(', ')}. Use them when a task involves those services.`,
+      `Connected accounts (the user's own, in other services, set up in Apps → Connected apps), each an MCP server of that name: ${apps.map((c) => `${c.id} (${c.entry.name})`).join(', ')}. Use them when a task involves those services.`,
     );
   lines.push(
     'Keys and sign-ins: never ask the user to type a password, token, API key or other secret into the chat, and never print one you come across. When a task needs one, use what is set up already (list_connections shows the vault and the connected accounts; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).',
@@ -168,14 +168,14 @@ function routes(d: Deps) {
     if (r.flow) {
       changed('apps', r.app);
       if (r.ok && r.app) testLater(r.app);
-      return reply.redirect(`/settings?s=connections&flow=${encodeURIComponent(r.flow)}`);
+      return reply.redirect(`/apps/connected?flow=${encodeURIComponent(r.flow)}`);
     }
     return reply
       .code(400)
       .header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'")
       .type('text/html; charset=utf-8')
       .send(
-        `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Naget Agent</title><body style="font:15px/1.5 system-ui,sans-serif;max-width:420px;margin:15vh auto;padding:0 20px;color:#222"><p>${(r.error ?? 'Signing in did not finish.').replace(/[<>&]/g, '')}</p><p><a href="/settings?s=connections">Back to Connections</a></p></body>`,
+        `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Naget Agent</title><body style="font:15px/1.5 system-ui,sans-serif;max-width:420px;margin:15vh auto;padding:0 20px;color:#222"><p>${(r.error ?? 'Signing in did not finish.').replace(/[<>&]/g, '')}</p><p><a href="/apps/connected">Back to Connected apps</a></p></body>`,
       );
   });
 

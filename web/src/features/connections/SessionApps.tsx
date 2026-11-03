@@ -60,8 +60,8 @@ export function SessionAppsDialog({ s }: { s: SessionSummary }) {
       ) : !list.length ? (
         <div className="space-y-3 text-[13.5px] leading-relaxed text-fg-2">
           <p>No accounts are connected yet. Connect one once in Settings, and every agent can use it.</p>
-          <Button size="sm" variant="secondary" onClick={() => (close(), go('/settings?s=connections'))}>
-            Open Settings → Connections
+          <Button size="sm" variant="secondary" onClick={() => (close(), go('/apps/connected'))}>
+            Open Connected apps
           </Button>
         </div>
       ) : (

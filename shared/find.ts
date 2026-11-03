@@ -260,7 +260,7 @@ export function placeOf(pathname: string, search: string, pagePaths: Record<stri
   const t = /^\/apps\/t\/([^/]+)$/.exec(pathname);
   if (t) return `app:tpl:${decodeURIComponent(t[1])}`;
   const a = /^\/apps\/([^/]+)$/.exec(pathname);
-  if (a && a[1] !== 'new') return `app:${decodeURIComponent(a[1])}`;
+  if (a && a[1] !== 'new' && a[1] !== 'connected') return `app:${decodeURIComponent(a[1])}`;
   const pg = /^\/pages\/([^/]+)$/.exec(pathname);
   if (pg) return `page:${decodeURIComponent(pg[1])}`;
   const md = /^\/media\/([^/]+)$/.exec(pathname);

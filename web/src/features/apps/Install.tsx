@@ -1,7 +1,7 @@
 // A template from a file and to a file: the link on the New template page that installs one (after a card
 // saying what it is, in plain terms, and what it will do here), the dialog that downloads one, and the line on
 // a template's page that says how the packages it needs stand.
-import { useRef, useState, type ReactNode } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Download, FileUp } from 'lucide-react';
 import type { AppDef } from '@shared/apps';
 import type { EnvView, InstallPreview } from '@shared/app-manifest';
@@ -11,6 +11,10 @@ import { toast, toastError } from '../../lib/store';
 import { Button, cx, Dialog, Switch } from '../../components/ui';
 import { AppAbout } from './About';
 import { appPath, fileToBase64, money } from './api';
+import { AppKeys, emptyKeys, keysBody, type KeyInput } from './AppKeys';
+
+/** "2.4 MB". */
+const size = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(n >= 10485760 ? 0 : 1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -28,7 +32,7 @@ type Picks = Record<string, string>;
  * What a template from a file is and will do here, before it is installed: in plain terms first (what it asks,
  * what you get, how it works, whether agents may run it), then what it uses here, folded unless something needs a look.
  */
-function PreviewCard({ p, picks, onPick, agents, onAgents }: { p: InstallPreview; picks: Picks; onPick: (key: string, value: string) => void; agents: boolean; onAgents: (on: boolean) => void }) {
+function PreviewCard({ p, picks, onPick, agents, onAgents, keys, onKeys }: { p: InstallPreview; picks: Picks; onPick: (key: string, value: string) => void; agents: boolean; onAgents: (on: boolean) => void; keys: KeyInput; onKeys: (k: KeyInput) => void }) {
   const needs = [...p.needs.node.map((n) => `${n} (Node)`), ...p.needs.python.map((n) => `${n} (Python)`)];
   // Models to pick, commands missing or warnings open the details by themselves.
   const [open, setOpen] = useState(() => p.models.some((m) => m.status !== 'here') || p.needs.missing.length > 0 || p.warnings.length > 0);
@@ -44,7 +48,8 @@ function PreviewCard({ p, picks, onPick, agents, onAgents }: { p: InstallPreview
           </ul>
         </div>
       )}
-      <AppAbout name={p.name} description={p.description} icon={p.icon} color={p.color} category={p.category} origin="From a file" summary={p.summary} agents={agents} onAgents={onAgents} />
+      <AppAbout name={p.name} description={p.description} icon={p.icon} color={p.color} category={p.category} origin={p.builtin ? 'Ready-made' : 'From a file'} summary={p.summary} agents={agents} onAgents={onAgents} />
+      {(p.secrets ?? []).length > 0 && <AppKeys keys={p.secrets} input={keys} onChange={onKeys} later own className="rounded-2xl border border-line px-4 py-3" />}
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 rounded-xl px-1 py-1 text-left text-[13px] font-medium text-fg-2 hover:text-fg" aria-expanded={open}>
         <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform', open && 'rotate-90')} />
         What it uses here
@@ -53,6 +58,24 @@ function PreviewCard({ p, picks, onPick, agents, onAgents }: { p: InstallPreview
         <div className="divide-y divide-line rounded-xl border border-line px-3">
           <Line label="Who does the work">{p.agents.join(', ') || '—'}</Line>
           <Line label="What it does">{p.steps ? `${p.steps} steps` : 'One agent does the task'}</Line>
+          {(p.files ?? []).length > 0 && (
+            <Line label="Its own files">
+              <span translate="no">{p.files.map((f) => f.name).join(', ')}</span>
+              <div className="text-fg-3">{`${p.files.length} ${p.files.length === 1 ? 'file' : 'files'}, ${size(p.files.reduce((n, f) => n + f.bytes, 0))}: kept with it, for its view and answers`}</div>
+            </Line>
+          )}
+          {(p.view?.widgets ?? []).length > 0 && (
+            <Line label="Its view’s scripts">
+              <span translate="no">{p.view.widgets.join(', ')}</span>
+              {p.view.libs.length > 0 && (
+                <div className="text-fg-3">
+                  {'Loads '}
+                  <span translate="no">{p.view.libs.join(', ')}</span>
+                  {' from jsDelivr'}
+                </div>
+              )}
+            </Line>
+          )}
           {p.screens.length > 0 && (
             <Line label="Its screens">
               <span translate="no">{p.screens.join(', ')}</span>
@@ -150,37 +173,49 @@ function PreviewCard({ p, picks, onPick, agents, onAgents }: { p: InstallPreview
   );
 }
 
+/** The largest app file, as the server takes it. */
+const MAX_FILE = 160 << 20;
+
+/** Opens the install card for a file from elsewhere (one dropped on the Apps page). */
+export interface InstallHandle {
+  open: (f: File) => void;
+}
+
 /** "Install a template from a file": picks a .naget-app or .json, shows what it will do, installs it. */
-/** `trigger`: what opens the file picker, in place of the usual link (a menu item, say). */
-export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => ReactNode } = {}) {
+/** `trigger`: what opens the file picker, in place of the usual link (a menu item, say); none: only `open`. */
+export const InstallFromFile = forwardRef<InstallHandle, { trigger?: (open: () => void) => ReactNode }>(function InstallFromFile({ trigger }, handle) {
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<{ name: string; data: string } | null>(null);
   const [preview, setPreview] = useState<InstallPreview | null>(null);
   const [picks, setPicks] = useState<Picks>({});
   const [agents, setAgents] = useState(true);
+  const [keys, setKeys] = useState<KeyInput>(emptyKeys);
   const [busy, setBusy] = useState(false);
   const pick = async (f: File | undefined) => {
     if (!f) return;
-    if (f.size > 20 << 20) return toast('An app file is at most 20 MB', 'error');
+    if (f.size > MAX_FILE) return toast(`An app file is at most ${MAX_FILE >> 20} MB`, 'error');
+    if (!/\.(naget-app|zip|json)$/i.test(f.name)) return toast('That is not an app file (.naget-app or .json)', 'error');
     try {
       const sent = { name: f.name, data: await fileToBase64(f) };
       const r = await post<{ preview: InstallPreview }>('/api/apps/install/check', { file: sent });
       setFile(sent);
       setPicks({});
       setAgents(true);
+      setKeys(emptyKeys());
       setPreview(r.preview);
     } catch (e) {
       toastError(e);
     }
   };
+  useImperativeHandle(handle, () => ({ open: (f: File) => void pick(f) }));
   const install = async () => {
     if (!file) return;
     setBusy(true);
     try {
-      const r = await post<{ app: AppDef }>('/api/apps/install', { file, models: picks, ...(preview?.summary.sessions ? { agents } : {}) });
+      const r = await post<{ app?: AppDef; builtin?: string }>('/api/apps/install', { file, models: picks, ...(preview?.summary.sessions ? { agents } : {}), ...keysBody(keys) });
       const needs = preview && preview.needs.node.length + preview.needs.python.length > 0;
-      toast(needs ? 'Installed. What it needs is installing; its first run waits for it.' : 'Installed', 'ok');
-      go(appPath(r.app.id));
+      toast(r.builtin ? 'Installed again' : needs ? 'Installed. What it needs is installing; its first run waits for it.' : 'Installed', 'ok');
+      go(appPath(r.app ? r.app.id : `tpl:${r.builtin}`));
     } catch (e) {
       toastError(e);
     } finally {
@@ -190,7 +225,7 @@ export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => R
   const close = () => (setPreview(null), setFile(null));
   return (
     <>
-      {trigger ? (
+      {trigger !== undefined ? (
         trigger(() => input.current?.click())
       ) : (
         <button type="button" onClick={() => input.current?.click()} className="inline-flex items-center gap-1.5 text-[13px] text-fg-3 hover:text-fg">
@@ -224,11 +259,11 @@ export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => R
           </>
         }
       >
-        {preview && <PreviewCard p={preview} picks={picks} onPick={(k, v) => setPicks((x) => ({ ...x, [k]: v }))} agents={agents} onAgents={setAgents} />}
+        {preview && <PreviewCard p={preview} picks={picks} onPick={(k, v) => setPicks((x) => ({ ...x, [k]: v }))} agents={agents} onAgents={setAgents} keys={keys} onKeys={setKeys} />}
       </Dialog>
     </>
   );
-}
+});
 
 /** Downloads a template as a .naget-app; one that keeps data asks whether its records go too. */
 export function DownloadDialog({ app, open, onClose }: { app: AppDef; open: boolean; onClose: () => void }) {

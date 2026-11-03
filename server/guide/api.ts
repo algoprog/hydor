@@ -32,6 +32,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(access-tokens|mcp\/tokens)$/, 'refuse', 'Tokens are made by the user in Settings, so their value never passes through an agent. Tell them where: Settings → App → Machines (access from other machines) or Connect other agents.'],
   ['POST', /^\/api\/apps\/[^/]+\/keys$/, 'refuse', 'An app’s API keys are made by the user, on its Share tab.'],
   ['POST|PATCH', /^\/api\/connections\/secrets/, 'refuse', 'A key’s value never passes through an agent: ask for it with request_secret, and the user enters it in a card.'],
+  ['POST', /^\/api\/apps\/[^/]+\/secrets$/, 'refuse', 'A key’s value never passes through an agent: the user gives the keys an app needs on its page, its install card, or its card in a session (use_app shows it).'],
   ['*', /^\/api\/accounts\/[^/]+\/(login|logout)/, 'refuse', 'Signing in and out of an agent’s account is the user’s to do, in Settings → Agents → Accounts.'],
   ['W', /^\/api\/budget\//, 'refuse', 'Spending caps are the user’s to set: the session’s menu → Spending cap, or Options on the start page.'],
   ['W', /^\/api\/sessions\/[^/]+\/(takeover|seen|queue)/, 'refuse', 'That is for the session’s own page.'],
@@ -74,6 +75,9 @@ export function ruleFor(method: string, path: string): { level: Level; why?: str
 /** A few calls are refused for what they carry: an agent changing a session's permissions or its spending cap. */
 function refusedBody(method: string, path: string, body: Json, own: string): string | null {
   const s = /^\/api\/sessions\/([^/]+)(\/.*)?$/.exec(path);
+  // An app's keys go with a run or an install only from the user's own pages.
+  // (A recipe's own `secrets` is a list of the keys it needs, by name: that is not a value.)
+  if (/^\/api\/apps\//.test(path) && ((body.secrets && typeof body.secrets === 'object' && !Array.isArray(body.secrets)) || body.allow !== undefined)) return 'A key’s value never passes through an agent: the user gives the keys an app needs on its page, its install card, or its card in a session (use_app shows it).';
   if (!s) return null;
   const key = decodeURIComponent(s[1]);
   if (s[2] === '/config' && body.mode !== undefined) return 'A session’s permissions are the user’s to change (the picker by the message box, or Shift+Tab).';

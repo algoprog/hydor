@@ -163,7 +163,7 @@ export async function finishOAuth(db: DB, q: Record<string, string | undefined>)
   const state = String(q.state ?? '');
   const f = state ? flows.get(state) : undefined;
   if (f) flows.delete(state);
-  if (!f || Date.now() - f.createdAt > FLOW_TTL) return { ok: false, error: 'This sign-in has expired or was already used. Start again from Settings → Connections.' };
+  if (!f || Date.now() - f.createdAt > FLOW_TTL) return { ok: false, error: 'This sign-in has expired or was already used. Start again from Apps → Connected apps.' };
   const done = (ok: boolean, error?: string) => {
     results.set(f.id, { app: f.appId, name: f.entry.name, ok, ...(error ? { error } : {}), at: Date.now() });
     return { flow: f.id, app: f.appId, ok, ...(error ? { error } : {}) };

@@ -20,6 +20,7 @@ import { Button, cx, Empty, IconButton, MenuItem, Popover, Section, Tabs, Throbb
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
 import { AgentsCard, AppAbout } from './About';
+import { AppKeys, AppKeysCard, emptyKeys, keysBody, keysMissing, type KeyInput, type KeyState } from './AppKeys';
 import { appPath, money, runPath, SOURCE_LABEL, useRunEvents, type AppDetail, type RunDetail } from './api';
 import { AppIcon } from './AppIcon';
 import { BatchTab } from './Batch';
@@ -31,6 +32,7 @@ import { AppScreen } from './Screen';
 import { AppView } from './View';
 import { Schedules } from './Schedules';
 import { ShareTab } from './Share';
+import { tr } from '../../i18n/runtime';
 
 type Tab = 'run' | 'runs' | 'rows' | 'share';
 
@@ -138,7 +140,12 @@ function LatestRuns({ id, recipe, template }: { id: string; recipe: AppDef | App
   );
 }
 
-function RunTab({ id, recipe, template, again, agents }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; agents?: ReactNode }) {
+function RunTab({ id, recipe, template, again, agents, secrets }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; agents?: ReactNode; secrets?: KeyState[] }) {
+  // The keys it needs: those the vault lacks are asked for here, and saved there as it starts.
+  const [keyStates, setKeyStates] = useState<KeyState[]>(secrets ?? []);
+  useEffect(() => setKeyStates(secrets ?? []), [secrets]);
+  const [keys, setKeys] = useState<KeyInput>(emptyKeys);
+  const [keyErrors, setKeyErrors] = useState<Record<string, string>>({});
   const [values, setValues] = useState<FormValues>(() => initialValues(recipe.fields));
   // "Run again": the answers of an earlier run (files are chosen afresh).
   useEffect(() => {
@@ -169,14 +176,22 @@ function RunTab({ id, recipe, template, again, agents }: { id: string; recipe: A
   const run = async () => {
     const errs = formErrors(recipe.fields, values, files);
     setErrors(errs);
-    if (Object.keys(errs).length) return toast('Fill in the questions marked first', 'error');
+    const lacking = keysMissing(keyStates, keys);
+    setKeyErrors(Object.fromEntries(lacking.map((k) => [k.name, tr('Needed to run it')])));
+    if (Object.keys(errs).length || lacking.length) return toast(lacking.length && !Object.keys(errs).length ? 'Add the key it needs first' : 'Fill in the questions marked first', 'error');
     setBusy(true);
     try {
       const pick = template ? { agent, acpAgent: agent === 'acp' ? acpAgent : undefined, model: model ?? undefined, effort: effort ?? undefined, mode: mode ?? undefined } : {};
       if (template) localStorage.setItem('wa.apps.agent', JSON.stringify(pick));
-      const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...pick });
+      const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...pick, ...keysBody(keys) });
       go(runPath(r.run.id));
     } catch (e) {
+      // Keys it still needs (one removed from the vault meanwhile): asked for here.
+      const need = (e as { data?: { secrets?: KeyState[] } }).data?.secrets;
+      if (need?.length) {
+        setKeyStates((ks) => ks.map((k) => (need.some((n) => n.name === k.name) ? { ...k, have: false, hint: undefined } : k)));
+        setKeyErrors(Object.fromEntries(need.map((k) => [k.name, tr('Needed to run it')])));
+      }
       toastError(e);
       setBusy(false);
     }
@@ -205,6 +220,17 @@ function RunTab({ id, recipe, template, again, agents }: { id: string; recipe: A
               }
             />
           </div>
+          {keyStates.length > 0 && (
+            <AppKeys
+              keys={keyStates}
+              input={keys}
+              onChange={(next) => (setKeys(next), setKeyErrors((x) => Object.fromEntries(Object.entries(x).filter(([n]) => !next.values[n]?.trim()))))}
+              errors={keyErrors}
+              disabled={busy}
+              own={!template}
+              className="border-t border-line px-5 pt-3.5 pb-2 sm:px-6"
+            />
+          )}
           {template && picking && (
             <div className="flex flex-wrap items-center gap-1 border-t border-line bg-bg-1 px-4 py-2.5">
               <AgentPicker
@@ -301,7 +327,7 @@ function HomeView({ app, view }: { app: AppDef; view?: Record<string, unknown> }
     );
   return (
     <div className="mx-auto max-w-[920px] px-4 py-6 sm:px-6">
-      <AppView ui={app.ui!} name={app.name} description={app.description} appId={app.id} on="app" last={last} answer={app.answer} view={view} info={info} can={['keep', 'run', 'start', 'data']} />
+      <AppView ui={app.ui!} name={app.name} description={app.description} appId={app.id} on="app" last={last} answer={app.answer} view={view} info={info} can={['keep', 'run', 'start', 'data']} assets={app.assets} />
     </div>
   );
 }
@@ -529,6 +555,12 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
           </div>
         ) : (
           <>
+            {/* An app that opens on its own screen or view: the keys it still needs, given here (its form asks for them otherwise). */}
+            {d?.app && tab === 'run' && !again && (pagesFor(d.app.ui, 'app').length > 0 || !!d.app.screens?.main) && (d.secrets ?? []).some((k) => !k.have && !k.optional) && (
+              <div className="mx-auto max-w-[920px] px-4 pt-5 sm:px-6">
+                <AppKeysCard appId={d.app.id} keys={d.secrets!} own onSaved={(secrets) => setD((x) => (x ? { ...x, secrets } : x))} />
+              </div>
+            )}
             {d?.app && d.env && tab === 'run' && (d.env.state !== 'none' && d.env.state !== 'ready' ? true : d.env.missing.length > 0) && (
               <div className="mx-auto max-w-[760px] px-5 pt-5 sm:px-7">
                 <EnvLine appId={d.app.id} env={d.env} onChange={load} />
@@ -544,7 +576,7 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                 <AppScreen app={d.app} />
               </div>
             ) : (
-              (tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} agents={agentsCard} />
+              (tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} agents={agentsCard} secrets={d?.secrets} />
             )}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} def={d?.app} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}

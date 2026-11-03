@@ -308,7 +308,7 @@ export async function freshOAuth(db: DB, c: Conn, o: OAuthCred, force = false): 
   if (!o.refresh_token) {
     if (o.expires_at && o.expires_at <= Date.now()) {
       setStatus(db, c.id, 'signin', 'The sign-in ended: connect again');
-      throw new HttpError(409, `${c.entry.name}'s sign-in ended: connect it again in Settings → Connections`);
+      throw new HttpError(409, `${c.entry.name}'s sign-in ended: connect it again in Apps → Connected apps`);
     }
     return o;
   }

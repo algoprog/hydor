@@ -5,6 +5,7 @@ import type { EnvView } from '@shared/app-manifest';
 import { isActive } from '@shared/apps';
 import { api, enc } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
+import type { KeyState } from './AppKeys';
 
 export interface Usage {
   runs: number;
@@ -42,10 +43,12 @@ export interface AppDetail {
   env?: EnvView;
   /** What its own page's view keeps (an app whose view has pages for its own page). */
   view?: Record<string, unknown>;
+  /** The keys it needs, and how the vault has each (never a value). */
+  secrets?: KeyState[];
 }
 
 /** What a run's page knows of its app: its face, form and answer, and the view its answer shows in (when it has one). */
-export type RunRecipe = Pick<AppRecipe, 'name' | 'icon' | 'color' | 'fields' | 'answer' | 'agent' | 'acpAgent' | 'model' | 'ui'> & {
+export type RunRecipe = Pick<AppRecipe, 'name' | 'icon' | 'color' | 'fields' | 'answer' | 'agent' | 'acpAgent' | 'model' | 'ui' | 'assets'> & {
   /** Its main flow works in steps (a one-task app's run takes follow-ups). */
   steps?: boolean;
 };

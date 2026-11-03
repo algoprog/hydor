@@ -34,6 +34,8 @@ export function publicApp(a: AppDef) {
     answer: a.answer.map(({ id, label, type, columns }) => ({ id, label, type, columns: columns?.map(({ id: cid, label: cl, type: ct }) => ({ id: cid, label: cl, type: ct })) })),
     // Its view, as a visitor's run shows in it: only what a click does on the page itself.
     ...(localUi(a.ui) ? { ui: localUi(a.ui) } : {}),
+    // Its own files, which its view and answers show (by addresses nobody can guess).
+    ...(a.assets ? { assets: Object.fromEntries(Object.entries(a.assets).map(([n, x]) => [n, { sha: x.sha }])) } : {}),
   };
 }
 

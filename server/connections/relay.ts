@@ -224,7 +224,7 @@ export function relayRoutes(d: Deps) {
     const c = connection(d.db, String((req.params as { app: string }).app));
     if (!c || c.entry.server.transport === 'stdio') return fail('That service is not connected here');
     if (!onFor(c, sessionExtra(d.db, run.key))) return fail(`${c.entry.name} is turned off for this session`);
-    if (c.status === 'signin') return fail(`${c.entry.name} needs connecting again (Settings → Connections)`);
+    if (c.status === 'signin') return fail(`${c.entry.name} needs connecting again (Apps → Connected apps)`);
     // Calls to tools that are off are answered here; the rest go to the app.
     const replies: Rpc[] = [];
     const forward: Rpc[] = [];
@@ -235,7 +235,7 @@ export function relayRoutes(d: Deps) {
       const tool = String(m.params?.name ?? '');
       // A call to a tool that is off never reaches the app, answered or not (a call without an id is dropped).
       if (m.method === 'tools/call' && !toolOn(c, tool)) {
-        if (isRequest(m)) replies.push({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `${c.entry.name}'s ${tool} tool is turned off (Settings → Connections).` }], isError: true } });
+        if (isRequest(m)) replies.push({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `${c.entry.name}'s ${tool} tool is turned off (Apps → Connected apps).` }], isError: true } });
       } else forward.push(m);
     }
     let sessionId: string | undefined;
@@ -253,7 +253,7 @@ export function relayRoutes(d: Deps) {
         if (e instanceof Unauthorized) {
           const oauth = c.entry.auth.type === 'oauth';
           setStatus(d.db, c.id, oauth ? 'signin' : 'error', oauth ? 'The sign-in was refused: connect again' : 'The key was refused');
-          return fail(oauth ? `${c.entry.name} refused the sign-in: the user needs to connect it again in Settings → Connections` : `${c.entry.name} refused its key (Settings → Connections)`);
+          return fail(oauth ? `${c.entry.name} refused the sign-in: the user needs to connect it again in Apps → Connected apps` : `${c.entry.name} refused its key (Apps → Connected apps)`);
         }
         return fail(`${c.entry.name}: ${(e as Error).message}`);
       }

@@ -104,7 +104,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### MCP servers
 
-[Settings → MCP servers](/settings?s=mcp): tools the agents can call. More in [Connections, keys and tools](/guide/connections).
+[Settings → MCP servers](/settings?s=mcp): tools the agents can call. More in [Connected apps, keys and tools](/guide/connections).
 
 - [**Add server**](/settings?s=mcp&find=Add%20server): A tool server for Claude Code or Codex.
 - [**Check connections**](/settings?s=mcp&find=Check%20connections): See whether each MCP server answers.
@@ -117,7 +117,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Plugins
 
-[Settings → Plugins](/settings?s=plugins): Claude Code add-ons that bundle skills, commands, agents and MCP servers. More in [Connections, keys and tools](/guide/connections).
+[Settings → Plugins](/settings?s=plugins): Claude Code add-ons that bundle skills, commands, agents and MCP servers. More in [Connected apps, keys and tools](/guide/connections).
 
 - [**Installed**](/settings?s=plugins&find=Installed): The plugins Claude Code has.
 - [**Browse**](/settings?s=plugins&find=Browse): Find plugins to install.
@@ -198,13 +198,6 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Making videos**](/settings?s=images&find=Making%20videos): Let agents make videos.
 - [**Video model**](/settings?s=images&find=Video%20model): The model that makes videos.
 - [**Captions in the Library**](/settings?s=images&find=Captions%20in%20the%20Library): The model that writes the titles and descriptions of the images and videos you keep.
-
-### Connections
-
-[Settings → Connections](/settings?s=connections): services every agent can use, from a marketplace anyone can add to, and a vault for keys. More in [Connections, keys and tools](/guide/connections).
-
-- [**Marketplace**](/settings?s=connections&find=Marketplace): Services every agent can use, to connect once.
-- [**Add a key**](/settings?s=connections&find=Add%20a%20key): A key agents can use without seeing it.
 
 ### Voice
 

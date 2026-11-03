@@ -1,9 +1,9 @@
-// Connections: apps and services signed in once for every agent, their marketplace, and the vault for keys.
-import { PlugZap } from 'lucide-react';
+// Connections: services signed in once for every agent, their marketplace, and the vault for keys. They are the
+// Connected apps part of the Apps page (/apps/connected, ConnectedApps.tsx); a session's menu turns them on or off
+// for it, and an agent asking for a key shows its card in the conversation.
 import type { ToolInfo } from '@shared/types';
 import { StepRow } from '../automations/StepRow';
 import type { WebFeature } from '../registry';
-import { ConnectionsSettings } from './ConnectionsSettings';
 import { SecretCard } from './SecretCard';
 import { SessionAppsDialog, SessionAppsItem } from './SessionApps';
 
@@ -14,15 +14,6 @@ const commandOf = (t: ToolInfo) => {
 
 export const connectionsFeature: WebFeature = {
   id: 'connections',
-  settings: [
-    {
-      id: 'connections',
-      label: 'Connections',
-      icon: PlugZap,
-      sub: 'Services every agent can use, from a marketplace anyone can add to, and a vault for keys',
-      Body: ConnectionsSettings,
-    },
-  ],
   // An agent asking for a key: a card outside the folded work, since it needs you. A command run with keys
   // reads and counts as the agent's other commands.
   toolViews: {

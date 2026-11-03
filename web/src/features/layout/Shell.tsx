@@ -21,13 +21,26 @@ import { undoLast } from '../../lib/flags';
 import { CommandPalette, usePalette } from '../palette/CommandPalette';
 import { CountVisits } from '../palette/usage';
 import { ReleaseNotes, WhatsNew } from '../settings/Releases';
-import { Lightbox } from '../../components/Lightbox';
+import { Lightbox, VideoBox } from '../../components/Lightbox';
 import { HelpButton, Tour } from '../tour/Tour';
 import { Tips } from '../tips/Tips';
 import { HandsFree } from '../voice/HandsFree';
 import { ReviewPage } from '../review/ReviewPage';
 import { PreviewPage } from '../preview/PreviewPage';
 import { features } from '../registry';
+
+/** Settings → Connections, from before it was part of the Apps page: the same place there (its sign-in coming back too). */
+function ToConnected({ q }: { q: URLSearchParams }) {
+  useEffect(() => {
+    const find = (q.get('find') ?? '').toLowerCase();
+    const to = new URLSearchParams();
+    if (q.get('flow')) to.set('flow', q.get('flow')!);
+    if (/key|vault|secret/.test(find)) to.set('tab', 'keys');
+    else if (/market|service/.test(find)) to.set('tab', 'market');
+    go(`/apps/connected${to.size ? `?${to}` : ''}`, true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
 
 function useDrag(onMove: (dy: number) => void) {
   return (e: React.PointerEvent) => {
@@ -81,6 +94,8 @@ function Page() {
   if (loc === '/system') return <SystemPage />;
   if (loc === '/settings') {
     const q = new URLSearchParams(search);
+    // Connections are the Apps page's Connected apps now: an old link (and a sign-in coming back) goes there.
+    if (q.get('s') === 'connections') return <ToConnected q={q} />;
     // Instructions (CLAUDE.md and AGENTS.md) are part of Agent Guidelines now.
     const s = q.get('s') === 'instructions' ? 'guidelines' : q.get('s');
     const agent = q.get('agent');
@@ -211,6 +226,7 @@ export function Shell() {
         <WhatsNew />
         <FilePeek />
         <Lightbox />
+        <VideoBox />
         <Tour />
         <Tips />
         <HandsFree />
@@ -246,6 +262,7 @@ export function Shell() {
       <WhatsNew />
       <FilePeek />
       <Lightbox />
+      <VideoBox />
       {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}
       <Tour />
       <Tips />

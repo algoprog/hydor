@@ -1,6 +1,6 @@
 # Adding an app to the catalog
 
-Settings → Connections lists the apps in `catalog/connections/`, one JSON file per app. Anyone can add
+Apps → Connected apps lists the apps in `catalog/connections/`, one JSON file per app. Anyone can add
 one, or fix one, with a pull request. Once connected, an app's tools reach every agent the person runs
 in Naget Agent: Claude Code, Codex, ACP agents and Custom.
 

@@ -163,7 +163,7 @@ webhook 是其他服务在发生某件事时调用的地址：GitHub 在有拉�
 - [**价格监控**](/settings?s=tasks&find=Price%20watch)：每 60 分钟查看一次商品页面（如果你给了一段文字，比如“价格”，就只看它附近），在价格变化时，或在价格达到或低于你给的目标价时告诉你。
 - [**网页变化提醒**](/settings?s=tasks&find=Page%20change%20alert)：每 30 分钟查看一次某个网页或其中某段文字附近的部分，告诉你变了什么、是否重要；无关紧要的变化不会打扰你。
 - [**基于文件夹的每周报告**](/settings?s=tasks&find=Weekly%20report%20from%20a%20folder)：在每周的某一天（默认周五 16:00），总结某个文件夹或代码仓库在过去七天里的变化，以及哪些看起来还没完成，并为下周提三条建议。它不会修改任何文件。
-- [**收件箱摘要**](/settings?s=tasks&find=Inbox%20digest)：自上次运行以来你收到的邮件，需要你处理的排在前面。它只读不写，并且需要连接一个邮件账户（见[连接、密钥和工具](/guide/connections)）。
+- [**收件箱摘要**](/settings?s=tasks&find=Inbox%20digest)：自上次运行以来你收到的邮件，需要你处理的排在前面。它只读不写，并且需要连接一个邮件账户（见[已连接的应用、密钥和工具](/guide/connections)）。
 - [**习惯打卡**](/settings?s=tasks&find=Habit%20check-in)：在你选的时间（默认每天 20:00）友好地问问你某个习惯的情况，并在任务的笔记里记下你连续坚持的天数。
 - [**新版本发布**](/settings?s=tasks&find=New%20releases)：每 6 小时查看一次某个 GitHub 仓库（owner/name）的发布，总结有哪些新内容、哪些可能导致问题。
 - [**网站在线检查**](/settings?s=tasks&find=Site%20up%20check)：每 10 分钟检查一次某个地址。网站宕机时，智能体会查出原因（DNS、证书、HTTP 状态、超时）；恢复时，它会用一句话告诉你。

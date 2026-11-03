@@ -42,7 +42,6 @@ const TOPIC = {
   memory: 'memory',
   children: 'research',
   images: 'documents-voice',
-  connections: 'connections',
   voice: 'documents-voice',
   assistants: 'assistants',
   skillpack: 'skills',

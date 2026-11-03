@@ -204,11 +204,11 @@ export async function liveEntries(): Promise<Entry[]> {
       title: c.name,
       keywords: `connection ${c.app?.name ?? ''}`,
       text: c.app?.description,
-      where: 'Settings › Capabilities › Connections',
+      where: 'Apps › Connected apps',
       body: c.app?.description,
-      opens: 'Opens Settings → Connections, at this one',
-      within: 'sec:connections',
-      run: () => go(settingsAt('connections', c.name)),
+      opens: 'Opens Apps → Connected apps',
+      within: 'go:connected',
+      run: () => go('/apps/connected?tab=connected'),
     });
   out.push(...(await guideEntries()));
   held = { at: Date.now(), entries: out };

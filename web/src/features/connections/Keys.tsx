@@ -1,4 +1,4 @@
-// Settings → Connections → Keys: the vault. Each key has a name agents use, a value never shown back
+// Apps → Connected apps → Keys: the vault. Each key has a name agents use, a value never shown back
 // (a masked hint only), the hosts http_request may send it to and the browser may type it on, whether
 // commands on this computer may have it, a note, and how it is sent.
 import { useEffect, useState } from 'react';

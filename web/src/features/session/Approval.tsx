@@ -9,8 +9,10 @@ import { DiffView } from '../../components/DiffView';
 import { Button } from '../../components/ui';
 import { AppIcon } from '../apps/AppIcon';
 import { AppForm, formErrors, type FormFiles } from '../apps/Form';
+import { AppKeys, emptyKeys, keysMissing, type KeyInput } from '../apps/AppKeys';
 import { Elapsed } from './items';
 import { allAnswered, answerOf, QuestionForm, type Picks } from './QuestionForm';
+import { tr } from '../../i18n/runtime';
 
 function FileDetail({ detail }: { detail: string }) {
   // "path\n@@ … diff" blocks, possibly several, possibly led by a reason line.
@@ -50,12 +52,18 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
   const link = a.form?.url;
   // One of your apps an agent runs, asking for what the request left out: the card is the app's.
   const app = a.app;
+  // Keys it needs that the vault lacks: saved there first, so they never go through the conversation.
+  const keyStates = app?.secrets ?? [];
+  const [keys, setKeys] = useState<KeyInput>(emptyKeys);
+  const [keyErrors, setKeyErrors] = useState<Record<string, string>>({});
 
   const respond = async (decision: string) => {
-    if (decision === 'accept' && fields.length) {
+    if (decision === 'accept' && (fields.length || keyStates.length)) {
       const wrong = formErrors(fields, values, files);
       setErrors(wrong);
-      if (Object.keys(wrong).length) return;
+      const lacking = keysMissing(keyStates, keys);
+      setKeyErrors(Object.fromEntries(lacking.map((k) => [k.name, tr('Needed to run it')])));
+      if (Object.keys(wrong).length || lacking.length) return;
     }
     // The page the server asks the user to open, opened by their own tap (a pop-up blocker allows it).
     if (decision === 'accept' && link) window.open(link, '_blank', 'noopener,noreferrer');
@@ -65,6 +73,7 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
       if (a.kind === 'question') {
         for (const q of a.questions ?? []) answers[q.id] = answerOf(q, picks[q.id], agent === 'claude' ? ', ' : '\n');
       }
+      if (app && decision === 'accept' && keyStates.length) await api(`/api/apps/${enc(app.id)}/secrets`, { method: 'POST', base, body: { values: keys.values } });
       let form = fields.length && decision === 'accept' ? values : undefined;
       // Files picked on the card are saved ahead of the answer, which gives where each went.
       const picked = Object.keys(files).filter((id) => fields.some((f) => f.id === id && f.type === 'file'));
@@ -116,7 +125,11 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
       <div className="space-y-3 px-3 py-3">
         {app && (
           <p className="text-[13px] leading-snug text-fg-2">
-            {fields.some((f) => f.required && !f.default) ? 'It needs a few details before it runs. Leave the optional ones empty if you don’t mind.' : 'Add any details you like, or run it as it is.'}
+            {fields.some((f) => f.required && !f.default)
+              ? 'It needs a few details before it runs. Leave the optional ones empty if you don’t mind.'
+              : keyStates.length
+                ? 'It needs a key before it runs: it goes to your vault, not into the conversation.'
+                : 'Add any details you like, or run it as it is.'}
           </p>
         )}
         {/* What the request said already, as the app's questions name it. */}
@@ -176,6 +189,7 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
             disabled={busy}
           />
         )}
+        {keyStates.length > 0 && <AppKeys keys={keyStates} input={keys} onChange={setKeys} errors={keyErrors} disabled={busy} own={!!app && !app.id.startsWith('tpl:')} className="border-t border-line pt-2.5" />}
         {question && <QuestionForm questions={a.questions ?? []} value={picks} onChange={setPicks} disabled={busy} onSubmit={() => answeredAll && !busy && respond('answer')} />}
         {denyOpen && (
           <textarea

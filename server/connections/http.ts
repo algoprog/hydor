@@ -139,7 +139,7 @@ export async function httpCall(c: HttpCall, o: { allowPrivate?: boolean; lookup?
   // Every key the request carries, the signing one and those written into it.
   const keys = [...(a ? [a] : []), ...(c.bound ?? [])];
   for (const k of keys) {
-    if (!k.domains.length) throw new RefusedRequest(`${k.name} has no hosts it may be sent to yet: the user can add them in Settings → Connections → Keys`);
+    if (!k.domains.length) throw new RefusedRequest(`${k.name} has no hosts it may be sent to yet: the user can add them in Apps → Connected apps → Keys`);
     if (!hostAllowed(url, k)) throw new RefusedRequest(`${k.name} may only be sent to ${k.domains.join(', ')} (and their subdomains), not ${url.hostname}`);
     if (url.protocol !== 'https:' && !o.allowPrivate) throw new RefusedRequest(`${k.name} is only sent over https`);
   }

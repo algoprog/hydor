@@ -45,11 +45,12 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   Excel and LaTeX exports, an agent that changes what you have open, pictures and short videos made with
   OpenRouter's models once you check their settings and price, all kept in your Library (each image and video with
   a title and a description a model writes for it), and apps for tasks you repeat: one agent, or steps with data, a
-  memory and a screen of their own, their answers in views made for them (pages, elements, buttons that act),
-  shared as one file; ask for what one does in any session and the agent runs it there, asking you for what is
-  missing on the app's own card
+  memory and a screen of their own, their answers in views made for them (pages, elements, buttons that act,
+  maps, 2D and 3D plots, pictures, videos and widgets of their own), the keys they need asked for once and kept
+  in the vault, shared as one file with their own pictures and videos (ready-made ones too); ask for what one
+  does in any session and the agent runs it there, asking you for what is missing on the app's own card
 - Give every agent memory of you and your projects, your documents (knowledge bases it searches and cites),
-  your apps and services (connected once), keys and sign-ins it uses without ever seeing them, skills, child
+  your services (connected once, beside your apps), keys and sign-ins it uses without ever seeing them, skills, child
   sessions, and tasks that run on a schedule or when something changes
 - Keep each project together in a space, with its own documents, guidelines and skills, run deep research that
   ends in a cited report, compare models side by side, and use the app in English, Chinese or Greek

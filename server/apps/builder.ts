@@ -4,6 +4,7 @@
 // app_data reads the records it keeps and adds some. The same can be done through the app's API (app_api),
 // which asks the user for each change; these say more, in fewer calls.
 import type { AppDef, AppRecipe } from '../../shared/apps.ts';
+import { MEDIA_LIMITS, type AppAsset } from '../../shared/app-media.ts';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
 import { allSteps, asText, innerLists } from '../../shared/app-manifest.ts';
@@ -17,6 +18,7 @@ import { appChanged, startRun, waitFor } from './runs.ts';
 import { changeScreen, makeScreen, screensOf } from './screens.ts';
 import { adviceOf } from './advice.ts';
 import { getApp, getRun, getVersion, lastExampleRuns, listApps, listVersions, saveApp, type RunRecord } from './store.ts';
+import { putAsset } from './media.ts';
 
 /** What saving checks a recipe with, and what follows a save (its packages): from index.ts. */
 export interface BuilderHelp {
@@ -183,7 +185,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_save',
       description:
-        'Makes one of the user\'s apps, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its view is part of it (ui: patch one element with { ui: { elements: { "day-card": { … } } } }); its screens stay as they are (app_screen changes them). Say why in a few words.',
+        'Makes one of the user\'s apps, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its view is part of it (ui: patch one element with { ui: { elements: { "day-card": { … } } } }); its screens stay as they are (app_screen changes them). Files that come with it (pictures, videos, sounds, data its view shows as asset:<name>) go in assets: a name → a file\'s path on this computer or an https:// address (null removes one); they travel in its .naget-app. Keys it needs (API keys, tokens) go in recipe.secrets by name, never a value: the user gives them when installing it or before its first run. Say why in a few words.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -191,6 +193,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
           recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form), prompt (a task for one agent) or flow (its steps), answer, ui (its view: how its answer looks and what a click there does; app_guide\'s API topic, Apps: views), data, memory, requires, flows, examples, tools, limits, agent, model, mode…' },
           patch: { type: 'object', description: 'Merged into the app as saved (or into recipe).' },
           step: { type: 'object', description: 'One step: { id, …its fields } changes it; { id, remove: true } removes it; a new id adds it (after: the step it follows; none: at the end).' },
+          assets: { type: 'object', additionalProperties: { type: ['string', 'null'] }, description: 'Its own files by name ("cover.jpg"): a path on this computer, an https:// address or a data: address, kept with the app; null removes one.' },
           why: { type: 'string', description: 'What changed, in a few words ("Added a step that checks prices").' },
           force: { type: 'boolean', description: 'Write over changes the user made since you last saved or read it.' },
         },
@@ -207,6 +210,24 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         if (a.patch && typeof a.patch === 'object') raw = mergePatch(raw, a.patch) as Record<string, any>;
         if (a.step && typeof a.step === 'object') raw = withStep(raw, a.step as Record<string, unknown>);
         if (!prev && !a.recipe && !a.patch) return { text: 'Give the app to make (recipe), or the one to change (app)', isError: true };
+        // Its own files: kept first, then named in its assets.
+        if (a.assets && typeof a.assets === 'object' && !Array.isArray(a.assets)) {
+          const assets: Record<string, AppAsset> = { ...((raw.assets as Record<string, AppAsset> | undefined) ?? prev?.assets ?? {}) };
+          const problems: string[] = [];
+          for (const [name, from] of Object.entries(a.assets as Record<string, unknown>).slice(0, MEDIA_LIMITS.count)) {
+            if (from === null) delete assets[name];
+            else if (typeof from === 'string' && from.trim())
+              try {
+                assets[name] = await putAsset(db, name, /^(https?:|data:)/i.test(from.trim()) ? { url: from.trim() } : { path: from.trim(), cwd: ctx.cwd });
+              } catch (e) {
+                problems.push(`${name}: ${(e as Error).message}`);
+              }
+          }
+          if (problems.length) return { text: `Not saved. These files could not be kept:\n- ${problems.join('\n- ')}`, isError: true };
+          if (Object.keys(assets).length > MEDIA_LIMITS.count) return { text: `Not saved: an app has at most ${MEDIA_LIMITS.count} files.`, isError: true };
+          if (Object.values(assets).reduce((n, x) => n + x.bytes, 0) > MEDIA_LIMITS.assets) return { text: `Not saved: an app's files are at most ${MEDIA_LIMITS.assets >> 20} MB together.`, isError: true };
+          raw = { ...raw, assets: Object.keys(assets).length ? assets : undefined };
+        }
         const { recipe, errors, warnings } = help.problemsOf(raw);
         if (errors.length) return { text: `Not saved. Fix these first:\n- ${errors.join('\n- ')}`, isError: true };
         const saved = help.prepare(saveApp(db, { id: prev?.id, recipe: { ...recipe, screens: prev?.screens }, by: 'agent', why: typeof a.why === 'string' ? a.why : undefined }));
