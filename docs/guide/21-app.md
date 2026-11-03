@@ -120,11 +120,12 @@ It is kept by the app, so it works with no browser open.
 - **As a service of your user** (the usual install): the switch turns it on or off. It starts at boot even before anyone logs in; if the line says it starts only once you log in, run `sudo loginctl enable-linger $USER` once on the computer to change that.
 - **As a system service**: changing it needs administrator rights on the computer.
 - **In Docker**: its restart policy brings it back (`restart: unless-stopped`), and the switch can't change it.
+- **In the Mac app**: it opens in the background when you log in to the Mac, with its icon in the menu bar and its window closed. It is on from the first time you open it from the Applications folder.
 - **Started some other way**: turning it on sets it up as a service of your user. Where that isn't possible (no systemd for your user), the line says so.
 
 ## Keep the app up to date
 
-For a copy installed from git (the installer's, or Docker's), the app looks for a newer version a few minutes after it starts and then once a day. **About**, at the bottom of [Settings → App → General](/settings?s=general&find=Check%20now), shows the version you run and how things stand:
+For a copy installed from git (the installer's, or Docker's), and for the Mac app, the app looks for a newer version a few minutes after it starts and then once a day. **About**, at the bottom of [Settings → App → General](/settings?s=general&find=Check%20now), shows the version you run and how things stand:
 
 - "Up to date · checked … ago", with **Check now** to look again at once.
 - When a newer version is out: "… updates out", the latest change's title, and **Update now**. It gets the new version, builds it and restarts the app; running agents carry on through the restart, and this tab reloads into the new version by itself. If the app can't restart itself, it gets and builds the new version, and you restart the app to use it.
@@ -133,7 +134,9 @@ For a copy installed from git (the installer's, or Docker's), the app looks for 
 
 When a newer version is out, a dot shows on **Settings** in the sidebar. A copy not installed from git can't check: **Check now** says so.
 
-[**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first) installs a newer version by itself after 5 hours without a message from you, at most once a day. Running agents carry on. It needs an app that can restart itself (the installer's service, or Docker); otherwise the switch is off and says why.
+The Mac app goes by released versions instead: "Version … is out", and **Update now** downloads it, checks that it is the build the release names, and opens it in place of the one you run ("Opening the new version, this page reconnects by itself…"). Running agents carry on. If the new version does not start, the version before comes back by itself and the line under **About** says why; that version then installs only when you press **Update now**. The Mac app can update itself only from the Applications folder (or another folder you can write to): opened from the disk image, it says to move it there.
+
+[**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first) installs a newer version by itself after 5 hours without a message from you, at most once a day. Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or the Mac app in the Applications folder); otherwise the switch is off and says why.
 
 Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Naget Agent was updated").
 

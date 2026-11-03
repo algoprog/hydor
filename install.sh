@@ -14,7 +14,7 @@ set -euo pipefail
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 die() { printf '\nError: %s\n' "$*" >&2; exit 1; }
 
-[ "$(uname -s)" = Linux ] || die "This installer is for Linux. On macOS or Windows, use Docker (see the README)."
+[ "$(uname -s)" = Linux ] || die "This installer is for Linux. On a Mac, use the Mac app; on Windows, Docker (see the README)."
 
 command -v node >/dev/null || die "Node.js 22.12 or newer is needed: https://nodejs.org/en/download"
 node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 12) ? 0 : 1)' ||

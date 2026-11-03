@@ -3,13 +3,23 @@
 // a copy that comes back by itself when the server exits (the installer's systemd service, the
 // Docker image's restart loop: both leave the agents running) also updates itself, after 5 hours
 // without a message from you and at most once a day. Agents may be at work meanwhile.
+//
+// In the Mac app (desktop.ts) it is by version instead: the newest release on GitHub says which version is
+// out and where each Mac's build is; an update downloads it, checks it, unpacks it, and hands it to the app,
+// which swaps itself for it, starts again, and goes back to the version before if the new one does not start.
 import { execFile, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import type { UpdateResult, UpdateState } from '../shared/types.ts';
 import { HttpError } from './auth.ts';
+import { newer } from './clients.ts';
+import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
+import { desktop, tellDesktop } from './desktop.ts';
 import { agentBaseEnv } from './env.ts';
 import { git } from './git.ts';
 
@@ -35,7 +45,7 @@ export function updateState(): UpdateState | null {
   try {
     last = ctx ? JSON.parse(kvGet(ctx.db, 'update.last') ?? 'null') ?? undefined : undefined;
   } catch {}
-  return { ...check, auto: !!ctx && kvGet(ctx.db, 'update.auto') !== '0', canRestart: !!restarter(), running, last };
+  return { ...check, kind: desktop ? 'app' : 'git', auto: !!ctx && kvGet(ctx.db, 'update.auto') !== '0', canRestart: !!restarter(), running, last };
 }
 
 const emit = () => {
@@ -44,6 +54,7 @@ const emit = () => {
 };
 
 export async function checkUpdates(): Promise<UpdateState | null> {
+  if (desktop) return checkRelease();
   if (!fs.existsSync(path.join(ROOT, '.git'))) return null;
   const up = await git(ROOT, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
   if (!up.ok) return null;
@@ -74,6 +85,7 @@ function restarter(): { code: number } | null {
   if (how !== undefined) return how;
   how = null;
   if ((process.env.NAGET_AGENT_RESTARTS ?? process.env.AGENT_CONSOLE_RESTARTS) === '1') return (how = { code: 0 });
+  if (desktop) return (how = desktop.updatable ? { code: 0 } : null);
   if (!process.env.INVOCATION_ID) return how;
   try {
     const cg = fs.readFileSync('/proc/self/cgroup', 'utf8');
@@ -118,6 +130,13 @@ const tail = (out: string) =>
 export function startUpdate(auto: boolean): UpdateState | null {
   if (!ctx) throw new HttpError(503, 'Starting up');
   if (running) throw new HttpError(409, 'An update is already running');
+  if (desktop) {
+    if (!desktop.updatable) throw new HttpError(400, 'Move Naget Agent to your Applications folder to update it');
+    running = { phase: 'pull', since: Date.now(), auto };
+    void updateApp(ctx.db, auto);
+    emit();
+    return updateState();
+  }
   if (!fs.existsSync(path.join(ROOT, '.git'))) throw new HttpError(400, 'This copy was not installed from git');
   running = { phase: 'pull', since: Date.now(), auto };
   void update(ctx.db, auto);
@@ -182,10 +201,22 @@ export function autoUpdateDue(s: { now: number; on: boolean; canRestart: boolean
 export function watchUpdates(db: DB, onChange: (u: UpdateState | null) => void) {
   ctx = { db, onChange };
   try {
-    if (fs.existsSync(path.join(ROOT, '.git'))) check = JSON.parse(kvGet(db, 'update.check') ?? 'null');
+    if (desktop || fs.existsSync(path.join(ROOT, '.git'))) check = JSON.parse(kvGet(db, 'update.check') ?? 'null');
   } catch {}
+  if (desktop && check) {
+    // What was out when it last looked, against the version running now (an update may have just installed).
+    const latest = check.latest;
+    check = { ...check, behind: latest && newer(latest, config.version) ? 1 : 0, latest: latest && newer(latest, config.version) ? latest : undefined };
+  }
+  if (desktop?.updateError) {
+    // The app went back to the version before (or could not swap): say so, and don't try that version again by itself.
+    const e = desktop.updateError;
+    const last = JSON.parse(kvGet(db, 'update.last') ?? 'null') as UpdateResult | null;
+    kvSet(db, 'update.last', JSON.stringify({ ok: false, from: e.from, to: e.to, error: e.error, at: Date.now(), auto: !!last?.auto }));
+    kvSet(db, 'update.skip', e.to);
+  }
   const tick = () => checkUpdates().catch(() => {});
-  setTimeout(tick, 3 * 60_000).unref();
+  setTimeout(tick, (desktop && !check ? 0.5 : 3) * 60_000).unref();
   setInterval(tick, DAY).unref();
   setInterval(() => {
     const now = Date.now();
@@ -193,7 +224,7 @@ export function watchUpdates(db: DB, onChange: (u: UpdateState | null) => void) 
       now,
       on: kvGet(db, 'update.auto') !== '0',
       canRestart: !!restarter(),
-      behind: check?.behind ?? 0,
+      behind: desktop && check?.latest === kvGet(db, 'update.skip') ? 0 : (check?.behind ?? 0),
       running: !!running,
       autoAt: Number(kvGet(db, 'update.autoAt') ?? 0),
       lastMessage: lastMessageAt(db),
@@ -204,4 +235,100 @@ export function watchUpdates(db: DB, onChange: (u: UpdateState | null) => void) 
       startUpdate(true);
     } catch {}
   }, 10 * 60_000).unref();
+}
+
+// ---- the Mac app: by release --------------------------------------------------------------------------------
+
+/** The newest release's Mac builds (mac/scripts/feed.mjs writes it, the release carries it). */
+interface Feed {
+  version: string;
+  files: Record<string, { url: string; sha512: string; size: number }>;
+}
+const feedUrl = () => process.env.NAGET_UPDATE_FEED || 'https://github.com/Naget-Inc/naget-agent/releases/latest/download/naget-mac.json';
+
+async function feed(): Promise<Feed> {
+  const r = await fetch(feedUrl(), { signal: AbortSignal.timeout(30_000), headers: { 'user-agent': `naget-agent/${config.version}` } });
+  if (!r.ok) throw new Error(r.status === 404 ? 'no Mac release is published yet' : `GitHub answered ${r.status}`);
+  const f = (await r.json()) as Feed;
+  if (typeof f?.version !== 'string' || typeof f.files !== 'object') throw new Error('the release does not say its version');
+  return f;
+}
+
+async function checkRelease(): Promise<UpdateState | null> {
+  try {
+    const f = await feed();
+    const out = newer(f.version, config.version) && !!f.files[process.arch];
+    check = { behind: out ? 1 : 0, latest: out ? f.version : undefined, checkedAt: Date.now() };
+  } catch (e) {
+    check = { behind: check?.behind ?? 0, latest: check?.latest, checkedAt: Date.now(), error: (e as Error).message.slice(0, 200) };
+  }
+  emit();
+  return updateState();
+}
+
+const run = (cmd: string, args: string[], timeout = 120_000) =>
+  new Promise<{ ok: boolean; out: string }>((resolve) => execFile(cmd, args, { timeout, maxBuffer: 16 << 20 }, (err, stdout, stderr) => resolve({ ok: !err, out: `${stdout ?? ''}${stderr ?? ''}`.trim() || (err?.message ?? '') })));
+
+/** The team a Mac app is signed by, or null when it is not signed by a developer. */
+async function teamOf(app: string): Promise<string | null> {
+  const r = await run('codesign', ['-dv', '--verbose=2', app]);
+  const team = /^TeamIdentifier=(.+)$/m.exec(r.out)?.[1]?.trim();
+  return team && team !== 'not set' ? team : null;
+}
+
+/** Downloads the build for this Mac, checks it is the one the release names, and unpacks it next to the others. */
+async function fetchBuild(to: string, file: Feed['files'][string]): Promise<string> {
+  const dir = path.join(desktop!.cache, 'updates');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const zip = path.join(dir, `${to}.zip`);
+  const r = await fetch(file.url, { signal: AbortSignal.timeout(30 * 60_000), headers: { 'user-agent': `naget-agent/${config.version}` } });
+  if (!r.ok || !r.body) throw new Error(`the download failed (${r.status})`);
+  const hash = createHash('sha512');
+  const body = Readable.fromWeb(r.body as import('node:stream/web').ReadableStream);
+  body.on('data', (c: Buffer) => hash.update(c));
+  await pipeline(body, fs.createWriteStream(zip));
+  if (fs.statSync(zip).size !== file.size || hash.digest('base64') !== file.sha512) throw new Error('the download is not the build the release names (its checksum differs)');
+  const out = path.join(dir, 'app');
+  const x = await run('ditto', ['-x', '-k', zip, out], 10 * 60_000);
+  fs.rmSync(zip, { force: true });
+  if (!x.ok) throw new Error(`could not unpack it: ${x.out.trim().split('\n').pop()}`);
+  const app = fs.readdirSync(out).find((n) => n.endsWith('.app'));
+  if (!app) throw new Error('the download has no app in it');
+  return path.join(out, app);
+}
+
+async function updateApp(db: DB, auto: boolean) {
+  const at = Date.now();
+  const from = config.version;
+  const done = (r: Omit<UpdateResult, 'at' | 'auto' | 'from'>) => {
+    kvSet(db, 'update.last', JSON.stringify({ ...r, from, at, auto }));
+    running = undefined;
+    emit();
+  };
+  try {
+    const f = await feed();
+    const file = f.files[process.arch];
+    if (!newer(f.version, from) || !file) {
+      check = { behind: 0, checkedAt: Date.now() };
+      return done({ ok: true, to: from });
+    }
+    const to = f.version;
+    const app = await fetchBuild(to, file);
+    // A signed app takes only a build signed by the same developer.
+    const team = await teamOf(desktop!.app);
+    if (team) {
+      const v = await run('codesign', ['--verify', '--deep', '--strict', app]);
+      if (!v.ok) return done({ ok: false, to, error: 'the new version’s signature does not check out' });
+      if ((await teamOf(app)) !== team) return done({ ok: false, to, error: 'the new version is signed by someone else' });
+    }
+    kvSet(db, 'update.last', JSON.stringify({ ok: true, from, to, at, auto }));
+    kvSet(db, 'update.skip', '');
+    running = { phase: 'restart', since: Date.now(), auto };
+    emit();
+    // The app stops this server, swaps itself for the new version and starts again; agents carry on.
+    if (!tellDesktop({ type: 'install', app, from, to })) done({ ok: false, to, error: 'the app around the server did not answer' });
+  } catch (e) {
+    done({ ok: false, error: (e as Error).message });
+  }
 }

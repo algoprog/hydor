@@ -1,13 +1,14 @@
 # Installation
 
-How to run Naget Agent with Docker or as a service of your user, and keep it up to date. [Back to the README](../README.md).
+How to run Naget Agent as the Mac app, with Docker or as a service of your user, and keep it up to date. [Back to the README](../README.md).
 
 ## Requirements
 
-- **Linux**, x86-64 or ARM64. On macOS or Windows, use Docker (or WSL2 on Windows).
+- **macOS 12 or newer** (Apple silicon or Intel) for the Mac app, or **Linux**, x86-64 or ARM64. On Windows, use
+  Docker (or WSL2).
 - **A subscription for at least one agent:** a Claude plan (Pro, Max, Team or Enterprise) or an Anthropic
   Console account for Claude Code, and a ChatGPT plan for Codex. You sign in from the app.
-- With Docker, nothing else. Without it: Node.js 22.12 or newer, `git`, `tmux`, a C/C++ toolchain for the
+- With the Mac app or Docker, nothing else (the Mac app brings its own Node.js and tmux). On Linux without Docker: Node.js 22.12 or newer, `git`, `tmux`, a C/C++ toolchain for the
   native modules (`build-essential` and `python3` on Debian or Ubuntu), and
   [Claude Code](https://docs.anthropic.com/en/docs/claude-code) if you want it (Codex is installed with the app).
 - Optional: [TeX Live](https://tug.org/texlive/) to typeset LaTeX documents in Pages, with bubblewrap to keep it
@@ -17,6 +18,32 @@ How to run Naget Agent with Docker or as a service of your user, and keep it up 
 - Optional: [ffmpeg](https://ffmpeg.org/) (`sudo apt install ffmpeg`), for the Library to take a video's frames,
   which its title and description are written from, and stills of videos. Without it, a video's description comes
   from the words it was made from. The Docker image has it (`--build-arg FFMPEG=false` leaves it out).
+
+## The Mac app
+
+Download `Naget-Agent-<version>-arm64-mac.dmg` (Apple silicon) or `…-x64-mac.dmg` (Intel) from the
+[Releases page](https://github.com/Naget-Inc/naget-agent/releases/latest), open it and drag **Naget Agent** to
+**Applications**. Open it from there: its window opens on the page where you choose a password, and the welcome
+tour does the rest. Until the releases are signed with an Apple Developer ID, macOS asks the first time whether
+to open an app from an unidentified developer: right-click the app, choose **Open**, then **Open** again (or
+**System Settings → Privacy & Security → Open Anyway**).
+
+The app runs the server inside it, with the Node.js and tmux that come with it, and shows Naget Agent in its own
+window. Closing the window keeps it running, with its icon in the menu bar (**Open Naget Agent**, **Open in
+Browser**, **Settings…**, **Quit Naget Agent**). Other devices reach it as they would any copy: see
+[Remote access](remote-access.md). It opens in the background when you log in (Settings → General → **Start
+when this computer starts**).
+
+- Sessions run as you, with your `~/.claude` and `~/.codex`, and with the `PATH` your login shell sets up, so
+  the programs you installed with Homebrew or npm are found.
+- Its data is in `~/.naget-agent`, as on Linux. Settings such as `PORT` or `DATA_DIR` go in
+  `~/.config/naget-agent.env`, one `NAME=value` per line; quit and open the app to apply them.
+- The server's log is in `~/Library/Logs/Naget Agent/server.log` (**Help → Show the Server Log**).
+- **Quit Naget Agent** stops the server; running agents carry on and are picked up again the next time it opens.
+- Not in the Mac app yet: **Run code** steps in apps and the agent sandbox need Linux's bubblewrap.
+
+Opened from the disk image or the Downloads folder, the app offers to move itself to Applications, where it can
+update itself.
 
 ## With Docker
 
@@ -122,7 +149,14 @@ node dist/server/cli.js app import reading-list.naget-app   # says what it will 
 
 ## Updates
 
-Naget Agent checks for a newer version once a day and installs it by itself after 5 hours without a
+The Mac app updates by release: once a day it looks at the newest release on GitHub, and when it is newer, it
+downloads the build for your Mac, checks it against the release's checksum (and, for a signed app, that the same
+developer signed it), and opens it in place of the version you run, after 5 hours without a message from you. Running
+agents carry on. If the new version's server does not start, the app goes back to the version before by itself,
+says why in Settings → General, and leaves that version for **Update now**. It needs to be in a folder you can
+write to (Applications is): opened from the disk image, it can't update.
+
+A copy installed from git checks for a newer version once a day and installs it by itself after 5 hours without a
 message from you, at most once a day. Agents can be at work meanwhile: they carry on through the
 restart. Settings → General shows what is out, has **Update now** for updating at once, and a switch to
 turn the automatic updates off.

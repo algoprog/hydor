@@ -49,6 +49,7 @@ import { devServerShot, listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewTok
 import { Kernels } from './notebook/kernels.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
+import { tellDesktop } from './desktop.ts';
 import { startSettings, updateStartSettings } from './startSettings.ts';
 import { claudeRetention, setClaudeRetention } from './claudeHistory.ts';
 import { computeStats } from './stats.ts';
@@ -1773,6 +1774,8 @@ setInterval(sweep, 6 * 3600_000).unref();
 await app.listen({ host: config.host, port: config.port });
 startFeatures();
 console.log(`[naget-agent] listening on http://${config.host}:${config.port}`);
+// The Mac app opens its window now, on the setup page the first time.
+tellDesktop({ type: 'ready', url: `http://127.0.0.1:${config.port}`, setupToken: auth.setupToken() ?? undefined });
 machines.start();
 // Starting with this computer is on by default (Settings → General).
 setTimeout(() => startupDefault(db), 3000).unref();

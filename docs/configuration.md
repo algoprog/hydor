@@ -2,7 +2,8 @@
 
 Settings, where the app keeps its data, and resetting the password. [Back to the README](../README.md).
 
-Everything is optional. Set these in the environment (or in `.env` for Docker Compose):
+Everything is optional. Set these in the environment (or in `.env` for Docker Compose, or in `~/.config/naget-agent.env`
+for the service and the Mac app):
 
 | Variable | Default | What it does |
 | --- | --- | --- |
@@ -23,6 +24,7 @@ Everything is optional. Set these in the environment (or in `.env` for Docker Co
 | `NAGET_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
 | `NAGET_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
 | `NAGET_FFMPEG`, `NAGET_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills with |
+| `NAGET_UPDATE_FEED` | the newest GitHub release's `naget-mac.json` | Where the Mac app looks for new versions |
 
 ## What it stores
 

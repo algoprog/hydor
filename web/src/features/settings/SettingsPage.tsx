@@ -490,6 +490,7 @@ function UpdateLine() {
       const boot = useApp.getState().boot;
       if (boot) useApp.getState().set({ boot: { ...boot, update: r.update ?? undefined } });
       if (!r.update) toast('This copy was not installed from git with an upstream, so it cannot check', 'info');
+      else if (r.update.kind === 'app' && !r.update.error && !(r.update.behind > 0)) toast('You have the newest version', 'info');
     } catch (e) {
       toastError(e);
     } finally {
@@ -527,21 +528,35 @@ function UpdateLine() {
     <div className="space-y-1.5">
       {update.running ? (
         <div className="anim-in flex items-center gap-2 text-fg-2">
-          <Throbber className="text-fg-3" /> {PHASE[update.running.phase]}…
+          <Throbber className="text-fg-3" /> {update.kind === 'app' && update.running.phase === 'restart' ? 'Opening the new version, this page reconnects by itself' : PHASE[update.running.phase]}…
         </div>
       ) : update.behind > 0 ? (
         <div className="space-y-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2.5 text-fg-2">
           <div>
-            <span className="font-medium text-fg">
-              {update.behind} update{update.behind === 1 ? '' : 's'} out
-            </span>
-            {update.latest && <span> · latest: {update.latest}</span>}
+            {update.kind === 'app' ? (
+              <span className="font-medium text-fg">{`Version ${update.latest} is out`}</span>
+            ) : (
+              <>
+                <span className="font-medium text-fg">
+                  {update.behind} update{update.behind === 1 ? '' : 's'} out
+                </span>
+                {update.latest && <span> · latest: {update.latest}</span>}
+              </>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <Button size="sm" variant="primary" onClick={updateNow}>
               Update now
             </Button>
-            <span className="text-[12px] text-fg-3">{update.canRestart ? 'It pulls, builds and restarts; running agents carry on.' : 'It pulls and builds; restart the server afterwards to use it.'}</span>
+            <span className="text-[12px] text-fg-3">
+              {update.kind === 'app'
+                ? update.canRestart
+                  ? 'It downloads the new version and opens it in place of this one; running agents carry on.'
+                  : 'Move Naget Agent to your Applications folder to update it.'
+                : update.canRestart
+                  ? 'It pulls, builds and restarts; running agents carry on.'
+                  : 'It pulls and builds; restart the server afterwards to use it.'}
+            </span>
           </div>
         </div>
       ) : (
@@ -586,7 +601,9 @@ function AutoUpdateSetting() {
       hint={
         update.canRestart
           ? 'After 5 hours without a message from you, at most once a day. Running agents carry on.'
-          : 'This server cannot restart itself. Run it as a service (install.sh) or with Docker to update automatically.'
+          : update.kind === 'app'
+            ? 'Move Naget Agent to your Applications folder to update it.'
+            : 'This server cannot restart itself. Run it as a service (install.sh) or with Docker to update automatically.'
       }
     >
       <Switch on={update.auto && update.canRestart} disabled={!update.canRestart} label="Update automatically" onChange={(on) => put('/api/update/auto', { on }).catch(toastError)} />
@@ -606,7 +623,11 @@ function StartupSetting() {
   }, []);
   if (!st) return null;
   const hint =
-    st.how === 'docker'
+    st.how === 'login-item'
+      ? st.on
+        ? 'Opens in the background when you log in to this Mac, from your menu bar.'
+        : 'Does not open by itself when you log in to this Mac.'
+      : st.how === 'docker'
       ? 'In Docker its restart policy brings it back: restart: unless-stopped in compose.yaml.'
       : st.how === 'system-service'
         ? `The system service ${st.unit} ${st.on ? 'starts it at boot' : 'is off: it does not start at boot'}. Changing it needs root on this computer.`
@@ -761,7 +782,9 @@ function NotificationSettings() {
     }
   };
   const hint =
-    state === 'unsupported'
+    state === 'app'
+      ? 'The Mac app shows them itself while it runs, even with its window closed (it stays in the menu bar).'
+      : state === 'unsupported'
       ? appleNotInstalled
         ? 'On iPhone or iPad: Share → Add to Home Screen, open Naget Agent from there, then turn this on.'
         : 'This browser cannot receive notifications here.'
@@ -772,7 +795,7 @@ function NotificationSettings() {
     <Section>
       <div className="-my-2 divide-y divide-line">
         <SettingRow label="Notify this device" hint={hint}>
-          {state === null || busy ? <Throbber className="text-fg-3" /> : <Switch on={state === 'on'} disabled={state === 'unsupported' || state === 'denied'} onChange={toggle} label="Notify this device" />}
+          {state === null || busy ? <Throbber className="text-fg-3" /> : <Switch on={state === 'on' || state === 'app'} disabled={state === 'unsupported' || state === 'denied' || state === 'app'} onChange={toggle} label="Notify this device" />}
         </SettingRow>
         <SettingRow label="Sound" hint="A short chime with each notice while the app is open">
           <Switch
