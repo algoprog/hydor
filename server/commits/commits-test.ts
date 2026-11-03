@@ -105,6 +105,48 @@ const items: TimelineItem[] = [
   ok();
 }
 
+// A quiet commit (`git commit -q` prints nothing) is found in the repository by the subject the command wrote;
+// another session's commit in the same folder meanwhile is not this turn's.
+{
+  fs.writeFileSync(path.join(proj, 'd.txt'), 'd\n');
+  sh(proj, 'add', 'd.txt');
+  sh(proj, 'commit', '-q', '-m', 'Add d quietly');
+  fs.writeFileSync(path.join(proj, 'e.txt'), 'e\n');
+  sh(proj, 'add', 'e.txt');
+  sh(proj, 'commit', '-q', '-m', 'Someone else adds e');
+  const msg = path.join(tmp, 'msg.txt');
+  fs.writeFileSync(msg, 'From a file\n\nbody\n');
+  fs.writeFileSync(path.join(proj, 'f.txt'), 'f\n');
+  sh(proj, 'add', 'f.txt');
+  sh(proj, 'commit', '-q', '-F', msg);
+  const q: TimelineItem[] = [
+    { id: 'u2', seq: 200, kind: 'user', text: 'Commit d', ts: Date.now() - 60_000 },
+    cmd('git add d.txt && git commit -q -m "Add d quietly"', ''),
+    cmd(`cat > ${msg} <<'EOF'\nFrom a file\n\nbody\nEOF`, ''),
+    cmd(`git commit -q -F ${msg}`, ''),
+    cmd('git log --oneline -3', sh(proj, 'log', '--oneline', '-3')),
+    { id: 'end2', seq: 300, kind: 'turn', status: 'completed' },
+  ];
+  const d = {
+    db,
+    sessions: { summary: () => ({ cwd: proj }), timeline: async () => ({ parser: { items: [...items, ...q] } }) },
+  } as unknown as Deps;
+  const t = { key: 's1', agent: 'claude' as const, cwd: proj, status: 'idle' as const, startedAt: Date.now(), endedAt: Date.now(), external: false };
+  await commits.turnEnd!(t, d);
+  const note = notesOf(db, 's1', 'commits').find((n) => n.anchor === 'end2');
+  assert.ok(note, 'a note for the quiet turn');
+  const c = (note.data as CommitsNote).commits;
+  assert.deepEqual(
+    c.map((x) => x.subject),
+    ['Add d quietly', 'From a file'],
+  );
+  assert.equal(c[0].branch, 'main');
+  assert.equal(c[0].own, true);
+  // The first turn's note is left as it was.
+  assert.equal((notesOf(db, 's1', 'commits').find((n) => n.anchor === 'end')!.data as CommitsNote).commits.length, 3);
+  ok();
+}
+
 db.close();
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`${passed} passed`);
