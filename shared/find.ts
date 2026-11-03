@@ -268,7 +268,8 @@ export function placeOf(pathname: string, search: string, pagePaths: Record<stri
   // A space, on any of its tabs (its files, knowledge, skills, settings).
   const sp = /^\/spaces\/([^/]+)/.exec(pathname);
   if (sp) return `space:${decodeURIComponent(sp[1])}`;
-  // A page's tab (Published pages), or a place on the Files page (its trash, the recent files).
-  const full = `${pathname}${q.get('tab') ? `?tab=${q.get('tab')}` : q.get('place') ? `?place=${q.get('place')}` : ''}`;
+  // A page's tab (Published pages), the Library's pictures and videos, or a place on the Files page (its trash, the recent files).
+  const kind = q.get('kind') ?? (q.get('tab') === 'media' ? 'media' : null);
+  const full = `${pathname}${q.get('tab') && q.get('tab') !== 'media' ? `?tab=${q.get('tab')}` : kind ? `?kind=${kind}` : q.get('place') ? `?place=${q.get('place')}` : ''}`;
   return pagePaths[full] ?? pagePaths[pathname] ?? null;
 }
