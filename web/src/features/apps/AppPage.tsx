@@ -220,7 +220,7 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
         title={
           recipe ? (
             <span className="flex min-w-0 items-center gap-2.5">
-              <IconButton label="All apps" size="sm" onClick={() => go('/apps')} className="-ml-1">
+              <IconButton label="All apps" size="sm" onClick={() => go('/apps')} className="shrink-0">
                 <ArrowLeft size={17} />
               </IconButton>
               <AppIcon icon={recipe.icon} color={recipe.color} size={26} />
