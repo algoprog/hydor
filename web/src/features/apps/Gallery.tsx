@@ -119,12 +119,15 @@ function AppsIntro({ onHide }: { onHide: () => void }) {
         Apps
       </div>
       <h2 className="mt-1 pr-8 text-[19px] leading-tight font-semibold tracking-tight sm:text-[21px]">Small tools that find things out and show them clearly</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      {/* Three tiles side by side; on a phone, three short rows, so the note leaves room for the apps. */}
+      <div className="mt-4 grid gap-2.5 sm:grid-cols-3 sm:gap-3">
         {parts.map(([icon, title, body]) => (
-          <div key={title} className="rounded-2xl bg-bg-1 px-4 py-3.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-accent-soft text-accent">{icon}</span>
-            <div className="mt-2.5 text-[13.5px] font-semibold">{title}</div>
-            <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{body}</div>
+          <div key={title} className="flex items-start gap-3 sm:block sm:rounded-2xl sm:bg-bg-1 sm:px-4 sm:py-3.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-accent-soft text-accent">{icon}</span>
+            <div className="min-w-0">
+              <div className="text-[13.5px] font-semibold sm:mt-2.5">{title}</div>
+              <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{body}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -413,7 +416,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                     </button>
                   )}
                 </label>
-                <span className="flex-1" />
+                <span className="flex-1 max-sm:hidden" />
                 {!intro && (
                   <button type="button" onClick={() => showIntro(true)} className="shrink-0 text-[12.5px] font-medium text-fg-3 hover:text-fg">
                     What are apps?
