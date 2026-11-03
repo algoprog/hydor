@@ -72,7 +72,7 @@ Your home folder, hidden folders, temporary ones and the folders the app makes f
 
 There are two ways:
 
-- **From the space**: click **New session** on its card on the Spaces page, or on its own page (its **Overview** has **New session in** and its name too). The start page opens with the space picked, and with its assistant when it has one.
+- **From the space**: click **New session** on its card on the Spaces page, or at the top of its own page (on a phone, the pen). The start page opens with the space picked, and with its assistant when it has one.
 - **From the start page**: open the folder chip in the row under the message box. Its menu lists your spaces first, then the folder in use and the ones you used last, then **New task folder** and **New space**. Until you type, it shows the three spaces at work most recently (and the one picked, if it isn't among them). Type part of a name in the field at the top to find any space, or any folder. Each space shows its mark, its name and what it is about.
 
 When you pick a space, the chip shows its mark and name instead of a folder, and the session will work in the space's folder. If the space starts its sessions as an assistant, the **Assistant** chip changes to it, with any agent, model and permissions that assistant suggests. You can still change any of them before you start. Then type your message and click **Start**.
@@ -85,15 +85,22 @@ When the space's folder is a Git repository, the end of the menu offers **New wo
 
 ## A space's own page
 
-Click a space on the Spaces page to open it. At the top are its mark and name, what it is about, and two buttons: **All spaces** goes back to the list (on a phone only its arrow shows), and **New session** starts a session in the space. Below them are six tabs: **Overview**, **Library**, **Files**, **Knowledge**, **Skills** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out to fit.
+Click a space on the Spaces page to open it. The top of its page is in the space's colour: the arrow on the left goes back to all your spaces (as on the app's other pages), then come the space's mark and name and what it is about (a group's spaces, for a group; its folder, with no description). On the right, **New session** starts a session in the space (on a phone, the pen), and **More** (⋯) has:
+
+- **Open its folder in Files**: the space's folder on the Files page.
+- **Only its sessions in the sidebar**: the session list shows only the sessions started in the space, as the sidebar's own filter does (see [Show one space's sessions in the sidebar](#show-one-spaces-sessions-in-the-sidebar)). Pick it again to see every session.
+- **Delete the space** (see [Delete a space](#delete-a-space)).
+
+Below them are six tabs: **Overview**, **Library**, **Files**, **Knowledge**, **Skills** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out to fit. Each tab shows at once.
 
 ### Overview
 
-The space at a glance:
+The space at a glance, in cards:
 
-- **Sessions**: **New session in** and the space's name, then the sessions started in the space, the one at work most recently first, each with its agent's icon, its title and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the space's folder, with its guidelines, documents and skills.
+- **Sessions**: the sessions started in the space, the one at work most recently first, each with its agent's icon, its title, what it is doing while it runs (**Working**, **Needs you**, **Ready**; not on a phone) and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the space's folder, with its guidelines, documents and skills, and has **New session**.
 - **In the Library**: what the space holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there.
-- Beside them (under them on a phone), what the space is: **Works in** (its folder, and how many more it works with: click for the **Files** tab), **What its agents follow** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Its sessions start as** (its assistant) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the space are listed under its folder).
+- **Every session here** (beside them, under them on a phone): what every session in the space gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Starts as** (its assistant) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the space are listed under its folder).
+- **The spaces it brings together**, for a group: each of its spaces, with how many sessions it has. Click one to open it.
 
 ### Library
 
@@ -120,14 +127,14 @@ The space's own skills, which only its sessions get, with your skill library. Se
 
 ### Settings
 
-Everything about the space itself, in four parts:
+Everything about the space itself, in four parts, each with a line on what it is for:
 
-- **The space**: its **Name**, **What it is about** and **Its colour**.
+- **The space**: its **Name** (beside its mark, in the colour picked), **What it is about** and **Its colour**.
 - **What every agent in it follows**: its **Agent Guidelines**, as when you made it.
-- **How its sessions start**: **Its sessions start as** **The assistant picked on the start page** (the default: picking the space leaves the start page's assistant as it is), or any of your assistants, built in or your own. Picking the space on the start page then picks that assistant too.
+- **How its sessions start**: under **Its sessions start as**, one choice to tap: **The assistant picked on the start page** (the default: picking the space leaves the start page's assistant as it is), or one of your assistants, built in or your own. Picking the space on the start page then picks that assistant too.
 - **The spaces it brings together**: pick spaces here to turn this space into a group (see [Bring spaces together in a group](#bring-spaces-together-in-a-group)).
 
-At the bottom: **Save**, which turns on once you change something, **Undo changes**, and **Delete the space**.
+Once you change something, a bar says **Unsaved changes**, with **Undo changes** and **Save**; it stays in view while you scroll. At the bottom, **Delete the space** says what stays, with its button.
 
 ## Give a space skills of its own
 
@@ -174,7 +181,7 @@ Open the space, go to its **Settings** tab, change what you like and click **Sav
 
 ## Delete a space
 
-1. Open the space and go to its **Settings** tab.
+1. Open the space, and click **More** (⋯) at its top, or go to its **Settings** tab.
 2. Click **Delete the space**.
 3. The app asks "Delete the *name* space?" Click **Delete**.
 
@@ -228,6 +235,8 @@ To list only one space's sessions:
 2. The menu lists **All agents**, **Claude Code** and **Codex**, then **Every space**, up to eight of your spaces, and **Spaces**, which opens the Spaces page. Pick a space.
 
 The session list then shows only the sessions started in that space, by day, and the filter button is coloured while a filter is on. Pick **Every space** to see every session again. The agent filter works at the same time, to show only one agent's sessions in a space. If the space is deleted, the list shows every session again.
+
+On the space's own page, **More** (⋯) → **Only its sessions in the sidebar** does the same, with a check while it is on; pick it again to see every session.
 
 On a phone, open the sidebar (a drawer) first.
 

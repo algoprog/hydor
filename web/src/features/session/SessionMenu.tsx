@@ -237,7 +237,7 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
   // Wider for the snooze times, as in the sidebar's menu.
   return (
     <Popover anchor={anchor} open onClose={close} align="end" width={at.sub === 'snooze' ? 290 : 260}>
-      <div key={at.sub ?? 'main'} className={at.sub ? 'anim-slide-left' : at.back ? 'anim-slide-right' : undefined}>
+      <div key={at.sub ?? 'main'}>
         {items}
       </div>
     </Popover>

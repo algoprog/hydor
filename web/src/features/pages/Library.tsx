@@ -666,7 +666,11 @@ export function Library() {
 // ---- a space's own Library -------------------------------------------------------------------------------------
 
 /** What a space holds in the Library, for its own page: the last changed first, with New (made in the space). */
-export function SpaceLibrary({ space, limit }: { space: SpaceView; limit?: number }) {
+/**
+ * What a space holds in the Library (its page's Overview and Library tab): the cards, the last changed first, or with
+ * nothing yet what will be here and New page and New slides. `framed`: false inside a card of its own.
+ */
+export function SpaceLibrary({ space, limit, framed = true }: { space: SpaceView; limit?: number; framed?: boolean }) {
   const items = useItems();
   const [making, setMaking] = useState<NewKind | null>(null);
   useEffect(() => {
@@ -682,10 +686,13 @@ export function SpaceLibrary({ space, limit }: { space: SpaceView; limit?: numbe
           <Throbber size={22} />
         </div>
       ) : !mine.length ? (
-        <div className="rounded-2xl border border-dashed border-line-2 px-5 py-6 text-center text-[13px] leading-relaxed text-fg-3">
-          <span className="block font-medium text-fg-2">Nothing here yet</span>
-          Pages, slides and documents agents save in this space’s sessions land here, and so does what you keep from them.
-          <span className="mt-3 flex justify-center gap-2">
+        <div className={cx('flex flex-col items-center px-5 text-center text-[13px] leading-relaxed text-fg-3', framed ? 'rounded-2xl border border-dashed border-line-2 py-7' : 'pt-1 pb-3')}>
+          <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-bg-2 text-fg-2">
+            <LibraryBig size={19} />
+          </span>
+          <span className="mt-3 block text-[14px] font-semibold text-fg">Nothing here yet</span>
+          <span className="mt-1 block max-w-[440px]">Pages, slides and documents agents save in this space’s sessions land here, and so does what you keep from them.</span>
+          <span className="mt-4 flex justify-center gap-2">
             <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
               New page
             </Button>

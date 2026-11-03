@@ -21,7 +21,7 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 ## What you can do
 
 - Start Claude Code, Codex or another [ACP](https://agentclientprotocol.com) agent (Gemini CLI, OpenCode…) in any folder,
-  their programs installed and kept up to date for you
+  their programs installed and kept up to date for you; the session's page opens the moment you press Start
 - Find every session with activity in the last five minutes in the sidebar’s Active group, plus sessions
   waiting to resume automatically after a usage limit
 - A rotating ring on the prompt bar’s Stop button makes running sessions easy to spot

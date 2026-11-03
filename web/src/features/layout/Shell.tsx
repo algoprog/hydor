@@ -11,6 +11,8 @@ import { GitPage } from '../git/GitPage';
 import { HomePage } from '../home/HomePage';
 import { InboxPage } from '../inbox/InboxPage';
 import { SessionView } from '../session/SessionView';
+import { StartingSession } from '../session/StartingSession';
+import { isStartingKey } from '../../lib/starting';
 import { isSettingsSection, SettingsPage } from '../settings/SettingsPage';
 import { go } from '../../lib/nav';
 import { SystemPage } from '../system/SystemPage';
@@ -61,15 +63,16 @@ function useDrag(onMove: (dy: number) => void) {
   };
 }
 
-/** Pages fade in when you move between sections (not when a file or folder changes inside one); a
- * session shows at once. Memoized: the shell re-rendering (a panel or the drawer toggled) never
- * re-renders the page. */
+/** Each page shows at once, with no fade. A page is built afresh when you move to another one, but not when a
+ * file or folder changes inside one or you switch its tabs (a space's, Usage's), so a tab shows at once with what
+ * the page already loaded. Memoized: the shell re-rendering (a panel or the drawer toggled) never re-renders the
+ * page. */
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
-  const session = loc.startsWith('/s/');
-  const section = session ? loc : loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc;
+  const space = /^\/spaces\/[^/]+/.exec(loc)?.[0];
+  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : (space ?? loc);
   return (
-    <div key={section} className={cx('h-full', !session && 'anim-fade')}>
+    <div key={section} className="h-full">
       <Page />
     </div>
   );
@@ -80,7 +83,11 @@ function Page() {
   const search = useSearch();
   const [isSession, params] = useRoute('/s/:key');
   const [isReview, rparams] = useRoute('/review/:key');
-  if (isSession && params) return <SessionView sessionKey={decodeURIComponent(params.key)} />;
+  if (isSession && params) {
+    const key = decodeURIComponent(params.key);
+    // A session you just started, until the server has started it (lib/starting.ts).
+    return isStartingKey(key) ? <StartingSession id={key} /> : <SessionView sessionKey={key} />;
+  }
   if (isReview && rparams) return <ReviewPage sessionKey={decodeURIComponent(rparams.key)} />;
   if (loc === '/file' || loc === '/files' || loc === '/search') {
     const q = new URLSearchParams(search);

@@ -124,7 +124,7 @@ export function useComposerMenu({
 
   const node =
     tok && items.length ? (
-      <div ref={listRef} className="anim-pop absolute inset-x-3 bottom-full z-20 mb-2 max-h-72 overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg">
+      <div ref={listRef} className="absolute inset-x-3 bottom-full z-20 mb-2 max-h-72 overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg">
         {items.map((s, i) => (
           <button
             key={s.key}

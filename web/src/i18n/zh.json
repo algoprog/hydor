@@ -9848,5 +9848,22 @@
 "The Library’s videos":"资料库中的视频",
 "The pictures agents made that you kept, each with a title and a description":"智能体做的、你保留下来的图片，每张都有标题和说明",
 "The videos agents made that you kept, each with a title and a description":"智能体做的、你保留下来的视频，每段都有标题和说明",
-"videos clips movies films media kept saved generated library titles descriptions captions frames":"视频 片段 影片 媒体 保留 保存 生成 资料库 标题 说明 帧"
+"videos clips movies films media kept saved generated library titles descriptions captions frames":"视频 片段 影片 媒体 保留 保存 生成 资料库 标题 说明 帧",
+"A new one works in this space’s folder, with its guidelines, documents and skills.":"新会话在这个空间的文件夹中工作，并使用它的准则、文档和技能。",
+"Back to the start page":"返回开始页",
+"Did not start":"未能开始",
+"Every session here":"这里的每个会话",
+"Its name, what it is about and its colour: on its card, its page and the start page":"它的名称、简介和颜色：显示在它的卡片、它的页面和开始页上",
+"Its sessions, folder, documents, skills and what it holds in the Library stay.":"它的会话、文件夹、文档、技能以及它在资料库中的内容都会保留。",
+"Only its sessions in the sidebar":"侧边栏只显示它的会话",
+"Open its folder in Files":"在“文件”中打开它的文件夹",
+"Picking the space on the start page picks this assistant too":"在开始页上选择这个空间时，也会选择这个助手",
+"Starting {0}…":"正在启动 {0}…",
+"Starting the session…":"正在开始会话…",
+"Starts as":"开始时使用",
+"The session did not start":"会话未能开始",
+"The session did not start: {0}":"会话未能开始：{0}",
+"{0} has hit its usage limit":"{0} 已达到使用限额",
+"All your {0} accounts have hit their usage limit":"你所有的 {0} 账户都已达到使用限额",
+"Your main {0} account has hit its usage limit":"你的主 {0} 账户已达到使用限额"
 }

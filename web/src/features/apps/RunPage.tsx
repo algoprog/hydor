@@ -1,7 +1,7 @@
 // One run's page: where it stands (live), its result as a card or table, the agent's reply, what was
 // asked, the follow-ups that refined it and a box for the next one, and a link to the full session.
 import { useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ChevronRight, MessageSquareText, RotateCcw, Square, Trash2 } from 'lucide-react';
+import { ChevronRight, MessageSquareText, RotateCcw, Square, Trash2 } from 'lucide-react';
 import { inputsLine, isActive } from '@shared/apps';
 import { del, enc, post } from '../../lib/api';
 import { ago } from '../../lib/format';
@@ -168,11 +168,9 @@ export function RunPage({ id }: { id: string }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
+        back={{ label: 'Back to the app', onClick: () => go(back) }}
         title={
           <span className="flex min-w-0 items-center gap-2.5">
-            <IconButton label="Back to the app" size="sm" onClick={() => go(back)} className="-ml-1">
-              <ArrowLeft size={17} />
-            </IconButton>
             {d && <AppIcon icon={d.recipe.icon} color={d.recipe.color} size={26} />}
             <span className="truncate">{d?.recipe.name ?? 'Run'}</span>
           </span>

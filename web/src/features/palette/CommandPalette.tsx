@@ -408,14 +408,14 @@ export function CommandPalette() {
 
   return createPortal(
     <div
-      className={cx('anim-overlay scrim fixed inset-0 z-[55] flex justify-center [--scrim:0.3]', mobile ? '' : 'px-3 pt-[11vh]')}
+      className={cx('scrim fixed inset-0 z-[55] flex justify-center [--scrim:0.3]', mobile ? '' : 'px-3 pt-[11vh]')}
       onPointerDown={(e) => e.target === e.currentTarget && close()}
     >
       <div
         role="dialog"
         aria-label="Search"
         className={cx(
-          'anim-pop flex flex-col overflow-hidden bg-elevated shadow-lg',
+          'flex flex-col overflow-hidden bg-elevated shadow-lg',
           mobile ? 'h-full w-full pt-[var(--safe-top)]' : cx('h-fit max-h-[72vh] w-full rounded-2xl border border-line', wide ? 'max-w-[860px]' : 'max-w-[640px]'),
         )}
       >

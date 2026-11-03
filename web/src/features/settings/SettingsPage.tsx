@@ -3,7 +3,7 @@
 // sections in a menu beside the open one; on phones a list, each section on its own page.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, MoreHorizontal, Pencil, Plug, Plus, ScrollText, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
+import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronRight, CircleHelp, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, MoreHorizontal, Pencil, Plug, Plus, ScrollText, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
 import { featureSections } from '../registry';
 import { isLang, LANGS } from '@shared/i18n';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, ClientUpdateItem, ClientUpdates, LoginFlow, RetentionSettings, StartupState, UpdateState } from '@shared/types';
@@ -1291,15 +1291,8 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   // Wide screens always show a section; phones start at the list.
   const current = section ?? (mobile ? null : 'general');
   const def = sections().find((d) => d.id === current);
-  // Phones: a section slides in over the list (which drifts left and dims under it) and back out. Only
-  // taps here slide; the browser's back and forward switch at once, since Safari on an iPhone has already
-  // animated its swipe. `slideTo` is where a tap is sliding until the slide ends; meanwhile a section
-  // sliding away stays on its page.
-  const [slideTo, setSlideTo] = useState<SettingsSection | null>();
-  const [last, setLast] = useState(current);
-  if (current && current !== last) setLast(current);
-  const sliding = slideTo !== undefined && slideTo === current;
-  const page = def ?? (sliding ? sections().find((d) => d.id === last) : undefined);
+  // Phones: a section opens over the list at once, and Back (or the browser's) shows the list again.
+  const page = def;
   const url = (p: { s?: SettingsSection | null; cwd?: string | null; agent?: Agent | null }) => {
     const q = new URLSearchParams();
     const s = p.s === undefined ? section : p.s;
@@ -1312,10 +1305,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
     return `/settings${qs ? `?${qs}` : ''}`;
   };
   // On a phone, opening a section is a step the back button undoes; elsewhere it replaces.
-  const open = (id: SettingsSection) => {
-    if (mobile) setSlideTo(id);
-    go(url({ s: id }), !mobile);
-  };
+  const open = (id: SettingsSection) => go(url({ s: id }), !mobile);
   const body = page && (
     <div data-settings-body>
       <SectionBody id={page.id} cwd={cwd} agent={agent} onAgent={(a) => go(url({ agent: a }), true)} onCwd={(c) => go(url({ cwd: c }), true)} />
@@ -1341,43 +1331,25 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   }, [findWords, current]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (mobile) {
-    const motion = sliding && 'transition-[translate,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]';
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <PageHeader
-          title={
-            def ? (
-              <button key={def.id} onClick={() => (setSlideTo(null), go(url({ s: null })))} className={cx('-ml-1 flex max-w-full items-center gap-0.5 rounded-md text-left', sliding && 'anim-fade')} aria-label="All settings">
-                <ChevronLeft size={18} className="shrink-0 text-fg-3" />
-                <span className="truncate">{def.label}</span>
-              </button>
-            ) : (
-              <span className={cx(sliding && 'anim-fade')}>Settings</span>
-            )
-          }
-        />
+        <PageHeader title={def ? def.label : 'Settings'} back={def ? { label: 'All settings', onClick: () => go(url({ s: null })) } : undefined} />
         {/* The list stays built under an open section, so it keeps its place; each section opens at its top. */}
         <div className="relative min-h-0 flex-1 overflow-hidden">
-          <div inert={!!def} className={cx('absolute inset-0 overflow-y-auto', motion, def ? '-translate-x-1/4' : 'translate-x-0')}>
+          <div inert={!!def} className="absolute inset-0 overflow-y-auto">
             <SectionList onOpen={open} />
           </div>
-          <div className={cx('pointer-events-none absolute inset-0 bg-black/20', motion, def ? 'opacity-100' : 'opacity-0')} />
-          <div
-            onTransitionEnd={(e) => e.target === e.currentTarget && setSlideTo(undefined)}
-            className={cx('absolute inset-0 bg-bg', motion, def ? 'translate-x-0' : 'translate-x-full', page && 'shadow-lg')}
-          >
-            {page && (
-              <div key={page.id} className="h-full overflow-y-auto">
-                <div className="space-y-4 px-4 pt-4 pb-8">
-                  <p data-tip={SECTION_TIPS[page.id]} className="text-[13px] leading-snug text-fg-3">
-                    {page.sub}
-                  </p>
-                  {folder}
-                  {body}
-                </div>
+          {page && (
+            <div key={page.id} className="absolute inset-0 overflow-y-auto bg-bg">
+              <div className="space-y-4 px-4 pt-4 pb-8">
+                <p data-tip={SECTION_TIPS[page.id]} className="text-[13px] leading-snug text-fg-3">
+                  {page.sub}
+                </p>
+                {folder}
+                {body}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );

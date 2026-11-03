@@ -34,7 +34,7 @@ export function ReadAloudDock(_: { s: SessionSummary }) {
   return (
     <div
       role="status"
-      className="anim-pop mx-3 mb-2 flex items-center gap-2 rounded-xl border border-line bg-panel py-1 pr-1 pl-3 sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]"
+      className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-line bg-panel py-1 pr-1 pl-3 sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]"
     >
       <AudioLines size={15} className={cx('shrink-0 text-accent', !paused && 'animate-pulse motion-reduce:animate-none')} />
       <span className="min-w-0 flex-1 truncate text-[13px]">

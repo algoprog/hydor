@@ -118,7 +118,7 @@ function LivePanel({ d }: { d: Dictation }) {
       role="status"
       aria-live="polite"
       data-dictation={d.phase}
-      className="anim-pop absolute inset-x-1 bottom-full z-20 mb-2 flex items-center gap-2.5 rounded-2xl border border-line-2 bg-elevated px-3 py-2 shadow-lg sm:inset-x-3"
+      className="absolute inset-x-1 bottom-full z-20 mb-2 flex items-center gap-2.5 rounded-2xl border border-line-2 bg-elevated px-3 py-2 shadow-lg sm:inset-x-3"
     >
       {d.phase === 'transcribing' ? (
         <Throbber size={15} className="shrink-0" />

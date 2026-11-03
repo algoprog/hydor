@@ -326,7 +326,7 @@ function ChangesList({ s, version }: { s: SessionSummary; version: number }) {
                 <ChevronRight size={14} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open === f.path && 'rotate-90')} />
               </button>
               {open === f.path && (
-                <div className="anim-expand space-y-2 px-2.5 pb-3">
+                <div className="space-y-2 px-2.5 pb-3">
                   <div className="flex items-center gap-2 pt-1 text-[12px] text-fg-3">
                     {f.edits.length} edit{f.edits.length > 1 ? 's' : ''}
                     <span className="flex-1" />
@@ -649,14 +649,14 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
         ) : (
           detailsOpen &&
           (wide ? (
-            <aside className="anim-slide-left w-[400px] shrink-0 border-l border-line">
+            <aside className="w-[400px] shrink-0 border-l border-line">
               <Details s={summary} version={version} onClose={close} />
             </aside>
           ) : (
             // Over the whole app, so the sidebar dims with the rest and its group headings stay behind.
             createPortal(
-              <div className="anim-overlay scrim fixed inset-0 z-40 flex justify-end [--scrim:0.26]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-                <div className="anim-slide-left h-full w-full max-w-[440px] border-l border-line shadow-lg">
+              <div className="scrim fixed inset-0 z-40 flex justify-end [--scrim:0.26]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+                <div className="h-full w-full max-w-[440px] border-l border-line shadow-lg">
                   <Details s={summary} version={version} onClose={close} />
                 </div>
               </div>,

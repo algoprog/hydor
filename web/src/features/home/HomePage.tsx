@@ -11,10 +11,10 @@ import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
 import { keepStartDraft, startDraft } from '../../lib/drafts';
 import { timeAgo } from '../../lib/format';
-import { carryToSession } from '../../lib/motion';
 import { openSession } from '../../lib/nav';
+import { startSession } from '../../lib/starting';
 import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
-import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
+import { toast, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { EffortPicker, findModel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
@@ -130,7 +130,6 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const [effort, setEffort] = useState<string | null>(null);
   const [mode, setMode] = useState<string | null>(null);
   const [atts, setAtts] = useState<Attachment[]>(() => draft?.files ?? []);
-  const [busy, setBusy] = useState(false);
 
   // Kept as it changes, until the session starts. A link's prompt doesn't replace a draft written
   // elsewhere until something here changes.
@@ -182,7 +181,6 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     };
   }, [cwd]);
   const ta = useRef<HTMLTextAreaElement>(null);
-  const box = useRef<HTMLDivElement>(null);
   const menu = useComposerMenu({ ta, setText, root: cwd || undefined, commands: cat?.commands });
   const fileRef = useRef<HTMLInputElement>(null);
   // Text from the capabilities' buttons (dictation) joins what is being written.
@@ -245,9 +243,11 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   }, []);
 
   const acct = accounts.some((a) => a.id === account) ? account : undefined;
-  const start = async () => {
-    if (busy || !cwd) return;
-    setBusy(true);
+  // The session's page opens at once, with your message, while the server starts the agent (lib/starting.ts).
+  const starting = useRef(false);
+  const start = () => {
+    if (starting.current || !cwd) return;
+    starting.current = true;
     // Kept as it was used, the whole of it, for the next start.
     saveStart(
       {
@@ -263,39 +263,37 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
       },
       true,
     );
-    try {
-      const r = await post<{ key: string }>('/api/sessions', {
+    const prompt = text.trim();
+    const body = {
+      agent,
+      acpAgent: agent === 'acp' ? acpId : undefined,
+      prompt,
+      model,
+      effort: agent === 'acp' ? undefined : effort,
+      mode,
+      account: acct,
+      worktree: !task && !!repo && worktree,
+      ...(Object.keys(extra).length ? { extra } : {}),
+      ...attachmentPayload(atts),
+    };
+    const inTask = task;
+    // The box as it was sent: it gets it back should the session not start.
+    const draft = { text, files: atts, extra: JSON.parse(own) as SessionExtra, folder: linkCwd ? { cwd: linkCwd, over: linkOver } : undefined, from };
+    // What was written went with the session (its pictures with it, still shown in your message).
+    sent.current = true;
+    keepStartDraft(null, false);
+    startSession(
+      {
         agent,
-        acpAgent: agent === 'acp' ? acpId : undefined,
-        cwd: task ? await taskFolderFor(text) : cwd,
-        prompt: text.trim(),
-        model,
-        effort: agent === 'acp' ? undefined : effort,
-        mode,
-        account: acct,
-        worktree: !task && !!repo && worktree,
-        ...(Object.keys(extra).length ? { extra } : {}),
-        ...attachmentPayload(atts),
-      });
-      // The box goes down to the session's, what was written up to its first message (lib/motion.ts). Still
-      // busy until the session shows, so a second press starts nothing.
-      carryToSession(
-        () => {
-          releaseAttachments(atts);
-          setAtts([]);
-          setText('');
-          // What was written went with the session.
-          sent.current = true;
-          keepStartDraft(null);
-          openSession(r.key);
-        },
-        box.current,
-        text.trim() ? ta.current : null,
-      );
-    } catch (e) {
-      toastError(e);
-      setBusy(false);
-    }
+        acpName: agent === 'acp' ? acpList?.find((a) => a.id === acpId)?.name : undefined,
+        title: prompt.slice(0, 300) || 'New session',
+        text: prompt,
+        atts,
+        cwd: inTask ? '' : cwd,
+      },
+      async () => (await post<{ key: string }>('/api/sessions', { ...body, cwd: inTask ? await taskFolderFor(prompt) : cwd })).key,
+      draft,
+    );
   };
 
   /** A space picked: its folder, its assistant, and its guidelines for the session (the server adds them). */
@@ -343,14 +341,13 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     .filter(Boolean)
     .join('\n');
 
-  const ready = !!cwd && !busy;
+  const ready = !!cwd;
   const iconBtn = 'shrink-0 rounded-lg p-2 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg';
   return (
     <div>
       <NewSpaceDialog open={newSpace} onClose={() => setNewSpace(false)} onMade={pickSpace} />
       <LimitBanner agent={agent} account={acct} className="mb-3" />
       <div
-        ref={box}
         data-tour="composer"
         className="relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50"
         onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
@@ -372,8 +369,6 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         <textarea
           ref={ta}
           value={text}
-          // What is being sent stays as it went.
-          readOnly={busy}
           autoFocus={!mobile}
           autoComplete="off"
           data-1p-ignore=""
@@ -439,14 +434,14 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
             title="Start (Enter)"
             aria-label="Start"
             className={cx(
-              // A round arrow on phones. While the session starts, its arrow keeps going up.
+              // A round arrow on phones.
               'group inline-flex h-9 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-full pr-3 pl-3.5 text-[13.5px] font-medium transition duration-150 active:scale-95 max-md:w-9 max-md:px-0',
-              ready || busy ? 'bg-accent text-accent-fg' : 'bg-bg-3 text-fg-3',
+              ready ? 'bg-accent text-accent-fg' : 'bg-bg-3 text-fg-3',
               ready && 'hover:opacity-90',
             )}
           >
-            <span className="max-md:hidden">{busy ? 'Starting…' : 'Start'}</span>
-            <span className={cx('ico', ready && 'ico-rise', busy && 'anim-send-up')}>
+            <span className="max-md:hidden">Start</span>
+            <span className={cx('ico', ready && 'ico-rise')}>
               <ArrowUp size={16} strokeWidth={2.4} />
             </span>
           </button>
@@ -576,17 +571,17 @@ export function HomePage() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[760px] px-4 pb-12 sm:px-6">
           {/* The tour's parts (data-tour) sit inside these, which have an entrance of their own. */}
-          <div className={cx('anim-in text-center', mobile ? 'pt-3' : 'pt-[11vh]')}>
+          <div className={cx('text-center', mobile ? 'pt-3' : 'pt-[11vh]')}>
             <div data-tour="home-title">
               <h1 className="text-[23px] font-semibold tracking-tight sm:text-[30px]">What should we work on?</h1>
               <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">Start an agent in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}: Claude Code, Codex, or any model.</p>
             </div>
           </div>
-          <div className="anim-in mt-6 [animation-delay:70ms] sm:mt-8">
+          <div className="mt-6 sm:mt-8">
             {/* It opens with the last picks, which come with the bootstrap. */}
             {booted ? <StartComposer key={search} initialCwd={initialCwd} link={link} from={search} /> : <div className="h-[200px]" />}
           </div>
-          <div className="anim-in mt-5 flex justify-center [animation-delay:140ms] sm:mt-8">
+          <div className="mt-5 flex justify-center sm:mt-8">
             <div data-tour="today">
               <TodayStrip />
             </div>

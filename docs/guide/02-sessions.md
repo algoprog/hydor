@@ -6,7 +6,7 @@ A session is one conversation with an agent, in one folder: you say what you wan
 
 ## Start a session
 
-**New session** at the top of the sidebar opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session opens at once and the agent starts on your message.
+**New session** at the top of the sidebar opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session's page opens at once with your message, and says **Starting** while the agent gets ready; then the agent starts on your message. If the session can't start, its page says why, and **Back to the start page** puts your message (and what you attached) back in the box.
 
 The row under the message box holds **Agent**, **Model**, **Folder** (or **Space**), **Assistant** and, at its end, **Options**. On a phone each of them opens as a sheet from the bottom of the screen.
 
@@ -336,13 +336,13 @@ Once linked, its state and checks show as a badge in the sidebar and the header,
 
 ## When a usage limit stops a session
 
-When a Claude Code or Codex plan runs out of usage, a banner above the message box says "You've hit the Claude Code usage limit", which limit, and when it resets.
+When a Claude Code or Codex plan runs out of usage, a banner above the message box says whose limit it hit, which limit, and when it resets: "You've hit the Claude Code usage limit" with one account of that agent, "All your Claude Code accounts have hit their usage limit" when you have several and none has usage left, or the account by its name ("Work has hit its usage limit") when another still has some.
 
 When another of that agent's accounts still has usage left, you see no banner while **Switch accounts at a limit** is on: the session moves to that account and carries on (new sessions start there). With it off, the banner names that account and offers **Turn on**.
 
 - **Resume at reset** continues the session by itself a minute after the limit resets, with the message "Continue where you left off." The banner then says when, with **Cancel**.
 - **Use a reset**: when your account holds limit resets, the banner says how many, and this uses one now.
-- [Resume after usage limits](/settings?s=general&find=Resume%20after%20usage%20limits) in Settings → App → General does this for every session a limit stops. With it on, you see no warning in the session: a line above the message box says which limit and when it continues ("Weekly · all models · Continues by itself in 2 days"), with **Use a reset** when you have one, and **Cancel**. A session you stopped yourself with **Stop** does not continue by itself.
+- [Resume after usage limits](/settings?s=general&find=Resume%20after%20usage%20limits) in Settings → App → General does this for every session a limit stops. With it on, you see no warning in the session: a line above the message box says whose limit it hit (as the banner does), which limit and when it continues ("All your Claude Code accounts have hit their usage limit", then "Current session (5 h) · Continues by itself in 3 h 15 min."), with **Use a reset** when you have one, and **Cancel**. A session you stopped yourself with **Stop** does not continue by itself.
 
 The time follows the limit: if the reset moves, or usage comes back early, the session continues then. See [Usage, limits and costs](/guide/usage).
 

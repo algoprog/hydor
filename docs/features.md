@@ -9,9 +9,11 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
   separate folder, so several agents can change one repository at once). Pick the model, how hard it
   thinks, and what it may do without asking you. The start page opens with what you picked there last,
   on any device: the agent and its model, the folder, the assistant, memory and a spending cap. What you
-  write in a message box, with the files you attach, waits there while you look at other pages. As a
-  session starts, the start page becomes it: the box moves down to its place and what you wrote moves up
-  as your first message.
+  write in a message box, with the files you attach, waits there while you look at other pages. Pressing
+  Start opens the session's page at once with your message (Starting, while the agent gets ready), and it
+  becomes the session as soon as the agent is up, with no loading in between; if it can't start, the page says
+  why and your message goes back in the start page's box. Pages, tabs, menus and dialogs open at once, with no
+  fade.
 - Switch models or assistants mid-session; the model menu lists the session's own agent's models, and another
   assistant applies from your next message, the conversation carrying on. "Continue in Codex" (or
   Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
@@ -74,9 +76,13 @@ agents that speak ACP and take MCP servers.
   folder: its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
   guidelines and its own skills and start as its assistant. The Spaces page shows each as a card in its colour with
-  what it holds (sessions, things in the Library, documents, skills) and New session; a space's Overview has its
-  latest sessions, what it holds in the Library and, at a glance, where it works, what its agents follow, its
-  documents, skills, assistant and memory, and its Library tab everything it holds there. Its Files tab shows its folders; files come in from
+  what it holds (sessions, things in the Library, documents, skills) and New session. A space's own page opens at
+  once under a band of its colour, with the way back on the left, New session and one menu (its folder in Files,
+  only its sessions in the sidebar, delete it); its Overview has its sessions (with what each is doing), what it
+  holds in the Library and what every session in it gets (its folder, guidelines, documents, skills, assistant and
+  memory), a group's spaces too, and its Library tab everything it holds there; its Settings tab sets its name,
+  colour, guidelines, the assistant its sessions start as (one tap among them) and its group, saved from a bar
+  that shows once something changed. Its Files tab shows its folders; files come in from
   Files, a file's window or an agent's file cards with Add to a space. Its Skills tab holds skills only its
   sessions get, with the skill library: written there, copied from the library to change for the space alone, or
   proposed by an agent working in it and kept for the space when you approve. A group brings several spaces
@@ -402,7 +408,8 @@ programs shows each program's version and what is out, with Check now, Update no
   nothing to report stay quiet, failures always tell you, and failures in a row pause the task. Webhooks can
   require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
   Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
-  when, while Resume after usage limits is on); one you stopped yourself never does.
+  whose limit it hit, all your accounts of that agent or one by name, which one and when, while Resume after
+  usage limits is on); one you stopped yourself never does.
 - Usage: how much of each plan's limits you have used and when they reset, what the same work would cost
   through the API, and activity over time, for every agent or one (Custom and the ACP agents by name) and every
   model or one.

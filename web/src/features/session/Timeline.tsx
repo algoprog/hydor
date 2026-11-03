@@ -265,7 +265,7 @@ const Group = memo(function Group({ b, sessionKey, agent, busy }: { b: Extract<B
         )}
         <ChevronRight size={14} className={cx('shrink-0 transition-transform duration-200', open && 'rotate-90')} />
       </button>
-      {open && <div className="anim-expand border-t border-line p-1">{visible.map(row)}</div>}
+      {open && <div className="border-t border-line p-1">{visible.map(row)}</div>}
     </div>
   );
 });
@@ -339,7 +339,7 @@ function WorkLog({
   const tail = [...shown].reverse().find(visibleBlock);
   const inBox = quiet && !live?.note && tail?.kind === 'group' && tail.items.some((i) => i.kind === 'tool') ? tail : null;
   return (
-    <div className="anim-expand mt-2 space-y-3">
+    <div className="mt-2 space-y-3">
       {hidden > 0 && (
         <button onClick={() => setAll(true)} className="-ml-2 rounded-md px-2 py-1 text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2">
           Show earlier work
@@ -385,7 +385,7 @@ function FileDiffs({ f, sessionKey }: { f: FileEntry; sessionKey: string }) {
     } catch {}
   };
   return (
-    <div className="anim-expand space-y-2 px-3 pt-1 pb-3">
+    <div className="space-y-2 px-3 pt-1 pb-3">
       {f.edits.map((e, i) => {
         const ch = full[i] ?? e.change;
         return (
@@ -840,8 +840,9 @@ export function Timeline({
   }, []);
 
   // Code and maths highlight late, so content keeps growing after a render; while following,
-  // keep up with it. (The content is there once the first page is: watch from then.)
-  const shown = !!tl && !(tl.loading && !tl.items.length);
+  // keep up with it. (The content is there once the first page is: watch from then. A session just started
+  // shows your message from the live copy while its transcript loads, so it never blinks to a loading mark.)
+  const shown = !!tl && !(tl.loading && !tl.items.length && !overlay?.items.length);
   useEffect(() => {
     const el = content.current;
     if (!el) return;

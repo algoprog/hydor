@@ -90,7 +90,7 @@ export const ComputerStep = memo(function ComputerStep({ item, sessionKey }: { i
         <ChevronRight size={14} onClick={() => setOpen((o) => !o)} className={cx('shrink-0 cursor-pointer text-fg-3 opacity-0 transition group-hover:opacity-100', open && 'rotate-90 opacity-100')} />
       </div>
       {open && (
-        <div className="anim-expand">
+        <div>
           {pic && (
             <div className="pt-1.5 pl-7">
               <button onClick={enlarge} className="cursor-zoom-in">

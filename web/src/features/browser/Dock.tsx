@@ -400,7 +400,7 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
       {full &&
         view.open &&
         createPortal(
-          <div className="anim-overlay fixed inset-0 z-50 flex flex-col bg-bg pt-[var(--safe-top,0px)]">
+          <div className="fixed inset-0 z-50 flex flex-col bg-bg pt-[var(--safe-top,0px)]">
             <div className="border-b border-line">
               {header(true)}
               {askList}

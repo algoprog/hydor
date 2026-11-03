@@ -3,7 +3,7 @@
 // may run it. A template runs as it is, with the agent and model picked here, or becomes an app of your own;
 // one you uninstalled shows what it is, to install it again.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppWindow, ArrowLeft, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { AppWindow, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
 import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
 import { appInfo } from '@shared/app-manifest';
@@ -439,12 +439,10 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
+        back={recipe ? { label: 'All apps', onClick: () => go('/apps') } : undefined}
         title={
           recipe ? (
             <span className="flex min-w-0 items-center gap-2.5">
-              <IconButton label="All apps" size="sm" onClick={() => go('/apps')} className="shrink-0">
-                <ArrowLeft size={17} />
-              </IconButton>
               <AppIcon icon={recipe.icon} color={recipe.color} size={26} />
               <span className="truncate">{recipe.name}</span>
             </span>

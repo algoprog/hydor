@@ -57,7 +57,7 @@ export function QuoteSelection() {
         setAt(null);
       }}
       style={{ left: at.x, top: Math.max(8, at.y) }}
-      className="anim-pop fixed z-40 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-lg border border-line-2 bg-elevated px-2.5 text-[12.5px] font-medium text-fg shadow-lg transition-colors hover:bg-bg-2"
+      className="fixed z-40 inline-flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-lg border border-line-2 bg-elevated px-2.5 text-[12.5px] font-medium text-fg shadow-lg transition-colors hover:bg-bg-2"
     >
       <Quote size={13} className="text-accent" /> Quote
     </button>,

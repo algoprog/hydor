@@ -34,7 +34,7 @@ function RunRow({ r, onRerun }: { r: TaskRun; onRerun: () => void }) {
             {r.summary ?? r.error}
           </button>
         )}
-        {open && r.reply && <Markdown text={r.reply} breaks className="anim-expand mt-1.5 rounded-lg border border-line px-3 py-2 !text-[13px]" />}
+        {open && r.reply && <Markdown text={r.reply} breaks className="mt-1.5 rounded-lg border border-line px-3 py-2 !text-[13px]" />}
       </div>
       <div className="flex shrink-0 items-center">
         {r.appRun ? (
@@ -134,7 +134,7 @@ export function History({ task }: { task: ScheduledTask }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task.id]);
   return (
-    <div className="anim-in mt-2 border-t border-line pt-1">
+    <div className="mt-2 border-t border-line pt-1">
       {!runs ? (
         <div className="flex justify-center py-3 text-fg-3">
           <Throbber />
