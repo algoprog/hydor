@@ -3,6 +3,32 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.14.0 · 3 November 2026
+
+Tips that go on showing you the app after the welcome tour, a simpler message box, one list of your accounts that
+carries on past a limit by itself, and running sessions that are easier to spot.
+
+- **Tips after the tour**: the first time a part of the app is on your screen (the inbox, a session's menu and
+  details, the queue, a goal, the browser's panel, a spending cap, the Git, Library, Apps and Spaces pages,
+  **Settings → Memory**…), a small card beside it says what it is for, with **Learn more** for the guide. Tips come
+  one at a time and a while apart, never while you type or have a menu open, and each shows once, on every device.
+  **Skip tips**, or **Skip the tour**, stops them; **Settings → General → Tips** turns them on again.
+- **A simpler message box**: the assistant, model, effort and permissions are one **Options** chip (amber while the
+  agent runs without asking), files and screenshots are under one **+** button, and the context shows as a small
+  ring with its percentage. The speed and cache meters are at the foot of the Options menu.
+- **Your accounts**: the Claude Code and Codex sign-ins and the accounts you added are one list, grouped by agent,
+  with **Sign out**, **Rename** and **Remove** behind a **⋯** menu. **Switch accounts at a limit** is now on unless
+  you turned it off, and the limit banner stays hidden while another account can carry on.
+- **The sidebar**: Active lists every session with activity in the last five minutes, finished ones too, and a
+  session waiting to resume after a usage limit stays there. The bar under **Usage** shows what is left across
+  your paid subscriptions.
+- **Running sessions stand out**: the Stop button turns a ring while a session starts or works, Custom shows the
+  app's own loading mark, and the conversation fades out above the message box as it does under the header.
+- **Commits under a reply**: the commits an agent made in a turn show in a chip under its changed files, each
+  opening to its whole message, author and every file's diff, with **Open in Git**.
+- **OpenRouter costs**: what an OpenRouter session costs, and its tokens, show by themselves above the message box,
+  with prices from OpenRouter, so there are none to set by hand.
+
 ## 0.13.0 · 2 November 2026
 
 Pictures and short videos from agents, kept in the Library (what Pages became); Word, Excel, CSV and LaTeX files
