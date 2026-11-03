@@ -40,6 +40,17 @@ counts down a minute in every page (`update.ready.installIn`) and then sends `in
 (`POST /api/update/later`) puts it off for 4 hours. `server/desktop-test.ts` plays the app over the real channel;
 `NAGET_UPDATE_NOTICE_MS` shortens the minute when trying it.
 
+Computer use (`server/computer/`) works through that channel too. The tools run macOS's own programs as children of
+the server, so macOS checks the app's permissions: `screencapture` for the main display, `sips` to scale it to
+1280 pixels and make a JPEG, `open -a` for apps, and `osascript -l JavaScript` with one driver script (`driver.ts`)
+that posts CGEvents through the ObjC bridge: clicks with their click count, drags, scroll wheels, key combinations by
+their US-keyboard codes, and text as Unicode on key events (a pasted fallback puts the clipboard back). `plan.ts`
+checks actions and maps the screenshot's pixels to points (Retina, scaled resolutions); `access.ts` keeps the
+setting, the per-session card, Stop and the one session at the Mac. The server asks the app for macOS's permissions
+(`ask` `permissions`, and `request` to show macOS's prompt and its System Settings pane), tells it while an agent
+acts (`computer`: the menu bar's title and Stop, with ⌘⇧Esc registered meanwhile) and hears `computer-stop`.
+`server/computer/computer-test.ts` runs everything but macOS itself, the driver with stand-ins for the bridge.
+
 Releases are built by `.github/workflows/mac.yml` on GitHub's Macs, for Apple silicon and Intel, when a tag
 `v<version>` (the version in `package.json`) is pushed; it publishes the `.dmg` and `.zip` builds and
 `naget-mac.json` on the Releases page, with the version's notes from `CHANGELOG.md`. Running it by hand (Actions →

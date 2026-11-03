@@ -38,7 +38,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - OpenRouter costs and token usage appear automatically, with prices fetched from OpenRouter
 - Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
 - Get help with anything, not just code: assistants for research, writing and planning (switch between them
-  mid-session), web search (Naget Search by default) and a browser you can watch and take over, documents in and
+  mid-session), web search (Naget Search by default) and a browser you can watch and take over (in the Mac app, your Mac itself
+  too: its screen, mouse and keyboard, once you allow it), documents in and
   out, small tools and pages you keep (watch them being written and change them yourself, in a visual editor that
   works on phones too, or in their code), slides to edit and present as in PowerPoint or Google Slides, documents,
   spreadsheets and LaTeX to edit as in Word, Excel and Overleaf (or opened from your files), PDF, Word, PowerPoint,

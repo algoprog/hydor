@@ -1,6 +1,6 @@
 # Search and the browser
 
-Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources under each reply, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings.
+Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources under each reply, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. In the Mac app, agents can also use the Mac itself: its screen, mouse and keyboard.
 
 ![An agent that searched the web, read pages and compared what it found in a table](images/web.webp)
 
@@ -273,6 +273,43 @@ To use it, open a session's browser, then **Browser options** (⋯) → pick the
 
 Each profile in the list has **Log in to sites** (to log in to more), the pencil (**Rename**), and the bin (**Delete**), which also deletes its logins and everything the browser kept for it, and closes the browsers using it. With no profiles yet, the list says each session's browser starts fresh, logged in nowhere.
 
+## Let agents use your Mac
+
+In the Mac app, agents can also use the Mac itself, like a person at it: they see its screen and use its mouse and keyboard, in any app (Notes, Calendar, the Finder, an app the browser can't reach). For websites they keep to the browser, which is quicker and safer. Computer use is off at first.
+
+### Turn on computer use
+
+Open [Settings → Capabilities → Computer use](/settings?s=computer) ("Agents see your Mac’s screen and use its mouse and keyboard, in the Mac app"):
+
+1. Turn on [**Let agents use this Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac).
+2. Beside [**Accessibility**](/settings?s=computer&find=Accessibility), macOS's permission to use the mouse and keyboard, press **Allow…**. macOS asks whether Naget Agent may control this computer, and its System Settings open at **Privacy & Security → Accessibility**: turn on **Naget Agent** there.
+3. Beside [**Screen Recording**](/settings?s=computer&find=Screen%20Recording), macOS's permission to see the screen, press **Allow…**, and turn on **Naget Agent** under **Screen Recording** (**Screen & System Audio Recording** on macOS 15). If macOS asks to quit and reopen Naget Agent, do: running agents carry on.
+
+A permission macOS gave shows **Allowed**. The section is in Settings everywhere, but only the Mac app can do this: elsewhere it says so.
+
+### What agents do on your Mac
+
+The first time an agent in a session wants the Mac, a card in the conversation asks: "Let the agent use your Mac?", with **Allow for this session** and **Not now**. The session waits for your answer, and you get a notification. Once allowed, the agent can:
+
+- look at the screen (the main display, scaled down; other displays aren't shown);
+- click, double-click, right-click, drag, scroll and move the pointer;
+- type text, in any language, and press keys and shortcuts like ⌘C;
+- open an app by its name.
+
+Each step shows in the conversation as a line with a small picture of the screen after it: click the picture to see it large, and the line for the agent's full answer. The app keeps the pictures of each session's last 200 steps; those of sessions untouched for a month go.
+
+Agents are told to look before they act, to use the browser for websites, and never to type passwords, card numbers or codes, pay, buy or send money: for those they stop and ask you to do it yourself. One session uses the Mac at a time.
+
+### Stop an agent using your Mac
+
+While an agent uses the Mac, the menu bar says "Agent using your Mac" beside the app's icon, and its session shows "The agent is using your Mac" above the message box. To stop it at once:
+
+- press **⌘⇧Esc** (Command-Shift-Escape), in any app;
+- choose **Stop** in the menu of the app's icon in the menu bar;
+- or press **Stop** above the session's message box, or in Settings → Computer use.
+
+Stopping ends what the agent is doing and takes back every session's allowance: an agent that wants the Mac again asks again on the card ("You stopped the agent using your Mac. Let it go on?"). Turning **Let agents use this Mac** off does the same.
+
 ## Ask an agent
 
 - "Turn on SearXNG at https://searx.example.org, put it first among the search providers, and test it."
@@ -281,3 +318,4 @@ Each profile in the list has **Log in to sites** (to log in to more), the pencil
 - "Never let the browser open facebook.com or tiktok.com."
 - "Show the browser in a window on this computer, and turn its screenshots off."
 - "Make a browser profile called Shopping." (Logging in to sites in it is yours to do, in Settings → Browser.)
+- "Open Notes on my Mac and start a note with today's shopping list."
