@@ -915,14 +915,14 @@ html {
 :root[data-tour-build~='sidebar'] [data-shell] [data-tour='sidebar'],
 :root[data-tour-build~='sessions'] [data-shell] [data-tour='sessions'],
 :root[data-tour-build~='tools'] [data-shell] [data-tour='tools'],
-:root[data-tour-build~='tools'] [data-shell] [data-tour='nav-settings'] {
+:root[data-tour-build~='tools'] [data-shell] :is([data-tour='nav-settings'], [data-tour='nav-system']) {
   visibility: visible;
   opacity: 1;
   transition: none;
   animation: tour-part-in 760ms 200ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 /* The sidebar slides in from its edge; the bar under the message box and the tools' grid just show as
-   their tiles come in, Settings among them; Options pops up; and when its own step comes, Settings' gear
+   their tiles come in, Settings and System among them; Options pops up; and when its own step comes, Settings' gear
    turns once. */
 :root[data-tour-build~='sidebar'] [data-shell] [data-tour='sidebar'] {
   animation-name: tour-panel-in;
@@ -931,7 +931,7 @@ html {
 :root[data-tour-build~='tools'] [data-shell] [data-tour='tools'] {
   animation: overlay-in 300ms 160ms ease-out backwards;
 }
-:root[data-tour-build~='tools'] [data-shell] [data-tour='nav-settings'] {
+:root[data-tour-build~='tools'] [data-shell] :is([data-tour='nav-settings'], [data-tour='nav-system']) {
   animation-name: tour-tile-in;
   animation-duration: 560ms;
   animation-delay: calc(260ms + (var(--tour-c, 0) + var(--tour-r, 0)) * 55ms);
