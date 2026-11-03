@@ -40,6 +40,10 @@ when this computer starts**).
   `~/.config/naget-agent.env`, one `NAME=value` per line; quit and open the app to apply them.
 - The server's log is in `~/Library/Logs/Naget Agent/server.log` (**Help → Show the Server Log**).
 - **Quit Naget Agent** stops the server; running agents carry on and are picked up again the next time it opens.
+- Computer use: agents can see your Mac's screen and use its mouse and keyboard, once you turn it on in Settings →
+  Computer use and give Naget Agent macOS's Accessibility and Screen Recording permissions (its **Allow…** buttons
+  ask). Each session asks you first; **Stop** in the menu bar or ⌘⇧Esc stops it. Builds not signed with a Developer
+  ID may need the permissions given again after an update (macOS ties them to the app's signature).
 - Not in the Mac app yet: **Run code** steps in apps and the agent sandbox need Linux's bubblewrap.
 
 Opened from the disk image or the Downloads folder, the app offers to move itself to Applications, where it can
@@ -149,12 +153,16 @@ node dist/server/cli.js app import reading-list.naget-app   # says what it will 
 
 ## Updates
 
-The Mac app updates by release: once a day it looks at the newest release on GitHub, and when it is newer, it
-downloads the build for your Mac, checks it against the release's checksum (and, for a signed app, that the same
-developer signed it), and opens it in place of the version you run, after 5 hours without a message from you. Running
-agents carry on. If the new version's server does not start, the app goes back to the version before by itself,
-says why in Settings → General, and leaves that version for **Update now**. It needs to be in a folder you can
-write to (Applications is): opened from the disk image, it can't update.
+The Mac app updates by release: a minute after it opens and then every 4 hours it looks at the newest release on
+GitHub, and when it is newer, it downloads the build for your Mac at once and checks it against the release's
+checksum (and, for a signed app, that the same developer signed it). Then it says so, with a notification from the
+Mac and a note in every open page that counts down a minute (**Restart now**, **Later**), and opens the new version
+in place of the one you run. **Later** puts it off for 4 hours; **Restart to Update** in the menu-bar icon's menu
+installs it whenever you like. Running agents carry on. With **Update automatically** off (Settings → General),
+nothing downloads by itself: Settings says a version is out, and **Update now** installs it. If the new version's
+server does not start, the app goes back to the version before by itself, says why in Settings → General, and
+leaves that version for **Update now**. It needs to be in a folder you can write to (Applications is): opened from
+the disk image, it can't update.
 
 A copy installed from git checks for a newer version once a day and installs it by itself after 5 hours without a
 message from you, at most once a day. Agents can be at work meanwhile: they carry on through the

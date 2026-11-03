@@ -38,7 +38,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - OpenRouter costs and token usage appear automatically, with prices fetched from OpenRouter
 - Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
 - Get help with anything, not just code: assistants for research, writing and planning (switch between them
-  mid-session), web search (Naget Search by default) and a browser you can watch and take over, documents in and
+  mid-session), web search (Naget Search by default) and a browser you can watch and take over (in the Mac app, your Mac itself
+  too: its screen, mouse and keyboard, once you allow it), documents in and
   out, small tools and pages you keep (watch them being written and change them yourself, in a visual editor that
   works on phones too, or in their code), slides to edit and present as in PowerPoint or Google Slides, documents,
   spreadsheets and LaTeX to edit as in Word, Excel and Overleaf (or opened from your files), PDF, Word, PowerPoint,
@@ -69,7 +70,8 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 On a Mac (macOS 12 or newer, Apple silicon or Intel): download the Mac app from the
 [latest release](https://github.com/Naget-Inc/naget-agent/releases/latest) (`…-arm64-mac.dmg` or `…-x64-mac.dmg`),
 drag it to Applications and open it. It brings everything it needs, opens in its own window, stays in the menu bar
-and keeps itself up to date. See [the Mac app](docs/install.md#the-mac-app).
+and keeps itself up to date: a new version installs itself a minute after it says so (or later, if you like). See
+[the Mac app](docs/install.md#the-mac-app).
 
 With Docker, on Linux, macOS or Windows (the image runs on Intel/AMD and ARM):
 

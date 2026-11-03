@@ -39,6 +39,7 @@ const TOPIC = {
   tasks: 'tasks',
   search: 'web',
   browser: 'web',
+  computer: 'web',
   memory: 'memory',
   children: 'research',
   images: 'documents-voice',

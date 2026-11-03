@@ -23,7 +23,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Resume after usage limits**](/settings?s=general&find=Resume%20after%20usage%20limits): Continues a session a minute after a plan’s limit resets.
 - [**Delete inactive sessions**](/settings?s=general&find=Delete%20inactive%20sessions): Deletes sessions nobody used for a year, or as long as you choose; until then every conversation is kept.
 - [**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts): Starts the app when the computer starts.
-- [**Update automatically**](/settings?s=general&find=Update%20automatically): Updates itself when you have not used it for a while.
+- [**Update automatically**](/settings?s=general&find=Update%20automatically): Installs new versions by itself: the Mac app as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while.
 - [**Take the tour**](/settings?s=general&find=Take%20the%20tour): See what each part of the app does.
 - [**Tips**](/settings?s=general&find=Tips): Points out a part of the app the first time you come to it, after the welcome tour.
 - [**Check now**](/settings?s=general&find=Check%20now): Look for a newer version now.
@@ -167,6 +167,14 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Screenshots for models that see images**](/settings?s=browser&find=Screenshots%20for%20models%20that%20see%20images): Models that see images get screenshots of the page.
 - [**Sites**](/settings?s=browser&find=Sites): Only these sites, or never these.
 - [**Profiles**](/settings?s=browser&find=Profiles): Separate sign-ins for the browser.
+
+### Computer use
+
+[Settings → Computer use](/settings?s=computer): agents see your Mac’s screen and use its mouse and keyboard, in the Mac app. More in [Search and the browser](/guide/web).
+
+- [**Let agents use this Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac): Agents see the screen and use the mouse and keyboard, in any app; each session asks you first.
+- [**Accessibility**](/settings?s=computer&find=Accessibility): macOS’s permission for Naget Agent to use the mouse and keyboard.
+- [**Screen Recording**](/settings?s=computer&find=Screen%20Recording): macOS’s permission for Naget Agent to see the screen.
 
 ### Memory
 
