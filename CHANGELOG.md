@@ -3,6 +3,28 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.14.3 · 3 November 2026
+
+Naget Agent as an app for your Mac that keeps itself up to date, a Library item to start a session with, and simpler
+Spaces and welcome tour.
+
+- **Mac app**: Naget Agent now comes as an app for macOS (Apple silicon and Intel), from the Releases page on
+  GitHub. It runs in a window of its own, stays in the menu bar when you close the window, can open when your Mac
+  starts (**Settings → General → Start when this computer starts**), finds your programs as your Terminal does, and
+  shows notifications. It updates itself from each new release, and goes back to the version before if a new one
+  will not start.
+- **Library pictures on another machine**: when you use another machine (**Settings → Machines**), the Library's
+  cards show their pictures again instead of a letter, and so do the pictures inside slides and documents and the
+  before and after screenshots in a session.
+- **Start a session with a Library item**: an image or a video in the Library has **Start a session with it** beside
+  **Download**, and the new session gets it with your first message.
+- **Spaces**: the **New space** window asks only for a name and where its files go (a new folder or one you have,
+  with the folders used lately one tap away); the rest is under **More options**.
+- **Welcome tour**: in plain words for people who don't code, with the choice of AI explained simply.
+- **Quote your own messages**: select text in one of your messages and **Quote** puts it in the message box.
+- **Commits under a reply**: commits an agent makes quietly now show under its reply too.
+- **Long tools in Claude sessions**: tools such as making a video may take up to ten minutes without failing.
+
 ## 0.14.2 · 3 November 2026
 
 Ask an agent about a file without leaving it, a sidebar that lists your projects, and a sharp browser in full screen.
