@@ -15,7 +15,6 @@ export interface LiveViewApi {
 
 const KEYCODES: Record<string, number> = { Enter: 13, Tab: 9, Escape: 27, Backspace: 8, Delete: 46, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Home: 36, End: 35, PageUp: 33, PageDown: 34, ' ': 32 };
 const mods = (e: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => (e.altKey ? MOD.alt : 0) | (e.ctrlKey ? MOD.ctrl : 0) | (e.metaKey ? MOD.meta : 0) | (e.shiftKey ? MOD.shift : 0);
-const viewerId = Math.random().toString(36).slice(2, 10);
 /** What the phone keyboard's field holds between keys, so a backspace on "nothing" still shows up. */
 const BASE = '  ';
 
@@ -25,6 +24,10 @@ export const LiveView = forwardRef<LiveViewApi, { k: string; view: BrowserView; 
   const img = useRef<HTMLImageElement>(null);
   const kb = useRef<HTMLInputElement>(null);
   const relay = useRef<InputRelay | null>(null);
+  // Each view on the page asks for its own size (the server sends the largest asked for): with one id
+  // for all, a small thumbnail still on the page under full screen overwrote the big view's size, and
+  // full screen showed thumbnail-sized frames stretched.
+  const viewerId = useRef(Math.random().toString(36).slice(2, 10)).current;
   const first = frames.get(k);
   const [size, setSize] = useState<{ w: number; h: number }>(() => (first ? { w: first.w, h: first.h } : { w: view.viewport.w, h: view.viewport.h }));
   const [has, setHas] = useState(!!first);
@@ -47,7 +50,8 @@ export const LiveView = forwardRef<LiveViewApi, { k: string; view: BrowserView; 
     let stop = false;
     const ask = () => {
       if (stop || document.visibilityState !== 'visible' || !box.current) return;
-      const r = box.current.getBoundingClientRect();
+      // Its laid-out size (an opening animation's transform does not count).
+      const r = { width: box.current.offsetWidth, height: box.current.offsetHeight };
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       void browserCall(k, '/watch', { w: Math.max(160, r.width * dpr), h: Math.max(100, r.height * dpr), viewer: viewerId });
     };
@@ -68,7 +72,7 @@ export const LiveView = forwardRef<LiveViewApi, { k: string; view: BrowserView; 
       document.removeEventListener('visibilitychange', vis);
       ro.disconnect();
     };
-  }, [k, small]);
+  }, [k, small, viewerId]);
 
   const at = (e: { clientX: number; clientY: number }) => {
     const r = img.current!.getBoundingClientRect();
