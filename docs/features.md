@@ -276,7 +276,7 @@ programs shows each program's version and what is out, with Check now, Update no
   from before and after, on a computer's or a phone's screen: a reply's screenshots as one card of small
   pictures, each opening a review (beside the conversation, or over the app on a phone) with a slider or side by
   side, and arrows to the reply's other screens.
-- Every file a turn changed, with its diff. Screenshots you attach show in the conversation and open full size.
+- Every file a turn changed, with its diff, and the commits it made, each opening to its message and diff. Screenshots you attach show in the conversation and open full size.
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - Message the agent while it works: your note joins the running turn, or waits in a queue you can reorder and
   edit, attachments included. Quote any part of a reply into your next message.

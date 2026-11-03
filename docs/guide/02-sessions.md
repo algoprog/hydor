@@ -138,6 +138,7 @@ The conversation reads like a chat. Each turn is your message, the agent's work,
 - **Thoughts** show as "Thought for 12s" with their first heading; click to read them.
 - **The reply** is what the agent wrote after its last step. Pages the agent showed sit with it.
 - **Files changed**: under the reply, a card lists every file the turn changed, with lines added and removed. Click a file for its diff; **Open file** opens it. More than five fold behind "Show 3 more files".
+- **Commits**: when the agent made commits in the turn, a chip under the reply says so: **Committed** · the commit's title, or "3 commits" with the branches, and the lines added and removed. Click it (with several, then a commit) to read the whole message, who made it and when, its hash (click to copy), and every file it changed with its diff. **Open in Git** opens it in the session's repository on the [Git page](/git). A commit the agent amended or rebased away in the same turn is left out.
 
 The agent may also keep a checklist (**Plan** or **To-dos**, with how many are done), which ticks off as it works. Notes from the app follow the turn they are about: what memory kept, a second opinion, a spending cap reached, a child session's card. Messages from other sessions show as "From …", a child session's reply as "Reply from …" (click it to read the reply), and a scheduled task's run starts with a line naming the task.
 

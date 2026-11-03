@@ -605,6 +605,7 @@ const SegmentView = memo(function SegmentView({
       ))}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}
       {!live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}
+      {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} after />}
     </section>
   );
 });

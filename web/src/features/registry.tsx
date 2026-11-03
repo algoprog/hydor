@@ -18,6 +18,7 @@ import { childrenFeature } from './children/feature';
 import { connectionsFeature } from './connections/feature';
 import { customFeature } from './custom/feature';
 import { documentsFeature } from './documents/feature';
+import { commitsFeature } from './git/feature';
 import { guideFeature } from './guide/feature';
 import { guidelinesFeature } from './guidelines/feature';
 import { imagesFeature } from './images/feature';
@@ -35,7 +36,8 @@ import { swarmFeature } from './swarm/feature';
 import { voiceFeature } from './voice/feature';
 
 /** A view of a note in the conversation. One that shows several (`many`) gets the later notes of its kind in that turn as `more`, shown as one note with the first. */
-export type NoteView = ComponentType<{ note: SessionNote; sessionKey: string; more?: SessionNote[] }> & { many?: boolean };
+/** `afterChanges`: it shows below the turn's changed files rather than above them (the commits it made). */
+export type NoteView = ComponentType<{ note: SessionNote; sessionKey: string; more?: SessionNote[] }> & { many?: boolean; afterChanges?: boolean };
 
 /** How one of the app's own MCP tools shows in the conversation. */
 export interface ToolView {
@@ -118,6 +120,7 @@ export const features = (): WebFeature[] =>
     swarmFeature,
     researchFeature,
     arenaFeature,
+    commitsFeature,
     documentsFeature,
     imagesFeature,
     mediaFeature,
