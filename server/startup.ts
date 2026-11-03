@@ -1,6 +1,8 @@
 // Whether the app comes back when this computer starts: as a systemd service of your user (lingering,
 // so it starts before anyone logs in), as a system service, or by Docker's restart policy. On by
 // default: a copy started by hand from a git install sets up its user service the first time it runs.
+// In the Mac app it is a login item (a launch agent that opens the app in the background when you log in),
+// on from its first start as well.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,6 +11,7 @@ import type { StartupState } from '../shared/types.ts';
 import { HttpError } from './auth.ts';
 import { APP_ROOT } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
+import { desktop } from './desktop.ts';
 import { ENV_FILE, UNIT, UNIT_DIR, UNIT_PATH, unitText } from './service.ts';
 
 const user = os.userInfo().username;
@@ -31,7 +34,28 @@ function ownUnit(): { unit: string; user: boolean } | null {
 const inDocker = () => fs.existsSync('/.dockerenv') || (process.env.NAGET_AGENT_RESTARTS ?? process.env.AGENT_CONSOLE_RESTARTS) === '1';
 const lingers = () => /Linger=yes/.test(run('loginctl', ['show-user', user, '-p', 'Linger']).out);
 
+/** The Mac app's launch agent: opens the app, without its window, when you log in. */
+const PLIST = path.join(os.homedir(), 'Library/LaunchAgents/com.naget.agent.plist');
+const xml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const plistText = (app: string) => `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.naget.agent</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/bin/open</string><string>-g</string><string>-a</string><string>${xml(app)}</string><string>--args</string><string>--hidden</string></array>
+  <key>RunAtLoad</key><true/>
+</dict>
+</plist>
+`;
+function setLoginItem(on: boolean) {
+  if (!on) return fs.rmSync(PLIST, { force: true });
+  fs.mkdirSync(path.dirname(PLIST), { recursive: true });
+  fs.writeFileSync(PLIST, plistText(desktop!.app));
+}
+
 export function startupState(): StartupState {
+  if (desktop) return { on: fs.existsSync(PLIST), how: 'login-item', can: true };
   if (inDocker()) return { on: true, how: 'docker', can: false };
   const own = ownUnit();
   if (own && !own.user) return { on: run('systemctl', ['is-enabled', own.unit]).out === 'enabled', how: 'system-service', unit: own.unit, can: true };
@@ -62,6 +86,10 @@ function install() {
 
 export function setStartup(on: boolean): StartupState {
   const st = startupState();
+  if (st.how === 'login-item') {
+    setLoginItem(on);
+    return startupState();
+  }
   if (st.how === 'docker') throw new HttpError(400, 'In Docker, its restart policy decides: restart: unless-stopped in compose.yaml, or docker run --restart unless-stopped');
   if (st.how === 'system-service') {
     if (!run('sudo', ['-n', 'systemctl', on ? 'enable' : 'disable', st.unit!]).ok) throw new HttpError(403, `The system service needs root: sudo systemctl ${on ? 'enable' : 'disable'} ${st.unit}`);
@@ -81,9 +109,15 @@ export function setStartup(on: boolean): StartupState {
 
 /** On by default: the first run of a copy started by hand from a git install sets up its service (not test copies). */
 export function startupDefault(db: DB) {
+  // The app may have moved since (to Applications, say): the login item opens it where it is now.
+  if (desktop && fs.existsSync(PLIST) && !fs.readFileSync(PLIST, 'utf8').includes(`<string>${xml(desktop.app)}</string>`)) setLoginItem(true);
   if (kvGet(db, 'startup.default')) return;
   kvSet(db, 'startup.default', String(Date.now()));
   const st = startupState();
+  if (desktop && st.how === 'login-item' && !st.on && desktop.updatable) {
+    setLoginItem(true);
+    return console.log('[naget-agent] It now opens when you log in; turn that off in Settings → General.');
+  }
   if (st.how !== 'none' || !st.can || process.env.NODE_ENV === 'development') return;
   if (!fs.existsSync(path.join(APP_ROOT, '.git')) || APP_ROOT.startsWith(os.tmpdir())) return;
   try {

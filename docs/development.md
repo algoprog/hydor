@@ -24,6 +24,32 @@ scratch data folder:
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/naget-test-guide node dist/dev/guide-test.js
 ```
 
+## The Mac app
+
+`mac/` wraps the server in an Electron app (`mac/main.cjs`): it starts the server with the Node.js inside it and a
+message channel (`server/desktop.ts`), shows it in a window, keeps it in the menu bar, and installs the updates the
+server downloads (`server/updates.ts`, release by release from `naget-mac.json` on the newest GitHub release),
+going back to the version before when a new one does not start.
+
+Releases are built by `.github/workflows/mac.yml` on GitHub's Macs, for Apple silicon and Intel, when a tag
+`v<version>` (the version in `package.json`) is pushed; it publishes the `.dmg` and `.zip` builds and
+`naget-mac.json` on the Releases page, with the version's notes from `CHANGELOG.md`. Running it by hand (Actions →
+Mac app) builds without publishing. With the signing secrets the workflow lists, the app is signed with a Developer
+ID and notarized; without them it is signed ad hoc.
+
+On a Mac, by hand:
+
+```bash
+npm ci && npm run build          # at the top of the repository
+mac/scripts/stage.sh             # the server with its production packages, Node.js and tmux, in mac/build/
+cd mac && npm ci && scripts/dist.sh   # mac/dist/Naget-Agent-<version>-<arch>-mac.dmg and .zip
+scripts/smoke.sh "dist/mac-arm64/Naget Agent.app"   # its server starts (dist/mac/ on Intel)
+npm start                        # or: the app around this repository's own build, to work on main.cjs
+```
+
+To try the updater without a release, point the server at a feed of your own with `NAGET_UPDATE_FEED` (in
+`~/.config/naget-agent.env`), and, in development, the app at a stand-in bundle with `NAGET_DESKTOP_BUNDLE`.
+
 ## Keeping the docs current
 
 What users can see and do is described in several places, which change with the feature in the same commit:

@@ -477,7 +477,7 @@ function NotifySetup() {
       .catch(() => setSt('unsupported'));
   }, []);
   if (st === null) return null;
-  if (st === 'on')
+  if (st === 'on' || st === 'app')
     return (
       <div className="anim-pop-in flex items-center gap-1.5 text-[13px] font-medium text-ok">
         <Check size={15} className="anim-draw" /> Notifications are on for this device

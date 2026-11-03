@@ -47,9 +47,14 @@ export async function initNotifications() {
   } catch {}
 }
 
-export type PushState = 'unsupported' | 'denied' | 'off' | 'on';
+/** 'app': in the Mac app, which shows the notices itself while it runs (it has no web push). */
+export type PushState = 'unsupported' | 'denied' | 'off' | 'on' | 'app';
+
+/** The Mac app's window (mac/main.cjs adds this to its user agent). */
+export const inMacApp = /\bNagetAgentMac\//.test(navigator.userAgent);
 
 export async function pushState(): Promise<PushState> {
+  if (inMacApp) return 'app';
   if (!supported()) return 'unsupported';
   if (Notification.permission === 'denied') return 'denied';
   const reg = await navigator.serviceWorker.ready;
@@ -61,6 +66,7 @@ export async function pushState(): Promise<PushState> {
 }
 
 export async function enablePush(): Promise<PushState> {
+  if (inMacApp) return 'app';
   if (!supported()) return 'unsupported';
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') return perm === 'denied' ? 'denied' : 'off';

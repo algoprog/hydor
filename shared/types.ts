@@ -1190,7 +1190,7 @@ export interface UpdateResult {
   at: number;
   /** Installed by itself, not from "Update now". */
   auto: boolean;
-  /** Short commits before and after. */
+  /** Short commits before and after (the Mac app: versions). */
   from?: string;
   to?: string;
   /** Built, but this server cannot restart itself: it runs the new version after a restart. */
@@ -1198,18 +1198,20 @@ export interface UpdateResult {
   error?: string;
 }
 
-/** A newer version, and updating to it, for a copy installed from git with an upstream. */
+/** A newer version, and updating to it, for a copy installed from git with an upstream, or for the Mac app. */
 export interface UpdateState {
-  /** Commits behind the upstream at the last check. */
+  /** How this copy updates: from git, commit by commit, or the Mac app, release by release. */
+  kind?: 'git' | 'app';
+  /** Commits behind the upstream at the last check (the Mac app: 1 when a newer release is out). */
   behind: number;
-  /** The newest upstream commit's subject. */
+  /** The newest upstream commit's subject (the Mac app: the newest version). */
   latest?: string;
   checkedAt: number;
   /** Why the upstream could not be reached (the counts are then from the last time it could). */
   error?: string;
   /** Updates install themselves after 5 hours without a message from you, at most once a day. */
   auto: boolean;
-  /** The server comes back by itself after it exits, its agents left running (the installer's service, the Docker image). */
+  /** The server comes back by itself after it exits, its agents left running (the installer's service, the Docker image, the Mac app in a folder it may replace itself in). */
   canRestart: boolean;
   running?: { phase: 'pull' | 'install' | 'build' | 'restart'; since: number; auto: boolean };
   last?: UpdateResult;
@@ -1303,7 +1305,7 @@ export type HfSort = 'downloads' | 'trending' | 'likes' | 'new';
 /** Whether the app starts again when this computer starts, and what does it. */
 export interface StartupState {
   on: boolean;
-  how: 'user-service' | 'system-service' | 'docker' | 'none';
+  how: 'user-service' | 'system-service' | 'docker' | 'login-item' | 'none';
   unit?: string;
   /** A user service starts at boot only while the user lingers; otherwise once they log in. */
   linger?: boolean;

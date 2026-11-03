@@ -8375,5 +8375,19 @@
 "This needs Ollama, a free program that runs models, and it is not running here yet: install it (the Install link above), then come back.":"这需要 Ollama，一个运行模型的免费程序，而它在这里还没有运行：先安装它（上面的“安装”链接），然后再回来。",
 "This one needs vLLM, a program for advanced setups, and it is not installed here.":"这个需要 vLLM，一个适合进阶配置的程序，而它在这里没有安装。",
 "Under the message box you choose the agent that does the work{0}, the AI model it uses{1}, the folder on this computer it works in, and the assistant it starts as (ready-made instructions for a kind of work). What you pick stays for next time.":"在消息框下方，你可以选择做事的智能体{0}、它用的 AI 模型{1}、它在这台电脑上工作的文件夹，以及它开始时扮演的助手（针对某类工作的现成指示）。你的选择下次还会保留。",
-"Works with your files":"处理你的文件"
+"Works with your files":"处理你的文件",
+"could not unpack it: {0}":"无法解压：{0}",
+"Does not open by itself when you log in to this Mac.":"登录这台 Mac 时不会自动打开。",
+"It downloads the new version and opens it in place of this one; running agents carry on.":"它会下载新版本，并用它替换当前版本打开；正在运行的智能体会继续工作。",
+"Move Naget Agent to your Applications folder to update it":"将 Naget Agent 移到“应用程序”文件夹后才能更新",
+"Move Naget Agent to your Applications folder to update it.":"将 Naget Agent 移到“应用程序”文件夹后才能更新。",
+"Opening the new version, this page reconnects by itself":"正在打开新版本，此页面会自动重新连接",
+"Opens in the background when you log in to this Mac, from your menu bar.":"登录这台 Mac 时在后台打开，位于菜单栏中。",
+"the download failed ({0})":"下载失败（{0}）",
+"the download has no app in it":"下载的文件中没有应用",
+"the download is not the build the release names (its checksum differs)":"下载的文件与发布中注明的版本不符（校验和不同）",
+"The Mac app shows them itself while it runs, even with its window closed (it stays in the menu bar).":"Mac 应用在运行时会自行显示通知，即使窗口已关闭（它会留在菜单栏中）。",
+"the release does not say its version":"该发布没有注明版本",
+"Version {0} is out":"版本 {0} 已发布",
+"You have the newest version":"你使用的已是最新版本"
 }

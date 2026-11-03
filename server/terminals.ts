@@ -22,7 +22,7 @@ set -g set-clipboard on
 set -g allow-rename off
 set -g window-size latest
 set -g aggressive-resize on
-set -g default-terminal "tmux-256color"
+set -g default-terminal "${process.platform === 'darwin' ? 'screen-256color' : 'tmux-256color'}"
 # Draw in the browser terminal's normal buffer so its own scrollback keeps the history.
 set -ga terminal-overrides ',xterm*:smcup@:rmcup@,xterm*:Tc'
 `;

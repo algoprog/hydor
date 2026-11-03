@@ -61,6 +61,11 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 
 ## Quick start
 
+On a Mac (macOS 12 or newer, Apple silicon or Intel): download the Mac app from the
+[latest release](https://github.com/Naget-Inc/naget-agent/releases/latest) (`…-arm64-mac.dmg` or `…-x64-mac.dmg`),
+drag it to Applications and open it. It brings everything it needs, opens in its own window, stays in the menu bar
+and keeps itself up to date. See [the Mac app](docs/install.md#the-mac-app).
+
 With Docker, on Linux, macOS or Windows (the image runs on Intel/AMD and ARM):
 
 ```bash
@@ -93,7 +98,7 @@ To use it from your phone, put HTTPS in front of it: see [remote access](docs/re
 ## Documentation
 
 - [Features](docs/features.md): everything the app does
-- [Installation](docs/install.md): requirements, Docker, the installer and the service, updates
+- [Installation](docs/install.md): requirements, the Mac app, Docker, the installer and the service, updates
 - [Configuration](docs/configuration.md): settings, where data lives, resetting the password
 - [Remote access](docs/remote-access.md): your phone and other devices, over HTTPS
 - [Several machines](docs/machines.md): agents on other machines, from one place
