@@ -170,7 +170,7 @@
 
 修改密码会让其他所有浏览器退出登录：手机、其他电脑，除了当前这个以外的所有地方。如果当前密码不对，或两次输入的新密码不一致，什么都不会改变，应用会说明原因。
 
-如果你忘了密码，在运行应用的那台电脑上、在应用的文件夹中运行：`node dist/server/cli.js set-password`（使用 Docker 时：`docker compose exec -it naget-agent node dist/server/cli.js set-password`）。所有浏览器都会退出登录。
+如果你忘了密码，在运行应用的那台电脑上、在应用的文件夹中运行：`node dist/server/cli.js set-password`（使用 Docker 时：`docker compose exec -it naget-agent node dist/server/cli.js set-password`）。所有浏览器都会退出登录，因输错密码而被暂停的地址也能马上重新登录。
 
 ## 在此浏览器上退出登录
 

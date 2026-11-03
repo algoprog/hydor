@@ -1,5 +1,5 @@
 // Maintenance commands, run on the host:
-//   node dist/server/cli.js set-password        prompts; resets the web password, signs everyone out
+//   node dist/server/cli.js set-password        prompts; resets the web password, signs everyone out, lifts sign-in pauses
 //   node dist/server/cli.js setup-token         prints the one-time token for first setup
 //   node dist/server/cli.js access-token [name] prints a new token for another Naget Agent to use this machine
 //   node dist/server/cli.js service install     runs the app as a systemd user service (no root needed)
@@ -76,7 +76,8 @@ if (cmd === 'set-password') {
   const token = a.setupToken()!;
   await a.setup(token, pw);
   db.prepare('delete from auth_sessions').run();
-  console.log('Password set. All browsers were signed out.');
+  a.clearTries();
+  console.log('Password set. All browsers were signed out, and addresses paused after wrong passwords may sign in again.');
 } else if (cmd === 'setup-token') {
   const { auth: a } = await auth();
   const t = a.setupToken();

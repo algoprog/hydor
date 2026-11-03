@@ -4,6 +4,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    /** The whole reply, for the fields beside `error`. */
+    public data: any = null,
   ) {
     super(message);
   }
@@ -35,7 +37,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
     data = null;
   }
   if (res.status === 401 && !path.startsWith('/api/auth/')) for (const fn of unauthorized) fn();
-  if (!res.ok) throw new ApiError(data?.error ?? `${res.status} ${res.statusText}`, res.status);
+  if (!res.ok) throw new ApiError(data?.error ?? `${res.status} ${res.statusText}`, res.status, data);
   return data as T;
 }
 

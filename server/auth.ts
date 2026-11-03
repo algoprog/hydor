@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { drawCaptcha, sameCaptcha } from './captcha.ts';
 import { paths } from './config.ts';
-import type { DB } from './db.ts';
+import { kvGet, kvSet, type DB } from './db.ts';
 
 interface AuthFile {
   v: 1;
@@ -35,15 +36,101 @@ function safeEqual(a: string, b: string): boolean {
   return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
 }
 
-interface Attempt {
-  fails: number;
-  first: number;
-  lockedUntil: number;
+/**
+ * Wrong passwords are counted by the address they come from, over the last hour. From the third on, the sign-in page
+ * asks for the characters in a picture as well (server/captcha.ts); the tenth stops sign-ins from that address for an
+ * hour. Counted over every address, ten wrong passwords in an hour bring the picture to everyone, and sixty stop all
+ * sign-ins until the hour is up. Reading a picture wrong costs no try; each picture is good for one, and an address
+ * gets at most thirty pictures an hour.
+ */
+export const SIGN_IN_LIMITS = {
+  hour: 3600_000,
+  picture: 3,
+  block: 10,
+  allPicture: 10,
+  allStop: 60,
+  pictures: 30,
+  pictureMs: 10 * 60_000,
+};
+const L = SIGN_IN_LIMITS;
+
+/** Wrong passwords of the last hour (when each came), from anywhere and by address, with an address's pause. */
+interface Tries {
+  all: number[];
+  by: Record<string, { fails: number[]; until: number }>;
+}
+const TRIES = 'auth:tries';
+
+/** An open picture: its characters, and when it was made. */
+interface Picture {
+  id: string;
+  text: string;
+  at: number;
 }
 
+/**
+ * The key wrong passwords are counted under: the address itself, or for IPv6 its first half (the /64 a home or a
+ * phone is given), so a bot can't take a fresh address for every try.
+ */
+export function addressKey(ip: string): string {
+  const s = String(ip ?? '').trim().toLowerCase().replace(/%.*$/, '');
+  const v4 = /^(?:::ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/.exec(s);
+  if (v4) return v4[1];
+  if (!/^[0-9a-f:.]+$/.test(s) || !s.includes(':')) return s || 'unknown';
+  const [head, tail] = s.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const groups = tail === undefined ? h : [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t];
+  return `${groups.slice(0, 4).map((g) => (parseInt(g, 16) || 0).toString(16)).join(':')}::/64`;
+}
+
+/** Whether an address is this computer's or a private network's (Docker's, a home network, Tailscale's): where a proxy in front of the app connects from. */
+function nearby(ip: string): boolean {
+  const s = ip.toLowerCase().replace(/^::ffff:(?=\d+\.)/, '');
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(s);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
+  }
+  return s === '::1' || /^f[cd][0-9a-f]{2}:/.test(s) || /^fe[89ab][0-9a-f]:/.test(s);
+}
+
+/** An address as a forwarding header writes it, without brackets or a port; '' for anything else. */
+function bareAddress(s: string): string {
+  let t = s.trim();
+  const v6 = /^\[([0-9a-fA-F:.]+)\](?::\d+)?$/.exec(t);
+  if (v6) t = v6[1];
+  else if (/^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(t)) t = t.replace(/:\d+$/, '');
+  return t.length <= 45 && /^[0-9a-fA-F:.]+$/.test(t) && /[.:]/.test(t) ? t : '';
+}
+
+/**
+ * The address a request comes from, which wrong passwords are counted by. Through a proxy on this computer or a
+ * private network (Cloudflare Tunnel, Tailscale, Caddy, Docker's own network) it is the visitor's, as the proxy added
+ * it to X-Forwarded-For: the last address there that is not a private one of the proxies. Cloudflare's own
+ * CF-Connecting-IP is that same address, and other proxies would let a visitor write it, so it is not read. From
+ * anywhere else the header counts for nothing, so no one can name a new address for each try.
+ */
+export function clientAddress(peer: string, forwardedFor?: unknown): string {
+  const p = String(peer ?? '').trim();
+  if (!nearby(p)) return p || 'unknown';
+  const chain = String(forwardedFor ?? '').split(',').map(bareAddress).filter(Boolean);
+  for (let i = chain.length - 1; i >= 0; i--) if (i === 0 || !nearby(chain[i])) return chain[i];
+  return p;
+}
+
+const minutes = (ms: number) => Math.max(1, Math.ceil(ms / 60_000));
+
+/** An address's pause, as the sign-in page says it. */
+function paused(ms: number) {
+  const m = minutes(ms);
+  return new HttpError(429, `Too many failed sign-ins from this address. Try again in ${m} minute${m === 1 ? '' : 's'}.`);
+}
+const stopped = () => new HttpError(429, 'Too many failed sign-ins. Try again later.');
+
 export class AuthManager {
-  private attempts = new Map<string, Attempt>();
-  private globalFails: number[] = [];
+  /** The pictures given out, by address: those still open, and when each was made (for the hourly cap). In memory: after a restart the page just asks for a new one. */
+  private pictures = new Map<string, { open: Picture[]; made: number[] }>();
   private lastSeenWrite = new Map<string, number>();
 
   constructor(private db: DB) {}
@@ -95,30 +182,116 @@ export class AuthManager {
     this.db.prepare('delete from auth_sessions where token_hash != ?').run(keep);
   }
 
-  /** Throws when this client must wait before trying again. */
-  checkRateLimit(ip: string) {
-    const now = Date.now();
-    this.globalFails = this.globalFails.filter((t) => now - t < 3600_000);
-    if (this.globalFails.length >= 60) throw new HttpError(429, 'Too many failed logins. Try again later.');
-    const a = this.attempts.get(ip);
-    if (a && a.lockedUntil > now) {
-      throw new HttpError(429, `Too many attempts. Try again in ${Math.ceil((a.lockedUntil - now) / 1000)} s.`);
+  /** The wrong passwords of the last hour. They live in the database, so a restart lifts no pause and the command line can clear them. */
+  private tries(now: number): Tries {
+    let saved: any = {};
+    try {
+      saved = JSON.parse(kvGet(this.db, TRIES) ?? '{}');
+    } catch {}
+    const recent = (xs: unknown) => (Array.isArray(xs) ? xs.filter((x): x is number => typeof x === 'number' && now - x < L.hour) : []);
+    const by: Tries['by'] = {};
+    for (const [key, a] of Object.entries<any>(saved?.by ?? {})) {
+      const fails = recent(a?.fails);
+      const until = typeof a?.until === 'number' && a.until > now ? a.until : 0;
+      if (fails.length || until) by[key] = { fails, until };
     }
+    return { all: recent(saved?.all), by };
   }
 
-  recordFailure(ip: string) {
+  private owesPicture(t: Tries, key: string): boolean {
+    return (t.by[key]?.fails.length ?? 0) >= L.picture || t.all.length >= L.allPicture;
+  }
+
+  /**
+   * Before a password is checked: refuses while sign-ins are stopped, from everywhere or from this address, and when
+   * the address owes the picture and has not read it right (that costs no try). Then counts the try as wrong until it
+   * turns out right, so tries sent all at once can't slip past the limits while their passwords are checked. Returns
+   * the try's time, for rightTry. The first-password setup passes no picture: its token can't be guessed.
+   */
+  beginTry(ip: string, picture: { id?: unknown; answer?: unknown } | null | undefined, needPicture = true): number {
     const now = Date.now();
-    this.globalFails.push(now);
-    let a = this.attempts.get(ip);
-    if (!a || now - a.first > 3600_000) a = { fails: 0, first: now, lockedUntil: 0 };
-    a.fails += 1;
-    // 3 free tries, then 30 s, 60 s, 2 min ... capped at 1 h.
-    if (a.fails >= 3) a.lockedUntil = now + Math.min(3600_000, 15_000 * 2 ** (a.fails - 2));
-    this.attempts.set(ip, a);
+    const key = addressKey(ip);
+    const t = this.tries(now);
+    if (t.all.length >= L.allStop) throw stopped();
+    const a = t.by[key] ?? { fails: [], until: 0 };
+    if (a.until > now) throw paused(a.until - now);
+    if (needPicture && this.owesPicture(t, key)) this.readPicture(key, picture, now);
+    a.fails.push(now);
+    if (a.fails.length >= L.block) a.until = now + L.hour;
+    t.by[key] = a;
+    t.all.push(now);
+    kvSet(this.db, TRIES, JSON.stringify(t));
+    return now;
   }
 
-  recordSuccess(ip: string) {
-    this.attempts.delete(ip);
+  /** A right password: its address starts afresh. */
+  rightTry(ip: string, at: number) {
+    const key = addressKey(ip);
+    const t = this.tries(Date.now());
+    delete t.by[key];
+    const i = t.all.indexOf(at);
+    if (i >= 0) t.all.splice(i, 1);
+    kvSet(this.db, TRIES, JSON.stringify(t));
+    this.pictures.delete(key);
+  }
+
+  /** A wrong password (already counted by beginTry): throws what the sign-in page is told. */
+  wrongTry(ip: string): never {
+    const now = Date.now();
+    const key = addressKey(ip);
+    const t = this.tries(now);
+    const a = t.by[key];
+    if (a && a.until > now) throw paused(a.until - now);
+    if (this.owesPicture(t, key)) throw new HttpError(401, 'Wrong password', { captcha: true, left: L.block - (a?.fails.length ?? 0) });
+    throw new HttpError(401, 'Wrong password');
+  }
+
+  /** Lifts every pause and forgets the wrong passwords (the command line's set-password). */
+  clearTries() {
+    this.db.prepare('delete from kv where k = ?').run(TRIES);
+  }
+
+  /** Checks the characters read from a picture; each picture is good for one try. */
+  private readPicture(key: string, given: { id?: unknown; answer?: unknown } | null | undefined, now: number) {
+    const id = typeof given?.id === 'string' ? given.id : '';
+    const answer = typeof given?.answer === 'string' ? given.answer : '';
+    if (!id || !answer.trim()) throw new HttpError(401, 'Type the characters in the picture as well', { captcha: true });
+    const p = this.pictures.get(key);
+    const i = p ? p.open.findIndex((o) => o.id === id) : -1;
+    const pic = i >= 0 ? p!.open.splice(i, 1)[0] : null;
+    if (!pic || now - pic.at > L.pictureMs) throw new HttpError(401, 'That picture has expired. Here is a new one.', { captcha: true });
+    if (!sameCaptcha(answer, pic.text)) throw new HttpError(401, 'The characters did not match the picture. Here is a new one.', { captcha: true });
+  }
+
+  /**
+   * What the sign-in page shows besides the password: nothing, or a new picture when this address owes one. Refuses,
+   * as a sign-in would, while sign-ins are stopped, so the page can say so before anyone types.
+   */
+  picture(ip: string): { needed: false } | { needed: true; id: string; image: string; left: number } {
+    const now = Date.now();
+    const key = addressKey(ip);
+    const t = this.tries(now);
+    if (t.all.length >= L.allStop) throw stopped();
+    const a = t.by[key];
+    if (a && a.until > now) throw paused(a.until - now);
+    if (!this.owesPicture(t, key)) return { needed: false };
+    for (const [k, q] of this.pictures) {
+      q.made = q.made.filter((x) => now - x < L.hour);
+      q.open = q.open.filter((o) => now - o.at < L.pictureMs);
+      if (!q.made.length && !q.open.length) this.pictures.delete(k);
+    }
+    const p = this.pictures.get(key) ?? { open: [], made: [] };
+    if (p.made.length >= L.pictures) {
+      const m = minutes(p.made[0] + L.hour - now);
+      throw new HttpError(429, `Too many new pictures from this address. Try again in ${m} minute${m === 1 ? '' : 's'}.`);
+    }
+    const { text, png } = drawCaptcha();
+    const id = crypto.randomBytes(12).toString('base64url');
+    p.open.push({ id, text, at: now });
+    if (p.open.length > 3) p.open.shift();
+    p.made.push(now);
+    this.pictures.set(key, p);
+    return { needed: true, id, image: `data:image/png;base64,${png.toString('base64')}`, left: L.block - (a?.fails.length ?? 0) };
   }
 
   createSession(ip: string, ua: string): string {
@@ -163,6 +336,8 @@ export class HttpError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** More fields for the reply, beside `error`. */
+    public extra?: Record<string, unknown>,
   ) {
     super(message);
   }

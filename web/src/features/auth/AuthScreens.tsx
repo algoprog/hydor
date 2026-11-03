@@ -1,8 +1,8 @@
-import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { Blocks, KeyRound, Lock } from 'lucide-react';
-import { post } from '../../lib/api';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { Blocks, KeyRound, Lock, RefreshCw } from 'lucide-react';
+import { post, type ApiError } from '../../lib/api';
 import { useApp } from '../../lib/store';
-import { Button, cx, inputCls } from '../../components/ui';
+import { Button, cx, IconButton, inputCls } from '../../components/ui';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Aurora, HeroMark, setupDone, TOUR_SETUP_STEPS, TourProgress } from '../tour/Tour';
 
@@ -47,32 +47,112 @@ function Shell({ title, sub, leaving, children }: { title: string; sub: ReactNod
 
 const input = inputCls.replace('h-9.5', 'h-10');
 
+/** A picture of characters to read back, which the server asks for after a few wrong passwords from this address. */
+type Picture = { id: string; image: string };
+
 export function Login() {
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pic, setPic] = useState<Picture | null>(null);
+  const [answer, setAnswer] = useState('');
+  // Wrong passwords this address has left before its sign-ins stop for an hour, once the picture shows.
+  const [left, setLeft] = useState<number | null>(null);
+  const pwRef = useRef<HTMLInputElement>(null);
+  const answerRef = useRef<HTMLInputElement>(null);
+
+  /** A new picture when this address needs one (none otherwise). Returns why there can't be one: a pause, or too many pictures. */
+  const loadPicture = async (): Promise<string> => {
+    setAnswer('');
+    try {
+      const r = await post<{ needed: boolean; id?: string; image?: string; left?: number }>('/api/auth/captcha');
+      setPic(r.needed && r.id && r.image ? { id: r.id, image: r.image } : null);
+      setLeft(r.needed && typeof r.left === 'number' ? r.left : null);
+      return '';
+    } catch (e) {
+      setPic(null);
+      return (e as Error).message;
+    }
+  };
+
+  // Before the card shows: the picture, if this address already owes one, or that its sign-ins are paused.
+  useEffect(() => {
+    void loadPicture().then((m) => m && setErr(m));
+  }, []);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    setErr('');
     try {
-      await post('/api/auth/login', { password: pw });
+      await post('/api/auth/login', { password: pw, captcha: pic ? { id: pic.id, answer } : undefined });
       useApp.getState().set({ auth: 'ok' });
     } catch (e2) {
-      setErr((e2 as Error).message);
+      const d = (e2 as ApiError).data;
+      // The next picture comes with the message, so they change together.
+      let why = '';
+      if (d?.captcha) why = await loadPicture();
+      else setPic(null);
+      setErr(why || (e2 as Error).message);
+      // Back to what needs typing again: the password after a wrong one, else the picture's characters.
+      const misread = d?.captcha && typeof d?.left !== 'number';
+      requestAnimationFrame(() => {
+        const el = misread ? answerRef.current : pwRef.current;
+        el?.focus();
+        if (!misread) el?.select();
+      });
     } finally {
       setBusy(false);
     }
   };
+
+  const newPicture = async () => {
+    const why = await loadPicture();
+    if (why) setErr(why);
+    answerRef.current?.focus();
+  };
+
   return (
     <Shell title="Naget Agent" sub="Sign in to continue.">
       <form onSubmit={submit} className="space-y-3">
         <div className="relative">
           <Lock size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
-          <input className={`${input} pl-9`} type="password" autoComplete="current-password" autoFocus placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} />
+          <input ref={pwRef} className={`${input} pl-9`} type="password" autoComplete="current-password" autoFocus placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} />
         </div>
+        {pic && (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="flex h-[78px] min-w-0 flex-1 items-center justify-center rounded-[10px] border border-line-2 bg-bg-1">
+                {/* The ink is the picture's alpha, in the page's own text colour. */}
+                <span
+                  role="img"
+                  aria-label="Characters to type"
+                  className="block aspect-[110/34] w-[220px] max-w-full bg-fg"
+                  style={{ maskImage: `url("${pic.image}")`, WebkitMaskImage: `url("${pic.image}")`, maskSize: '100% 100%', WebkitMaskSize: '100% 100%' }}
+                />
+              </div>
+              <IconButton type="button" label="New picture" onClick={() => void newPicture()}>
+                <RefreshCw size={15} />
+              </IconButton>
+            </div>
+            <input
+              ref={answerRef}
+              className={input}
+              placeholder="Characters in the picture"
+              autoComplete="off"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={12}
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+            />
+          </>
+        )}
         {err && <div className="text-[12.5px] text-err">{err}</div>}
-        <Button variant="primary" className="h-10 w-full" disabled={!pw || busy}>
+        {pic && left !== null && (
+          <div className="text-[12px] leading-snug text-fg-3">{`After ${left} more wrong password${left === 1 ? '' : 's'}, signing in from this address stops for an hour.`}</div>
+        )}
+        <Button variant="primary" className="h-10 w-full" disabled={!pw || busy || (!!pic && !answer.trim())}>
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
