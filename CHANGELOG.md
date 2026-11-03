@@ -3,6 +3,33 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.15.0 · 3 November 2026
+
+Apps with views of their own: each ready-made app's answer opens in pages made for it, with buttons that do things,
+and the Apps pages are friendlier.
+
+- **Views**: an app's answer can open in a view of its own: tabs, elements made for it (a timeline of days, a
+  product with its strengths and weaknesses, a story card) and buttons. Open a day or a product on a page of its
+  own, tick things off (kept with the run, on every device), show one topic's stories or one person's actions, copy
+  an email or a letter, run it again with a change (a slower pace, one more day, a more formal tone, new questions
+  about the same document), or start another app on part of it (research a story, a finding or a product).
+  **Plain answer** shows the card and tables as before.
+- **The ready-made apps** each have one: the Trip planner's days to tick off, a page for each day, what to book and
+  a budget chart; Compare products' pick and the products side by side; the meeting's actions by owner; a
+  contract's red flags by how serious; a lesson's timeline; and more. Compare products also names its pick on its
+  own, for programs.
+- **Design**: a new tab in an app's **Edit** shows its view with its latest run (or a made-up answer), lists what
+  to fix, and lets you ask an agent to design it, start from its answer, or change it as code. Agents design views
+  too, and a try tells them what a view used that the run did not give.
+- **The Apps page**: a box that asks what your next app should do, with ideas to start from; your apps with when
+  each last ran; the runs to pick up again; ready-made apps showing what you get from each; building blocks folded
+  away. **New app** is one menu: describe it, start from scratch, or install from a file.
+- **An app's page**: what it does at the top, your answers in one card, and beside them what you get, its latest
+  runs and how it works; a ready-made app's agent and model wait behind **Change**. Its back arrow is no longer cut
+  off. A run's page says what it was asked, with **Run again** at the top.
+- **Sessions**: no empty space under a short reply; the view holds a new text at its top only once what is below
+  it fills the screen.
+
 ## 0.14.3 · 3 November 2026
 
 Naget Agent as an app for your Mac that keeps itself up to date, a Library item to start a session with, and simpler
