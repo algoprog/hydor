@@ -8188,5 +8188,8 @@
 "cached ·":"已缓存 ·",
 "{0} still has usage left. Turn on Switch accounts at a limit and new sessions start there.":"{0} 还有用量。开启“达到限额时切换账户”，新会话就会从那里开始。",
 "{0} still has usage left. Turn on Switch accounts at a limit and this session carries on there.":"{0} 还有用量。开启“达到限额时切换账户”，这个会话就会在那里继续。",
-"Switch accounts at a limit is on":"“达到限额时切换账户”已开启"
+"Switch accounts at a limit is on":"“达到限额时切换账户”已开启",
+"Attach files or a screenshot":"附加文件或截图",
+"{0}% of the context in use":"已使用 {0}% 的上下文",
+"{0}% of the context in use ({1} of {2} tokens) · click to compact":"已使用 {0}% 的上下文（{1} / {2} token）· 点击压缩"
 }

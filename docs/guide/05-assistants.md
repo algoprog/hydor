@@ -131,7 +131,7 @@ Picking a space in the folder menu also picks the assistant that space starts it
 
 A session's message box shows the assistant it works as, and you can switch to another one at any time: from **Researcher** to **Writer** once the facts are in, say.
 
-1. In a wide message box, the assistant comes first in the row under the box, before the model: its icon and name. In a narrow box or on a phone, it is the first row of the chip that opens **Options**, and that chip names it first, such as "Researcher · Opus 5.5".
+1. It is the first row of the chip under the message box that opens **Options**, and that chip names it first, such as "Researcher · Opus 5.5".
 2. Click it. Under **Switch to**, pick another one: the same menu as on the start page, a grid on a computer and a sheet from the bottom on a phone.
 3. The app says "The agent works as *name* from your next message".
 

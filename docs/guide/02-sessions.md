@@ -101,11 +101,11 @@ In every mode Custom asks you before risky commands. In Ask, Accept edits and Pl
 
 ### Attach files, point at files, use commands
 
-- **Attach files** (the paperclip), drop files on the message box, or paste pictures and files into it. A message carries up to 25 MB of files. Pictures (PNG, JPEG, GIF, WebP) go to the model as images, up to 8 a message; other files (up to 20) are saved on this computer and listed at the end of your message, so the agent opens them. Remove one with its × before sending. Files you have attached wait in the box until you send them, even while you go to another page (reloading the page clears them).
-- **Attach a screenshot** (the screen icon, on computers): your browser asks which screen, window or tab, and one picture of it is attached.
+- **Attach files** (the **+** at the left of the box's bottom row), drop files on the message box, or paste pictures and files into it. A message carries up to 25 MB of files. Pictures (PNG, JPEG, GIF, WebP) go to the model as images, up to 8 a message; other files (up to 20) are saved on this computer and listed at the end of your message, so the agent opens them. Remove one with its × before sending. Files you have attached wait in the box until you send them, even while you go to another page (reloading the page clears them).
+- **Attach a screenshot** (in the same **+** menu, on computers; where the browser can't take one, the **+** is a paperclip that attaches files): your browser asks which screen, window or tab, and one picture of it is attached.
 - **@**: type @ and part of a file's name to list matching files in the folder; ↑ ↓ to move, Enter or Tab to insert it, Esc to close.
 - **/**: at the very start of the message, / lists the agent's commands and skills (Claude Code's), with what each does.
-- The microphone (dictate your message) and the headphones (hands-free voice mode) sit by the paperclip when your browser or this computer can recognize speech. See [Documents, images, videos and voice](/guide/documents-voice).
+- The microphone (dictate your message) and the headphones (hands-free voice mode) sit by the send button when your browser or this computer can recognize speech. See [Documents, images, videos and voice](/guide/documents-voice).
 
 ### What the start page remembers
 
@@ -211,7 +211,7 @@ Queued messages wait above the message box, numbered in the order they go out. O
 
 ## Change the assistant, model, effort or permissions
 
-The message box of a session has the start page's **Assistant** and its three choices **Model**, **Effort** and **Permissions**: side by side in a wide box, or in one chip (it opens **Options**) in a narrow one or on a phone, which names the assistant and the model, and the effort and permissions when they are not the usual. Another assistant applies from your next message (see [Switch assistants in a session](/guide/assistants#switch-assistants-in-a-session)). A change of model, effort or permissions applies to the running agent at once and stays with the session. Shift+Tab moves to the next permissions mode. The model menu lists only this agent's models; to move the conversation to another agent, use [Continue in another agent](#continue-in-another-agent).
+The message box of a session has the start page's **Assistant** and its three choices **Model**, **Effort** and **Permissions**, in one chip beside the **+** (it opens **Options**, a sheet from the bottom on a phone). The chip names the assistant and the model, and the effort and permissions when they are not the usual; it turns amber while the agent may do anything without asking (**Bypass**, or Codex's **Full access**). Another assistant applies from your next message (see [Switch assistants in a session](/guide/assistants#switch-assistants-in-a-session)). A change of model, effort or permissions applies to the running agent at once and stays with the session. Shift+Tab moves to the next permissions mode. The model menu lists only this agent's models; to move the conversation to another agent, use [Continue in another agent](#continue-in-another-agent).
 
 ## Quote part of a reply
 
@@ -239,9 +239,9 @@ Press Ctrl+F (⌘F) in a session. **Find in this session** looks through your me
 
 ## Read the meters: context, cache and speed
 
-A wide message box shows small meters on the right of its bottom row:
+A small ring with a percentage by the microphone fills as the conversation uses up the model's context window; the rest is at the foot of the Options chip's menu:
 
-- **42% context**: how much of the model's context window the conversation fills. It turns amber above 85%. Click it to compact the conversation (not while a turn runs). In a narrow box this is the **Context** row of the Options chip, with **Compact**.
+- **Context**: the ring, and the **Context** row in Options ("42% in use"). Point at the ring for the exact number of tokens. It turns amber above 85%. Click the ring, or **Compact** in Options, to compact the conversation (not while a turn runs).
 - **cache 4m** (Claude Code): the prompt cache keeps the conversation ready for a while (5 minutes or an hour), so the next message is cheaper and quicker. It counts down while you send nothing; a message before then reuses it and starts the count again. **cache cold** means the next message rebuilds it.
 - **85 tok/s**: how fast the last reply was written, in tokens a second.
 
