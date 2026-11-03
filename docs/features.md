@@ -99,8 +99,8 @@ agents that speak ACP and take MCP servers.
   agent stops waiting, and plays in the app's own player. **Save to Library** keeps one in the Library, where a
   model that sees images writes its title and description (a video's from ten of its frames on one picture, with
   ffmpeg): the app's choice, any of OpenRouter's vision models, Claude through Claude Code, or a model of your own
-  (Ollama, vLLM, an endpoint). The Library's Media tab finds, plays, downloads and edits them, and agents can work
-  from them.
+  (Ollama, vLLM, an endpoint). The Library's Media tab finds, plays, downloads and edits them, **Start a session with it** opens a new
+  session with one in the message box, and agents can work from them.
 - **Connections**: a marketplace of apps and services (Notion, Linear, GitHub, Google, Stripe and more), signed
   in once for every agent; anyone can add one with a pull request to `catalog/`. Keys and sign-ins live in an
   encrypted vault: when a task needs one that isn't there, the agent asks with a card (one key, or a sign-in's

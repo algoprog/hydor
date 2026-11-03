@@ -2,12 +2,13 @@
 // it, newest first or by name, all or only images or only videos, and a box to find one by its words. Each
 // opens at its own place (/media/<id>).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownUp, Download, Ellipsis, ImageIcon, Images, Play, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { ArrowDownUp, Download, Ellipsis, ImageIcon, Images, MessageSquarePlus, Play, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { clipLength, type MediaItem } from '@shared/media';
 import { del, enc, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
+import { startSessionWith } from '../../lib/startFiles';
 import { toastError } from '../../lib/store';
 import { Button, cx, Empty, IconButton, MenuItem, MenuSep, Popover, Segmented, Throbber, useConfirm } from '../../components/ui';
 import { mediaUrl, useMedia } from './state';
@@ -42,6 +43,9 @@ export async function recaption(m: MediaItem) {
     toastError(e);
   }
 }
+
+/** The start page, with the Library's copy in its message box: the new session gets it with its first message. */
+export const startSessionWithMedia = (m: MediaItem) => startSessionWith([{ path: m.file, size: m.bytes, name: `${m.title}${/\.[a-z0-9]+$/i.exec(m.file)?.[0] ?? ''}` }]);
 
 export function downloadMedia(m: MediaItem) {
   const a = document.createElement('a');
@@ -90,6 +94,9 @@ function MediaCard({ m }: { m: MediaItem }) {
         </IconButton>
       </div>
       <Popover anchor={anchor} open={menu} onClose={close} align="end" width={250}>
+        <MenuItem icon={<MessageSquarePlus size={14} />} onClick={() => (close(), startSessionWithMedia(m))}>
+          Start a session with it
+        </MenuItem>
         <MenuItem icon={<Download size={14} />} onClick={() => (close(), downloadMedia(m))}>
           Download
         </MenuItem>
