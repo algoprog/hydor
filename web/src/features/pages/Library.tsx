@@ -4,8 +4,8 @@
 // screen the places are a list beside it: Everything (each space's things together, under its name), each space,
 // Not in a space, and Published (the sites published from pages or a project's build); on a phone, a row of chips.
 // Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space.
-// Addresses: /library?space=<id>|none, &kind=<kind>, ?tab=published; ?tab=media (the old Media tab) shows pictures
-// and videos; ?new=page|slides|doc|sheet|tex opens New with that kind.
+// Addresses: /library?space=<id>|none, &kind=<kind> (image and video each, media both: the old Media tab's
+// ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex opens New with that kind.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import {
@@ -62,7 +62,7 @@ import { usePagesStore } from './state';
 
 type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'image' | 'video';
 /** What a place shows: everything, one kind, or pictures and videos together. */
-type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'media';
+type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'image' | 'video' | 'media';
 
 interface Item {
   key: string;
@@ -93,8 +93,12 @@ const SHOWS: { value: Show; label: string; has: (k: ItemKind) => boolean }[] = [
   { value: 'doc', label: 'Documents', has: (k) => k === 'doc' },
   { value: 'sheet', label: 'Spreadsheets', has: (k) => k === 'sheet' },
   { value: 'tex', label: 'LaTeX', has: (k) => k === 'tex' },
-  { value: 'media', label: 'Pictures and videos', has: (k) => k === 'image' || k === 'video' },
+  { value: 'image', label: 'Pictures', has: (k) => k === 'image' },
+  { value: 'video', label: 'Videos', has: (k) => k === 'video' },
 ];
+/** Pictures and videos together: the old Media tab's address (and an older link's), with no chip of its own. */
+const BOTH: (typeof SHOWS)[number] = { value: 'media', label: 'Pictures and videos', has: (k) => k === 'image' || k === 'video' };
+const showOf = (v: Show) => SHOWS.find((s) => s.value === v) ?? BOTH;
 
 type Sort = 'changed' | 'name' | 'made';
 const SORTS: { value: Sort; label: string }[] = [
@@ -454,7 +458,7 @@ export function Library() {
   const q = new URLSearchParams(search);
   const place = placeOf(q);
   const asked = q.get('kind') ?? (q.get('tab') === 'media' ? 'media' : 'all');
-  const show: Show = SHOWS.some((s) => s.value === asked) ? (asked as Show) : 'all';
+  const show: Show = SHOWS.some((s) => s.value === asked) || asked === 'media' ? (asked as Show) : 'all';
   const items = useItems();
   const sites = usePagesStore((s) => s.sites);
   const spaces = useSpaces();
@@ -494,7 +498,7 @@ export function Library() {
   const kinds = useMemo(() => SHOWS.filter((s) => s.value === 'all' || here.some((it) => s.has(it.kind))), [here]);
   const words = find.trim().toLowerCase();
   const shown = useMemo(() => {
-    const has = SHOWS.find((s) => s.value === show)!.has;
+    const has = showOf(show).has;
     return sorted(
       here.filter((it) => has(it.kind) && (!words || `${it.title} ${it.media?.description ?? ''}`.toLowerCase().includes(words))),
       sort,

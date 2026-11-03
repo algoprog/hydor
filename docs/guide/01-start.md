@@ -122,7 +122,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 
 ### What it finds
 
-- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Spaces, Shared knowledge, Library, Pictures and videos, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
+- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Spaces, Shared knowledge, Library, Pictures, Videos, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
 - **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or space, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.

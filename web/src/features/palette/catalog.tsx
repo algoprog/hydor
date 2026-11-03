@@ -62,6 +62,7 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:new-app': <LayoutGrid size={15} />,
   'go:library': <LibraryBig size={15} />,
   'go:media': <Images size={15} />,
+  'go:videos': <Play size={15} />,
   'go:published': <Globe size={15} />,
   'go:preview': <MonitorSmartphone size={15} />,
   'go:usage': <Gauge size={15} />,
