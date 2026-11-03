@@ -15,6 +15,7 @@ import { AssistantBlock, Elapsed, hiddenThought, SessionCtx, StepLine, stepsIcon
 import { toolView } from '../registry';
 import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
 import type { SessionNote } from '@shared/features';
+import { runEndedNotice } from '@shared/apps';
 import { LOCALE } from '../../i18n/locale';
 
 type Block = { kind: 'item'; item: TimelineItem } | { kind: 'group'; id: string; items: TimelineItem[] };
@@ -117,6 +118,8 @@ const FollowCtx = createContext<() => boolean>(() => true);
 interface Segment {
   id: string;
   prompt?: UserItem;
+  /** The app run whose end the prompt told the agent of (use_app): the prompt shows no bubble, the run's card shows after the reply. */
+  runEnded?: string;
   /** A notice that started the agent without a prompt (a background task finished). */
   notice?: SystemItem;
   work: TimelineItem[];
@@ -169,7 +172,10 @@ function segment(items: TimelineItem[]): Segment[] {
   };
   for (const it of items) {
     if (it.kind === 'user' && it.meta !== 'note' && it.meta !== 'command-output') {
-      open(`seg:${it.id}`).prompt = it;
+      const seg = open(`seg:${it.id}`);
+      seg.prompt = it;
+      const run = runEndedNotice(it.text ?? '');
+      if (run !== null) seg.runEnded = run;
       continue;
     }
     if (it.kind === 'turn') {
@@ -277,7 +283,7 @@ export function dayLabel(ts: number): string {
   return d.toLocaleDateString(LOCALE, { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
 }
 
-/** The day the conversation's turns below it are from, on a line across it ("Today"). A session starting shows it too. */
+/** The day the conversation's turns below it are from, on a line across it ("Yesterday", "Today"); none over a conversation all from today. */
 export function DayLine({ day }: { day: string }) {
   return (
     <div className="flex items-center gap-3 text-[12px] font-medium text-fg-3">
@@ -623,7 +629,7 @@ const SegmentView = memo(function SegmentView({
 
   return (
     <section className={cx('tl-seg space-y-2', isNew && !seg.prompt && 'anim-in')}>
-      {seg.prompt && <UserBubble item={seg.prompt} arrive={isNew && !seg.prompt.peer} sent={sent} />}
+      {seg.prompt && seg.runEnded === undefined && <UserBubble item={seg.prompt} arrive={isNew && !seg.prompt.peer} sent={sent} />}
       {seg.notice && (
         <div className="flex items-center gap-2 px-2 pt-2 text-[12.5px] text-fg-3">
           <Info size={13} className="shrink-0" />
@@ -836,7 +842,17 @@ export function Timeline({
   // Pictures sent from this page, in their messages until those show their own (lib/attachments.ts).
   const sentList = useSentPictures((s) => s.byKey[sessionKey]);
   const sent = useMemo(() => sentPicturesOf(sentList, merged, tl?.items.length ?? 0), [sentList, merged, tl?.items.length]);
-  const notes = useSessionNotes(sessionKey);
+  const loaded = useSessionNotes(sessionKey);
+  // An app run that ended after its call stopped waiting: its card shows under the reply to that news, not above it.
+  const notes = useMemo(() => {
+    const moved = new Map(segs.filter((s) => s.runEnded).map((s) => [s.runEnded!, s.id]));
+    if (!moved.size) return loaded;
+    return loaded.map((n) => {
+      const run = (n.data as { run?: unknown } | null)?.run;
+      const to = n.kind === 'app-run' && typeof run === 'string' ? moved.get(run) : undefined;
+      return to ? { ...n, anchor: to } : n;
+    });
+  }, [loaded, segs]);
   const noteIds = useMemo(() => new Set(segs.flatMap((s) => [...segIds(s)])), [segs]);
   const approvals: ApprovalRequest[] = overlay?.approvals ?? [];
   const here = !!live && live.status !== 'exited' && live.status !== 'error';
@@ -1074,7 +1090,8 @@ export function Timeline({
             {segs.map((seg, i) => {
               const ts = seg.prompt?.ts ?? seg.notice?.ts ?? seg.work[0]?.ts ?? seg.answer[0]?.ts;
               const day = ts ? dayLabel(ts) : '';
-              const divider = day && day !== prevDay;
+              // A conversation that is all from today needs no "Today" over it: the line shows where days change.
+              const divider = day && day !== prevDay && !(day === 'Today' && !prevDay && tl.start === 0);
               if (day) prevDay = day;
               const isLast = i === segs.length - 1;
               // The day line sits beside the block, not in it: when older turns of the same day arrive and

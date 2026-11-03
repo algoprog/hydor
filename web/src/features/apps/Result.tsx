@@ -461,6 +461,7 @@ export function RunBody({
   followUp,
   view,
   assets,
+  noReply,
 }: {
   run: AppRun;
   progress?: RunProgress;
@@ -474,6 +475,8 @@ export function RunBody({
   view?: ReactNode;
   /** The app's own files, by name (asset:<name> in its answer). */
   assets?: Record<string, Pick<AppAsset, 'sha'>>;
+  /** Leave out the agent's reply when there is a result (in a session, whose agent says what came of it). */
+  noReply?: boolean;
 }) {
   const hasResult = !!run.result && Object.keys(run.result).length > 0;
   const text = reply ?? run.reply;
@@ -491,7 +494,7 @@ export function RunBody({
         )}
       </RunStatusCard>
       {hasResult && (inView ? view : <ResultView answer={answer} result={run.result!} name={name} assets={assets} />)}
-      {text && (reply !== undefined || !isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={text} folded={hasResult} />}
+      {text && !(noReply && hasResult) && (reply !== undefined || !isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={text} folded={hasResult} />}
     </div>
   );
 }

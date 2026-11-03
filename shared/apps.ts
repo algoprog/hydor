@@ -900,3 +900,13 @@ export function inputsLine(fields: AppField[], inputs: Record<string, string>, m
   const s = parts.slice(0, 3).join(' · ');
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
+
+/**
+ * The message a session gets when an app run its agent started ends after the call stopped waiting
+ * ("[Trip planner finished] The run you started for the user…", then the run as JSON): its run's id, or null for any
+ * other message. The conversation shows no bubble for it, and the run's card moves under the reply it brings.
+ */
+export function runEndedNotice(text: string): string | null {
+  if (!/^\[[^\]\n]+ (?:finished|was stopped|failed)\] The run you started for the user /.test(text)) return null;
+  return text.match(/"run":\s*"([^"]+)"/)?.[1] ?? '';
+}

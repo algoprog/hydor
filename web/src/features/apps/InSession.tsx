@@ -1,7 +1,9 @@
 // An app an agent ran for you in a session (use_app): its card in the conversation, under the turn that asked for
 // it. It follows the run live (where it stands, the steps going by), asks you what one of its steps needs to know,
 // and shows its answer as the app shows it (its view, or the plain card); Open goes to the run's page, the app's
-// name to the app. The tool call itself is a line among the agent's steps.
+// name to the app. The tool call itself is a line among the agent's steps. The run's own reply stays on its page: the
+// session's agent says what came of it, above the card (a run that ends after the call stopped waiting moves its
+// card under the reply to that news, and the news itself shows no bubble: Timeline.tsx).
 import { ArrowUpRight } from 'lucide-react';
 import type { SessionNote } from '@shared/features';
 import type { ToolInfo } from '@shared/types';
@@ -62,6 +64,7 @@ export function AppRunNote({ note }: { note: SessionNote; sessionKey: string }) 
         <>
           <RunBody
             assets={d.recipe.assets}
+            noReply
             run={d.run}
             progress={d.progress}
             answer={d.recipe.answer}

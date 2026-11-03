@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.20.3 · 3 November 2026
+
+Tidier conversations when an agent runs an app for you.
+
+- **The reply first, then the app**: when an app an agent ran for you finishes, the agent's few words about it
+  come first and the app's answer shows right under them, instead of above.
+- **No stray messages**: the note telling the agent the app has finished no longer shows in the conversation as
+  if you had written it, and the app's card no longer repeats its own reply under its answer (it is still on
+  the run's page).
+- **No "Today" over a new conversation**: the day line shows only where a conversation moves from one day to the
+  next.
+
 ## 0.20.2 · 3 November 2026
 
 A fix for the welcome tour on phones.
