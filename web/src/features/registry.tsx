@@ -48,6 +48,12 @@ export interface ToolView {
   step?: (t: ToolInfo) => { category?: ToolCategory; verb?: string; title?: string };
   /** Shown with the reply, its later calls in that reply come to the first as `more` and show with it, as one (screenshots). */
   many?: boolean;
+  /**
+   * Shown with the reply, what a call makes again when called again (a saved page, by its id). Of a turn's calls
+   * that make the same, the reply shows only the newest that did not fail (or was not declined or stopped), the others
+   * coming to it as `more`; they stay steps of the work, drawn as their `step` says.
+   */
+  same?: (t: ToolInfo) => string | undefined;
   Row: ComponentType<{ item: ToolItem; sessionKey: string; more?: ToolItem[] }>;
 }
 

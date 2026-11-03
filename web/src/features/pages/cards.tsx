@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppWindow, ChevronRight, Expand, ExternalLink, FileText, Globe, GlobeLock, PenLine, Presentation, Sheet, Sigma } from 'lucide-react';
 import type { PublishRequest, SiteVisibility } from '@shared/pages';
-import type { ToolItem } from '@shared/types';
+import type { ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { bytes, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -13,7 +13,7 @@ import { CopyButton } from '../../components/Markdown';
 import { Button, cx, IconButton, Segmented, Throbber, useMediaQuery } from '../../components/ui';
 import { editPage, SmallPageCard, useOpensBeside, usePicks } from '../session/HtmlPage';
 import { StepLine, ToolDetail } from '../session/items';
-import { PageFrame, pageStore, previewStore, StreamFrame } from './frame';
+import { PageFrame, pageStore, StreamFrame, usePreviewMax } from './frame';
 import { PageOverlay } from './overlay';
 import { absolute, CANVAS_MEDIA, requestRef, savedRef, useCanvas, useDrafts, usePagesStore } from './state';
 
@@ -72,44 +72,98 @@ export function ReadPageRow({ item, sessionKey }: { item: ToolItem; sessionKey: 
 
 // ---- save_page -------------------------------------------------------------------------------------
 
-export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey: string }) {
-  const ref = savedRef(item.tool.output);
+type Ref = { id: string; version: number };
+
+/** Of a turn's other saves of a page, the newest with a version to show: the card shows it while a new one is saved. */
+function newestSaved(more?: ToolItem[]): { item: ToolItem; ref: Ref } | null {
+  let best: { item: ToolItem; ref: Ref } | null = null;
+  for (const m of more ?? []) {
+    const ref = savedRef(m.tool.output);
+    if (ref && (!best || ref.version > best.ref.version)) best = { item: m, ref };
+  }
+  return best;
+}
+
+/** How a save of a page reads among the steps of the work, where the reply shows a newer save of it. */
+export function savedPageStep(t: ToolInfo) {
+  const ref = savedRef(t.output);
+  const a = (t.input ?? {}) as { title?: unknown };
+  const title = /^Saved "(.+?)" \(page /.exec(t.output ?? '')?.[1] ?? (typeof a.title === 'string' && a.title.trim() ? a.title.trim() : undefined);
+  const named = title ? `“${title}”` : 'the page';
+  return {
+    category: 'edit' as const,
+    verb: t.status === 'running' || t.status === 'pending' || t.status === 'waiting' ? 'Saving' : ref ? 'Saved' : 'Could not save',
+    title: ref ? `${named} · version ${ref.version}` : named,
+  };
+}
+
+/**
+ * A page an agent saved (save_page, or save_slides, save_doc, save_sheet, save_latex). Saved several times in a turn,
+ * it has one card, at the newest save; the others come as `more`, and while a new save runs the card shows the version
+ * before it. Only the page's newest version shows itself, working with its data: a card left behind by a newer one
+ * (saved in a later turn, or by you) keeps to its title line.
+ */
+export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sessionKey: string; more?: ToolItem[] }) {
+  const own = savedRef(item.tool.output);
+  const running = item.tool.status === 'running' || item.tool.status === 'pending';
+  // Saved again: until the new version is in (the call may wait on your approval too), the version before it shows.
+  const before = own || !(running || item.tool.status === 'waiting') ? null : newestSaved(more);
+  const ref: Ref | null = own ?? before?.ref ?? null;
+  const saving = !!before;
   const pages = usePagesStore((s) => s.pages);
   const info = ref ? pages?.find((p) => p.id === ref.id) : undefined;
   const draft = useDrafts((x) => x.byKey[sessionKey]?.[item.id]);
-  const [page, setPage] = useState<{ title: string; html: string } | 'gone' | null>(null);
+  const [page, setPage] = useState<{ title: string; html: string; v: string } | 'gone' | null>(null);
   const [height, setHeight] = useState(0);
   const [full, setFull] = useState(false);
   const onPick = usePicks(sessionKey, full);
   const wide = useMediaQuery(CANVAS_MEDIA);
   const besideOpen = useCanvas((x) => !!x.open[sessionKey]);
+  const fit = usePreviewMax();
   useOpensBeside(sessionKey, item);
   useEffect(() => {
     if (!pages) usePagesStore.getState().loadPages().catch(() => {});
   }, []);
+  // The newest version, as far as the Library has said (it may not have heard of this one yet; while a save runs, it
+  // may have heard of the version being saved, which the card shows once the call is done).
+  const current = !!ref && (saving || !info || info.version <= ref.version);
+  const v = ref ? `${ref.id}:${ref.version}` : '';
   useEffect(() => {
-    if (!ref) return;
+    if (!ref || !current) return;
     let alive = true;
+    // The version shown so far stays until the next one is here.
     api<{ title: string; html: string }>(`/api/pages/${enc(ref.id)}/versions/${ref.version}`)
-      .then((v) => alive && setPage(v))
+      .then((r) => alive && setPage({ title: r.title, html: r.html, v }))
       .catch(() => alive && setPage('gone'));
     return () => {
       alive = false;
     };
-  }, [ref?.id, ref?.version]);
-  // The version this call saved works with the page's data; an older one shows it without changing it.
-  const current = !!info && info.version === ref?.version;
-  const store = useMemo(() => (ref ? (current ? pageStore(ref.id) : previewStore(ref.id)) : null), [ref?.id, current]);
-  const writing = !ref && item.tool.status !== 'error' && (!draft || !draft.done || item.tool.status === 'running' || item.tool.status === 'pending');
+  }, [v, current]);
+  const store = useMemo(() => (ref ? pageStore(ref.id) : null), [ref?.id]);
+  const writing = !ref && item.tool.status !== 'error' && (!draft || !draft.done || running);
   const title = info?.title ?? (page && page !== 'gone' ? page.title : undefined) ?? draft?.title ?? 'Page';
 
   const kind = /save_slides$/.test(item.tool.name) ? 'slides' : /save_doc$/.test(item.tool.name) ? 'doc' : /save_sheet$/.test(item.tool.name) ? 'sheet' : /save_latex$/.test(item.tool.name) ? 'tex' : null;
   const deck = kind !== null;
+  // A deck stands whole: its slide is as tall as the card's width makes it (16:9), its buttons under it.
+  const max = kind === 'slides' ? Math.max(fit, 900) : fit;
   const noun = kind === 'slides' ? 'the slides' : kind === 'doc' ? 'the document' : kind === 'sheet' ? 'the spreadsheet' : kind === 'tex' ? 'the LaTeX document' : 'the page';
+  const status = saving ? ' · saving a new version…' : ref && !current ? ' · a newer one is there' : '';
   if (item.tool.status === 'error') return <Note>{`Could not save ${noun}`}: {failure(item)}</Note>;
   if (wide && besideOpen) {
-    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : `Saved in the Library · version ${ref?.version ?? 1}${info && !current ? ' · a newer one is there' : ''}`;
-    return <SmallPageCard sessionKey={sessionKey} item={item} title={title} sub={sub} writing={writing} />;
+    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : `Saved in the Library · version ${ref?.version ?? 1}${status}`;
+    return (
+      <SmallPageCard
+        sessionKey={sessionKey}
+        item={item}
+        title={title}
+        sub={sub}
+        writing={writing || saving}
+        opens={before?.item.id ?? item.id}
+        also={more?.map((m) => m.id)}
+        pageId={current ? ref?.id : undefined}
+      />
+    );
   }
   if (writing && deck)
     return (
@@ -127,7 +181,7 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
           </span>
           <span className="shrink-0 text-[12px] text-fg-3">Writing · {kb(draft.text.length)}</span>
         </div>
-        <div style={{ height: Math.min(Math.max(height, 120), 560) }} className="relative">
+        <div style={{ height: Math.min(Math.max(height, 120), max) }} className="relative">
           <StreamFrame html={draft.text} title={title} onHeight={setHeight} />
         </div>
       </div>
@@ -144,7 +198,7 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
     );
   if (pages && !info) return <Note>This page was deleted from Pages.</Note>;
   const open = () => go(`/pages/${ref.id}`);
-  const frameKey = `${ref.id}:${ref.version}:${current}`;
+  const shown = current && page && page !== 'gone' ? page : null;
   return (
     <div className="tl-item my-1.5 overflow-hidden rounded-xl border border-line bg-panel">
       <div className="flex items-center gap-3 py-2.5 pr-2 pl-2.5">
@@ -156,9 +210,12 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
             <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
               {title}
             </span>
-            <span className="block truncate text-[12px] leading-4 text-fg-3">
-              {kind === 'slides' ? 'Slides in the Library' : kind === 'doc' ? 'A document in the Library' : kind === 'sheet' ? 'A spreadsheet in the Library' : kind === 'tex' ? 'LaTeX in the Library' : 'Saved in the Library'} · version {ref.version}
-              {info && !current ? ' · a newer one is there' : ''}
+            <span className="flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-fg-3">
+              {saving && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
+              <span className="min-w-0 truncate">
+                {kind === 'slides' ? 'Slides in the Library' : kind === 'doc' ? 'A document in the Library' : kind === 'sheet' ? 'A spreadsheet in the Library' : kind === 'tex' ? 'LaTeX in the Library' : 'Saved in the Library'} · version {ref.version}
+                {status}
+              </span>
             </span>
           </span>
         </button>
@@ -169,23 +226,23 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
           <IconButton label="Edit" onClick={() => editPage(sessionKey, { kind: 'page', id: ref.id })}>
             <PenLine size={15} />
           </IconButton>
-          {page && page !== 'gone' && (
+          {shown && (
             <IconButton label="Full screen" onClick={() => setFull(true)}>
               <Expand size={16} />
             </IconButton>
           )}
         </div>
       </div>
-      {page === 'gone' ? (
+      {!current ? null : page === 'gone' ? (
         <div className="border-t border-line px-3 py-2.5 text-[12.5px] text-fg-3">This version is no longer kept; Open shows the latest.</div>
-      ) : !page || !store ? (
+      ) : !shown || !store ? (
         <div className="flex items-center gap-2 border-t border-line px-3 py-3 text-fg-3">
           <Throbber />
         </div>
       ) : (
-        <div style={{ height: Math.min(Math.max(height, 60), 900) }} className="relative border-t border-line transition-[height] duration-200">
-          {!full && <PageFrame key={frameKey} html={page.html} title={title} store={store} onHeight={setHeight} onPick={onPick} />}
-          {height > 900 && !full && (
+        <div style={{ height: Math.min(Math.max(height, 60), max) }} className="relative border-t border-line transition-[height] duration-200">
+          {!full && <PageFrame key={shown.v} html={shown.html} title={title} store={store} onHeight={setHeight} onPick={onPick} />}
+          {height > max && !full && (
             // The page fades into the card under the button, so its words never run behind the button's.
             <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-panel via-panel/85 to-transparent pt-14 pb-3">
               <button
@@ -198,9 +255,9 @@ export function SavedPageCard({ item, sessionKey }: { item: ToolItem; sessionKey
           )}
         </div>
       )}
-      {full && page && page !== 'gone' && store && (
+      {full && shown && store && (
         <PageOverlay title={title} onClose={() => setFull(false)}>
-          <PageFrame key={frameKey} html={page.html} title={title} store={store} onPick={onPick} fill />
+          <PageFrame key={shown.v} html={shown.html} title={title} store={store} onPick={onPick} fill />
         </PageOverlay>
       )}
     </div>

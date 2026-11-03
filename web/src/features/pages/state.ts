@@ -4,6 +4,7 @@
 // beside its conversation (the canvas).
 import { create } from 'zustand';
 import type { PageDraft, PageInfo, PagesEvent, PublishRequest, SiteInfo } from '@shared/pages';
+import type { ToolInfo } from '@shared/types';
 import { api, enc } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 
@@ -164,6 +165,19 @@ export const absolute = (p: string) => `${location.origin}${p}`;
 export function savedRef(output?: string): { id: string; version: number } | null {
   const m = /\(page ([a-f0-9]{10}), version (\d+)\)/.exec(output ?? '');
   return m ? { id: m[1], version: Number(m[2]) } : null;
+}
+
+/**
+ * The page a call of save_page (or save_slides, save_doc, save_sheet, save_latex) saves: the one its answer names,
+ * else, while it runs, the saved page it was given to change. A long call comes shortened ({ _preview }), the id in
+ * what is left of it.
+ */
+export function savedPageOf(t: ToolInfo): string | undefined {
+  const ref = savedRef(t.output);
+  if (ref) return ref.id;
+  const a = (t.input ?? {}) as { id?: unknown; _preview?: unknown };
+  const id = typeof a.id === 'string' ? a.id.trim() : typeof a._preview === 'string' ? /"id":"([a-f0-9]{10})"/.exec(a._preview)?.[1] : undefined;
+  return id && /^[a-f0-9]{10}$/.test(id) ? id : undefined;
 }
 
 /** The request a publish_site call made, from what the tool answered: "(request <id>)". */

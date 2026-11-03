@@ -3,6 +3,22 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.18.1 · 3 November 2026
+
+One card for each page an agent saves in a reply, and previews in the conversation that fit the screen.
+
+- **One card for each page**: when an agent saves a page, slides, a document, a spreadsheet or a LaTeX report several
+  times in one reply, the reply shows one card, for the newest version, instead of one for each save. The earlier
+  saves are among the reply's steps ("Saved “Report” · version 2"), and while the agent saves the page again its card
+  keeps showing the version before, with **saving a new version…**.
+- **Older cards keep small**: a card from an earlier reply whose page has a newer version since (the agent's, or
+  yours) keeps to its title line and says **a newer one is there**; **Open** shows the newest. Only the newest version
+  shows a preview.
+- **Previews that fit**: a page, a document or a report in the conversation stops at half the window's height, with
+  **See the whole page**, instead of growing as tall as 900 pixels; slides still show whole, and a phone's keyboard no
+  longer changes the size.
+- The panel beside the conversation lists each page once.
+
 ## 0.18.0 · 3 November 2026
 
 A redesigned page for each space, a session's page the moment you press Start, no more fades, and usage limits that

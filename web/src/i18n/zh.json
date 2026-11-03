@@ -103,6 +103,8 @@
 "· {0} working, {1} at most":"· {0} 个在工作，最多 {1} 个",
 "· {0} working{1}":"· {0} 个在工作{1}",
 "· a newer one is there":"· 已有更新的版本",
+"Could not save":"无法保存",
+"· saving a new version…":"· 正在保存新版本…",
 "· about":"· 约",
 "· about {0} tokens/s":"· 约 {0} tokens/s",
 "· an agent if it fails":"· 失败时由智能体接手",

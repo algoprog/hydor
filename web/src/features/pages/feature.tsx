@@ -4,11 +4,14 @@
 // conversation where a page shows as it is written and can be changed (Canvas).
 import { LibraryBig } from 'lucide-react';
 import { HtmlPage } from '../session/HtmlPage';
-import type { WebFeature } from '../registry';
+import type { ToolView, WebFeature } from '../registry';
 import { CanvasSide, closeCanvas, PageOver, useCanvasOpen } from './Canvas';
-import { exportPageStep, PublishCard, ReadPageRow, readPageStep, SavedPageCard } from './cards';
+import { exportPageStep, PublishCard, ReadPageRow, readPageStep, SavedPageCard, savedPageStep } from './cards';
 import { PageEditNoteView } from './notes';
 import { PagesRoute } from './PagesPage';
+import { savedPageOf } from './state';
+
+const saved = { place: 'answer', Row: SavedPageCard, same: savedPageOf, step: savedPageStep } satisfies ToolView;
 
 const isPages = (p: string) => p === '/library' || p === '/pages' || p.startsWith('/pages/');
 /** The Library's own pages, a page's and an image's or video's among them. */
@@ -18,12 +21,13 @@ export const pagesFeature: WebFeature = {
   id: 'pages',
   toolViews: {
     show_html: { place: 'answer', Row: HtmlPage },
-    save_page: { place: 'answer', Row: SavedPageCard },
+    // A page saved several times in a turn shows once, at its newest save; the earlier saves are steps of the work.
+    save_page: saved,
     // A deck shows as its slideshow, a document as its pages, a spreadsheet as its tables: each opens to edit in Pages.
-    save_slides: { place: 'answer', Row: SavedPageCard },
-    save_doc: { place: 'answer', Row: SavedPageCard },
-    save_sheet: { place: 'answer', Row: SavedPageCard },
-    save_latex: { place: 'answer', Row: SavedPageCard },
+    save_slides: saved,
+    save_doc: saved,
+    save_sheet: saved,
+    save_latex: saved,
     // Nothing is published until the user says so on its card.
     publish_site: { place: 'attention', Row: PublishCard },
     // A step of the work, counted with the agent's other reads.

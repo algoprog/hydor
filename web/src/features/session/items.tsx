@@ -438,14 +438,29 @@ export function StepLine({ item }: { item: TimelineItem }) {
   );
 }
 
-export const ToolRow = memo(function ToolRow({ item, sessionKey, forceOpen, trailing, more }: { item: ToolItem; sessionKey: string; forceOpen?: boolean; trailing?: ReactNode; more?: ToolItem[] }) {
+export const ToolRow = memo(function ToolRow({
+  item,
+  sessionKey,
+  forceOpen,
+  trailing,
+  more,
+  inWork,
+}: {
+  item: ToolItem;
+  sessionKey: string;
+  forceOpen?: boolean;
+  trailing?: ReactNode;
+  more?: ToolItem[];
+  /** Among the steps of the work, where what shows with the reply (a page saved again later in the turn) is a step too. */
+  inWork?: boolean;
+}) {
   const t = item.tool;
   const [open, setOpen] = useState(false);
   const isOpen = open || !!forceOpen;
 
   // The app's own tools (show_html, web_search…) show as their capability draws them (registry.tsx).
   const view = toolView(t.name, t);
-  if (view) return <view.Row item={item} sessionKey={sessionKey} more={more} />;
+  if (view && !(inWork && view.place === 'answer')) return <view.Row item={item} sessionKey={sessionKey} more={more} />;
   if (t.category === 'todo') return <TodoCard t={t} sessionKey={sessionKey} />;
   if (t.category === 'question') return <QuestionCard t={t} sessionKey={sessionKey} />;
 

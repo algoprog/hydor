@@ -93,9 +93,9 @@ function blocks(items: TimelineItem[]): Block[] {
     cur = [];
   };
   for (const it of items) {
-    // A page an agent showed (or another of the app's tools shown with the reply) is not a step to fold away.
-    const place = placeOf(it);
-    if ((it.kind === 'tool' && !STANDALONE.has(it.tool.category) && (!place || place === 'work')) || it.kind === 'thinking') cur.push(it);
+    // What needs the user is not a step to fold away. (What shows with the reply is here only as a step: a page saved
+    // again later in the turn, whose newest version the reply shows.)
+    if ((it.kind === 'tool' && !STANDALONE.has(it.tool.category) && placeOf(it) !== 'attention') || it.kind === 'thinking') cur.push(it);
     else {
       flush();
       out.push({ kind: 'item', item: it });
@@ -124,6 +124,8 @@ interface Segment {
   /** Open questions: shown outside the folded work. */
   attention: TimelineItem[];
   end?: TurnItem;
+  /** By the id of a call the reply shows, the turn's other calls that made the same (`same`), and the first of them all. */
+  same: Map<string, { first: string; others: ToolItem[] }>;
 }
 
 const isOpenQuestion = (it: TimelineItem) =>
@@ -132,11 +134,36 @@ const isOpenQuestion = (it: TimelineItem) =>
 /** Where one of the app's own tools shows (registry.tsx): with the reply, outside the fold, or in the work. */
 const placeOf = (it: TimelineItem) => (it.kind === 'tool' ? toolView(it.tool.name, it.tool)?.place : undefined);
 
+/** A call that came to nothing: it failed, was declined, or was stopped. */
+const cameToNothing = (i: ToolItem) => i.tool.status === 'error' || i.tool.status === 'declined' || i.tool.status === 'interrupted';
+
+/**
+ * Of a turn's calls that make the same thing (the saves of one page, by `same` in registry.tsx): the newest that did
+ * not come to nothing, which the reply shows, and the others, which stay steps of the work.
+ */
+function newestOfSame(items: TimelineItem[]): { hidden: Set<string>; same: Segment['same'] } {
+  const groups = new Map<string, ToolItem[]>();
+  for (const it of items) {
+    const k = it.kind === 'tool' ? toolView(it.tool.name, it.tool)?.same?.(it.tool) : undefined;
+    if (k) groups.set(k, [...(groups.get(k) ?? []), it as ToolItem]);
+  }
+  const hidden = new Set<string>();
+  const same: Segment['same'] = new Map();
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const lead = g.filter((i) => !cameToNothing(i)).pop() ?? g[g.length - 1];
+    const others = g.filter((i) => i !== lead);
+    for (const i of others) hidden.add(i.id);
+    same.set(lead.id, { first: g[0].id, others });
+  }
+  return { hidden, same };
+}
+
 function segment(items: TimelineItem[]): Segment[] {
   const out: Segment[] = [];
   let cur: Segment | null = null;
   const open = (id: string) => {
-    cur = { id, work: [], answer: [], attention: [] };
+    cur = { id, work: [], answer: [], attention: [], same: new Map() };
     out.push(cur);
     return cur;
   };
@@ -162,8 +189,14 @@ function segment(items: TimelineItem[]): Segment[] {
   for (const s of out) {
     s.attention = s.work.filter((i) => isOpenQuestion(i) || placeOf(i) === 'attention');
     if (s.attention.length) s.work = s.work.filter((i) => !s.attention.includes(i));
-    // Pages the agent showed (and what else the app's tools put with a reply) belong with it, outside the folded work.
-    const pages = s.work.filter((it) => placeOf(it) === 'answer');
+    // Pages the agent showed (and what else the app's tools put with a reply) belong with it, outside the folded work;
+    // a page saved several times, once: its newest version. Its earlier saves stay steps of the work.
+    const withReply = s.work.filter((it) => placeOf(it) === 'answer');
+    const { hidden, same } = newestOfSame(withReply);
+    // Its card stays where the page first came, whichever save it shows.
+    const at = new Map([...same].map(([lead, g]) => [g.first, withReply.find((it) => it.id === lead)!]));
+    const pages = withReply.flatMap((it) => (at.has(it.id) ? [at.get(it.id)!] : hidden.has(it.id) || same.has(it.id) ? [] : [it]));
+    s.same = same;
     if (pages.length) s.work = s.work.filter((it) => !pages.includes(it));
     // The reply is what the agent wrote after its last step.
     let last = -1;
@@ -176,15 +209,20 @@ function segment(items: TimelineItem[]): Segment[] {
   return out;
 }
 
-/** The reply's items, with the later calls of a tool that shows them together (`many`) in its first one's `more`. */
-function together(items: TimelineItem[]): { item: TimelineItem; more?: ToolItem[] }[] {
-  const out: { item: TimelineItem; more?: ToolItem[] }[] = [];
-  const first = new Map<string, { item: TimelineItem; more?: ToolItem[] }>();
+/**
+ * The reply's items, with the later calls of a tool that shows them together (`many`) in its first one's `more`, and
+ * the turn's other calls that made the same as one (`same`) in its `more`. `key` stays the same while a page is saved
+ * again: its card stays in place and shows the new version.
+ */
+function together(items: TimelineItem[], same: Segment['same']): { key: string; item: TimelineItem; more?: ToolItem[] }[] {
+  const out: { key: string; item: TimelineItem; more?: ToolItem[] }[] = [];
+  const first = new Map<string, { key: string; item: TimelineItem; more?: ToolItem[] }>();
   for (const it of items) {
     const lead = it.kind === 'tool' && toolView(it.tool.name, it.tool)?.many ? first.get(it.tool.name) : undefined;
     if (lead) (lead.more ??= []).push(it as ToolItem);
     else {
-      const e = { item: it };
+      const s = same.get(it.id);
+      const e = { key: s?.first ?? it.id, item: it, ...(s ? { more: s.others } : {}) };
       if (it.kind === 'tool' && toolView(it.tool.name, it.tool)?.many) first.set(it.tool.name, e);
       out.push(e);
     }
@@ -263,7 +301,7 @@ const Group = memo(function Group({ b, sessionKey, agent, busy }: { b: Extract<B
   const current = visible.filter(isActive);
   const done = tools.filter((i) => !isActive(i));
   if (!visible.length) return null;
-  const row = (it: TimelineItem) => <div key={it.id}>{it.kind === 'tool' ? <ToolRow item={it} sessionKey={sessionKey} /> : it.kind === 'thinking' ? <ThinkingRow item={it} /> : null}</div>;
+  const row = (it: TimelineItem) => <div key={it.id}>{it.kind === 'tool' ? <ToolRow item={it} sessionKey={sessionKey} inWork /> : it.kind === 'thinking' ? <ThinkingRow item={it} /> : null}</div>;
   // Thoughts on their own stay a quiet line.
   if (!tools.length) return <div className="px-1">{visible.map(row)}</div>;
   // The agent at work after the last step, shown in its box rather than on a line of its own.
@@ -272,7 +310,7 @@ const Group = memo(function Group({ b, sessionKey, agent, busy }: { b: Extract<B
   if (visible.length === 1)
     return (
       <div className="rounded-xl border border-line bg-bg-1 p-1">
-        <ToolRow item={tools[0]} sessionKey={sessionKey} trailing={working} />
+        <ToolRow item={tools[0]} sessionKey={sessionKey} trailing={working} inWork />
       </div>
     );
   const sum = summarize(tools);
@@ -397,10 +435,10 @@ function WorkLog({
             ) : b.item.kind === 'tool' ? (
               b.item.tool.category === 'plan' ? (
                 <div className="rounded-xl border border-line bg-bg-1 p-1">
-                  <ToolRow item={b.item} sessionKey={sessionKey} />
+                  <ToolRow item={b.item} sessionKey={sessionKey} inWork />
                 </div>
               ) : (
-                <ToolRow item={b.item} sessionKey={sessionKey} />
+                <ToolRow item={b.item} sessionKey={sessionKey} inWork />
               )
             ) : null}
           </div>
@@ -567,7 +605,7 @@ const SegmentView = memo(function SegmentView({
   }, [!!live]);
   const visibleWork = seg.work.filter((i) => !hiddenThought(i));
   const stats = useMemo(() => workStats(seg.work), [seg.work]);
-  const answer = useMemo(() => together(seg.answer), [seg.answer]);
+  const answer = useMemo(() => together(seg.answer, seg.same), [seg.answer, seg.same]);
   const first = seg.prompt?.ts ?? seg.notice?.ts ?? seg.work[0]?.ts;
   const lastItem = [...seg.work, ...seg.answer].reverse().find((i) => i.ts);
   const took = seg.end?.durationMs ?? (first && lastItem?.ts && lastItem.ts > first ? lastItem.ts - first : 0);
@@ -623,8 +661,8 @@ const SegmentView = memo(function SegmentView({
           {q.kind === 'tool' && <ToolRow item={q} sessionKey={sessionKey} />}
         </div>
       ))}
-      {answer.map(({ item: a, more }) => (
-        <div key={a.id} className={cx(fresh(a.id) && 'anim-in')}>
+      {answer.map(({ key, item: a, more }) => (
+        <div key={key} className={cx(fresh(key) && 'anim-in')}>
           {a.kind === 'assistant' && <AssistantBlock item={a} />}
           {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} more={more} />}
         </div>

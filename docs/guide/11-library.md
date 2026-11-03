@@ -10,7 +10,7 @@ When a picture says more than words, an agent shows a page: a report, a chart, a
 
 On a wide screen the page opens beside the conversation as the agent starts writing it (see [Watch a page as it is written](#watch-a-page-as-it-is-written)), and the conversation keeps a small card for it: its title, what it is ("A page · 24 KB", "Kept in the Library · version 2") and **Open**, or **Beside** for the one shown there. Click a card to show its page beside the conversation.
 
-In a narrower window, on a phone, or with the panel beside the conversation closed, the page sits in the reply, as wide as the conversation, and grows to fit what it holds. A very tall page stops at a set height and shows **See the whole page** at its bottom edge. The bar above the page has:
+In a narrower window, on a phone, or with the panel beside the conversation closed, the page sits in the reply, as wide as the conversation, and grows to fit what it holds. A tall page stops at half the window's height, so the conversation around it stays in sight, and shows **See the whole page** at its bottom edge (slides always show whole). The bar above the page has:
 
 - the page's title;
 - **Keep**: puts the page in your Library (see [Keep a page](#keep-a-page));
@@ -130,13 +130,13 @@ What you entered on the page while it was in the conversation goes with it. Befo
 
 You can also ask an agent for something to keep from the start: "make me a habit tracker I can use on my phone", "a checklist for moving house". The agent saves it in the Library itself (in the session's space, when the session is in one), and a card shows in the conversation with:
 
-- the page's title and **Saved in the Library · version 2** (the version this reply saved);
+- the page's title and **Saved in the Library · version 2** (the version this reply saved: when the agent saves the page several times in one reply, the reply has one card, for the last version, and the earlier saves are listed among its steps);
 - **Open**, which opens it in the Library, **Edit** (the pencil) and **Full screen**;
 - the page itself, working, with its data, right in the card.
 
 On a wide screen, while pages show beside the conversation, the card stays small and its page opens beside it.
 
-When a newer version is saved later, an older card says **a newer one is there**. It still shows its own version and reads the page's data, but what you change there is not kept. If that version is no longer kept at all, the card says "This version is no longer kept; Open shows the latest". If the page was deleted, the card says so.
+When a newer version is saved later (in a later reply, or by you), the older card keeps to its title line and says **a newer one is there**: **Open** shows the newest. While the agent saves the page again in the same reply, its card keeps showing the version before, with **saving a new version…**. If the page was deleted, the card says so.
 
 Agents can also change a page you kept: ask "add a notes column to my habit tracker" and the agent saves a new version of it. Your data stays, and the older versions stay as they were.
 

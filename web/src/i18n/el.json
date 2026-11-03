@@ -103,6 +103,8 @@
 "· {0} working, {1} at most":"· {0} σε εργασία, έως {1}",
 "· {0} working{1}":"· {0} σε εργασία{1}",
 "· a newer one is there":"· υπάρχει νεότερη",
+"Could not save":"Δεν αποθηκεύτηκε",
+"· saving a new version…":"· αποθηκεύεται νέα έκδοση…",
 "· about":"· περίπου",
 "· about {0} tokens/s":"· περίπου {0} tokens/s",
 "· an agent if it fails":"· ένας πράκτορας αν αποτύχει",
