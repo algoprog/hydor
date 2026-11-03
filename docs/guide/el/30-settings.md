@@ -68,8 +68,7 @@
 
 [Ρυθμίσεις → Λογαριασμοί](/settings?s=accounts): οι συνδέσεις Claude Code και Codex που χρησιμοποιεί κάθε συνεδρία. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
 
-- [**Οι συνδέσεις σας**](/settings?s=accounts&find=Your%20sign-ins): Οι λογαριασμοί Claude Code και Codex που χρησιμοποιούν οι συνεδρίες.
-- [**Περισσότεροι λογαριασμοί**](/settings?s=accounts&find=More%20accounts): Ακόμη μία συνδρομή για έναν πράκτορα.
+- [**Οι λογαριασμοί σας**](/settings?s=accounts&find=Your%20accounts): Οι συνδέσεις του Claude Code και του Codex που χρησιμοποιούν οι συνεδρίες, και όσοι λογαριασμοί προσθέσετε.
 - [**Αλλαγή λογαριασμού στο όριο**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): Μια συνεδρία που εξαντλεί τη χρήση της συνεχίζει με άλλον λογαριασμό.
 - [**Προγράμματα πρακτόρων**](/settings?s=accounts&find=Agent%20programs): Ποια προγράμματα πρακτόρων είναι εγκατεστημένα, και εγκατάσταση των υπολοίπων.
 - [**Αυτόματη ενημέρωση**](/settings?s=accounts&find=Update%20automatically): Κρατά το Claude Code, το Codex και τα άλλα προγράμματα πρακτόρων στη νεότερη έκδοσή τους.

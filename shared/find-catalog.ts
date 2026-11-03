@@ -91,8 +91,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['machines', 'Add a machine', 'remote ssh server computer connect', 'Another machine running Naget Agent, to use from here'],
   ['machines', 'Access from other machines', 'access token remote', 'Tokens other machines use to reach this one'],
   // Agents › Accounts
-  ['accounts', 'Your sign-ins', 'login sign in claude code codex subscription email plan', 'The Claude Code and Codex accounts sessions use'],
-  ['accounts', 'More accounts', 'second account work personal subscription', 'Another subscription for an agent'],
+  ['accounts', 'Your accounts', 'login sign in claude code codex subscription email plan second account work personal add', 'The Claude Code and Codex sign-ins sessions use, and more you add'],
   ['accounts', 'Switch accounts at a limit', 'auto switch rotate use all accounts usage limit continue other account', 'A session that runs out of usage carries on with another account'],
   ['accounts', 'Agent programs', 'install claude code codex gemini opencode qwen auggie version', 'Which agent programs are installed, and installing the others'],
   ['accounts', 'Update automatically', 'update upgrade newest latest version claude code codex gemini opencode agent programs daily', 'Keeps Claude Code, Codex and the other agent programs at their newest version', 'Update agent programs automatically'],
