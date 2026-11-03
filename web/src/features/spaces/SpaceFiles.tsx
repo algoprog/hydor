@@ -97,7 +97,7 @@ export function SpaceFiles({ s, onSaved }: { s: Space; onSaved: (next: Space) =>
           Open in Files
         </Button>
         <Popover anchor={attachRef} open={attach} onClose={() => setAttach(false)} width={340} title="A folder it works with">
-          <div className="px-1 pb-1.5 text-[12.5px] leading-snug text-fg-3">It stays where it is: the space’s sessions work with it, and its files show here.</div>
+          <div className="px-1 pb-1.5 text-[12.5px] leading-snug text-fg-3">It stays where it is: the project’s sessions work with it, and its files show here.</div>
           <FolderFinder value={null} onPick={(p) => void add(p)} autoFocus anchor={attachRef} />
         </Popover>
       </div>

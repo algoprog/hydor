@@ -32,7 +32,7 @@ export function guidelinesBlock(db: DB, extra: SessionExtra): string {
   const g = globalGuidelines(db).trim();
   if (g) parts.push(`## For every session\n${g}`);
   const sp = typeof extra.space === 'string' ? spaceById(db, extra.space) : null;
-  if (sp?.instructions?.trim()) parts.push(`## For the space “${sp.name}”\n${sp.instructions.trim()}`);
+  if (sp?.instructions?.trim()) parts.push(`## For the project “${sp.name}”\n${sp.instructions.trim()}`);
   const s = typeof extra.guidelines === 'string' ? clip(extra.guidelines) : '';
   if (s) parts.push(`## For this session\n${s}`);
   if (!parts.length) return '';
@@ -68,7 +68,7 @@ export function guidelinesView(db: DB, o: { key?: string; space?: string }): Gui
 export function putGuidelines(d: Pick<Deps, 'db' | 'sessions' | 'broadcast'>, b: GuidelinesPut) {
   if (b.global !== undefined) setGlobalGuidelines(d.db, b.global);
   if (b.space) {
-    if (!spaceById(d.db, String(b.space.id))) throw new HttpError(404, 'No such space');
+    if (!spaceById(d.db, String(b.space.id))) throw new HttpError(404, 'No such project');
     updateSpace(d.db, String(b.space.id), { instructions: clip(b.space.text) });
     d.broadcast({ t: 'feature', id: 'spaces', data: { changed: true } });
   }

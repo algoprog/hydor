@@ -19,7 +19,7 @@ const ID = /^[a-z0-9]{1,40}$/;
 
 /** The folder of a space's own things in the data folder (not the space's folder of files). */
 const spaceData = (id: string) => {
-  if (!ID.test(id)) throw new HttpError(400, 'Not a space');
+  if (!ID.test(id)) throw new HttpError(400, 'Not a project');
   return path.join(config.dataDir, 'spaces', id);
 };
 
@@ -106,9 +106,9 @@ const nameOf = (v: unknown): string => {
 export function saveSpaceSkill(db: DB, id: string, b: { name?: unknown; description?: unknown; body?: unknown; triggers?: unknown }, was?: string): SpaceSkill {
   historyTables(db);
   const prev = was ? spaceSkillText(id, was) : null;
-  if (was && !prev) throw new HttpError(404, `The space has no skill named ${was}`);
+  if (was && !prev) throw new HttpError(404, `The project has no skill named ${was}`);
   const name = b.name === undefined && was ? was : nameOf(b.name);
-  if (name !== was && spaceSkillText(id, name)) throw new HttpError(409, `The space has a skill named ${name} already: pick another name, or change that one.`);
+  if (name !== was && spaceSkillText(id, name)) throw new HttpError(409, `The project has a skill named ${name} already: pick another name, or change that one.`);
   const old = prev ? parseSkill(prev.text) : null;
   const description = String(b.description ?? old?.description ?? '').replace(/\s+/g, ' ').trim();
   const body = String(b.body ?? old?.body ?? '').replace(/\r\n/g, '\n');
@@ -145,7 +145,7 @@ export function writeSpaceSkill(db: DB, id: string, name: string, text: string, 
 export function copyToSpace(db: DB, id: string, name: string): SpaceSkill {
   const lib = librarySkills().find((s) => s.dir === name);
   if (!lib) throw new HttpError(404, `There is no skill named ${name} in the skill library`);
-  if (spaceSkillText(id, name)) throw new HttpError(409, `The space has a skill named ${name} already`);
+  if (spaceSkillText(id, name)) throw new HttpError(409, `The project has a skill named ${name} already`);
   const dir = path.join(spaceSkillsDir(id), name);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   fs.cpSync(path.dirname(lib.file), dir, { recursive: true });
@@ -156,7 +156,7 @@ export function copyToSpace(db: DB, id: string, name: string): SpaceSkill {
 /** Removes one of a space's skills (a library skill of its name, if any, comes back in the space); its text stays in the history. */
 export function removeSpaceSkill(db: DB, id: string, name: string) {
   const cur = spaceSkillText(id, name);
-  if (!cur) throw new HttpError(404, `The space has no skill named ${name}`);
+  if (!cur) throw new HttpError(404, `The project has no skill named ${name}`);
   fs.rmSync(path.join(spaceSkillsDir(id), name), { recursive: true, force: true });
   record(db, { name, action: 'remove', before: cur.text, after: null, space: id });
 }
@@ -165,7 +165,7 @@ export function removeSpaceSkill(db: DB, id: string, name: string) {
 export function restoreSpaceSkill(db: DB, id: string, name: string) {
   const r = lastRemoved(db, id).find((x) => x.name === name);
   if (!r?.before) throw new HttpError(404, `Nothing to bring back for ${name}`);
-  if (spaceSkillText(id, name)) throw new HttpError(409, `The space has a skill named ${name} already`);
+  if (spaceSkillText(id, name)) throw new HttpError(409, `The project has a skill named ${name} already`);
   writeSkill(id, name, r.before);
   record(db, { name, action: 'restore', before: null, after: r.before, space: id });
 }

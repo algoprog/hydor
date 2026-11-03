@@ -1,5 +1,5 @@
-// Settings for the agents themselves: MCP servers, skills, Claude Code plugins and the instruction
-// files (CLAUDE.md, AGENTS.md), for one working folder where that matters.
+// Settings for the agents themselves: MCP servers, Claude Code's own plugins and the instruction files
+// (CLAUDE.md, AGENTS.md), for one working folder where that matters.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Download, KeyRound, LogIn, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import type { Agent, MarketplaceEntry, McpEntry, McpScope, McpSpec, McpStatus, McpTransport, PluginEntry, SetupResult, SkillEntry } from '@shared/types';
@@ -461,224 +461,6 @@ export function McpSettings({ cwd }: { cwd: string }) {
   );
 }
 
-// ---- skills ------------------------------------------------------------------------------
-
-const SKILL_SCOPE: Record<SkillEntry['scope'], string> = { user: 'All folders', project: 'This folder', repo: 'This repository', plugin: 'Plugin', system: 'Built in', admin: 'Admin' };
-const SCOPE_ORDER: SkillEntry['scope'][] = ['project', 'repo', 'user', 'plugin', 'system', 'admin'];
-
-function NewSkillDialog({ open, cwd, onClose, onCreated }: { open: boolean; cwd: string; onClose: () => void; onCreated: (path: string) => void }) {
-  const home = useApp((s) => s.boot?.home) ?? '';
-  const [agent, setAgent] = useState<Agent>('claude');
-  const [name, setName] = useState('');
-  const [desc, setDesc] = useState('');
-  const [scope, setScope] = useState<'user' | 'project'>('user');
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    setName('');
-    setDesc('');
-    setScope('user');
-  }, [open]);
-
-  const submit = async () => {
-    if (!name.trim() || busy) return;
-    setBusy(true);
-    try {
-      const r = await post<{ path: string }>('/api/setup/skills', { agent, name, description: desc, scope, cwd });
-      onClose();
-      onCreated(r.path);
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const where = agent === 'codex' ? '~/.agents/skills' : scope === 'project' ? `${tildify(cwd, home)}/.claude/skills` : '~/.claude/skills';
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="New skill"
-      width={520}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={submit} disabled={!name.trim() || busy}>
-            {busy ? <Throbber /> : 'Create and edit'}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4 pb-1">
-        <Field label="For">
-          <Segmented
-            size="sm"
-            value={agent}
-            onChange={setAgent}
-            options={AGENTS.map((a) => ({ value: a, label: agentName(a), icon: <AgentIcon agent={a} size={13} /> }))}
-          />
-        </Field>
-        <Field label="Name" hint="Becomes the folder name: lowercase, with dashes.">
-          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="release-notes" autoFocus autoComplete="off" />
-        </Field>
-        <Field label="When to use it" hint="The agent sees this line in every session and reads the rest of the skill only when it applies.">
-          <textarea className={cx(inputCls, 'h-20 resize-y py-2')} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Use when writing release notes from merged pull requests" />
-        </Field>
-        {agent === 'claude' && (
-          <Field label="Where">
-            <Segmented
-              size="sm"
-              value={scope}
-              onChange={setScope}
-              options={[
-                { value: 'user', label: 'All folders' },
-                { value: 'project', label: 'This folder' },
-              ]}
-            />
-          </Field>
-        )}
-        <div className="text-[11.5px] text-fg-3">
-          Saved to <span className="font-mono">{where}</span>
-          {agent === 'codex' && ', which Codex reads in every folder'}.
-        </div>
-      </div>
-    </Dialog>
-  );
-}
-
-function SkillRow({ s, onOpen, onToggle, onDelete }: { s: SkillEntry; onOpen: () => void; onToggle: (on: boolean) => void; onDelete: () => void }) {
-  return (
-    <div className="flex items-start gap-3 py-2.5">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button onClick={onOpen} className={cx('min-w-0 truncate text-left text-[14px] font-medium hover:underline', !s.enabled && 'text-fg-3')}>
-            {s.name}
-          </button>
-          <Badge>{SKILL_SCOPE[s.scope]}</Badge>
-          {s.plugin && <Badge tone="info">{s.plugin.split('@')[0]}</Badge>}
-        </div>
-        {s.description && <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">{s.description}</div>}
-      </div>
-      <div className="flex shrink-0 items-center gap-0.5">
-        <IconButton label={s.deletable ? 'Edit' : 'Open'} size="sm" onClick={onOpen}>
-          <Pencil size={14} />
-        </IconButton>
-        {s.deletable && (
-          <IconButton label="Delete" size="sm" onClick={onDelete}>
-            <Trash2 size={14} />
-          </IconButton>
-        )}
-        <Switch on={s.enabled} onChange={onToggle} label={s.enabled ? `Turn ${s.name} off` : `Turn ${s.name} on`} className="ml-1.5" />
-      </div>
-    </div>
-  );
-}
-
-export function SkillsSettings({ cwd }: { cwd: string }) {
-  const [data, setData] = useState<{ skills: SkillEntry[]; errors: string[] } | null>(null);
-  const [agent, setAgent] = useState<'all' | Agent>('all');
-  const [q, setQ] = useState('');
-  const [editing, setEditing] = useState<{ path: string; title: string } | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [confirm, confirmNode] = useConfirm();
-  const load = useCallback(
-    () =>
-      api<{ skills: SkillEntry[]; errors: string[] }>(`/api/setup/skills?cwd=${enc(cwd)}`)
-        .then(setData)
-        .catch(toastError),
-    [cwd],
-  );
-  useEffect(() => {
-    setData(null);
-    load();
-  }, [load]);
-
-  const toggle = async (s: SkillEntry, enabled: boolean) => {
-    setData((d) => d && { ...d, skills: d.skills.map((x) => (x === s ? { ...x, enabled } : x)) });
-    try {
-      await post('/api/setup/skills/toggle', { agent: s.agent, name: s.name, path: s.path, enabled });
-    } catch (e) {
-      toastError(e);
-      load();
-    }
-  };
-  const remove = async (s: SkillEntry) => {
-    const ok = await confirm({ title: `Delete ${s.name}?`, body: 'Its folder is deleted from disk, with every file in it.', confirm: 'Delete', danger: true });
-    if (!ok) return;
-    try {
-      await post('/api/setup/skills/delete', { agent: s.agent, path: s.path, cwd });
-      toast(`Deleted ${s.name}`, 'ok');
-    } catch (e) {
-      toastError(e);
-    }
-    load();
-  };
-
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = (data?.skills ?? []).filter((s) => (agent === 'all' || s.agent === agent) && words.every((w) => `${s.name} ${s.description} ${s.plugin ?? ''}`.toLowerCase().includes(w)));
-  const sorted = (a: Agent) =>
-    shown.filter((s) => s.agent === a).sort((x, y) => SCOPE_ORDER.indexOf(x.scope) - SCOPE_ORDER.indexOf(y.scope) || x.name.localeCompare(y.name));
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Segmented
-          size="sm"
-          value={agent}
-          onChange={setAgent}
-          options={[{ value: 'all' as const, label: 'All' }, ...AGENTS.map((a) => ({ value: a, label: agentName(a), icon: <AgentIcon agent={a} size={13} /> }))]}
-        />
-        <SearchBox value={q} onChange={setQ} placeholder="Filter skills" className="min-w-[160px] flex-1" />
-        <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setCreating(true)}>
-          New skill
-        </Button>
-      </div>
-      {!!data?.errors.length && (
-        <div className="rounded-lg border border-warn/35 bg-warn/10 px-3 py-2 text-[12.5px]">
-          {data.errors.map((e, i) => (
-            <div key={i} className="break-words">
-              {e}
-            </div>
-          ))}
-        </div>
-      )}
-      {AGENTS.filter((a) => agent === 'all' || agent === a).map((a) => {
-        const rows = sorted(a);
-        const total = data?.skills.filter((s) => s.agent === a).length ?? 0;
-        return (
-          <Section key={a} title={<AgentTitle agent={a} />} sub={data ? `${total} skill${total === 1 ? '' : 's'}${rows.length !== total ? `, ${rows.length} shown` : ''}` : undefined}>
-            {!data ? (
-              <Loading />
-            ) : rows.length ? (
-              <div className="-my-1 divide-y divide-line">
-                {rows.map((s) => (
-                  <SkillRow key={`${s.agent}:${s.path}`} s={s} onOpen={() => setEditing({ path: s.path, title: s.name })} onToggle={(on) => toggle(s, on)} onDelete={() => remove(s)} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-[13px] text-fg-3">{words.length ? 'No skills match.' : 'No skills yet.'}</div>
-            )}
-          </Section>
-        );
-      })}
-      <NewSkillDialog
-        open={creating}
-        cwd={cwd}
-        onClose={() => setCreating(false)}
-        onCreated={(path) => {
-          load();
-          setEditing({ path, title: 'New skill' });
-        }}
-      />
-      <EditorDialog path={editing?.path ?? null} title={editing?.title} onClose={() => (setEditing(null), load())} />
-      {confirmNode}
-    </div>
-  );
-}
-
 // ---- plugins -------------------------------------------------------------------------------
 
 interface PluginsData {
@@ -712,7 +494,8 @@ function PluginRow({ p, busy, actions }: { p: PluginEntry; busy: boolean; action
   );
 }
 
-export function PluginsSettings() {
+/** Claude Code's own plugins (its marketplaces): Settings → Plugins, its Claude Code tab. */
+export function ClaudePluginsSettings() {
   const [q, setQ] = useState('');
   const [limit, setLimit] = useState(PAGE);
   const [data, setData] = useState<PluginsData | null>(null);
@@ -788,7 +571,7 @@ export function PluginsSettings() {
 
   return (
     <div className="space-y-4">
-      <Section title="Installed" sub="Claude Code plugins on this machine. New sessions load them.">
+      <Section title="Installed" sub="Claude Code’s own plugins on this machine: only its sessions load them.">
         {!data ? (
           <Loading />
         ) : data.installed.length ? (

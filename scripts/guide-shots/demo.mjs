@@ -370,9 +370,9 @@ export function makeSessions(home, projects, now, { shop, blog }) {
   // Plain conversations, for the session list.
   const plain = [
     ['lisbon', path.join(tasks, '2026-10-31-lisbon-trip'), 30 * HOUR, 'Plan a 4-day trip to Lisbon in May: two adults, mid-range hotels, lots of walking.', 'Here is a day-by-day plan, with the neighbourhoods to stay in and what to book ahead.', '4 days in Lisbon in May'],
-    ['thesis', path.join(home, 'Naget/Spaces/thesis'), 3 * HOUR, 'Outline chapter 3: the method, the survey and how I analysed the answers.', 'Here is an outline in five parts, with what each needs from your notes.', 'Outline chapter 3'],
-    ['garden', path.join(home, 'Naget/Spaces/the-garden'), 50 * HOUR, 'Which vegetables can I still sow in November?', 'In zone 5b, garlic and broad beans go in now; spinach and lettuce under cover.', 'What to sow in November'],
-    ['taxes', path.join(home, 'Naget/Spaces/taxes-2026'), 4 * DAY, 'Sort the receipts in this folder by quarter and add them up.', 'Done: 46 receipts in four folders, with a table of the totals.', 'Receipts by quarter'],
+    ['thesis', path.join(home, 'Naget/Projects/thesis'), 3 * HOUR, 'Outline chapter 3: the method, the survey and how I analysed the answers.', 'Here is an outline in five parts, with what each needs from your notes.', 'Outline chapter 3'],
+    ['garden', path.join(home, 'Naget/Projects/the-garden'), 50 * HOUR, 'Which vegetables can I still sow in November?', 'In zone 5b, garlic and broad beans go in now; spinach and lettuce under cover.', 'What to sow in November'],
+    ['taxes', path.join(home, 'Naget/Projects/taxes-2026'), 4 * DAY, 'Sort the receipts in this folder by quarter and add them up.', 'Done: 46 receipts in four folders, with a table of the totals.', 'Receipts by quarter'],
     ['blog', blog, 3 * DAY, 'Add an RSS feed to the blog.', 'The feed is at /feed.xml, built with the posts. I added a link to it in the header.', 'RSS feed for the blog'],
     ['darkmode', blog, 6 * DAY, 'Give the blog a dark mode that follows the system setting.', 'Done: the colours follow your system, with a switch in the footer to override it.', 'Dark mode for the blog'],
     ['search', shop, 5 * HOUR, 'Product search is slow with more than 1,000 products. Make it faster.', 'Search now uses an index on the product names: 40 ms instead of 1.2 s for 5,000 products.', 'Faster product search'],
@@ -418,6 +418,10 @@ export async function seedApi(api, home, now, s) {
   await api('PUT', '/api/tips', { on: false });
   await api('PUT', '/api/me/timezone', { tz: 'America/New_York' });
   await api('PUT', '/api/guidelines', { global: 'Answer in plain English, short and to the point. Ask before deleting anything. Keep what you make for me in ~/Naget.' });
+  // Two built-in plugins with nothing to set up, and one switched off (Settings → Plugins).
+  for (const name of ['sqlite', 'library-docs']) await api('POST', '/api/plugins/install', { name }).catch(() => {});
+  for (let i = 0; i < 50 && (await api('GET', '/api/plugins')).installed.length < 2; i++) await new Promise((r) => setTimeout(r, 100));
+  await api('POST', '/api/plugins/library-docs/disable').catch(() => {});
 
   const space = async (b) => (await api('POST', '/api/spaces', b)).id ?? (await api('GET', '/api/spaces')).spaces.find((x) => x.name === b.name)?.id;
   const thesis = await space({ name: 'Thesis', color: 'violet', description: 'Chapter drafts, sources and the defense in March', instructions: 'Cite in APA 7. My advisor prefers short paragraphs and plain words.' });
@@ -630,7 +634,7 @@ export function overrides(s, now) {
       },
     },
     { id: `browser:${s.ebike.key}:signin`, kind: 'browser', title: 'Sign in to velora.bike', detail: 'The agent needs you in the browser to check the stock in your area.', key: s.ebike.key, session: 'Compare e-bikes for a hilly commute', agent: 'claude', at: now - 14 * MIN, path: `/s/${encodeURIComponent(s.ebike.key)}` },
-    { id: 'skill:receipts', kind: 'skill', title: 'A new skill to review: Sort receipts by quarter', detail: 'Learned from “Receipts by quarter”: how to file receipts by date and add them up.', at: now - 3 * HOUR, path: '/settings?s=skillpack' },
+    { id: 'skill:receipts', kind: 'skill', title: 'A new skill to review: Sort receipts by quarter', detail: 'Learned from “Receipts by quarter”: how to file receipts by date and add them up.', at: now - 3 * HOUR, path: '/settings?s=skills' },
   ];
   /** Settings → Models as on a desktop with one graphics card: OpenRouter's models picked, two run here. */
   const models = (real) => ({

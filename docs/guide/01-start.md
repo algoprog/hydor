@@ -20,7 +20,7 @@ The screen has two parts: the **sidebar** on the left, and the page you are on (
 - A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
 - **New session** opens the [start page](#the-start-page).
 - **Search sessions** finds sessions by their title, their folder and the words said in them, archived sessions included. Escape clears it. On a computer, the **Ctrl+K** badge at the end of the field opens the search box instead (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
-- The filter button at the end of that field (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have spaces, **Every space** or one of your spaces (up to eight are listed), with **Spaces** to open the Spaces page. The button takes the accent colour while a filter is on. Its last line, **Group by folder or space**, turns the groups for your spaces and folders on or off (see [The session list](#the-session-list)). See [Spaces and knowledge](/guide/spaces).
+- The filter button at the end of that field (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have projects, **Every project** or one of your projects (up to eight are listed), with **Projects** to open the Projects page. The button takes the accent colour while a filter is on. Its last line, **Group by folder or project**, turns the groups for your projects and folders on or off (see [The session list](#the-session-list)). See [Projects and knowledge](/guide/spaces).
 
 ### The session list
 
@@ -28,15 +28,15 @@ Under the search field is every session, in groups:
 
 - **Active**: all sessions with activity in the last five minutes, here or in VS Code or a terminal, including ones that have finished. After five minutes without activity they return to their usual group, even if their agent is still open. Sessions stopped by a usage limit stay here while scheduled to resume automatically; cancelling that resume restores the five-minute rule. Sessions whose background agents, commands or monitors are still running stay here too, however quiet, until those end. They keep their places while listed; drag one to move it.
 - **Pinned**: the sessions you pinned, in the order you drag them into. Drag a session from the groups below onto it to pin it.
-- **Projects**: a group for each of your spaces, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
+- **Projects**: a group for each of your projects, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
 - **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
 - **Snoozed**: at the bottom, until their time comes.
 
-Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and a session started in a space in the space's group, whatever its folder.
+Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and a session started in a project in the project's group, whatever its folder.
 
-Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. The pen at the end of a heading (on a computer, when you point at the heading) starts a new session in that folder or space.
+Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. The pen at the end of a heading (on a computer, when you point at the heading) starts a new session in that folder or project.
 
-To list the sessions by day only, as before, untick **Group by folder or space** in the filter button's menu, or find **Group sessions by folder or space** in the search box; it switches back the same way. While the list shows one space, its sessions go by day.
+To list the sessions by day only, as before, untick **Group by folder or project** in the filter button's menu, or find **Group sessions by folder or project** in the search box; it switches back the same way. While the list shows one project, its sessions go by day.
 
 Archived sessions are not listed, but **Search sessions** still finds them. "No sessions yet." shows before your first one.
 
@@ -70,14 +70,10 @@ Each session has a menu in the list: point at its row and click **⋯** at the e
 The bottom of the sidebar holds the app's tools, four to a row:
 
 - **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
-- **Spaces**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Spaces and knowledge](/guide/spaces).
+- **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/spaces).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
 - **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs. A thin bar under its icon shows how much is left across your paid subscriptions (or your free ones, when you have no paid ones), red when nothing is left; with no subscriptions there is no bar. See [Usage, limits and costs](/guide/usage).
-- **Files**: browse, open and edit files on this computer. See [Files, Git, Terminal and Preview](/guide/files-git).
-- **Git**: your repositories, their changes, branches and history.
-- **Terminal**: shells on this computer that keep running when you leave the page.
-- **System**: this computer's processors, GPUs, memory, disks and busiest processes, live.
-- **Preview**: look at a web app's development server running on this computer. It shows only on this machine's own pages, not while you look at another machine.
+- **System**: this computer, with a tab for each of its tools: **Overview** (how it is doing, and what each tool holds now), **Files** (browse, open and edit files), **Git** (your repositories, their changes, branches and history), **Terminal** (shells that keep running when you leave the page), **Preview** (a web app's development server running here; only on this machine's own pages) and **Monitor** (processors, graphics cards, memory, disks and the busiest programs, live). See [System: files, Git, Terminal and Preview](/guide/files-git).
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
 - **Search**: opens the search box (the same as Ctrl+K).
 - **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
@@ -90,7 +86,7 @@ That is their usual order. To change it, drag a tool to another place among them
 
 - **Agent**: who does the work (Claude Code, Codex, Custom, or another agent you added).
 - **Model**: that agent's model.
-- **Folder**: where the agent works, or a space, or a new folder made for the task.
+- **Folder**: where the agent works, or a project, or a new folder made for the task.
 - **Assistant**: what the session starts as (General, Researcher, Writer, Coder, Tutor, Planner, Analyst, App builder, or one of your own).
 - **Options**: effort, permissions, memory, a spending cap and more. The chip names any of them you set away from the usual.
 
@@ -105,7 +101,7 @@ Everything on the start page is explained in [Start a session](/guide/sessions#s
 3. Press **Agent** under the message box and pick the agent. **Model** beside it picks its model; the one marked "default" is fine to start with.
 4. Press **Folder** and pick where the agent works:
    - one of the folders you used last, or another one: type its name or its path in **Find a folder, or type its path**;
-   - a space, by its name, to work in that project's folder with its documents and guidelines;
+   - a project, by its name, to work in that project's folder with its documents and guidelines;
    - **New task folder**, for a fresh folder named after your task (in `~/Naget` unless you change it in [Settings → Capabilities → Assistants](/settings?s=assistants&find=Task%20folders)).
 
    Most assistants start in a new task folder unless you pick a folder; Coder works in the folder you pick.
@@ -122,23 +118,23 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 
 ### What it finds
 
-- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Spaces, Shared knowledge, Library, Pictures, Videos, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
-- **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or space, Show or hide the terminal panel.
+- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Projects, Shared knowledge, Library, Pictures, Videos, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
+- **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or project, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.
 - **Sessions**: by title, folder, branch and first message (not archived ones). Opening one opens it.
 - **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
 - **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
-- **Spaces**: your spaces, by name and description. Opening one opens the space.
+- **Projects**: your projects, by name and description. Opening one opens the project.
 - **Apps**, **Scheduled tasks**, **Assistants**, **Skills**, **Pages**, **Images and videos** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
 - **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
 
 ### Choose where it looks
 
-**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Spaces**, **Library** (pages, images and videos), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Assistants**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions) and **Guide**.
+**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Projects**, **Library** (pages, images and videos), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Assistants**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions) and **Guide**.
 
 - Tick one or more, and the box looks only there. The button names them ("Sessions, Library", or "3 places") in the accent colour. Click a place again to take it out, or **Everywhere** to look in all of them again.
-- With nothing typed, it lists what the places you picked hold, the ones you use most first: your recent sessions, spaces and pages, the sections of Settings, the topics of the guide. Messages, memory notes and files wait for your words.
+- With nothing typed, it lists what the places you picked hold, the ones you use most first: your recent sessions, projects and pages, the sections of Settings, the topics of the guide. Messages, memory notes and files wait for your words.
 - What you pick is kept on every device until you change it. When nothing is found, **Search everywhere** under the message looks in every place again.
 - On a phone, **Search in** is the filter icon beside **Cancel** (it names the places once you pick some), and its list opens from the bottom of the screen.
 

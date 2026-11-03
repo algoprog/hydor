@@ -15,7 +15,7 @@ import { filePath, go, showInFiles } from '../../lib/nav';
 import { useApp, useUI } from '../../lib/store';
 import { FolderFinder } from '../../components/FolderPicker';
 import { cx, Throbber, IconButton, MenuBack, Popover, SheetsOnPhone, useIsMobile, useMediaQuery } from '../../components/ui';
-import { PageHeader } from '../layout/PageHeader';
+import { rememberFilesPlace, SystemHeader } from '../system/SystemHeader';
 import { goFolder } from './actions';
 import { FileAskButton, FileAskPanel, FileAskPill, useFileAsk } from './FileAsk';
 import { FileEditor } from './FileEditor';
@@ -211,7 +211,10 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
     if (!path && place === 'folder' && dir !== useUI.getState().explorerRoot) useUI.getState().set({ explorerRoot: dir });
   }, [dir, place, path]);
   useEffect(() => {
-    if (!path) lastPlace = `${location.pathname.replace(/^\/m\/[^/]+/, '')}${qs ? `?${qs}` : ''}`;
+    if (!path) {
+      lastPlace = `${location.pathname.replace(/^\/m\/[^/]+/, '')}${qs ? `?${qs}` : ''}`;
+      rememberFilesPlace(lastPlace);
+    }
   }, [path, qs]);
 
   // A file opened joins the recent ones; a folder given as a file opens as the folder.
@@ -308,7 +311,7 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
     return (
       <SheetsOnPhone.Provider value>
         <div className="flex h-full min-h-0 flex-col">
-          <PageHeader title={title} tip="files" />
+          <SystemHeader tab="files" actions={title} />
           <div className="min-h-0 flex-1">{main}</div>
           {placesMenu}
         </div>
@@ -318,7 +321,7 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
 
   return (
     <div ref={pageRef} className="flex h-full min-h-0 flex-col">
-      <PageHeader title={fold ? title : 'Files'} tip="files" />
+      <SystemHeader tab="files" actions={fold ? title : undefined} />
       <div className="flex min-h-0 flex-1">
         {!fold && (
           <nav aria-label="Places" className="w-[232px] shrink-0 overflow-y-auto border-r border-line bg-bg-1">

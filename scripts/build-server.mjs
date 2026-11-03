@@ -8,6 +8,7 @@ const entries = {
   cli: 'server/cli.ts',
   agent: 'server/agent/main.ts',
   connbridge: 'server/connections/bridge.ts',
+  pluginlaunch: 'server/plugins/launch.ts',
 };
 const only = process.argv.slice(2);
 

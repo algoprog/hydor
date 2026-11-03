@@ -30,7 +30,8 @@ test('an order: the tools named first, then the rest in their usual order', () =
   assert.deepEqual(toolOrder(undefined), usual);
   assert.deepEqual(toolOrder('settings'), usual, 'not a list: the usual order');
   assert.deepEqual(toolOrder(['settings', 'help']), ['settings', 'help', ...usual.filter((t) => t !== 'settings' && t !== 'help')]);
-  assert.deepEqual(toolOrder(['help', 'gone', 'help', 3, 'files']), ['help', 'files', ...usual.filter((t) => t !== 'help' && t !== 'files')], 'unknown names and repeats skipped');
+  assert.deepEqual(toolOrder(['help', 'gone', 'help', 3, 'system']), ['help', 'system', ...usual.filter((t) => t !== 'help' && t !== 'system')], 'unknown names and repeats skipped');
+  assert.deepEqual(toolOrder(['files', 'git', 'help']), ['help', ...usual.filter((t) => t !== 'help')], 'tools that moved into System are passed over');
   const reversed = [...usual].reverse();
   assert.deepEqual(toolOrder(reversed), reversed);
   assert.ok(usualOrder(toolOrder([])));
@@ -39,7 +40,7 @@ test('an order: the tools named first, then the rest in their usual order', () =
 
 test('kept: every device reads the same; the usual order is kept as none', () => {
   assert.deepEqual(sidebarTools(db), usual, 'nothing kept yet');
-  const mine = ['settings', 'files', 'terminal', 'git', ...usual.filter((t) => !['settings', 'files', 'terminal', 'git'].includes(t))];
+  const mine = ['settings', 'system', 'apps', 'spaces', ...usual.filter((t) => !['settings', 'system', 'apps', 'spaces'].includes(t))];
   assert.deepEqual(setSidebarTools(db, mine), mine);
   assert.deepEqual(sidebarTools(db), mine);
   assert.deepEqual(setSidebarTools(db, ['help']), ['help', ...usual.filter((t) => t !== 'help')], 'an agent naming one tool puts it first');
@@ -51,11 +52,13 @@ test('kept: every device reads the same; the usual order is kept as none', () =>
 });
 
 test('a name it does not know is refused, and changes nothing', () => {
-  setSidebarTools(db, ['git']);
-  assert.throws(() => setSidebarTools(db, ['git', 'setings']), (e: Error & { status?: number }) => e.status === 400 && /setings/.test(e.message) && /settings/.test(e.message));
-  assert.throws(() => setSidebarTools(db, 'git'), /first to last/);
+  setSidebarTools(db, ['system']);
+  assert.throws(() => setSidebarTools(db, ['system', 'setings']), (e: Error & { status?: number }) => e.status === 400 && /setings/.test(e.message) && /settings/.test(e.message));
+  assert.throws(() => setSidebarTools(db, 'system'), /first to last/);
   assert.throws(() => setSidebarTools(db, undefined), /first to last/);
-  assert.equal(sidebarTools(db)[0], 'git');
+  assert.equal(sidebarTools(db)[0], 'system');
+  // An older page still sending Files or Git: those are passed over, not refused.
+  assert.equal(setSidebarTools(db, ['files', 'apps', 'git'])[0], 'apps');
   // Kept by an older or a hand-edited copy: what it no longer knows is left out.
   db.prepare("insert or replace into kv (k, v) values ('sidebar.tools', ?)").run(JSON.stringify(['notebook', 'help']));
   assert.deepEqual(sidebarTools(db), ['help', ...usual.filter((t) => t !== 'help')]);

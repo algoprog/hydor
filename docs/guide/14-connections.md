@@ -10,7 +10,7 @@ Agents can do more when you give them tools. There are three places to do that:
 
 - **Connected apps** ([Apps → Connected apps](/apps/connected)): services from a marketplace, connected once for every agent: Claude Code, Codex, Custom and the agents that speak ACP, and the apps they run. Each connected account gives the agents its tools.
 - **The vault** (the **Keys** tab of the same page): API keys, tokens and the passwords of sign-ins. An API key is a password a service gives you so that programs can use your account. Agents use these to call a service, sign in to a site or run a program, but never see them.
-- **MCP servers and plugins** ([Settings → MCP servers](/settings?s=mcp) and [Settings → Plugins](/settings?s=plugins)): tool servers you set up yourself in Claude Code's and Codex's own settings, and add-ons for Claude Code.
+- **MCP servers and plugins** ([Settings → MCP servers](/settings?s=mcp) and [Settings → Plugins](/settings?s=plugins)): tool servers you set up yourself in Claude Code's and Codex's own settings, and plugins that bring skills and tools to every agent (see [Plugins](/guide/plugins)).
 
 MCP (the Model Context Protocol) is the common way a service offers tools to agents. A connected account is an MCP server that Naget Agent sets up and signs in to for every agent. The MCP servers in Settings → Agents are ones you set up by hand, with a command or an address.
 
@@ -306,18 +306,18 @@ Click the bin beside a server and confirm with **Remove**. The agent stops loadi
 
 ## Add plugins to Claude Code
 
-Open [Settings → Agents → Plugins](/settings?s=plugins). Plugins are add-ons for Claude Code that bundle skills, commands, agents, hooks and MCP servers. They come from marketplaces: catalogs of plugins, kept in a GitHub repository, another git repository or a folder. They work for Claude Code only; for know-how every agent uses, see [Skills](/guide/skills).
+Claude Code has plugins of its own: add-ons that bundle skills, commands, agents, hooks and MCP servers, from marketplaces (catalogs of plugins, kept in a GitHub repository, another git repository or a folder). They work for Claude Code only. They are on the **Claude Code** tab of [Settings → Agents → Plugins](/settings?s=plugins&find=Claude%20Code); Codex's own plugins are on its **Codex** tab. Plugins for every agent are on the **Every agent** tab: see [Plugins](/guide/plugins).
 
 ### Installed plugins
 
-[Installed](/settings?s=plugins&find=Installed) lists the Claude Code plugins on this machine. New sessions load them. Each shows its name, its marketplace, its version and what it does.
+**Installed** lists Claude Code's plugins on this machine. New Claude Code sessions load them. Each shows its name, its marketplace, its version and what it does.
 
 - The switch turns a plugin off or on without removing it.
 - The bin uninstalls it, once you confirm. New Claude Code sessions stop loading its skills, commands and servers.
 
 ### Find and install a plugin
 
-[Browse](/settings?s=plugins&find=Browse) lists every plugin you can install from your marketplaces, most installed first, with how many installs each has. **Search plugins** narrows the list. It shows 40 at a time: **Show more** adds 40 more.
+**Browse** lists every plugin you can install from your marketplaces, most installed first, with how many installs each has. **Search plugins** narrows the list. It shows 40 at a time: **Show more** adds 40 more.
 
 Click **Install** and confirm. The plugin installs for every Claude Code session. Plugins can add hooks and servers that run commands on this machine, so install only plugins you trust.
 
@@ -325,7 +325,7 @@ Naget Agent asks Claude Code for the list of plugins at most every 10 minutes, a
 
 ### Plugin marketplaces
 
-[Marketplaces](/settings?s=plugins&find=Marketplaces) lists the catalogs Claude Code installs plugins from.
+**Marketplaces** lists the catalogs Claude Code installs plugins from.
 
 - To add one, type a GitHub owner/repo, a git URL or a folder into the box under the list, and click **Add**.
 - To remove one, click its bin and confirm. Plugins installed from it are uninstalled too.

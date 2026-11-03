@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "ocr",
+  "version": "1.0.0",
+  "description": "Reads the text in pictures, photos of documents, screenshots and scanned PDFs on this computer (RapidOCR), so agents can use what a scan or a receipt says.",
+  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "license": "MIT",
+  "keywords": ["ocr", "scans", "receipts", "images", "pdf"],
+  "extensions": {
+    "com.naget.agent": {
+      "title": "Text from pictures",
+      "category": "documents",
+      "icon": "scan",
+      "requires": {
+        "python": ">=3.10",
+        "pip": ["rapidocr>=3,<4", "onnxruntime>=1.18", "pypdfium2>=4,<6"]
+      }
+    }
+  }
+}

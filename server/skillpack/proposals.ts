@@ -13,7 +13,7 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { spaceById, spaceOfSession } from '../spaces/index.ts';
 import { lineDiff } from './diff.ts';
 import { historyTables, lastRemoved, record, usage } from './history.ts';
-import { checkText, composeSkill, librarySkills, MAX_SKILL, parseSkill, removeLearned, skillText, slug, writeLearned } from './library.ts';
+import { checkText, composeSkill, isOff, librarySkills, MAX_SKILL, parseSkill, removeLearned, skillText, slug, writeLearned } from './library.ts';
 import { scanSkill, secretsMessage } from './scan.ts';
 import { spaceSkillText, writeSpaceSkill } from './spaceSkills.ts';
 
@@ -163,9 +163,9 @@ export function propose(db: DB, p: ProposalInput): { proposal: SkillProposal; re
   let space = where?.space.id;
   let scope: Data['scope'] = where && (p.space === true || p.space === 'true') ? 'space' : 'library';
   if (p.kind === 'new') {
-    if (owner) throw new Error(`The space ${owner.name} has a skill named ${name} already. To improve it, use skill_patch; for something else, pick another name.`);
+    if (owner) throw new Error(`The project ${owner.name} has a skill named ${name} already. To improve it, use skill_patch; for something else, pick another name.`);
     if (skillText(name))
-      throw new Error(`There is a skill named ${name} already. To improve it, use skill_patch${where ? ' (the user can keep the change for this space alone)' : ''}; for something else, pick another name.`);
+      throw new Error(`There is a skill named ${name} already. To improve it, use skill_patch${where ? ' (the user can keep the change for this project alone)' : ''}; for something else, pick another name.`);
     let body = String(p.body ?? '');
     let description = String(p.description ?? '').trim();
     let listed: string[] | undefined;
@@ -182,7 +182,7 @@ export function propose(db: DB, p: ProposalInput): { proposal: SkillProposal; re
     const cur = owner ? { ...spaceSkillText(owner.id, name)!, source: 'space' as const } : skillText(name);
     if (!cur)
       throw new Error(
-        `There is no skill named ${name} in the app's skill library (its built-in skills and the ones the user approved)${where ? ' nor in this space' : ''}. Skills in the user's own folders (~/.claude/skills, a project's .claude/skills) are not changed from here: propose a new skill with skill_save instead, or tell the user what to change.`,
+        `There is no skill named ${name} in the app's skill library (its built-in skills and the ones the user approved)${where ? ' nor in this project' : ''}. Skills in the user's own folders (~/.claude/skills, a project's .claude/skills) are not changed from here: propose a new skill with skill_save instead, or tell the user what to change.`,
       );
     before = cur.text;
     bundled = cur.source === 'bundled' || undefined;
@@ -283,8 +283,8 @@ export async function decide(d: Deps, id: string, yes: boolean, o: { text?: stri
   const what =
     p.kind === 'new'
       ? `the skill “${p.name}”`
-      : `your change to the skill “${p.name}”${p.spaceSkill ? ` of the space “${inSpace}”` : inSpace ? ' (saved as the space’s own version; the library’s stays as it was for other sessions)' : p.bundled ? ' (a built-in one: saved as the user’s own version)' : ''}`;
-  const where = inSpace ? `one of the skills of the space “${inSpace}” now, for its sessions alone` : 'in the app’s skill library now';
+      : `your change to the skill “${p.name}”${p.spaceSkill ? ` of the project “${inSpace}”` : inSpace ? ' (saved as the project’s own version; the library’s stays as it was for other sessions)' : p.bundled ? ' (a built-in one: saved as the user’s own version)' : ''}`;
+  const where = inSpace ? `one of the skills of the project “${inSpace}” now, for its sessions alone` : 'in the app’s skill library now';
   const text = yes
     ? `The user approved ${what}${edited ? ', after editing it' : ''}. It is ${where}: Custom has it from its next turn, and Claude Code and Codex from their next sessions. Just acknowledge this briefly.`
     : `The user dismissed ${what}; nothing was saved.${data.note ? ` Their note: ${data.note}` : ''} Do not propose it again unless they ask. Just acknowledge this briefly.`;
@@ -312,6 +312,27 @@ export function removeSkill(db: DB, name: string) {
   record(db, { name, action: 'remove', before: cur.text, after: skillText(name)?.text ?? null });
 }
 
+/**
+ * A skill the user writes or changes themselves (no proposal): a new one in the library, a change to one
+ * of theirs, or their own version of a built-in one. Recorded in its history like an approved change.
+ */
+export function saveOwnSkill(db: DB, name: string, text: string, o: { create?: boolean } = {}) {
+  tables(db);
+  if (!SKILL_NAME.test(name)) throw new HttpError(400, 'Name it with lowercase letters, digits and dashes, like release-notes');
+  const t = text.replace(/\r\n/g, '\n');
+  try {
+    checkText(name, t);
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+  const stop = secretsMessage(newFindings(undefined, t));
+  if (stop) throw new HttpError(400, stop);
+  const cur = skillText(name);
+  if (o.create && cur && cur.source !== 'plugin') throw new HttpError(409, `A skill named ${name} is in the library already`);
+  writeLearned(name, t);
+  record(db, { name, action: cur && cur.source === 'learned' ? 'update' : 'create', before: cur?.source === 'learned' ? cur.text : null, after: t });
+}
+
 /** Brings back a removed learned skill as it was. */
 export function restoreSkill(db: DB, name: string) {
   tables(db);
@@ -323,14 +344,17 @@ export function restoreSkill(db: DB, name: string) {
   record(db, { name, action: 'restore', before: cur?.text ?? null, after: r.before });
 }
 
-/** The library as Settings shows it: each skill with its use. */
+/** The library as the skills page shows it: each skill with its group, where it comes from, whether it is on, and its use. */
 export function libraryView(db: DB): LibrarySkill[] {
   const used = usage(db);
   return librarySkills().map((s) => ({
     name: s.name,
     description: s.description,
     triggers: s.triggers,
+    ...(s.category ? { category: s.category } : {}),
     source: s.source,
+    ...(s.plugin ? { plugin: { name: s.plugin, title: s.pluginTitle ?? s.plugin } } : {}),
+    ...(isOff(s.dir) ? { off: true } : {}),
     overrides: s.overrides,
     path: s.file,
     updatedAt: s.source === 'learned' ? Math.round(s.mtime) : undefined,

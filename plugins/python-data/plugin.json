@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "python-data",
+  "version": "1.0.0",
+  "description": "A ready Python of its own with pandas, NumPy, SciPy, Matplotlib, openpyxl and PyArrow, so agents can analyse tables and make charts at once, without installing anything into your own Python.",
+  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "license": "MIT",
+  "keywords": ["python", "pandas", "data", "charts", "excel", "csv"],
+  "extensions": {
+    "com.naget.agent": {
+      "title": "Python for data",
+      "category": "data",
+      "icon": "chart",
+      "requires": {
+        "python": ">=3.10",
+        "pip": ["pandas>=2.2,<3", "numpy>=1.26,<3", "scipy>=1.11,<2", "matplotlib>=3.8,<4", "openpyxl>=3.1,<4", "pyarrow>=15"]
+      }
+    }
+  }
+}

@@ -76,7 +76,7 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
         .sessions.filter((s) => !s.archived)
         .map(sessionItem);
     case 'spaces':
-      return allSpaces(db).map((s) => ({ id: `space:${s.id}`, text: text(s.name, isGroup(s) ? 'A group of spaces' : 'A space', s.description) }));
+      return allSpaces(db).map((s) => ({ id: `space:${s.id}`, text: text(s.name, isGroup(s) ? 'A group of projects' : 'A project', s.description) }));
     case 'apps':
       return [...listApps(db).map((a) => ({ id: `app:${a.id}`, text: appItemText(a.name, true, a.description) })), ...templates()];
     case 'tasks':

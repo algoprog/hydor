@@ -24,6 +24,18 @@ scratch data folder:
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/naget-test-guide node dist/dev/guide-test.js
 ```
 
+Built-in skills are folders in `skills/` (a SKILL.md each, with `category:` for its group on the Skills page);
+`server/skillpack/tests.ts` checks them. Built-in plugins are folders in `plugins/`, in the Agent Plugins 1.0
+format (`plugin.json`, `skills/`, `mcp.json`) with the app's own extension, `com.naget.agent`, for what they need.
+`server/plugins/` reads them, sets them up in their own data folders and gives every agent their skills and tool
+servers (stdio servers start through `dist/server/pluginlaunch.js`, in the plugin's folder). Its tests check every
+built-in plugin; with `NAGET_TEST_REAL_SETUP=1` they install the plugins' packages for real and talk to their
+servers:
+
+```bash
+OUTDIR=dist/dev node scripts/build-server.mjs server/plugins/plugins-test.ts && NAGET_TEST_REAL_SETUP=1 DATA_DIR=/tmp/naget-test-plugins node dist/dev/plugins-test.js
+```
+
 ## The Mac app
 
 `mac/` wraps the server in an Electron app (`mac/main.cjs`): it starts the server with the Node.js inside it and a

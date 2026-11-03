@@ -1,7 +1,7 @@
 # The guide's screenshots
 
 `docs/guide/images/<topic>.webp` (dark theme) and `<topic>-light.webp` (light theme) show each guide topic's part
-of the app. They are taken from a demo copy of the app filled with made-up data: Alex's sessions, spaces, memory,
+of the app. They are taken from a demo copy of the app filled with made-up data: Alex's sessions, projects, memory,
 tasks and pages, `alex@example.com`. Nothing comes from a real account.
 
 Take them again when the app's look changes:
@@ -37,7 +37,7 @@ the real app's).
   real account is read: the app starts agents' programs with the computer's own login environment.
 - `demo.mjs` is the made-up world: folders and a git repository with history, a remote beside the home that lacks
   its last commit, and one change not committed, sessions written as Claude Code transcripts (steps, a web
-  search, files handed over, a picture and a clip made), and what the app's own API keeps (spaces, guidelines,
+  search, files handed over, a picture and a clip made), and what the app's own API keeps (projects, guidelines,
   memory notes, scheduled tasks at times well away from now, pages, the Library's images and videos, apps, learned
   skills). The pictures and clips are in `media/`: made once through OpenRouter, kept small. What only a running agent or a real account has
   is answered to the page instead (`overrides`): two sessions waiting on a card, Claude Code's model list, the

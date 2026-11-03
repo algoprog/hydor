@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Python with the libraries for analysing data: pandas, matplotlib (charts as pictures) and openpyxl
+# (Excel files). They are installed once, on first use, into a private environment in Naget Agent's data
+# folder; nothing is installed system-wide.
+#
+#   data-python analyse.py [args…]           run a script
+#   data-python -c 'import pandas'           or anything python takes
+set -euo pipefail
+
+PKGS="pandas>=2.2,<4 matplotlib>=3.8,<4 openpyxl>=3.1,<4"
+
+data="${NAGET_DATA_DIR:-${DATA_DIR:-}}"
+if [ -z "$data" ]; then
+  if [ ! -d "$HOME/.naget-agent" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.naget-agent"; fi
+fi
+venv="$data/analysis/venv"
+py="$venv/bin/python"
+
+if [ ! -x "$py" ] || [ "$(cat "$venv/.packages" 2>/dev/null)" != "$PKGS" ]; then
+  mkdir -p "$data/analysis"
+  # One setup at a time (several agents may start at once).
+  lock="$data/analysis/.setup-lock"
+  for _ in $(seq 1 600); do mkdir "$lock" 2>/dev/null && break; sleep 1; done
+  trap 'rmdir "$lock" 2>/dev/null || true' EXIT
+  if [ ! -x "$py" ] || [ "$(cat "$venv/.packages" 2>/dev/null)" != "$PKGS" ]; then
+    sys="$(command -v python3 || true)"
+    if [ -z "$sys" ]; then
+      echo "Python 3 is not installed on this computer, and analysing data needs it." >&2
+      echo "Install it (Debian/Ubuntu: sudo apt install python3 python3-venv; macOS: brew install python), then run this again." >&2
+      exit 3
+    fi
+    if [ ! -x "$py" ] && ! "$sys" -m venv "$venv" >/dev/null 2>&1; then
+      rm -rf "$venv"
+      echo "Python is here, but it cannot make a private environment: its venv module is missing." >&2
+      echo "Install it (Debian/Ubuntu: sudo apt install python3-venv), then run this again." >&2
+      exit 3
+    fi
+    echo "Setting up pandas, matplotlib and openpyxl (once, about 250 MB)…" >&2
+    # shellcheck disable=SC2086
+    if ! "$py" -m pip install --quiet --disable-pip-version-check $PKGS >&2; then
+      echo "Could not download the Python libraries. Is the internet reachable from here?" >&2
+      exit 4
+    fi
+    printf '%s' "$PKGS" > "$venv/.packages"
+  fi
+fi
+# No __pycache__ beside the scripts (they may live in the app's own folder); charts drawn without a screen.
+export PYTHONDONTWRITEBYTECODE=1
+export MPLBACKEND="${MPLBACKEND:-Agg}"
+exec "$py" "$@"

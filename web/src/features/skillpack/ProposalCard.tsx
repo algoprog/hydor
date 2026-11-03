@@ -1,6 +1,6 @@
 // A skill an agent proposed (skill_save) or a change it proposed to one (skill_patch), as a card in the
 // conversation: why it is worth keeping, when it applies, the text or the change, and anything in it
-// that needs a look. Nothing is saved until you approve it here (or in Settings → Skill library); you
+// that needs a look. Nothing is saved until you approve it here (or in Settings → Skills); you
 // can edit it first, or dismiss it with a note. In a space, you pick whether it is kept for every
 // session or for the space alone. Your answer goes back to the agent as a message.
 import { useEffect, useState } from 'react';
@@ -143,8 +143,8 @@ export function ProposalPanel({ p, onChange, framed = true }: { p: SkillProposal
           </div>
         )}
         {p.saved && <p className="text-[12px] text-fg-3">You edited it before saving; this is the saved version.</p>}
-        {p.spaceSkill && p.space && pending && <p className="text-[12px] text-fg-3">{`A skill of the space ${p.space.name}: the change stays in it.`}</p>}
-        {p.kind === 'patch' && !p.spaceSkill && toSpace && pending && <p className="text-[12px] text-fg-3">Saved as the space’s own version; other sessions keep the library’s as it is.</p>}
+        {p.spaceSkill && p.space && pending && <p className="text-[12px] text-fg-3">{`A skill of the project ${p.space.name}: the change stays in it.`}</p>}
+        {p.kind === 'patch' && !p.spaceSkill && toSpace && pending && <p className="text-[12px] text-fg-3">Saved as the project’s own version; other sessions keep the library’s as it is.</p>}
         {p.bundled && pending && !toSpace && <p className="text-[12px] text-fg-3">A built-in skill: approving saves your own version in its place. The original stays with the app.</p>}
         {p.note && <p className="text-[12.5px] text-fg-3">Your note: {p.note}</p>}
         {dismissing && (
@@ -197,8 +197,8 @@ export function ProposalPanel({ p, onChange, framed = true }: { p: SkillProposal
               )}
             </span>
             {p.status === 'approved' && (
-              <button type="button" onClick={() => go(toSpace ? `/spaces/${p.space!.id}/skills` : '/settings?s=skillpack')} className="text-[12.5px] text-accent hover:underline">
-                {toSpace ? 'The space’s skills' : 'Skill library'}
+              <button type="button" onClick={() => go(toSpace ? `/spaces/${p.space!.id}/skills` : '/settings?s=skills')} className="text-[12.5px] text-accent hover:underline">
+                {toSpace ? 'The project’s skills' : 'Your skills'}
               </button>
             )}
           </>

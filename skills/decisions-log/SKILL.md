@@ -1,6 +1,7 @@
 ---
 name: decisions-log
 description: Use when working without the user at hand (a goal or scheduled task, a long run on its own, or when told not to wait for answers) and questions come up that would otherwise stall the work.
+category: work
 triggers: [while I'm away, while I am away, don't wait for me, do not wait for me, on your own, without checking with me, overnight, unattended]
 ---
 

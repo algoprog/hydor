@@ -1,6 +1,7 @@
 ---
 name: app-builder
-description: Use when making or changing one of the user's apps (made here: a form, steps, a view, data, screens and examples), or when they want a tool they will run again and again, or work that runs by itself.
+description: "Use when making or changing one of the user's apps (made here: a form, steps, a view, data, screens and examples), or when they want a tool they will run again and again, or work that runs by itself."
+category: app
 triggers: [make a template, build a template, make an app, build an app, an app that, a tool that, every time I, automate, workflow]
 ---
 

@@ -40,10 +40,10 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['accounts', 'Accounts', 'Agents', 'The Claude Code and Codex sign-ins every session uses'],
   ['agents', 'More agents', 'Agents', 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP'],
   ['models', 'Models', 'Agents', 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM'],
-  ['guidelines', 'Agent Guidelines', 'Agents', 'What every agent follows: in every session, in a space, or in one session'],
+  ['guidelines', 'Agent Guidelines', 'Agents', 'What every agent follows: in every session, in a project, or in one session'],
   ['mcp', 'MCP servers', 'Agents', 'Tools the agents can call'],
-  ['skills', 'Skills', 'Agents', 'Know-how the agents load when a task calls for it'],
-  ['plugins', 'Plugins', 'Agents', 'Claude Code add-ons that bundle skills, commands, agents and MCP servers'],
+  ['skills', 'Skills', 'Agents', 'Written methods agents load when a task calls for one: built in, yours, from plugins and the agents’ own'],
+  ['plugins', 'Plugins', 'Agents', 'Add-ons that bring skills, tools and instructions to every agent'],
   ['tasks', 'Scheduled tasks', 'Agents', 'Agent work that starts by itself: on a schedule, once, or when a webhook calls'],
   ['search', 'Search', 'Capabilities', 'How agents search the web: Naget Search and other providers'],
   ['browser', 'Browser', 'Capabilities', 'A web browser agents use, which you can watch and take over'],
@@ -53,7 +53,6 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['images', 'Images and video', 'Capabilities', 'Pictures and videos agents make for you through OpenRouter, and who writes their captions in the Library'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
   ['assistants', 'Assistants', 'Capabilities', 'Presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go'],
-  ['skillpack', 'Skill library', 'Capabilities', 'Skills that come with the app, and the ones agents learned with your approval'],
   ['custom', 'Custom', 'Capabilities', 'Auto mode, a sandbox for commands, and how long goals run'],
 ];
 
@@ -109,18 +108,29 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['models', 'Hugging Face token', 'hf token gated private', 'Only for gated or private models'],
   // Agents › Agent Guidelines
   ['guidelines', 'For every session', 'rules instructions preferences system prompt always never how to talk to you tone style claude.md agents.md', 'What every agent follows, in every session', 'Agent Guidelines for every session'],
-  ['guidelines', 'For a space', 'space project guidelines instructions', 'Guidelines the sessions in a space follow', 'Guidelines for a space'],
+  ['guidelines', 'For a project', 'project space guidelines instructions', 'Guidelines the sessions in a project follow', 'Guidelines for a project'],
   ['guidelines', 'For one session', 'session guidelines instructions start page', 'Guidelines for one session, from the start page or the session’s menu', 'Guidelines for one session'],
   ['guidelines', 'Files Claude Code and Codex read too', 'claude.md agents.md instruction files project folder', 'CLAUDE.md and AGENTS.md, which Claude Code and Codex read on their own', 'CLAUDE.md and AGENTS.md'],
   // Agents › MCP servers
   ['mcp', 'Add server', 'mcp tools server add', 'A tool server for Claude Code or Codex', 'Add an MCP server'],
   ['mcp', 'Check connections', 'mcp status connected failed', 'See whether each MCP server answers', 'Check MCP servers'],
   // Agents › Skills
-  ['skills', 'New skill', 'skill create write', 'Write a skill for Claude Code or Codex'],
+  ['skills', 'New skill', 'skill create write own add', 'Write a skill for every agent, or for Claude Code or Codex alone'],
+  ['skills', 'Built in', 'skills bundled come with the app library', 'The skills that come with the app', 'Built-in skills'],
+  ['skills', 'Yours', 'skills learned approved my own written', 'Skills you wrote, or approved when an agent suggested them', 'Your skills'],
+  ['skills', 'From plugins', 'plugin skills', 'Skills your plugins bring', 'Skills from plugins'],
+  ['skills', 'Claude Code and Codex', 'claude code codex own skills folder', 'The agents’ own skills, which only they get', 'Claude Code’s and Codex’s own skills'],
+  ['skills', 'Bring skills in by keywords', 'skill triggers keywords auto load', 'Keywords in a message load skills by themselves'],
+  ['skills', 'Make my own version', 'change edit built-in skill override customise customize', 'Change a built-in skill: your version takes its place', 'Change a built-in skill'],
   // Agents › Plugins
-  ['plugins', 'Installed', 'plugins claude code add-ons', 'The plugins Claude Code has', 'Installed plugins'],
-  ['plugins', 'Browse', 'plugins install find', 'Find plugins to install', 'Browse plugins'],
-  ['plugins', 'Marketplaces', 'plugins marketplace add', 'Where plugins come from', 'Plugin marketplaces'],
+  ['plugins', 'Your plugins', 'plugins installed added on off every agent', 'The plugins you added, on or off for every agent'],
+  ['plugins', 'Come with the app', 'built-in plugins add sqlite speech to text transcribe ocr python data audio video library docs meeting recordings', 'Plugins that come with the app, ready to add', 'Built-in plugins'],
+  ['plugins', 'Make a plugin', 'create build new plugin package share editor own', 'Bundle skills, tools, instructions and files of your own as a plugin'],
+  ['plugins', 'From a link', 'add plugin github git repository url install', 'Add a plugin from GitHub or another Git address', 'Add a plugin from a link'],
+  ['plugins', 'From a .zip file', 'add plugin zip file import upload', 'Add a plugin someone packed into a .zip', 'Add a plugin from a file'],
+  ['plugins', 'Pack into a .zip', 'export share package plugin zip download', 'A plugin as one file to share', 'Pack a plugin into a .zip'],
+  ['plugins', 'Claude Code', 'claude code plugins marketplaces install', 'Claude Code’s own plugins and marketplaces', 'Claude Code’s plugins'],
+  ['plugins', 'Codex', 'codex plugins marketplaces', 'Codex’s own plugins and marketplaces', 'Codex’s plugins'],
   // Agents › Scheduled tasks
   ['tasks', 'New task', 'schedule cron automation task timer webhook recurring', 'Agent work that starts by itself', 'New scheduled task'],
   ['tasks', 'Start from an example', 'task examples templates automation ideas', 'Ready-made scheduled tasks', 'Scheduled task examples'],
@@ -185,10 +195,6 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['assistants', 'New assistant', 'assistant preset create researcher writer tutor', 'A preset to start sessions as'],
   ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where an assistant’s new task folders go'],
-  // Capabilities › Skill library
-  ['skillpack', 'Learned', 'skills learned approved', 'Skills agents learned with your approval', 'Learned skills'],
-  ['skillpack', 'Built in', 'skills bundled', 'Skills that come with the app', 'Built-in skills'],
-  ['skillpack', 'Bring skills in by keywords', 'skill triggers keywords auto load', 'Keywords in a message load skills by themselves'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
   ['custom', 'Sandbox for commands', 'sandbox bubblewrap security commands', 'Commands run in a sandbox'],
@@ -207,7 +213,7 @@ const PAGES: [string, string, string, string, string][] = [
   // id, title, path, other words, what it is
   ['new', 'New session', '/', 'start new chat conversation task claude codex agent', 'Start a session with any agent and model, in any folder'],
   ['inbox', 'Inbox', '/inbox', 'waiting approvals approve deny questions forms needs you pending to do', 'Everything waiting on you, across sessions, tasks and machines'],
-  ['files', 'Files', '/files', 'explorer browse folders documents', 'Browse, open and edit files'],
+  ['files', 'Files', '/files', 'explorer browse folders documents system', 'Browse, open and edit the files on this computer'],
   ['search-files', 'Search in files', '/search', 'grep find text in files code names where folder', 'Find files by their names and the text inside them, in any folder'],
   ['files-recent', 'Recent files', '/files?place=recent', 'recent files opened lately last history', 'The files you opened lately'],
   ['files-trash', 'Trash', '/files?place=trash', 'trash deleted files put back restore undelete recycle bin empty', 'What you deleted in Files, to put back or delete for good'],
@@ -218,9 +224,9 @@ const PAGES: [string, string, string, string, string][] = [
   ['connections-market', 'Connect a service', '/apps/connected?tab=market', 'marketplace services connect add catalog notion linear github google', 'The marketplace of services agents can use, to connect once'],
   ['keys', 'Keys', '/apps/connected?tab=keys', 'api key secret vault token password sign-in login credentials add a key', 'Keys agents use without seeing them: your vault'],
   ['new-app', 'New app', '/apps/new', 'create build make new template app apps form tool', 'An app anyone can run from a form'],
-  ['spaces', 'Spaces', '/spaces', 'spaces projects workspace group sessions files documents knowledge memory guidelines instructions skills folder library overview', 'Each project’s sessions, files, documents and Library, together'],
+  ['spaces', 'Projects', '/spaces', 'projects spaces project workspace group sessions files documents knowledge memory guidelines instructions skills folder library overview', 'Each project’s sessions, files, documents and Library, together'],
   ['knowledge', 'Shared knowledge', '/knowledge', 'knowledge base documents folder pdf files search rag library cite sources', 'Documents every session can search and cite'],
-  ['library', 'Library', '/library', 'library saved pages html reports small tools tracker calculator checklist edit editor slides decks presentations documents spreadsheets images pictures videos media kept export pdf word powerpoint spaces by space project move', 'What agents made for you and what you kept: pages, slides, documents, pictures and videos, by space'],
+  ['library', 'Library', '/library', 'library saved pages html reports small tools tracker calculator checklist edit editor slides decks presentations documents spreadsheets images pictures videos media kept export pdf word powerpoint projects spaces by project move', 'What agents made for you and what you kept: pages, slides, documents, pictures and videos, by project'],
   ['media', 'Pictures', '/library?kind=image', 'images pictures photos drawings media kept saved generated library titles descriptions captions', 'The pictures agents made that you kept, each with a title and a description'],
   ['videos', 'Videos', '/library?kind=video', 'videos clips movies films media kept saved generated library titles descriptions captions frames', 'The videos agents made that you kept, each with a title and a description'],
   ['new-page', 'New page', '/library?new=1', 'make create new page blank notes checklist tracker write design editor', 'A page of your own: blank, notes, a checklist or a tracker, or one an agent makes'],
@@ -233,7 +239,8 @@ const PAGES: [string, string, string, string, string][] = [
   ['usage', 'Usage and limits', '/usage', 'usage limits plan quota reset tokens', 'What you have used of each plan, and when it resets'],
   ['arena', 'Model arena', '/arena', 'arena compare models side by side best answer leaderboard rating which model wins vote', 'Which models win on your own tasks, from the answers you kept'],
   ['stats', 'Activity', '/stats', 'activity stats statistics tokens cost', 'What the agents did, over time'],
-  ['system', 'System', '/system', 'system cpu gpu memory ram disk processes', 'This computer: processors, GPUs, memory, disks, the busiest processes'],
+  ['system', 'System', '/system', 'system computer overview machine files git terminal preview monitor', 'This computer: its files, Git, terminals, the web apps running on it, and how busy it is'],
+  ['monitor', 'Monitor', '/system/monitor', 'cpu gpu memory ram disk processes network temperature busy load notebook kernels', 'How busy this computer is: processors, graphics cards, memory, disks and the busiest processes'],
   ['settings', 'Settings', '/settings', 'settings preferences options configuration', 'Everything the app can be set to'],
   ['guide', 'Help', '/guide', 'help guide manual documentation how to learn tutorial faq questions explain ask agent', 'The guide to every part of the app, and an agent to ask about it'],
 ];
@@ -245,7 +252,7 @@ const ACTIONS: [CatalogItem['act'] & string, string, string, string][] = [
   ['releases', 'Release notes', 'what is new whats new changelog changes version history updates', 'What changed in each version of the app'],
   ['theme', 'Switch between light and dark', 'theme dark light mode appearance night day', 'Turns the theme to light or dark'],
   ['sidebar', 'Show or hide the sidebar', 'sidebar toggle hide show', 'Ctrl+B'],
-  ['groups', 'Group sessions by folder or space', 'sidebar session list group by folder space project organize sort by date day', 'In the sidebar: a group for each space and each folder you work in, or every session by day'],
+  ['groups', 'Group sessions by folder or project', 'sidebar session list group by folder project space organize sort by date day', 'In the sidebar: a group for each project and each folder you work in, or every session by day'],
   ['panel', 'Show or hide the terminal panel', 'terminal panel toggle bottom', 'Ctrl+`'],
 ];
 

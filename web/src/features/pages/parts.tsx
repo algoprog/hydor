@@ -357,7 +357,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
           </label>
           {!!spaces?.length && (
             <div className="min-w-0 space-y-1.5 sm:w-[200px]">
-              <span className="block text-[12.5px] font-medium text-fg-2">In a space</span>
+              <span className="block text-[12.5px] font-medium text-fg-2">In a project</span>
               <SpaceSelect value={where} onChange={setWhere} className="w-full" />
             </div>
           )}

@@ -10,7 +10,7 @@
 
 - **已连接的应用**（[应用 → 已连接的应用](/apps/connected)）：来自市场的服务，连接一次就供所有智能体使用：Claude Code、Codex、Custom 和支持 ACP 的智能体，以及它们运行的应用。每个已连接的账户都会把它的工具提供给智能体。
 - **保险库**（同一页面的 **密钥** 标签页）：API 密钥、令牌和登录用的密码。API 密钥是服务给你的一种密码，让程序可以使用你的账户。智能体用它们调用服务、登录网站或运行程序，但永远看不到它们。
-- **MCP 服务器和插件**（[设置 → MCP 服务器](/settings?s=mcp) 和 [设置 → 插件](/settings?s=plugins)）：你自己在 Claude Code 和 Codex 的设置中配置的工具服务器，以及 Claude Code 的扩展组件。
+- **MCP 服务器和插件**（[设置 → MCP 服务器](/settings?s=mcp) 和 [设置 → 插件](/settings?s=plugins)）：你自己在 Claude Code 和 Codex 的设置中配置的工具服务器，以及为每个智能体带来技能和工具的插件（参见[插件](/guide/plugins)）。
 
 MCP（Model Context Protocol，模型上下文协议）是服务向智能体提供工具的通用方式。一个已连接的账户就是一个 MCP 服务器，由 Naget Agent 为每个智能体配置好并登录。“设置 → 智能体”中的 MCP 服务器则是你用一条命令或一个地址手动配置的。
 
@@ -306,18 +306,18 @@ Claude Code 或 Codex 旁边的[检查连接](/settings?s=mcp&find=Check%20conne
 
 ## 为 Claude Code 添加插件
 
-打开 [设置 → 智能体 → 插件](/settings?s=plugins)。插件是 Claude Code 的扩展组件，打包了技能、命令、智能体、钩子和 MCP 服务器。它们来自市场：也就是插件目录，保存在 GitHub 仓库、其他 git 仓库或某个文件夹中。它们只适用于 Claude Code；要让每个智能体都能用上的专门知识，见[技能](/guide/skills)。
+Claude Code 有它自己的插件：打包了技能、命令、智能体、钩子和 MCP 服务器的扩展组件，来自市场（也就是插件目录，保存在 GitHub 仓库、其他 git 仓库或某个文件夹中）。它们只适用于 Claude Code。它们在[设置 → 智能体 → 插件](/settings?s=plugins&find=Claude%20Code)的 **Claude Code** 标签页上；Codex 自己的插件在它的 **Codex** 标签页上。适用于所有智能体的插件在**所有智能体**标签页上：参见[插件](/guide/plugins)。
 
 ### 已安装的插件
 
-[已安装](/settings?s=plugins&find=Installed) 列出这台机器上的 Claude Code 插件。新会话会加载它们。每个插件显示它的名称、所属市场、版本和用途。
+**已安装** 列出这台机器上 Claude Code 的插件。新的 Claude Code 会话会加载它们。每个插件显示它的名称、所属市场、版本和用途。
 
 - 开关可以关闭或开启插件，而不移除它。
 - 垃圾桶图标会在你确认后卸载它。新的 Claude Code 会话将不再加载它的技能、命令和服务器。
 
 ### 查找并安装插件
 
-[浏览](/settings?s=plugins&find=Browse) 列出你可以从你的市场中安装的所有插件，安装最多的排在前面，并显示每个插件的安装次数。**搜索插件** 可以缩小列表范围。它一次显示 40 个：**显示更多** 会再多显示 40 个。
+**浏览** 列出你可以从你的市场中安装的所有插件，安装最多的排在前面，并显示每个插件的安装次数。**搜索插件** 可以缩小列表范围。它一次显示 40 个：**显示更多** 会再多显示 40 个。
 
 点击 **安装** 并确认。插件会为每个 Claude Code 会话安装。插件可以添加在这台机器上运行命令的钩子和服务器，所以只安装你信任的插件。
 
@@ -325,7 +325,7 @@ Naget Agent 最多每 10 分钟向 Claude Code 获取一次插件列表，每次
 
 ### 插件市场
 
-[市场](/settings?s=plugins&find=Marketplaces) 列出 Claude Code 安装插件所用的目录。
+**市场** 列出 Claude Code 安装插件所用的目录。
 
 - 要添加一个，在列表下方的输入框中输入 GitHub 的 owner/repo、git URL 或文件夹，然后点击 **添加**。
 - 要移除一个，点击它的垃圾桶图标并确认。从它安装的插件也会被卸载。

@@ -79,7 +79,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   groups: {
     title: 'Sessions by project',
-    body: 'Sessions in the same space or folder gather under its name. Click the heading to fold the group; its pen starts a new session there.',
+    body: 'Sessions in the same project or folder gather under its name. Click the heading to fold the group; its pen starts a new session there.',
   },
   dictate: {
     title: 'Dictate',
@@ -115,15 +115,15 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   library: {
     title: 'Your Library',
-    body: 'Pages, slides, documents, pictures and videos agents made for you to keep, each space’s together, and the sites you published.',
+    body: 'Pages, slides, documents, pictures and videos agents made for you to keep, each project’s together, and the sites you published.',
   },
   apps: {
     title: 'Apps',
     body: 'Small tools that find things out and show them clearly. Open one here, or just ask for what it does in any chat.',
   },
   spaces: {
-    title: 'Spaces',
-    body: 'A space keeps a project together: its sessions, folder, documents, memory and the guidelines its agents follow.',
+    title: 'Projects',
+    body: 'A project keeps a project together: its sessions, folder, documents, memory and the guidelines its agents follow.',
   },
   knowledge: {
     title: 'Shared knowledge',
@@ -147,7 +147,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   guidelines: {
     title: 'Guidelines for every agent',
-    body: 'Write once how you like to work, and every agent here follows it. A space, or a single session, can have its own.',
+    body: 'Write once how you like to work, and every agent here follows it. A project, or a single session, can have its own.',
   },
   assistants: {
     title: 'Assistants',
@@ -158,7 +158,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
     body: 'Connect Gmail, GitHub, Notion and more once, and every agent can work with them. Keys go in a vault agents use without seeing.',
   },
   skills: {
-    title: 'The skill library',
-    body: 'Methods agents load when a task calls for them, and the ones they learned with your approval.',
+    title: 'Every skill in one place',
+    body: 'Methods agents load when a task calls for one: those that come with the app, yours, your plugins’ and the agents’ own. Switch any off, or write your own.',
   },
 };

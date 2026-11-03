@@ -553,7 +553,7 @@ function PageView({ id }: { id: string }) {
             </MenuItem>
             {!!spaces?.length && !data.page.app && (
               <MenuItem icon={<FolderInput size={14} />} hint={<span translate="no">{spaces.find((x) => x.id === data.page.space)?.name ?? ''}</span>} onClick={() => setMenu('space')}>
-                Move to a space
+                Move to a project
               </MenuItem>
             )}
             <MenuItem
@@ -581,7 +581,7 @@ function PageView({ id }: { id: string }) {
               patch(`/api/pages/${enc(id)}`, { space })
                 .then(() => {
                   const name = spaces?.find((x) => x.id === space)?.name;
-                  toast(name ? tr(`Moved to ${name}`) : 'Moved out of its space', 'ok');
+                  toast(name ? tr(`Moved to ${name}`) : 'Moved out of its project', 'ok');
                 })
                 .catch(toastError);
             }}

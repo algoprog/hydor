@@ -218,7 +218,7 @@ test('the translations: every topic but the API one, each with the English headi
 });
 
 test('finding sections by words: the one about it first', () => {
-  const hits = findByWords('make a new space for a project', 5);
+  const hits = findByWords('make a new project for my work', 5);
   assert.ok(hits.length, 'something found');
   assert.equal(hits[0].topic.id, 'spaces');
   assert.equal(findByWords('the and of', 5).length, 0);
@@ -487,7 +487,7 @@ test('a question asked on Help: its agent answers it from the guide, knowing the
   const add = await guide.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { help: 'spaces' } }, {} as Deps);
   assert.equal(add?.instructions?.length, 2);
   assert.equal(add!.instructions![0], GUIDE_INSTRUCTIONS);
-  assert.match(add!.instructions![1], /Help page, while reading the guide's topic "Spaces and knowledge"/);
+  assert.match(add!.instructions![1], /Help page, while reading the guide's topic "Projects and knowledge"/);
   assert.match(helpInstructions(true)!, /from the guide \(app_guide\)/);
   assert.doesNotMatch(helpInstructions('no-such-topic')!, /while reading/);
   assert.equal(helpInstructions(undefined), null);
@@ -539,20 +539,20 @@ const d = {
   broadcast: () => {},
 } as unknown as Deps;
 
-test('guidelines: every session’s, the space’s, the session’s own, the most general first', () => {
+test('guidelines: every session’s, the project’s, the session’s own, the most general first', () => {
   assert.equal(guidelinesBlock(db, {}), '');
   const sp = createSpace(db, { name: 'Thesis', instructions: 'Cite in APA style.' });
   putGuidelines(d, { global: '  Answer in plain English.  ' });
   setSessionExtra(db, 'claude:k1', { space: sp.id, guidelines: 'Only Python 3.12.' });
   const block = guidelinesBlock(db, sessionExtra(db, 'claude:k1'));
   assert.match(block, /^# Agent Guidelines\n/);
-  assert.match(block, /## For every session\nAnswer in plain English\.\n\n## For the space “Thesis”\nCite in APA style\.\n\n## For this session\nOnly Python 3\.12\.$/);
+  assert.match(block, /## For every session\nAnswer in plain English\.\n\n## For the project “Thesis”\nCite in APA style\.\n\n## For this session\nOnly Python 3\.12\.$/);
   const v = guidelinesView(db, { key: 'claude:k1' });
   assert.deepEqual(v, { global: 'Answer in plain English.', space: { id: sp.id, name: 'Thesis', text: 'Cite in APA style.' }, session: { key: 'claude:k1', text: 'Only Python 3.12.' } });
   putGuidelines(d, { space: { id: sp.id, text: 'Cite in MLA style.' }, session: { key: 'claude:k1', text: '' } });
   assert.equal(guidelinesView(db, { key: 'claude:k1' }).space?.text, 'Cite in MLA style.');
   assert.equal(sessionExtra(db, 'claude:k1').guidelines, undefined, 'an emptied level goes');
-  assert.throws(() => putGuidelines(d, { space: { id: 'spnone', text: 'x' } }), /No such space/);
+  assert.throws(() => putGuidelines(d, { space: { id: 'spnone', text: 'x' } }), /No such project/);
 });
 
 test('guidelines: every agent gets them when it starts; a change starts an idle Claude Code or Codex afresh before the next message', async () => {

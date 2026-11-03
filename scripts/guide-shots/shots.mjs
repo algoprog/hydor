@@ -123,7 +123,7 @@ export const SHOTS = [
     },
   },
   {
-    // The Library: its places beside the cards, each space's things under its name, then those in no space.
+    // The Library: its places beside the cards, each project's things under its name, then those in no project.
     id: 'library',
     height: 900,
     async take(p, ctx) {
@@ -182,7 +182,8 @@ export const SHOTS = [
   // The switches and the first notes fit in one picture.
   settingsShot('memory', 'memory', { height: 900 }),
   settingsShot('tasks', 'tasks', { until: cardWith('Water the greenhouse reminder') }),
-  settingsShot('skills', 'skillpack'),
+  settingsShot('skills', 'skills'),
+  settingsShot('plugins', 'plugins'),
   {
     // Apps → Connected apps: the services connected for every agent, the marketplace and the keys, as tabs.
     id: 'connections',

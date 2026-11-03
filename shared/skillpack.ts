@@ -4,7 +4,24 @@
 // tool, a SKILL.md read by Codex or another agent).
 import type { ToolInfo } from './types.ts';
 
-export type SkillSource = 'bundled' | 'learned';
+/** Where a skill of the library comes from: the app, the user (approved or written), or an enabled plugin. */
+export type SkillSource = 'bundled' | 'learned' | 'plugin';
+
+/** The groups skills are shown in, by the `category` in their frontmatter. */
+export const SKILL_CATEGORIES = {
+  work: 'Ways of working',
+  writing: 'Writing',
+  documents: 'Documents',
+  research: 'Research and the web',
+  planning: 'Planning and decisions',
+  data: 'Data and numbers',
+  creative: 'Design and pictures',
+  coding: 'Coding',
+  ai: 'AI models',
+  app: 'This app',
+} as const;
+export type SkillCategory = keyof typeof SKILL_CATEGORIES;
+export const isSkillCategory = (v: unknown): v is SkillCategory => typeof v === 'string' && v in SKILL_CATEGORIES;
 
 export interface LibrarySkill {
   name: string;
@@ -12,7 +29,13 @@ export interface LibrarySkill {
   description: string;
   /** Words and phrases that load it into Custom's turn by themselves. */
   triggers: string[];
+  /** Its group (SKILL_CATEGORIES), as its frontmatter says. */
+  category?: string;
   source: SkillSource;
+  /** A plugin's skill: which plugin. */
+  plugin?: { name: string; title: string };
+  /** The user turned it off: agents do not get it. */
+  off?: boolean;
   /** A learned skill that takes the place of a built-in one of the same name. */
   overrides?: boolean;
   /** Its SKILL.md. */
@@ -53,6 +76,10 @@ export interface SkillDoc {
   source: SkillSource | 'space';
   /** For a space's own skill: which space. */
   space?: { id: string; name: string };
+  /** For a plugin's skill: which plugin. */
+  plugin?: { name: string; title: string };
+  /** The user turned it off. */
+  off?: boolean;
   file: string;
   history: SkillChange[];
 }
@@ -115,6 +142,13 @@ export interface SkillChange {
   removed: number;
 }
 
+/** A space's own skills, as the skills page lists them (each space's page manages them). */
+export interface SpaceSkillGroup {
+  id: string;
+  name: string;
+  skills: { name: string; description: string }[];
+}
+
 export interface SkillLibrary {
   skills: LibrarySkill[];
   pending: SkillProposal[];
@@ -123,6 +157,8 @@ export interface SkillLibrary {
   /** Keyword triggers load skills into Custom's turns. */
   triggers: boolean;
   folders: { bundled: string; learned: string; view: string };
+  /** The spaces with skills of their own. */
+  spaces: SpaceSkillGroup[];
 }
 
 /** Skill and folder names: lowercase letters, digits and dashes. */
@@ -165,6 +201,8 @@ export function skillLoaded(t: Pick<ToolInfo, 'name' | 'title' | 'input'>): stri
 export interface Frontmatter {
   name?: string;
   description?: string;
+  /** Its group on the skills page (SKILL_CATEGORIES). */
+  category?: string;
   triggers: string[];
   /** Everything after the frontmatter. */
   body: string;
@@ -223,7 +261,22 @@ export function parseSkill(text: string): Frontmatter {
   return {
     name: raw.name ? unquote(raw.name) : undefined,
     description: raw.description ? unquote(raw.description) : undefined,
+    category: raw.category ? unquote(raw.category).trim().toLowerCase() || undefined : undefined,
     triggers: triggers.map((t) => t.trim()).filter(Boolean),
     body: text.slice(m[0].length),
   };
+}
+
+/** A list item as YAML: plain when it can be, quoted otherwise. */
+const yamlItem = (s: string) => (/^[\p{L}\p{N}][\p{L}\p{N} '’*.-]*$/u.test(s) && !/^(yes|no|true|false|null|on|off)$/i.test(s) ? s : JSON.stringify(s));
+/** A line of text as YAML: plain when every reader takes it as it is, quoted otherwise. */
+const yamlText = (s: string) => (/^[\p{L}\p{N}(]/u.test(s) && !/: |\s#|:$|["\\]/.test(s) ? s : JSON.stringify(s));
+
+/** A whole SKILL.md from its parts. */
+export function composeSkill(p: { name: string; description: string; category?: string; triggers?: string[]; body: string }): string {
+  const head = ['---', `name: ${p.name}`, `description: ${yamlText(p.description.replace(/\s+/g, ' ').trim())}`];
+  if (p.category) head.push(`category: ${p.category}`);
+  if (p.triggers?.length) head.push(`triggers: [${p.triggers.map(yamlItem).join(', ')}]`);
+  head.push('---', '');
+  return `${head.join('\n')}\n${p.body.replace(/^\s*\n/, '').trimEnd()}\n`;
 }

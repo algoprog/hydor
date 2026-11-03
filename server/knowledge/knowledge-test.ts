@@ -183,7 +183,7 @@ test('spaces: a space’s own base is searched by its sessions alone, the shared
   assert.match(await search(inThesis, 'sick leave doctor'), /leave\.md, Leave policy › Sick leave · Handbook/);
   assert.match(await search('claude:k', 'dairy farmers cohort'), /^Nothing in the knowledge bases matches/);
   // What agents are told: in the space, whose each base is; elsewhere, the shared ones alone.
-  assert.match(knowledgeInstructions(db, thesis.id) ?? '', /Handbook \(3 documents, shared\), Papers \(1 document, this space’s own\)\./);
+  assert.match(knowledgeInstructions(db, thesis.id) ?? '', /Handbook \(3 documents, shared\), Papers \(1 document, this project’s own\)\./);
   assert.doesNotMatch(knowledgeInstructions(db) ?? '', /Papers/);
   // Another session cannot read the space's documents, by passage or by path.
   const ref = /kb:\d+/.exec(await search(inThesis, 'dairy farmers cohort'))![0];
@@ -200,7 +200,7 @@ test('spaces: a space’s own base is searched by its sessions alone, the shared
   const group = createSpace(db, { name: 'Research', members: [thesis.id] });
   setSessionExtra(db, 'claude:group1', { space: group.id });
   assert.match(await search('claude:group1', 'dairy farmers cohort'), /notes\.md, Notes · Papers/);
-  assert.match(knowledgeInstructions(db, group.id) ?? '', /Papers \(1 document, from the Thesis space\)/);
+  assert.match(knowledgeInstructions(db, group.id) ?? '', /Papers \(1 document, from the Thesis project\)/);
   deleteSpace(db, group.id);
   // Deleting the space keeps its base, shared now.
   deleteSpace(db, thesis.id);

@@ -15,7 +15,8 @@ import { StartingSession } from '../session/StartingSession';
 import { isStartingKey } from '../../lib/starting';
 import { isSettingsSection, SettingsPage } from '../settings/SettingsPage';
 import { go } from '../../lib/nav';
-import { SystemPage } from '../system/SystemPage';
+import { MonitorPage } from '../system/SystemPage';
+import { SystemOverview } from '../system/SystemOverview';
 import { TerminalPage, TerminalPanel } from '../terminal/TerminalPanel';
 import { UsagePage } from '../usage/UsagePage';
 import { Sidebar } from './Sidebar';
@@ -98,13 +99,14 @@ function Page() {
   if (loc === '/preview') return <PreviewPage />;
   if (loc === '/git') return <GitPage selected={new URLSearchParams(search).get('path')} />;
   if (loc === '/usage' || loc === '/stats' || loc === '/arena') return <UsagePage tab={loc === '/stats' ? 'activity' : loc === '/arena' ? 'arena' : 'limits'} />;
-  if (loc === '/system') return <SystemPage />;
+  if (loc === '/system') return <SystemOverview />;
+  if (loc === '/system/monitor') return <MonitorPage />;
   if (loc === '/settings') {
     const q = new URLSearchParams(search);
     // Connections are the Apps page's Connected apps now: an old link (and a sign-in coming back) goes there.
     if (q.get('s') === 'connections') return <ToConnected q={q} />;
-    // Instructions (CLAUDE.md and AGENTS.md) are part of Agent Guidelines now.
-    const s = q.get('s') === 'instructions' ? 'guidelines' : q.get('s');
+    // Instructions (CLAUDE.md and AGENTS.md) are part of Agent Guidelines now, and the Skill library part of Skills.
+    const s = q.get('s') === 'instructions' ? 'guidelines' : q.get('s') === 'skillpack' ? 'skills' : q.get('s');
     const agent = q.get('agent');
     return <SettingsPage section={isSettingsSection(s) ? s : null} cwd={q.get('cwd')} agent={agent === 'claude' || agent === 'codex' ? agent : null} />;
   }

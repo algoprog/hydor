@@ -12,7 +12,7 @@ import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { RefreshIcon } from '../../components/RefreshIcon';
 import { cx, Empty, IconButton, Popover, SheetsOnPhone, Throbber, useIsMobile } from '../../components/ui';
-import { PageHeader } from '../layout/PageHeader';
+import { SystemHeader } from '../system/SystemHeader';
 import { AddRepo } from './AddRepo';
 import { repoUrl, useWidth } from './parts';
 import { RepoView } from './RepoView';
@@ -218,7 +218,7 @@ export function GitPage({ selected }: { selected: string | null }) {
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
-            <PageHeader title="Git" actions={actions} tip="git" />
+            <SystemHeader tab="git" actions={actions} />
             <div className="min-h-0 flex-1 overflow-y-auto">{list}</div>
           </div>
         )}
@@ -238,7 +238,19 @@ export function GitPage({ selected }: { selected: string | null }) {
   );
   return (
     <div ref={page} className="flex h-full min-h-0 flex-col">
-      <PageHeader title={title} actions={actions} tip="git" />
+      <SystemHeader
+        tab="git"
+        actions={
+          fold ? (
+            <>
+              {title}
+              {actions}
+            </>
+          ) : (
+            actions
+          )
+        }
+      />
       <div className="flex min-h-0 flex-1">
         {!fold && !!repos?.length && (
           <nav aria-label="Repositories" className="w-[248px] shrink-0 overflow-y-auto border-r border-line bg-bg-1">

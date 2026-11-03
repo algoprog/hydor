@@ -1,33 +1,57 @@
-# Files, Git, Terminal and Preview
+# System: files, Git, Terminal and Preview
 
-The tools around the agents: browse, find, open and edit the files on this computer, add them to spaces and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the web apps running here, before and after screenshots of an agent's changes to one, and a live view of the computer (System) are here too, so you can check and finish an agent's work without leaving the app.
+**System** in the sidebar is this computer: browse, find, open and edit its files, add them to projects and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the web apps running here, before and after screenshots of an agent's changes to one, and a live view of how the computer is doing (Monitor) are here too, so you can check and finish an agent's work without leaving the app.
 
-![Git: a repository’s changes beside one file’s diff, the commit box, and Sync](images/files-git.webp)
+![System → Git: a repository’s changes beside one file’s diff, the commit box, and Sync](images/files-git.webp)
+
+## Open System
+
+Click **System** in the sidebar's tools, or go to [System](/system). A row of tabs under its title takes you to each part, and each keeps its own address:
+
+- **Overview** ([open it](/system)): the computer at a glance, and what each tool holds now (see [The overview](#the-overview)).
+- **Files** ([open it](/files)): the files on this computer (see [Open the Files page](#open-the-files-page)).
+- **Git** ([open it](/git)): your repositories (see [See your repositories on the Git page](#see-your-repositories-on-the-git-page)).
+- **Terminal** ([open it](/terminal)): shells on this computer (see [Use the terminal](#use-the-terminal)).
+- **Preview** ([open it](/preview)): the web apps running here (see [Look at a dev server with Preview](#look-at-a-dev-server-with-preview)). It shows only on this machine's own pages, not while you look at another machine.
+- **Monitor** ([open it](/system/monitor)): how busy the computer is (see [Watch this computer in Monitor](#watch-this-computer-in-monitor)).
+
+On a phone the tabs scroll sideways under the title. A tab's own buttons (Git's **Add**, Preview's refresh) sit at the right of the title.
+
+## The overview
+
+**Overview** shows, at the top, the computer's name, its system and how long it has been up, with four meters: **Processor**, **Memory**, **Disk** (the main disk, with its free space) and **Graphics** (when it has NVIDIA graphics cards). A meter turns red as it nears full. Click them to open **Monitor**.
+
+Below, a card for each tool; its title, or **Open**, opens its tab:
+
+- **Files**: a box that searches file names and the words inside them (from your home folder), the files you opened lately, and **Home folder**, **Recent files** and **Trash**.
+- **Git**: your repositories, those with changes or commits to send first, each with its branch and how many files changed. Click one to open it on the Git tab.
+- **Terminal**: the shells running, and **New** for another.
+- **Preview**: the web apps running here, each with its port. Click one to look at it.
 
 ## Open the Files page
 
-Click **Files** in the sidebar's tools, or go to [Files](/files). On a computer the page has two parts:
+Click **System**, then **Files**, or go to [Files](/files). On a computer the page has two parts:
 
-- On the left, the **places**: the files you opened lately, your home folder, folders you pinned, your spaces' folders, the folders sessions worked in, and the trash (see [Places](/guide/files-git#places)).
+- On the left, the **places**: the files you opened lately, your home folder, folders you pinned, your projects' folders, the folders sessions worked in, and the trash (see [Places](/guide/files-git#places)).
 - On the right, the folder you are in, with what is in it (see [Browse a folder](/guide/files-git#browse-a-folder)). Files you open show there too, each in a tab: the first tab goes back to the folder.
 
-In a small window, the places fold into the page's title: it names the folder you are in, and a click on it lists the places.
+In a small window, the places fold into a button at the right of the title: it names the folder you are in, and a click on it lists the places.
 
-On a phone the folder fills the screen. Its name at the top opens the places, from the bottom of the screen; **‹** with the folder above's name, under the title, goes up a folder, and your phone's Back goes to the folder you were in before. A file opens on a page of its own, with **Back**.
+On a phone the folder fills the screen. Its name at the top right opens the places, from the bottom of the screen; **‹** with the folder above's name, under the title, goes up a folder, and your phone's Back goes to the folder you were in before. A file opens on a page of its own, with **Back**.
 
 Other ways in:
 
 - Click the folder under a session's title, or use the session's menu (⋯) → **Folder and code** → **Browse the folder**: Files opens at that folder.
 - A file an agent changed or handed you, or a link to a file in its reply, opens in a window over the conversation, so you keep your place. **Open in Files** moves it to the Files page; ✕ or Esc closes it (if you changed it without saving, it asks "Discard your changes?" first).
-- A space's **Files** tab shows the space's own folders (see [Spaces and knowledge](/guide/spaces)).
+- A project's **Files** tab shows the project's own folders (see [Projects and knowledge](/guide/spaces)).
 
 ## Places
 
-- **Go to a folder**: find a folder by its name, or type its path (`~/code/shop`); the spaces and pinned folders come first. Tab, or the arrow at a row's end, lists the folders inside one.
+- **Go to a folder**: find a folder by its name, or type its path (`~/code/shop`); the projects and pinned folders come first. Tab, or the arrow at a row's end, lists the folders inside one.
 - **Recent files**: the files you opened lately in this browser, the last first, each with its folder. Those no longer there say so; **Clear those gone** takes them off the list.
 - **Home folder**: your own folder, where your files are. The folder new sessions start in shows below it when it isn't your home folder.
 - **Pinned**: folders you pinned, the same on every device. To pin one, use its menu or the folder's ⋯ → **Pin to Places**; to unpin it, point at it and click ✕, or use **Unpin from Places**.
-- **Spaces**: each space's own folder.
+- **Projects**: each project's own folder.
 - **Sessions worked in**: the folders sessions worked in lately.
 - **Trash**: what you deleted (see [Delete and put back](/guide/files-git#delete-and-put-back)).
 
@@ -73,7 +97,7 @@ Every row has a menu. Point at the row and click **More** (⋯) at its end, or r
 
 - **Open**.
 - **Start a session with it** (a file; see [Start a session with files](/guide/files-git#start-a-session-with-files)), or **New session in this folder** (a folder: the start page, with that folder picked).
-- **Add to a space** (see [Add files to a space](/guide/files-git#add-files-to-a-space)).
+- **Add to a project** (see [Add files to a project](/guide/files-git#add-files-to-a-project)).
 - **Pin to Places** or **Unpin from Places** (a folder).
 - **Rename** (F2), **Duplicate**, **Move to** and **Copy to**.
 - **Open a terminal here** (a folder): a new shell in that folder, in the bottom panel on a computer or on the Terminal page on a phone.
@@ -88,7 +112,7 @@ To act on several things at once, pick them:
 - On a computer, click the box at the start of a row (it shows when you point at the row), Ctrl+click (⌘+click on a Mac) to add one, Shift+click to pick everything from the last one picked, or press Ctrl+A for all.
 - On a phone, press and hold a row, then tap the others; or **More** → **Pick several**.
 
-The bar then says how many are picked, with **Start a session**, **Add to a space**, **Move to**, **Delete**, and **More** (⋯) for the rest of the menu: **Copy to**, **Copy paths**, **Download as .zip** and so on. ✕ (or Esc) unpicks them all.
+The bar then says how many are picked, with **Start a session**, **Add to a project**, **Move to**, **Delete**, and **More** (⋯) for the rest of the menu: **Copy to**, **Copy paths**, **Download as .zip** and so on. ✕ (or Esc) unpicks them all.
 
 ### Use the keyboard
 
@@ -118,7 +142,7 @@ A new file is empty and opens in the editor at once. If the name is taken, the a
 ### Rename or move
 
 - **Rename** turns the name into a field. Enter keeps the new name, Esc leaves it as it was.
-- **Move to** lists your spaces and pinned folders first, then the folders used lately, with a field to find any folder by name or type its path. Pick one, and the file or folder moves there. A message says where it went, with **Undo**.
+- **Move to** lists your projects and pinned folders first, then the folders used lately, with a field to find any folder by name or type its path. Pick one, and the file or folder moves there. A message says where it went, with **Undo**.
 - On a computer, drag rows onto a folder (in the list, a step of the path or among the places) to move them there; files picked together move together. Hold Alt (Option on a Mac) as you drop to copy instead.
 
 A folder can't go into itself, and moving replaces nothing: if the place already has something with that name, the move stops.
@@ -144,18 +168,18 @@ The trash is a folder in the app's data folder (for example `~/.naget-agent/tras
 
 A file downloads as itself. A folder, or several things picked together, download as one .zip file, made as it downloads. A .zip leaves out `.git` and `node_modules` folders, and holds up to 4 GB and 65,000 files.
 
-## Add files to a space
+## Add files to a project
 
-A space keeps a project's files in its folder, and can work with other folders of yours where they are (see [Spaces and knowledge](/guide/spaces)). To add to one:
+A project keeps a project's files in its folder, and can work with other folders of yours where they are (see [Projects and knowledge](/guide/spaces)). To add to one:
 
-1. Open the menu of a file or folder (or pick several), and click **Add to a space**.
-2. Pick the space, or **New space** to make one for them first.
+1. Open the menu of a file or folder (or pick several), and click **Add to a project**.
+2. Pick the project, or **New project** to make one for them first.
 
-A file is copied into the space's folder. A folder isn't copied: it joins the folders the space works with, where it is. A message says what was added, with **Show**, which opens the space's **Files** tab. Something already in the space stays as it is.
+A file is copied into the project's folder. A folder isn't copied: it joins the folders the project works with, where it is. A message says what was added, with **Show**, which opens the project's **Files** tab. Something already in the project stays as it is.
 
-**Add to a space** is also in a file's **More** (⋯) in the editor, in the window a file opens in over a session, on the cards of files an agent handed you, and on pictures an agent made.
+**Add to a project** is also in a file's **More** (⋯) in the editor, in the window a file opens in over a session, on the cards of files an agent handed you, and on pictures an agent made.
 
-Sessions you start in the space then find the files there: each is told what the space's folder holds and which other folders it works with.
+Sessions you start in the project then find the files there: each is told what the project's folder holds and which other folders it works with.
 
 ## Start a session with files
 
@@ -203,12 +227,12 @@ On a computer, the bar above the file shows its path and these buttons:
 - **Ask**: asks an agent to change the file, or about it ([below](#ask-an-agent-about-the-file)).
 - **Terminal in this folder**: a new shell in the file's folder.
 - **Download**.
-- **More** (⋯): **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**.
+- **More** (⋯): **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**.
 - **Save**.
 
 To find text in the file, press Ctrl+F (⌘F on a Mac) while the cursor is in it: a find bar opens at the top, with replace.
 
-On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
+On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
 
 ### Ask an agent about the file
 
@@ -242,7 +266,7 @@ These files open in the editors the [Library](/guide/library#documents) has for 
 - **Excel files** (.xlsx), **CSV** and **TSV** files open in the spreadsheet editor, with their sheets and working formulas.
 - **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, each in a tab, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document that reads it, on the chapter's own tab.
 
-Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Ask** ([ask an agent](#ask-an-agent-about-the-file)), **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
+Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Ask** ([ask an agent](#ask-an-agent-about-the-file)), **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
 
 What saving keeps of the file:
 
@@ -295,7 +319,7 @@ The search box (Ctrl+K, ⌘K on a Mac) finds files by name too, from the same fo
 One search finds files by their names and by the text inside them, everywhere under a folder. Type in a folder's **Find in** field and press Enter, or go to [Search in files](/search).
 
 1. Type what to look for in "Search names and the text inside files". Results come as you type.
-2. Under the field, **In** says where it searches: at first the folder you came from. Click it to search somewhere else: a space's folder, a pinned folder, one sessions worked in, your **Home folder**, or any folder you find by name or type the path of.
+2. Under the field, **In** says where it searches: at first the folder you came from. Click it to search somewhere else: a project's folder, a pinned folder, one sessions worked in, your **Home folder**, or any folder you find by name or type the path of.
 3. Narrow it down if you like:
    - **All kinds of files** picks the kind: **Text and notes**, **Code**, **Data and settings**, **Web pages** or **Notebooks**. Or type names like these in the same menu, separated by commas (`*.md, *.py`); a `!` in front leaves those out (`!dist/**`).
    - **Hidden files too** searches files and folders whose names start with a dot.
@@ -306,7 +330,7 @@ The results come in two parts:
 - **Files by that name**: up to 30 files whose names hold what you typed, each with its folder.
 - **Inside files**: the matching lines, grouped by file, each file with its number of matches. Click a line to open the file at that line, or a file's name to open it.
 
-Each result's **More** (⋯) has **Show in its folder**, **Start a session with it**, **Add to a space** and the rest of a file's menu.
+Each result's **More** (⋯) has **Show in its folder**, **Start a session with it**, **Add to a project** and the rest of a file's menu.
 
 The search is in the page's address, so Back and a reload keep it. It skips files the folder's `.gitignore` leaves out and files over 4 MB. It stops at 50 matches in a file and 1,000 in all, or after 15 seconds, and shows the first 30 matching lines of each file. PDF, Word and other documents are found by their names, not the text inside them; for agents to search inside them, add them to [knowledge](/guide/spaces#shared-knowledge-documents-every-session-can-search).
 
@@ -355,7 +379,7 @@ Ctrl+S (⌘S on a Mac) saves. As with other files, if the notebook changes on di
 
 ## See your repositories on the Git page
 
-Click **Git** in the sidebar, or go to [Git](/git). On the left it lists your git repositories, the most recently used first: those your sessions worked in (a session's folder, or a file a session edited; throwaway places such as `/tmp` are left out) and those you added yourself. Once there are more than six, a field at the top finds one by name.
+Click **System**, then **Git**, or go to [Git](/git). On the left it lists your git repositories, the most recently used first: those your sessions worked in (a session's folder, or a file a session edited; throwaway places such as `/tmp` are left out) and those you added yourself. Once there are more than six, a field at the top finds one by name.
 
 Each repository shows its name and branch, and small marks when there is something to do:
 
@@ -520,7 +544,7 @@ New files git doesn't track yet are shown when they are small text files. Binary
 
 ## Use the terminal
 
-Click **Terminal** in the sidebar, or go to [Terminal](/terminal): real shells on this computer. If none is open, one starts.
+Click **System**, then **Terminal**, or go to [Terminal](/terminal): real shells on this computer. If none is open, one starts.
 
 - Each terminal is a tab, named after its folder and the program running in it. **New terminal** (+) opens another, in the Files page's root folder.
 - Double-click a tab to rename it.
@@ -562,7 +586,7 @@ The Terminal page adds a row of keys phones lack: **Ctrl** and **Alt** (they app
 
 ## Look at a dev server with Preview
 
-When you or an agent run a web app's dev server here (`npm run dev`, a Python server), Preview shows it, on this computer or any other device that reaches the app. Click **Preview** in the sidebar, or go to [Preview](/preview).
+When you or an agent run a web app's dev server here (`npm run dev`, a Python server), Preview shows it, on this computer or any other device that reaches the app. Click **System**, then **Preview**, or go to [Preview](/preview).
 
 On the left, **Web apps** lists the servers on this computer that answer with a web page: each with its project's name (its package's, else its folder's), its port, the page's title, what serves it when the app can tell (Vite, Next.js, Python…) and its folder. **Other servers**, folded, lists the rest: APIs, databases and the like. **Another port** opens one that isn't listed. The list refreshes every 5 seconds; the refresh button reads it at once.
 
@@ -595,9 +619,9 @@ When an agent changes how a web app looks or works (a site or an app with a dev 
 
 You can also ask for a screenshot any time: "show me the settings page on a phone". The pictures are taken on this computer by a Chromium ([Settings → Capabilities → Browser](/settings?s=browser)) and kept with their session: they go when the session is deleted, and the oldest go first past 500 MB in all.
 
-## Watch this computer on the System page
+## Watch this computer in Monitor
 
-Click **System** in the sidebar, or go to [System](/system). Under the title: the computer's name, its processor, how many threads it has and how long it has been up, then the operating system.
+Click **System**, then **Monitor**, or go to [Monitor](/system/monitor). At the top: the computer's name, its processor, how many threads it has, how long it has been up, and its operating system.
 
 The tiles at the top show, with a small chart of the last two minutes:
 
@@ -623,7 +647,7 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 ## Ask an agent
 
 - "In the file I have open, add a comment over each function saying what it does."
-- "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 space."
+- "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 project."
 - "Which files in ~/code/shop mention the checkout, and what does each do with it?"
 - "Add a column to ~/Documents/people.csv with each person's share of the total."
 - "Open a pull request for this session's branch, with a title and description written from the commits."

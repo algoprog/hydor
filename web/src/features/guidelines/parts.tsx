@@ -109,12 +109,12 @@ export function GuidelinesSettings({ files }: { files: ReactNode }) {
           </>
         )}
       </Section>
-      <Section title="For a space" sub="Each space has guidelines of its own, which its sessions follow as well">
+      <Section title="For a project" sub="Each project has guidelines of its own, which its sessions follow as well">
         {!withText.length ? (
           <p className="text-[13px] leading-relaxed text-fg-3">
-            None of your spaces has guidelines yet. Open a space in{' '}
+            None of your projects has guidelines yet. Open a project in{' '}
             <button className="text-accent hover:underline" onClick={() => go('/spaces')}>
-              Spaces
+              Projects
             </button>{' '}
             to give it some.
           </p>
@@ -135,7 +135,7 @@ export function GuidelinesSettings({ files }: { files: ReactNode }) {
         )}
       </Section>
       <Section title="For one session" sub="On the start page: Options → Guidelines. In a session: its menu → Guidelines">
-        <p className="text-[13px] leading-relaxed text-fg-3">Where two levels disagree, the more specific one wins: a session’s over its space’s, a space’s over these. What you ask in the conversation comes first of all.</p>
+        <p className="text-[13px] leading-relaxed text-fg-3">Where two levels disagree, the more specific one wins: a session’s over its project’s, a project’s over these. What you ask in the conversation comes first of all.</p>
       </Section>
       <div className="rounded-2xl border border-line">
         <button onClick={() => setFilesOpen((o) => !o)} aria-expanded={filesOpen} className="flex w-full items-center gap-2.5 px-5 py-3.5 text-left">
@@ -216,7 +216,7 @@ export function GuidelinesDialog({
   ];
   const sub: Record<Level, string> = {
     session: start ? 'Only the session you are starting follows these.' : 'Only this session follows these. A change takes effect from your next message.',
-    space: `Every session in ${v?.space?.name ?? 'this space'} follows these.`,
+    space: `Every session in ${v?.space?.name ?? 'this project'} follows these.`,
     global: 'Every agent follows these, in every session.',
   };
   return (
@@ -269,7 +269,7 @@ export function GuidelinesStartOption({ value, onChange }: { value: SessionExtra
         on={!!own.trim()}
         open={open}
         onClick={() => setOpen(true)}
-        title="What the agent follows: your guidelines for every session and the space’s, and any for this session alone"
+        title="What the agent follows: your guidelines for every session and the project’s, and any for this session alone"
       />
       <GuidelinesDialog
         open={open}

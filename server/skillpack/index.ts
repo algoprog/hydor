@@ -19,12 +19,47 @@ import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { addNote, notesOf } from '../notes.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { spaceOfSession } from '../spaces/index.ts';
-import { folders, parseSkill, skillText, syncView, viewSkills, visibleSkills } from './library.ts';
-import { announce, decide, getProposal, history, libraryView, noteUse, pendingProposals, propose, removedSkills, removeSkill, restoreSkill } from './proposals.ts';
-import { spaceSkillDoc, spaceSkillText, spaceView } from './spaceSkills.ts';
+import { composeSkill, folders, isOff, librarySkills, parseSkill, setOffSkills, skillText, slug, syncView, viewSkills, visibleSkills } from './library.ts';
+import { announce, decide, getProposal, history, libraryView, noteUse, pendingProposals, propose, removedSkills, removeSkill, restoreSkill, saveOwnSkill } from './proposals.ts';
+import { spaceSkillDoc, spaceSkillsView, spaceSkillText, spaceView } from './spaceSkills.ts';
+import { allSpaces } from '../spaces/index.ts';
+import { isSkillCategory, type SpaceSkillGroup } from '../../shared/skillpack.ts';
 import { matchTriggers } from './triggers.ts';
 
 const triggersOn = (db: DB) => kvGet(db, 'skillpack.triggers') !== '0';
+
+/** The skills the user turned off, as kept. */
+function loadOff(db: DB) {
+  try {
+    const v = JSON.parse(kvGet(db, 'skillpack.off') ?? '[]');
+    setOffSkills(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
+  } catch {
+    setOffSkills([]);
+  }
+}
+
+/** The spaces with skills of their own, for the skills page. */
+function spaceGroups(db: DB): SpaceSkillGroup[] {
+  const out: SpaceSkillGroup[] = [];
+  for (const sp of allSpaces(db)) {
+    try {
+      const v = spaceSkillsView(db, sp.id);
+      if (v.skills.length) out.push({ id: sp.id, name: sp.name, skills: v.skills.map((x) => ({ name: x.name, description: x.description })) });
+    } catch {}
+  }
+  return out;
+}
+
+/** For agents that read skills by themselves (the other ACP agents): the library's skills, each with its file. */
+function skillIndex(): string | undefined {
+  const list = librarySkills().filter((s) => !isOff(s.dir));
+  if (!list.length) return undefined;
+  const lines = list.map((s) => `- ${s.name}: ${s.description.replace(/\s+/g, ' ').slice(0, 220)} (${path.join(viewSkills(), s.dir, 'SKILL.md')})`);
+  return [
+    'Skills: written methods for kinds of work. Before a task, look through this list; when one fits, read its SKILL.md with your file tools and follow it (its folder holds any files it mentions). Skip skills for greetings, quick questions and small, clear changes.',
+    ...lines,
+  ].join('\n');
+}
 
 const warnOnce = (() => {
   let said = false;
@@ -78,7 +113,7 @@ const REASON = { type: 'string', description: 'One or two sentences for the user
 const SPACE = {
   type: 'boolean',
   description:
-    'Only in a session in a space: true to keep it for that space alone (its sessions get it), for a method that belongs to that project rather than to every task of its kind. The user can still choose on the card. A change to a skill of the space’s own stays the space’s either way.',
+    'Only in a session in a project: true to keep it for that project alone (its sessions get it), for a method that belongs to that project rather than to every task of its kind. The user can still choose on the card. A change to a skill of the project’s own stays the project’s either way.',
 };
 const TRIGGERS = {
   type: 'array',
@@ -146,7 +181,7 @@ const SKILL_SAVE: RunTool = {
 const SKILL_PATCH: RunTool = {
   name: 'skill_patch',
   description: [
-    'Propose an improvement to a skill in the app’s skill library (a built-in one, or one the user approved) or to one of the skills of the space the session is in, for instance after following it and finding a step missing, wrong or unclear.',
+    'Propose an improvement to a skill in the app’s skill library (a built-in one, or one the user approved) or to one of the skills of the project the session is in, for instance after following it and finding a step missing, wrong or unclear.',
     'Give exact edits (find and replace on its current text), or a whole new body. The user approves first, in a card; their answer comes back to you as a message.',
     'A built-in skill changed this way is saved as the user’s own version, in its place.',
   ].join(' '),
@@ -264,7 +299,53 @@ export const skillpack: Feature = {
     const changed = () => d.broadcast({ t: 'feature', id: 'skillpack', data: { library: true } });
     app.get('/api/skillpack', async () => {
       freshView();
-      return { skills: libraryView(db), pending: pendingProposals(db), removed: removedSkills(db), triggers: triggersOn(db), folders: { ...folders(), view: viewSkills() } };
+      return { skills: libraryView(db), pending: pendingProposals(db), removed: removedSkills(db), triggers: triggersOn(db), folders: { ...folders(), view: viewSkills() }, spaces: spaceGroups(db) };
+    });
+    // A skill the user writes: name, when to use it, the instructions (or a whole SKILL.md as text).
+    app.post('/api/skillpack/skills', async (req) => {
+      const b = body(req);
+      const name = slug(String(b.name ?? ''));
+      if (!name) throw new HttpError(400, 'Give the skill a name');
+      const text =
+        typeof b.text === 'string'
+          ? b.text
+          : composeSkill({
+              name,
+              description: String(b.description ?? '').trim(),
+              category: isSkillCategory(b.category) ? b.category : undefined,
+              triggers: Array.isArray(b.triggers) ? b.triggers.map(String).filter(Boolean).slice(0, 12) : undefined,
+              body: String(b.body ?? '').trim() || `# ${String(b.name ?? name).trim()}\n\nWhen to use this skill, then the steps to follow.`,
+            });
+      saveOwnSkill(db, name, text, { create: true });
+      changed();
+      return { name };
+    });
+    // Its new text (the user's own skill), or the user's own version of a built-in one.
+    app.put('/api/skillpack/skills/:name', async (req) => {
+      const name = param(req, 'name');
+      const text = body(req).text;
+      if (typeof text !== 'string') throw new HttpError(400, 'No text came');
+      if (!skillText(name)) throw new HttpError(404, `No skill named ${name} in the library`);
+      saveOwnSkill(db, name, text);
+      changed();
+      return { ok: true };
+    });
+    // Turning a skill of the library off (agents stop getting it) and on again.
+    app.put('/api/skillpack/skills/:name/off', async (req) => {
+      const name = param(req, 'name');
+      if (!librarySkills().some((s) => s.dir === name)) throw new HttpError(404, `No skill named ${name} in the library`);
+      let cur: string[] = [];
+      try {
+        cur = JSON.parse(kvGet(db, 'skillpack.off') ?? '[]');
+      } catch {}
+      const next = new Set(cur.filter((x) => typeof x === 'string'));
+      if (body(req).off === true) next.add(name);
+      else next.delete(name);
+      kvSet(db, 'skillpack.off', JSON.stringify([...next].sort()));
+      loadOff(db);
+      freshView();
+      changed();
+      return { off: next.has(name) };
     });
     app.get('/api/skillpack/skills/:name', async (req) => {
       const name = param(req, 'name');
@@ -275,7 +356,7 @@ export const skillpack: Feature = {
       if (owner) return spaceSkillDoc(db, owner, name);
       const s = skillText(name);
       if (!s) throw new HttpError(404, `No skill named ${name} in the library`);
-      return { name, text: s.text, source: s.source, file: s.file, history: history(db, name) };
+      return { name, text: s.text, source: s.source, file: s.file, history: history(db, name), ...(s.plugin ? { plugin: s.plugin } : {}), ...(isOff(name) ? { off: true } : {}) };
     });
     app.post('/api/skillpack/skills/:name/remove', async (req) => {
       removeSkill(db, param(req, 'name'));
@@ -306,10 +387,15 @@ export const skillpack: Feature = {
     if (s.agent === 'claude') return (await claudeTakesPlugins()) ? { args: ['--plugin-dir', view] } : undefined;
     if (s.agent === 'codex') return { skillRoots: [path.join(view, 'skills')] };
     if (s.agent === 'acp' && s.acpAgent === CONSOLE_ID) return { env: { NAGET_SKILL_DIRS: path.join(view, 'skills') } };
+    // Other ACP agents (Gemini CLI, OpenCode…) have no skills of their own: the list, to read when one fits.
+    if (s.agent === 'acp') {
+      const index = skillIndex();
+      return index ? { instructions: [index] } : undefined;
+    }
     return undefined;
   },
   context: (s, d) => customContext(s, d),
-  // Skills agents proposed, waiting for the user's yes (Settings → Skill library, or the card in the session).
+  // Skills agents proposed, waiting for the user's yes (Settings → Skills, or the card in the session).
   inbox: (d) =>
     pendingProposals(d.db).map((p) => {
       const s = d.sessions.summary(p.key);
@@ -322,10 +408,11 @@ export const skillpack: Feature = {
         session: s?.title,
         agent: s?.agent,
         at: p.createdAt,
-        path: s ? `/s/${encodeURIComponent(p.key)}` : '/settings?s=skillpack',
+        path: s ? `/s/${encodeURIComponent(p.key)}` : '/settings?s=skills',
       };
     }),
   start(d) {
+    loadOff(d.db);
     freshView();
     // Every skill an agent loads, once per step, for the library's use counts.
     d.sessions.on('items', (key: string, items: TimelineItem[]) => {

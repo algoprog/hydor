@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "transcribe",
+  "version": "1.0.0",
+  "description": "Speech to text on this computer with Whisper (faster-whisper): recordings, voice notes, videos and podcasts become text and subtitles, in about 100 languages, without sending the audio anywhere.",
+  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "license": "MIT",
+  "keywords": ["transcription", "speech to text", "whisper", "subtitles", "audio"],
+  "extensions": {
+    "com.naget.agent": {
+      "title": "Speech to text",
+      "category": "creative",
+      "icon": "mic",
+      "requires": {
+        "plugins": { "media-tools": "^1.0.0" },
+        "python": ">=3.10",
+        "pip": ["faster-whisper>=1.1,<2"]
+      }
+    }
+  }
+}

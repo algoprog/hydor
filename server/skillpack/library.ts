@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseSkill, SKILL_NAME, type SkillSource } from '../../shared/skillpack.ts';
+import { composeSkill, parseSkill, SKILL_NAME, type SkillSource } from '../../shared/skillpack.ts';
 import { APP_ROOT, config } from '../config.ts';
 
 export interface Folders {
@@ -38,20 +38,7 @@ export const spaceViewRoot = (id: string) => path.join(path.dirname(roots.view),
 
 // ---- SKILL.md ------------------------------------------------------------------------------------
 
-export { parseSkill };
-
-/** A list item as YAML: plain when it can be, quoted otherwise. */
-const yamlItem = (s: string) => (/^[\p{L}\p{N}][\p{L}\p{N} '’*.-]*$/u.test(s) && !/^(yes|no|true|false|null|on|off)$/i.test(s) ? s : JSON.stringify(s));
-/** A line of text as YAML: plain when every reader takes it as it is, quoted otherwise. */
-const yamlText = (s: string) => (/^[\p{L}\p{N}(]/u.test(s) && !/: |\s#|:$|["\\]/.test(s) ? s : JSON.stringify(s));
-
-/** A whole SKILL.md from its parts. */
-export function composeSkill(p: { name: string; description: string; triggers?: string[]; body: string }): string {
-  const head = ['---', `name: ${p.name}`, `description: ${yamlText(p.description.replace(/\s+/g, ' ').trim())}`];
-  if (p.triggers?.length) head.push(`triggers: [${p.triggers.map(yamlItem).join(', ')}]`);
-  head.push('---', '');
-  return `${head.join('\n')}\n${p.body.replace(/^\s*\n/, '').trimEnd()}\n`;
-}
+export { composeSkill, parseSkill };
 
 /** Longest SKILL.md the library takes: longer guides belong in reference files. */
 export const MAX_SKILL = 20_000;
@@ -82,11 +69,44 @@ export interface FolderSkill {
   name: string;
   description: string;
   triggers: string[];
+  category?: string;
   file: string;
   /** own: the user's or the project's own folders; space: a space's own skills. */
   source: SkillSource | 'own' | 'space';
   mtime: number;
+  /** A plugin's skill: which plugin, and its name as people see it. */
+  plugin?: string;
+  pluginTitle?: string;
 }
+
+/** A skill an enabled plugin brings (server/plugins): its folder as agents read it, placeholders filled in. */
+export interface PluginSkill {
+  dir: string;
+  name: string;
+  description: string;
+  triggers: string[];
+  category?: string;
+  /** The folder agents get (with its SKILL.md), and that SKILL.md. */
+  folder: string;
+  file: string;
+  plugin: string;
+  /** The plugin's name as people see it. */
+  pluginTitle: string;
+  mtime: number;
+}
+
+let pluginSkills: () => PluginSkill[] = () => [];
+/** Where the library finds the skills of enabled plugins (set by server/plugins). */
+export const setPluginSkills = (fn: () => PluginSkill[]) => {
+  pluginSkills = fn;
+};
+
+/** Skills the user turned off: agents do not get them (kept in skillpack.off). */
+let off = new Set<string>();
+export const setOffSkills = (names: Iterable<string>) => {
+  off = new Set(names);
+};
+export const isOff = (name: string) => off.has(name);
 
 /** The skills in one folder of skills. */
 export function folderSkills(root: string, source: FolderSkill['source']): FolderSkill[] {
@@ -103,7 +123,7 @@ export function folderSkills(root: string, source: FolderSkill['source']): Folde
     try {
       const st = fs.statSync(file);
       const fm = parseSkill(fs.readFileSync(file, 'utf8').slice(0, 64 * 1024));
-      out.push({ dir: n, name: fm.name || n, description: fm.description ?? '', triggers: fm.triggers, file, source, mtime: st.mtimeMs });
+      out.push({ dir: n, name: fm.name || n, description: fm.description ?? '', triggers: fm.triggers, category: fm.category, file, source, mtime: st.mtimeMs });
     } catch {}
   }
   return out;
@@ -118,7 +138,7 @@ export function visibleSkills(cwd: string, view?: string): FolderSkill[] {
   const own = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
   const seen = new Set<string>();
   const out: FolderSkill[] = [];
-  const lib = view ? folderSkills(view, 'space') : librarySkills().map((s) => ({ ...s, file: path.join(viewSkills(), s.dir, 'SKILL.md') }));
+  const lib = view ? folderSkills(view, 'space') : librarySkills().filter((s) => !off.has(s.dir)).map((s) => ({ ...s, file: path.join(viewSkills(), s.dir, 'SKILL.md') }));
   for (const s of [...own.flatMap((d) => folderSkills(d, 'own')), ...lib]) {
     if (seen.has(s.name)) continue;
     seen.add(s.name);
@@ -127,13 +147,24 @@ export function visibleSkills(cwd: string, view?: string): FolderSkill[] {
   return out;
 }
 
-/** Every skill of the library, a learned one in place of a built-in one of the same name. */
+/**
+ * Every skill of the library, a learned one in place of a built-in one of the same name, then those of
+ * enabled plugins whose names are free.
+ */
 export function librarySkills(): (FolderSkill & { source: SkillSource; overrides?: boolean })[] {
   const bundled = folderSkills(roots.bundled, 'bundled') as (FolderSkill & { source: SkillSource })[];
   const learned = folderSkills(roots.learned, 'learned') as (FolderSkill & { source: SkillSource })[];
   const mine = new Set(learned.map((s) => s.dir));
   const built = new Set(bundled.map((s) => s.dir));
-  return [...learned.map((s) => ({ ...s, overrides: built.has(s.dir) || undefined })), ...bundled.filter((s) => !mine.has(s.dir))].sort((a, b) => a.name.localeCompare(b.name));
+  const plugins = pluginSkills()
+    .filter((s) => !mine.has(s.dir) && !built.has(s.dir))
+    .map((s): FolderSkill & { source: SkillSource } => ({ dir: s.dir, name: s.name, description: s.description, triggers: s.triggers, category: s.category, file: s.file, source: 'plugin', mtime: s.mtime, plugin: s.plugin, pluginTitle: s.pluginTitle }));
+  return [...learned.map((s) => ({ ...s, overrides: built.has(s.dir) || undefined })), ...bundled.filter((s) => !mine.has(s.dir)), ...plugins].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The names the library's own skills take (built in and learned): a plugin's skill of one of these is left out. */
+export function libraryNames(): Set<string> {
+  return new Set([...folderSkills(roots.bundled, 'bundled'), ...folderSkills(roots.learned, 'learned')].map((s) => s.dir));
 }
 
 export const bundledFile = (name: string) => path.join(roots.bundled, name, 'SKILL.md');
@@ -146,27 +177,33 @@ const readOr = (f: string): string | null => {
   }
 };
 
-/** A skill's text as agents get it now (the learned version first), and where it comes from. */
-export function skillText(name: string): { text: string; source: SkillSource; file: string } | null {
+/** A skill's text as agents get it now (the learned version first, then the built-in one, then a plugin's), and where it comes from. */
+export function skillText(name: string): { text: string; source: SkillSource; file: string; plugin?: { name: string; title: string } } | null {
   if (!SKILL_NAME.test(name)) return null;
   const mine = readOr(learnedFile(name));
   if (mine !== null) return { text: mine, source: 'learned', file: learnedFile(name) };
   const built = readOr(bundledFile(name));
-  return built !== null ? { text: built, source: 'bundled', file: bundledFile(name) } : null;
+  if (built !== null) return { text: built, source: 'bundled', file: bundledFile(name) };
+  const p = pluginSkills().find((s) => s.dir === name);
+  const text = p ? readOr(p.file) : null;
+  return p && text !== null ? { text, source: 'plugin', file: p.file, plugin: { name: p.plugin, title: p.pluginTitle } } : null;
 }
 
 export const isBundled = (name: string) => fs.existsSync(bundledFile(name));
 
 /**
- * Saves a learned skill's SKILL.md. A built-in skill changed for the first time starts as a copy of its
- * folder (its reference files and scripts come along). Written through a temporary file.
+ * Saves a learned skill's SKILL.md. A built-in or a plugin's skill changed for the first time starts as a copy
+ * of its folder (its reference files and scripts come along). Written through a temporary file.
  */
 export function writeLearned(name: string, text: string) {
   if (!SKILL_NAME.test(name)) throw new Error(`Not a skill name: ${name}`);
   const dir = path.join(roots.learned, name);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(roots.learned, { recursive: true });
+    // Your version of a built-in or a plugin's skill starts as a copy of its folder, its files included.
+    const plugin = pluginSkills().find((s) => s.dir === name);
     if (fs.existsSync(path.join(roots.bundled, name))) fs.cpSync(path.join(roots.bundled, name), dir, { recursive: true });
+    else if (plugin && fs.existsSync(plugin.folder)) fs.cpSync(plugin.folder, dir, { recursive: true, dereference: true });
     else fs.mkdirSync(dir);
   }
   const file = path.join(dir, 'SKILL.md');
@@ -183,11 +220,16 @@ export function removeLearned(name: string) {
   syncView();
 }
 
-/** The library's skills by folder name, each linked to its learned folder or else its built-in one. */
+/**
+ * The library's skills by folder name, each linked to its learned folder or else its built-in one, then
+ * the enabled plugins' skills whose names are free; none the user turned off.
+ */
 function libraryLinks(): Map<string, string> {
   const want = new Map<string, string>();
   for (const s of folderSkills(roots.bundled, 'bundled')) want.set(s.dir, path.join(roots.bundled, s.dir));
   for (const s of folderSkills(roots.learned, 'learned')) want.set(s.dir, path.join(roots.learned, s.dir));
+  for (const s of pluginSkills()) if (!want.has(s.dir)) want.set(s.dir, s.folder);
+  for (const n of off) want.delete(n);
   return want;
 }
 
@@ -236,8 +278,8 @@ export function syncView() {
  */
 export function syncSpaceView(id: string, extra: string[]): string {
   const want = libraryLinks();
-  for (const dir of [...extra].reverse()) for (const s of folderSkills(dir, 'space')) want.set(s.dir, path.join(dir, s.dir));
+  for (const dir of [...extra].reverse()) for (const s of folderSkills(dir, 'space')) if (!off.has(s.dir) || !want.has(s.dir)) want.set(s.dir, path.join(dir, s.dir));
   const root = spaceViewRoot(id);
-  syncLinks(root, want, 'Skills that come with Naget Agent, the ones you approved in it, and those of a space of yours.');
+  syncLinks(root, want, 'Skills that come with Naget Agent, the ones you approved in it, and those of a project of yours.');
   return root;
 }

@@ -1,6 +1,7 @@
 ---
 name: clarify-first
 description: Use when a request is big or open-ended and a wrong guess would waste real work, in any field (an app or website, a trip or event, a talk, a renovation, a business plan, a long document). Not for small, clear requests.
+category: work
 triggers: [plan a trip, plan my trip, itinerary, help me plan, build me, from scratch, renovat*, business plan, wedding, give a talk, new website, new app]
 ---
 

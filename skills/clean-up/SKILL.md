@@ -1,6 +1,7 @@
 ---
 name: clean-up
 description: Use when a task is done, before the final reply, to remove what was made along the way and is no longer needed (scratch files, test data, temporary folders, git branches, worktrees and stashes, processes and containers started for the work), and whenever asked to clean or tidy up after work.
+category: work
 triggers: [clean up after, tidy up after, clean up afterwards, leftover files, temporary files, temp files, stale branches, unused branches]
 ---
 

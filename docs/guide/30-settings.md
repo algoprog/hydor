@@ -95,10 +95,10 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Agent Guidelines
 
-[Settings → Agent Guidelines](/settings?s=guidelines): what every agent follows: in every session, in a space, or in one session. More in [Agent Guidelines](/guide/guidelines).
+[Settings → Agent Guidelines](/settings?s=guidelines): what every agent follows: in every session, in a project, or in one session. More in [Agent Guidelines](/guide/guidelines).
 
 - [**For every session**](/settings?s=guidelines&find=For%20every%20session): What every agent follows, in every session.
-- [**For a space**](/settings?s=guidelines&find=For%20a%20space): Guidelines the sessions in a space follow.
+- [**For a project**](/settings?s=guidelines&find=For%20a%20project): Guidelines the sessions in a project follow.
 - [**For one session**](/settings?s=guidelines&find=For%20one%20session): Guidelines for one session, from the start page or the session’s menu.
 - [**Files Claude Code and Codex read too**](/settings?s=guidelines&find=Files%20Claude%20Code%20and%20Codex%20read%20too): CLAUDE.md and AGENTS.md, which Claude Code and Codex read on their own.
 
@@ -111,17 +111,28 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Skills
 
-[Settings → Skills](/settings?s=skills): know-how the agents load when a task calls for it. More in [Skills](/guide/skills).
+[Settings → Skills](/settings?s=skills): written methods agents load when a task calls for one: built in, yours, from plugins and the agents’ own. More in [Skills](/guide/skills).
 
-- [**New skill**](/settings?s=skills&find=New%20skill): Write a skill for Claude Code or Codex.
+- [**New skill**](/settings?s=skills&find=New%20skill): Write a skill for every agent, or for Claude Code or Codex alone.
+- [**Built in**](/settings?s=skills&find=Built%20in): The skills that come with the app.
+- [**Yours**](/settings?s=skills&find=Yours): Skills you wrote, or approved when an agent suggested them.
+- [**From plugins**](/settings?s=skills&find=From%20plugins): Skills your plugins bring.
+- [**Claude Code and Codex**](/settings?s=skills&find=Claude%20Code%20and%20Codex): The agents’ own skills, which only they get.
+- [**Bring skills in by keywords**](/settings?s=skills&find=Bring%20skills%20in%20by%20keywords): Keywords in a message load skills by themselves.
+- [**Make my own version**](/settings?s=skills&find=Make%20my%20own%20version): Change a built-in skill: your version takes its place.
 
 ### Plugins
 
-[Settings → Plugins](/settings?s=plugins): Claude Code add-ons that bundle skills, commands, agents and MCP servers. More in [Connected apps, keys and tools](/guide/connections).
+[Settings → Plugins](/settings?s=plugins): add-ons that bring skills, tools and instructions to every agent. More in [Connected apps, keys and tools](/guide/connections).
 
-- [**Installed**](/settings?s=plugins&find=Installed): The plugins Claude Code has.
-- [**Browse**](/settings?s=plugins&find=Browse): Find plugins to install.
-- [**Marketplaces**](/settings?s=plugins&find=Marketplaces): Where plugins come from.
+- [**Your plugins**](/settings?s=plugins&find=Your%20plugins): The plugins you added, on or off for every agent.
+- [**Come with the app**](/settings?s=plugins&find=Come%20with%20the%20app): Plugins that come with the app, ready to add.
+- [**Make a plugin**](/settings?s=plugins&find=Make%20a%20plugin): Bundle skills, tools, instructions and files of your own as a plugin.
+- [**From a link**](/settings?s=plugins&find=From%20a%20link): Add a plugin from GitHub or another Git address.
+- [**From a .zip file**](/settings?s=plugins&find=From%20a%20.zip%20file): Add a plugin someone packed into a .zip.
+- [**Pack into a .zip**](/settings?s=plugins&find=Pack%20into%20a%20.zip): A plugin as one file to share.
+- [**Claude Code**](/settings?s=plugins&find=Claude%20Code): Claude Code’s own plugins and marketplaces.
+- [**Codex**](/settings?s=plugins&find=Codex): Codex’s own plugins and marketplaces.
 
 ### Scheduled tasks
 
@@ -223,14 +234,6 @@ You don’t have to know where an option lives: type what you want in the search
 - [**New assistant**](/settings?s=assistants&find=New%20assistant): A preset to start sessions as.
 - [**Clean up after a task**](/settings?s=assistants&find=Clean%20up%20after%20a%20task): Agents remove what they made along the way and no longer need.
 - [**Task folders**](/settings?s=assistants&find=Task%20folders): Where an assistant’s new task folders go.
-
-### Skill library
-
-[Settings → Skill library](/settings?s=skillpack): skills that come with the app, and the ones agents learned with your approval. More in [Skills](/guide/skills).
-
-- [**Learned**](/settings?s=skillpack&find=Learned): Skills agents learned with your approval.
-- [**Built in**](/settings?s=skillpack&find=Built%20in): Skills that come with the app.
-- [**Bring skills in by keywords**](/settings?s=skillpack&find=Bring%20skills%20in%20by%20keywords): Keywords in a message load skills by themselves.
 
 ### Custom
 

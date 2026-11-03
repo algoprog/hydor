@@ -24,6 +24,6 @@ export function sessionSpace(db: DB, key: string | undefined): string | null {
 export function spaceChoice(db: DB, v: unknown, fallback: string | null = null): string | null {
   if (v === undefined) return fallback && spaceById(db, fallback) ? fallback : null;
   if (v === null || v === '' || v === 'none') return null;
-  if (typeof v !== 'string' || !spaceById(db, v)) throw new HttpError(400, 'space: a space’s id (GET /api/spaces lists them), or null for none');
+  if (typeof v !== 'string' || !spaceById(db, v)) throw new HttpError(400, 'space: a project’s id (GET /api/spaces lists them), or null for none');
   return v;
 }

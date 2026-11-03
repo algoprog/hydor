@@ -167,7 +167,7 @@ const GET_PAGE: RunTool = {
       const names = new Map(allSpaces(db).map((x) => [x.id, x.name]));
       return list.length
         ? list
-            .map((p) => `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''}${p.space && names.has(p.space) ? ` · in the space “${names.get(p.space)}”` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`)
+            .map((p) => `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''}${p.space && names.has(p.space) ? ` · in the project “${names.get(p.space)}”` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`)
             .join('\n')
         : 'No saved pages yet.';
     }
@@ -495,7 +495,7 @@ function routes(d: Deps) {
   app.patch('/api/pages/:id', async (req) => {
     const b = B(req);
     const id = P(req).id;
-    if (b.title === undefined && b.space === undefined) throw new HttpError(400, 'Send its new title, or the space to move it to (space: an id, or null)');
+    if (b.title === undefined && b.space === undefined) throw new HttpError(400, 'Send its new title, or the project to move it to (space: an id, or null)');
     let page = mustPage(db, id);
     if (b.space !== undefined) page = setPageSpace(db, id, spaceChoice(db, b.space));
     if (b.title !== undefined) page = renamePage(db, id, b.title);

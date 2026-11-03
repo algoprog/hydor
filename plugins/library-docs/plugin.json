@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "library-docs",
+  "version": "1.0.0",
+  "description": "Up-to-date documentation and code examples for programming libraries and frameworks, from Context7, so agents write code against the version you use rather than what they remember.",
+  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "homepage": "https://context7.com",
+  "license": "MIT",
+  "keywords": ["documentation", "libraries", "frameworks", "coding", "context7"],
+  "extensions": {
+    "com.naget.agent": { "title": "Library docs", "category": "coding", "icon": "book" }
+  }
+}

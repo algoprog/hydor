@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "sqlite",
+  "version": "1.0.0",
+  "description": "Tools to look inside SQLite databases, query them safely, change them in one go, and move data in and out of CSV files.",
+  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "license": "MIT",
+  "keywords": ["sqlite", "database", "sql", "csv"],
+  "extensions": {
+    "com.naget.agent": {
+      "title": "SQLite databases",
+      "category": "data",
+      "icon": "database",
+      "requires": { "commands": [{ "name": "python3", "hint": "Python 3.9 or newer (python.org, or your system's package manager)" }] }
+    }
+  }
+}

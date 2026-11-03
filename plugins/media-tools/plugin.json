@@ -1,0 +1,23 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "media-tools",
+  "version": "1.0.0",
+  "description": "Audio and video work for every agent: convert, trim, join, compress, pull out the sound, make GIFs and thumbnails, burn in subtitles with ffmpeg, and download media you have the right to with yt-dlp.",
+  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "license": "MIT",
+  "keywords": ["ffmpeg", "video", "audio", "convert", "yt-dlp"],
+  "extensions": {
+    "com.naget.agent": {
+      "title": "Audio and video",
+      "category": "creative",
+      "icon": "film",
+      "requires": {
+        "pip": ["yt-dlp>=2025.1.1"],
+        "commands": [
+          { "name": "ffmpeg", "hint": "On a Mac: brew install ffmpeg. On Ubuntu or Debian: sudo apt install ffmpeg. On Windows: winget install ffmpeg." },
+          { "name": "ffprobe", "hint": "It comes with ffmpeg." }
+        ]
+      }
+    }
+  }
+}

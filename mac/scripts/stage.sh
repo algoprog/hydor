@@ -29,7 +29,7 @@ tar -cf - \
   package.json package-lock.json CHANGELOG.md LICENSE \
   dist/server dist/web \
   server/find/shipped-vectors.json server/memory/embed_worker.py \
-  web/src/i18n docs/guide catalog skills |
+  web/src/i18n docs/guide catalog skills plugins |
   tar -xf - -C "$out/server"
 (cd "$out/server" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
 # Prebuilt binaries for other systems are dead weight (and Apple's notary checks every binary).

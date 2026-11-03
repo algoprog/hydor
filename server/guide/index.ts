@@ -43,8 +43,8 @@ const APP_GUIDE: RunTool = {
     type: 'object',
     properties: {
       query: { type: 'string', description: 'What the user wants to know or do, in a few words: "share a session with someone".' },
-      topic: { type: 'string', description: 'A topic’s id from the contents ("spaces", "api").' },
-      section: { type: 'string', description: 'A section’s id in that topic ("make-a-space").' },
+      topic: { type: 'string', description: 'A topic’s id from the contents ("projects", "api").' },
+      section: { type: 'string', description: 'A section’s id in that topic ("make-a-project").' },
     },
   },
   async run(a, ctx) {
@@ -85,7 +85,7 @@ const APP_GUIDE: RunTool = {
 const APP_API: RunTool = {
   name: 'app_api',
   description: [
-    'Do in Naget Agent what the user could do in its pages: read its state, change a setting, or make, change and delete things (spaces, assistants, scheduled tasks, apps, pages, memory notes, connections, guidelines…), through the app’s own API as the signed-in user.',
+    'Do in Naget Agent what the user could do in its pages: read its state, change a setting, or make, change and delete things (projects, assistants, scheduled tasks, apps, pages, memory notes, connections, guidelines…), through the app’s own API as the signed-in user.',
     'app_guide topic "api" lists the endpoints and their bodies; read the current state (GET) before changing it.',
     'Reading runs at once. A change shows the user a card with what changes (before → after) and waits for their answer, up to about nine minutes; give summary, the change in a few plain words, as its title.',
     'To have the user fill in or check details on that card, give form: fields as a JSON schema’s properties, each named by its address in body ("name", "settings.results") and filled in from body; their answers go into body.',
@@ -99,7 +99,7 @@ const APP_API: RunTool = {
       method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
       path: { type: 'string', description: '"/api/spaces", with a query string when the endpoint takes one; or "/device".' },
       body: { type: 'object', description: 'The JSON body, for POST, PUT and PATCH.' },
-      summary: { type: 'string', description: 'For a change: what it does, as the user will read it on the card ("Make the space “Thesis”").' },
+      summary: { type: 'string', description: 'For a change: what it does, as the user will read it on the card ("Make the project “Thesis”").' },
       form: {
         type: 'object',
         description: 'Optional, for a change: details for the user to fill in or check on the card before it is made.',
@@ -138,7 +138,7 @@ const ASK_FORM: RunTool = {
 
 /** Every agent hears of the tools: Claude Code sees an MCP tool's name only until it looks it up. */
 export const GUIDE_INSTRUCTIONS =
-  'Naget Agent, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask you to change one of its settings or to make, change or remove something in it (a space, an assistant, a scheduled task, an app, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound) change with app_api on /device.';
+  'Naget Agent, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask you to change one of its settings or to make, change or remove something in it (a project, an assistant, a scheduled task, an app, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound) change with app_api on /device.';
 
 /** A question asked on the Help page (`extra.help`: true, or the topic open there): the session is about the app. */
 export function helpInstructions(help: unknown): string | null {
