@@ -1,4 +1,4 @@
-// Select text in one of the agent's replies and a small "Quote" button appears above it; it puts the
+// Select text in one of the agent's replies or your own messages and a small "Quote" button appears above it; it puts the
 // text in the message box as a quote, to answer it or point at it.
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
