@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const home = os.homedir();
 const here = path.dirname(fileURLToPath(import.meta.url));
 // dist/server/*.js -> project root is two levels up
-export const APP_ROOT = process.env.NAGET_AGENT_ROOT ?? process.env.WEB_AGENT_ROOT ?? path.resolve(here, '..', '..');
+export const APP_ROOT = path.resolve(process.env.NAGET_AGENT_ROOT ?? process.env.WEB_AGENT_ROOT ?? path.join(here, '..', '..'));
 
 function packageVersion(): string {
   try {
