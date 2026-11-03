@@ -3,6 +3,34 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.16.0 · 3 November 2026
+
+Your apps work in any session and show maps, charts, pictures and videos; Connections join the Apps page; apps ask
+for the keys they need; and every app downloads as a file.
+
+- **Agents run your apps for you**: ask for what an app does in any session ("Plan a 4-day trip to Lisbon in May")
+  and the agent runs it there. What it needs and you didn't say is asked on the app's own card in the
+  conversation (the optional questions may stay empty), and its answer shows there as the app shows it. Each app
+  has **Agents can use it**, to turn that off.
+- **Ready-made apps come installed**: they are among your apps from the start. Uninstall one you don't use
+  (**More → Uninstall**), and install it again from **Ready-made apps to install**. Installing an app from a file
+  first shows a card that says in plain words what it asks, what you get and how it works.
+- **Keys an app needs**: an app can say which API keys or tokens it needs (a weather service's, say). Its page asks
+  for one it lacks, with where to get it, and so do its install card and its card in a session. Keys go to your
+  vault, never into the app or its file, and agents use them without seeing them.
+- **Connected apps**: Settings → Connections is now part of the Apps page, which has two tabs: **Agent apps** and
+  **Connected apps** (the services you connected, the marketplace and your keys).
+- **Apps as files**: every app downloads as a file from its card's **More** menu, the ready-made ones too, with
+  its own pictures and videos. Drop a file on the Apps page to install it. A ready-made app's file brings that app
+  back where you uninstalled it.
+- **Maps, charts, pictures and videos**: an app's view can show a map of the places in its answer, charts in 2D
+  and 3D, pictures that open large, videos (YouTube and Vimeo too) and sounds, and drawings of its own made with a
+  library it names. An answer can hold pictures, videos and files the agent found on your computer or on the web:
+  a copy is kept, so they keep showing. An app can also carry files of its own (**Edit → Design → Its own files**).
+- **Quick questions** to Claude and Codex (an app's quick steps, memory notes, pull-request descriptions, command
+  suggestions) no longer hang when an account is at its limit: the next signed-in account answers, and when none
+  does, the error says why.
+
 ## 0.15.0 · 3 November 2026
 
 Apps with views of their own: each ready-made app's answer opens in pages made for it, with buttons that do things,
