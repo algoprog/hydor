@@ -6,31 +6,72 @@
 // spaces together: its sessions work with all of them. Picked by name on the start page in place of a folder.
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Boxes, Brain, FolderOpen, FolderPlus, Layers, Plus, SquarePen, Trash2 } from 'lucide-react';
+import { ArrowLeft, Boxes, Brain, Folder, FolderOpen, FolderPlus, Layers, Plus, SquarePen, Trash2, X } from 'lucide-react';
 import type { KnowledgeBase } from '@shared/knowledge';
 import type { Space } from '@shared/spaces';
 import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Empty, inputCls, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { api, del, enc, patch, post } from '../../lib/api';
-import { tildify, timeAgo } from '../../lib/format';
+import { basename, tildify, timeAgo } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { toastError, useApp, useSessions } from '../../lib/store';
 import type { PickedFile } from '../../lib/upload';
 import { PageHeader } from '../layout/PageHeader';
 import { useAssistantsState } from '../assistants/state';
 import { addFiles, BaseCard, DropFiles, MeaningHint, TrySearch, useKnowledge } from '../knowledge/parts';
-import { MemberPicker, memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace } from './parts';
+import { MemberPicker, memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace, useSpaceSuggestions } from './parts';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { loadSpaces, useSpaces } from './state';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+/** Folders sessions worked in lately, or changed files in, that no space has: each a tap from a space of its own. */
+function Suggestions({ onMake }: { onMake: (folder: string) => void }) {
+  const home = useApp((s) => s.boot?.home);
+  const [list, hide] = useSpaceSuggestions();
+  if (!list?.length) return null;
+  return (
+    <section className="mt-7">
+      <h2 className="text-[13.5px] font-semibold">Folders you work in, not in a space yet</h2>
+      <div className="mb-2 text-[12.5px] text-fg-3">Where your sessions ran or changed files lately, the most used first</div>
+      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+        {list.map((x) => (
+          <div key={x.path} className="flex min-w-0 items-center gap-3 px-3 py-2.5">
+            <Folder size={16} className="shrink-0 text-fg-3" />
+            <div className="min-w-0 flex-1">
+              <div translate="no" className="truncate text-[13.5px] font-medium" title={x.path}>
+                {basename(x.path)}
+              </div>
+              <div className="truncate text-[12px] text-fg-3">
+                <span translate="no">{tildify(x.path, home)}</span>
+                {' · '}
+                {plural(x.sessions, 'session', 'sessions')}
+                {' · '}
+                {timeAgo(x.lastAt)}
+              </div>
+            </div>
+            <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => onMake(x.path)}>
+              <span className="max-sm:hidden">Make a space</span>
+              <span className="sm:hidden">Space</span>
+            </Button>
+            <button type="button" aria-label={`Not a project: ${basename(x.path)}`} title="Not a project: stop suggesting it" onClick={() => hide(x.path)} className="shrink-0 rounded p-1.5 text-fg-3 hover:bg-bg-3 hover:text-fg">
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function List() {
   const spaces = useSpaces();
   const home = useApp((s) => s.boot?.home);
   const [made, setMade] = useState<false | 'space' | 'group'>(false);
+  // A suggested folder the new space starts with.
+  const [from, setFrom] = useState<string | undefined>();
   const plain = (spaces ?? []).filter((s) => !isGroup(s)).length;
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -39,7 +80,15 @@ function List() {
         tip="spaces"
         sub="Each project’s sessions, documents and guidelines, together"
         actions={
-          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMade('space')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<Plus size={14} />}
+            onClick={() => {
+              setFrom(undefined);
+              setMade('space');
+            }}
+          >
             New space
           </Button>
         }
@@ -111,9 +160,17 @@ function List() {
               )}
             </div>
           )}
+          {spaces && (
+            <Suggestions
+              onMake={(f) => {
+                setFrom(f);
+                setMade('space');
+              }}
+            />
+          )}
         </div>
       </div>
-      <NewSpaceDialog open={!!made} group={made === 'group'} onClose={() => setMade(false)} onMade={(s) => go(`/spaces/${s.id}`)} />
+      <NewSpaceDialog open={!!made} group={made === 'group'} folder={made === 'space' ? from : undefined} onClose={() => setMade(false)} onMade={(s) => go(`/spaces/${s.id}`)} />
     </div>
   );
 }

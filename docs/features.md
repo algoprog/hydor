@@ -77,7 +77,12 @@ agents that speak ACP and take MCP servers.
   sessions get, with the skill library: written there, copied from the library to change for the space alone, or
   proposed by an agent working in it and kept for the space when you approve. A group brings several spaces
   together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar
-  groups each space's sessions under its name, and its filter shows one space's sessions.
+  groups each space's sessions under its name, and its filter shows one space's sessions. New space asks only for a
+  name (its colour on the mark beside it) and where its files go, a new folder or one you have, with the folders you
+  used lately one tap away; what it is about, its guidelines and other folders are under More options. Under your
+  spaces, the Spaces page suggests folders your sessions worked in, or changed files in, over the last 90 days that
+  no space has yet (a folder in a Git repository counting as the repository), each with Make a space, or ✕ to stop
+  suggesting it.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and

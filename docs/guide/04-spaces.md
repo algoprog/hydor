@@ -34,24 +34,38 @@ Each space shows as a card:
 
 Click a card to open the space's own page, or type the space's name in the search box (Ctrl+K) to go straight there. With no spaces yet, the page says what a space is for; click **New space** to make one.
 
+Under the spaces, **Folders you work in, not in a space yet** lists folders your sessions used lately that could become spaces (see [Folders you work in, not in a space yet](#folders-you-work-in-not-in-a-space-yet)).
+
 ## Make a space
 
 1. On the [Spaces page](/spaces), click **New space**. The start page's folder menu has **New space** too (see [Start a session in a space](#start-a-session-in-a-space)).
 2. Fill in the window:
-   - **Name**: what you call the project, such as "Taxes 2026", "The garden" or "Thesis". Up to 60 characters. It is the only field you must fill in.
-   - **What it is about**: an optional line, shown under the name. Up to 300 characters.
-   - **Its folders**: where the space's files are. At first **A new folder, named for it**. To make the space around a folder you already have, such as a project on this computer, click **Use one you have** and find it by name or type its path: picked with the name still empty, its name becomes the space's. ✕ goes back to a new folder. **Add a folder it works with, where it is** adds more folders of yours: its sessions work in the first and with the others too, where they are, and nothing is copied. Up to 12; ✕ leaves one out again.
-   - **Agent Guidelines: what every agent in it follows**, in the larger box: optional. What every agent in the space should know, such as who the work is for, how to work and what to keep in mind: "Amounts in EUR. I am self-employed in Greece." Up to 20,000 characters. See [Agent Guidelines](/guide/guidelines).
-   - **Colour**: one of eight dots (amber, blue, green, pink, violet, teal, orange, slate). If you pick none, spaces take the colours in turn.
-3. Click **Make the space**, or press Enter in the name field.
+   - **Name**: what you call the project, such as "Taxes 2026", "The garden" or "Thesis". Up to 60 characters. It is the only field you must fill in. The square beside it is the space's mark, in the colour it will get: click it to pick another of the eight colours (amber, blue, green, pink, violet, teal, orange, slate). If you pick none, spaces take the colours in turn.
+   - **Where its files go**: pick one of two.
+     - **In a new folder** (the usual choice): the app makes the space a folder of its own, named after it.
+     - **In a folder I already have**: a project or a folder of documents on this computer, which stays where it is. Below it, **Used lately, in no space yet** shows folders your sessions worked in lately as one-tap choices; or click **Choose a folder…** and find one by name or type its path. Picked with the name still empty, the folder's name becomes the space's. **Change** picks another.
+3. Optionally, click **More options** for the rest (a dot beside it means something there is filled in):
+   - **What it is about**: a line shown under the name. Up to 300 characters.
+   - **Agent Guidelines**: what every agent in the space should follow, such as who the work is for, how to work and what to keep in mind: "Amounts in EUR. I am self-employed in Greece." Up to 20,000 characters. See [Agent Guidelines](/guide/guidelines).
+   - **Other folders it uses**: more folders of yours its agents work with, where they are; nothing is copied. **Add a folder** adds one, up to 12; ✕ leaves one out again.
+4. Click **Make the space**, or press Enter in the name field.
 
-Unless you picked a folder you have, the app makes the space a folder of its own, named after it, in a **Spaces** folder where task folders go: "Taxes 2026" gets `~/Naget/Spaces/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/assistants#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Spaces page, the new space's page opens. Made from the start page, the new space is picked for the session you are about to start.
+A new folder goes in a **Spaces** folder where task folders go: "Taxes 2026" gets `~/Naget/Spaces/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/assistants#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Spaces page, the new space's page opens. Made from the start page, the new space is picked for the session you are about to start.
 
 Two more things are set on the space's **Settings** tab afterwards: the assistant its sessions start as, and the spaces it brings together. Its documents go on its **Knowledge** tab, its skills on its **Skills** tab, and more folders on its **Files** tab.
 
 ### A space for a folder you already have
 
-In the **New space** window, click **Use one you have** under **Its folders** and pick the folder: the space works in it, and no new folder is made. An agent can do it too: "Make a space called Shop for ~/code/shop". A space's own folder can't be changed once the space is made, but the folders it works with can: see [Files](#files).
+In the **New space** window, pick **In a folder I already have** under **Where its files go**, then the folder: the space works in it, and no new folder is made. An agent can do it too: "Make a space called Shop for ~/code/shop". A space's own folder can't be changed once the space is made, but the folders it works with can: see [Files](#files).
+
+### Folders you work in, not in a space yet
+
+Under your spaces on the [Spaces page](/spaces), the app lists up to six folders you could make spaces for: folders your sessions worked in over the last 90 days, or changed files in while working somewhere else, that no space has yet. The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project. Each row shows the folder's name, where it is, how many sessions used it and when one last did.
+
+- **Make a space** opens the **New space** window with that folder picked and its name filled in.
+- ✕ (**Not a project**) stops suggesting that folder. The folder itself is untouched.
+
+Your home folder, hidden folders, temporary ones and the folders the app makes for itself (task folders, apps' runs, worktrees) are never suggested. Once a space has a folder, as its own or as one of the folders it works with, it leaves the list. The same folders show under **Used lately, in no space yet** in the **New space** window.
 
 ## Start a session in a space
 
@@ -318,6 +332,7 @@ The knowledge tools never bring up another space's documents, not even when an a
 
 - "Make a space called Taxes 2026 for my receipts and tax return. Its sessions should start as the Researcher, and every agent in it should know that amounts are in EUR."
 - "Make a space called Shop for my project in ~/code/shop."
+- "Which folders have I been working in that aren't in a space yet? Make spaces for the two I use most."
 - "Copy ~/Downloads/contract.pdf into my Taxes 2026 space, and have it work with ~/Documents/Receipts too."
 - "Group my Thesis and Reading notes spaces into one called Everything for the thesis."
 - "Give my Thesis space a skill: cite in APA 7, and check that every DOI resolves before I hand a chapter in."

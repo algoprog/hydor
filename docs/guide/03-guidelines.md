@@ -40,7 +40,7 @@ Every space has guidelines of its own, for the work you keep in it: who it is fo
 2. Write in the **Agent Guidelines: what every agent in it follows** field.
 3. Save the space.
 
-You can also write them when you make a space, in the same field of the new space's form. **Settings → Agents → Agent Guidelines → For a space** lists every space that has guidelines; click one to open it.
+You can also write them when you make a space: in the **New space** window, click **More options**, then write in **Agent Guidelines**. **Settings → Agents → Agent Guidelines → For a space** lists every space that has guidelines; click one to open it.
 
 In a group (a space that brings several spaces together), its sessions follow the group's own guidelines, and read what each space in the group asks as part of working with that space.
 
