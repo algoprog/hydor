@@ -271,9 +271,9 @@ function runText(r: RunRecord): string {
 
 /** What the call answers once the run ended, or while it goes on. */
 function endText(r: RunRecord): string {
-  if (r.status === 'done') return `${r.appName} is done. The user sees its answer in its card here, as the app shows it: reply in a sentence or two (what came of it, what to look at or decide next) without repeating it.\n\n${runText(r)}`;
+  if (r.status === 'done') return `${r.appName} is done. Its card, with the answer as the app shows it, shows right under your reply: reply in a sentence or two (what came of it, what to look at or decide next) without repeating it, and if you point to the card, it is below, not above.\n\n${runText(r)}`;
   if (r.status === 'stopped') return `${r.appName} was stopped before it finished.\n\n${runText(r)}`;
-  if (r.status === 'failed') return `${r.appName} failed: ${r.error ?? 'it did not finish'}. Its card here says so. Tell the user, and offer what could help (a detail it lacked, trying again).\n\n${runText(r)}`;
+  if (r.status === 'failed') return `${r.appName} failed: ${r.error ?? 'it did not finish'}. Its card, under your reply, says so. Tell the user, and offer what could help (a detail it lacked, trying again).\n\n${runText(r)}`;
   const waiting = r.status === 'waiting' ? ' It waits for the user’s answer to one of its questions, on its card.' : '';
   return `${r.appName} is still running (run ${r.id}); its card here shows it working.${waiting} Its answer comes to you as a message when it ends: end your turn now (say it is on its way), or call use_app with run "${r.id}" to wait for it.`;
 }
@@ -287,7 +287,7 @@ export async function tellAsker(d: Deps, r: RunRecord) {
   updateRun(d.db, r.id, { told: true });
   const head =
     r.status === 'done'
-      ? `[${r.appName} finished] The run you started for the user is done; its card with the answer shows right under your reply. Reply in a sentence or two (what came of it, what to look at), without repeating it.`
+      ? `[${r.appName} finished] The run you started for the user is done; its card with the answer shows right under your reply. Reply in a sentence or two (what came of it, what to look at), without repeating it; if you point to the card, it is below, not above.`
       : `[${r.appName} ${r.status === 'stopped' ? 'was stopped' : 'failed'}] The run you started for the user did not finish${r.error ? `: ${r.error}` : ''}.`;
   try {
     await d.sessions.deliverOrQueue(r.askedBy, `${head}\n\n${runText(r)}`);
@@ -366,7 +366,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
     description: [
       "Runs one of the user's apps for them, here in the conversation: use it when they ask for what one of their apps does, instead of doing that work yourself.",
       'Give app and inputs, the answers to its form: only what the user said or clearly meant (dates as YYYY-MM-DD, numbers, true or false for yes/no, a choice word for word, a file by its path). Leave out what they did not say: the user fills in what the app needs on its card here, and may leave its optional questions empty. ask: true shows the card even when nothing it needs is missing, to let them add the optional details.',
-      'It runs once they have, and its answer shows in the conversation as the app shows it. The call waits for that answer (wait, in seconds: 300 unless set); a longer run comes back still running, and its answer comes to you as a message when it ends. Then reply in a sentence or two: the user sees the answer itself in its card.',
+      'It runs once they have, and its answer shows in the conversation as the app shows it. The call waits for that answer (wait, in seconds: 300 unless set); a longer run comes back still running, and its answer comes to you as a message when it ends. Then reply in a sentence or two: the user sees the answer itself in its card, which shows under your reply (below it, not above).',
       many
         ? `The user has ${list.length} apps: find the one to run with find_apps, which gives each one's name to use here and what its form asks.`
         : `The apps (? marks a question it can do without):\n${list.map((u) => appLine(u, true)).join('\n')}`,
