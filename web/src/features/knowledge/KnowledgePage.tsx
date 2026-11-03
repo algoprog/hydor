@@ -40,6 +40,7 @@ export function KnowledgePage() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Spaces"
+        tip="knowledge"
         sub="Documents every session can search and cite"
         actions={
           shared.length > 0 && (

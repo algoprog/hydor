@@ -71,7 +71,7 @@ function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) =
   const there = useMachines((s) => s.list.filter((m) => m.id !== machineId && m.status.state === 'online').reduce((n, m) => n + m.status.waiting, 0));
   const n = here + there;
   return (
-    <span className="relative inline-flex">
+    <span data-tip={n > 0 ? 'inbox' : undefined} className="relative inline-flex">
       <IconButton label={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'} active={active} onClick={() => onGo('/inbox')}>
         <Inbox size={17} />
       </IconButton>
@@ -263,7 +263,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
           </span>
           New session
         </button>
-        <div className="relative">
+        <div data-tip="search" className="relative">
           <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
           <input
             ref={searchRef}

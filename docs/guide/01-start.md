@@ -232,7 +232,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 
 **Ask an agent**, at the top of every Help page, opens the same panel; so does "Ask an agent about the app" in the search box. The topics are grouped under the box. Each one opens its sections one at a time (**Open all** shows them all) and ends with things to ask an agent: click one to put it in the panel's box, change it if you like, and send it.
 
-- The welcome tour shows you around and sets up the agents you want to use. Start it with **Take the tour** at the top of Help, from [Take the tour](/settings?s=general&find=Take%20the%20tour) in Settings → App → General, or by typing "tour" in the search box.
+- The welcome tour shows you around and sets up the agents you want to use. Start it with **Take the tour** at the top of Help, from [Take the tour](/settings?s=general&find=Take%20the%20tour) in Settings → App → General, or by typing "tour" in the search box. After it, tips point out the rest of the app, one part at a time, the first time you come to each (see [Take the tour](/guide/app#take-the-tour)).
 - **Release notes** (in Settings → App → General, or from the search box) say what changed in each version. After an update, a "What's new" note shows once.
 - Agents in the app read this guide too: ask any session "how do I…" and it can answer, or do it for you (see [Let agents work the app for you](/guide/ask-agents)).
 

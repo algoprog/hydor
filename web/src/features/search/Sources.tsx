@@ -29,6 +29,7 @@ export function SourcesNote({ note, sessionKey }: { note: SessionNote; sessionKe
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        data-tip="sources"
         className="group inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-panel py-1 pr-2 pl-2.5 text-[12.5px] transition-colors hover:bg-bg-2"
       >
         <Globe size={13} className="shrink-0 text-fg-3" />

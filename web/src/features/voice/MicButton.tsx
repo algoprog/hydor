@@ -157,6 +157,7 @@ export function MicButton({ insert, disabled }: { s?: SessionSummary; insert: (t
     <>
       <button
         ref={ref}
+        data-tip="dictate"
         type="button"
         disabled={(disabled && !active) || busy}
         aria-pressed={live}

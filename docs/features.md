@@ -365,6 +365,11 @@ programs shows each program's version and what is out, with Check now, Update no
 - A short welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter or on this
   computer, other agents) and sets those up, on pages that fill the screen. Then it shows you around as the
   app builds itself up: each part arrives as it is explained, the rest as the tour ends. Help shows it again.
+- After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
+  inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Library,
+  Apps and Spaces pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
+  guide. One at a time and a while apart, never while you type or a menu is open; each shows once, on every
+  device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again.
 - Help (in the sidebar): a guide to every part of the app, its topics grouped on one page, each with a picture of
   that part of the app and its sections to open one at a time. One box finds sections as you type, or asks an
   agent on Enter: the answer, from the guide with links that open the place they name, shows in a panel beside

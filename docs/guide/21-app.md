@@ -154,6 +154,12 @@ The welcome tour asks what you want to use (Claude Code, Codex, models through O
 
 To take it again: [Settings → App → General → Welcome tour → **Take the tour**](/settings?s=general&find=Take%20the%20tour), **Take the tour** in the search box, or **Take the tour** at the top of **Help** in the sidebar. More in [Getting started](/guide/start).
 
+After the tour, tips show you the rest of the app as you come to it. The first time a part of the app is on your screen (the inbox, a session's menu, the Git page, **Settings → Memory**…), a small card beside it says what it is for, and **Learn more** opens this guide where it says more. Tips come one at a time and a while apart, never while you type or have a menu open.
+
+- **Got it**, or using the part it points at, puts a tip away for good, on every device.
+- **Skip tips** stops them all, on every device. **Skip the tour** on the tour's first page does too; closing the tour with ✕ leaves them on.
+- To turn them on or off again: [Settings → App → General → **Tips**](/settings?s=general&find=Tips).
+
 ## Change your password
 
 The app has one password, chosen when it was installed. To change it, open [Settings → App → Password](/settings?s=security&find=Change%20password):
@@ -196,7 +202,7 @@ Some choices belong to the browser you make them in, so each device can differ:
 - files marked **Viewed** when reviewing a branch;
 - whether the "What's new" note was shown.
 
-The rest is kept by the app and is the same on every device: themes you made, **Resume after usage limits**, **Delete inactive sessions**, **Start when this computer starts**, **Update automatically**, and whether the tour was taken.
+The rest is kept by the app and is the same on every device: themes you made, **Resume after usage limits**, **Delete inactive sessions**, **Start when this computer starts**, **Update automatically**, whether the tour was taken, and the tips (on or off, and which were shown).
 
 ## Ask an agent
 
@@ -206,3 +212,4 @@ The rest is kept by the app and is the same on every device: themes you made, **
 - "Turn off automatic updates."
 - "Make sure the app starts when this computer starts."
 - "Turn on resuming sessions after usage limits."
+- "Turn the tips back on, and show them all again from the start."

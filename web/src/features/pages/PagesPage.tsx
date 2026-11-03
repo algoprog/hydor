@@ -756,6 +756,7 @@ function Library() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Library"
+        tip="library"
         sub="Small tools and pages agents made for you, the images and videos you kept, and what you published"
         actions={
           tab === 'published' ? (

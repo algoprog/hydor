@@ -9,8 +9,8 @@ export const machineId: string | null = m ? m[1] : null;
 /** The path prefix of the machine's pages, and of its API and sockets ('' for this server's own). */
 export const machineBase = machineId ? `/m/${machineId}` : '';
 
-/** Calls this server answers itself, whichever machine the page shows: sign-in, the machines, push, themes, the tour, the sidebar's tools. */
-const OWN = /^\/api\/(auth\/|machines\b|push\b|themes\b|tour\b|sidebar\b)/;
+/** Calls this server answers itself, whichever machine the page shows: sign-in, the machines, push, themes, the tour and its tips, the sidebar's tools. */
+const OWN = /^\/api\/(auth\/|machines\b|push\b|themes\b|tour\b|tips\b|sidebar\b)/;
 
 /** A URL on the server of the machine this page shows. */
 export function mu(path: string): string {

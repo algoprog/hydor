@@ -4,7 +4,8 @@
 // fill the screen while the app behind is empty. Then it builds the app up as it shows it around: a step
 // points at an element marked data-tour="…", which arrives as the step comes, with the rest of the page
 // dimmed and blurred around it; whatever no step points at arrives when the tour ends. A step without a
-// target after the pages shows in the middle of the screen.
+// target after the pages shows in the middle of the screen. After it, tips (features/tips) show the rest of the
+// app as you come to each part: finishing the tour turns them on, skipping it turns them off for good.
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
@@ -25,6 +26,7 @@ import { LoginDialog } from '../settings/SettingsPage';
 import { shortGpu } from '../settings/ModelsSettings';
 import { TourLocal, TourOpenRouter } from './TourModels';
 import { machineBase, machineId } from '../../lib/machine';
+import { tourDone } from '../tips/state';
 
 /** Raise it when the tour changes enough to be worth showing again to everyone. */
 export const TOUR_VERSION = 2;
@@ -88,6 +90,9 @@ interface TourState {
 
 const useTour = create<TourState>(() => ({ open: false, closing: false, i: 0, signIn: null, accountsRev: 0, uses: [], picked: false, fresh: false, burst: null }));
 
+/** The tour is on screen (tips wait for it). */
+export const tourOpen = () => useTour.getState().open;
+
 let closeTimer = 0;
 let builtTimer = 0;
 
@@ -117,8 +122,9 @@ export const setupDone = () => {
 };
 
 /** Closes the tour (fading) as the rest of the app arrives; finishing it sends gold dust from the
- * button and points at the message box. */
-function endTour(finishedAt?: HTMLElement | null) {
+ * button and points at the message box. Finishing it turns the tips after it on; skipping it turns them off;
+ * closing it (✕ or Esc) leaves them as they were. */
+function endTour(finishedAt?: HTMLElement | null, skipped = false) {
   const s = useTour.getState();
   if (!s.open || s.closing) return;
   const r = finishedAt?.getBoundingClientRect();
@@ -137,6 +143,7 @@ function endTour(finishedAt?: HTMLElement | null) {
   const boot = useApp.getState().boot;
   if (boot && boot.tourSeen < TOUR_VERSION) useApp.getState().set({ boot: { ...boot, tourSeen: TOUR_VERSION } });
   post('/api/tour', { version: TOUR_VERSION }).catch(() => {});
+  tourDone(TOUR_VERSION, finishedAt ? true : skipped ? false : undefined);
 }
 
 /** After the tour: the message box glows once, ready for the first task. */
@@ -680,7 +687,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
             Review every file it changed. {MOD}F finds text in the conversation.
           </Feature>
           <div className="pt-1 text-[12.5px] text-fg-3" style={{ '--i': 5 } as CSSProperties}>
-            Help (<CircleHelp size={13} className="inline -translate-y-px" />) explains every part of the app, and takes you on this tour again.
+            Help (<CircleHelp size={13} className="inline -translate-y-px" />) explains every part of the app, and takes you on this tour again. As you go on, tips point out the rest, one part at a time.
           </div>
         </div>
       ),
@@ -841,7 +848,7 @@ function TourPage(p: {
   const column = 'mx-auto w-full max-w-[760px] px-5 sm:px-10 2xl:max-w-[840px]';
   const where = ready ? <TourProgress at={k + (fresh ? 1 : 0)} total={list.length + (fresh ? 1 : 0)} /> : <span className="text-[12.5px] text-fg-3">Pick one or more</span>;
   const back = (
-    <Button variant="ghost" className="h-10 rounded-xl px-3.5 text-[14px]" onClick={k > 0 ? p.onBack : p.onSkip}>
+    <Button variant="ghost" className="h-10 rounded-xl px-3.5 text-[14px]" onClick={k > 0 ? p.onBack : p.onSkip} title={k > 0 ? undefined : 'No tour, and no tips later'}>
       {k > 0 ? 'Back' : phone ? 'Skip' : 'Skip the tour'}
     </Button>
   );
@@ -1173,7 +1180,7 @@ export function Tour() {
                     </div>
                   </div>
                   <div ref={setFoot} className="flex shrink-0 items-center gap-2 border-t border-line bg-bg-1 px-4 py-2.5">
-                    <Button size="sm" variant="ghost" onClick={i > 0 ? back : () => endTour()}>
+                    <Button size="sm" variant="ghost" onClick={i > 0 ? back : () => endTour(null, true)} title={i > 0 ? undefined : 'No tour, and no tips later'}>
                       {i > 0 ? 'Back' : 'Skip the tour'}
                     </Button>
                     <span className="flex min-w-0 flex-1 justify-center">
@@ -1197,7 +1204,7 @@ export function Tour() {
               out={page.out}
               now={fresh && page.n === 0}
               ready={page.out || ready}
-              {...(!page.out && { onBack: back, onNext: next, onSkip: () => endTour(), nextRef: nextBtn })}
+              {...(!page.out && { onBack: back, onNext: next, onSkip: () => endTour(null, true), nextRef: nextBtn })}
             />
           )}
         </div>,

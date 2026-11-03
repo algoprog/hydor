@@ -123,7 +123,7 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
   // The server continues a minute after the reset; told apart only when the two disagree.
   const withReset = !!resumeAt && !!lim.resetsAt && Math.abs(resumeAt - lim.resetsAt - 60_000) < 3 * 60_000;
   return (
-    <div className={cx('anim-expand flex gap-3 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[13.5px]', className)} role="status">
+    <div data-tip={session ? 'limit' : undefined} className={cx('anim-expand flex gap-3 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-2.5 text-[13.5px]', className)} role="status">
       <AlertTriangle size={15} className="mt-[3px] shrink-0 text-warn" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

@@ -391,7 +391,7 @@ const shownWhole = new Set<string>();
 function PlaceHead({ g, folded, home, onFold }: { g: SessionGroup; folded: boolean; home?: string; onFold: () => void }) {
   const unread = folded && g.items.some(unreadOf);
   return (
-    <div className="group/head sticky top-0 z-[1] flex items-center gap-0.5 bg-sidebar pt-1 pb-0.5">
+    <div data-tip="groups" className="group/head sticky top-0 z-[1] flex items-center gap-0.5 bg-sidebar pt-1 pb-0.5">
       <button
         type="button"
         aria-expanded={!folded}

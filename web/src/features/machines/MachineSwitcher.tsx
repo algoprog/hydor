@@ -45,6 +45,7 @@ export function MachineSwitcher({ onGo }: { onGo?: () => void }) {
     <>
       <button
         ref={ref}
+        data-tip="machines"
         onClick={() => setOpen((o) => !o)}
         title="Switch machine"
         className={cx(

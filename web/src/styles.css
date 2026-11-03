@@ -1106,6 +1106,23 @@ html {
     rotate: 360deg;
   }
 }
+/* Tips after the tour: a still accent ring around the part a tip is about, with one ripple as it lands; the page
+   around stays as it is (no dimming), so you can go on working. */
+.tip-ring {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 5px var(--accent-soft);
+  transition: opacity 200ms ease;
+}
+.tip-card {
+  animation: tip-card-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@keyframes tip-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
 /* The password and sign-in screens: the card rises in once the mark has drawn. */
 .auth-card {
   animation: tour-card-in 700ms 380ms cubic-bezier(0.22, 1, 0.36, 1) backwards;

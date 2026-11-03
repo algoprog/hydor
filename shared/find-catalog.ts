@@ -74,6 +74,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['general', 'Start when this computer starts', 'boot startup login service autostart systemd', 'Starts the app when the computer starts'],
   ['general', 'Update automatically', 'updates upgrade auto update new version', 'Updates itself when you have not used it for a while'],
   ['general', 'Take the tour', 'tour help guide onboarding welcome', 'See what each part of the app does', 'Welcome tour'],
+  ['general', 'Tips', 'tips hints help onboarding introduce features skip guide', 'Points out a part of the app the first time you come to it, after the welcome tour'],
   ['general', 'Check now', 'update upgrade new version about', 'Look for a newer version now', 'Check for updates'],
   // App › Notifications
   ['notifications', 'Notify this device', 'push notifications alerts phone browser when an agent is done finishes fails needs you', 'A notice when a session finishes, fails or needs your answer, even with the app closed'],

@@ -448,7 +448,7 @@ export function TerminalPanel({ page }: { page?: boolean }) {
 export function TerminalPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Terminal" sub="Shells on this machine. They keep running when you leave this page." />
+      <PageHeader title="Terminal" sub="Shells on this machine. They keep running when you leave this page." tip="terminal" />
       <div className="min-h-0 flex-1">
         <TerminalPanel page />
       </div>

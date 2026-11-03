@@ -277,7 +277,7 @@ export function ProposalCard({ item, sessionKey }: { item: ToolItem; sessionKey:
   const Icon = p.kind === 'new' ? BookPlus : FilePen;
   const s = STATUS[p.status];
   return (
-    <div className="tl-item my-1.5 overflow-hidden rounded-2xl border border-line bg-panel">
+    <div data-tip={pending ? 'skill' : undefined} className="tl-item my-1.5 overflow-hidden rounded-2xl border border-line bg-panel">
       <div className="flex items-center gap-3 px-4 pt-3">
         <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]', pending ? 'bg-accent-soft text-accent' : 'bg-bg-2 text-fg-3')}>
           <Icon size={16} />

@@ -77,7 +77,7 @@ On another machine's pages the row is highlighted, so you know where you are, an
 ### What works across machines
 
 - **Everything on a machine's pages is that machine's**: its sessions, folders and files, Git, terminals, agents' sign-ins, models and settings.
-- **Some things always come from the machine you opened the app on**: your password and sign-in, the list of machines, notifications, the themes you made and the welcome tour.
+- **Some things always come from the machine you opened the app on**: your password and sign-in, the list of machines, notifications, the themes you made, and the welcome tour and its tips.
 - **Notices from every machine reach you.** A notice from another machine names it, push notifications come through your own machine, and the [Inbox](/guide/inbox) lists what waits on you on every machine. The sidebar's inbox count includes them.
 - **Read-only links** work for sessions on other machines too (see [Share a session with a read-only link](/guide/devices#share-a-session-with-a-read-only-link)).
 - **Not on other machines**: Preview, which opens dev servers on the machine you opened only, and Connect other agents, since each machine's own server is reached at its own address.

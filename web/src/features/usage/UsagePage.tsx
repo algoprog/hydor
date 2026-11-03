@@ -153,6 +153,7 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Usage"
+        tip="usage"
         sub={SUBS[tab]}
         actions={
           tab === 'limits' && (

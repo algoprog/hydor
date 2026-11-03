@@ -25,6 +25,7 @@
 - [**开机时启动**](/settings?s=general&find=Start%20when%20this%20computer%20starts)：电脑启动时自动启动本应用。
 - [**自动更新**](/settings?s=general&find=Update%20automatically)：在你一段时间没有使用时自动更新。
 - [**开始导览**](/settings?s=general&find=Take%20the%20tour)：了解应用各部分的作用。
+- [**小贴士**](/settings?s=general&find=Tips)：欢迎导览之后，在你第一次用到应用的某个部分时为你指出它。
 - [**立即检查**](/settings?s=general&find=Check%20now)：立即检查新版本。
 
 ### 通知

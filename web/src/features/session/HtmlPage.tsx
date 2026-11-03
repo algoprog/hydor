@@ -153,7 +153,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
   const changed = !!keptInfo && keptInfo.version > 1;
   const frameKey = `${kept ?? 'memory'}:${changed ? keptInfo!.version : 0}`;
   return (
-    <div className="tl-item my-1 overflow-hidden rounded-xl border border-line bg-panel">
+    <div data-tip={html && !writing && sessionKey ? 'page' : undefined} className="tl-item my-1 overflow-hidden rounded-xl border border-line bg-panel">
       <div className="flex items-center gap-2 border-b border-line px-3 py-1.5">
         {writing ? <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" /> : <AppWindow size={14} className="shrink-0 text-fg-3" />}
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-fg-2">

@@ -414,6 +414,8 @@ table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e4dc
 /** Spaces, guidelines, memory, scheduled tasks, pages, apps and the start page's picks. */
 export async function seedApi(api, home, now, s) {
   await api('POST', '/api/tour', { version: 999 });
+  // No tips over the pictures (a shot that shows one turns them on).
+  await api('PUT', '/api/tips', { on: false });
   await api('PUT', '/api/me/timezone', { tz: 'America/New_York' });
   await api('PUT', '/api/guidelines', { global: 'Answer in plain English, short and to the point. Ask before deleting anything. Keep what you make for me in ~/Naget.' });
 

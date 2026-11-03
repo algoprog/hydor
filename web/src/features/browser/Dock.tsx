@@ -381,7 +381,7 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
   return (
     <div className="shrink-0 px-3 sm:px-6">
       <div className="mx-auto mb-2 max-w-[800px]">
-        <div className={cx('anim-expand overflow-hidden rounded-2xl border bg-panel', asks || driving ? 'border-warn/50' : 'border-line-2')}>
+        <div data-tip="browser" className={cx('anim-expand overflow-hidden rounded-2xl border bg-panel', asks || driving ? 'border-warn/50' : 'border-line-2')}>
           {askList}
           {header(false)}
           {expanded && !full && view.open && (

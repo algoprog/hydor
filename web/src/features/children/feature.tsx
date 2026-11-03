@@ -20,7 +20,7 @@ function ParentDock({ s }: { s: SessionSummary }) {
   // A swarm's member: the swarm's own bar says where it reports.
   if (!parent || leadsSwarm(p?.extra)) return null;
   return (
-    <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
+    <div data-tip="children" className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
       <CornerDownRight size={14} className="shrink-0 text-fg-3" />
       <span className="min-w-0 flex-1 truncate text-fg-2">
         Child of <span className="text-fg">{p?.title ?? 'another session'}</span>

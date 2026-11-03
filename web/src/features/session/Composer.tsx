@@ -111,6 +111,7 @@ function ContextRing({ pct, title, disabled, onClick }: { pct: number; title: st
       type="button"
       disabled={disabled}
       onClick={onClick}
+      data-tip="context"
       title={title}
       aria-label={`${pct}% of the context in use`}
       className={cx('tnum inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px] transition-colors hover:bg-bg-2 disabled:pointer-events-none', pct > 85 ? 'text-warn' : 'text-fg-3')}
@@ -558,7 +559,6 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 pct={ctx}
                 disabled={working}
                 onClick={() => void compact()}
-                data-tip="context"
                 title={`${ctx}% of the context in use (${live?.contextTokens?.toLocaleString()} of ${live?.contextWindow?.toLocaleString()} tokens) · click to compact`}
               />
             )}

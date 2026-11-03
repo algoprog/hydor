@@ -25,6 +25,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts): Starts the app when the computer starts.
 - [**Update automatically**](/settings?s=general&find=Update%20automatically): Updates itself when you have not used it for a while.
 - [**Take the tour**](/settings?s=general&find=Take%20the%20tour): See what each part of the app does.
+- [**Tips**](/settings?s=general&find=Tips): Points out a part of the app the first time you come to it, after the welcome tour.
 - [**Check now**](/settings?s=general&find=Check%20now): Look for a newer version now.
 
 ### Notifications
