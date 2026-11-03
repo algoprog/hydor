@@ -10,10 +10,10 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
   thinks, and what it may do without asking you. The start page opens with what you picked there last,
   on any device: the agent and its model, the folder, the assistant, memory and a spending cap. What you
   write in a message box, with the files you attach, waits there while you look at other pages. Pressing
-  Start opens the session's page at once with your message (Starting, while the agent gets ready), and it
-  becomes the session as soon as the agent is up, with no loading in between; if it can't start, the page says
-  why and your message goes back in the start page's box. Pages, tabs, menus and dialogs open at once, with no
-  fade.
+  Start opens the session's page at once with your message and the agent at work on it (Working), as the
+  session shows it, and it becomes the session as soon as the agent is up, with no loading in between; if it
+  can't start, the page says why and your message goes back in the start page's box. Pages, tabs, menus and
+  dialogs open at once, with no fade.
 - Switch models or assistants mid-session; the model menu lists the session's own agent's models, and another
   assistant applies from your next message, the conversation carrying on. "Continue in Codex" (or
   Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.

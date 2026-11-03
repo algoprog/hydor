@@ -1,15 +1,18 @@
-// A session's page while the session starts (lib/starting.ts): shown the moment you send from the start page, laid
-// out as the session's own page (its header, your message, the message box) so it simply becomes the session once
-// the server has started it. Should the session not start, it says why, and the start page has your message back.
+// A session's page while the session starts (lib/starting.ts): shown the moment you send from the start page as the
+// session's own page shows a turn under way (its header, your message, the agent at work, the message box), nothing
+// of its own in between, so it simply becomes the session once the server has started it. Should the session not
+// start, it says why, and the start page has your message back.
 import { useEffect } from 'react';
-import { ArrowLeft, ArrowUp, FileText, TriangleAlert } from 'lucide-react';
-import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { Button, cx, Throbber } from '../../components/ui';
-import { basename, tildify } from '../../lib/format';
+import { ArrowLeft, ArrowUp, ChevronRight, FileText, TriangleAlert } from 'lucide-react';
+import { AgentIcon } from '../../components/AgentIcon';
+import { Button, cx } from '../../components/ui';
+import { basename, clockTime, tildify } from '../../lib/format';
 import { go, sessionPath } from '../../lib/nav';
 import { forget, useStarting } from '../../lib/starting';
 import { useApp } from '../../lib/store';
 import { NavButton } from '../layout/PageHeader';
+import { isTouch, workingPlaceholder } from './Composer';
+import { dayLabel, DayLine, LiveHead } from './Timeline';
 
 export function StartingSession({ id }: { id: string }) {
   const st = useStarting((x) => x.byId[id]);
@@ -24,7 +27,6 @@ export function StartingSession({ id }: { id: string }) {
   const failed = !!st.error;
   const pictures = st.atts.filter((a) => a.image && a.url);
   const files = st.atts.filter((a) => !(a.image && a.url));
-  const custom = st.agent === 'acp' && (st.acpName === 'Custom' || st.acpName === 'Console');
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-line pt-[var(--safe-top)]">
@@ -40,7 +42,7 @@ export function StartingSession({ id }: { id: string }) {
             <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
               <span className={cx('inline-flex h-5.5 max-w-[60%] min-w-0 shrink-0 items-center gap-1.5 rounded-full bg-bg-2 px-2 text-[12px] font-medium', failed ? 'text-err' : 'text-busy')}>
                 <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', failed ? 'bg-err' : 'breathe bg-busy')} />
-                <span className="truncate">{failed ? 'Did not start' : 'Starting'}</span>
+                <span className="truncate">{failed ? 'Did not start' : 'Working'}</span>
               </span>
               {st.cwd && (
                 <span translate="no" className="min-w-0 truncate" title={st.cwd}>
@@ -54,8 +56,9 @@ export function StartingSession({ id }: { id: string }) {
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-x-0 top-px bottom-px overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable_both-edges]">
           <div className="mx-auto w-full max-w-[848px] space-y-8 px-3 pt-6 pb-10 sm:px-6">
+            <DayLine day={dayLabel(st.at)} />
             <section className="space-y-2">
-              <div className="flex flex-col items-end gap-1.5">
+              <div className="group/u flex flex-col items-end gap-1.5">
                 {pictures.length > 0 && (
                   <div className="flex flex-wrap justify-end gap-1.5">
                     {pictures.map((a) => (
@@ -84,6 +87,10 @@ export function StartingSession({ id }: { id: string }) {
                     )}
                   </div>
                 )}
+                {/* Its time on hover, as the session shows it under your message (with "Edit from here"), in the same room. */}
+                <div className="mt-1 mr-2 flex items-center gap-1.5 text-[11.5px] text-fg-3 opacity-0 transition-opacity group-hover/u:opacity-100">
+                  <span>{clockTime(st.at)}</span>
+                </div>
               </div>
               {failed ? (
                 <div className="rounded-2xl border border-err/30 bg-err/8 px-4 py-3">
@@ -107,16 +114,20 @@ export function StartingSession({ id }: { id: string }) {
                   </div>
                 </div>
               ) : (
-                <div className="flex min-h-7 items-center gap-2.5 px-1 text-[12.5px] text-fg-3">
-                  {custom ? <Throbber size={14} /> : <AgentIcon agent={st.agent} name={st.acpName} size={14} spinning />}
-                  <span className="shine">{`Starting ${agentName(st.agent, st.acpName)}…`}</span>
+                // The agent at work, as the head of the session's turn shows it (Timeline.tsx). Its time shows once the
+                // agent has the message: the session counts the turn from then.
+                <div className="flex min-h-9 w-full items-center gap-2 rounded-xl px-2 text-[13.5px]">
+                  <LiveHead agent={st.agent} name={st.acpName} live={{ status: 'working' }} />
+                  <span className="ml-auto flex shrink-0 items-center gap-2.5 text-[12px] text-fg-3">
+                    <ChevronRight size={15} className="rotate-90" />
+                  </span>
                 </div>
               )}
             </section>
           </div>
         </div>
       </div>
-      {/* The message box, as the session's own will be: it takes messages once the session has started. */}
+      {/* The message box, as the session's own is while the agent works: it takes messages once the session has started. */}
       <div className="shrink-0 px-3 pb-[max(10px,var(--safe-bottom))] sm:px-6 sm:pb-5">
         <div className="mx-auto max-w-[800px]">
           <div className="relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)]">
@@ -124,7 +135,7 @@ export function StartingSession({ id }: { id: string }) {
               disabled
               rows={1}
               aria-label="Message"
-              placeholder={failed ? 'The session did not start' : 'Starting the session…'}
+              placeholder={failed ? 'The session did not start' : workingPlaceholder(isTouch())}
               className="block min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 disabled:cursor-not-allowed"
             />
             <div className="flex items-center gap-1 px-2.5 pt-0.5 pb-2.5">

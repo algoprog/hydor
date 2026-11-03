@@ -6,7 +6,7 @@ A session is one conversation with an agent, in one folder: you say what you wan
 
 ## Start a session
 
-**New session** at the top of the sidebar opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session's page opens at once with your message, and says **Starting** while the agent gets ready; then the agent starts on your message. If the session can't start, its page says why, and **Back to the start page** puts your message (and what you attached) back in the box.
+**New session** at the top of the sidebar opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session's page opens at once, with your message and the agent at work on it (**Working**). If the session can't start, its page says why, and **Back to the start page** puts your message (and what you attached) back in the box.
 
 The row under the message box holds **Agent**, **Model**, **Folder** (or **Space**), **Assistant** and, at its end, **Options**. On a phone each of them opens as a sheet from the bottom of the screen.
 

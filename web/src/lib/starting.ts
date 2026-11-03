@@ -1,8 +1,8 @@
-// A session started from the start page shows at once. Its page opens on a stand-in with your message
-// (features/session/StartingSession.tsx) while the server starts the agent, and becomes the session itself as soon
-// as the server answers and the session can show: its summary, its conversation and your message in it, so it
-// never shows half-loaded. Should it not start, the stand-in says why, and your message (with what went with it)
-// waits in the start page's box again.
+// A session started from the start page shows at once. Its page opens on a stand-in with your message and the agent
+// at work, as the session's own page shows them (features/session/StartingSession.tsx), while the server starts the
+// agent, and becomes the session itself as soon as the server answers and the session can show: its summary, its
+// conversation and your message in it, so it never shows half-loaded. Should it not start, the stand-in says why,
+// and your message (with what went with it) waits in the start page's box again.
 import { create } from 'zustand';
 import type { Agent, LiveOverlay, LiveState, SessionSummary } from '@shared/types';
 import { api, enc } from './api';
@@ -24,6 +24,8 @@ export interface Starting {
   atts: Attachment[];
   /** Where it works (empty while a task folder is being made for it). */
   cwd: string;
+  /** When Start was pressed. */
+  at: number;
   /** The session, once the server has started it. */
   key?: string;
   /** The session can show now: the stand-in becomes it. */
@@ -46,9 +48,10 @@ const showing = (path: string) => location.pathname === machineBase + path;
  * Opens a new session's page at once and starts the session with `create`, which returns its key. `draft`: the
  * start page's box as it was sent, which gets it back should the session not start.
  */
-export function startSession(s: Omit<Starting, 'id' | 'key' | 'ready' | 'error'>, create: () => Promise<string>, draft: StartDraft) {
-  const id = `new-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-  useStarting.setState((x) => ({ byId: { ...x.byId, [id]: { ...s, id } } }));
+export function startSession(s: Omit<Starting, 'id' | 'at' | 'key' | 'ready' | 'error'>, create: () => Promise<string>, draft: StartDraft) {
+  const at = Date.now();
+  const id = `new-${at.toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+  useStarting.setState((x) => ({ byId: { ...x.byId, [id]: { ...s, id, at } } }));
   const here = sessionPath(id);
   go(here);
   void (async () => {

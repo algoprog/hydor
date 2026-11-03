@@ -19,12 +19,38 @@ import { LOCALE } from '../../i18n/locale';
 
 type Block = { kind: 'item'; item: TimelineItem } | { kind: 'group'; id: string; items: TimelineItem[] };
 
-/** Custom works with Naget's loading mark; other agents keep their own animation. */
-function WorkingIcon({ agent, size, spinning, className }: { agent: Agent; size: number; spinning?: boolean; className?: string }) {
+/**
+ * Custom works with Naget's loading mark; other agents keep their own animation. `name`: an agent of Settings → More
+ * agents by name, for a session not in the list yet (one starting); otherwise the session's own.
+ */
+function WorkingIcon({ agent, name, size, spinning, className }: { agent: Agent; name?: string; size: number; spinning?: boolean; className?: string }) {
   const { sessionKey } = useContext(SessionCtx);
-  const name = useSessions((s) => sessionKey ? s.byKey[sessionKey]?.acpName : undefined);
-  if (agent === 'acp' && (name === 'Custom' || name === 'Console') && spinning) return <Throbber size={size} className={className} />;
-  return <AgentIcon agent={agent} name={name} size={size} spinning={spinning} className={className} />;
+  const own = useSessions((s) => (sessionKey ? s.byKey[sessionKey]?.acpName : undefined));
+  const n = name ?? own;
+  if (agent === 'acp' && (n === 'Custom' || n === 'Console') && spinning) return <Throbber size={size} className={className} />;
+  return <AgentIcon agent={agent} name={n} size={size} spinning={spinning} className={className} />;
+}
+
+/**
+ * What the head of a turn under way says: the agent at work (or waiting for you), where, and for how long. A session
+ * you just started shows it from the moment you press Start (StartingSession.tsx), so its page never changes look.
+ */
+export function LiveHead({ agent, name, live }: { agent: Agent; name?: string; live: LiveInfo }) {
+  const waiting = live.status === 'waiting';
+  return (
+    <>
+      <WorkingIcon agent={agent} name={name} size={15} spinning={!waiting} className={waiting ? 'breathe' : undefined} />
+      <span className={cx('font-medium', waiting ? 'text-warn' : 'text-busy')}>
+        {waiting ? 'Waiting for you' : live.status === 'starting' ? 'Starting' : 'Working'}
+        {live.where ? ` in ${live.where}` : ''}
+      </span>
+      {live.since && (
+        <span className="tnum text-fg-3">
+          · <Elapsed since={live.since} />
+        </span>
+      )}
+    </>
+  );
 }
 
 const STANDALONE = new Set(['todo', 'question', 'plan']);
@@ -204,13 +230,24 @@ function workStats(items: TimelineItem[]) {
 
 const plural = (n: number, one: string, many = one + 's') => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
-function dayLabel(ts: number): string {
+export function dayLabel(ts: number): string {
   const d = new Date(ts);
   const today = new Date();
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   if (ts >= start) return 'Today';
   if (ts >= start - 86400_000) return 'Yesterday';
   return d.toLocaleDateString(LOCALE, { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+}
+
+/** The day the conversation's turns below it are from, on a line across it ("Today"). A session starting shows it too. */
+export function DayLine({ day }: { day: string }) {
+  return (
+    <div className="flex items-center gap-3 text-[12px] font-medium text-fg-3">
+      <span className="h-px flex-1 bg-line" />
+      {day}
+      <span className="h-px flex-1 bg-line" />
+    </div>
+  );
 }
 
 const isActive = (i: TimelineItem) => (i.kind === 'tool' && (i.tool.status === 'running' || i.tool.status === 'pending')) || (i.kind === 'thinking' && !!i.streaming);
@@ -299,7 +336,7 @@ function tailShowsStatus(items: TimelineItem[]): boolean {
   return false;
 }
 
-interface LiveInfo {
+export interface LiveInfo {
   status: string;
   since?: number;
   where?: string;
@@ -564,18 +601,7 @@ const SegmentView = memo(function SegmentView({
           >
             {!live && <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform duration-200 group-hover:text-fg-2', expanded && 'rotate-90')} />}
             {live ? (
-              <>
-                <WorkingIcon agent={agent} size={15} spinning={live.status !== 'waiting'} className={live.status === 'waiting' ? 'breathe' : undefined} />
-                <span className={cx('font-medium', live.status === 'waiting' ? 'text-warn' : 'text-busy')}>
-                  {live.status === 'waiting' ? 'Waiting for you' : live.status === 'starting' ? 'Starting' : 'Working'}
-                  {live.where ? ` in ${live.where}` : ''}
-                </span>
-                {live.since && (
-                  <span className="tnum text-fg-3">
-                    · <Elapsed since={live.since} />
-                  </span>
-                )}
-              </>
+              <LiveHead agent={agent} live={live} />
             ) : (
               <>
                 <span className={cx('shrink-0 font-medium', status === 'interrupted' ? 'text-warn' : status === 'failed' ? 'text-err' : 'text-fg-2')}>{head}</span>
@@ -1017,13 +1043,7 @@ export function Timeline({
               // the line moves up to them, the block the reader is on stays put.
               return (
                 <Fragment key={seg.id}>
-                  {divider && (
-                    <div className="flex items-center gap-3 text-[12px] font-medium text-fg-3">
-                      <span className="h-px flex-1 bg-line" />
-                      {day}
-                      <span className="h-px flex-1 bg-line" />
-                    </div>
-                  )}
+                  {divider && <DayLine day={day} />}
                   <div data-seg={seg.id} data-partial={i === 0 && tl.start > 0 && !seg.prompt ? '1' : undefined}>
                     <SegmentView
                       seg={seg}
