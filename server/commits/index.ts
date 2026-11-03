@@ -65,6 +65,63 @@ export function commitsMade(items: TimelineItem[], cwd: string): Made[] {
   return out;
 }
 
+/** A command that may make a commit: `git commit`, cherry-pick, revert, merge, am, rebase. */
+const COMMITS = /\bgit\b(?:\s+-C\s+\S+|\s+-c\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+(?:commit|cherry-pick|revert|merge|am|rebase|pull)\b/;
+
+const flat = (s: string) => s.replace(/\\(.)/g, '$1').replace(/\s+/g, ' ');
+
+/**
+ * Commits a turn made that git printed no line for (`git commit -q`, or output cut short): in each folder a
+ * committing command ran in, those made since the turn began whose subject the turn's commands wrote out
+ * (`-m`, a heredoc, a message file it wrote). Another session committing in the same folder meanwhile wrote
+ * its message elsewhere, so it is left out (a hash a later `git log` prints is no sign: it lists others' too).
+ */
+async function quietCommits(items: TimelineItem[], cwd: string, since: number, known: Set<string>): Promise<Made[]> {
+  const committing: string[][] = [];
+  let here = cwd;
+  const abs = (d: string, from: string) => path.resolve(from, d);
+  /** What the turn wrote: its commands, and files it wrote (a message for `git commit -F`). */
+  let written = '';
+  for (const it of items) {
+    if (it.kind !== 'tool') continue;
+    if (it.tool.category !== 'command') {
+      if (it.tool.input) written += `${flat(JSON.stringify(it.tool.input).replace(/\\n/g, ' '))}\n`;
+      continue;
+    }
+    const cmd = commandOf(it.tool.input, it.tool.title);
+    written += `${flat(cmd)}\n`;
+    const from = it.tool.cwd || here;
+    const dirs = dirsIn(cmd)
+      .filter((d) => !d.startsWith('~') && !d.includes('$'))
+      .map((d) => abs(d, from));
+    const cd = cmd.match(/^\s*cd\s+("[^"]+"|'[^']+'|[^\s;&|]+)\s*(?:&&|;|$)/);
+    if (cd && !cd[1].includes('$') && !cd[1].startsWith('~')) here = abs(unquote(cd[1]), from);
+    if (COMMITS.test(cmd)) committing.push([...new Set([...dirs.reverse(), from, cwd])]);
+  }
+  if (!committing.length) return [];
+  const repos = new Map<string, string>();
+  for (const dir of new Set(committing.flat())) {
+    const top = await git(dir, ['rev-parse', '--show-toplevel'], 5000);
+    if (top.ok && !repos.has(top.out.trim())) repos.set(top.out.trim(), dir);
+  }
+  const out: Made[] = [];
+  for (const [repo] of repos) {
+    // A minute's slack for a clock read late; commits dated earlier were there before the turn.
+    const log = await git(repo, ['log', '--all', '-n', '50', `--since=@${Math.floor(since / 1000) - 60}`, `--format=%H${SEP}%s`, '--reverse'], 5000);
+    if (!log.ok) continue;
+    const head = (await git(repo, ['rev-parse', '--abbrev-ref', 'HEAD'], 5000)).out.trim();
+    for (const line of log.out.split('\n')) {
+      const [hash, subject = ''] = line.split(SEP);
+      if (!hash || known.has(hash) || [...known].some((k) => hash.startsWith(k))) continue;
+      const s = flat(subject).trim();
+      if (s.length < 4 || !written.includes(s.slice(0, 60))) continue;
+      out.push({ hash, branch: head === 'HEAD' ? 'detached HEAD' : head, subject, dirs: [repo] });
+      known.add(hash);
+    }
+  }
+  return out;
+}
+
 const SEP = '\x1f';
 
 /** A commit as the note shows it, from the first of its folders that has it; null when none does or nothing points to it any more. */
@@ -119,11 +176,20 @@ export const commits: Feature = {
     const turn = lastTurn(items);
     if (!turn) return;
     const made = commitsMade(turn.items, cwd);
+    // Agents often commit with -q, which prints no line: look for those in the repositories too.
+    // When the turn began: its items' times, else what the session watcher saw (late for a quick turn, so
+    // a few hours back; the subject still has to be in the turn's commands, and earlier turns' commits are known).
+    const stamped = Math.min(...[turn.prompt, ...turn.items].map((i) => i?.ts ?? Infinity));
+    const began = Number.isFinite(stamped) ? Math.min(stamped, t.startedAt || stamped) : Math.min(t.startedAt || Infinity, t.endedAt - 3 * 3600_000);
+    // Commits earlier turns showed are theirs; this turn's own note, told again, is made afresh.
+    const anchor = anchorOf(turn.items, turn.last);
+    const earlier = notesOf(d.db, t.key, 'commits').filter((n) => n.anchor !== anchor);
+    const known = new Set([...made.map((m) => m.hash), ...earlier.flatMap((n) => ((n.data as CommitsNote | null)?.commits ?? []).map((c) => c.hash))]);
+    made.push(...(await quietCommits(turn.items, cwd, began, known)));
     if (!made.length) return;
     const own = (await git(cwd, ['rev-parse', '--show-toplevel'], 5000)).out.trim() || null;
     const found = (await Promise.all(made.map((m) => lookUp(m, own)))).filter((c): c is TurnCommit => !!c);
     if (!found.length) return;
-    const anchor = anchorOf(turn.items, turn.last);
     const data: CommitsNote = { commits: found };
     // Told twice of the same turn: the note it has is brought up to date.
     const had = notesOf(d.db, t.key, 'commits').find((n) => n.anchor === anchor);
