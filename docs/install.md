@@ -149,12 +149,16 @@ node dist/server/cli.js app import reading-list.naget-app   # says what it will 
 
 ## Updates
 
-The Mac app updates by release: once a day it looks at the newest release on GitHub, and when it is newer, it
-downloads the build for your Mac, checks it against the release's checksum (and, for a signed app, that the same
-developer signed it), and opens it in place of the version you run, after 5 hours without a message from you. Running
-agents carry on. If the new version's server does not start, the app goes back to the version before by itself,
-says why in Settings → General, and leaves that version for **Update now**. It needs to be in a folder you can
-write to (Applications is): opened from the disk image, it can't update.
+The Mac app updates by release: a minute after it opens and then every 4 hours it looks at the newest release on
+GitHub, and when it is newer, it downloads the build for your Mac at once and checks it against the release's
+checksum (and, for a signed app, that the same developer signed it). Then it says so, with a notification from the
+Mac and a note in every open page that counts down a minute (**Restart now**, **Later**), and opens the new version
+in place of the one you run. **Later** puts it off for 4 hours; **Restart to Update** in the menu-bar icon's menu
+installs it whenever you like. Running agents carry on. With **Update automatically** off (Settings → General),
+nothing downloads by itself: Settings says a version is out, and **Update now** installs it. If the new version's
+server does not start, the app goes back to the version before by itself, says why in Settings → General, and
+leaves that version for **Update now**. It needs to be in a folder you can write to (Applications is): opened from
+the disk image, it can't update.
 
 A copy installed from git checks for a newer version once a day and installs it by itself after 5 hours without a
 message from you, at most once a day. Agents can be at work meanwhile: they carry on through the

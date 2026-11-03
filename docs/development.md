@@ -31,6 +31,15 @@ message channel (`server/desktop.ts`), shows it in a window, keeps it in the men
 server downloads (`server/updates.ts`, release by release from `naget-mac.json` on the newest GitHub release),
 going back to the version before when a new one does not start.
 
+The channel goes both ways. The server tells the app what to show and do: `ready` (its address), `update` (a new
+version downloaded and waiting, for Restart to Update in the menus; with `notice`, the words of the notification
+the Mac shows a minute before it installs) and `install`. It asks the app what only the app can find out or do
+(`ask`, answered with `reply`), and hears what you picked in the app's menus (`update-now`). The server looks for a
+release a minute after it starts and every 4 hours; with Update automatically on it downloads a new one at once,
+counts down a minute in every page (`update.ready.installIn`) and then sends `install`; Later
+(`POST /api/update/later`) puts it off for 4 hours. `server/desktop-test.ts` plays the app over the real channel;
+`NAGET_UPDATE_NOTICE_MS` shortens the minute when trying it.
+
 Releases are built by `.github/workflows/mac.yml` on GitHub's Macs, for Apple silicon and Intel, when a tag
 `v<version>` (the version in `package.json`) is pushed; it publishes the `.dmg` and `.zip` builds and
 `naget-mac.json` on the Releases page, with the version's notes from `CHANGELOG.md`. Running it by hand (Actions →

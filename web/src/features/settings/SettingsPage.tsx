@@ -16,6 +16,8 @@ import { FolderChip } from '../../components/FolderPicker';
 import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, IconButton, MenuItem, Popover, Throbber, inputCls, Section, Segmented, Switch, Tabs, useConfirm, useIsMobile } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
+import { LOCALE } from '../../i18n/locale';
+import { restartToUpdate, updateLater } from '../../components/UpdateNotice';
 import { chime, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
 import { PageHeader } from '../layout/PageHeader';
 import { followUpPref, type FollowUp } from '../session/Composer';
@@ -474,10 +476,46 @@ function GeneralSettings() {
 
 const PHASE: Record<NonNullable<UpdateState['running']>['phase'], string> = {
   pull: 'Getting the new version',
+  download: 'Downloading the new version',
   install: 'Installing packages',
   build: 'Building',
   restart: 'Restarting, this page reconnects by itself',
 };
+
+/** The Mac app's new version, downloaded and waiting: Restart now, and while it counts down, Later. */
+function ReadyLine({ ready }: { ready: NonNullable<UpdateState['ready']> }) {
+  const [busy, setBusy] = useState(false);
+  const act = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    await fn();
+    setBusy(false);
+  };
+  const at = (ms: number) => new Date(ms).toLocaleTimeString(LOCALE, { hour: 'numeric', minute: '2-digit' });
+  return (
+    <div className="space-y-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2.5 text-fg-2">
+      <div>
+        <span className="font-medium text-fg">{`Version ${ready.version} is ready to install`}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <Button size="sm" variant="primary" disabled={busy} onClick={() => act(restartToUpdate)}>
+          Restart now
+        </Button>
+        {ready.installIn != null && (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => act(updateLater)}>
+            Later
+          </Button>
+        )}
+        <span className="text-[12px] text-fg-3">
+          {ready.installIn != null
+            ? 'It restarts into it within a minute; running agents carry on.'
+            : ready.later
+              ? `It asks again at ${at(ready.later)}; running agents carry on through the restart.`
+              : 'Running agents carry on through the restart.'}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 /** Whether a newer version is out (for copies installed from git), updating to it, and how the last update went. */
 function UpdateLine() {
@@ -530,6 +568,8 @@ function UpdateLine() {
         <div className="anim-in flex items-center gap-2 text-fg-2">
           <Throbber className="text-fg-3" /> {update.kind === 'app' && update.running.phase === 'restart' ? 'Opening the new version, this page reconnects by itself' : PHASE[update.running.phase]}…
         </div>
+      ) : update.ready ? (
+        <ReadyLine ready={update.ready} />
       ) : update.behind > 0 ? (
         <div className="space-y-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2.5 text-fg-2">
           <div>
@@ -591,7 +631,10 @@ function TipsSetting() {
 /** Settings sections with a tip that says what they are for, the first time they open (features/tips). */
 const SECTION_TIPS: Partial<Record<string, TipId>> = { tasks: 'tasks', memory: 'memory', guidelines: 'guidelines', assistants: 'assistants', connections: 'connections', skillpack: 'skills' };
 
-/** New versions install themselves while you are away, for a copy that can restart itself. */
+/**
+ * New versions install themselves, for a copy that can restart itself: from git while you are away; the Mac app as
+ * soon as one is out, after a minute's notice.
+ */
 function AutoUpdateSetting() {
   const update = useApp((s) => s.boot?.update);
   if (!update) return null;
@@ -600,7 +643,9 @@ function AutoUpdateSetting() {
       label="Update automatically"
       hint={
         update.canRestart
-          ? 'After 5 hours without a message from you, at most once a day. Running agents carry on.'
+          ? update.kind === 'app'
+            ? 'Downloads a new version as soon as it is out, says so, and restarts into it a minute later (Later puts it off). Running agents carry on.'
+            : 'After 5 hours without a message from you, at most once a day. Running agents carry on.'
           : update.kind === 'app'
             ? 'Move Naget Agent to your Applications folder to update it.'
             : 'This server cannot restart itself. Run it as a service (install.sh) or with Docker to update automatically.'

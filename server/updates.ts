@@ -5,8 +5,12 @@
 // without a message from you and at most once a day. Agents may be at work meanwhile.
 //
 // In the Mac app (desktop.ts) it is by version instead: the newest release on GitHub says which version is
-// out and where each Mac's build is; an update downloads it, checks it, unpacks it, and hands it to the app,
-// which swaps itself for it, starts again, and goes back to the version before if the new one does not start.
+// out and where each Mac's build is. The app looks a minute after it starts and then every 4 hours. With updates
+// on, it downloads a new version at once, checks it and unpacks it, says so (a notification from the Mac, and a
+// note in every open page that counts down a minute, with Restart now and Later), then hands it to the app, which
+// swaps itself for it, starts again, and goes back to the version before if the new one does not start. Later
+// puts it off for 4 hours; Restart to Update in the menu bar and Restart now in Settings install it at any time.
+// With updates off nothing downloads by itself: Update now downloads, checks and installs at once.
 import { execFile, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -14,26 +18,55 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import type { UpdateResult, UpdateState } from '../shared/types.ts';
+import { UPDATE_WORDS } from '../shared/desktop.ts';
+import type { UpdateReady, UpdateResult, UpdateState } from '../shared/types.ts';
 import { HttpError } from './auth.ts';
 import { newer } from './clients.ts';
 import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
-import { desktop, tellDesktop } from './desktop.ts';
+import { desktop, onDesktop, tellDesktop } from './desktop.ts';
 import { agentBaseEnv } from './env.ts';
 import { git } from './git.ts';
+import { appWords } from './language/index.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
 /** No message from you for this long before an update installs itself. */
 const IDLE = 5 * HOUR;
+/** The Mac app looks for a new version this often, and a minute after it starts. */
+export const APP_EVERY = 4 * HOUR;
+/** A version the Mac app downloaded by itself is said this long before it restarts into it. */
+export const NOTICE = Number(process.env.NAGET_UPDATE_NOTICE_MS) || 60_000;
+/** Later puts it off this long. */
+export const LATER = 4 * HOUR;
+/** After a download the app started by itself failed, the next one waits at least this long. */
+export const RETRY = HOUR;
 
 let check: { behind: number; latest?: string; checkedAt: number; error?: string } | null = null;
 let running: UpdateState['running'];
 let ctx: { db: DB; onChange: (u: UpdateState | null) => void } | null = null;
 /** The last message you sent through the app (the activity index has the rest, by the hour). */
 let lastMessage = 0;
+
+/** The Mac app: a new version downloaded and checked, waiting for its turn (see Waiting). */
+let ready: Waiting | null = null;
+let readyTimer: NodeJS.Timeout | null = null;
+/** When a download the app started by itself last failed. */
+let failedAt = 0;
+
+/**
+ * A downloaded version: said at `askAt` (a notification from the Mac, the pages' note) and installed at
+ * `installAt`; both 0 while it waits for you (automatic updates off). `told`: the notification for this ask went out.
+ */
+interface Waiting {
+  version: string;
+  app: string;
+  at: number;
+  askAt: number;
+  installAt: number;
+  told?: boolean;
+}
 
 export const noteUserMessage = () => {
   lastMessage = Date.now();
@@ -45,8 +78,18 @@ export function updateState(): UpdateState | null {
   try {
     last = ctx ? JSON.parse(kvGet(ctx.db, 'update.last') ?? 'null') ?? undefined : undefined;
   } catch {}
-  return { ...check, kind: desktop ? 'app' : 'git', auto: !!ctx && kvGet(ctx.db, 'update.auto') !== '0', canRestart: !!restarter(), running, last };
+  return {
+    ...check,
+    kind: desktop ? 'app' : 'git',
+    auto: !!ctx && autoOn(ctx.db),
+    canRestart: !!restarter(),
+    running,
+    ...(ready ? { ready: readyView(ready, Date.now()) } : {}),
+    last,
+  };
 }
+
+const autoOn = (db: DB) => kvGet(db, 'update.auto') !== '0';
 
 const emit = () => {
   if (ctx && check) kvSet(ctx.db, 'update.check', JSON.stringify(check));
@@ -126,14 +169,21 @@ const tail = (out: string) =>
     .join(' · ')
     .slice(0, 300) || 'it failed';
 
-/** Starts an update (409 while one runs); its progress and outcome arrive as update events. */
+/**
+ * Starts an update (409 while one runs); its progress and outcome arrive as update events. In the Mac app, a version
+ * already downloaded and waiting installs at once.
+ */
 export function startUpdate(auto: boolean): UpdateState | null {
   if (!ctx) throw new HttpError(503, 'Starting up');
   if (running) throw new HttpError(409, 'An update is already running');
   if (desktop) {
     if (!desktop.updatable) throw new HttpError(400, 'Move Naget Agent to your Applications folder to update it');
-    running = { phase: 'pull', since: Date.now(), auto };
-    void updateApp(ctx.db, auto);
+    if (ready) {
+      installReady(ctx.db, auto);
+      return updateState();
+    }
+    running = { phase: 'download', since: Date.now(), auto };
+    void updateApp(ctx.db, auto, 'install');
     emit();
     return updateState();
   }
@@ -187,7 +237,14 @@ async function update(db: DB, auto: boolean) {
 }
 
 export function setAutoUpdate(on: boolean): UpdateState | null {
-  if (ctx) kvSet(ctx.db, 'update.auto', on ? '1' : '0');
+  if (ctx) {
+    kvSet(ctx.db, 'update.auto', on ? '1' : '0');
+    // A version waiting: it now installs after its notice, or waits for you.
+    if (ready) {
+      ready = { ...ready, ...(on ? appInstallTimes(Date.now(), ready.version, laterOf(ctx.db)) : { askAt: 0, installAt: 0 }), told: false };
+      schedule();
+    } else if (on) autoDownload();
+  }
   emit();
   return updateState();
 }
@@ -197,7 +254,35 @@ export function autoUpdateDue(s: { now: number; on: boolean; canRestart: boolean
   return s.on && s.canRestart && s.behind > 0 && !s.running && s.now - s.autoAt >= DAY && s.now - s.lastMessage >= IDLE;
 }
 
-/** Checks a few minutes after start, then daily; installs on its own when it may. */
+/**
+ * The Mac app: whether to download a newer version by itself now. It is on and the app can replace itself, a newer
+ * version is out that did not have to be rolled back, nothing runs, it is not the one waiting already, and the
+ * last download that failed was a while ago.
+ */
+export function appDownloadDue(s: { now: number; on: boolean; canRestart: boolean; latest?: string; current: string; skip?: string; running: boolean; ready?: string; failedAt: number }): boolean {
+  return s.on && s.canRestart && !!s.latest && newer(s.latest, s.current) && s.latest !== s.skip && !s.running && s.ready !== s.latest && s.now - s.failedAt >= RETRY;
+}
+
+/** When a downloaded version is said and installs: now and a minute later, or when Later put it off to. */
+export function appInstallTimes(now: number, version: string, later?: { version: string; until: number } | null, notice = NOTICE): { askAt: number; installAt: number } {
+  const askAt = later && later.version === version && later.until > now ? later.until : now;
+  return { askAt, installAt: askAt + notice };
+}
+
+/** A waiting version as the pages see it: counting down to its install, put off until a time, or waiting for you. */
+export function readyView(r: { version: string; at: number; askAt: number; installAt: number }, now: number): UpdateReady {
+  if (!r.installAt) return { version: r.version, at: r.at };
+  if (now < r.askAt) return { version: r.version, at: r.at, later: r.askAt };
+  return { version: r.version, at: r.at, installIn: Math.max(0, r.installAt - now) };
+}
+
+/** When to look for a new version: the first time after starting, then how often. */
+export function checkTimes(kind: 'app' | 'git', checkedBefore: boolean): { first: number; every: number } {
+  if (kind === 'app') return { first: (checkedBefore ? 1 : 0.5) * 60_000, every: APP_EVERY };
+  return { first: 3 * 60_000, every: DAY };
+}
+
+/** The Mac app: a look at the newest release every few hours; elsewhere a daily one, and installing when you are away. */
 export function watchUpdates(db: DB, onChange: (u: UpdateState | null) => void) {
   ctx = { db, onChange };
   try {
@@ -216,15 +301,26 @@ export function watchUpdates(db: DB, onChange: (u: UpdateState | null) => void) 
     kvSet(db, 'update.skip', e.to);
   }
   const tick = () => checkUpdates().catch(() => {});
-  setTimeout(tick, (desktop && !check ? 0.5 : 3) * 60_000).unref();
-  setInterval(tick, DAY).unref();
+  const times = checkTimes(desktop ? 'app' : 'git', !!check);
+  setTimeout(tick, times.first).unref();
+  setInterval(tick, times.every).unref();
+  if (desktop) {
+    // Nothing waits yet (a menu left from before this server started says otherwise); Restart to Update installs.
+    tellDesktop({ type: 'update', version: null });
+    onDesktop('update-now', () => {
+      try {
+        if (ready) installReady(db, false);
+      } catch {}
+    });
+    return;
+  }
   setInterval(() => {
     const now = Date.now();
     const due = autoUpdateDue({
       now,
-      on: kvGet(db, 'update.auto') !== '0',
+      on: autoOn(db),
       canRestart: !!restarter(),
-      behind: desktop && check?.latest === kvGet(db, 'update.skip') ? 0 : (check?.behind ?? 0),
+      behind: check?.behind ?? 0,
       running: !!running,
       autoAt: Number(kvGet(db, 'update.autoAt') ?? 0),
       lastMessage: lastMessageAt(db),
@@ -262,8 +358,33 @@ async function checkRelease(): Promise<UpdateState | null> {
   } catch (e) {
     check = { behind: check?.behind ?? 0, latest: check?.latest, checkedAt: Date.now(), error: (e as Error).message.slice(0, 200) };
   }
+  autoDownload();
   emit();
   return updateState();
+}
+
+/** The version just found, downloaded by itself when it may (appDownloadDue). */
+function autoDownload() {
+  if (!ctx || !desktop) return;
+  const due = appDownloadDue({
+    now: Date.now(),
+    on: autoOn(ctx.db),
+    canRestart: !!restarter(),
+    latest: check?.latest,
+    current: config.version,
+    skip: kvGet(ctx.db, 'update.skip') || undefined,
+    running: !!running,
+    ready: ready?.version,
+    failedAt,
+  });
+  if (!due) return;
+  // A newer version than the one waiting: that one goes (its download is replaced).
+  if (ready) {
+    ready = null;
+    schedule();
+  }
+  running = { phase: 'download', since: Date.now(), auto: true };
+  void updateApp(ctx.db, true, 'wait');
 }
 
 const run = (cmd: string, args: string[], timeout = 120_000) =>
@@ -298,7 +419,11 @@ async function fetchBuild(to: string, file: Feed['files'][string]): Promise<stri
   return path.join(out, app);
 }
 
-async function updateApp(db: DB, auto: boolean) {
+/**
+ * Downloads the newest version and checks it; then installs it at once (Update now), or keeps it waiting for its
+ * notice (`wait`: found by itself).
+ */
+async function updateApp(db: DB, auto: boolean, then: 'install' | 'wait') {
   const at = Date.now();
   const from = config.version;
   const done = (r: Omit<UpdateResult, 'at' | 'auto' | 'from'>) => {
@@ -306,11 +431,19 @@ async function updateApp(db: DB, auto: boolean) {
     running = undefined;
     emit();
   };
+  const fail = (error: string, to?: string) => {
+    if (then === 'wait') failedAt = Date.now();
+    done({ ok: false, to, error });
+  };
   try {
     const f = await feed();
     const file = f.files[process.arch];
     if (!newer(f.version, from) || !file) {
       check = { behind: 0, checkedAt: Date.now() };
+      if (then === 'wait') {
+        running = undefined;
+        return emit();
+      }
       return done({ ok: true, to: from });
     }
     const to = f.version;
@@ -319,16 +452,100 @@ async function updateApp(db: DB, auto: boolean) {
     const team = await teamOf(desktop!.app);
     if (team) {
       const v = await run('codesign', ['--verify', '--deep', '--strict', app]);
-      if (!v.ok) return done({ ok: false, to, error: 'the new version’s signature does not check out' });
-      if ((await teamOf(app)) !== team) return done({ ok: false, to, error: 'the new version is signed by someone else' });
+      if (!v.ok) return fail('the new version’s signature does not check out', to);
+      if ((await teamOf(app)) !== team) return fail('the new version is signed by someone else', to);
     }
-    kvSet(db, 'update.last', JSON.stringify({ ok: true, from, to, at, auto }));
-    kvSet(db, 'update.skip', '');
-    running = { phase: 'restart', since: Date.now(), auto };
+    running = undefined;
+    ready = { version: to, app, at: Date.now(), askAt: 0, installAt: 0 };
+    if (then === 'install') return installReady(db, auto);
+    if (autoOn(db)) ready = { ...ready, ...appInstallTimes(Date.now(), to, laterOf(db)) };
+    schedule();
     emit();
-    // The app stops this server, swaps itself for the new version and starts again; agents carry on.
-    if (!tellDesktop({ type: 'install', app, from, to })) done({ ok: false, to, error: 'the app around the server did not answer' });
   } catch (e) {
-    done({ ok: false, error: (e as Error).message });
+    fail((e as Error).message);
   }
+}
+
+/** The version Later put off, and until when. */
+function laterOf(db: DB): { version: string; until: number } | null {
+  try {
+    const l = JSON.parse(kvGet(db, 'update.later') || 'null');
+    return l && typeof l.version === 'string' && typeof l.until === 'number' ? l : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The waiting version's turn: the menu bar offers it; when its time to be said comes, a notification from the Mac
+ * and the pages' note (they count down from installIn), and a minute later it installs.
+ */
+function schedule() {
+  if (readyTimer) clearTimeout(readyTimer);
+  readyTimer = null;
+  const r = ready;
+  if (!r) return void tellDesktop({ type: 'update', version: null });
+  const now = Date.now();
+  if (!r.installAt || now < r.askAt) {
+    tellDesktop({ type: 'update', version: r.version });
+    if (r.installAt) {
+      readyTimer = setTimeout(() => {
+        schedule();
+        emit();
+      }, r.askAt - now);
+      readyTimer.unref?.();
+    }
+    return;
+  }
+  if (!r.told) {
+    r.told = true;
+    const tr = ctx ? appWords(ctx.db) : (s: string) => s;
+    tellDesktop({ type: 'update', version: r.version, notice: { title: tr(UPDATE_WORDS.title(r.version)), body: tr(UPDATE_WORDS.body), action: tr(UPDATE_WORDS.action) } });
+  } else tellDesktop({ type: 'update', version: r.version });
+  readyTimer = setTimeout(() => {
+    if (ctx) installReady(ctx.db, true);
+  }, Math.max(0, r.installAt - now));
+  readyTimer.unref?.();
+}
+
+/** Hands the waiting version to the app, which stops this server, swaps itself for it and starts again; agents carry on. */
+function installReady(db: DB, auto: boolean) {
+  const r = ready;
+  if (!r || running) return;
+  if (readyTimer) clearTimeout(readyTimer);
+  readyTimer = null;
+  ready = null;
+  const from = config.version;
+  const at = Date.now();
+  kvSet(db, 'update.last', JSON.stringify({ ok: true, from, to: r.version, at, auto }));
+  kvSet(db, 'update.skip', '');
+  kvSet(db, 'update.later', '');
+  running = { phase: 'restart', since: at, auto };
+  emit();
+  if (!tellDesktop({ type: 'install', app: r.app, from, to: r.version })) {
+    kvSet(db, 'update.last', JSON.stringify({ ok: false, from, to: r.version, at, auto, error: 'the app around the server did not answer' }));
+    running = undefined;
+    emit();
+  }
+}
+
+/** Restart now: the waiting version installs at once. */
+export function installUpdateNow(): UpdateState | null {
+  if (!ctx) throw new HttpError(503, 'Starting up');
+  if (running) throw new HttpError(409, 'An update is already running');
+  if (!ready) throw new HttpError(409, 'No new version is waiting to be installed');
+  installReady(ctx.db, false);
+  return updateState();
+}
+
+/** Later: the waiting version asks again in 4 hours (and keeps waiting in the menu bar and Settings meanwhile). */
+export function laterUpdate(): UpdateState | null {
+  if (!ctx) throw new HttpError(503, 'Starting up');
+  if (!ready) throw new HttpError(409, 'No new version is waiting to be installed');
+  const until = Date.now() + LATER;
+  kvSet(ctx.db, 'update.later', JSON.stringify({ version: ready.version, until }));
+  if (ready.installAt) ready = { ...ready, askAt: until, installAt: until + NOTICE, told: false };
+  schedule();
+  emit();
+  return updateState();
 }
