@@ -152,6 +152,9 @@ test('the feature through the registry: Claude Code’s command line', async () 
   assert.ok(at > 0, 'has --disallowedTools');
   assert.deepEqual(spec.args[at + 1].split(','), add.disallowedTools);
   assert.ok(spec.args.includes('--strict-mcp-config'));
+  // Claude Code would give up on the app's own tools after a minute (a video takes several).
+  const mcp = JSON.parse(fs.readFileSync(spec.args[spec.args.indexOf('--mcp-config') + 1], 'utf8'));
+  assert.equal(mcp.mcpServers['naget-agent'].timeout, 600_000);
   assert.match(spec.args[spec.args.indexOf('--append-system-prompt') + 1], /# Assistant: Offline/);
   // No assistant and no tone: no limits, and only the capabilities' notes in the instructions.
   const plain = claudeSpec({ cwd: tmp, sessionId: '00000000-0000-4000-8000-000000000002', add: await spawnAdditions(info('claude', {})) }, {});

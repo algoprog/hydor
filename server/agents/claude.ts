@@ -49,6 +49,9 @@ function mcpConfigFile(sessionId: string, cfg: object): string {
   return file;
 }
 
+/** How long a call to the app's own tools (and the capabilities' servers) may take: ten minutes, as for Codex. */
+const TOOL_TIMEOUT_MS = 600_000;
+
 export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec {
   const args = [
     '--output-format',
@@ -70,9 +73,11 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
   if (o.mode) args.push('--permission-mode', o.mode);
   // The app's own server (and the capabilities' servers) join the user's MCP servers. The app's tools
   // need no approval here: those that need the user's say ask in the conversation themselves.
+  // Their tools may take minutes (a video model at work, a form waiting for the user): over HTTP, Claude Code
+  // gives up on a call after 60 seconds unless the server's entry says how long to wait, as Codex's does.
   const servers: Record<string, unknown> = {};
-  for (const [name, d] of Object.entries(o.add?.mcpServers ?? {})) servers[name] = d.type === 'http' ? { type: 'http', url: d.url, ...(d.headers ? { headers: d.headers } : {}) } : { type: 'stdio', command: d.command, args: d.args ?? [], env: d.env ?? {} };
-  if (o.pageServer) servers[PAGE_SERVER] = { type: 'http', url: o.pageServer };
+  for (const [name, d] of Object.entries(o.add?.mcpServers ?? {})) servers[name] = { ...(d.type === 'http' ? { type: 'http', url: d.url, ...(d.headers ? { headers: d.headers } : {}) } : { type: 'stdio', command: d.command, args: d.args ?? [], env: d.env ?? {} }), timeout: TOOL_TIMEOUT_MS };
+  if (o.pageServer) servers[PAGE_SERVER] = { type: 'http', url: o.pageServer, timeout: TOOL_TIMEOUT_MS };
   // In a file only this user can read, not on the command line: its addresses carry the run's token.
   if (Object.keys(servers).length) args.push('--mcp-config', mcpConfigFile(o.sessionId, { mcpServers: servers }));
   if (o.pageServer) args.push('--allowedTools', `mcp__${PAGE_SERVER}`);
