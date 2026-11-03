@@ -148,7 +148,7 @@ function FromLibrary({ s, have, onCopied }: { s: Space; have: string[]; onCopied
             <Throbber />
           </div>
         ) : !list.length ? (
-          <div className="px-2.5 py-2 text-[12.5px] text-fg-3">{find ? 'No skill of the library matches.' : 'The space has every skill of the library already.'}</div>
+          <div className="px-2.5 py-2 text-[12.5px] text-fg-3">{find ? 'No skill of the library matches.' : 'The project has every skill of the library already.'}</div>
         ) : (
           <>
             {shown.map((k) => (
@@ -223,7 +223,7 @@ export function SpaceSkillsTab({ s }: { s: Space }) {
   const remove = async (k: SpaceSkill) => {
     const ok = await confirm({
       title: `Remove ${k.name}?`,
-      body: k.overrides ? 'The space’s sessions go back to the library’s skill of that name. You can bring this one back from this tab.' : 'The space’s sessions stop seeing it. You can bring it back from this tab.',
+      body: k.overrides ? 'The project’s sessions go back to the library’s skill of that name. You can bring this one back from this tab.' : 'The project’s sessions stop seeing it. You can bring it back from this tab.',
       confirm: 'Remove',
       danger: true,
     });
@@ -264,7 +264,7 @@ export function SpaceSkillsTab({ s }: { s: Space }) {
     <div className="mx-auto max-w-[880px] space-y-5">
       {members.length > 0 && (
         <div className="rounded-2xl border border-line bg-panel px-4 py-3.5">
-          <div className="text-[13.5px] font-medium">Also the skills of the spaces it brings together</div>
+          <div className="text-[13.5px] font-medium">Also the skills of the projects it brings together</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {members.map((m) => (
               <button key={m.id} type="button" onClick={() => go(`/spaces/${m.id}/skills`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
@@ -289,10 +289,10 @@ export function SpaceSkillsTab({ s }: { s: Space }) {
           </span>
           <div className="mt-3 text-[14px] font-semibold">None of its own</div>
           <p className="mt-1 max-w-[520px] text-[13px] leading-relaxed text-fg-3">
-            Skills only this space’s sessions get, with your skill library: how its work is done, step by step. Agents load one when a task calls for it. A skill with the name of one in the library takes
+            Skills only this project’s sessions get, with your skill library: how its work is done, step by step. Agents load one when a task calls for it. A skill with the name of one in the library takes
             its place here.
           </p>
-          <p className="mt-2 max-w-[520px] text-[12.5px] leading-relaxed text-fg-3">Agents working in the space can propose one too, after a task that took real effort: you approve it in the conversation.</p>
+          <p className="mt-2 max-w-[520px] text-[12.5px] leading-relaxed text-fg-3">Agents working in the project can propose one too, after a task that took real effort: you approve it in the conversation.</p>
           <div className="mt-4">{actions}</div>
         </div>
       ) : (

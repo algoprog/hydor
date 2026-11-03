@@ -32,7 +32,7 @@ function Choices({ value, suggest, onPick, list }: { value?: string | null; sugg
       {list.length > FIND_PAST && (
         <label className="mx-1 mb-1 flex h-8 items-center gap-2 rounded-lg bg-bg-2 px-2.5">
           <Search size={13} className="shrink-0 text-fg-3" />
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a space" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a project" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3" />
         </label>
       )}
       <div className={cx(list.length > FIND_PAST && 'max-h-[260px] overflow-y-auto')}>
@@ -41,11 +41,11 @@ function Choices({ value, suggest, onPick, list }: { value?: string | null; sugg
             <span translate="no">{s.name}</span>
           </MenuItem>
         ))}
-        {!shown.length && <div className="px-3 py-2 text-[12.5px] text-fg-3">No space’s name has that in it</div>}
+        {!shown.length && <div className="px-3 py-2 text-[12.5px] text-fg-3">No project’s name has that in it</div>}
       </div>
       <MenuSep />
       <MenuItem icon={<LibraryBig size={15} />} checked={value === null} onClick={() => onPick(null)}>
-        No space
+        No project
       </MenuItem>
     </>
   );
@@ -125,7 +125,7 @@ export function SpaceSelect({ value, onChange, className }: { value: string | nu
       >
         {cur ? <SpaceMark s={cur} size={18} /> : <LibraryBig size={16} className="shrink-0 text-fg-3" />}
         <span translate={cur ? 'no' : undefined} className="min-w-0 flex-1 truncate text-left">
-          {cur ? cur.name : 'No space'}
+          {cur ? cur.name : 'No project'}
         </span>
         <ChevronDown size={14} className="shrink-0 text-fg-3" />
       </button>

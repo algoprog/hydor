@@ -95,10 +95,10 @@
 
 ### 智能体准则
 
-[设置 → 智能体准则](/settings?s=guidelines)：每个智能体都遵循的内容：适用于所有会话、某个空间或单个会话。详见[智能体准则](/guide/guidelines)。
+[设置 → 智能体准则](/settings?s=guidelines)：每个智能体都遵循的内容：适用于所有会话、某个项目或单个会话。详见[智能体准则](/guide/guidelines)。
 
 - [**适用于所有会话**](/settings?s=guidelines&find=For%20every%20session)：每个智能体在每个会话中都遵循的内容。
-- [**适用于某个空间**](/settings?s=guidelines&find=For%20a%20space)：空间中的会话所遵循的准则。
+- [**适用于某个项目**](/settings?s=guidelines&find=For%20a%20project)：项目中的会话所遵循的准则。
 - [**适用于单个会话**](/settings?s=guidelines&find=For%20one%20session)：单个会话的准则，可在开始页或会话菜单中设置。
 - [**Claude Code 和 Codex 也会读取的文件**](/settings?s=guidelines&find=Files%20Claude%20Code%20and%20Codex%20read%20too)：CLAUDE.md 和 AGENTS.md，由 Claude Code 和 Codex 自行读取。
 
@@ -111,17 +111,28 @@
 
 ### 技能
 
-[设置 → 技能](/settings?s=skills)：智能体在任务需要时加载的专门知识。详见[技能](/guide/skills)。
+[设置 → 技能](/settings?s=skills)：智能体在任务需要时加载的成文方法：内置的、你的、来自插件的，以及智能体自己的。详见[技能](/guide/skills)。
 
-- [**新建技能**](/settings?s=skills&find=New%20skill)：为 Claude Code 或 Codex 编写技能。
+- [**新建技能**](/settings?s=skills&find=New%20skill)：为所有智能体编写技能，或只为 Claude Code 或 Codex 编写。
+- [**内置**](/settings?s=skills&find=Built%20in)：应用自带的技能。
+- [**你的**](/settings?s=skills&find=Yours)：你编写的技能，或智能体建议后你批准的技能。
+- [**来自插件**](/settings?s=skills&find=From%20plugins)：你的插件带来的技能。
+- [**Claude Code 和 Codex**](/settings?s=skills&find=Claude%20Code%20and%20Codex)：智能体自己的技能，只有它们自己会获得。
+- [**按关键词引入技能**](/settings?s=skills&find=Bring%20skills%20in%20by%20keywords)：消息中的关键词会自动加载技能。
+- [**制作我自己的版本**](/settings?s=skills&find=Make%20my%20own%20version)：修改内置技能：你的版本会替代它。
 
 ### 插件
 
-[设置 → 插件](/settings?s=plugins)：Claude Code 扩展，打包了技能、命令、智能体和 MCP 服务器。详见[已连接的应用、密钥和工具](/guide/connections)。
+[设置 → 插件](/settings?s=plugins)：为每个智能体带来技能、工具和指令的扩展。详见[已连接的应用、密钥和工具](/guide/connections)。
 
-- [**已安装**](/settings?s=plugins&find=Installed)：Claude Code 拥有的插件。
-- [**浏览**](/settings?s=plugins&find=Browse)：查找可安装的插件。
-- [**市场**](/settings?s=plugins&find=Marketplaces)：插件来源。
+- [**你的插件**](/settings?s=plugins&find=Your%20plugins)：你添加的插件，可为所有智能体开启或关闭。
+- [**应用自带**](/settings?s=plugins&find=Come%20with%20the%20app)：应用自带的插件，随时可以添加。
+- [**制作插件**](/settings?s=plugins&find=Make%20a%20plugin)：把你自己的技能、工具、指令和文件打包成插件。
+- [**来自链接**](/settings?s=plugins&find=From%20a%20link)：从 GitHub 或其他 Git 地址添加插件。
+- [**来自 .zip 文件**](/settings?s=plugins&find=From%20a%20.zip%20file)：添加别人打包成 .zip 的插件。
+- [**打包成 .zip**](/settings?s=plugins&find=Pack%20into%20a%20.zip)：把插件打包成一个文件来分享。
+- [**Claude Code**](/settings?s=plugins&find=Claude%20Code)：Claude Code 自己的插件和市场。
+- [**Codex**](/settings?s=plugins&find=Codex)：Codex 自己的插件和市场。
 
 ### 定时任务
 
@@ -223,14 +234,6 @@
 - [**新建助手**](/settings?s=assistants&find=New%20assistant)：启动会话时使用的预设。
 - [**任务完成后清理**](/settings?s=assistants&find=Clean%20up%20after%20a%20task)：智能体会删除过程中创建且不再需要的内容。
 - [**任务文件夹**](/settings?s=assistants&find=Task%20folders)：助手的新任务文件夹存放位置。
-
-### 技能库
-
-[设置 → 技能库](/settings?s=skillpack)：应用自带的技能，以及智能体经你批准学会的技能。详见[技能](/guide/skills)。
-
-- [**已习得**](/settings?s=skillpack&find=Learned)：智能体经你批准学会的技能。
-- [**内置**](/settings?s=skillpack&find=Built%20in)：应用自带的技能。
-- [**按关键词引入技能**](/settings?s=skillpack&find=Bring%20skills%20in%20by%20keywords)：消息中的关键词会自动加载技能。
 
 ### Custom
 

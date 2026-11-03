@@ -650,7 +650,9 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       target: 'tools',
       sidebar: true,
       title: 'Your computer, from anywhere',
-      body: `Files to look through and change what is on this computer${cli ? ', Usage to see how much of your subscription is left and when it resets,' : ''} and System to see how busy the computer is. Git and Terminal are there for programmers.`,
+      body: cli
+        ? 'The Library keeps what agents made for you, and Apps the tools you run again and again. Usage shows how much of your subscription is left and when it resets. System is this computer: its files, how busy it is, and Git, a terminal and previews of web apps for programmers.'
+        : 'The Library keeps what agents made for you, and Apps the tools you run again and again. System is this computer: its files, how busy it is, and Git, a terminal and previews of web apps for programmers.',
     },
     {
       id: 'notify',

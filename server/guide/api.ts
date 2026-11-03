@@ -44,6 +44,7 @@ const RULES: Rule[] = [
   // Changes that change nothing, or only look something up.
   ['POST', /^\/api\/(update-check|knowledge\/search|models\/inspect|automations\/next|automations\/watch\/test|apps\/draft|apps\/check|apps\/install\/check|automations\/draft)$/, 'free'],
   ['POST', /^\/api\/(search|push|voice)\/test$|^\/api\/connections\/[^/]+\/test$/, 'free'],
+  ['POST', /^\/api\/plugins\/inspect$/, 'free'],
   // Ask every time: risky, costly or hard to undo.
   ['DELETE', /./, 'always'],
   ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|interrupt|cancel)(\/|$)/, 'always'],
@@ -53,6 +54,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(update|update\/auto|startup|machines|scm\/accounts|acp-agents|agent-accounts|clients)(\/|$)/, 'always'],
   ['W', /^\/api\/models\/(install|start)$/, 'always', 'This downloads or starts a model on this computer.'],
   ['POST', /^\/api\/apps\/install$|^\/api\/apps\/[^/]+\/env$/, 'always', 'This installs an app on this computer, with the apps and the Node or Python packages it needs.'],
+  ['W', /^\/api\/plugins\/(install|new|[^/]+\/(enable|setup|update|draft|files))$/, 'always', 'A plugin runs programs on this computer, installs what it needs, and gives every agent its skills, tools and instructions.'],
   ['W', /^\/api\/voice$/, 'confirm'],
   ['POST', /^\/api\/sessions$/, 'always', 'This starts a new session.'],
   ['W', /^\/api\/sessions\/[^/]+\/(message|handoff|fork|rewind|guest-links|pr|worktree|start|compact|goal)/, 'always'],

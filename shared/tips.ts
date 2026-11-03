@@ -82,7 +82,7 @@ export const TIP_GUIDE: Record<TipId, string> = {
   review: '/guide/files-git#review-what-a-branch-changes',
   library: '/guide/library#find-your-pages',
   apps: '/guide/apps#find-your-way-around-the-apps-page',
-  spaces: '/guide/spaces#what-a-space-is',
+  spaces: '/guide/spaces#what-a-project-is',
   knowledge: '/guide/spaces#shared-knowledge-documents-every-session-can-search',
   usage: '/guide/usage#open-the-usage-page',
   ask: '/guide/ask-agents#ask-how-to-do-something',
@@ -91,7 +91,7 @@ export const TIP_GUIDE: Record<TipId, string> = {
   guidelines: '/guide/guidelines#what-guidelines-are',
   assistants: '/guide/assistants#make-your-own-assistant',
   connections: '/guide/connections#what-connections-keys-and-tools-are',
-  skills: '/guide/skills#skills-agents-learned',
+  skills: '/guide/skills#open-the-skills-page',
 };
 
 /** GET and PUT /api/tips. */

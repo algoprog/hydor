@@ -39,7 +39,7 @@ export function KnowledgePage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
-        title="Spaces"
+        title="Projects"
         tip="knowledge"
         sub="Documents every session can search and cite"
         actions={
@@ -63,7 +63,7 @@ export function KnowledgePage() {
             <div className="space-y-4">
               <Empty icon={<Library size={22} />} title="Add your documents once">
                 Contracts, manuals, notes, papers, a whole folder: every session can then search them, by their words or by what they mean, and cites the file and page it read. A
-                space can have documents of its own too, on its Knowledge tab.
+                project can have documents of its own too, on its Knowledge tab.
               </Empty>
               <DropFiles big onFiles={(p) => void firstFiles(p)} />
               <div className="text-center">

@@ -10,7 +10,7 @@ import { searchKnowledge, type SearchMode } from './search.ts';
 import { baseRow, baseView, chunkById, chunksOf, docByPath, docById, docsOf, type BaseRow } from './store.ts';
 
 const MAX_READ = 14_000;
-const NONE = 'There are no knowledge bases for this session yet (the user adds documents in Spaces: shared knowledge for every session, or a space’s own).';
+const NONE = 'There are no knowledge bases for this session yet (the user adds documents in Projects: shared knowledge for every session, or a project’s own).';
 
 /** The bases with documents in them, as agents are told of them. */
 export function filled(db: DB, bases: (BaseRow & { own?: boolean; from?: string })[]): { id: string; name: string; own: boolean; from?: string; docs: number }[] {
@@ -23,7 +23,7 @@ export function filled(db: DB, bases: (BaseRow & { own?: boolean; from?: string 
 export function knowledgeInstructions(db: DB, space: string | null = null): string | null {
   const bases = filled(db, basesFor(db, space));
   if (!bases.length) return null;
-  const whose = (b: { own: boolean; from?: string }) => (space ? (b.from ? `, from the ${b.from} space` : b.own ? ', this space’s own' : ', shared') : '');
+  const whose = (b: { own: boolean; from?: string }) => (space ? (b.from ? `, from the ${b.from} project` : b.own ? ', this project’s own' : ', shared') : '');
   return [
     `Knowledge bases: the user added their own documents for you to search: ${bases.map((b) => `${b.name} (${b.docs} document${b.docs === 1 ? '' : 's'}${whose(b)})`).join(', ')}.`,
     'When a question may be answered from them, search there first with knowledge_search, before the web or memory, and read more of a document with knowledge_read.',
@@ -34,7 +34,7 @@ export function knowledgeInstructions(db: DB, space: string | null = null): stri
 const SEARCH: RunTool = {
   name: 'knowledge_search',
   description: [
-    "Search the user's knowledge bases (documents and folders they added: the shared knowledge, and this session's space's own) for passages about a question.",
+    "Search the user's knowledge bases (documents and folders they added: the shared knowledge, and this session's project's own) for passages about a question.",
     'mode: auto (by words and by meaning, the default), words (the words themselves), meaning (what it means, in other words or languages), exact (this exact text, or a /regular expression/, as grep would).',
     'Each passage comes with its file, page or part, and path: cite them. knowledge_read gives more of a document around a passage.',
   ].join(' '),

@@ -1,6 +1,7 @@
 ---
 name: evidence-before-done
 description: Use before reporting that something is done, fixed, working, saved, sent or booked, or that a fact, number or result is right, whenever the claim can be checked.
+category: work
 triggers: [make sure, double-check, double check, verify, is it working, check that it works, confirm that]
 ---
 

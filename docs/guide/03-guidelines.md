@@ -1,8 +1,8 @@
 # Agent Guidelines
 
-Agent Guidelines are what you want every agent here to follow: how you like to work, what to always or never do, how to talk to you. One text works for every agent (Claude Code, Codex, Custom and the agents that speak ACP), and you can write it for every session, for a space, or for one session.
+Agent Guidelines are what you want every agent here to follow: how you like to work, what to always or never do, how to talk to you. One text works for every agent (Claude Code, Codex, Custom and the agents that speak ACP), and you can write it for every session, for a project, or for one session.
 
-![Settings → Agent Guidelines: what every session follows, and the guidelines of each space](images/guidelines.webp)
+![Settings → Agent Guidelines: what every session follows, and the guidelines of each project](images/guidelines.webp)
 
 ## What guidelines are
 
@@ -17,10 +17,10 @@ What you ask in the conversation always comes first: if your guidelines say "sho
 Guidelines come at three levels, from the most general to the most specific:
 
 1. **For every session**: every agent, in every session. Set in [Settings → Agents → Agent Guidelines](/settings?s=guidelines).
-2. **For a space**: every session in that [space](/guide/spaces). Set on the space's page, in its **Agent Guidelines** field.
+2. **For a project**: every session in that [project](/guide/spaces). Set on the project's page, in its **Agent Guidelines** field.
 3. **For one session**: only that session. Set on the start page (**Options → Guidelines**) before it starts, or later from the session's menu (⋯) → **Session settings → Guidelines**.
 
-An agent gets all the levels that apply to its session, in that order. Where two disagree, the more specific one wins: a session's guidelines over its space's, a space's over the ones for every session.
+An agent gets all the levels that apply to its session, in that order. Where two disagree, the more specific one wins: a session's guidelines over its project's, a project's over the ones for every session.
 
 ## Write guidelines for every session
 
@@ -32,17 +32,17 @@ Below the box are a few ready-made ways for agents to talk to you (**Plain Engli
 
 Each level holds up to 20,000 characters. Keep them short where you can: every session reads all of it, and a few clear lines work better than pages.
 
-## Give a space its guidelines
+## Give a project its guidelines
 
-Every space has guidelines of its own, for the work you keep in it: who it is for, the style to write in, the rules of the project.
+Every project has guidelines of its own, for the work you keep in it: who it is for, the style to write in, the rules of the project.
 
-1. Open **Spaces** in the sidebar and pick the space.
+1. Open **Projects** in the sidebar and pick the project.
 2. Write in the **Agent Guidelines: what every agent in it follows** field.
-3. Save the space.
+3. Save the project.
 
-You can also write them when you make a space: in the **New space** window, click **More options**, then write in **Agent Guidelines**. **Settings → Agents → Agent Guidelines → For a space** lists every space that has guidelines; click one to open it.
+You can also write them when you make a project: in the **New project** window, click **More options**, then write in **Agent Guidelines**. **Settings → Agents → Agent Guidelines → For a project** lists every project that has guidelines; click one to open it.
 
-In a group (a space that brings several spaces together), its sessions follow the group's own guidelines, and read what each space in the group asks as part of working with that space.
+In a group (a project that brings several projects together), its sessions follow the group's own guidelines, and read what each project in the group asks as part of working with that project.
 
 ## Guidelines for one session
 
@@ -52,12 +52,12 @@ In a group (a space that brings several spaces together), its sessions follow th
 2. Click **Guidelines**. A dialog opens on **This session**.
 3. Write what this session alone should follow, and click **Save**. The Options chip then shows **For this session**.
 
-The same dialog shows the space's guidelines (when you picked a space) and the ones for every session, each on its own tab, so you can see everything the agent will follow, and change those too. A dot on a tab means that level has some.
+The same dialog shows the project's guidelines (when you picked a project) and the ones for every session, each on its own tab, so you can see everything the agent will follow, and change those too. A dot on a tab means that level has some.
 
 ### In a running session
 
 1. Open the session's menu (⋯) → **Session settings → Guidelines**.
-2. Change **This session** (or the space's, or every session's), and click **Save**.
+2. Change **This session** (or the project's, or every session's), and click **Save**.
 
 A change takes effect from your next message. Claude Code and Codex read their instructions when they start, so when you send your next message the app starts the agent again quietly with the new guidelines; the conversation carries on where it was. This waits while the agent is in the middle of a turn, works towards a goal, or has work running in the background: it happens once it is idle. Custom reads them before each turn anyway. Other agents (Gemini CLI, OpenCode and the rest) take changed guidelines from their next session.
 
@@ -65,13 +65,13 @@ A change takes effect from your next message. Claude Code and Codex read their i
 
 - **Say what you want, plainly**: "Ask me before installing anything" is clearer than "be careful".
 - **Put the lasting things here, and the task in the message**: guidelines are for what holds every time.
-- **Use the right level**: how you like to be talked to belongs in every session's; a project's rules in its space; a one-off constraint in the session's.
+- **Use the right level**: how you like to be talked to belongs in every session's; a project's rules in its project; a one-off constraint in the session's.
 - **Keep them current**: when an agent keeps doing something you don't want, add a line.
 
 Some examples:
 
 - For every session: "Answer in plain English. Explain jargon the first time. Ask before deleting files or sending anything outside this computer."
-- For a space "Thesis": "Cite in APA style. The thesis is about dairy farming in Greece. Keep drafts in the drafts folder."
+- For a project "Thesis": "Cite in APA style. The thesis is about dairy farming in Greece. Keep drafts in the drafts folder."
 - For one session: "Only use Python's standard library."
 
 ## How the agents talk to you
@@ -92,6 +92,6 @@ The list shows every file the agent reads for a session in that folder, in the o
 
 - "Add to my guidelines that you should always answer in Greek."
 - "What guidelines does this session follow?"
-- "Give my Thesis space the guideline: cite in APA style."
+- "Give my Thesis project the guideline: cite in APA style."
 - "Remove the line about British spelling from my guidelines."
 - "For this session only, don't use any libraries outside the standard library."

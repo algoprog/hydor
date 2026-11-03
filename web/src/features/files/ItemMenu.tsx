@@ -26,7 +26,7 @@ export function useFolderLead(pick: (path: string) => void, at?: string | null):
       key: `sp:${s.id}`,
       icon: <SpaceMark s={s} size={15} />,
       name: s.name,
-      where: 'Space',
+      where: 'Project',
       title: tildify(s.folder, home),
       on: at === s.folder,
       pick: () => pick(s.folder),

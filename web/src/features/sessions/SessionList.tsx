@@ -479,7 +479,7 @@ function PlaceHead({ g, folded, home, onFold }: { g: SessionGroup; folded: boole
       <button
         type="button"
         aria-expanded={!folded}
-        title={g.space ? `The ${g.space.name} space: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : tildify(g.path, home)}
+        title={g.space ? `The ${g.space.name} project: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : tildify(g.path, home)}
         onClick={(e) => {
           // On a phone a tap on a button in the list closes the drawer (it opened a session); this one stays.
           e.stopPropagation();

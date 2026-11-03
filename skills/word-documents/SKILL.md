@@ -1,6 +1,7 @@
 ---
 name: word-documents
 description: Use when the user wants a Word file (.docx) made or changed from code (a report, letter, CV, memo, contract, form, handout or notes to open in Word, Google Docs or Pages), or wants an existing .docx, .doc or .odt read, summarised or edited. For a new document to read, edit and print in the app, write it with save_doc instead.
+category: documents
 ---
 
 # Word documents

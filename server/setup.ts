@@ -328,7 +328,7 @@ const slug = (s: string) =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 64);
 
-export function createSkill(agent: Agent, name: string, description: string, scope: 'user' | 'project', cwdArg?: string): string {
+export function createSkill(agent: Agent, name: string, description: string, scope: 'user' | 'project', cwdArg?: string, body?: string): string {
   const s = slug(name);
   if (!s) throw new HttpError(400, 'Give the skill a name');
   const root = agent === 'codex' ? codexUserSkills() : scope === 'project' ? path.join(folder(cwdArg), '.claude', 'skills') : path.join(claudeDir(), 'skills');
@@ -337,7 +337,8 @@ export function createSkill(agent: Agent, name: string, description: string, sco
   fs.mkdirSync(dir, { recursive: true });
   const desc = description.replace(/\s+/g, ' ').trim() || `Use when …`;
   const file = path.join(dir, 'SKILL.md');
-  fs.writeFileSync(file, `---\nname: ${s}\ndescription: ${JSON.stringify(desc)}\n---\n\n# ${name.trim()}\n\nWhen to use this skill, then the steps to follow.\n`);
+  const text = body?.trim() || `# ${name.trim()}\n\nWhen to use this skill, then the steps to follow.`;
+  fs.writeFileSync(file, `---\nname: ${s}\ndescription: ${JSON.stringify(desc)}\n---\n\n${text}\n`);
   return file;
 }
 
@@ -416,6 +417,57 @@ export async function marketplaceAction(action: 'add' | 'remove', target: string
   if (!/^[\w.@:/~+-]{1,300}$/.test(target)) throw new HttpError(400, 'Use a GitHub owner/repo, a git URL or a path');
   const r = await run('claude', ['plugin', 'marketplace', action, target], { timeoutMs: 180_000 });
   catalog = null;
+  return result(r);
+}
+
+// ---- Codex's plugins (its marketplaces) -----------------------------------------------------------
+
+let codexCatalog: { at: number; list: PluginEntry[] } | null = null;
+
+/** Codex's catalog lists connectors by opaque ids too ("app-6a05…"): only plugins with names people can read are offered. */
+const readable = (p: Json) => !/^app-[0-9a-f]{16,}$/.test(String(p.name ?? '')) && p.installPolicy !== 'NOT_AVAILABLE';
+
+export async function listCodexPlugins(q = '', limit = 60): Promise<{ installed: PluginEntry[]; available: PluginEntry[]; marketplaces: MarketplaceEntry[]; total: number }> {
+  if (!codexCatalog || Date.now() - codexCatalog.at > 10 * 60_000) {
+    const r = await run('codex', ['plugin', 'list', '--json', '--available'], { timeoutMs: 180_000 });
+    let d: Json = {};
+    try {
+      d = JSON.parse(r.out);
+    } catch {}
+    const installed = ((d.installed ?? []) as Json[]).map((p) => pluginOf(p, true));
+    const have = new Set(installed.map((p) => p.id));
+    codexCatalog = {
+      at: Date.now(),
+      list: [
+        ...installed,
+        ...((d.available ?? []) as Json[])
+          .filter(readable)
+          .map((p) => pluginOf(p, false))
+          .filter((p) => !have.has(p.id)),
+      ],
+    };
+  }
+  const m = await run('codex', ['plugin', 'marketplace', 'list', '--json'], { timeoutMs: 30_000 });
+  let marketplaces: MarketplaceEntry[] = [];
+  try {
+    marketplaces = ((JSON.parse(m.out).marketplaces ?? []) as Json[]).map((x) => ({ name: String(x.name), source: x.root ?? undefined, url: x.url ?? undefined }));
+  } catch {}
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const avail = codexCatalog.list.filter((p) => !p.installed).filter((p) => !words.length || words.every((w) => `${p.name} ${p.description ?? ''} ${p.marketplace ?? ''}`.toLowerCase().includes(w)));
+  return { installed: codexCatalog.list.filter((p) => p.installed), available: avail.slice(0, Math.max(1, Math.min(limit, 200))), marketplaces, total: avail.length };
+}
+
+export async function codexPluginAction(action: 'add' | 'remove', id: string): Promise<SetupResult> {
+  if (!PLUGIN_ID.test(id)) throw new HttpError(400, 'Bad plugin id');
+  const r = await run('codex', ['plugin', action, id], { timeoutMs: action === 'add' ? 300_000 : 60_000 });
+  codexCatalog = null;
+  return result(r);
+}
+
+export async function codexMarketplaceAction(action: 'add' | 'remove' | 'upgrade', target: string): Promise<SetupResult> {
+  if (!/^[\w.@:/~+-]{1,300}$/.test(target)) throw new HttpError(400, 'Use a GitHub owner/repo, a git URL or a path');
+  const r = await run('codex', ['plugin', 'marketplace', action, target], { timeoutMs: 180_000 });
+  codexCatalog = null;
   return result(r);
 }
 

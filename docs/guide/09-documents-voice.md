@@ -10,7 +10,7 @@ Every agent the app runs can read documents: Claude Code, Codex, Custom, and the
 
 1. **Attach it to your message**: the paperclip (**Attach files**) in the message box, or drag the file onto the box, or paste it. Pictures go to the model as pictures; any other file is saved on the computer that runs Naget Agent, and its path is added to your message so the agent can open it. One message carries up to 25 MB of files.
 2. **Name a file on this computer**: "Summarize ~/Documents/lease.pdf". A path that doesn't start with `/` or `~` starts in the session's folder.
-3. **Keep documents in a space or in the shared knowledge**, so that sessions can search them and cite the page: see [Spaces and knowledge](/guide/spaces).
+3. **Keep documents in a project or in the shared knowledge**, so that sessions can search them and cite the page: see [Projects and knowledge](/guide/spaces).
 
 While the agent reads, its work shows **Reading lease.pdf**, then **Read lease.pdf**. On a wider screen the line also says what the document is (the kind, its pages, sheets or slides) and which lines were read. Click the line to see the text the agent got, and **Open lease.pdf** to see the file itself.
 
@@ -47,7 +47,7 @@ Custom also reads PDFs, Office documents and pictures with its ordinary file rea
 
 ## Have an agent make a document
 
-The app comes with four document skills that every agent can load: **word-documents**, **spreadsheets**, **presentations** and **pdf**. You find them under [Settings → Capabilities → Skill library](/settings?s=skillpack&find=Built%20in), in **Built in** (see [Skills](/guide/skills)). You don't pick them: ask in plain words ("Make a one-page CV from my notes as a Word document", "Put these expenses in a spreadsheet with monthly totals and a chart", "Make 8 slides for my talk on bees", "Merge these three PDFs"), and the agent loads the right skill when the task calls for it.
+The app comes with four document skills that every agent can load: **word-documents**, **spreadsheets**, **presentations** and **pdf**. You find them in [Settings → Skills](/settings?s=skills&find=Built%20in), under **Documents** (see [Skills](/guide/skills)). You don't pick them: ask in plain words ("Make a one-page CV from my notes as a Word document", "Put these expenses in a spreadsheet with monthly totals and a chart", "Make 8 slides for my talk on bees", "Merge these three PDFs"), and the agent loads the right skill when the task calls for it.
 
 Each skill works the same way:
 
@@ -120,13 +120,13 @@ When an agent has made files for you (a document, a spreadsheet, slides, a PDF, 
 
 **Open** shows the file in the file viewer, in a window over the conversation, which stays where it was (on a phone the window comes up from the bottom of the screen). **Open in Files** at its top takes the file to the Files page; the cross, or Escape, closes the window. The download button saves the file on your device.
 
-**More** (⋯), on a card and at the top of the window, has **Start a session with it** (the start page, with the file in its message box), **Add to a space** (copies it into a space's folder), **Show in Files** (on a card) and **Copy path**. See [Start a session with files](/guide/files-git#start-a-session-with-files) and [Add files to a space](/guide/files-git#add-files-to-a-space).
+**More** (⋯), on a card and at the top of the window, has **Start a session with it** (the start page, with the file in its message box), **Add to a project** (copies it into a project's folder), **Show in Files** (on a card) and **Copy path**. See [Start a session with files](/guide/files-git#start-a-session-with-files) and [Add files to a project](/guide/files-git#add-files-to-a-project).
 
 A file deleted or moved since shows as **No longer there**. If an agent names a file that doesn't exist, you see "Could not show the files" with the reason, and the agent is told to fix it.
 
 ## Preview a document in the file viewer
 
-The file viewer shows documents from a card, from the Files page, or from a link in a reply (see [Files, Git, Terminal and Preview](/guide/files-git)).
+The file viewer shows documents from a card, from the Files page, or from a link in a reply (see [System: files, Git, Terminal and Preview](/guide/files-git)).
 
 - **PDFs** show as they are, in the browser's own PDF view.
 - **Word, Excel, PowerPoint, OpenDocument, EPUB and RTF** files (old .doc, .xls and .ppt too) show as a preview. When LibreOffice is installed, a switch at the top offers two views:
@@ -182,7 +182,7 @@ Pictures are saved in an **images** folder inside the session's folder, named af
 In the conversation:
 
 - While the model works, a placeholder in the shape asked for says "Making an image" with the time so far, and the description under it.
-- Then the pictures show with the reply, with the description and the model's name under them, and **Save to Library** (see [Keep a picture or a video](#keep-a-picture-or-a-video)). Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a space**, **Copy path**) appear when you point at it (on a phone they are always there); with several pictures, **Save to Library** is there too.
+- Then the pictures show with the reply, with the description and the model's name under them, and **Save to Library** (see [Keep a picture or a video](#keep-a-picture-or-a-video)). Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a project**, **Copy path**) appear when you point at it (on a phone they are always there); with several pictures, **Save to Library** is there too.
 - Without an OpenRouter key you see "Images need an OpenRouter key", with **Add an OpenRouter key**. When the model makes nothing, you see "No image this time" with its reason.
 
 ## Ask for a video
@@ -297,7 +297,7 @@ It fills the screen, says "I'm listening", and asks the device to keep the scree
 
 ### What you can say
 
-- **Start a session**: "Start a session to plan my weekend in Crete". It starts as the start page would: with the agent, model, effort, permissions, assistant and space you picked there last, in a new task folder (or in the folder you last picked there). From then on it follows that session.
+- **Start a session**: "Start a session to plan my weekend in Crete". It starts as the start page would: with the agent, model, effort, permissions, assistant and project you picked there last, in a new task folder (or in the folder you last picked there). From then on it follows that session.
 - **Tell a session something**: "Tell it to use metric units". The words go to the session it follows, as your message.
 - **Ask how things are**: "How are my sessions doing?". It says what is working, what needs you and what it asks, and what finished lately.
 - **Hear the result**: "Read me the answer". It says the latest reply of the session it follows (or, when it follows none, of the busiest or latest session). A long reply comes as its gist, in three to five sentences; when the app is shown in another language than English, every reply comes as its gist in that language.
@@ -326,7 +326,7 @@ It stops listening to say these, then listens again. Sessions on your other mach
 
 - "Turn on speech recognition on this computer, with the Small model."
 - "Use my speech server at http://192.168.1.20:8000/v1 for dictation, with the model whisper-large-v3."
-- "Which whisper models are on this computer, and how much space do they take? Remove the ones not in use."
+- "Which whisper models are on this computer, and how much project do they take? Remove the ones not in use."
 - "Which image model do agents use now, and about what does one image cost?"
 - "Switch the image model to the cheapest one that can edit pictures."
 - "Stop agents from making images."

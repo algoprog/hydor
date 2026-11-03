@@ -138,7 +138,7 @@ async function moveTo(it: Item, space: string | null, spaces: SpaceView[] | null
       useMedia.getState().put(r.item);
     }
     const name = spaces?.find((s) => s.id === space)?.name;
-    toast(name ? tr(`Moved to ${name}`) : 'Moved out of its space', 'ok');
+    toast(name ? tr(`Moved to ${name}`) : 'Moved out of its project', 'ok');
   } catch (e) {
     toastError(e);
   }
@@ -248,7 +248,7 @@ function ItemCard({ it, showSpace }: { it: Item; showSpace?: boolean }) {
         )}
         {!!spaces?.length && (
           <MenuItem icon={<FolderInput size={14} />} onClick={() => (close(), setMoving(true))}>
-            Move to a space
+            Move to a project
           </MenuItem>
         )}
         {p ? (
@@ -368,12 +368,12 @@ function Places({ place, onPlace, items, sites, chips }: { place: Place; onPlace
   const list = (
     <>
       <PlaceButton chip={chips} on={place.kind === 'all'} icon={<LibraryBig size={15} className={chips ? undefined : 'text-fg-3'} />} label="Everything" count={items.length} onClick={() => onPlace({ kind: 'all' })} />
-      {spaces.length > 0 && !chips && <div className="px-2.5 pt-4 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3 uppercase">Spaces</div>}
+      {spaces.length > 0 && !chips && <div className="px-2.5 pt-4 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3 uppercase">Projects</div>}
       {spaces.map((s) => (
         <PlaceButton key={s.id} chip={chips} mine on={place.kind === 'space' && place.id === s.id} icon={<SpaceMark s={s} size={chips ? 16 : 18} />} label={s.name} count={count(s.id)} onClick={() => onPlace({ kind: 'space', id: s.id })} />
       ))}
       {spaces.length > 0 && (none > 0 || place.kind === 'none') && (
-        <PlaceButton chip={chips} on={place.kind === 'none'} icon={<Layers size={15} className={chips ? undefined : 'text-fg-3'} />} label="Not in a space" count={none} onClick={() => onPlace({ kind: 'none' })} />
+        <PlaceButton chip={chips} on={place.kind === 'none'} icon={<Layers size={15} className={chips ? undefined : 'text-fg-3'} />} label="Not in a project" count={none} onClick={() => onPlace({ kind: 'none' })} />
       )}
       {!chips && <div className="mx-2.5 my-3 border-t border-line" />}
       <PlaceButton chip={chips} on={place.kind === 'published'} icon={<Globe size={15} className={chips ? undefined : 'text-fg-3'} />} label="Published" count={sites?.length ?? undefined} onClick={() => onPlace({ kind: 'published' })} />
@@ -386,9 +386,9 @@ function Places({ place, onPlace, items, sites, chips }: { place: Place; onPlace
       {!spaces.length && (
         <div className="mt-4 rounded-xl border border-dashed border-line-2 px-3 py-3 text-[12.5px] leading-snug text-fg-3">
           <span className="block font-medium text-fg-2">Sort it by project</span>
-          Make a space for a project, and what its sessions make lands together here.
+          Make a project for each piece of work, and what its sessions make lands together here.
           <button type="button" onClick={() => go('/spaces')} className="mt-1.5 flex items-center gap-1 font-medium text-accent hover:underline">
-            Spaces <ArrowRight size={13} />
+            Projects <ArrowRight size={13} />
           </button>
         </div>
       )}
@@ -409,7 +409,7 @@ function SpaceSection({ space, items, onAll }: { space: SpaceView | null; items:
       <div className="mb-3 flex min-w-0 items-center gap-2.5">
         {space ? <SpaceMark s={space} size={22} className="rounded-md" /> : <Layers size={18} className="shrink-0 text-fg-3" />}
         <h2 translate={space ? 'no' : undefined} className="min-w-0 truncate text-[15px] font-semibold tracking-tight">
-          {space ? space.name : 'Not in a space'}
+          {space ? space.name : 'Not in a project'}
         </h2>
         <span className="tnum text-[13px] text-fg-3">{items.length}</span>
         <span className="flex-1" />
@@ -518,7 +518,7 @@ export function Library() {
       New
     </Button>
   );
-  const title = place.kind === 'published' ? 'Published' : place.kind === 'none' ? 'Not in a space' : space ? space.name : 'Everything';
+  const title = place.kind === 'published' ? 'Published' : place.kind === 'none' ? 'Not in a project' : space ? space.name : 'Everything';
 
   const body = () => {
     if (place.kind === 'published') return <Published sites={sites} onPublish={() => setPublish(true)} />;
@@ -532,7 +532,7 @@ export function Library() {
       return (
         <Empty icon={<LibraryBig size={22} />} title="Your Library is empty">
           <span className="block">
-            Pages and small tools agents make for you, slides, documents and spreadsheets, and the pictures and videos you keep land here, sorted by space. Ask an agent for a tracker, a calculator or a
+            Pages and small tools agents make for you, slides, documents and spreadsheets, and the pictures and videos you keep land here, sorted by project. Ask an agent for a tracker, a calculator or a
             deck, or make one here.
           </span>
           <span className="mt-3 inline-flex gap-2">
@@ -548,7 +548,7 @@ export function Library() {
     if (!here.length)
       return space ? (
         <Empty icon={<SpaceMark s={space} size={22} />} title={tr(`Nothing in ${space.name} yet`)}>
-          <span className="block">What agents save in this space’s sessions lands here. To bring in something you have, use its More → Move to a space.</span>
+          <span className="block">What agents save in this project’s sessions lands here. To bring in something you have, use its More → Move to a project.</span>
           <span className="mt-3 inline-flex gap-2">
             <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
               New page here
@@ -556,8 +556,8 @@ export function Library() {
           </span>
         </Empty>
       ) : (
-        <Empty icon={<Boxes size={22} />} title="Everything is in a space">
-          Things you keep outside any space show here.
+        <Empty icon={<Boxes size={22} />} title="Everything is in a project">
+          Things you keep outside any project show here.
         </Empty>
       );
     if (!shown.length)
@@ -578,7 +578,7 @@ export function Library() {
       <PageHeader
         title="Library"
         tip="library"
-        sub="What agents made for you and what you kept: pages, slides, documents, pictures and videos, by space"
+        sub="What agents made for you and what you kept: pages, slides, documents, pictures and videos, by project"
         actions={
           place.kind === 'published' ? (
             <Button size="sm" variant="secondary" icon={<Upload size={14} />} onClick={() => setPublish(true)}>
@@ -610,7 +610,7 @@ export function Library() {
                 )}
                 {space && wide && (
                   <button type="button" onClick={() => go(`/spaces/${space.id}`)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
-                    Open the space
+                    Open the project
                   </button>
                 )}
                 <span className="flex-1 max-lg:hidden" />
@@ -691,7 +691,7 @@ export function SpaceLibrary({ space, limit, framed = true }: { space: SpaceView
             <LibraryBig size={19} />
           </span>
           <span className="mt-3 block text-[14px] font-semibold text-fg">Nothing here yet</span>
-          <span className="mt-1 block max-w-[440px]">Pages, slides and documents agents save in this space’s sessions land here, and so does what you keep from them.</span>
+          <span className="mt-1 block max-w-[440px]">Pages, slides and documents agents save in this project’s sessions land here, and so does what you keep from them.</span>
           <span className="mt-4 flex justify-center gap-2">
             <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
               New page

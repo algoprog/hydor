@@ -210,7 +210,7 @@ You can open a session's browser before the agent does, to log in to a site befo
 
 Files a page downloads are saved in the session's folder, in a folder named downloads, and the agent is told where they went. The browser's menu lists the latest under **Saved in the session’s folder**.
 
-An agent can attach files to a page's upload field only from the session's folder. To have it upload another file, copy the file into that folder first (see [Files, Git, Terminal and Preview](/guide/files-git)).
+An agent can attach files to a page's upload field only from the session's folder. To have it upload another file, copy the file into that folder first (see [System: files, Git, Terminal and Preview](/guide/files-git)).
 
 ## When the browser closes
 

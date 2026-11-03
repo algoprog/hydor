@@ -40,12 +40,12 @@ const test = (name: string, fn: () => void | Promise<void>) => tests.push([name,
 test('a new space gets a folder of its own, named for it, and the next colour', () => {
   const a = createSpace(db, { name: '  Taxes 2026 ', instructions: 'Amounts in EUR. I am self-employed in Greece.' });
   assert.equal(a.name, 'Taxes 2026');
-  assert.equal(a.folder, path.join(tmp, 'Naget', 'Spaces', 'taxes-2026'));
+  assert.equal(a.folder, path.join(tmp, 'Naget', 'Projects', 'taxes-2026'));
   assert.ok(fs.statSync(a.folder).isDirectory());
   const b = createSpace(db, { name: 'Taxes 2026' });
-  assert.equal(b.folder, path.join(tmp, 'Naget', 'Spaces', 'taxes-2026-2'));
+  assert.equal(b.folder, path.join(tmp, 'Naget', 'Projects', 'taxes-2026-2'));
   assert.notEqual(a.color, b.color);
-  assert.throws(() => createSpace(db, { name: '   ' }), /Give the space a name/);
+  assert.throws(() => createSpace(db, { name: '   ' }), /Give the project a name/);
   assert.throws(() => createSpace(db, { name: 'X', folder: path.join(tmp, 'nowhere') }), /No folder at/);
   const own = createSpace(db, { name: 'Thesis', folder: tmp, color: 'violet' });
   assert.equal(own.folder, tmp);
@@ -83,10 +83,10 @@ test('a session in a space is told what it is, where its files go, and its guide
   const [a] = spaceViews(db);
   const add = await spawnAdditions({ agent: 'claude', key: 'claude:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } });
   const text = add.instructions.join('\n');
-  assert.match(text, /^# Space: Taxes 2026\n/);
+  assert.match(text, /^# Project: Taxes 2026\n/);
   assert.match(text, /\(Receipts and the yearly return\)/);
   assert.ok(text.includes(a.folder));
-  assert.match(text, /# Agent Guidelines\n[\s\S]*## For the space “Taxes 2026”\nAmounts in EUR/);
+  assert.match(text, /# Agent Guidelines\n[\s\S]*## For the project “Taxes 2026”\nAmounts in EUR/);
   assert.doesNotMatch(text, /In its folder now/, 'an empty folder says nothing');
   assert.deepEqual((await spawnAdditions({ agent: 'claude', key: 'claude:x', cwd: tmp, runId: 'r', resume: false, extra: {} })).instructions, []);
 });
@@ -121,7 +121,7 @@ test('a group brings spaces together: plain spaces that exist, once; its session
   assert.throws(() => updateSpace(db, thesis.id, { members: [taxes.id] }), /in a group already/);
   const add = await spawnAdditions({ agent: 'claude', key: 'claude:g1', cwd: all.folder, runId: 'r', resume: false, extra: { space: all.id } });
   const text = add.instructions.join('\n');
-  assert.match(text, /"Everything" brings together 2 more spaces/);
+  assert.match(text, /"Everything" brings together 2 more projects/);
   assert.match(text, /## Thesis \(Dairy farming\)\nIts folder: .*thesis\nCite in APA style\./);
   assert.match(text, /## Taxes 2026 \(Receipts and the yearly return\)\nIts folder: /);
   assert.deepEqual(add.args, ['--add-dir', taxes.folder, '--add-dir', thesis.folder]);
@@ -254,9 +254,9 @@ test('a session in a space gets its skills with the library’s, its own in plac
   assert.equal(linkOf(group, 'writing'), path.join(spaceSkillsDir(kitchen.id), 'writing'));
   // The agent is told which skills are the space's.
   const told = (await spawnAdditions({ ...base, agent: 'codex', key: 'codex:k1', extra: { space: kitchen.id } })).instructions.join('\n');
-  assert.match(told, /Skills of the space's own: recipe-format and writing\. They are in your skills list/);
+  assert.match(told, /Skills of the project's own: recipe-format and writing\. They are in your skills list/);
   const toldGroup = (await spawnAdditions({ ...base, agent: 'codex', key: 'codex:h1', extra: { space: home.id } })).instructions.join('\n');
-  assert.match(toldGroup, /Skills of the space's own: recipe-format, writing and sowing-plan\./);
+  assert.match(toldGroup, /Skills of the project's own: recipe-format, writing and sowing-plan\./);
   // A skill removed from the space is gone from its view at the next start; the library's comes back.
   removeSpaceSkill(db, kitchen.id, 'writing');
   await skillpack.spawn!({ ...base, agent: 'codex', extra: { space: kitchen.id } }, deps);

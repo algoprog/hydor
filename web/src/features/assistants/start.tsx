@@ -70,14 +70,14 @@ export function WorkFolderChip({
     <>
       <SettingChip
         ref={ref}
-        label={space ? 'Space' : 'Folder'}
+        label={space ? 'Project' : 'Folder'}
         icon={space ? <SpaceMark s={space} size={14} /> : task ? <FolderPlus size={14} /> : <Folder size={14} />}
         open={open}
         onClick={() => setOpen((o) => !o)}
-        title={space ? `The ${space.name} space: its sessions, files and memory, in ${tildify(space.folder, home)}` : task ? `A new folder for this task, in ${root}` : tildify(value, home)}
+        title={space ? `The ${space.name} project: its sessions, files and memory, in ${tildify(space.folder, home)}` : task ? `A new folder for this task, in ${root}` : tildify(value, home)}
         value={space ? `${space.name}${note ? ` · ${note}` : ''}` : task ? 'New task folder' : `${nameOf(value)}${note ? ` · ${note}` : ''}`}
       />
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(380, window.innerWidth - 16)} title={spaces.length ? 'Space or folder to work in' : 'Folder to work in'}>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={Math.min(380, window.innerWidth - 16)} title={spaces.length ? 'Project or folder to work in' : 'Folder to work in'}>
         <FolderFinder
           value={task || space ? null : value}
           lead={[...spaces].sort((a, b) => (b.lastAt ?? b.createdAt) - (a.lastAt ?? a.createdAt)).map((sp) => ({
@@ -85,7 +85,7 @@ export function WorkFolderChip({
             icon: <SpaceMark s={sp} />,
             name: sp.name,
             where: sp.description ?? 'space',
-            title: `The ${sp.name} space: its sessions, files and memory`,
+            title: `The ${sp.name} project: its sessions, files and memory`,
             on: space?.id === sp.id,
             pick: () => {
               onSpace?.(sp);
@@ -116,9 +116,9 @@ export function WorkFolderChip({
                   {
                     key: 'new-space',
                     icon: <Plus size={15} />,
-                    name: 'New space',
+                    name: 'New project',
                     where: 'sessions, files and memory together',
-                    title: 'A space keeps a project’s sessions, files and memory together, picked by name',
+                    title: 'A project keeps a project’s sessions, files and memory together, picked by name',
                     pick: () => {
                       onNewSpace();
                       setOpen(false);

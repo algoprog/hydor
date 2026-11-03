@@ -5,7 +5,7 @@ import { api, del, post } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError, useApp, useUI } from '../../lib/store';
-import { PageHeader } from '../layout/PageHeader';
+import { SystemHeader } from '../system/SystemHeader';
 import { cx, Throbber, IconButton, useConfirm } from '../../components/ui';
 import { Suggester, type SuggestView } from './suggest';
 import { TermSuggest } from './TermSuggest';
@@ -448,7 +448,7 @@ export function TerminalPanel({ page }: { page?: boolean }) {
 export function TerminalPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Terminal" sub="Shells on this machine. They keep running when you leave this page." tip="terminal" />
+      <SystemHeader tab="terminal" />
       <div className="min-h-0 flex-1">
         <TerminalPanel page />
       </div>

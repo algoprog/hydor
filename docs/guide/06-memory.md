@@ -12,7 +12,7 @@ Memory is a set of short notes, called memory notes. Each is a sentence or two, 
 - **A project**: facts about one project, such as its conventions, the commands that build and test it, where things are, and decisions made. The project is the folder a session works in: the top folder of its Git repository when it is in one, or the folder itself otherwise. A worktree (a separate copy of a repository on its own branch) shares its main repository's notes, so the sessions on every branch see the same ones. A session in your home folder itself has no project notes: it gets only what is about you and its own.
 - **A session**: where one task stands, for that session to pick up when it goes on. These go when the session is deleted.
 
-A session sees and changes only three sets of notes: the ones about you, its own project's, and its own. An agent working in one project never sees another project's notes. The sessions of a [space](/guide/spaces) all work in the space's folder, so they share its project notes. A task that gets a new folder of its own (see [Assistants](/guide/assistants)) has that folder as its project.
+A session sees and changes only three sets of notes: the ones about you, its own project's, and its own. An agent working in one project never sees another project's notes. The sessions of a [project](/guide/spaces) all work in the project's folder, so they share its project notes. A task that gets a new folder of its own (see [Assistants](/guide/assistants)) has that folder as its project.
 
 Once a place has many notes, two more kinds of entry appear there: **topics**, each summing up a group of related notes, and a **profile**, a short summary agents always get first. The nightly tidy-up writes them (see [Tidy up each night](/guide/memory#tidy-up-each-night)).
 
@@ -105,7 +105,7 @@ Everything about memory is in [Settings → Capabilities → Memory](/settings?s
 - Agents start with the notes that bear on your request even when the notes use other words than you did.
 - Agents looking notes up, and the search field in the Notes list, find them by meaning as well as by words.
 - A note that says the same as one already kept, in other words, isn't saved again, and the tidy-up groups notes by meaning.
-- The search box (Ctrl+K) finds pages, settings, sessions, apps and more by what they mean, and knowledge bases are searched by meaning too (see [Spaces and knowledge](/guide/spaces)).
+- The search box (Ctrl+K) finds pages, settings, sessions, apps and more by what they mean, and knowledge bases are searched by meaning too (see [Projects and knowledge](/guide/spaces)).
 
 **Turn it on**:
 

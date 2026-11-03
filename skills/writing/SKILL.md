@@ -1,6 +1,7 @@
 ---
 name: writing
 description: Use when writing or substantially editing something people will read, such as a report, article, proposal, letter or email, documentation, a speech or a story. Not for a one-line reply.
+category: writing
 triggers: [draft a, draft an, proofread, essay, blog post, article about, cover letter, newsletter, press release, speech, proposal for, report on]
 ---
 

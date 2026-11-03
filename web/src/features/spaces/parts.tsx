@@ -20,7 +20,7 @@ export function SpacesTabs({ tab }: { tab: 'spaces' | 'shared' }) {
       value={tab}
       onChange={(t) => go(t === 'shared' ? '/knowledge' : '/spaces', true)}
       options={[
-        { value: 'spaces', label: 'All spaces' },
+        { value: 'spaces', label: 'All projects' },
         { value: 'shared', label: 'Shared knowledge' },
       ]}
     />
@@ -64,7 +64,7 @@ export function memberNames(s: Pick<Space, 'members'>, spaces: Space[] | null): 
 export function MemberPicker({ value, onChange, self }: { value: string[]; onChange: (ids: string[]) => void; self?: string }) {
   const spaces = useSpaces();
   const can = (spaces ?? []).filter((x) => x.id !== self && !isGroup(x));
-  if (!can.length) return <div className="text-[12.5px] text-fg-3">Make a few spaces first: a group brings them together.</div>;
+  if (!can.length) return <div className="text-[12.5px] text-fg-3">Make a few projects first: a group brings them together.</div>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {can.map((x) => {
@@ -284,7 +284,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
     <Dialog
       open={open}
       onClose={onClose}
-      title={group ? 'New group of spaces' : 'New space'}
+      title={group ? 'New group of projects' : 'New project'}
       width={460}
       footer={
         <>
@@ -292,7 +292,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
             Cancel
           </Button>
           <Button onClick={() => void make()} disabled={!ready}>
-            {group ? 'Make the group' : 'Make the space'}
+            {group ? 'Make the group' : 'Make the project'}
           </Button>
         </>
       }
@@ -300,8 +300,8 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
       <div className="space-y-4">
         <div className="text-[13px] leading-relaxed text-fg-2">
           {group
-            ? 'A group brings spaces together: sessions in it work with all of them, their files, documents and guidelines.'
-            : 'A space keeps one project together: its sessions, files, documents and what agents remember about it.'}
+            ? 'A group brings projects together: sessions in it work with all of them, their files, documents and guidelines.'
+            : 'A project keeps one piece of work together: its sessions, files, documents and what agents remember about it.'}
         </div>
         <label className="block">
           <span className={label}>Name</span>
@@ -319,7 +319,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
         </label>
         {group && (
           <div>
-            <span className={label}>The spaces it brings together</span>
+            <span className={label}>The projects it brings together</span>
             <MemberPicker value={members} onChange={setMembers} />
           </div>
         )}
@@ -355,7 +355,7 @@ export function NewSpaceDialog({ open, onClose, onMade, group, folder }: { open:
                   )}
                   {chips.length > 0 && (
                     <div>
-                      <div className="mb-1 text-[12px] text-fg-3">Used lately, in no space yet</div>
+                      <div className="mb-1 text-[12px] text-fg-3">Used lately, in no project yet</div>
                       <div className="flex flex-wrap gap-1.5">
                         {chips.map((x) => (
                           <button

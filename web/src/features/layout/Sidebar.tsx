@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Activity, Boxes, CircleHelp, Folders, FolderTree, Gauge, GitBranch, Inbox, ListFilter, MonitorSmartphone, PanelLeftClose, RotateCcw, Search, Settings, SquarePen, SquareTerminal, WifiOff, X } from 'lucide-react';
+import { Boxes, CircleHelp, Folders, Gauge, Inbox, ListFilter, MonitorCog, PanelLeftClose, RotateCcw, Search, Settings, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
 import { activityOf } from '../../lib/activity';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
@@ -25,6 +25,7 @@ import { MachineSwitcher } from '../machines/MachineSwitcher';
 import { features } from '../registry';
 import type { AgentUsage } from '@shared/types';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
+import { systemTabOf } from '../system/SystemHeader';
 
 /** A subscription on a free plan (Codex "free", a Claude free account); any other plan counts as paid. */
 const freePlan = (u: AgentUsage) => /free/i.test(u.account?.plan ?? '');
@@ -175,14 +176,10 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   };
 
   const tools: Tool[] = [
-    { id: 'files', label: 'Files', icon: <FolderTree size={17} />, match: loc === '/files' || loc === '/file' || loc === '/search', go: () => nav('/files') },
-    { id: 'git', label: 'Git', icon: <GitBranch size={17} />, match: loc === '/git', go: () => nav('/git') },
-    { id: 'terminal', label: 'Terminal', icon: <SquareTerminal size={17} />, match: loc === '/terminal', go: () => nav('/terminal'), anim: 'ico-nudge' },
     ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path) }))),
-    // Dev-server previews open on this server's own preview port: its own machine only.
-    ...(machineId ? [] : [{ id: 'preview', label: 'Preview', icon: <MonitorSmartphone size={17} />, match: loc === '/preview', go: () => nav('/preview') } satisfies Tool]),
     { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint />, anim: 'ico-grow' },
-    { id: 'system', label: 'System', icon: <Activity size={17} />, match: loc === '/system', go: () => nav('/system'), anim: 'ico-beat' },
+    // This computer: its files, Git, terminals, previews and monitor, each a tab of System.
+    { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), anim: 'ico-turn', tour: 'nav-system' },
     {
       id: 'settings',
       label: 'Settings',
@@ -313,7 +310,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
               <>
                 <MenuSep />
                 <MenuItem checked={!spaceFilter} onClick={() => (useUI.getState().set({ spaceFilter: null }), setFilterOpen(false))}>
-                  Every space
+                  Every project
                 </MenuItem>
                 {spaces.slice(0, 8).map((sp) => (
                   <MenuItem key={sp.id} icon={<SpaceMark s={sp} size={14} />} checked={spaceFilter === sp.id} onClick={() => (useUI.getState().set({ spaceFilter: sp.id }), setFilterOpen(false))}>
@@ -327,13 +324,13 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
                     nav('/spaces');
                   }}
                 >
-                  Spaces
+                  Projects
                 </MenuItem>
               </>
             )}
             <MenuSep />
             <MenuItem icon={<Folders size={14} />} checked={byFolder} onClick={() => (useUI.getState().set({ groupByFolder: !byFolder }), setFilterOpen(false))}>
-              Group by folder or space
+              Group by folder or project
             </MenuItem>
           </Popover>
         </div>

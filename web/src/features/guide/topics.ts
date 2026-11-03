@@ -2,6 +2,7 @@
 // Help's first page, and a line on what it is for. The titles and the text come from docs/guide; a topic
 // missing here still shows, under "More".
 import {
+  Blocks,
   Bot,
   Boxes,
   Braces,
@@ -16,6 +17,7 @@ import {
   Inbox,
   LayoutGrid,
   MessagesSquare,
+  MonitorCog,
   MousePointerClick,
   Palette,
   PlugZap,
@@ -58,7 +60,8 @@ const LOOKS: Record<string, TopicLook> = {
   assistants: { icon: WandSparkles, group: 'yours', blurb: 'Researcher, Writer and others for each kind of work' },
   spaces: { icon: Boxes, group: 'yours', blurb: 'A project’s sessions, files and documents together' },
   memory: { icon: Brain, group: 'yours', blurb: 'What agents remember about you and your projects' },
-  skills: { icon: Sparkles, group: 'yours', blurb: 'Methods agents learn once and use again' },
+  skills: { icon: Sparkles, group: 'yours', blurb: 'Methods agents load when a task calls for one, and yours' },
+  plugins: { icon: Blocks, group: 'yours', blurb: 'Skills, tools and files bundled for every agent' },
   connections: { icon: PlugZap, group: 'yours', blurb: 'Your apps and accounts, and keys kept safe' },
   web: { icon: Globe, group: 'abilities', blurb: 'Web searches, and a browser you can take over' },
   research: { icon: Telescope, group: 'abilities', blurb: 'Deep research, second opinions and teams of agents' },
@@ -69,7 +72,7 @@ const LOOKS: Record<string, TopicLook> = {
   'agents-models': { icon: Cpu, group: 'setup', blurb: 'Claude Code, Codex and others, their accounts and models' },
   custom: { icon: Bot, group: 'setup', blurb: 'The app’s own agent, for any model, local ones too' },
   usage: { icon: Gauge, group: 'setup', blurb: 'What you used, your limits and what it costs' },
-  'files-git': { icon: FolderTree, group: 'setup', blurb: 'Files, changes, a terminal and previews of sites' },
+  'files-git': { icon: MonitorCog, group: 'setup', blurb: 'This computer: files, Git, a terminal, previews and its monitor' },
   settings: { icon: Settings, group: 'setup', blurb: 'Every option in Settings, one by one' },
   api: { icon: Braces, group: 'more', blurb: 'The app’s endpoints, for scripts and agents' },
 };

@@ -36,8 +36,8 @@ export function SpaceChoices({ onPick, onNew }: { onPick: (s: Space) => void; on
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && list[0] && onPick(list[0])}
-            placeholder="Find a space"
-            aria-label="Find a space"
+            placeholder="Find a project"
+            aria-label="Find a project"
             className="h-8.5 w-full rounded-lg bg-bg-2 pr-2.5 pl-8 text-[13px] outline-none placeholder:text-fg-3 max-sm:h-11 max-sm:text-[15px]"
           />
         </div>
@@ -47,13 +47,13 @@ export function SpaceChoices({ onPick, onNew }: { onPick: (s: Space) => void; on
           <span translate="no">{s.name}</span>
         </MenuItem>
       ))}
-      {!spaces.length && <div className="px-2.5 py-1.5 text-[12.5px] text-fg-3">No spaces yet: make one, and its folder holds the files.</div>}
-      {t && !list.length && <div className="px-2.5 py-1.5 text-[12.5px] text-fg-3">No space by that name</div>}
+      {!spaces.length && <div className="px-2.5 py-1.5 text-[12.5px] text-fg-3">No projects yet: make one, and its folder holds the files.</div>}
+      {t && !list.length && <div className="px-2.5 py-1.5 text-[12.5px] text-fg-3">No project by that name</div>}
       {onNew && (
         <>
           <MenuSep />
           <MenuItem icon={<Plus size={14} />} onClick={onNew}>
-            New space
+            New project
           </MenuItem>
         </>
       )}
@@ -70,12 +70,12 @@ export function useSpaceMenu(items: () => Item[], close: () => void) {
   const [made, setMade] = useState<Item[] | null>(null);
   const entry = (
     <MenuItem icon={<Boxes size={14} />} submenu onClick={() => setOpen(true)}>
-      Add to a space
+      Add to a project
     </MenuItem>
   );
   const sub = open && (
     <>
-      <MenuBack onClick={() => setOpen(false)}>Add to a space</MenuBack>
+      <MenuBack onClick={() => setOpen(false)}>Add to a project</MenuBack>
       <SpaceChoices
         onPick={(s) => {
           setOpen(false);

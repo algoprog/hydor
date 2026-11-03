@@ -21,7 +21,9 @@ import { restartToUpdate, updateLater } from '../../components/UpdateNotice';
 import { chime, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
 import { PageHeader } from '../layout/PageHeader';
 import { followUpPref, type FollowUp } from '../session/Composer';
-import { InstructionsSettings, McpSettings, PluginsSettings, SkillsSettings } from './AgentSettings';
+import { InstructionsSettings, McpSettings } from './AgentSettings';
+import { SkillsSettings } from '../skillpack/SkillsPage';
+import { PluginsSettings } from '../plugins/PluginsSettings';
 import { startTour } from '../tour/Tour';
 import { setTipsOn, useTips } from '../tips/state';
 import type { TipId } from '@shared/tips';
@@ -67,10 +69,10 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
       { id: 'accounts', label: 'Accounts', icon: UserRound, sub: 'The Claude Code and Codex sign-ins every session uses' },
       { id: 'agents', label: 'More agents', icon: Bot, sub: 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP' },
       { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM' },
-      { id: 'guidelines', label: 'Agent Guidelines', icon: ScrollText, sub: 'What every agent follows: in every session, in a space, or in one session' },
+      { id: 'guidelines', label: 'Agent Guidelines', icon: ScrollText, sub: 'What every agent follows: in every session, in a project, or in one session' },
       { id: 'mcp', label: 'MCP servers', icon: Plug, sub: 'Tools the agents can call', folder: true },
-      { id: 'skills', label: 'Skills', icon: Sparkles, sub: 'Know-how the agents load when a task calls for it', folder: true },
-      { id: 'plugins', label: 'Plugins', icon: Blocks, sub: 'Claude Code add-ons that bundle skills, commands, agents and MCP servers' },
+      { id: 'skills', label: 'Skills', icon: Sparkles, sub: 'Written methods agents load when a task calls for one: built in, yours, from plugins and the agents’ own', folder: true },
+      { id: 'plugins', label: 'Plugins', icon: Blocks, sub: 'Add-ons that bring skills, tools and instructions to every agent' },
       { id: 'tasks', label: 'Scheduled tasks', icon: CalendarClock, sub: 'Agent work that starts by itself: on a schedule, once, or when a webhook calls' },
     ],
   },
@@ -629,7 +631,7 @@ function TipsSetting() {
 }
 
 /** Settings sections with a tip that says what they are for, the first time they open (features/tips). */
-const SECTION_TIPS: Partial<Record<string, TipId>> = { tasks: 'tasks', memory: 'memory', guidelines: 'guidelines', assistants: 'assistants', connections: 'connections', skillpack: 'skills' };
+const SECTION_TIPS: Partial<Record<string, TipId>> = { tasks: 'tasks', memory: 'memory', guidelines: 'guidelines', assistants: 'assistants', connections: 'connections', skills: 'skills' };
 
 /**
  * New versions install themselves, for a copy that can restart itself: from git while you are away; the Mac app as

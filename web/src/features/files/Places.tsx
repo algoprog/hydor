@@ -271,7 +271,7 @@ export function Places({
       )}
       {!!spaces?.length && (
         <>
-          <Label>Spaces</Label>
+          <Label>Projects</Label>
           {spaces.slice(0, 8).map((s) => (
             <PlaceRow
               key={s.id}
@@ -284,7 +284,7 @@ export function Places({
               after={after}
             />
           ))}
-          {spaces.length > 8 && <PlaceRow icon={<span className="text-[13px]">…</span>} label="All spaces" onClick={() => go('/spaces')} />}
+          {spaces.length > 8 && <PlaceRow icon={<span className="text-[13px]">…</span>} label="All projects" onClick={() => go('/spaces')} />}
         </>
       )}
       {lately.length > 0 && (

@@ -1,6 +1,7 @@
 ---
 name: presentations
 description: Use when the user wants a PowerPoint file (.pptx) made or changed from code (a pitch deck, talk, lesson, report or summary to show in PowerPoint, Keynote or Google Slides), or wants an existing .pptx, .ppt or .odp read, summarised or edited. For new slides to edit and present in the app, make a deck with save_slides instead.
+category: documents
 ---
 
 # Presentations

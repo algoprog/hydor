@@ -30,7 +30,7 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - Get a notification when a session finishes or needs you (approve right from it), see everything waiting on you
   in one inbox, and carry on from your phone, or talk to it hands-free while you walk
 - Open pull requests on GitHub or Gitea, and review a branch file by file
-- Use a terminal, a file browser (add files to a space or a new session in a click, a trash to put things back
+- Use a terminal, a file browser (add files to a project or a new session in a click, a trash to put things back
   from, Word, Excel, CSV and LaTeX files edited in place in the editors below), git (one Sync button, the history
   as a graph, merges and conflicts in plain words), notebooks, scheduled tasks and your plans' limits in the same app
 - Switch between several accounts and machines from the sidebar, and sign in several Claude or Codex plans: when
@@ -44,7 +44,7 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   works on phones too, or in their code), slides to edit and present as in PowerPoint or Google Slides, documents,
   spreadsheets and LaTeX to edit as in Word, Excel and Overleaf (or opened from your files), PDF, Word, PowerPoint,
   Excel and LaTeX exports, an agent that changes what you have open, pictures and short videos made with
-  OpenRouter's models once you check their settings and price, all kept in your Library, sorted by space (each
+  OpenRouter's models once you check their settings and price, all kept in your Library, sorted by project (each
   image and video with a title and a description a model writes for it), and apps: small tools for one job that
   find things out and show them clearly, ready-made (research, trips, comparisons, the weather, a team's matches,
   recipes and a week's meals, gifts, what to watch, games and a quiz to play, what's on, savings, your data as
@@ -55,14 +55,16 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   does in any session and the agent finds the right one among many (by words and by meaning) and runs it there,
   asking you for what is missing on the app's own card
 - Give every agent memory of you and your projects, your documents (knowledge bases it searches and cites),
-  your services (connected once, beside your apps), keys and sign-ins it uses without ever seeing them, skills, child
+  your services (connected once, beside your apps), keys and sign-ins it uses without ever seeing them, more than
+  fifty skills on one page (with yours and those agents learn), plugins that bundle skills, tools and what they
+  need for every agent (seven built in, others from a link or a file, or made and shared by you), child
   sessions, and tasks that run on a schedule or when something changes
-- Keep each project together in a space, with its own documents, guidelines and skills, run deep research that
+- Keep each project together in a project, with its own documents, guidelines and skills, run deep research that
   ends in a cited report, compare models side by side, and use the app in English, Chinese or Greek
-- Write your Agent Guidelines once, for every session, a space or one session, and every agent follows them,
+- Write your Agent Guidelines once, for every session, a project or one session, and every agent follows them,
   whichever it is
 - Ask any agent how the app works, from Help or in any session, or have it change a setting or set something up
-  for you (a space, an assistant, a scheduled task): it reads the app's own guide and asks you to confirm each change
+  for you (a project, an assistant, a scheduled task): it reads the app's own guide and asks you to confirm each change
   on a card
 
 See [all features](docs/features.md), or the [user guide](docs/guide/), which the app also shows under Help.

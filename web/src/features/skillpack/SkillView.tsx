@@ -39,6 +39,17 @@ function Change({ c, first }: { c: SkillChange; first: boolean }) {
   );
 }
 
+/** A skill's changes, newest first, each opening to its diff. */
+export function SkillHistory({ list }: { list: SkillChange[] }) {
+  return (
+    <div className="space-y-2">
+      {list.map((c, i) => (
+        <Change key={c.id} c={c} first={i === 0} />
+      ))}
+    </div>
+  );
+}
+
 /**
  * A skill: what it says, and every change approved for it. The library's, a space's own (`space`, its
  * id), or the one a session's agent read (`sessionKey`: in a space, its own before the library's).
@@ -72,7 +83,7 @@ export function SkillDialog({ name, onClose, history, space, sessionKey, onChang
           <span className="truncate">{name}</span>
           {doc && (
             <Badge tone={doc.source === 'bundled' ? 'neutral' : doc.source === 'learned' ? 'ok' : 'info'}>
-              {ofSpace ? <span translate="no">{ofSpace.name}</span> : doc.source === 'learned' ? 'Learned' : 'Built in'}
+              {ofSpace ? <span translate="no">{ofSpace.name}</span> : doc.plugin ? <span translate="no">{doc.plugin.title}</span> : doc.source === 'learned' ? 'Yours' : 'Built in'}
             </Badge>
           )}
         </span>
@@ -86,7 +97,7 @@ export function SkillDialog({ name, onClose, history, space, sessionKey, onChang
           )}
           {ofSpace && !onChange && (
             <Button variant="ghost" onClick={() => (onClose(), go(`/spaces/${ofSpace.id}/skills`))}>
-              The space’s skills
+              The project’s skills
             </Button>
           )}
           <Button onClick={onClose}>Close</Button>
@@ -95,7 +106,7 @@ export function SkillDialog({ name, onClose, history, space, sessionKey, onChang
     >
       {error ? (
         <p className="py-3 text-[13.5px] leading-relaxed text-fg-2">
-          {/no skill named/i.test(error) ? 'This skill is not in the app’s library: it comes from your own or the project’s skills folder.' : error}
+          {/no skill named/i.test(error) ? 'This skill is not in the app’s library: it comes from the agent’s own skills folder, or the project’s.' : error}
         </p>
       ) : !doc || !fm ? (
         <div className="flex justify-center py-10">
@@ -119,11 +130,7 @@ export function SkillDialog({ name, onClose, history, space, sessionKey, onChang
               <Markdown text={fm.body} className="text-[13.5px]" />
             </div>
           ) : doc.history.length ? (
-            <div className="space-y-2">
-              {doc.history.map((c, i) => (
-                <Change key={c.id} c={c} first={i === 0} />
-              ))}
-            </div>
+            <SkillHistory list={doc.history} />
           ) : (
             <p className="flex items-center gap-2 py-2 text-[13px] text-fg-3">
               <History size={14} /> {doc.source !== 'bundled' ? 'No changes recorded yet.' : 'Built in, as it came with the app. Changes you approve are saved as your own version.'}

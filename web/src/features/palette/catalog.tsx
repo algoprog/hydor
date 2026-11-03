@@ -4,7 +4,7 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, AppWindow, ArrowRight, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, AppWindow, ArrowRight, Blocks, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
@@ -13,6 +13,7 @@ import type { ConnectionView } from '@shared/connections';
 import type { MediaItem } from '@shared/media';
 import type { PageInfo } from '@shared/pages';
 import type { SkillLibrary } from '@shared/skillpack';
+import type { PluginList } from '@shared/plugins';
 import { isGroup, type SpaceView } from '@shared/spaces';
 import { api } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
@@ -28,7 +29,7 @@ import { openAsk } from '../guide/ask';
 import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
 
-export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Spaces' | 'Apps' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Connections' | 'Pages' | 'Images and videos' | 'Themes' | 'Files';
+export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Projects' | 'Apps' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Plugins' | 'Connections' | 'Pages' | 'Images and videos' | 'Themes' | 'Files';
 
 export interface Entry extends Findable {
   id: string;
@@ -67,7 +68,8 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:preview': <MonitorSmartphone size={15} />,
   'go:usage': <Gauge size={15} />,
   'go:stats': <TrendingUp size={15} />,
-  'go:system': <Activity size={15} />,
+  'go:system': <MonitorCog size={15} />,
+  'go:monitor': <Activity size={15} />,
   'go:settings': <Settings size={15} />,
   'go:guide': <CircleHelp size={15} />,
 };
@@ -130,7 +132,7 @@ let held: { at: number; entries: Entry[] } | null = null;
 export async function liveEntries(): Promise<Entry[]> {
   if (held && Date.now() - held.at < 60_000) return held.entries;
   const get = <T,>(path: string) => api<T>(path).catch(() => null);
-  const [apps, tasks, assistants, lib, pages, conns, spaces, media] = await Promise.all([
+  const [apps, tasks, assistants, lib, pages, conns, spaces, media, plugins] = await Promise.all([
     get<Gallery>('/api/apps'),
     get<{ tasks: ScheduledTask[] }>('/api/tasks'),
     get<{ assistants?: { id: string; name: string; description?: string }[] }>('/api/assistants'),
@@ -139,25 +141,26 @@ export async function liveEntries(): Promise<Entry[]> {
     get<{ connections: ConnectionView[] }>('/api/connections'),
     get<{ spaces: SpaceView[] }>('/api/spaces'),
     get<{ items: MediaItem[] }>('/api/media'),
+    get<PluginList>('/api/plugins'),
   ]);
   const out: Entry[] = [];
   for (const s of spaces?.spaces ?? [])
     out.push({
       id: `space:${s.id}`,
-      group: 'Spaces',
+      group: 'Projects',
       icon: <SpaceMark s={s} />,
       mark: <SpaceMark s={s} size={22} />,
       title: s.name,
-      keywords: isGroup(s) ? 'space group project' : 'space project',
+      keywords: isGroup(s) ? 'project group space' : 'project space',
       text: s.description,
-      where: 'Spaces',
+      where: 'Projects',
       body: s.description,
       facts: [
         ['Folder', s.folder],
         ['Sessions', String(s.sessions)],
         ['Last active', s.lastAt ? timeAgo(s.lastAt) : ''],
       ],
-      opens: 'Opens the space',
+      opens: 'Opens the project',
       run: () => go(`/spaces/${encodeURIComponent(s.id)}`),
     });
   for (const a of apps?.apps ?? [])
@@ -181,7 +184,21 @@ export async function liveEntries(): Promise<Entry[]> {
   for (const a of Array.isArray(assistants) ? assistants : (assistants?.assistants ?? []))
     out.push({ id: `asst:${a.id}`, group: 'Assistants', icon: <Bot size={15} />, title: a.name, keywords: 'assistant', text: a.description, where: 'Settings › Capabilities › Assistants', body: a.description, opens: 'Opens Settings → Assistants, at this one', within: 'sec:assistants', run: () => go(settingsAt('assistants', a.name)) });
   for (const s of lib?.skills ?? [])
-    out.push({ id: `skill:${s.name}`, group: 'Skills', icon: <Library size={15} />, title: s.name, keywords: `skill ${s.triggers.join(' ')}`, text: s.description, where: 'Settings › Capabilities › Skill library', body: s.description, opens: 'Opens the skill library, at this skill', within: 'sec:skillpack', run: () => go(settingsAt('skillpack', s.name)) });
+    out.push({ id: `skill:${s.name}`, group: 'Skills', icon: <Library size={15} />, title: s.name, keywords: `skill ${s.triggers.join(' ')}`, text: s.description, where: 'Settings › Agents › Skills', body: s.description, opens: 'Opens Settings → Skills, at this skill', within: 'sec:skills', run: () => go(settingsAt('skills', s.name)) });
+  for (const p of [...(plugins?.installed ?? []), ...(plugins?.available ?? [])])
+    out.push({
+      id: `plugin:${p.name}`,
+      group: 'Plugins',
+      icon: <Blocks size={15} />,
+      title: p.title,
+      keywords: `plugin ${p.name} ${p.keywords.join(' ')} ${p.skills.map((s) => s.name).join(' ')}`,
+      text: p.description,
+      where: 'Settings › Agents › Plugins',
+      body: p.description,
+      opens: p.installed ? 'Opens the plugin' : 'Opens the plugin, to add it',
+      within: 'sec:plugins',
+      run: () => go(`/settings?s=plugins&plugin=${encodeURIComponent(p.name)}`),
+    });
   for (const p of pages?.pages ?? [])
     out.push({ id: `page:${p.id}`, group: 'Pages', icon: <AppWindow size={15} />, title: p.title, keywords: 'page published', where: 'Library', body: `Version ${p.version}`, opens: 'Opens the page', run: () => go(`/pages/${encodeURIComponent(p.id)}`) });
   for (const m of media?.items ?? [])

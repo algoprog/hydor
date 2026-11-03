@@ -139,7 +139,7 @@ function MediaView({ id }: { id: string }) {
             )}
             {!!spaces?.length && (
               <MenuItem icon={<FolderInput size={14} />} hint={<span translate="no">{spaces.find((x) => x.id === m.space)?.name ?? ''}</span>} onClick={() => (setMenu(false), setMoving(true))}>
-                Move to a space
+                Move to a project
               </MenuItem>
             )}
             <MenuSep />
@@ -159,7 +159,7 @@ function MediaView({ id }: { id: string }) {
                 .then((r) => {
                   useMedia.getState().put(r.item);
                   const name = spaces?.find((x) => x.id === space)?.name;
-                  toast(name ? tr(`Moved to ${name}`) : 'Moved out of its space', 'ok');
+                  toast(name ? tr(`Moved to ${name}`) : 'Moved out of its project', 'ok');
                 })
                 .catch(toastError);
             }}

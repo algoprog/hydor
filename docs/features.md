@@ -24,7 +24,7 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
   after a usage limit stay in Active until that scheduled resume is cleared, and so do sessions whose background
-  agents, commands or monitors are still running, until those end. Pinned comes next, then Projects: a group for each space and each folder you picked
+  agents, commands or monitors are still running, until those end. Pinned comes next, then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable, a line per session, with a pen to
   start a new session there; then the rest by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
   (until later), settles (done for now), archives or deletes the session, on phones too.
@@ -46,11 +46,11 @@ agents that speak ACP and take MCP servers.
   one of its own (`~/Naget/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
   how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,
-  Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a space, and
+  Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a project, and
   one session (the start page's Options, or the session's menu); the more specific wins. A changed session's
   agent follows the new ones from the next message. CLAUDE.md and AGENTS.md still work, and can be edited there too.
 - **Agents that work the app**: every agent knows the app's own guide (the `app_guide` tool) and answers questions
-  about it from there, with links to the place. Ask it to change a setting or set something up (a space, an
+  about it from there, with links to the place. Ask it to change a setting or set something up (a project, an
   assistant, a scheduled task, memory notes…) and it does it through the app's API (`app_api`): reading runs at
   once, and each change shows you a card first, with what changes before → after, to allow once, for the rest of
   the session, or not. When it needs details it shows a form (`ask_form`). Passwords, keys' values, approvals,
@@ -72,33 +72,33 @@ agents that speak ACP and take MCP servers.
   Settings → Memory lists every note with when it was written, changed and last needed, lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
   Agents can also look up earlier sessions.
-- **Spaces** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
-  together, like Projects in ChatGPT or Claude. Pick a space by name in the start page's folder menu instead of a
+- **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
+  together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder: its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
-  guidelines and its own skills and start as its assistant. The Spaces page shows each as a card in its colour with
-  what it holds (sessions, things in the Library, documents, skills) and New session. A space's own page opens at
+  guidelines and its own skills and start as its assistant. The Projects page shows each as a card in its colour with
+  what it holds (sessions, things in the Library, documents, skills) and New session. A project's own page opens at
   once under a band of its colour, with the way back on the left, New session and one menu (its folder in Files,
   only its sessions in the sidebar, delete it); its Overview has its sessions (with what each is doing), what it
   holds in the Library and what every session in it gets (its folder, guidelines, documents, skills, assistant and
-  memory), a group's spaces too, and its Library tab everything it holds there; its Settings tab sets its name,
+  memory), a group's projects too, and its Library tab everything it holds there; its Settings tab sets its name,
   colour, guidelines, the assistant its sessions start as (one tap among them) and its group, saved from a bar
   that shows once something changed. Its Files tab shows its folders; files come in from
-  Files, a file's window or an agent's file cards with Add to a space. Its Skills tab holds skills only its
-  sessions get, with the skill library: written there, copied from the library to change for the space alone, or
-  proposed by an agent working in it and kept for the space when you approve. A group brings several spaces
+  Files, a file's window or an agent's file cards with Add to a project. Its Skills tab holds skills only its
+  sessions get, with the skill library: written there, copied from the library to change for the project alone, or
+  proposed by an agent working in it and kept for the project when you approve. A group brings several projects
   together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar
-  groups each space's sessions under its name, and its filter shows one space's sessions. New space asks only for a
+  groups each project's sessions under its name, and its filter shows one project's sessions. New project asks only for a
   name (its colour on the mark beside it) and where its files go, a new folder or one you have, with the folders you
   used lately one tap away; what it is about, its guidelines and other folders are under More options. Under your
-  spaces, the Spaces page suggests folders your sessions worked in, or changed files in, over the last 90 days that
-  no space has yet (a folder in a Git repository counting as the repository), each with Make a space, or ✕ to stop
+  projects, the Projects page suggests folders your sessions worked in, or changed files in, over the last 90 days that
+  no project has yet (a folder in a Git repository counting as the repository), each with Make a project, or ✕ to stop
   suggesting it.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
-  kept up to date. Shared knowledge (Spaces → Shared knowledge) is searched by every session; a space's own
-  documents (its Knowledge tab) by its sessions alone, which search the shared knowledge too unless the space
+  kept up to date. Shared knowledge (Projects → Shared knowledge) is searched by every session; a project's own
+  documents (its Knowledge tab) by its sessions alone, which search the shared knowledge too unless the project
   turns that off.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
@@ -129,9 +129,9 @@ agents that speak ACP and take MCP servers.
   searches used, and opens the report once it is ready.
 - **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in the
   Library with pictures, storage of their own and an address for a phone's home screen, and folders publish at a
-  link. The Library is sorted by space: what an agent saves goes in its session's space, Keep and Save to Library
-  ask which space when there are spaces (the session's first), New makes it in the space you look at, and More →
-  Move to a space moves anything; its places (Everything, each space's things under its name, Not in a space,
+  link. The Library is sorted by project: what an agent saves goes in its session's project, Keep and Save to Library
+  ask which project when there are projects (the session's first), New makes it in the project you look at, and More →
+  Move to a project moves anything; its places (Everything, each project's things under its name, Not in a project,
   Published) sit beside the cards, with Find by name, sorting and kind chips (Pages, Slides, Documents,
   Spreadsheets, LaTeX, Pictures, Videos). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
@@ -268,10 +268,21 @@ agents that speak ACP and take MCP servers.
   citations, labels and pictures, and a jump between a place on a page and its line. TeX runs in a folder of its
   own, with no shell escape and, where bubblewrap is installed, in its sandbox. They export as the PDF, the main
   .tex file or the whole project as a .zip.
-- **Skills**: a library that comes with the app (clarify first, check before saying it is done, troubleshooting,
-  research, writing, documents, building apps) for every agent, and skills of a space's own for its
-  sessions. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a
-  space, for the space alone.
+- **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
+  fifty that come with the app for every agent (ways of working, writing, documents, research and the web,
+  planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
+  Code's and Codex's own, and each project's own. A search, a row of filters and a switch on every skill; write
+  your own for every agent or for one, change a built-in one (your version takes its place), remove and bring
+  back. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a project,
+  for the project alone. Other ACP agents get the list of skills to read when one fits.
+- **Plugins** for every agent (Settings → Plugins): skills, tool servers (MCP), instructions, files of their own
+  and what they need (other plugins, Python and Node packages in an environment of their own, programs, files to
+  download, keys from the vault), in the open Agent Plugins 1.0 format (Claude Code's layout read too). Seven come
+  with the app (Audio and video, Library docs, Meeting recordings, Python for data, Speech to text, SQLite
+  databases, Text from pictures); add others from a Git link, a .zip or a folder, after a look at what each gives
+  and needs, with the plugins it needs added first and turned on and off together. Make your own in an editor
+  (skills, tools, needs, files, instructions), or have an agent make one, and pack it into a .zip to share.
+  Claude Code's and Codex's own plugins and marketplaces have a tab each.
 - **Voice**: dictate into the message box, with the browser's own recognition or, when you turn it on, a model
   on this machine; replies can be read aloud. Hands-free mode (the headphones by the message box) is for
   walking: say what you want, and it starts, steers and checks sessions, answers approvals and reads you the
@@ -364,11 +375,11 @@ programs shows each program's version and what is out, with Check now, Update no
 - Share a session with a read-only link that ends when you want.
 
 ## Around the agents
-- Files: places to start from (recent files, home, pinned folders, your spaces' folders, the folders sessions
+- Files: places to start from (recent files, home, pinned folders, your projects' folders, the folders sessions
   worked in, the trash), and each folder as a list with dates, sizes and git status (folders open in place, as a
   tree) or as tiles with pictures; sort, narrow as you type, pick several, drag to move (Alt copies) or to
   upload, keys for everything. Each file or folder's menu: start a session with it (named by its path, nothing
-  uploaded), add it to a space (a file is copied into its folder, a folder joins those it works with), rename,
+  uploaded), add it to a project (a file is copied into its folder, a folder joins those it works with), rename,
   duplicate, move or copy to a folder, download (a folder or several as one .zip), delete to a trash with Undo
   and Put back. One search finds names and text inside files, under a folder you pick, by kind. An editor with
   Markdown and HTML preview and diffs, quick open, and uploads. Ask, beside an open file, has an agent change it
@@ -418,7 +429,10 @@ programs shows each program's version and what is out, with Check now, Update no
   and the app keeps its own link to every conversation file (no extra disk), so one that gets deleted comes back.
   Sessions nobody used for a year are deleted (Settings → General → Delete inactive sessions: on or off, and how
   long); pinned and busy ones stay, and their numbers stay in Activity.
-- System: CPU, memory, GPUs, disks, network and the busiest processes, live.
+- System: this computer under one tool in the sidebar, a tab each for Files, Git, Terminal, Preview and
+  Monitor (CPU, memory, GPUs, disks, network and the busiest processes, live), and an overview with how it is
+  doing and what each tool holds now (recent files and a search, repositories with changes, the shells
+  running, the web apps to preview).
 - Settings: sign the agents in and out from the browser, and manage MCP servers, skills, plugins, Agent
   Guidelines and the CLAUDE.md / AGENTS.md instruction files.
 - An MCP server of its own, so an agent elsewhere can list, read, start and steer sessions here.
@@ -439,23 +453,23 @@ programs shows each program's version and what is out, with Check now, Update no
   look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The tools at the bottom of the sidebar (Library, Spaces, Apps, Usage, Files, Git, Terminal, Settings…) stay in
+- The tools at the bottom of the sidebar (Library, Projects, Apps, Usage, System, Settings, Search, Help) stay in
   the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
   it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
-  every setting, sessions and what was said in them, memory notes, spaces, apps, scheduled tasks, assistants,
-  skills, the Library's pages, images and videos, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
+  every setting, sessions and what was said in them, memory notes, projects, apps, scheduled tasks, assistants,
+  skills, plugins, the Library's pages, images and videos, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
   page and points at it, a message opens its session at the words. With search by meaning on (Settings →
   Memory) things also match what they mean, in nine languages; what ships with the app has its vectors made
   ahead of time, and what you make gets them as you make it. Search in, beside the field, looks only in the
-  places you pick (sessions, messages, spaces, pages, files, settings…), the same on every device; with nothing
+  places you pick (sessions, messages, projects, pages, files, settings…), the same on every device; with nothing
   typed it lists what those places hold. `Ctrl+F` finds within a conversation.
 - A short welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter or on this
   computer, other agents) and sets those up, on pages that fill the screen. Then it shows you around as the
   app builds itself up: each part arrives as it is explained, the rest as the tour ends. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
   inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Library,
-  Apps and Spaces pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
+  Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
   guide. One at a time and a while apart, never while you type or a menu is open; each shows once, on every
   device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again.
 - Help (in the sidebar): a guide to every part of the app, its topics grouped on one page, each with a picture of

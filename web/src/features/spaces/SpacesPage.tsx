@@ -33,7 +33,7 @@ function Suggestions({ onMake }: { onMake: (folder: string) => void }) {
   return (
     <section>
       <h2 className="text-[15px] font-semibold tracking-tight">Folders you work in</h2>
-      <div className="mb-3 text-[13px] text-fg-3">Where your sessions ran or changed files lately, not in a space yet: each could be one</div>
+      <div className="mb-3 text-[13px] text-fg-3">Where your sessions ran or changed files lately, not in a project yet: each could be one</div>
       <div className="grid gap-2 sm:grid-cols-2">
         {list.map((x) => (
           <div key={x.path} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-panel px-3 py-2.5">
@@ -53,7 +53,7 @@ function Suggestions({ onMake }: { onMake: (folder: string) => void }) {
               </div>
             </div>
             <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => onMake(x.path)}>
-              Make a space
+              Make a project
             </Button>
             <button type="button" aria-label={tr(`Not a project: ${basename(x.path)}`)} title="Not a project: stop suggesting it" onClick={() => hide(x.path)} className="shrink-0 rounded p-1.5 text-fg-3 hover:bg-bg-3 hover:text-fg">
               <X size={14} />
@@ -129,12 +129,12 @@ function Intro({ onMake }: { onMake: () => void }) {
   const points: [ReactNode, string, string][] = [
     [<MessagesSquare key="s" size={17} />, 'Sessions that know the project', 'Every agent in it follows its guidelines, and searches its documents and skills.'],
     [<LibraryBig key="l" size={17} />, 'Its files and Library together', 'Its folder, and the pages, slides and pictures made in it, in one place.'],
-    [<Boxes key="b" size={17} />, 'Picked by name', 'On the start page, pick the space instead of a folder.'],
+    [<Boxes key="b" size={17} />, 'Picked by name', 'On the start page, pick the project instead of a folder.'],
   ];
   return (
     <section className="rounded-3xl border border-line bg-panel px-5 py-7 sm:px-8">
       <h2 className="text-[20px] font-semibold tracking-tight">Keep each project together</h2>
-      <p className="mt-1 max-w-[560px] text-[14px] leading-relaxed text-fg-2">A space holds one project: a thesis, your taxes, a website. Its sessions, files, documents and what the agents remember stay with it.</p>
+      <p className="mt-1 max-w-[560px] text-[14px] leading-relaxed text-fg-2">A project holds one project: a thesis, your taxes, a website. Its sessions, files, documents and what the agents remember stay with it.</p>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         {points.map(([icon, title, body]) => (
           <div key={title} className="rounded-2xl bg-bg-1 px-4 py-3.5">
@@ -145,7 +145,7 @@ function Intro({ onMake }: { onMake: () => void }) {
         ))}
       </div>
       <Button className="mt-5" variant="primary" icon={<Plus size={15} />} onClick={onMake}>
-        Make a space
+        Make a project
       </Button>
     </section>
   );
@@ -164,12 +164,12 @@ function List() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
-        title="Spaces"
+        title="Projects"
         tip="spaces"
         sub="Each project’s sessions, files, documents and Library, together"
         actions={
           <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={make}>
-            New space
+            New project
           </Button>
         }
       >
@@ -197,8 +197,8 @@ function List() {
                   <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-bg-2 text-fg-3">
                     <Layers size={17} />
                   </span>
-                  <span className="text-[14px] font-semibold">Group spaces together</span>
-                  <span className="text-[12.5px] leading-snug text-fg-3">Sessions in a group work with all its spaces: their files, documents and guidelines</span>
+                  <span className="text-[14px] font-semibold">Group projects together</span>
+                  <span className="text-[12.5px] leading-snug text-fg-3">Sessions in a group work with all its projects: their files, documents and guidelines</span>
                 </button>
               )}
             </div>

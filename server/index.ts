@@ -1163,7 +1163,7 @@ app.post('/api/setup/mcp/login', async (req) => {
 app.get('/api/setup/skills', async (req) => setup.listSkills(codex, query(req).cwd));
 app.post('/api/setup/skills', async (req) => {
   const b = body(req);
-  return { path: setup.createSkill(agentOf(b.agent), String(b.name ?? ''), String(b.description ?? ''), b.scope === 'project' ? 'project' : 'user', b.cwd) };
+  return { path: setup.createSkill(agentOf(b.agent), String(b.name ?? ''), String(b.description ?? ''), b.scope === 'project' ? 'project' : 'user', b.cwd, typeof b.body === 'string' ? b.body : undefined) };
 });
 app.post('/api/setup/skills/toggle', async (req) => {
   const b = body(req);
@@ -1185,6 +1185,17 @@ app.post('/api/setup/marketplaces/:action', async (req) => {
   const action = (req.params as { action: string }).action;
   if (action !== 'add' && action !== 'remove') throw new HttpError(404, 'Unknown action');
   return setup.marketplaceAction(action, String(body(req).target ?? '').trim());
+});
+app.get('/api/setup/codex-plugins', async (req) => setup.listCodexPlugins(query(req).q ?? '', Number(query(req).limit) || 60));
+app.post('/api/setup/codex-plugins/:action', async (req) => {
+  const action = (req.params as { action: string }).action;
+  if (action !== 'add' && action !== 'remove') throw new HttpError(404, 'Not found');
+  return setup.codexPluginAction(action, String(body(req).id ?? ''));
+});
+app.post('/api/setup/codex-marketplaces/:action', async (req) => {
+  const action = (req.params as { action: string }).action;
+  if (action !== 'add' && action !== 'remove' && action !== 'upgrade') throw new HttpError(404, 'Not found');
+  return setup.codexMarketplaceAction(action, String(body(req).target ?? ''));
 });
 app.get('/api/setup/instructions', async (req) => ({ files: setup.instructionFiles(agentOf(query(req).agent), query(req).cwd) }));
 app.post('/api/setup/instructions', async (req) => {

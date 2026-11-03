@@ -801,8 +801,8 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
       <Button size="sm" variant="ghost" icon={<MessageSquarePlus size={14} />} onClick={() => (startSession(picked), clearPicks())} title="Start a session with them">
         <span className="@max-[760px]:hidden">Start a session</span>
       </Button>
-      <Button ref={spaceRef} size="sm" variant="ghost" icon={<Boxes size={14} />} onClick={() => setBar((b) => (b === 'space' ? false : 'space'))} title="Add to a space">
-        <span className="@max-[760px]:hidden">Add to a space</span>
+      <Button ref={spaceRef} size="sm" variant="ghost" icon={<Boxes size={14} />} onClick={() => setBar((b) => (b === 'space' ? false : 'space'))} title="Add to a project">
+        <span className="@max-[760px]:hidden">Add to a project</span>
       </Button>
       <Button ref={moveRef} size="sm" variant="ghost" icon={<FolderInput size={14} />} onClick={() => setBar((b) => (b === 'move' ? false : 'move'))} title="Move to another folder">
         <span className="@max-[760px]:hidden">Move to</span>
@@ -816,7 +816,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
       <Popover anchor={moveRef} open={bar === 'move'} onClose={() => setBar(false)} width={320} title="Move to">
         <FolderFinder value={dir} onPick={(p) => (setBar(false), void moveInto(picked, p, () => (clearPicks(), refresh())))} lead={lead} autoFocus anchor={moveRef} />
       </Popover>
-      <Popover anchor={spaceRef} open={bar === 'space'} onClose={() => setBar(false)} width={250} title="Add to a space">
+      <Popover anchor={spaceRef} open={bar === 'space'} onClose={() => setBar(false)} width={250} title="Add to a project">
         <SpaceChoices
           onPick={(sp) => {
             setBar(false);

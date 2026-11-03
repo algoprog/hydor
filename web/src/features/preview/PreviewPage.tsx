@@ -13,7 +13,7 @@ import { startSessionWith } from '../../lib/startFiles';
 import { tr } from '../../i18n/runtime';
 import { toastError, useApp } from '../../lib/store';
 import { Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Throbber, useIsMobile } from '../../components/ui';
-import { PageHeader } from '../layout/PageHeader';
+import { SystemHeader } from '../system/SystemHeader';
 import { RefreshIcon } from '../../components/RefreshIcon';
 
 interface DevServer {
@@ -416,10 +416,8 @@ export function PreviewPage() {
     );
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader
-        title="Preview"
-        tip="preview"
-        sub="The web apps running on this computer, to look at from any device"
+      <SystemHeader
+        tab="preview"
         actions={
           <IconButton label="Refresh" onClick={load}>
             <RefreshIcon size={15} />

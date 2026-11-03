@@ -3,6 +3,45 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.19.0 · 3 November 2026
+
+Every skill on one page, more than fifty of them built in, plugins that bring skills and tools to every agent (seven
+built in, others from a link or a file, or your own), and System: your computer's files, Git, terminals, previews and
+monitor under one tool. And Spaces are now called Projects.
+
+- **Skills, all in one place**: Settings → Skills now holds every skill agents can use (the old Skill library is part
+  of it): the ones that come with the app, yours, those of your plugins, Claude Code's and Codex's own, and your
+  projects'. They are grouped by what they are for, with a search, a row of filters and a switch on each to turn it off
+  for agents. Open a skill to read it and its history; write one of your own for every agent (or only Claude Code or
+  Codex) in plain fields, change one of yours, or make your own version of a built-in one. Skills agents suggest wait
+  at the top.
+- **More than forty new built-in skills**: emails, decision briefs, weekly reviews, project plans, brainstorming,
+  studying, translation, plain language, data analysis, dashboards, financial models, keeping watch on prices and
+  news, social media posts, image prompts; blocked pages, places and maps, papers, web scraping, diagrams and quick
+  mockups; APIs, GitHub, debugging, tests first, code reviews, getting out of Git trouble, refactoring, finding your
+  way in a codebase, polishing a web page, testing a web app, Docker, security checks, speed, SQL, MCP servers,
+  release notes, writing skills and making plugins; Hugging Face, fine-tuning, evaluating and running models
+  locally. Agents other than Claude Code, Codex and Custom now get the skills too, as a list to read from.
+- **Plugins for every agent**: Settings → Plugins adds skills, tool servers, instructions and files of their own to
+  every agent at once (Claude Code, Codex, Custom and the others), with what they need set up in a folder of their
+  own: other plugins (added first, and turned on and off together), Python and Node packages, files to download,
+  programs and keys. Seven come with the app: **Audio and video**, **Library docs**, **Meeting recordings**,
+  **Python for data**, **Speech to text** (on this computer), **SQLite databases** and **Text from pictures**. Add
+  others from a Git link, a .zip or a folder after a look at what each gives and needs; plugins made for Claude Code
+  work too. Plugins use the open Agent Plugins format.
+- **Make and share plugins**: **Make a plugin** opens an editor for its skills (write one, or copy one of yours),
+  tools, needs, files and instructions, or have an agent make one for you; **Pack into a .zip** makes the file to
+  share, and anyone adds it with **From a .zip file**.
+- **Claude Code's and Codex's own plugins** have a tab each on the Plugins page; Codex's are new there.
+- **System**: Files, Git, Terminal and Preview moved under one **System** tool in the sidebar, which now has two rows
+  of tools and more room for your sessions. System opens on an overview of the computer (processor, memory, disk,
+  graphics) and of each tool (recent files and a search, repositories with changes, the shells running, the web apps
+  to preview), with a tab for each and **Monitor** for the live charts.
+- **Spaces are now Projects**: the sidebar, the Projects page, Settings, the Library, the start page, the guide and
+  what agents are told all say project for what was a space. Your projects keep everything they held, their folders
+  included; a new project's folder goes in a Projects folder beside your task folders. Links to the old pages still
+  work.
+
 ## 0.18.1 · 3 November 2026
 
 One card for each page an agent saves in a reply, and previews in the conversation that fit the screen.

@@ -1,6 +1,7 @@
 ---
 name: pdf
 description: Use when the user wants a PDF made (a report, invoice, certificate, flyer, letter, form), PDFs merged, split, rotated, filled in or stamped, an Office file turned into a PDF, or a PDF read, scanned ones included.
+category: documents
 ---
 
 # PDF

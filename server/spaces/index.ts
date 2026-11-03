@@ -76,9 +76,9 @@ export function sessionsIn(db: DB, id: string, limit = 100): string[] {
 const clean = (s: unknown, max: number) => String(s ?? '').trim().slice(0, max);
 const slug = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'space';
 
-/** A folder of its own for a new space: in the task folders' place (Settings → Assistants), under Spaces. */
+/** A folder of its own for a new project: in the task folders' place (Settings → Assistants), under Projects. */
 function newFolder(db: DB, name: string): string {
-  const root = path.join(taskRoot(db), 'Spaces');
+  const root = path.join(taskRoot(db), 'Projects');
   for (let i = 1; ; i++) {
     const p = path.join(root, i === 1 ? slug(name) : `${slug(name)}-${i}`);
     if (!fs.existsSync(p)) {
@@ -117,7 +117,7 @@ function foldersOf(b: Record<string, unknown>, prev: Space | undefined, own: str
 /** A space's fields as given (or kept from `prev`); a new one's colour is the next of the list. */
 function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor = 'blue'): Omit<Space, 'id' | 'createdAt' | 'folder'> {
   const name = b.name !== undefined ? clean(b.name, 60) : (prev?.name ?? '');
-  if (!name) throw new HttpError(400, 'Give the space a name');
+  if (!name) throw new HttpError(400, 'Give the project a name');
   const color = b.color !== undefined ? String(b.color) : (prev?.color ?? nextColor);
   const shared = b.sharedKnowledge !== undefined ? b.sharedKnowledge !== false : prev?.sharedKnowledge !== false;
   return {
@@ -135,10 +135,10 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
  */
 function membersOf(db: DB, b: Record<string, unknown>, prev: Space | undefined): string[] | undefined {
   if (b.members === undefined) return prev?.members;
-  if (!Array.isArray(b.members)) throw new HttpError(400, 'members: a list of spaces');
+  if (!Array.isArray(b.members)) throw new HttpError(400, 'members: a list of projects');
   const all = new Map(allSpaces(db).map((s) => [s.id, s]));
   const ids = [...new Set(b.members.map(String))].filter((id) => id !== prev?.id && all.has(id) && !isGroup(all.get(id)!)).slice(0, MAX_GROUP);
-  if (ids.length && prev && [...all.values()].some((s) => s.members?.includes(prev.id))) throw new HttpError(400, `${prev.name} is in a group already, so it cannot bring other spaces together itself`);
+  if (ids.length && prev && [...all.values()].some((s) => s.members?.includes(prev.id))) throw new HttpError(400, `${prev.name} is in a group already, so it cannot bring other projects together itself`);
   return ids.length ? ids : undefined;
 }
 
@@ -159,7 +159,7 @@ export function createSpace(db: DB, b: Record<string, unknown>): Space {
 
 export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Space {
   const prev = spaceById(db, id);
-  if (!prev) throw new HttpError(404, 'No such space');
+  if (!prev) throw new HttpError(404, 'No such project');
   const { sharedKnowledge: _was, members: _had, folders: _also, ...kept } = prev;
   const members = membersOf(db, b, prev);
   const folders = foldersOf(b, prev, prev.folder);
@@ -244,21 +244,21 @@ const and = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} an
  */
 export function spaceInstructions(s: Space, members: Space[] = [], glance?: string | null, skills: string[] = []): string {
   const lines = [
-    `# Space: ${s.name}`,
-    `The user keeps this work in a space of its own, "${s.name}"${s.description ? ` (${s.description})` : ''}: its sessions, files, memory and guidelines belong together. Its folder, ${s.folder}, holds the space's files: keep what you make for it there.`,
+    `# Project: ${s.name}`,
+    `The user keeps this work in a project of its own, "${s.name}"${s.description ? ` (${s.description})` : ''}: its sessions, files, memory and guidelines belong together. Its folder, ${s.folder}, holds the project's files: keep what you make for it there.`,
   ];
-  if (glance) lines.push('', `In its folder now (the last changed first; the user adds files to the space there): ${glance}. Open those the task needs.`);
+  if (glance) lines.push('', `In its folder now (the last changed first; the user adds files to the project there): ${glance}. Open those the task needs.`);
   if (s.folders?.length)
-    lines.push('', `It also works with ${s.folders.length === 1 ? 'this folder' : 'these folders'} of the user's, where ${s.folders.length === 1 ? 'it is' : 'they are'}: ${s.folders.join(', ')}. They belong to the space too: use them as the task needs.`);
+    lines.push('', `It also works with ${s.folders.length === 1 ? 'this folder' : 'these folders'} of the user's, where ${s.folders.length === 1 ? 'it is' : 'they are'}: ${s.folders.join(', ')}. They belong to the project too: use them as the task needs.`);
   if (skills.length)
     lines.push(
       '',
-      `Skills of the space's own: ${and(skills)}. They are in your skills list with the others, in place of any of the same name, and say how this work is done here: when one fits the task, use it.`,
+      `Skills of the project's own: ${and(skills)}. They are in your skills list with the others, in place of any of the same name, and say how this work is done here: when one fits the task, use it.`,
     );
   if (members.length) {
     lines.push(
       '',
-      `"${s.name}" brings together ${members.length} more space${members.length === 1 ? '' : 's'}, all yours to work with: their folders and files, their documents (knowledge_search searches them) and what they ask below. Use what bears on the task, from any of them; keep what you make in ${s.folder} unless the user says otherwise.`,
+      `"${s.name}" brings together ${members.length} more project${members.length === 1 ? '' : 's'}, all yours to work with: their folders and files, their documents (knowledge_search searches them) and what they ask below. Use what bears on the task, from any of them; keep what you make in ${s.folder} unless the user says otherwise.`,
     );
     for (const m of members) {
       lines.push('', `## ${m.name}${m.description ? ` (${m.description})` : ''}`, `Its folder: ${m.folder}`);
@@ -292,7 +292,7 @@ export const spaces: Feature = {
     });
     d.app.get('/api/spaces/:id', async (req) => {
       const s = spaceById(d.db, id(req));
-      if (!s) throw new HttpError(404, 'No such space');
+      if (!s) throw new HttpError(404, 'No such project');
       return { space: s, sessions: sessionsIn(d.db, s.id) };
     });
     d.app.patch('/api/spaces/:id', async (req) => {
@@ -312,7 +312,7 @@ export const spaces: Feature = {
     // Its own skills (server/skillpack/spaceSkills.ts).
     const space = (req: { params: unknown }) => {
       const s = spaceById(d.db, id(req));
-      if (!s) throw new HttpError(404, 'No such space');
+      if (!s) throw new HttpError(404, 'No such project');
       return s;
     };
     const skill = (req: { params: unknown }) => String((req.params as { name: string }).name);
@@ -323,7 +323,7 @@ export const spaces: Feature = {
     d.app.get('/api/spaces/:id/skills', async (req) => spaceSkillsView(d.db, space(req).id, withGroups(d.db, space(req).id)));
     d.app.get('/api/spaces/:id/skills/:name', async (req) => {
       const doc = spaceSkillDoc(d.db, space(req), skill(req));
-      if (!doc) throw new HttpError(404, `The space has no skill named ${skill(req)}`);
+      if (!doc) throw new HttpError(404, `The project has no skill named ${skill(req)}`);
       return doc;
     });
     d.app.post('/api/spaces/:id/skills', async (req) => {

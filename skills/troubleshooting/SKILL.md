@@ -1,6 +1,7 @@
 ---
 name: troubleshooting
 description: Use when something does not work as expected and the cause is not yet known, in any field (an error or failing test, a broken setup or device, a home network, a spreadsheet, a recipe or process that keeps going wrong).
+category: work
 triggers: [not working, doesn't work, does not work, isn't working, stopped working, keeps failing, keeps crashing, won't start, troubleshoot*, debug*, fails with]
 ---
 

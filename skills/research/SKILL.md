@@ -1,6 +1,7 @@
 ---
 name: research
 description: Use when a question needs looking things up and weighing sources, such as comparing options, checking a claim, finding papers, patents, people or organisations, or surveying a topic. Not for a quick fact one search settles.
+category: research
 triggers: [research, find sources, literature review, papers on, studies on, evidence for, state of the art, fact-check, fact check, patents, compare the best]
 ---
 

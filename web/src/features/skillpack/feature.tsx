@@ -1,11 +1,9 @@
 // The skill library in the pages: a skill an agent proposes (skill_save, skill_patch) as a card to
-// approve, edit or dismiss; a "Using skill …" chip where an agent loads a skill, or where your words
-// brought one into Custom's turn; and Settings → Skill library.
-import { Library } from 'lucide-react';
+// approve, edit or dismiss; and a "Using skill …" chip where an agent loads a skill, or where your words
+// brought one into Custom's turn. Every skill is listed in Settings → Skills (SkillsPage.tsx).
 import { skillLoaded } from '@shared/skillpack';
 import type { ToolInfo } from '@shared/types';
 import type { ToolView, WebFeature } from '../registry';
-import { LibrarySettings } from './LibrarySettings';
 import { ProposalCard } from './ProposalCard';
 import { SkillChip, TriggerNote } from './SkillView';
 
@@ -27,5 +25,4 @@ export const skillpackFeature: WebFeature = {
   },
   matchTool: (t) => (t.status !== 'error' && t.status !== 'declined' && skillLoaded(t) ? CHIP : undefined),
   noteViews: { skillpack: TriggerNote },
-  settings: [{ id: 'skillpack', label: 'Skill library', icon: Library, sub: 'Skills that come with the app, and the ones agents learned with your approval', Body: LibrarySettings }],
 };

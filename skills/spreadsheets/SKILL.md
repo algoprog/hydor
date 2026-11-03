@@ -1,6 +1,7 @@
 ---
 name: spreadsheets
 description: Use when the user wants an Excel file (.xlsx) made or changed from code (a budget, tracker, schedule, invoice, data table, anything with rows, totals or charts), or an .xlsx, .xls, .ods or .csv read, cleaned up or analysed. For a new spreadsheet to edit in the app, make it with save_sheet instead.
+category: documents
 ---
 
 # Spreadsheets

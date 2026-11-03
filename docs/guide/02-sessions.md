@@ -8,7 +8,7 @@ A session is one conversation with an agent, in one folder: you say what you wan
 
 **New session** at the top of the sidebar opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session's page opens at once, with your message and the agent at work on it (**Working**). If the session can't start, its page says why, and **Back to the start page** puts your message (and what you attached) back in the box.
 
-The row under the message box holds **Agent**, **Model**, **Folder** (or **Space**), **Assistant** and, at its end, **Options**. On a phone each of them opens as a sheet from the bottom of the screen.
+The row under the message box holds **Agent**, **Model**, **Folder** (or **Project**), **Assistant** and, at its end, **Options**. On a phone each of them opens as a sheet from the bottom of the screen.
 
 ### Pick the agent and its model
 
@@ -23,18 +23,18 @@ At the bottom, **Models for Custom** opens [Settings → Models](/settings?s=mod
 
 **Model** lists only the chosen agent's own models. The agent's default is marked "default". Older versions of a model wait behind "2 older models"; a long list has a **Search models** field (Enter picks the first match). Custom lists the models you added in Settings → Models; another ACP agent lists the models it offered when it last ran, and the chip appears once it has run.
 
-### Pick a folder, a space or a new task folder
+### Pick a folder, a project or a new task folder
 
-The **Folder** chip says where the agent works. Its menu ("Space or folder to work in") has a field, **Find a folder, or type its path**, over a short list:
+The **Folder** chip says where the agent works. Its menu ("Project or folder to work in") has a field, **Find a folder, or type its path**, over a short list:
 
-- your spaces, by name (the three used last, and the one picked). Picking a space sets the folder to the space's own, its assistant, and its guidelines for the session; the chip then reads **Space** and shows the space's name. A group of spaces works the same way, with all its spaces. See [Spaces and knowledge](/guide/spaces) and [Agent Guidelines](/guide/guidelines).
+- your projects, by name (the three used last, and the one picked). Picking a project sets the folder to the project's own, its assistant, and its guidelines for the session; the chip then reads **Project** and shows the project's name. A group of projects works the same way, with all its projects. See [Projects and knowledge](/guide/spaces) and [Agent Guidelines](/guide/guidelines).
 - the folder in use and the three folders you picked last;
 - **New task folder**: a fresh folder for this task, named by the day and a few words of your message (such as `2026-11-01-plan-trip-lisbon`), in `~/Naget` unless you set another place in [Task folders](/settings?s=assistants&find=Task%20folders) (Settings → Capabilities → Assistants);
-- **New space**: makes a space (sessions, files and memory together) and picks it.
+- **New project**: makes a project (sessions, files and memory together) and picks it.
 
 Type in the field to find more:
 
-- A name finds matching spaces, and folders among those you used lately, in the folder in use and in your home folder.
+- A name finds matching projects, and folders among those you used lately, in the folder in use and in your home folder.
 - A path (`~/code/`, or `code/` from your home folder) lists the folders there.
 - ↑ ↓ and Enter pick. Tab, or the arrow at the end of a row, lists the folders inside it.
 
@@ -109,7 +109,7 @@ In every mode Custom asks you before risky commands. In Ask, Accept edits and Pl
 
 ### What the start page remembers
 
-The start page opens with what you picked last, on every device: the agent; for each agent its model, effort, permissions and account; the folder, new task folder or space; the worktree switch; the assistant; memory off; and the spending cap. Picking an agent brings back what you last used with it.
+The start page opens with what you picked last, on every device: the agent; for each agent its model, effort, permissions and account; the folder, new task folder or project; the worktree switch; the assistant; memory off; and the spending cap. Picking an agent brings back what you last used with it.
 
 A link to the start page can fill it in, for example `/?prompt=Summarize%20my%20notes&agent=codex`; `model=` and `cwd=` (a folder's path) can be added. It only fills the box and the choices; it never starts anything by itself. Invisible characters are removed from a linked message, with a notice.
 
@@ -305,7 +305,7 @@ Compacting replaces the history so far with a summary, which frees room in the m
 Most of these are in the session's menu (⋯), and in its row's menu in the sidebar: point at the row and click **⋯** at its end, or right-click it (on a phone, tap its **⋯**).
 
 - **Rename**: type a new title (up to 200 characters); Enter saves, Esc cancels. Double-clicking the title in the header or the sidebar, or F2 on a selected row, does the same.
-- **Pin to the top** / **Unpin**: pinned sessions stay in the **Pinned** group, in the order you drag them into. You can also drag a session from the groups below it (a space's or a folder's, Today, Yesterday…) onto Pinned, or onto "Drop here to pin" when nothing is pinned yet.
+- **Pin to the top** / **Unpin**: pinned sessions stay in the **Pinned** group, in the order you drag them into. You can also drag a session from the groups below it (a project's or a folder's, Today, Yesterday…) onto Pinned, or onto "Drop here to pin" when nothing is pinned yet.
 - **Snooze**: hides the session in the **Snoozed** group at the bottom until **For an hour**, **For 3 hours**, **This evening** (while it is before 5 pm), **Tomorrow morning**, **Next week** (Monday morning), or **Pick a date and time**. It comes back by itself, with a notice, or sooner if it needs you. **Unsnooze** brings it back now.
 - **Settle: done for now**: for finished work. The agent stops (it is not offered while a turn runs) and the session counts as read; its history and any worktree stay. For a session in a worktree, the worktree's dialog opens so you can remove it.
 - **Archive** / **Unarchive**: takes the session out of the list; nothing is deleted. Archived sessions are found with **Search sessions** in the sidebar; open one and choose **Unarchive** in its menu.
@@ -332,7 +332,7 @@ A worktree is a separate copy of a repository's files on a new branch, so an age
 
 From a session's branch, the session's menu (⋯) → **Folder and code** → **Open a pull request** opens a pull request on GitHub or Gitea. **Write it for me** drafts the title and description from the commits and the diff; a box can commit uncommitted changes first; **Draft** marks it as a draft; the branch is pushed when you press **Open pull request**. You need an account in [Settings → Source control](/settings?s=scm). **Link a pull request that already exists…** links one opened elsewhere.
 
-Once linked, its state and checks show as a badge in the sidebar and the header, and update every few minutes, with a notice when it is merged or its checks finish. The same menu item, now **Pull request #12**, has **Open on GitHub** (or Gitea), **Review the changes**, **Check now** and **Unlink**. **Review the changes** in the submenu goes through what the branch changes, file by file. See [Files, Git, Terminal and Preview](/guide/files-git).
+Once linked, its state and checks show as a badge in the sidebar and the header, and update every few minutes, with a notice when it is merged or its checks finish. The same menu item, now **Pull request #12**, has **Open on GitHub** (or Gitea), **Review the changes**, **Check now** and **Unlink**. **Review the changes** in the submenu goes through what the branch changes, file by file. See [System: files, Git, Terminal and Preview](/guide/files-git).
 
 ## When a usage limit stops a session
 

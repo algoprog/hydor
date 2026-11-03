@@ -189,7 +189,7 @@ await test("Custom's skills list: the project's own first, then the library (bun
   assert.ok(vis.find((s) => s.name === 'research')?.file.startsWith(viewSkills()));
 });
 
-await test('what each agent is given: a plugin folder, an extra skills folder, an environment variable', async () => {
+await test('what each agent is given: a plugin folder, an extra skills folder, an environment variable, a list to read from', async () => {
   const base = { cwd: root, runId: 'r', resume: false, extra: {} };
   // Stand-ins for Claude Code: an older one without --plugin-dir gets nothing (it would not start).
   const fake = (name: string, help: string) => {
@@ -206,7 +206,10 @@ await test('what each agent is given: a plugin folder, an extra skills folder, a
   assert.deepEqual(codex?.skillRoots, [viewSkills()]);
   const custom = await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'console' }, deps);
   assert.equal(custom?.env?.NAGET_SKILL_DIRS, viewSkills());
-  assert.equal(await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'gemini' }, deps), undefined);
+  // Other ACP agents have no skills of their own: they get the list, each with the SKILL.md to read.
+  const other = (await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'gemini' }, deps))?.instructions?.join('\n') ?? '';
+  assert.match(other, /read its SKILL\.md with your file tools/);
+  assert.ok(other.includes(`- research: `) && other.includes(path.join(viewSkills(), 'research', 'SKILL.md')), 'each skill with its file');
   assert.equal(claude?.instructions, undefined, 'nothing added to Claude Code’s system prompt');
 });
 
@@ -345,7 +348,7 @@ await test('skill_save → a card → approved: saved, linked, in the history wi
   const out = String(
     await tool('skill_save').run(
       {
-        name: 'Release Notes',
+        name: 'Team Notes',
         description: 'Use when writing release notes from merged pull requests.',
         body: '# Release notes\n\n1. List merged pull requests since the last tag.\n2. Group them: features, fixes, other.\n3. Write one line each, in the user’s words.',
         triggers: ['release notes', 'changelog'],
@@ -354,7 +357,7 @@ await test('skill_save → a card → approved: saved, linked, in the history wi
       ctx('claude:s1'),
     ),
   );
-  assert.match(out, /looking at a card with the proposed skill “release-notes”/);
+  assert.match(out, /looking at a card with the proposed skill “team-notes”/);
   const id = idOf(out);
   assert.ok(id, 'the card finds the proposal by its id');
   const p = await proposalOf(id);
@@ -362,20 +365,20 @@ await test('skill_save → a card → approved: saved, linked, in the history wi
   assert.equal(p.kind, 'new');
   assert.equal(p.added, p.after.trimEnd().split('\n').length);
   assert.equal(p.removed, 0);
-  assert.ok(!fs.existsSync(path.join(folders().learned, 'release-notes')), 'nothing saved before approval');
+  assert.ok(!fs.existsSync(path.join(folders().learned, 'team-notes')), 'nothing saved before approval');
   const lib = (await app.inject({ method: 'GET', url: '/api/skillpack' })).json();
   assert.ok(lib.pending.some((x: SkillProposal) => x.id === id), 'listed as waiting in Settings');
   const r = await app.inject({ method: 'POST', url: `/api/skillpack/proposals/${id}/approve`, payload: {} });
   assert.equal(r.statusCode, 200, r.body);
   assert.equal(r.json().proposal.status, 'approved');
-  const saved = fs.readFileSync(path.join(folders().learned, 'release-notes', 'SKILL.md'), 'utf8');
+  const saved = fs.readFileSync(path.join(folders().learned, 'team-notes', 'SKILL.md'), 'utf8');
   assert.equal(saved, p.after);
   assert.deepEqual(parseSkill(saved).triggers, ['release notes', 'changelog']);
-  assert.equal(fs.readlinkSync(path.join(viewSkills(), 'release-notes')), path.join(folders().learned, 'release-notes'));
-  const h = history(db, 'release-notes');
+  assert.equal(fs.readlinkSync(path.join(viewSkills(), 'team-notes')), path.join(folders().learned, 'team-notes'));
+  const h = history(db, 'team-notes');
   assert.equal(h[0].action, 'create');
   assert.ok(h[0].added > 5 && h[0].removed === 0);
-  assert.match(sessions.delivered.at(-1)!.text, /^The user approved the skill “release-notes”\. It is in the app’s skill library now/);
+  assert.match(sessions.delivered.at(-1)!.text, /^The user approved the skill “team-notes”\. It is in the app’s skill library now/);
   assert.equal(sessions.delivered.at(-1)!.key, 'claude:s1');
   assert.ok(events.some((x) => x.key === 'claude:s1' && (x.e as any).data?.proposal?.status === 'approved'), 'the card follows');
   assert.equal((await app.inject({ method: 'POST', url: `/api/skillpack/proposals/${id}/approve`, payload: {} })).statusCode, 409, 'answered once');
@@ -384,7 +387,7 @@ await test('skill_save → a card → approved: saved, linked, in the history wi
 await test('skill_patch with edits → a diff of only what changed → approved after the user edits it', async () => {
   const out = String(
     await tool('skill_patch').run(
-      { name: 'release-notes', edits: [{ find: '2. Group them: features, fixes, other.', replace: '2. Group them: breaking changes first, then features, fixes, other.' }], reason: 'Breaking changes were missed.' },
+      { name: 'team-notes', edits: [{ find: '2. Group them: features, fixes, other.', replace: '2. Group them: breaking changes first, then features, fixes, other.' }], reason: 'Breaking changes were missed.' },
       ctx('claude:s1'),
     ),
   );
@@ -398,9 +401,9 @@ await test('skill_patch with edits → a diff of only what changed → approved 
   const r = await app.inject({ method: 'POST', url: `/api/skillpack/proposals/${p.id}/approve`, payload: { text: edited } });
   assert.equal(r.statusCode, 200, r.body);
   assert.equal(r.json().proposal.saved, edited);
-  assert.equal(fs.readFileSync(path.join(folders().learned, 'release-notes', 'SKILL.md'), 'utf8'), edited);
-  assert.match(sessions.delivered.at(-1)!.text, /approved your change to the skill “release-notes”, after editing it/);
-  assert.equal(history(db, 'release-notes')[0].action, 'update');
+  assert.equal(fs.readFileSync(path.join(folders().learned, 'team-notes', 'SKILL.md'), 'utf8'), edited);
+  assert.match(sessions.delivered.at(-1)!.text, /approved your change to the skill “team-notes”, after editing it/);
+  assert.equal(history(db, 'team-notes')[0].action, 'update');
 });
 
 await test('a change to a built-in skill is saved as the user’s own version, with its other files', async () => {
@@ -431,8 +434,8 @@ await test('rules for proposals: names, duplicates, the agent’s mistakes, a ne
   await assert.rejects(save({ name: 'x-y', description: '', body }), /Give a description/);
   await assert.rejects(save({ name: 'x-y', description: 'Use when x happens.', body: 'Too short.' }), /needs more than that/);
   await assert.rejects(save({ name: 'x-y', description: 'Use when x happens.', body: 'x'.repeat(21_000) }), /at most 20,000/);
-  await assert.rejects(tool('skill_patch').run({ name: 'release-notes', edits: [{ find: 'not in the text', replace: 'y' }] }, ctx('claude:s2')), /not in the skill/);
-  await assert.rejects(tool('skill_patch').run({ name: 'release-notes', edits: [{ find: 'pull requests', replace: 'merge requests' }] }, ctx('claude:s2')), /appears 2 times/);
+  await assert.rejects(tool('skill_patch').run({ name: 'team-notes', edits: [{ find: 'not in the text', replace: 'y' }] }, ctx('claude:s2')), /not in the skill/);
+  await assert.rejects(tool('skill_patch').run({ name: 'team-notes', edits: [{ find: 'pull requests', replace: 'merge requests' }] }, ctx('claude:s2')), /appears 2 times/);
   await assert.rejects(tool('skill_patch').run({ name: 'nobody-knows' }, ctx('claude:s2')), /no skill named nobody-knows/);
   // A whole SKILL.md as the body: its frontmatter fills in.
   const whole = String(await save({ name: 'packing', body: '---\nname: packing\ndescription: Use when packing for a trip.\ntriggers: [packing list]\n---\n\n# Packing\n\nLay everything out first, then halve it, then pack.' }));
@@ -444,8 +447,8 @@ await test('rules for proposals: names, duplicates, the agent’s mistakes, a ne
   assert.equal((await proposalOf(idOf(again))).status, 'pending');
   assert.equal((await app.inject({ method: 'POST', url: `/api/skillpack/proposals/${first.id}/approve`, payload: {} })).statusCode, 409);
   // A change proposed before another one was saved does not overwrite it.
-  const a = await proposalOf(idOf(String(await tool('skill_patch').run({ name: 'release-notes', edits: [{ find: '3. Write one line each', replace: '3. Write a line each' }] }, ctx('claude:s3')))));
-  const b = await proposalOf(idOf(String(await tool('skill_patch').run({ name: 'release-notes', edits: [{ find: '1. List merged', replace: '1. Collect merged' }] }, ctx('claude:s4')))));
+  const a = await proposalOf(idOf(String(await tool('skill_patch').run({ name: 'team-notes', edits: [{ find: '3. Write one line each', replace: '3. Write a line each' }] }, ctx('claude:s3')))));
+  const b = await proposalOf(idOf(String(await tool('skill_patch').run({ name: 'team-notes', edits: [{ find: '1. List merged', replace: '1. Collect merged' }] }, ctx('claude:s4')))));
   assert.equal((await app.inject({ method: 'POST', url: `/api/skillpack/proposals/${a.id}/approve`, payload: {} })).statusCode, 200);
   const stale = await app.inject({ method: 'POST', url: `/api/skillpack/proposals/${b.id}/approve`, payload: {} });
   assert.equal(stale.statusCode, 409);
@@ -458,13 +461,13 @@ await test('rules for proposals: names, duplicates, the agent’s mistakes, a ne
 });
 
 await test('a removed learned skill can come back, and its history keeps both steps', async () => {
-  assert.equal((await app.inject({ method: 'POST', url: '/api/skillpack/skills/release-notes/remove', payload: {} })).statusCode, 200);
-  assert.ok(!fs.existsSync(path.join(viewSkills(), 'release-notes')) && !isLink(path.join(viewSkills(), 'release-notes')));
+  assert.equal((await app.inject({ method: 'POST', url: '/api/skillpack/skills/team-notes/remove', payload: {} })).statusCode, 200);
+  assert.ok(!fs.existsSync(path.join(viewSkills(), 'team-notes')) && !isLink(path.join(viewSkills(), 'team-notes')));
   const lib = (await app.inject({ method: 'GET', url: '/api/skillpack' })).json();
-  assert.ok(lib.removed.some((x: { name: string }) => x.name === 'release-notes'));
-  assert.equal((await app.inject({ method: 'POST', url: '/api/skillpack/skills/release-notes/restore', payload: {} })).statusCode, 200);
-  assert.match(fs.readFileSync(path.join(viewSkills(), 'release-notes', 'SKILL.md'), 'utf8'), /Collect merged|List merged/);
-  const h = (await app.inject({ method: 'GET', url: '/api/skillpack/skills/release-notes' })).json().history;
+  assert.ok(lib.removed.some((x: { name: string }) => x.name === 'team-notes'));
+  assert.equal((await app.inject({ method: 'POST', url: '/api/skillpack/skills/team-notes/restore', payload: {} })).statusCode, 200);
+  assert.match(fs.readFileSync(path.join(viewSkills(), 'team-notes', 'SKILL.md'), 'utf8'), /Collect merged|List merged/);
+  const h = (await app.inject({ method: 'GET', url: '/api/skillpack/skills/team-notes' })).json().history;
   assert.deepEqual(
     h.slice(0, 2).map((x: { action: string }) => x.action),
     ['restore', 'remove'],
@@ -486,7 +489,7 @@ await test('in a space: kept for the space alone or for every session as the use
   assert.equal((await approve(a.id)).statusCode, 200);
   assert.ok(spaceSkillText(sp.id, 'sowing-plan'));
   assert.equal(skillText('sowing-plan'), null, 'not in the library');
-  assert.match(sessions.delivered.at(-1)!.text, /It is one of the skills of the space “Garden” now, for its sessions alone: Custom has it/);
+  assert.match(sessions.delivered.at(-1)!.text, /It is one of the skills of the project “Garden” now, for its sessions alone: Custom has it/);
   assert.equal(history(db, 'sowing-plan', sp.id)[0].action, 'create');
   // The user can keep it for every session instead; outside a space there is no choice.
   const b = await run('skill_save', { name: 'compost-check', description: 'Use when checking whether compost is ready to use.', body, space: true });
@@ -497,7 +500,7 @@ await test('in a space: kept for the space alone or for every session as the use
   assert.equal(c.space, undefined);
   assert.equal(c.scope, 'library');
   // A name the space has already is refused, as one the library has is.
-  await assert.rejects(tool('skill_save').run({ name: 'sowing-plan', description: 'Use when sowing.', body }, ctx('claude:g1')), /The space Garden has a skill named sowing-plan already/);
+  await assert.rejects(tool('skill_save').run({ name: 'sowing-plan', description: 'Use when sowing.', body }, ctx('claude:g1')), /The project Garden has a skill named sowing-plan already/);
   // A change to the space's own skill stays the space's, whatever is asked.
   const d = await run('skill_patch', { name: 'sowing-plan', edits: [{ find: 'six weeks', replace: 'eight weeks' }] });
   assert.equal(d.spaceSkill, true);
@@ -513,7 +516,7 @@ await test('in a space: kept for the space alone or for every session as the use
   assert.match(spaceSkillText(sp.id, 'troubleshooting')!.text, /After one failed fix/);
   assert.ok(fs.existsSync(path.join(spaceSkillsDir(sp.id), 'troubleshooting', 'references', 'log.md')), 'its references came along');
   assert.equal(skillText('troubleshooting')!.text, before);
-  assert.match(sessions.delivered.at(-1)!.text, /saved as the space’s own version/);
+  assert.match(sessions.delivered.at(-1)!.text, /saved as the project’s own version/);
   // A skill's pill in the space's session opens the space's; elsewhere, the library's.
   const own = (await app.inject({ method: 'GET', url: '/api/skillpack/skills/troubleshooting?key=claude:g1' })).json();
   assert.equal(own.source, 'space');

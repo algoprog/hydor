@@ -234,7 +234,7 @@ Then choose:
 
 The agent hears your answer as a message, including any parts you changed, so you need not tell it. The card stays in the conversation with the outcome ("Scheduled", "Next run …", a link to **Scheduled tasks**), and shows the same on your other devices.
 
-Unless you ask for something else, the task runs with the conversation's agent, model, permissions and folder, and each run's session starts with the conversation's settings: its assistant, memory, spending cap, connected accounts and space. Ask for the runs to post here, and each one posts into this conversation instead of starting a new session.
+Unless you ask for something else, the task runs with the conversation's agent, model, permissions and folder, and each run's session starts with the conversation's settings: its assistant, memory, spending cap, connected accounts and project. Ask for the runs to post here, and each one posts into this conversation instead of starting a new session.
 
 Agents can also change, pause, turn back on or delete your tasks, always with a card first: **Change this task?** (the parts that change, the old value struck through above the new), **Pause this task?**, **Turn this task back on?** or **Delete this task?**, each with its own yes and no (**Change it** or **Keep it as is**, **Pause it** or **Keep it running**, **Turn it on** or **Keep it paused**, **Delete it** or **Keep it**). They can also list your tasks with when each runs next and how the last run went.
 

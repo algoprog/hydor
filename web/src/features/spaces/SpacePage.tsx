@@ -90,8 +90,8 @@ function Fact({ icon, label, children, onClick }: { icon: ReactNode; label: stri
 /** Asks, then deletes the space and goes back to the list (its sessions, folder, documents and skills stay). */
 async function deleteSpace(s: Space, confirm: ReturnType<typeof useConfirm>[0]) {
   const ok = await confirm({
-    title: tr(`Delete the ${s.name} space?`),
-    body: 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a space, its knowledge moves to the shared knowledge, and its skills to your skill library.',
+    title: tr(`Delete the ${s.name} project?`),
+    body: 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library.',
     confirm: 'Delete',
     danger: true,
   });
@@ -132,7 +132,7 @@ function SpaceMenu({ s }: { s: Space }) {
         </MenuItem>
         <MenuSep />
         <MenuItem icon={<Trash2 size={15} />} danger onClick={pick(() => void deleteSpace(s, confirm))}>
-          Delete the space
+          Delete the project
         </MenuItem>
       </Popover>
       {confirmNode}
@@ -152,7 +152,7 @@ function Top({ s, view, tab }: { s: Space; view?: SpaceView; tab: SpaceTab }) {
       <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(180deg, color-mix(in oklab, ${c} 15%, transparent), color-mix(in oklab, ${c} 3%, transparent))` }} />
       <div className="relative mx-auto flex max-w-[1120px] items-center gap-2 px-3 pt-3 sm:gap-3 sm:px-6 sm:pt-5">
         <NavButton />
-        <BackButton label="All spaces" onClick={() => go('/spaces')} />
+        <BackButton label="All projects" onClick={() => go('/spaces')} />
         <SpaceMark s={s} size={wide ? 46 : 34} className="rounded-[12px] max-sm:rounded-[10px]" />
         <div className="min-w-0 flex-1">
           <h1 translate="no" className="truncate text-[17px] leading-tight font-semibold tracking-tight sm:text-[21px]">
@@ -242,7 +242,7 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
                   </Button>
                 }
               >
-                A new one works in this space’s folder, with its guidelines, documents and skills.
+                A new one works in this project’s folder, with its guidelines, documents and skills.
               </Blank>
             </div>
           )}
@@ -295,7 +295,7 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
           </div>
         </Card>
         {members.length > 0 && (
-          <Card title="The spaces it brings together" count={members.length}>
+          <Card title="The projects it brings together" count={members.length}>
             <div className="divide-y divide-line border-t border-line">
               {members.map((m) => (
                 <button key={m.id} type="button" onClick={() => go(`/spaces/${m.id}`)} className="flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-bg-1">
@@ -370,7 +370,7 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
       </div>
       {members.length > 0 && (
         <div className="rounded-2xl border border-line bg-panel px-4 py-3.5">
-          <div className="text-[13.5px] font-medium">Also the documents of the spaces it brings together</div>
+          <div className="text-[13.5px] font-medium">Also the documents of the projects it brings together</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {members.map((m) => (
               <button key={m.id} type="button" onClick={() => go(`/spaces/${m.id}/knowledge`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
@@ -392,8 +392,8 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
         <div className="rounded-2xl border border-line bg-panel">
           <Blank icon={<BookOpen size={19} />} title="No documents yet">
             {members.length
-              ? 'Documents of the group’s own, beside those of its spaces: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page they read.'
-              : 'Documents only this space’s sessions search: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page they read.'}
+              ? 'Documents of the group’s own, beside those of its projects: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page they read.'
+              : 'Documents only this project’s sessions search: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page they read.'}
           </Blank>
           <div className="px-4 pb-4 sm:px-6 sm:pb-6">
             <DropFiles big onFiles={(p) => void firstFiles(p)} />
@@ -485,7 +485,7 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
   return (
     <div className="mx-auto max-w-[860px]">
       <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
-        <Row title="The space" sub="Its name, what it is about and its colour: on its card, its page and the start page">
+        <Row title="The project" sub="Its name, what it is about and its colour: on its card, its page and the start page">
           <label className="block">
             <span className="mb-1 block text-[12.5px] text-fg-2">Name</span>
             <span className="flex items-center gap-2.5">
@@ -528,7 +528,7 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
             aria-label="Agent Guidelines"
           />
         </Row>
-        <Row title="How its sessions start" sub="Picking the space on the start page picks this assistant too">
+        <Row title="How its sessions start" sub="Picking the project on the start page picks this assistant too">
           <span className="mb-1.5 block text-[12.5px] text-fg-2">Its sessions start as</span>
           <div role="radiogroup" aria-label="Its sessions start as" className="flex flex-wrap gap-1.5">
             <Chip on={!form.assistant} onClick={() => setForm({ ...form, assistant: '' })}>
@@ -544,9 +544,9 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
             ))}
           </div>
         </Row>
-        <Row title="The spaces it brings together" sub="A group: its sessions work with all of them, their files, documents and guidelines.">
+        <Row title="The projects it brings together" sub="A group: its sessions work with all of them, their files, documents and guidelines.">
           {inGroups.length ? (
-            <div className="text-[12.5px] text-fg-3">{tr(`It is in ${inGroups.map((g) => g.name).join(', ')}, so it cannot bring other spaces together itself.`)}</div>
+            <div className="text-[12.5px] text-fg-3">{tr(`It is in ${inGroups.map((g) => g.name).join(', ')}, so it cannot bring other projects together itself.`)}</div>
           ) : (
             <MemberPicker value={form.members ?? []} onChange={(members) => setForm({ ...form, members })} self={s.id} />
           )}
@@ -566,11 +566,11 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
       )}
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-err/25 px-4 py-4 sm:px-6">
         <div className="min-w-[min(100%,260px)] flex-1">
-          <div className="text-[14px] font-semibold">Delete the space</div>
+          <div className="text-[14px] font-semibold">Delete the project</div>
           <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">Its sessions, folder, documents, skills and what it holds in the Library stay.</div>
         </div>
         <Button variant="secondary" icon={<Trash2 size={14} />} onClick={() => void deleteSpace(s, confirm)} className="text-err">
-          Delete the space
+          Delete the project
         </Button>
       </div>
       {confirmNode}
@@ -603,12 +603,12 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   if (gone)
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <PageHeader title="Spaces" />
-        <Empty icon={<Boxes size={22} />} title="This space is gone">
-          <span className="block">It was deleted, or the address is not one of your spaces.</span>
+        <PageHeader title="Projects" />
+        <Empty icon={<Boxes size={22} />} title="This project is gone">
+          <span className="block">It was deleted, or the address is not one of your projects.</span>
           <span className="mt-3 inline-flex">
             <Button size="sm" variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => go('/spaces')}>
-              All spaces
+              All projects
             </Button>
           </span>
         </Empty>
@@ -646,7 +646,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
               view ? (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="min-w-0 flex-1 text-[13px] text-fg-3">Pages, slides, documents, pictures and videos made in this space, or moved to it</span>
+                    <span className="min-w-0 flex-1 text-[13px] text-fg-3">Pages, slides, documents, pictures and videos made in this project, or moved to it</span>
                     <Button size="sm" variant="ghost" onClick={() => go(`/library?space=${s.id}`)}>
                       Open in the Library
                       <ArrowRight size={13} className="ml-1" />

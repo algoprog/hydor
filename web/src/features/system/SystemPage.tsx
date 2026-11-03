@@ -7,7 +7,7 @@ import { openFile } from '../../lib/nav';
 import { toastError, useApp, useSystemLive } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { CoreGrid, Legend, Meter, severityColor, Sparkline, TimeSeries, useInterval } from '../../components/charts';
-import { PageHeader } from '../layout/PageHeader';
+import { SystemHeader } from './SystemHeader';
 import { Button, cx, Throbber, Segmented, useConfirm } from '../../components/ui';
 
 function Card({ icon, title, right, children, className }: { icon: React.ReactNode; title: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -146,7 +146,8 @@ function NotebookKernels() {
   );
 }
 
-export function SystemPage() {
+/** System → Monitor: how this computer is doing, live (processor, memory, graphics, network, storage, sensors, processes, notebook kernels). */
+export function MonitorPage() {
   const samples = useSystemLive((s) => s.samples);
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const loadInfo = async (withHistory = false) => {
@@ -194,19 +195,15 @@ export function SystemPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader
-        title="System"
-        sub={
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />
-            {info.hostname} · {info.cpuModel} · {info.cores} threads · up {uptime(info.uptime)}
-          </span>
-        }
-      />
+      <SystemHeader tab="monitor" />
       <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
-        <div className="mb-4 text-[12.5px] text-fg-3">
-          {info.os} · {info.kernel}
+        <div className="mb-4 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-fg-3">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />
+          <span translate="no" className="font-medium text-fg-2">
+            {info.hostname}
+          </span>
+          · {info.cpuModel} · {info.cores} threads · up {uptime(info.uptime)} · {info.os} · {info.kernel}
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5 [&>:last-child:nth-child(odd)]:col-span-2 lg:[&>:last-child:nth-child(odd)]:col-span-1">
           <Tile icon={<Cpu size={13} />} label="CPU" value={pct(s.cpu)} sub={`load ${s.load.map((l) => l.toFixed(2)).join(' · ')}`} spark={series.cpu.slice(-60)} sparkMax={100} />
