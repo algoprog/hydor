@@ -146,6 +146,7 @@ With two or more accounts for the same agent, the app can use them all: when one
 - When every account is at its limit, nothing moves. With **Resume after usage limits** on, the session continues when the first account resets, on that account. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
 - A new session started on an account that is at its limit starts on one with usage left instead, and a message you send to a session whose account is at its limit moves the session first, so the message isn't turned away.
 - Sessions open in VS Code or a terminal stay on their account.
+- The app's own quick questions to Claude Code or Codex (the helper model on **Automatic**, an app's quick model steps, pull-request descriptions, command suggestions) go to your next signed-in account the same way when one is at its limit, or signed out.
 
 ## Add Gemini CLI, OpenCode and other ACP agents
 
@@ -213,7 +214,7 @@ The helper model does small jobs beside your sessions, outside any conversation:
 
 Open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and click the menu next to **Helper model**:
 
-- **Automatic** (the default): Claude Haiku through Claude Code, or Codex when Claude Code can't answer.
+- **Automatic** (the default): Claude Haiku through Claude Code, or Codex when Claude Code can't answer. An account at its usage limit hands the question to your next signed-in account first (with **Switch accounts at a limit** on). When nothing answers, the error says why for each: "You've hit your weekly limit", a model your Codex plan doesn't offer…
 - Any of Custom's models, with where it runs (openrouter, ollama, vllm or endpoint) and "sees images" for those that can see.
 
 Automatic can't look at pictures. If you use Custom with a model that doesn't see images, pick a helper model that sees images, or Custom can't have your pictures described.

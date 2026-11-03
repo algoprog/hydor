@@ -43,7 +43,7 @@ import { clients as agentClients, clientUpdates, ensureCommand, install as insta
 import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
-import { addAccount, addedAccounts, autoSwitchOn, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
+import { accountEnv, accountPool, addAccount, addedAccounts, autoSwitchOn, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { devServerShot, listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
@@ -61,6 +61,7 @@ import { eventSent, featureContext, inboxItems, registerFeatures, startFeatures 
 import { arenaOf } from '../shared/arena.ts';
 import { startMatch } from './arena/index.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
+import { setOneShotAccounts } from './oneshot.ts';
 import { appWords } from './language/index.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
@@ -716,6 +717,8 @@ app.post('/api/clients/:id/install', async (req) => {
 
 const models = new ModelManager((state) => broadcast({ t: 'models', state }));
 setHelperModels(models);
+// One-off questions to Claude or Codex go to the next signed-in account when one is at its limit, as sessions do (unless switching is off).
+setOneShotAccounts((agent) => (autoSwitchOn(db) ? accountPool(db, agent) : [undefined]).map((id) => accountEnv(db, agent, id)));
 sessions.consoleOffers = () => ({ models: models.options(), modes: CONSOLE_MODES.map((m) => ({ value: m.id, label: m.name, description: m.description })), defaultMode: 'ask' });
 app.get('/api/models', async () => models.state());
 app.put('/api/models', async (req) => models.configure((req.body ?? {}) as Parameters<ModelManager['configure']>[0]));
