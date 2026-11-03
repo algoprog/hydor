@@ -14,7 +14,9 @@ import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import type { AppRecipe } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, fillTemplate, parseCsv, placeholders, toCsv } from '../../shared/apps.ts';
-import { allSteps, checkFlow, givesOf, refsIn } from '../../shared/app-manifest.ts';
+import { allSteps, checkFlow, cleanExamples, cleanFlow, givesOf, readRule, refsIn } from '../../shared/app-manifest.ts';
+import { checkUi, cleanUi } from '../../shared/app-ui.ts';
+import { APP_ICONS } from '../../shared/apps.ts';
 import { HttpError } from '../auth.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
@@ -189,9 +191,13 @@ test('form: defaults, numbers, dates, choices, yes/no and what to fix', () => {
   assert.match(checkInputs(fields, { n: 1, t: 'x'.repeat(3000) }).errors.join(), /Name: too long/);
 });
 
-test('templates: ten tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
+/** The ten ready-made tasks of before the apps for everyday things (templates-more.ts), each made of several kinds of step. */
+const FIRST_TEN = ['deep-research', 'trip-planner', 'compare-products', 'document-qa', 'meeting-actions', 'cover-letter', 'lesson-plan', 'news-digest', 'explain-contract', 'small-web-app'];
+
+test('templates: twenty-six tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
   const tasks = TEMPLATES.filter((t) => !t.block);
-  assert.equal(tasks.length, 10);
+  assert.equal(tasks.length, 26);
+  assert.deepEqual(tasks.slice(0, 10).map((t) => t.id), FIRST_TEN, 'the first ten keep their place');
   const blocks = TEMPLATES.filter((t) => t.block);
   assert.equal(blocks.length, 5);
   for (const t of blocks) {
@@ -222,7 +228,7 @@ test('templates: ten tasks in steps, each checking out as a save checks it, usin
       const from = steps.find((s) => s.id === ref[1]);
       assert.ok(from && (givesOf(from) ?? []).includes(ref[2]), `${t.id}: ${f.id} comes from {{${ref[1]}.${ref[2]}}}, which that step gives`);
     }
-    assert.ok(new Set(steps.map((s) => s.do)).size >= 4, `${t.id}: several kinds of step`);
+    assert.ok(new Set(steps.map((s) => s.do)).size >= (FIRST_TEN.includes(t.id) ? 4 : 2), `${t.id}: several kinds of step`);
     assert.ok(steps.every((s) => s.title), `${t.id}: each step says what it does`);
     // A person is asked only when the form says so and the run comes from the form, a test or a session (an agent ran it for them there): never the API, rows or a schedule; nobody answering does not stop it.
     for (const s of steps.filter((x) => x.do === 'ask')) {
@@ -243,6 +249,33 @@ test('templates: ten tasks in steps, each checking out as a save checks it, usin
       assert.ok(s.failed === 'agent' || (s.failed === 'skip' && steps.some((r) => r.do === 'repeat' && allSteps(r.steps).includes(s))), `${t.id}: ${s.id} says what happens when it cannot run`);
     }
   }
+});
+
+test('ready-made apps: each recipe, flow, view and set of examples cleans up without a word to fix; each example’s answers pass its form and its checks read; ids, icons and kinds are as the Apps page wants them', () => {
+  const ids = new Set<string>();
+  const kinds = new Set<string>();
+  for (const t of TEMPLATES) {
+    assert.ok(!ids.has(t.id) && /^[a-z][a-z0-9-]*$/.test(t.id), `${t.id}: an id of its own`);
+    ids.add(t.id);
+    assert.ok((APP_ICONS as readonly string[]).includes(t.icon), `${t.id}: its icon`);
+    assert.ok(t.name.length <= 60 && t.description.length <= 300 && (t.category ?? '').length <= 30, `${t.id}: within bounds`);
+    assert.deepEqual(cleanFlow(t.flow).errors, [], `${t.id}: its steps`);
+    if (t.block) continue;
+    kinds.add(t.category ?? '');
+    assert.ok(t.ui, `${t.id}: a view`);
+    assert.deepEqual(cleanUi(t.ui).errors, [], `${t.id}: its view`);
+    assert.deepEqual(checkUi(t).errors, [], `${t.id}: its view against its answer`);
+    assert.ok((t.examples ?? []).length >= (FIRST_TEN.includes(t.id) ? 1 : 2), `${t.id}: examples to try it with`);
+    assert.deepEqual(cleanExamples(t.examples).errors, [], `${t.id}: its examples`);
+    for (const e of t.examples ?? []) {
+      assert.deepEqual(checkInputs(t.fields, e.inputs).errors, [], `${t.id}, example ${e.id}: its answers pass the form`);
+      for (const f of t.fields.filter((x) => x.required)) assert.ok(e.inputs[f.id] !== undefined && e.inputs[f.id] !== '', `${t.id}, example ${e.id}: answers ${f.id}`);
+      for (const c of e.checks ?? []) assert.ok(!('error' in readRule(c)), `${t.id}, example ${e.id}: its check “${c}” reads`);
+      assert.ok((e.checks ?? []).length, `${t.id}, example ${e.id}: has a check`);
+    }
+    for (const f of t.answer) assert.ok((f.columns ?? []).length <= 12, `${t.id}: ${f.id} has at most twelve columns`);
+  }
+  assert.ok(kinds.size <= 12, `at most twelve kinds of app, not ${[...kinds].join(', ')}`);
 });
 
 // ---- the answer fields ------------------------------------------------------------------------------
