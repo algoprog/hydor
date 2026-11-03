@@ -458,8 +458,11 @@ export class ClaudeLive extends LiveAdapter {
 
   /** `replay`: re-read after a restart; an old turn's error is already in the transcript, so it is not re-added. */
   private onResult(m: Json, replay = false) {
-    this.limitStopped = !!m.is_error && (this.limitStopped === true || /hit your .*limit/i.test(String(m.result ?? '')));
-    if (!replay && this.limitStopped) this.emit('limithit');
+    // A turn the CLI starts by itself (a background task's notice) while the plan is still used up can end
+    // without asking the model anything: that does not show the limit lifted, so the session stays stopped on it.
+    const kept = this.limitStopped === true && !m.is_error && !((m.usage?.output_tokens ?? 0) > 0);
+    this.limitStopped = kept || (!!m.is_error && (this.limitStopped === true || /hit your .*limit/i.test(String(m.result ?? ''))));
+    if (!replay && this.limitStopped && !kept) this.emit('limithit');
     this.approvals.clear();
     this.state.status = 'idle';
     this.state.turnStartedAt = undefined;

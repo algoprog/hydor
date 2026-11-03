@@ -380,7 +380,8 @@ programs shows each program's version and what is out, with Check now, Update no
   summary, the cost and the session (or the app's run), and runs again with the same input. Runs with
   nothing to report stay quiet, failures always tell you, and failures in a row pause the task. Webhooks can
   require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
-  Sessions stopped by a usage limit can continue by themselves when it resets.
+  Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
+  when, while Resume after usage limits is on); one you stopped yourself never does.
 - Usage: how much of each plan's limits you have used and when they reset, what the same work would cost
   through the API, and activity over time, for every agent or one (Custom and the ACP agents by name) and every
   model or one.
