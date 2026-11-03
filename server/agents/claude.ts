@@ -16,8 +16,9 @@ import { JsonFields } from '../pages/drafts.ts';
 
 type Json = Record<string, any>;
 
-/** The app's tools that save a page, a deck, a document, a spreadsheet or a LaTeX document, given its id to save it again. */
-const SAVES_PAGE = new RegExp(`^mcp__(?:${PAGE_SERVER}|agent-console)__save_(?:page|slides|doc|sheet|latex)$`);
+/** The app's tools that save a page, a deck, a document, a spreadsheet or a LaTeX document, given its id to save it again
+ * (named naget-agent or agent-console in sessions started before the renames). */
+const SAVES_PAGE = new RegExp(`^mcp__(?:${PAGE_SERVER}|naget-agent|agent-console)__save_(?:page|slides|doc|sheet|latex)$`);
 
 export interface ClaudeOpts {
   cwd: string;
