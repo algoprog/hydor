@@ -11,9 +11,12 @@ export interface Usage {
   spent: number;
 }
 
+/** A ready-made app as the Apps page lists it: installed (all are until you uninstall one), and whether agents may run it. */
+export type ReadyApp = AppTemplate & { installed: boolean; agents: boolean; lastRunAt?: number };
+
 export interface Gallery {
   apps: (AppDef & { usage: Usage; lastRunAt?: number })[];
-  templates: AppTemplate[];
+  templates: ReadyApp[];
   recent: AppRun[];
 }
 
@@ -28,6 +31,9 @@ export interface AppKey {
 export interface AppDetail {
   app?: AppDef;
   template?: AppTemplate;
+  /** A ready-made app: installed, and whether agents in sessions may run it. */
+  installed?: boolean;
+  agents?: boolean;
   keys?: AppKey[];
   usage?: Usage;
   publicUsage?: Usage;
@@ -144,4 +150,4 @@ export function useRunDetail(id: string) {
 
 export const money = (n?: number | null) => (n == null ? '' : n === 0 ? '$0' : n < 0.01 ? '<$0.01' : `$${n < 10 ? n.toFixed(2) : n.toFixed(0)}`);
 
-export const SOURCE_LABEL: Record<AppRun['source'], string> = { web: 'From the form', test: 'Test run', api: 'From the API', mcp: 'From another agent', public: 'Public page', batch: 'Row', step: 'A step of another run', app: 'From another app', screen: 'From its screen', task: 'From a scheduled task', chat: 'A conversation on its screen' };
+export const SOURCE_LABEL: Record<AppRun['source'], string> = { web: 'From the form', test: 'Test run', api: 'From the API', mcp: 'From another agent', public: 'Public page', batch: 'Row', step: 'A step of another run', app: 'From another app', screen: 'From its screen', task: 'From a scheduled task', chat: 'A conversation on its screen', session: 'From a session' };

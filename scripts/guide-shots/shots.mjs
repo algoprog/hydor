@@ -112,13 +112,13 @@ export const SHOTS = [
     },
   },
   {
-    // The Apps page down to the first row of ready-made apps, which show what you get from each.
+    // The Apps page down to the second row of your apps: your own, then the ready-made ones that come installed.
     id: 'apps',
     height: 1240,
     async take(p, ctx) {
       await ctx.go('/apps', { settle: 1500 });
       await p.park();
-      return p.shot(ctx.file, { clip: await main(p, await bottomOf(p, `js:[...document.querySelectorAll('main button')].filter((b) => b.textContent.includes('Try it'))[2]`, 24)) });
+      return p.shot(ctx.file, { clip: await main(p, await bottomOf(p, `js:document.querySelectorAll('main .grid')[0]?.children[5]`, 24)) });
     },
   },
   {

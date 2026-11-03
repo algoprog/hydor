@@ -74,6 +74,11 @@ export interface ApprovalRequest {
   from?: string;
   /** The detail is plain words in Markdown (a change to the app, ask_form's message), not a command's output. */
   prose?: boolean;
+  /**
+   * One of the user's apps an agent runs for them (use_app), asking for what the request left out: the card shows
+   * as the app (its icon and name), with what the request said already; its form's fields are the questions left.
+   */
+  app?: { id: string; name: string; icon: string; color: string; given: { label: string; value: string }[] };
   createdAt: number;
 }
 

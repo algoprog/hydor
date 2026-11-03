@@ -97,4 +97,8 @@ not a plain card. The format is in app_guide's API topic (Apps: views).
 - A screen (app_screen) when it will be used often or keeps data: start from the one made from its parts. Its
   `<n-chat>` part lets people ask the app's agent about its records, or to change them or run its flows.
 - When it should run by itself, propose a scheduled task that runs it (schedule_task with template: the app and its answers).
+- Agents in the user's sessions run their apps for them (use_app, when asked for what one does), asking on the
+  app's card for what the request left out: give its questions labels that read on their own, and mark only what
+  it truly needs as required. An app used on its own page (a screen, or a view of what it keeps) gets
+  `sessions: false`, so agents leave it alone.
 - Say in a few lines what it asks, what it does, what a run costs, and how to change it (Edit, or ask you).

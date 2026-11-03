@@ -211,7 +211,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['files-trash', 'Trash', '/files?place=trash', 'trash deleted files put back restore undelete recycle bin empty', 'What you deleted in Files, to put back or delete for good'],
   ['git', 'Git', '/git', 'repositories commits branches push pull sync diff merge conflicts rebase stash clone tags history graph', 'Repositories, changes, branches and history'],
   ['terminal', 'Terminal', '/terminal', 'shell console command line bash', 'Shells on this computer'],
-  ['apps', 'Apps', '/apps', 'app apps gallery templates ready-made tasks tools forms', 'Tasks you run again and again: fill in a form, and an agent does the job'],
+  ['apps', 'Apps', '/apps', 'app apps gallery templates ready-made tasks tools forms install uninstall', 'Tasks you run again and again: fill in a form, and an agent does the job'],
   ['new-app', 'New app', '/apps/new', 'create build make new template app apps form tool', 'An app anyone can run from a form'],
   ['spaces', 'Spaces', '/spaces', 'spaces projects workspace group sessions files documents knowledge memory guidelines instructions skills folder', 'Each project’s sessions, documents and guidelines, together'],
   ['knowledge', 'Shared knowledge', '/knowledge', 'knowledge base documents folder pdf files search rag library cite sources', 'Documents every session can search and cite'],

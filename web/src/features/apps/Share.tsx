@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Copy, ExternalLink, Globe, KeyRound, Plus, Trash2 } from 'lucide-react';
 import type { AppDef, PublicSettings } from '@shared/apps';
+import { madeForSessions } from '@shared/apps';
+import { pagesFor } from '@shared/app-ui';
 import { api, del, enc, post, put } from '../../lib/api';
 import { machineBase } from '../../lib/machine';
 import { timeAgo } from '../../lib/format';
@@ -10,6 +12,7 @@ import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { CodeBlock } from '../../components/Markdown';
 import { Button, cx, Dialog, inputCls, Section, Switch, useConfirm } from '../../components/ui';
+import { SessionsLine } from './About';
 import { money, type AppDetail } from './api';
 
 const origin = () => `${location.origin}${machineBase}`;
@@ -146,6 +149,14 @@ export function ShareTab({ detail, onChange }: { detail: AppDetail; onChange: ()
           <code className="font-mono">session</code>; a run still going can be asked about at <code className="font-mono">GET …/run/&lt;run&gt;?wait=60</code>. Behind a proxy that cuts long requests (Cloudflare’s is 100 seconds), wait less and ask again.
         </div>
         <CodeBlock code={curl} lang="bash" maxHeight={260} />
+      </Section>
+
+      <Section title="In your sessions">
+        <SessionsLine
+          s={{ sessions: madeForSessions(app), ownPage: !!app.screens?.main || pagesFor(app.ui, 'app').length > 0, block: app.block }}
+          on={app.agents}
+          onChange={(on) => put(`/api/apps/${enc(app.id)}/agents`, { on }).then(onChange, toastError)}
+        />
       </Section>
 
       <Section title="Other agents" sub="Claude Code, Cursor or another agent connected to Naget Agent’s MCP server can run it as a tool.">

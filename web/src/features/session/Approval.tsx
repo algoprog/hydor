@@ -7,7 +7,8 @@ import { toastError } from '../../lib/store';
 import { CodeBlock, Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
 import { Button } from '../../components/ui';
-import { AppForm, formErrors } from '../apps/Form';
+import { AppIcon } from '../apps/AppIcon';
+import { AppForm, formErrors, type FormFiles } from '../apps/Form';
 import { Elapsed } from './items';
 import { allAnswered, answerOf, QuestionForm, type Picks } from './QuestionForm';
 
@@ -44,12 +45,15 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
   // A form an MCP server asks for: its fields, as a template's form shows them.
   const fields = a.form?.fields ?? [];
   const [values, setValues] = useState<Record<string, string>>(() => formDefaults(fields));
+  const [files, setFiles] = useState<FormFiles>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const link = a.form?.url;
+  // One of your apps an agent runs, asking for what the request left out: the card is the app's.
+  const app = a.app;
 
   const respond = async (decision: string) => {
     if (decision === 'accept' && fields.length) {
-      const wrong = formErrors(fields, values, {});
+      const wrong = formErrors(fields, values, files);
       setErrors(wrong);
       if (Object.keys(wrong).length) return;
     }
@@ -61,6 +65,13 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
       if (a.kind === 'question') {
         for (const q of a.questions ?? []) answers[q.id] = answerOf(q, picks[q.id], agent === 'claude' ? ', ' : '\n');
       }
+      let form = fields.length && decision === 'accept' ? values : undefined;
+      // Files picked on the card are saved ahead of the answer, which gives where each went.
+      const picked = Object.keys(files).filter((id) => fields.some((f) => f.id === id && f.type === 'file'));
+      if (form && picked.length) {
+        const up = await api<{ files: { path: string }[] }>('/api/uploads', { method: 'POST', base, body: { files: picked.map((id) => ({ name: files[id].name, data: files[id].data })) } });
+        form = { ...form, ...Object.fromEntries(picked.map((id, i) => [id, up.files[i]?.path ?? ''])) };
+      }
       await api(`/api/sessions/${enc(sessionKey)}/approvals/${enc(a.id)}`, {
         method: 'POST',
         base,
@@ -68,7 +79,7 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
           decision,
           message: !a.form && (decision === 'deny' || decision === 'decline') ? msg : undefined,
           answers,
-          form: fields.length && decision === 'accept' ? values : undefined,
+          form,
         },
       });
       onDone?.();
@@ -86,13 +97,44 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
   return (
     <div id={id} className="anim-pop my-2 overflow-hidden rounded-xl border border-warn/45 bg-panel shadow-[0_0_0_3px_color-mix(in_srgb,var(--warn)_10%,transparent)]">
       <div className="flex items-center gap-2 border-b border-line bg-warn/8 px-3 py-2">
-        {question ? <MessageCircleQuestion size={15} className="shrink-0 text-warn" /> : a.form ? <ClipboardList size={15} className="shrink-0 text-warn" /> : <ShieldAlert size={15} className="shrink-0 text-warn" />}
-        <div className="min-w-0 flex-1 truncate text-[13px] font-medium">{a.title}</div>
+        {app ? (
+          <AppIcon icon={app.icon} color={app.color} size={22} />
+        ) : question ? (
+          <MessageCircleQuestion size={15} className="shrink-0 text-warn" />
+        ) : a.form ? (
+          <ClipboardList size={15} className="shrink-0 text-warn" />
+        ) : (
+          <ShieldAlert size={15} className="shrink-0 text-warn" />
+        )}
+        <div className="min-w-0 flex-1 truncate text-[13px] font-medium" translate={app && !app.id.startsWith('tpl:') ? 'no' : undefined}>
+          {a.title}
+        </div>
         <span className="shrink-0 text-[11px] text-fg-3">
           waiting <Elapsed since={a.createdAt} />
         </span>
       </div>
       <div className="space-y-3 px-3 py-3">
+        {app && (
+          <p className="text-[13px] leading-snug text-fg-2">
+            {fields.some((f) => f.required && !f.default) ? 'It needs a few details before it runs. Leave the optional ones empty if you don’t mind.' : 'Add any details you like, or run it as it is.'}
+          </p>
+        )}
+        {/* What the request said already, as the app's questions name it. */}
+        {app && app.given.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-[12.5px]">
+            <span className="text-fg-3">From your message:</span>
+            {app.given.map((g) => (
+              <span key={g.label} className="inline-flex max-w-full min-w-0 items-baseline gap-1 rounded-full bg-bg-2 px-2.5 py-0.5">
+                <span className="shrink-0 text-fg-3" translate={app.id.startsWith('tpl:') ? undefined : 'no'}>
+                  {g.label}
+                </span>
+                <span className="min-w-0 truncate" translate="no">
+                  {g.value}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
         {a.detail && a.kind === 'command' && <CodeBlock code={a.detail} lang="bash" maxHeight={260} className="!my-0" />}
         {a.detail && a.kind === 'file' && <FileDetail detail={a.detail} />}
         {a.detail && a.kind === 'plan' && (
@@ -116,12 +158,20 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
           <AppForm
             fields={fields}
             values={values}
-            files={{}}
+            files={files}
             onChange={(id, v) => {
               setValues((x) => ({ ...x, [id]: v }));
               setErrors((x) => (x[id] ? { ...x, [id]: '' } : x));
             }}
-            onFile={() => {}}
+            onFile={(id, f) => {
+              setFiles((x) => {
+                const next = { ...x };
+                if (f) next[id] = f;
+                else delete next[id];
+                return next;
+              });
+              setErrors((x) => (x[id] ? { ...x, [id]: '' } : x));
+            }}
             errors={errors}
             disabled={busy}
           />
@@ -155,7 +205,7 @@ export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: Ap
                 disabled={busy || (o.id === 'answer' && !answeredAll)}
                 onClick={() => respond(o.id)}
               >
-                {o.label}
+                {app && o.id === 'accept' ? 'Run it' : app && o.id === 'decline' ? 'Not now' : o.label}
               </Button>
             );
           })}

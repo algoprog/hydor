@@ -13,6 +13,7 @@ import zlib from 'node:zlib';
 import type { AppDef, AppRecipe } from '../../shared/apps.ts';
 import { cleanRecipe, slugify } from '../../shared/apps.ts';
 import type { InstallPreview, ModelNeed } from '../../shared/app-manifest.ts';
+import { appSummary } from '../../shared/app-summary.ts';
 import { allSteps, checkFlow, cleanData, cleanFlow, cleanRequires, DATA_LIMITS, modelsUsed } from '../../shared/app-manifest.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { AGENT_FILE } from '../models/config.ts';
@@ -75,7 +76,8 @@ function modelNeeds(r: AppRecipe): ModelNeed[] {
 
 /** What travels of a recipe: everything but its folder and what is this computer's own; its models said portably. */
 function travelling(a: AppRecipe): Record<string, unknown> {
-  const { id: _i, slug: _s, mcp: _m, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = a as AppDef;
+  // What is kept beside its recipe here (its address, who may run it, where it came from) stays here.
+  const { id: _i, slug: _s, mcp: _m, agents: _a, fromFile: _f, public: _p, template: _t, createdAt: _c, updatedAt: _u, cwd: _w, ...recipe } = a as AppDef;
   const models = modelNeeds(a);
   return { ...recipe, ...(models.length ? { requires: { ...(recipe.requires ?? {}), models } } : {}) } as unknown as Record<string, unknown>;
 }
@@ -382,11 +384,15 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
   if (taken) notes.push(`You have an app called “${taken}” already: this one installs beside it, at an address of its own`);
   const models = await modelsHere([recipe, ...bundled.filter((b) => !b.reuse).map((b) => b.recipe)], catalog);
   for (const m of models) if (m.status === 'missing') warnings.push(m.options.length ? `It asks for ${m.label}, which is not set up here: pick another to stand in, or its agent's default is used` : m.agent === 'custom' ? `It asks for ${m.label}, and Custom has no models here: add one in Settings → Models first` : `It asks for ${m.label}, and ${AGENT_NAME[m.agent]} is not set up here`);
+  const screens = Object.keys(raw.screens && typeof raw.screens === 'object' ? (raw.screens as Record<string, unknown>) : {});
+  const summary = appSummary(recipe);
   const preview: InstallPreview = {
     name: recipe.name,
     description: recipe.description,
     icon: recipe.icon,
     color: recipe.color,
+    ...(recipe.category ? { category: recipe.category } : {}),
+    summary: { ...summary, ownPage: summary.ownPage || screens.includes('main') },
     steps: recipe.flow ? allSteps(recipe.flow.steps).length : 0,
     agents: who,
     tools: recipe.tools,
@@ -396,7 +402,7 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
     limits: recipe.limits,
     needs,
     models,
-    screens: Object.keys(raw.screens && typeof raw.screens === 'object' ? (raw.screens as Record<string, unknown>) : {}),
+    screens,
     bundled: bundled.map((b) => ({ name: b.recipe.name, from: b.pkg.slug ?? '', installs: b.reuse ? 'reuse' : 'new' })),
     notes,
     warnings: [...new Set(warnings)],
@@ -428,7 +434,7 @@ function retarget(r: AppRecipe, moved: Map<string, string>) {
  * Installs a template as previewOf showed: the templates that come with it first (or the ones you have),
  * then it, its records added, its public page closed and no keys; the packages it needs start installing.
  */
-export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Record<string, unknown>; catalog?: Catalog } = {}): Promise<{ app: AppDef; notes: string[]; records: number; skipped: number; bundled: { name: string; slug: string; reused: boolean }[] }> {
+export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Record<string, unknown>; catalog?: Catalog; agents?: boolean } = {}): Promise<{ app: AppDef; notes: string[]; records: number; skipped: number; bundled: { name: string; slug: string; reused: boolean }[] }> {
   const { recipe, bundled, preview } = await previewOf(db, pkg, o.catalog);
   if (preview.problems.length) throw new HttpError(400, `This app cannot be installed: ${preview.problems.join('; ')}`);
   // Each model as picked on the card, else as the preview found it.
@@ -444,7 +450,7 @@ export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Reco
   const made: { app: AppDef; recipe: AppRecipe }[] = [];
   const out: { name: string; slug: string; reused: boolean }[] = [];
   for (const b of bundled) {
-    const app = b.reuse ?? saveApp(db, { recipe: b.recipe, by: 'install' });
+    const app = b.reuse ?? saveApp(db, { recipe: b.recipe, by: 'install', fromFile: true });
     if (!b.reuse) {
       b.recipe.screens = screensFrom(db, app.id, b.pkg.app.screens);
       made.push({ app, recipe: b.recipe });
@@ -458,7 +464,8 @@ export async function installPackage(db: DB, pkg: AppPackage, o: { models?: Reco
     saveApp(db, { id: m.app.id, recipe: m.recipe, by: 'install' });
   }
   retarget(recipe, moved);
-  const first = saveApp(db, { recipe, by: 'install' });
+  // Installed from a file (uninstalling deletes it); agents in sessions may run it unless the card said no.
+  const first = saveApp(db, { recipe, by: 'install', fromFile: true, ...(o.agents === false ? { agents: false } : {}) });
   recipe.screens = screensFrom(db, first.id, (pkg.app as Record<string, unknown>).screens);
   const app = recipe.screens ? saveApp(db, { id: first.id, recipe, by: 'install' }) : first;
   let records = 0;
