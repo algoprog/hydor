@@ -41,9 +41,9 @@ function NoteRow({ note, more, sessionKey }: { note: SessionNote; more: SessionN
   return View ? <View note={note} more={more.length ? more : undefined} sessionKey={sessionKey} /> : null;
 }
 
-/** The notes anchored to any of `ids` (one turn's items). */
-export function TurnNotes({ notes, ids, sessionKey }: { notes: SessionNote[]; ids: Set<string>; sessionKey: string }) {
-  const mine = notes.filter((n) => n.anchor && ids.has(n.anchor));
+/** The notes anchored to any of `ids` (one turn's items): those above its changed files, or with `after` those below. */
+export function TurnNotes({ notes, ids, sessionKey, after = false }: { notes: SessionNote[]; ids: Set<string>; sessionKey: string; after?: boolean }) {
+  const mine = notes.filter((n) => n.anchor && ids.has(n.anchor) && !!noteView(n.kind)?.afterChanges === after);
   if (!mine.length) return null;
   return (
     <div className="space-y-1.5">

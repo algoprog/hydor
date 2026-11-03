@@ -758,9 +758,12 @@ export class GitRepos {
       });
   }
 
-  /** A commit's message, where it sits (parents, branches and tags on it, whether a remote has it), and each file it changed with its diff. */
-  async commitDetail(repoPath: string, hash: string): Promise<GitCommitDetail> {
-    this.known(repoPath);
+  /**
+   * A commit's message, where it sits (parents, branches and tags on it, whether a remote has it), and each file it
+   * changed with its diff. `trusted`: the caller vouches for the folder (a commit an agent made, in a worktree).
+   */
+  async commitDetail(repoPath: string, hash: string, trusted = false): Promise<GitCommitDetail> {
+    if (!trusted) this.known(repoPath);
     if (!isHash(hash)) throw new HttpError(400, 'Not a commit');
     const [meta, stat, patch, names, head, remote] = await Promise.all([
       git(repoPath, ['show', '-s', '--decorate=full', `--format=%H${SEP}%P${SEP}%an${SEP}%ae${SEP}%ct${SEP}%D${SEP}%B`, hash, '--']),
