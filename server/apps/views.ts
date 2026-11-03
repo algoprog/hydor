@@ -8,7 +8,7 @@ import type { AppUi } from '../../shared/app-ui.ts';
 // ---- what several share --------------------------------------------------------------------------------------------
 
 /** A row of big numbers, each with a line under it. */
-const STATS_CSS = String.raw`
+export const STATS_CSS = String.raw`
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr)); gap: 10px; }
 .stat { padding: 12px 14px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
 .stat b { display: block; font-size: 22px; line-height: 1.2; letter-spacing: -.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -17,7 +17,7 @@ const STATS_CSS = String.raw`
 `;
 
 /** A card, and its heading. */
-const CARD_CSS = String.raw`
+export const CARD_CSS = String.raw`
 .card { padding: 14px 16px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
 .card > h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--n-muted); }
 `;
@@ -47,6 +47,15 @@ const TRIP: AppUi = {
       title: 'Day',
       tab: false,
       blocks: [{ element: 'day-detail', data: 'page.item' }],
+    },
+    {
+      id: 'map',
+      title: 'Map',
+      if: 'result.stops',
+      blocks: [
+        { title: 'Each day’s area, in order', element: 'map', data: 'result.stops', with: { label: 'area', popup: 'date', numbered: true, line: true, height: 420 } },
+        { element: 'day-row', data: 'result.days', each: true, layout: 'grid' },
+      ],
     },
     {
       id: 'book',
@@ -248,7 +257,7 @@ section p { flex: 1; margin: 0 0 12px; font-size: 15px; line-height: 1.55; }
 
 
 /** A header over a view: a line in small capitals, a title, a line under it. */
-const HERO_CSS = String.raw`
+export const HERO_CSS = String.raw`
 .hero { padding: 20px 22px 18px; border: 1px solid var(--n-line); border-radius: calc(var(--n-radius) + 4px); background: linear-gradient(135deg, var(--n-accent-soft), transparent 65%), var(--n-card); }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .hero h1 { margin: 6px 0 4px !important; font-size: 24px !important; line-height: 1.25 !important; letter-spacing: -.015em; }
@@ -257,7 +266,7 @@ const HERO_CSS = String.raw`
 `;
 
 /** Small rounded labels, and a row of them to pick one from (data-event on each). */
-const CHIPS_CSS = String.raw`
+export const CHIPS_CSS = String.raw`
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--n-line); border-radius: 999px; background: var(--n-card); color: var(--n-muted); font: inherit; font-size: 13px; line-height: 1.3; }
 button.chip:hover { color: var(--n-fg); border-color: var(--n-accent); }
@@ -405,7 +414,10 @@ const COMPARE: AppUi = {
       id: 'side',
       title: 'Side by side',
       if: 'result.comparison',
-      blocks: [{ element: 'product', data: 'result.comparison', each: true, layout: 'grid' }],
+      blocks: [
+        { title: 'Score out of 100, by what matters to you', element: 'plot', data: 'result.comparison', if: 'result.comparison|sum:score', with: { kind: 'hbar', x: 'product', y: 'score', height: 240 } },
+        { element: 'product', data: 'result.comparison', each: true, layout: 'grid' },
+      ],
     },
     { id: 'product', title: 'Product', tab: false, blocks: [{ element: 'product-detail', data: 'page.item' }] },
     {
@@ -455,7 +467,7 @@ b { font-size: 15px; } .price { font-size: 14px; } .for { color: var(--n-muted);
       html: String.raw`<article class="p{{#product|is:$result.pick}} pick{{/product}}">
   {{#product|is:$result.pick}}<span class="badge">🏆 The pick</span>{{/product}}
   <h3>{{product}}</h3>
-  <p class="price">{{price|or:No price found}}</p>
+  <p class="price">{{price|or:No price found}}{{#score}} · <span class="score">{{score}}/100</span>{{/score}}</p>
   <ul class="pros">{{#strengths|split}}<li>{{.}}</li>{{/strengths}}</ul>
   <ul class="cons">{{#weaknesses|split}}<li>{{.}}</li>{{/weaknesses}}</ul>
   {{#best_for}}<p class="for">Best for {{best_for}}</p>{{/best_for}}
@@ -468,6 +480,7 @@ b { font-size: 15px; } .price { font-size: 14px; } .for { color: var(--n-muted);
 .badge { align-self: flex-start; margin-bottom: 8px; padding: 2px 10px; border-radius: 999px; background: var(--n-accent); color: var(--n-accent-fg); font-size: 12px; font-weight: 700; }
 h3 { margin: 0; font-size: 16.5px; }
 .price { margin: 4px 0 10px; font-weight: 600; }
+.score { color: var(--n-accent); }
 ul { list-style: none; margin: 0 0 8px; padding: 0; font-size: 14px; line-height: 1.45; }
 li { position: relative; padding-left: 20px; margin: 4px 0; }
 .pros li::before { content: "✓"; position: absolute; left: 0; color: var(--n-ok); font-weight: 700; }

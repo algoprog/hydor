@@ -244,9 +244,9 @@ function answerOf(answer: AnswerField[]): Record<string, unknown> {
   return Object.fromEntries(answer.map((f) => [f.id, f.type === 'table' ? [1, 2].map((n) => Object.fromEntries((f.columns ?? []).map((c) => [c.id, cell(c.type, n)]))) : f.type === 'list' ? ['one', 'two'] : cell(f.type, 1)]));
 }
 
-test('ready-made apps: each of the ten has a view of pages and elements of its own that checks out, uses only what its answer and form give, and has events', () => {
+test('ready-made apps: each of the twenty-six has a view of pages and elements of its own that checks out, uses only what its answer and form give, and has events', () => {
   const tasks = TEMPLATES.filter((t) => !t.block);
-  assert.equal(tasks.length, 10);
+  assert.equal(tasks.length, 26);
   for (const t of tasks) {
     assert.ok(t.ui, `${t.id}: a view`);
     assert.ok(t.ui!.pages.filter((p) => p.tab !== false).length >= 2, `${t.id}: pages`);

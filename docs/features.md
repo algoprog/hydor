@@ -142,9 +142,16 @@ agents that speak ACP and take MCP servers.
   use it switch keeps agents from running it, and blocks and apps made for their own page stay out. An app's page has its form beside what you get, its latest
   runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
   ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
-  sources in code, reads the best in parallel, searches again for gaps and writes a cited report), and each hands
-  back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
-  off, a page for each day, a list to book and a budget chart; Compare products' pick and products side by side;
+  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). Beside those ten
+  come sixteen small, quick apps for everyday things that get real data from free services, no key needed, and show it
+  as charts, maps and cards: a weather outlook and the best time to go somewhere (Open-Meteo), a team tracker and
+  match previews (TheSportsDB and the web), recipes from what is in your fridge and a week of dinners with one
+  shopping list by aisle (TheMealDB), gift ideas, what to watch tonight and where it streams (TVmaze), a game finder
+  with PC prices and their lowest ever (CheapShark), a quiz on any topic to play on its page, a book finder (Open
+  Library), what's on in a city by day and on a map, a savings plan, your own spreadsheet or numbers as charts, a
+  topic as a timeline (Wikipedia) and a place explored on a map in walking order (Wikipedia and OpenStreetMap). Each
+  hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
+  off, a page for each day, a map of the days, a list to book and a budget chart; Compare products' pick, and the products side by side with their scores on a chart;
   the news digest's stories by topic), with buttons that run it again with a change (a slower pace, one more day,
   a more formal letter, new questions about the same document) or start another app on part of it (research a
   story, a finding or a product). An app's view is part of it: elements (HTML templates its values fill, each
