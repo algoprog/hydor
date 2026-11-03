@@ -17,7 +17,7 @@ import { toast, toastError, useApp, useLive, useTimeline } from '../../lib/store
 import { nagetTool } from '../registry';
 import { cx, IconButton, MenuItem, MenuSep, Popover, Switch, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { memoryStore, pageFile, pageStore, type Store } from './frame';
-import { CANVAS_MEDIA, onDraftStart, onScreen, savedRef, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from './state';
+import { CANVAS_MEDIA, onDraftStart, onScreen, savedPageOf, savedRef, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { exportFile } from './exportFile';
 import { EXPORTS } from './exports';
@@ -60,6 +60,16 @@ function usePageItems(key: string): ToolItem[] {
     return out;
   }, [items, overlay]);
 }
+
+/** Which page a call shows: a saved page by its id and an HTML file by its path (saved again, it is the same), else the call itself. */
+const pageKey = (it: ToolItem): string => {
+  const k = pageCall(it.tool);
+  const path = (it.tool.input as { file_path?: unknown } | undefined)?.file_path;
+  return (k === 'save_page' && savedPageOf(it.tool)) || (k === 'file' && typeof path === 'string' ? `file:${path}` : it.id);
+};
+
+/** A call that came to nothing: it failed, was declined, or was stopped. */
+const cameToNothing = (it: ToolItem) => it.tool.status === 'error' || it.tool.status === 'declined' || it.tool.status === 'interrupted';
 
 const titleOf = (it: ToolItem | undefined, kind: PageCall | null): string => {
   const input = (it?.tool.input ?? {}) as { title?: unknown; file_path?: unknown };
@@ -242,6 +252,20 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
   const draft = useDrafts((x) => (target.kind === 'item' ? x.byKey[key]?.[target.id] : undefined));
   const kind: PageCall | null = target.kind === 'page' ? 'save_page' : (pageCall(item?.tool) ?? (draft ? draft.tool : null));
   const { loaded, error } = useLoaded(key, target, item, kind);
+  // The pages to switch to, newest first: a page saved several times once, at its newest save that saved it.
+  const picks = useMemo(() => {
+    const newest = items.slice().reverse();
+    const seen = new Set<string>();
+    const out: ToolItem[] = [];
+    for (const it of newest) {
+      const k = pageKey(it);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(cameToNothing(it) ? (newest.find((x) => pageKey(x) === k && !cameToNothing(x)) ?? it) : it);
+    }
+    return out;
+  }, [items]);
+  const shownKey = target.kind === 'page' ? target.id : item ? pageKey(item) : target.id;
   const auto = useCanvas((x) => x.auto);
   const [menu, setMenu] = useState<'more' | 'pick' | null>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
@@ -271,12 +295,12 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
       <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', writing ? 'bg-busy/12 text-busy' : 'bg-accent-soft text-accent')}>
         {kind === 'file' ? <FileCode2 size={16} /> : <AppWindow size={16} />}
       </span>
-      <button ref={pickRef} type="button" onClick={() => items.length > 1 && setMenu(menu === 'pick' ? null : 'pick')} className={cx('min-w-0 text-left', items.length > 1 && 'cursor-pointer')}>
+      <button ref={pickRef} type="button" onClick={() => picks.length > 1 && setMenu(menu === 'pick' ? null : 'pick')} className={cx('min-w-0 text-left', picks.length > 1 && 'cursor-pointer')}>
         <span className="flex min-w-0 items-center gap-1">
           <span translate="no" className="truncate text-[13.5px] font-medium text-fg">
             {title}
           </span>
-          {items.length > 1 && <ChevronDown size={13} className="shrink-0 text-fg-3" />}
+          {picks.length > 1 && <ChevronDown size={13} className="shrink-0 text-fg-3" />}
         </span>
         <span className="flex items-center gap-1.5 truncate text-[11.5px] text-fg-3">
           {writing && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
@@ -327,11 +351,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
       </Popover>
       <Popover anchor={pickRef} open={menu === 'pick'} onClose={() => setMenu(null)} width={300}>
         <div className="px-2.5 pt-1.5 pb-1 text-[11.5px] font-medium text-fg-3">Pages in this conversation</div>
-        {items
-          .slice()
-          .reverse()
-          .slice(0, 9)
-          .map((it) => {
+        {picks.slice(0, 9).map((it) => {
             const k = pageCall(it.tool);
             return (
               <MenuItem
@@ -343,7 +363,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
                   else openOver(key, { kind: 'item', id: it.id });
                 }}
               >
-                <span translate="no" className={cx('truncate', target.kind === 'item' && target.id === it.id && 'font-semibold')}>
+                <span translate="no" className={cx('truncate', pageKey(it) === shownKey && 'font-semibold')}>
                   {titleOf(it, k)}
                 </span>
               </MenuItem>

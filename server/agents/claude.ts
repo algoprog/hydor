@@ -12,8 +12,12 @@ import { approvalTitleFor, LiveAdapter, type ApprovalAnswer, type ImageInput, ty
 import { splitHandoff } from '../handoff.ts';
 import type { SpawnAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
+import { JsonFields } from '../pages/drafts.ts';
 
 type Json = Record<string, any>;
+
+/** The app's tools that save a page, a deck, a document, a spreadsheet or a LaTeX document, given its id to save it again. */
+const SAVES_PAGE = new RegExp(`^mcp__(?:${PAGE_SERVER}|agent-console)__save_(?:page|slides|doc|sheet|latex)$`);
 
 export interface ClaudeOpts {
   cwd: string;
@@ -120,6 +124,8 @@ export class ClaudeLive extends LiveAdapter {
   private blocks = new Map<number, string>();
   private toolJson = new Map<string, string>();
   private toolNames = new Map<string, string>();
+  /** A call saving a page again, while the model writes it: the page's id, read as soon as it comes (SAVES_PAGE). */
+  private savedIds = new Map<string, JsonFields>();
 
   constructor(runner: Runner, opts: ClaudeOpts) {
     super(runner);
@@ -369,6 +375,7 @@ export class ClaudeLive extends LiveAdapter {
           this.blocks.set(idx, id);
           this.toolJson.set(id, '');
           this.toolNames.set(id, b.name);
+          if (SAVES_PAGE.test(String(b.name))) this.savedIds.set(id, new JsonFields(new Set(['id'])));
           const tool = describeClaudeTool(String(b.name), {});
           this.overlayItems.set(id, { kind: 'tool', id, seq: 0, ts, tool: { ...tool, title: tool.title || b.name, status: 'pending' } });
           this.emit('toolstream', { id, name: String(b.name), at: 'start' });
@@ -386,6 +393,15 @@ export class ClaudeLive extends LiveAdapter {
           const acc = (this.toolJson.get(id) ?? '') + (d.partial_json ?? '');
           this.toolJson.set(id, acc);
           if (d.partial_json) this.emit('toolstream', { id, name: this.toolNames.get(id) ?? '', at: 'delta', delta: d.partial_json });
+          // The page a save changes, before its long input is written whole: its card in the reply knows it at once.
+          const ids = this.savedIds.get(id);
+          if (ids && d.partial_json && ids.feed(d.partial_json).has('id')) {
+            const page = ids.fields.get('id') ?? '';
+            if (/^[a-f0-9]{10}$/.test(page) && item?.kind === 'tool') {
+              item.tool = { ...item.tool, input: { id: page } };
+              this.savedIds.delete(id);
+            }
+          }
           if (item?.kind === 'tool') {
             const peek = acc.match(/"(?:command|file_path|pattern|query|url|description)"\s*:\s*"((?:[^"\\]|\\.)*)/);
             if (peek) {
@@ -409,6 +425,7 @@ export class ClaudeLive extends LiveAdapter {
           } catch {}
           (item as ToolItem).tool = { ...describeClaudeTool(this.toolNames.get(id) ?? item.tool.name, input), status: 'running' };
           this.toolJson.delete(id);
+          this.savedIds.delete(id);
           this.emit('toolstream', { id, name: this.toolNames.get(id) ?? item.tool.name, at: 'end', input });
         }
         break;

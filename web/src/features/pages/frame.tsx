@@ -4,7 +4,7 @@
 // to put in the message box, and calls of window.naget.storage, which a store answers. A template's
 // screen also gets window.naget.app: its calls are answered here, for that template only (its runs,
 // its data), and what changes in them is passed on to it.
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
 import { STORAGE_LIMITS } from '@shared/pages';
 import type { AppRun } from '@shared/apps';
@@ -13,6 +13,48 @@ import { api, del, enc, patch, post } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { tr } from '../../i18n/runtime';
 import { cx } from '../../components/ui';
+
+// ---- how tall a page stands in the conversation ---------------------------------------------------------
+
+/**
+ * A page in the conversation stops at half the window's height (240 to 600 pixels), so what is around it stays in
+ * sight; a taller one shows See the whole page. Measured again when the window's width changes, not when only its
+ * height does (a phone's keyboard, its address bar): cards keep still while you type or scroll.
+ */
+const previewMax = (() => {
+  let value = 0;
+  let width = 0;
+  const subs = new Set<() => void>();
+  const measure = () => {
+    if (value && window.innerWidth === width) return;
+    width = window.innerWidth;
+    const next = Math.round(Math.min(600, Math.max(240, window.innerHeight * 0.5)));
+    if (next === value) return;
+    value = next;
+    for (const f of subs) f();
+  };
+  return {
+    get: () => {
+      if (!value) measure();
+      return value;
+    },
+    subscribe: (f: () => void) => {
+      if (!subs.size) {
+        window.addEventListener('resize', measure);
+        // The window may have changed while no card was on screen.
+        measure();
+      }
+      subs.add(f);
+      return () => {
+        subs.delete(f);
+        if (!subs.size) window.removeEventListener('resize', measure);
+      };
+    },
+  };
+})();
+
+/** The most a page shows of itself in the conversation, in pixels (previewMax). */
+export const usePreviewMax = () => useSyncExternalStore(previewMax.subscribe, previewMax.get);
 
 /** A template's screen: what the frame tells it of its template. */
 export interface AppBridge {

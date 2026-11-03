@@ -16,7 +16,7 @@ import { Throbber, IconButton, cx, useMediaQuery } from '../../components/ui';
 import { useKeepIn } from '../spaces/SpacePick';
 import { useSpacesStore } from '../spaces/state';
 import { openOver, shownStore, showBeside } from '../pages/Canvas';
-import { pageFile, pageStore, PageFrame, StreamFrame, type Pick } from '../pages/frame';
+import { pageFile, pageStore, PageFrame, StreamFrame, usePreviewMax, type Pick } from '../pages/frame';
 import { PageOverlay } from '../pages/overlay';
 import { CANVAS_MEDIA, onScreen, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from '../pages/state';
 
@@ -47,7 +47,7 @@ export function usePicks(sessionKey: string | undefined, holding: boolean) {
 
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10_240 ? 1 : 0)} KB`);
 
-/** A page call that just came in (Codex and other agents hand over whole calls) opens beside, as a streamed one does. */
+/** A page call that just came in (Codex and other agents hand over whole calls) opens beside, as a streamed one does; so does a newer save a card shows. */
 export function useOpensBeside(sessionKey: string | undefined, item: ToolItem) {
   useEffect(() => {
     if (!sessionKey || !item.ts || Date.now() - item.ts > 20_000) return;
@@ -56,7 +56,7 @@ export function useOpensBeside(sessionKey: string | undefined, item: ToolItem) {
     if (useDrafts.getState().byKey[sessionKey]?.[item.id]) return;
     c.show(sessionKey, { kind: 'item', id: item.id });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [item.id]);
 }
 
 /** Opens a page to change: beside the conversation when there is room, else over everything. */
@@ -65,16 +65,41 @@ export function editPage(sessionKey: string, t: CanvasTarget) {
   if (!showBeside(sessionKey, target)) openOver(sessionKey, target);
 }
 
-/** The card a page leaves in the conversation while pages show beside it. */
-export function SmallPageCard({ sessionKey, item, title, sub, writing, icon }: { sessionKey: string; item: ToolItem; title: string; sub: string; writing?: boolean; icon?: ReactNode }) {
+/**
+ * The card a page leaves in the conversation while pages show beside it. A page saved several times in a turn has
+ * one card: `opens` is the save whose version it shows, `also` the turn's other saves of it, and `pageId` the page,
+ * so it says Beside however that page was opened there.
+ */
+export function SmallPageCard({
+  sessionKey,
+  item,
+  title,
+  sub,
+  writing,
+  icon,
+  opens = item.id,
+  also,
+  pageId,
+}: {
+  sessionKey: string;
+  item: ToolItem;
+  title: string;
+  sub: string;
+  writing?: boolean;
+  icon?: ReactNode;
+  opens?: string;
+  also?: string[];
+  pageId?: string;
+}) {
   const here = useCanvas((x) => {
     const t = x.open[sessionKey];
-    return t?.kind === 'item' && t.id === item.id;
+    if (t?.kind === 'page') return !!pageId && t.id === pageId;
+    return t?.kind === 'item' && (t.id === item.id || t.id === opens || !!also?.includes(t.id));
   });
   return (
     <button
       type="button"
-      onClick={() => useCanvas.getState().show(sessionKey, { kind: 'item', id: item.id })}
+      onClick={() => useCanvas.getState().show(sessionKey, { kind: 'item', id: opens })}
       className={cx(
         'tl-item my-1 flex w-full items-center gap-3 rounded-xl border bg-panel py-2 pr-3 pl-2.5 text-left transition-colors',
         here ? 'border-accent/50 shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-line hover:border-line-2',
@@ -117,6 +142,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
   const onPick = usePicks(sessionKey, full);
   const wide = useMediaQuery(CANVAS_MEDIA);
   const besideOpen = useCanvas((x) => (sessionKey ? !!x.open[sessionKey] : false));
+  const max = usePreviewMax();
   useOpensBeside(sessionKey, item);
   useEffect(() => {
     if (sessionKey && !keptMap) usePagesStore.getState().loadKept(sessionKey).catch(() => {});
@@ -204,7 +230,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
       </div>
       {writing ? (
         draft?.text ? (
-          <div style={{ height: Math.min(Math.max(height, 120), 560) }} className="relative">
+          <div style={{ height: Math.min(Math.max(height, 120), max) }} className="relative">
             <StreamFrame html={draft.text} title={title} onHeight={setHeight} />
           </div>
         ) : (
@@ -215,9 +241,9 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
       ) : !html ? (
         <div className="flex items-center gap-2 px-3 py-3 text-[12.5px] text-fg-3">The page was too big to keep here.</div>
       ) : (
-        <div style={{ height: Math.min(Math.max(height, 60), 900) }} className="relative transition-[height] duration-200">
+        <div style={{ height: Math.min(Math.max(height, 60), max) }} className="relative transition-[height] duration-200">
           {!full && <KeptOrShown key={frameKey} kept={changed ? kept : undefined} html={html} title={title} store={store} onHeight={setHeight} onPick={onPick} />}
-          {height > 900 && !full && (
+          {height > max && !full && (
             // The page fades into the card under the button, so its words never run behind the button's.
             <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-panel via-panel/85 to-transparent pt-14 pb-3">
               <button
