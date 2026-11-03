@@ -68,8 +68,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 [Settings → Accounts](/settings?s=accounts): the Claude Code and Codex sign-ins every session uses. More in [Agents, accounts and models](/guide/agents-models).
 
-- [**Your sign-ins**](/settings?s=accounts&find=Your%20sign-ins): The Claude Code and Codex accounts sessions use.
-- [**More accounts**](/settings?s=accounts&find=More%20accounts): Another subscription for an agent.
+- [**Your accounts**](/settings?s=accounts&find=Your%20accounts): The Claude Code and Codex sign-ins sessions use, and more you add.
 - [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): A session that runs out of usage carries on with another account.
 - [**Agent programs**](/settings?s=accounts&find=Agent%20programs): Which agent programs are installed, and installing the others.
 - [**Update automatically**](/settings?s=accounts&find=Update%20automatically): Keeps Claude Code, Codex and the other agent programs at their newest version.

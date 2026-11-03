@@ -87,7 +87,7 @@ Sessions that are running carry on with the version they started with; new sessi
 
 ## Sign Claude Code and Codex in
 
-Claude Code and Codex need a sign-in before they can work. Open [Settings → Agents → Accounts](/settings?s=accounts) (on a phone, Settings is a list of sections: tap **Accounts** under Agents; the title at the top takes you back). Under **Your sign-ins** ("The accounts the Claude Code and Codex CLIs on this machine use") each agent shows a green check with the email, plan and sign-in method, or a red cross with "Not signed in" or what went wrong.
+Claude Code and Codex need a sign-in before they can work. Open [Settings → Agents → Accounts](/settings?s=accounts) (on a phone, Settings is a list of sections: tap **Accounts** under Agents; the title at the top takes you back). **Your accounts** ("The Claude Code and Codex sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session.") lists each agent's own sign-in first, then any accounts you added for it. Each shows a green check with the email, plan and sign-in method, or a red cross with "Not signed in" or what went wrong.
 
 To sign in:
 
@@ -103,7 +103,7 @@ To sign in:
 
 When it works you see "Claude Code is signed in" (or Codex). If it fails, the dialog says why; click **Try again**.
 
-Once signed in, the button reads **Switch account**: it starts the same sign-in for another account. **Sign out** signs the program out on this computer, for every terminal and editor that uses it, after you confirm.
+Once signed in, the button reads **Switch account**: it starts the same sign-in for another account. **Sign out** is in the row's **⋯** menu: it signs the program out on this computer, for every terminal and editor that uses it, after you confirm.
 
 The welcome tour (from **Help** in the sidebar) asks which agents and models you want to use and walks you through these sign-ins too.
 
@@ -111,14 +111,14 @@ The welcome tour (from **Help** in the sidebar) asks which agents and models you
 
 You can sign in more than one Claude Code or Codex account, for example a work plan and a personal plan, and pick one per session.
 
-1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=More%20accounts) and find **More accounts** ("Another subscription for an agent, a work and a personal one say. Pick one when you start a session.").
-2. Click **Add an account**.
+1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Your%20accounts).
+2. Click **Add an account**, at the top of **Your accounts**.
 3. Choose **Claude Code** or **Codex**, type a name (up to 40 characters, like "Work" or "Personal") and click **Add and sign in**.
 4. The sign-in dialog opens for the new account. Sign in as described above.
 
 Each added account signs in on its own and keeps its own session history. Your settings, instructions, skills and plugins are shared with the agent's main sign-in, so changes apply to both. Two accounts of the same agent can't have the same name.
 
-Each added account has its own row with **Sign in** or **Switch account**, **Sign out**, **Rename** and **Remove**:
+Each added account has its own row, under the agent's own sign-in, with **Sign in** or **Switch account**; its **⋯** menu has **Sign out**, **Rename** and **Remove**:
 
 - **Rename** asks for a new name.
 - **Sign out** stops the sessions that run as this account from working until it signs in again.
@@ -130,7 +130,7 @@ The [Usage page](/usage) shows a card for every added account, with its own limi
 
 When the agent you picked has added accounts, the start page's **Options** shows an **Account** row. Click it:
 
-- **Your sign-in** is the program's own account (the one under Your sign-ins).
+- **Your sign-in** is the program's own account (the first one for that agent under Your accounts).
 - Each added account is listed by name.
 - **Manage accounts** opens Settings → Accounts.
 
@@ -138,7 +138,7 @@ The start page remembers your choice for that agent. A session running as an add
 
 ## Use all your accounts: switch at a limit
 
-With two or more accounts for the same agent, the app can use them all: when one runs out of usage, your work carries on with another. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) and turn on **Switch accounts at a limit**, under **More accounts** ("When a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on. New sessions skip an account at its limit."). It is off until you turn it on, and it works while no browser is open.
+With two or more accounts for the same agent, the app can use them all: when one runs out of usage, your work carries on with another. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) and turn on **Switch accounts at a limit**, at the bottom of **Your accounts** once you have added an account ("When a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on. New sessions skip an account at its limit."). It is off until you turn it on, and it works while no browser is open.
 
 - When a turn stops because the session's account hit its usage limit, the app picks another signed-in account of the same agent that still has usage (the least used one), moves the session there with all its history, and sends "… reached its usage limit, so this session now runs on …. Continue where you left off." A note at the top of the app says which account it moved to.
 - Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex.

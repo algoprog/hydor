@@ -3,7 +3,7 @@
 // sections in a menu beside the open one; on phones a list, each section on its own page.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, Plug, Plus, ScrollText, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
+import { Bell, Blocks, Bot, Cable, CalendarClock, Cpu, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, GitPullRequest, KeyRound, LogIn, LogOut, MoreHorizontal, Pencil, Plug, Plus, ScrollText, Server, SlidersHorizontal, Sparkles, Trash2, UserRound, XCircle, type LucideIcon } from 'lucide-react';
 import { featureSections } from '../registry';
 import { isLang, LANGS } from '@shared/i18n';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, ClientUpdateItem, ClientUpdates, LoginFlow, RetentionSettings, StartupState, UpdateState } from '@shared/types';
@@ -14,7 +14,7 @@ import { toast, toastError, useApp, useLogins, useUI } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { FolderChip } from '../../components/FolderPicker';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Throbber, inputCls, Section, Segmented, Switch, Tabs, useConfirm, useIsMobile } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, MenuItem, Popover, Throbber, inputCls, Section, Segmented, Switch, Tabs, useConfirm, useIsMobile } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
 import { chime, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
 import { PageHeader } from '../layout/PageHeader';
@@ -245,10 +245,15 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
   );
 }
 
-function AccountRow({ a, account, onChange, extra }: { a: AccountStatus | null; account?: AgentAccount; onChange: () => void; extra?: ReactNode }) {
+/** Something a row's ⋯ menu does besides signing out. */
+type RowAction = { label: string; icon?: ReactNode; danger?: boolean; run: () => void };
+
+function AccountRow({ a, account, onChange, actions = [] }: { a: AccountStatus | null; account?: AgentAccount; onChange: () => void; actions?: RowAction[] }) {
   const agent = a?.agent ?? account?.agent;
   const q = account ? `?account=${encodeURIComponent(account.id)}` : '';
   const [login, setLogin] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const more = useRef<HTMLButtonElement>(null);
   const [confirm, node] = useConfirm();
   if (!a || !agent) {
     return (
@@ -257,6 +262,20 @@ function AccountRow({ a, account, onChange, extra }: { a: AccountStatus | null; 
       </div>
     );
   }
+  const signOut = async () => {
+    if (
+      !(await confirm({
+        title: `Sign out of ${agentName(agent)}${account ? ` (${account.name})` : ''}?`,
+        body: account ? 'Sessions that run as this account stop working until it signs in again.' : 'This signs the CLI out on the server, for every terminal and editor that uses it.',
+        confirm: 'Sign out',
+        danger: true,
+      }))
+    )
+      return;
+    await post(`/api/accounts/${agent}/logout${q}`).catch(toastError);
+    onChange();
+  };
+  const items: RowAction[] = [...(a.loggedIn ? [{ label: 'Sign out', icon: <LogOut size={14} />, run: signOut }] : []), ...actions];
   // The name and sign-in keep their width; on a phone the buttons go under them.
   return (
     <div className="flex items-start gap-3 py-3">
@@ -267,7 +286,12 @@ function AccountRow({ a, account, onChange, extra }: { a: AccountStatus | null; 
         <div className="min-w-[min(100%,14rem)] flex-1">
           <div className="text-[14px] font-medium">
             {agentName(agent)}
-            {account && <span className="font-normal text-fg-3"> · {account.name}</span>}
+            {account && (
+              <span className="font-normal text-fg-3" translate="no">
+                {' '}
+                · {account.name}
+              </span>
+            )}
           </div>
           <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-fg-3">
             {a.loggedIn ? <CheckCircle2 size={12} className="shrink-0 text-ok" /> : <XCircle size={12} className="shrink-0 text-err" />}
@@ -282,33 +306,32 @@ function AccountRow({ a, account, onChange, extra }: { a: AccountStatus | null; 
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {a.loggedIn && (
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<LogOut size={13} />}
-              onClick={async () => {
-                if (
-                  !(await confirm({
-                    title: `Sign out of ${agentName(agent)}${account ? ` (${account.name})` : ''}?`,
-                    body: account ? 'Sessions that run as this account stop working until it signs in again.' : 'This signs the CLI out on the server, for every terminal and editor that uses it.',
-                    confirm: 'Sign out',
-                    danger: true,
-                  }))
-                )
-                  return;
-                await post(`/api/accounts/${agent}/logout${q}`).catch(toastError);
-                onChange();
-              }}
-            >
-              Sign out
-            </Button>
-          )}
+        <div className="flex items-center gap-1">
           <Button size="sm" variant={a.loggedIn ? 'secondary' : 'primary'} icon={<LogIn size={13} />} onClick={() => setLogin(true)}>
             {a.loggedIn ? 'Switch account' : 'Sign in'}
           </Button>
-          {extra}
+          {items.length > 0 && (
+            <>
+              <IconButton label="More" ref={more} onClick={() => setMenu((m) => !m)}>
+                <MoreHorizontal size={17} />
+              </IconButton>
+              <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={180}>
+                {items.map((it) => (
+                  <MenuItem
+                    key={it.label}
+                    icon={it.icon}
+                    danger={it.danger}
+                    onClick={() => {
+                      setMenu(false);
+                      it.run();
+                    }}
+                  >
+                    {it.label}
+                  </MenuItem>
+                ))}
+              </Popover>
+            </>
+          )}
         </div>
       </div>
       <LoginDialog agent={agent} account={account} open={login} onClose={() => setLogin(false)} onDone={onChange} />
@@ -835,50 +858,40 @@ function AccountSettings() {
     await del(`/api/agent-accounts/${a.id}${wipe ? '?wipe=1' : ''}`).catch(toastError);
     load();
   };
+  // Each agent's own sign-in, then the accounts added for it.
+  const rows = (agent: Agent, main: AccountStatus | undefined) => [
+    <AccountRow key={agent} a={main ?? null} onChange={load} />,
+    ...(accounts?.extra ?? [])
+      .filter((x) => x.agent === agent)
+      .map((x) => (
+        <AccountRow
+          key={x.id}
+          a={x.status}
+          account={x}
+          onChange={load}
+          actions={[
+            { label: 'Rename', icon: <Pencil size={14} />, run: () => rename(x) },
+            { label: 'Remove', icon: <Trash2 size={14} />, danger: true, run: () => remove(x) },
+          ]}
+        />
+      )),
+  ];
   return (
     <div className="space-y-4">
-      <Section title="Your sign-ins" sub="The accounts the Claude Code and Codex CLIs on this machine use">
-        <div className="-my-2 divide-y divide-line">
-          <AccountRow a={accounts?.claude ?? null} onChange={load} />
-          <AccountRow a={accounts?.codex ?? null} onChange={load} />
-        </div>
-      </Section>
       <Section
-        title="More accounts"
-        sub="Another subscription for an agent, a work and a personal one say. Pick one when you start a session."
+        title="Your accounts"
+        sub="The Claude Code and Codex sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session."
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
             Add an account
           </Button>
         }
       >
-        {!accounts ? (
-          <Throbber className="text-fg-3" />
-        ) : !accounts.extra.length ? (
-          <p className="text-[13px] leading-relaxed text-fg-3">None yet. Each added account signs in on its own and keeps its own history; your settings, instructions, skills and plugins are shared.</p>
-        ) : (
-          <div className="-my-2 divide-y divide-line">
-            {accounts.extra.map((x) => (
-              <AccountRow
-                key={x.id}
-                a={x.status}
-                account={x}
-                onChange={load}
-                extra={
-                  <>
-                    <Button size="sm" variant="ghost" onClick={() => rename(x)}>
-                      Rename
-                    </Button>
-                    <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={() => remove(x)}>
-                      Remove
-                    </Button>
-                  </>
-                }
-              />
-            ))}
-            <AutoSwitchSetting />
-          </div>
-        )}
+        <div className="-my-2 divide-y divide-line">
+          {rows('claude', accounts?.claude)}
+          {rows('codex', accounts?.codex)}
+          {!!accounts?.extra.length && <AutoSwitchSetting />}
+        </div>
       </Section>
       <AgentPrograms />
       <AddAgentAccount open={adding} onClose={() => setAdding(false)} onAdded={load} />

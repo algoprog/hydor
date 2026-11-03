@@ -68,8 +68,7 @@
 
 [设置 → 账户](/settings?s=accounts)：每个会话都使用的 Claude Code 和 Codex 登录。详见[智能体、账户和模型](/guide/agents-models)。
 
-- [**你的登录账号**](/settings?s=accounts&find=Your%20sign-ins)：会话使用的 Claude Code 和 Codex 账户。
-- [**更多账户**](/settings?s=accounts&find=More%20accounts)：为智能体再添一个订阅。
+- [**你的账户**](/settings?s=accounts&find=Your%20accounts)：会话使用的 Claude Code 和 Codex 登录，以及你添加的更多账户。
 - [**达到限额时切换账户**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)：用量耗尽的会话会换另一个账户继续。
 - [**智能体程序**](/settings?s=accounts&find=Agent%20programs)：已安装哪些智能体程序，以及安装其他程序。
 - [**自动更新**](/settings?s=accounts&find=Update%20automatically)：让 Claude Code、Codex 和其他智能体程序保持最新版本。
