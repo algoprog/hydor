@@ -11,7 +11,7 @@ export function PageOverlay({ title, onClose, actions, children }: { title: stri
     return () => document.removeEventListener('keydown', k);
   }, [onClose]);
   return createPortal(
-    <div className="anim-overlay scrim fixed inset-0 z-50 flex flex-col p-0 sm:p-6 [--scrim:0.6]" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="scrim fixed inset-0 z-50 flex flex-col p-0 sm:p-6 [--scrim:0.6]" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-panel sm:rounded-2xl">
         <div className="flex items-center gap-2 border-b border-line px-4 py-2 pt-[max(8px,var(--safe-top))]">
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{title}</span>

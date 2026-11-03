@@ -41,12 +41,12 @@ export function FilePeek() {
     <>
       {file &&
         createPortal(
-          <div className="anim-overlay scrim fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+          <div className="scrim fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" onPointerDown={(e) => e.target === e.currentTarget && close()}>
             <div
               role="dialog"
               aria-modal
               aria-label={basename(file.path)}
-              className="anim-pop flex h-[92dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-t-[20px] border border-line bg-elevated shadow-lg sm:h-[min(88dvh,960px)] sm:rounded-[20px]"
+              className="flex h-[92dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-t-[20px] border border-line bg-elevated shadow-lg sm:h-[min(88dvh,960px)] sm:rounded-[20px]"
             >
               <div className="flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-5">
                 <div className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight" title={file.path}>

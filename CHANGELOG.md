@@ -3,6 +3,29 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.18.0 · 3 November 2026
+
+A redesigned page for each space, a session's page the moment you press Start, no more fades, and usage limits that
+say whose they are.
+
+- **A space's page, redesigned**: it opens at once under a band of the space's colour, with the arrow back on the
+  left as on the app's other pages, **New session**, and one menu: **Open its folder in Files**, **Only its sessions
+  in the sidebar** and **Delete the space**. **Overview** shows its sessions (with what each is doing), what it holds
+  in the Library, and what every session in it gets: its folder, guidelines, documents, skills, assistant and memory;
+  a group lists its spaces too. **Settings** puts each part beside a line on what it is for, the assistant its
+  sessions start as is one tap among a few, and **Save** shows once you change something. Its tabs fit a phone.
+- **Sessions start at once**: pressing **Start** opens the session's page straight away with your message
+  (**Starting**), and it becomes the session the moment the agent is ready, with no loading in between. If it can't
+  start, the page says why, and **Back to the start page** puts your message, with what you attached, back in the box.
+- **No more fades**: pages, tabs, menus, dialogs, side panels and the parts you unfold open at once, and on a phone a
+  Settings section opens without sliding. Only what arrives by itself (a reply, a toast, a card that asks you
+  something) still comes in softly.
+- **Back arrows that fit**: on an app's editor, an app's page and a run, and on a phone in Settings and Help, the
+  arrow back sits beside the title instead of in it, so it is never cut off.
+- **Usage limits say whose they are**: when a limit stops a session, the notice says "All your Claude Code accounts
+  have hit their usage limit" when every account is used up, or names the account when another still has usage
+  left, then which limit and when the session continues.
+
 ## 0.17.1 · 3 November 2026
 
 Pictures and videos each have their own place in the Library.

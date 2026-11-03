@@ -283,10 +283,10 @@ export function Popover({
     const kb = !!room && room.bottom > 0;
     return createPortal(
       <div ref={ref} role="dialog" aria-modal className="fixed inset-0 z-50" style={z ? { zIndex: z } : undefined}>
-        <div className="anim-overlay absolute inset-0 touch-none bg-black/40" onClick={onClose} aria-hidden />
+        <div className="absolute inset-0 touch-none bg-black/40" onClick={onClose} aria-hidden />
         <div
           style={{ bottom: room?.bottom ?? 0, maxHeight: room ? `calc(${room.height}px - var(--safe-top) - 12px)` : undefined }}
-          className="anim-sheet absolute inset-x-0 flex max-h-[calc(100dvh-var(--safe-top)-12px)] flex-col rounded-t-[20px] border border-b-0 border-line bg-elevated shadow-lg"
+          className="absolute inset-x-0 flex max-h-[calc(100dvh-var(--safe-top)-12px)] flex-col rounded-t-[20px] border border-b-0 border-line bg-elevated shadow-lg"
         >
           <div className="flex shrink-0 items-center gap-2 pt-2.5 pr-2.5 pb-1 pl-4">
             <div className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight">{title}</div>
@@ -304,12 +304,12 @@ export function Popover({
   const dim = sheet && window.innerWidth < SHEET_BELOW;
   return createPortal(
     <>
-      {dim && <div className="anim-overlay fixed inset-0 z-50 bg-black/30" style={z ? { zIndex: z } : undefined} aria-hidden />}
+      {dim && <div className="fixed inset-0 z-50 bg-black/30" style={z ? { zIndex: z } : undefined} aria-hidden />}
       <div
         ref={ref}
         role="dialog"
         style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: pos?.width ?? width, maxHeight: pos?.maxH, zIndex: z }}
-        className={cx('anim-pop fixed z-50 overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg', className)}
+        className={cx('fixed z-50 overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg', className)}
       >
         {children}
       </div>
@@ -545,7 +545,7 @@ export function Dialog({
   return createPortal(
     <div
       ref={ref}
-      className="anim-overlay scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+      className="scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       onPointerDown={(e) => (pressed.current = e.target === e.currentTarget)}
       onClick={(e) => pressed.current && e.target === e.currentTarget && onClose()}
     >
@@ -553,7 +553,7 @@ export function Dialog({
         role="dialog"
         aria-modal
         style={{ maxWidth: width }}
-        className="anim-pop flex max-h-[92dvh] w-full flex-col rounded-t-[20px] border border-line bg-elevated shadow-lg sm:rounded-[20px]"
+        className="flex max-h-[92dvh] w-full flex-col rounded-t-[20px] border border-line bg-elevated shadow-lg sm:rounded-[20px]"
       >
         {title && (
           <div className="flex items-center gap-2 px-5 pt-4 pb-1">
@@ -698,10 +698,22 @@ export const useIsMobile = () => !useMediaQuery('(min-width: 768px)');
 
 // ---- page building blocks -------------------------------------------------------------
 
-/** Underline tabs for page and panel headers. */
-export function Tabs<T extends string>({ value, options, onChange, className }: { value: T; options: { value: T; label: ReactNode; count?: ReactNode }[]; onChange: (v: T) => void; className?: string }) {
+/** Underline tabs for page and panel headers. `dense`: closer together, so six fit a phone's width. */
+export function Tabs<T extends string>({
+  value,
+  options,
+  onChange,
+  className,
+  dense,
+}: {
+  value: T;
+  options: { value: T; label: ReactNode; count?: ReactNode }[];
+  onChange: (v: T) => void;
+  className?: string;
+  dense?: boolean;
+}) {
   return (
-    <div role="tablist" className={cx('flex items-end gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden', className)}>
+    <div role="tablist" className={cx('flex items-end overflow-x-auto [&::-webkit-scrollbar]:hidden', dense ? 'gap-0' : 'gap-1', className)}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -709,13 +721,14 @@ export function Tabs<T extends string>({ value, options, onChange, className }: 
           aria-selected={value === o.value}
           onClick={() => onChange(o.value)}
           className={cx(
-            'relative flex h-9 shrink-0 items-center gap-1.5 px-2.5 text-[13.5px] font-medium transition-colors',
+            'relative flex h-9 shrink-0 items-center gap-1.5 text-[13.5px] font-medium transition-colors',
+            dense ? 'px-1.5' : 'px-2.5',
             value === o.value ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
           )}
         >
           {o.label}
           {o.count != null && o.count !== 0 && <span className="tnum rounded-md bg-bg-2 px-1.5 text-[11.5px] font-normal text-fg-3">{o.count}</span>}
-          {value === o.value && <span className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-fg" />}
+          {value === o.value && <span className={cx('absolute -bottom-px h-[2px] rounded-full bg-fg', dense ? 'inset-x-1' : 'inset-x-2')} />}
         </button>
       ))}
     </div>

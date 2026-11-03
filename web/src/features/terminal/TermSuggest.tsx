@@ -48,7 +48,7 @@ export function TermSuggest({ view, font, onPick }: { view: SuggestView; font: {
           aria-label="Command suggestions"
           // Keep the keyboard in the terminal: a click picks without taking focus.
           onMouseDown={(e) => e.preventDefault()}
-          className="anim-pop absolute z-20 overflow-hidden rounded-xl border border-line bg-elevated p-1 shadow-lg"
+          className="absolute z-20 overflow-hidden rounded-xl border border-line bg-elevated p-1 shadow-lg"
           style={{ left: menu.left, width: menu.width, top: menu.top, bottom: menu.bottom }}
         >
           {menu.items.map((s, i) => {

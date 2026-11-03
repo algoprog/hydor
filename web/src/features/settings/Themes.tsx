@@ -282,7 +282,7 @@ function ThemeEditor({ start, onClose }: { start: Draft; onClose: () => void }) 
     <div
       role="dialog"
       aria-label={d.id ? 'Edit theme' : 'New theme'}
-      className="anim-pop fixed inset-x-0 bottom-0 z-50 flex h-[64dvh] flex-col rounded-t-[20px] border border-line bg-elevated shadow-lg md:inset-y-3 md:right-3 md:left-auto md:h-auto md:w-[380px] md:rounded-[18px]"
+      className="fixed inset-x-0 bottom-0 z-50 flex h-[64dvh] flex-col rounded-t-[20px] border border-line bg-elevated shadow-lg md:inset-y-3 md:right-3 md:left-auto md:h-auto md:w-[380px] md:rounded-[18px]"
     >
       <div className="flex items-center gap-2 px-4 pt-3.5 pb-2">
         <div className="min-w-0 flex-1 text-[15px] font-semibold tracking-tight">{d.id ? 'Edit theme' : 'New theme'}</div>

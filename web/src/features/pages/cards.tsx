@@ -280,7 +280,7 @@ export function PublishCard({ item }: { item: ToolItem; sessionKey: string }) {
   const open = req.status === 'open';
   const site = req.site;
   return (
-    <div className={cx('tl-item my-1.5 overflow-hidden rounded-xl border bg-panel sm:max-w-[34rem]', open ? 'anim-pop border-accent/45 shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-line')}>
+    <div className={cx('tl-item my-1.5 overflow-hidden rounded-xl border bg-panel sm:max-w-[34rem]', open ? 'border-accent/45 shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-line')}>
       <div className="flex items-center gap-3 py-2.5 pr-3 pl-2.5">
         <Tile tone={req.status === 'declined' || req.status === 'failed' ? 'muted' : 'accent'}>
           {site?.visibility === 'private' ? <GlobeLock size={19} strokeWidth={1.8} /> : <Globe size={19} strokeWidth={1.8} />}

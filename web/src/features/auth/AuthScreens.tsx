@@ -26,7 +26,7 @@ function Shell({ title, sub, leaving, children }: { title: string; sub: ReactNod
           </div>
         </div>
         <div className={cx('auth-card rounded-[20px] border border-line bg-panel p-6 shadow-lg', leaving && 'tour-card-out')}>{children}</div>
-        <div className="stagger mt-6 flex flex-wrap items-center justify-center gap-x-3.5 gap-y-1.5 text-[12.5px] text-fg-3">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3.5 gap-y-1.5 text-[12.5px] text-fg-3">
           <span className="flex items-center gap-1.5" style={n(16)}>
             <AgentIcon agent="claude" size={14} /> Claude Code
           </span>

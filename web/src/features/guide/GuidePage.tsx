@@ -5,7 +5,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
-import { BookOpen, ChevronLeft, Signpost, Sparkles } from 'lucide-react';
+import { BookOpen, Signpost, Sparkles } from 'lucide-react';
 import { Button, cx, Empty, IconButton, Throbber, useIsMobile, useMediaQuery } from '../../components/ui';
 import { go, goApp } from '../../lib/nav';
 import { toastError } from '../../lib/store';
@@ -145,16 +145,8 @@ export function GuidePage() {
   );
   const header = mobile ? (
     <PageHeader
-      title={
-        topic ? (
-          <button onClick={() => go('/guide')} className="-ml-1 flex items-center gap-0.5 rounded-md text-left" aria-label="All topics">
-            <ChevronLeft size={18} className="shrink-0 text-fg-3" />
-            Help
-          </button>
-        ) : (
-          'Help'
-        )
-      }
+      title="Help"
+      back={topic ? { label: 'All topics', onClick: () => go('/guide') } : undefined}
       actions={
         <>
           {!topic && (

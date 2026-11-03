@@ -43,7 +43,7 @@ export function Lightbox() {
 
   if (!open || !img) return null;
   return createPortal(
-    <div className="anim-overlay scrim fixed inset-0 z-[70] flex flex-col [--scrim-blur:14px] [--scrim:0.78]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+    <div className="scrim fixed inset-0 z-[70] flex flex-col [--scrim-blur:14px] [--scrim:0.78]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div className="flex shrink-0 items-center gap-2 px-3 pt-[max(8px,var(--safe-top))] pb-2 text-[13px] text-white/80">
         <span className="min-w-0 flex-1 truncate">{img.name ?? ''}</span>
         {images.length > 1 && (
@@ -67,7 +67,7 @@ export function Lightbox() {
           src={img.src}
           alt={img.name ?? ''}
           onClick={() => setZoom((z) => !z)}
-          className={cx('anim-pop select-none', zoom ? 'm-auto block max-w-none cursor-zoom-out' : 'max-h-full max-w-full cursor-zoom-in rounded-lg object-contain shadow-2xl')}
+          className={cx('select-none', zoom ? 'm-auto block max-w-none cursor-zoom-out' : 'max-h-full max-w-full cursor-zoom-in rounded-lg object-contain shadow-2xl')}
         />
         {images.length > 1 && (
           <>
@@ -108,7 +108,7 @@ export function VideoBox() {
   }, [src]);
   if (!src) return null;
   return createPortal(
-    <div className="anim-overlay scrim fixed inset-0 z-[70] flex flex-col [--scrim-blur:14px] [--scrim:0.85]" onPointerDown={(e) => e.target === e.currentTarget && closeVideo()}>
+    <div className="scrim fixed inset-0 z-[70] flex flex-col [--scrim-blur:14px] [--scrim:0.85]" onPointerDown={(e) => e.target === e.currentTarget && closeVideo()}>
       <div className="flex shrink-0 items-center gap-2 px-3 pt-[max(8px,var(--safe-top))] pb-2 text-[13px] text-white/80">
         <span className="min-w-0 flex-1 truncate" translate="no">
           {title}
@@ -124,7 +124,7 @@ export function VideoBox() {
           allow={PLAYER_ALLOW}
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
-          className="anim-pop aspect-video max-h-full w-full max-w-[1100px] rounded-xl bg-black shadow-2xl"
+          className="aspect-video max-h-full w-full max-w-[1100px] rounded-xl bg-black shadow-2xl"
         />
       </div>
     </div>,

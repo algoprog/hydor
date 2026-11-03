@@ -99,7 +99,7 @@ export function OpinionCard({ note, sessionKey }: { note: SessionNote; sessionKe
     );
 
   return (
-    <div className="anim-in mt-3 overflow-hidden rounded-2xl border border-line bg-panel">
+    <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-panel">
       <div className="flex items-center gap-1 py-1 pr-1.5 pl-2">
         <button
           type="button"

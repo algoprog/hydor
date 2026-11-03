@@ -97,7 +97,7 @@ export function FindBar({ sessionKey, first, onClose }: { sessionKey: string; fi
   };
 
   return (
-    <div className="anim-pop absolute top-2 right-3 z-20 flex items-center gap-1 rounded-xl border border-line bg-elevated py-1 pr-1 pl-3 shadow-lg sm:right-6">
+    <div className="absolute top-2 right-3 z-20 flex items-center gap-1 rounded-xl border border-line bg-elevated py-1 pr-1 pl-3 shadow-lg sm:right-6">
       <input
         ref={input}
         autoFocus

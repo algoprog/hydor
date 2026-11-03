@@ -421,7 +421,7 @@ function InspectPanel({ info, st, onCheck, onInstalled }: { info: HfInspect; st:
       onInstalled();
     }, toastError);
   return (
-    <div className="anim-in rounded-xl border border-line bg-bg-1 p-3">
+    <div className="rounded-xl border border-line bg-bg-1 p-3">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <a href={`https://huggingface.co/${info.repo}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-medium text-fg hover:underline">
           {info.repo} <ExternalLink size={11} />
@@ -630,7 +630,7 @@ export function HfSearch({ st }: { st: ModelsState }) {
       <FilterChips items={HF_FILTERS} on={filters} toggle={toggle} />
       {!browsing && <Starters words={HF_STARTERS} onWord={setQ} browse="see the most downloaded" onBrowse={() => setBrowse(true)} />}
       {browsing && (hits || named) && (
-        <div className="anim-in mt-2.5">
+        <div className="mt-2.5">
           <ResultsHead n={list.length} limit={40} order={HF_ORDER} value={sort} onChange={(v) => setSort(v as HfSort)} />
           {(list.length > 0 || named) && (
             <div className={resultList}>
@@ -842,7 +842,7 @@ export function OpenRouterBody({ st }: { st: ModelsState }) {
           />
         )}
         {hits && (
-          <div className="anim-in mt-2.5">
+          <div className="mt-2.5">
             <ResultsHead
               n={hits.length}
               limit={50}

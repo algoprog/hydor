@@ -687,7 +687,7 @@ function HandoffCard({ h }: { h: HandoffInfo }) {
         <button onClick={() => setOpen((o) => !o)} className="mt-1 text-[12px] text-fg-3 transition-colors hover:text-fg">
           {open ? 'Hide' : 'Show'} the {h.messages} message{h.messages === 1 ? '' : 's'} carried over{h.omitted ? ` (${h.omitted} older left out)` : ''}
         </button>
-        {open && <pre className="anim-expand mt-2 max-h-[50vh] overflow-auto rounded-lg bg-bg px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-fg-2">{h.context}</pre>}
+        {open && <pre className="mt-2 max-h-[50vh] overflow-auto rounded-lg bg-bg px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-fg-2">{h.context}</pre>}
       </div>
     </div>
   );
@@ -717,7 +717,7 @@ function PeerMessage({ item }: { item: Extract<TimelineItem, { kind: 'user' }> }
         <ChevronRight size={14} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-90')} />
       </button>
       {open && (
-        <div className="anim-expand mt-1 mb-2 ml-[15px] border-l border-accent/30 pl-4">
+        <div className="mt-1 mb-2 ml-[15px] border-l border-accent/30 pl-4">
           <div className="mb-1 text-[11.5px] text-fg-3">
             {p.mode && <span className="mr-1.5 rounded bg-bg-2 px-1.5 py-px">{p.mode}</span>}
             from another Claude session
@@ -751,7 +751,7 @@ function RunMessageRow({ item, run }: { item: Extract<TimelineItem, { kind: 'use
         <ChevronRight size={14} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-90')} />
       </button>
       {open && (
-        <div className="anim-expand mt-1 mb-2 ml-[15px] border-l border-accent/30 pl-4">
+        <div className="mt-1 mb-2 ml-[15px] border-l border-accent/30 pl-4">
           <div className="text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-fg-2">{run.body}</div>
           <div className="mt-2.5 text-[11.5px] text-fg-3">Added by the app for this run:</div>
           <pre className="mt-1 max-h-60 overflow-auto rounded-lg bg-bg-1 px-3 py-2 font-mono text-[11.5px] whitespace-pre-wrap text-fg-3">{run.preamble}</pre>
@@ -829,7 +829,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
     return (
       <details className="tl-item rounded-lg px-2 py-1 text-[12.5px]">
         <summary className="cursor-pointer text-fg-3 transition-colors hover:text-fg-2">{item.meta === 'note' ? 'Message from the harness' : 'Command output'}</summary>
-        <pre className="term-out anim-expand mt-2 max-h-80 overflow-auto rounded-lg px-3 py-2">{item.text}</pre>
+        <pre className="term-out mt-2 max-h-80 overflow-auto rounded-lg px-3 py-2">{item.text}</pre>
       </details>
     );
   }
@@ -848,8 +848,8 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
         {item.images ? <MessageImages item={item} sent={sent} /> : null}
         {(text || files.length > 0 || context) && (
           // Short ones keep to their words; a long one is as wide as the message box, and lines up with it.
-          // (The words written on the start page become this as the session opens: lib/motion.ts.)
-          <div data-bubble className="max-w-full rounded-[20px] bg-bg-2 px-4 py-2.5">
+          // (A session just started shows it the same way while it starts: StartingSession.tsx.)
+          <div className="max-w-full rounded-[20px] bg-bg-2 px-4 py-2.5">
             {text && (
               <div
                 ref={body}
@@ -888,7 +888,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
                 )}
               </div>
             )}
-            {context && showContext && <pre className="anim-expand mt-2 max-h-60 overflow-auto rounded-lg bg-bg-1 px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-fg-3">{context}</pre>}
+            {context && showContext && <pre className="mt-2 max-h-60 overflow-auto rounded-lg bg-bg-1 px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-fg-3">{context}</pre>}
           </div>
         )}
         {editing ? (
@@ -937,7 +937,7 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
     }
   };
   return (
-    <div className="anim-pop w-full space-y-2.5 rounded-2xl border border-accent/40 bg-panel p-3">
+    <div className="w-full space-y-2.5 rounded-2xl border border-accent/40 bg-panel p-3">
       <textarea
         autoFocus
         value={text}

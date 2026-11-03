@@ -67,6 +67,20 @@ function useSpareAccount(agent: Agent, account: string | undefined): { id: strin
   return pool.find((a) => a.id !== account && !usedUp(a.id ? usage.accounts[a.id] : usage[agent])) ?? null;
 }
 
+/**
+ * Whose usage limit it is, in words: the agent's when you have one account of it; when you have several, all of
+ * them, or the one at its limit by name while another still has usage left (`spare`).
+ */
+function useLimitTitle(agent: Agent, account: string | undefined, spare: { id: string | undefined } | null): string {
+  const added = useApp((s) => s.boot?.accounts);
+  const email = useUsage((s) => (agent === 'acp' ? undefined : s[agent]?.account?.email));
+  const others = (added ?? []).filter((a) => a.agent === agent);
+  if (agent === 'acp' || !others.length) return `You've hit the ${agentName(agent)} usage limit`;
+  if (!spare) return `All your ${agentName(agent)} accounts have hit their usage limit`;
+  const name = account ? others.find((a) => a.id === account)?.name : email;
+  return name ? `${name} has hit its usage limit` : `Your main ${agentName(agent)} account has hit its usage limit`;
+}
+
 /** Renders again every `ms` while `on`, so "in 1 h 31 min" keeps counting down. */
 function useTicking(on: boolean, ms = 30_000) {
   const [, set] = useState(0);
@@ -87,6 +101,7 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
   const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : agent === 'acp' ? null : s[agent]));
   const reset = useLimitReset(agent, account);
   const spare = useSpareAccount(agent, account);
+  const title = useLimitTitle(agent, account, spare);
   const autoSwitch = useAppSettings((s) => s.autoSwitch);
   const autoResume = useAppSettings((s) => s.autoResume);
   useEffect(() => void useAppSettings.getState().load(), []);
@@ -98,15 +113,24 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
   const cancel = () => del(`/api/sessions/${enc(session!.key)}/resume-at`).catch(toastError);
   const usable = usableResets(u);
   // In a session with Resume after usage limits on, a turn the limit stopped continues by itself: no warning,
-  // only when (and a reset, if there is one). Not known yet whether it is on: nothing, rather than a flash.
+  // only whose limit it hit, which one, and when it continues (and a reset, if there is one). Not known yet
+  // whether it is on: nothing, rather than a flash.
   if (session && autoResume !== false) {
     if (!resumeAt || autoResume === null) return null;
     return (
       <div className={cx('flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
-        <Clock3 size={15} className="shrink-0 text-busy" />
-        <span className="min-w-0 flex-1">
-          {lim && <span className="text-fg-2">{lim.label} · </span>}
-          Continues by itself <span className="font-medium">{untilText(resumeAt)}</span>.
+        <Clock3 size={15} className={cx('shrink-0 text-busy', lim && 'mt-[3px] self-start')} />
+        <span className="min-w-0 flex-1 leading-snug">
+          {lim && <span className="block font-medium">{title}</span>}
+          <span className={cx('block', lim && 'text-[12.5px] text-fg-2')}>
+            {lim && (
+              <>
+                {lim.label}
+                {' · '}
+              </>
+            )}
+            Continues by itself <span className="font-medium text-fg">{untilText(resumeAt)}</span>.
+          </span>
         </span>
         <span className="flex items-center gap-1">
           {lim && usable.length > 0 && (
@@ -154,7 +178,7 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="min-w-[min(100%,15rem)] flex-1 leading-snug">
-            <div className="font-medium">You've hit the {agentName(agent)} usage limit</div>
+            <div className="font-medium">{title}</div>
             <div className="text-[12.5px] text-fg-2">
               {lim.label}
               {lim.resetsAt ? ` · resets ${untilText(lim.resetsAt)}` : ''}

@@ -265,7 +265,7 @@ export function MemoryNote({ note, sessionKey, more }: { note: SessionNote; sess
       </div>
     );
   return (
-    <div className="anim-in mt-3 overflow-hidden rounded-2xl border border-line bg-panel">
+    <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-panel">
       <div className="flex items-center gap-1 py-1 pr-1.5 pl-2">
         <button onClick={() => setOpen(false)} aria-expanded className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-bg-2">
           <Brain size={15} className="shrink-0 text-fg-3" />

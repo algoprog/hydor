@@ -246,8 +246,8 @@ export function SpaceSkillsTab({ s }: { s: Space }) {
     changed();
   };
   const actions = (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" icon={<Plus size={14} />} onClick={() => setEdit({})}>
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setEdit({})}>
         New skill
       </Button>
       <FromLibrary
@@ -261,15 +261,17 @@ export function SpaceSkillsTab({ s }: { s: Space }) {
     </div>
   );
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-[880px] space-y-5">
       {members.length > 0 && (
-        <div className="rounded-xl border border-line bg-panel px-4 py-3">
+        <div className="rounded-2xl border border-line bg-panel px-4 py-3.5">
           <div className="text-[13.5px] font-medium">Also the skills of the spaces it brings together</div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {members.map((m) => (
               <button key={m.id} type="button" onClick={() => go(`/spaces/${m.id}/skills`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
                 <SpaceMark s={m} size={15} />
-                <span className="min-w-0 truncate">{m.name}</span>
+                <span translate="no" className="min-w-0 truncate">
+                  {m.name}
+                </span>
                 <span className="tnum text-fg-3">{m.skills}</span>
               </button>
             ))}
@@ -281,28 +283,32 @@ export function SpaceSkillsTab({ s }: { s: Space }) {
           <Throbber size={24} />
         </div>
       ) : !st.skills.length ? (
-        <div className="space-y-4">
-          <div className="flex gap-3 text-[13.5px] leading-relaxed text-fg-2">
-            <Sparkles size={16} className="mt-0.5 shrink-0 text-accent" />
-            <div className="space-y-2">
-              <p>
-                Skills only this space’s sessions get, with your skill library: how its work is done, step by step. Agents load one when a task calls for it. A skill with the name of one in the library
-                takes its place here.
-              </p>
-              <p className="text-fg-3">Agents working in the space can propose one too, after a task that took real effort: you approve it in the conversation.</p>
-            </div>
-          </div>
-          {actions}
+        <div className="flex flex-col items-center rounded-2xl border border-line bg-panel px-6 pt-6 pb-7 text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-bg-2 text-fg-2">
+            <Sparkles size={19} />
+          </span>
+          <div className="mt-3 text-[14px] font-semibold">None of its own</div>
+          <p className="mt-1 max-w-[520px] text-[13px] leading-relaxed text-fg-3">
+            Skills only this space’s sessions get, with your skill library: how its work is done, step by step. Agents load one when a task calls for it. A skill with the name of one in the library takes
+            its place here.
+          </p>
+          <p className="mt-2 max-w-[520px] text-[12.5px] leading-relaxed text-fg-3">Agents working in the space can propose one too, after a task that took real effort: you approve it in the conversation.</p>
+          <div className="mt-4">{actions}</div>
         </div>
       ) : (
-        <>
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+        <section className="overflow-hidden rounded-2xl border border-line bg-panel">
+          <header className="flex min-h-12 flex-wrap items-center gap-2 px-4 py-2.5">
+            <h2 className="text-[14.5px] font-semibold tracking-tight">Skills</h2>
+            <span className="tnum rounded-md bg-bg-2 px-1.5 text-[11.5px] text-fg-3">{st.skills.length}</span>
+            <span className="flex-1" />
+            {actions}
+          </header>
+          <div className="divide-y divide-line border-t border-line">
             {st.skills.map((k) => (
               <SkillRow key={k.name} k={k} onOpen={() => setOpen(k.name)} onEdit={() => setEdit({ name: k.name })} onRemove={() => void remove(k)} />
             ))}
           </div>
-          {actions}
-        </>
+        </section>
       )}
       {st && st.removed.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-fg-3">

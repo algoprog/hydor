@@ -200,7 +200,7 @@ export function StatsBody() {
           </div>
         ) : (
           <div className={cx('space-y-4 transition-opacity', loading && 'opacity-60')}>
-            <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <Tile i={0} icon={<Plus size={13} />} label="Lines added" format={whole} cur={t!.linesAdded} prev={hasPrev ? p!.linesAdded : undefined} />
               <Tile i={1} icon={<Minus size={13} />} label="Lines removed" format={whole} cur={t!.linesRemoved} prev={hasPrev ? p!.linesRemoved : undefined} />
               <Tile

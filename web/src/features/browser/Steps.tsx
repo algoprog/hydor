@@ -100,7 +100,7 @@ export const BrowserStep = memo(function BrowserStep({ item, sessionKey }: { ite
         <ChevronRight size={14} className={cx('shrink-0 text-fg-3 opacity-0 transition group-hover:opacity-100', open && 'rotate-90 opacity-100')} />
       </button>
       {open && (
-        <div className="anim-expand">
+        <div>
           {pic && (
             <div className="pt-1.5 pl-7">
               <img src={pic} alt="The page after this step" className="max-h-[220px] max-w-full rounded-lg border border-line" />

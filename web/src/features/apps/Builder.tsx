@@ -4,7 +4,7 @@
 // what is on screen before saving. "Save as template" in a session's menu opens it with a draft from that
 // session.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, FlaskConical, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, FlaskConical, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
@@ -607,16 +607,8 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
-        title={
-          <span className="flex min-w-0 items-center gap-2.5">
-            {!embedded && (
-              <IconButton label="Back" size="sm" onClick={() => go(back)} className="-ml-1">
-                <ArrowLeft size={17} />
-              </IconButton>
-            )}
-            <span className="truncate">{saved ? `Edit ${saved.name}` : 'New app'}</span>
-          </span>
-        }
+        title={saved ? `Edit ${saved.name}` : 'New app'}
+        back={embedded ? undefined : { label: 'Back', onClick: () => go(back) }}
         actions={
           <>
             <Button size="sm" variant="ghost" icon={<FlaskConical size={14} />} onClick={() => (recipe.prompt.trim() || recipe.flow ? setTesting(true) : toast('Write the task first', 'error'))}>

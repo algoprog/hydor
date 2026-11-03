@@ -65,11 +65,14 @@ export function startDraft(): StartDraft | null {
   return start;
 }
 
-/** Keeps the start page's box as it is now; null, or a box with nothing in it, clears it. */
-export function keepStartDraft(d: StartDraft | null) {
+/**
+ * Keeps the start page's box as it is now; null, or a box with nothing in it, clears it. `release`: false when the
+ * files it no longer holds went somewhere that still shows them (a session starting with them).
+ */
+export function keepStartDraft(d: StartDraft | null, release = true) {
   const next = d && (d.text || d.files.length || Object.keys(d.extra).length || d.folder) ? d : null;
   // Files the box no longer holds have no thumbnail to show.
-  if (start) releaseAttachments(start.files.filter((a) => !next?.files.includes(a)));
+  if (start && release) releaseAttachments(start.files.filter((a) => !next?.files.includes(a)));
   start = next;
   try {
     if (next) localStorage.setItem(START, JSON.stringify({ text: next.text, extra: next.extra, folder: next.folder, from: next.from }));

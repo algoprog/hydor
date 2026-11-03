@@ -9851,5 +9851,22 @@
 "The Library’s videos":"Τα βίντεο της Βιβλιοθήκης",
 "The pictures agents made that you kept, each with a title and a description":"Οι εικόνες που έφτιαξαν οι πράκτορες και κρατήσατε, η καθεμία με τίτλο και περιγραφή",
 "The videos agents made that you kept, each with a title and a description":"Τα βίντεο που έφτιαξαν οι πράκτορες και κρατήσατε, το καθένα με τίτλο και περιγραφή",
-"videos clips movies films media kept saved generated library titles descriptions captions frames":"βίντεο κλιπ ταινίες πολυμέσα κρατημένα αποθηκευμένα βιβλιοθήκη τίτλοι περιγραφές λεζάντες καρέ"
+"videos clips movies films media kept saved generated library titles descriptions captions frames":"βίντεο κλιπ ταινίες πολυμέσα κρατημένα αποθηκευμένα βιβλιοθήκη τίτλοι περιγραφές λεζάντες καρέ",
+"A new one works in this space’s folder, with its guidelines, documents and skills.":"Μια νέα δουλεύει στον φάκελο αυτού του χώρου, με τις οδηγίες, τα έγγραφα και τις δεξιότητές του.",
+"Back to the start page":"Πίσω στην αρχική σελίδα",
+"Did not start":"Δεν ξεκίνησε",
+"Every session here":"Κάθε συνεδρία εδώ",
+"Its name, what it is about and its colour: on its card, its page and the start page":"Το όνομά του, τι αφορά και το χρώμα του: στην κάρτα του, στη σελίδα του και στην αρχική σελίδα",
+"Its sessions, folder, documents, skills and what it holds in the Library stay.":"Οι συνεδρίες, ο φάκελος, τα έγγραφα, οι δεξιότητές του και ό,τι έχει στη Βιβλιοθήκη μένουν.",
+"Only its sessions in the sidebar":"Μόνο οι συνεδρίες του στην πλευρική στήλη",
+"Open its folder in Files":"Άνοιγμα του φακέλου του στα Αρχεία",
+"Picking the space on the start page picks this assistant too":"Όταν επιλέγετε τον χώρο στην αρχική σελίδα, επιλέγεται και αυτός ο βοηθός",
+"Starting {0}…":"Ξεκινά το {0}…",
+"Starting the session…":"Η συνεδρία ξεκινά…",
+"Starts as":"Ξεκινά ως",
+"The session did not start":"Η συνεδρία δεν ξεκίνησε",
+"The session did not start: {0}":"Η συνεδρία δεν ξεκίνησε: {0}",
+"{0} has hit its usage limit":"Ο λογαριασμός {0} έφτασε το όριο χρήσης του",
+"All your {0} accounts have hit their usage limit":"Όλοι οι λογαριασμοί σας στο {0} έφτασαν το όριο χρήσης τους",
+"Your main {0} account has hit its usage limit":"Ο κύριος λογαριασμός σας στο {0} έφτασε το όριο χρήσης του"
 }

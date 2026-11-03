@@ -218,6 +218,8 @@ html {
 }
 
 /* ---- motion ---------------------------------------------------------------- */
+/* What you open shows at once, with no fade: pages, tabs, dialogs, menus, popovers, sheets, side panels and the
+   parts you unfold. Only what arrives by itself comes in softly: a message, a toast, a card asking you something. */
 
 @keyframes fade-in {
   from {
@@ -242,23 +244,10 @@ html {
     opacity: 0;
   }
 }
-@keyframes up-in {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: none;
-  }
-}
 
+/* Something that arrived by itself: a toast, a card that asks, the way back to the latest messages. */
 .anim-pop {
   animation: fade-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.anim-overlay {
-  animation: overlay-in 140ms ease-out;
-}
-.anim-sheet {
-  animation: up-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* Loading: the app's mark at work (Throbber), whole from the first frame so even a short load shows
@@ -332,7 +321,7 @@ html {
   animation: caret 1s steps(1) infinite;
 }
 
-/* Subtle motion: content arriving rises in, opened sections ease open, panels slide in. */
+/* Content arriving while you look rises in: a new reply, a status line, a card that comes up by itself. */
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -361,66 +350,7 @@ html {
   animation: msg-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transform-origin: 100% 100%;
 }
-/* Starting a session on the start page: Start's arrow keeps going up while the session starts; then the page
-   becomes the session at once, while the message box goes down to the session's own and the words written in
-   it, now your message, go up to their place in the conversation (lib/motion.ts, carryToSession). */
-@keyframes send-up {
-  0% {
-    transform: none;
-    opacity: 1;
-    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6);
-  }
-  35% {
-    transform: translateY(-120%);
-    opacity: 0;
-  }
-  35.01% {
-    transform: translateY(120%);
-    opacity: 0;
-    animation-timing-function: cubic-bezier(0.1, 0.4, 0.4, 1);
-  }
-  70%,
-  100% {
-    transform: none;
-    opacity: 1;
-  }
-}
-.anim-send-up {
-  animation: send-up 1.1s infinite;
-}
-:root.carrying::view-transition-old(root) {
-  display: none;
-}
-:root.carrying::view-transition-new(root) {
-  animation: none;
-}
-::view-transition-group(carry-box),
-::view-transition-group(carry-words) {
-  animation-duration: 480ms;
-  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-/* The box keeps to its outline as it shrinks (the start page's taller box is cut down to the session's), and is
-   the session's early on the way, not two boxes at once. */
-::view-transition-group(carry-box) {
-  overflow: clip;
-  border-radius: 22px;
-}
-::view-transition-old(carry-box),
-::view-transition-new(carry-box) {
-  animation-duration: 220ms;
-}
-/* The words become the message where they were written, over the box they leave, and keep their size on the way. */
-::view-transition-group(carry-words) {
-  z-index: 1;
-}
-::view-transition-old(carry-words) {
-  display: none;
-}
-::view-transition-new(carry-words) {
-  animation: none;
-  inline-size: auto;
-  block-size: auto;
-}
+/* A bar that comes up by itself over the message box (a goal set, a card waiting, a limit reached). */
 @keyframes expand-in {
   from {
     opacity: 0;
@@ -433,36 +363,6 @@ html {
 }
 .anim-expand {
   animation: expand-in 220ms ease-out both;
-}
-@keyframes slide-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.anim-slide-left {
-  animation: slide-in-left 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-/* Back the other way: a menu returning from one of its submenus. */
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(-18px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.anim-slide-right {
-  animation: slide-in-right 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-.anim-fade {
-  animation: overlay-in 220ms ease-out both;
 }
 /* A working agent's mark turns slowly; a waiting one breathes. */
 @keyframes turn {

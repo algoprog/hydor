@@ -44,7 +44,7 @@ export function SourcesNote({ note, sessionKey }: { note: SessionNote; sessionKe
         <ChevronRight size={13} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-90')} />
       </button>
       {open && (
-        <div className="anim-in mt-1.5 divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+        <div className="mt-1.5 divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
           {pages.length > 0 && (
             <div className="px-3 py-2">
               <div className="pb-1 text-[11.5px] font-medium text-fg-3">Pages read</div>

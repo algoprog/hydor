@@ -359,8 +359,6 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
           </div>
         )}
         <div
-          // Where the start page's box goes as the session opens (lib/motion.ts).
-          data-composer
           className="@container relative rounded-[22px] border border-line-2 bg-panel shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50"
           onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
           onDrop={(e) => {
