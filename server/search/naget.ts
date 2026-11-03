@@ -32,7 +32,7 @@ export function readCredits(c: unknown, at = Date.now()): NagetCredits | null {
 
 /** One call to Naget's API, its errors in plain words (and whether to stop asking for a while). */
 async function call(ctx: ProviderCtx, path: string, body: unknown | null, timeoutMs: number): Promise<any> {
-  const headers: Record<string, string> = { accept: 'application/json', 'user-agent': 'Naget Agent' };
+  const headers: Record<string, string> = { accept: 'application/json', 'user-agent': 'Hydor' };
   if (body) headers['content-type'] = 'application/json';
   if (ctx.key) headers.authorization = `Bearer ${ctx.key}`;
   const { data, res } = await request(ctx, 'Naget Search', nagetBase(ctx.url) + path, { method: body ? 'POST' : 'GET', headers, body: body ? JSON.stringify(body) : undefined, timeoutMs });

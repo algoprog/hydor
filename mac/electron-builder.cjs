@@ -5,8 +5,8 @@
 const signed = !!process.env.CSC_LINK;
 
 module.exports = {
-  appId: 'com.naget.agent',
-  productName: 'Naget Agent',
+  appId: 'com.hydor.app',
+  productName: 'Hydor',
   copyright: 'Copyright © Naget, Inc.',
   directories: { output: 'dist', buildResources: 'resources' },
   files: ['main.cjs', 'package.json'],
@@ -17,7 +17,7 @@ module.exports = {
     { from: 'resources', to: '.', filter: ['trayTemplate*.png'] },
   ],
   electronLanguages: ['en', 'zh_CN', 'el'],
-  artifactName: 'Naget-Agent-${version}-${arch}-mac.${ext}',
+  artifactName: 'Hydor-${version}-${arch}-mac.${ext}',
   publish: null,
   mac: {
     icon: 'resources/icon.png',
@@ -31,10 +31,10 @@ module.exports = {
     entitlementsInherit: 'resources/entitlements.plist',
     notarize: signed && !!process.env.APPLE_TEAM_ID,
     extendInfo: {
-      NSMicrophoneUsageDescription: 'Naget Agent uses the microphone when you talk to it.',
+      NSMicrophoneUsageDescription: 'Hydor uses the microphone when you talk to it.',
       LSMultipleInstancesProhibited: true,
     },
   },
-  dmg: { title: 'Naget Agent ${version}' },
+  dmg: { title: 'Hydor ${version}' },
   afterSign: signed ? undefined : 'scripts/adhoc-sign.cjs',
 };

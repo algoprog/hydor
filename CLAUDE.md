@@ -1,4 +1,4 @@
-# Notes for agents working on Naget Agent
+# Notes for agents working on Hydor
 
 ## Releases: every version has its release notes
 
@@ -52,7 +52,7 @@ rename or remove something users can see or do (a page, a button, a setting or a
 an `/api/` route is missing from `docs/guide/90-api.md`, or a translation is missing or out of step:
 
 ```bash
-OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/naget-test-guide node dist/dev/guide-test.js
+OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 ```
 
 ## Search embeddings: keep the shipped vectors current
@@ -79,9 +79,9 @@ npm run find:vectors   # embeds only the texts without a vector yet, on the CPU;
 ```
 
 It needs a Python with PyTorch and Transformers 5.6+: the app's own one once search by meaning is turned on
-in Settings → Memory, or `NAGET_EMBED_PYTHON=/path/to/python`. `server/find/find-test.ts` fails while a
+in Settings → Memory, or `HYDOR_EMBED_PYTHON=/path/to/python`. `server/find/find-test.ts` fails while a
 shipped text has no vector, or the catalog no longer matches the Settings pages:
 
 ```bash
-OUTDIR=dist/dev node scripts/build-server.mjs server/find/find-test.ts && DATA_DIR=/tmp/naget-test-find node dist/dev/find-test.js
+OUTDIR=dist/dev node scripts/build-server.mjs server/find/find-test.ts && DATA_DIR=/tmp/hydor-test-find node dist/dev/find-test.js
 ```

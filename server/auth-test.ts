@@ -4,7 +4,7 @@
 // once, the picture for everyone and the full stop after many wrong passwords from anywhere, the pause kept over a
 // restart and lifted by set-password, the cap on pictures, and the PNG itself. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/auth-test.ts
-//   DATA_DIR=/tmp/naget-test-auth node dist/dev/auth-test.js
+//   DATA_DIR=/tmp/hydor-test-auth node dist/dev/auth-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -23,7 +23,7 @@ if (!config.dataDir.startsWith('/tmp/')) {
 ensureDirs();
 fs.rmSync(paths.auth, { force: true });
 fs.rmSync(paths.setupToken, { force: true });
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-auth-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-auth-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let auth = new AuthManager(db);
 const PW = 'the right password';

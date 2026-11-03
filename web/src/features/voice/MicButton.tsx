@@ -15,7 +15,7 @@ const PROBLEMS: Record<Problem, { title: string; body: () => string }> = {
   insecure: {
     title: 'The microphone needs a secure connection',
     body: () =>
-      `Browsers allow the microphone only on pages served over HTTPS, or on this computer at localhost. This page is at ${location.origin}: open Naget Agent through an HTTPS address to dictate.`,
+      `Browsers allow the microphone only on pages served over HTTPS, or on this computer at localhost. This page is at ${location.origin}: open Hydor through an HTTPS address to dictate.`,
   },
   denied: {
     title: 'The microphone is blocked for this site',

@@ -1401,7 +1401,7 @@ const SETTINGS_XML =
   '<w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>';
 const APP_XML =
   `${XML_HEAD}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">` +
-  '<Application>Naget Agent</Application><DocSecurity>0</DocSecurity></Properties>';
+  '<Application>Hydor</Application><DocSecurity>0</DocSecurity></Properties>';
 
 function contentTypes(pictures: Set<string>): string {
   const ov = (part: string, type: string) => `<Override PartName="${part}" ContentType="${type}"/>`;

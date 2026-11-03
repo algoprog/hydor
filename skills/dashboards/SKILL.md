@@ -64,7 +64,7 @@ directly, label it so it reads without you, keep it honest, and build it where i
 - **A quick look in the conversation:** `show_html`, a self-contained page with the data inside it.
   It cannot reach the app or the user's files, and keeps nothing between views.
 - **A dashboard to keep:** `save_page`. It sits in the Library, opens at its own address (a phone can
-  add it to its home screen), and keeps data with `naget.storage`: entries the person types in,
+  add it to its home screen), and keeps data with `hydor.storage`: entries the person types in,
   their settings, the last data fetched as a cache.
 - **Live data:** a page can fetch public sources that allow it (web APIs that send CORS headers);
   test that the fetch works from the page. A page runs without the app's sign-in and anyone with its

@@ -92,7 +92,7 @@ not a plain card. The format is in app_guide's API topic (Apps: views).
   the built-in map and plot first; a widget reaches the app only through `view.event(name, item)` and `view.set`.
 - **Its own files** (pictures, a logo, sample videos, a data file): app_save's `assets` (a name → a path or an
   https:// address); a view shows one as `asset:<name>` (an image block's value, or a template's `src`). They
-  travel in its .naget-app.
+  travel in its .hydor-app.
 - **Events** make it useful: `data-event="name"` on a button, mapped to actions. Go to a detail page with the item;
   tick something off and keep it (`toggle`, `name: "done.@key"`, `keep: true`); filter with `set` and a block's
   `where`; copy the part people paste elsewhere; run it again with one answer changed (`again`: a slower pace,

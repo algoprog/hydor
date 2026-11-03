@@ -51,7 +51,7 @@ export async function initNotifications() {
 export type PushState = 'unsupported' | 'denied' | 'off' | 'on' | 'app';
 
 /** The Mac app's window (mac/main.cjs adds this to its user agent). */
-export const inMacApp = /\bNagetAgentMac\//.test(navigator.userAgent);
+export const inMacApp = /\b(?:HydorMac|NagetAgentMac)\//.test(navigator.userAgent);
 
 export async function pushState(): Promise<PushState> {
   if (inMacApp) return 'app';
@@ -121,7 +121,7 @@ export function chime(kind: NotifyEvent['kind']) {
  */
 export function handleNotify(n: NotifyEvent, own = false) {
   // Hands-free mode says what it hears of (features/voice/HandsFree.tsx).
-  window.dispatchEvent(new CustomEvent('naget:notify', { detail: n }));
+  window.dispatchEvent(new CustomEvent('hydor:notify', { detail: n }));
   // The machine the session is on (null: this server's own).
   const on = n.machine ? n.machine.id : own ? null : machineId;
   // The machine this page shows sends its own notices.

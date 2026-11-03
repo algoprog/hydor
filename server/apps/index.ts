@@ -479,7 +479,7 @@ function routes(d: Deps) {
 
   app.get('/api/apps/:id/screens', async (req) => ({ screens: screensOf(db, own(req)) }));
   app.get('/api/apps/:id/screens/:name', async (req) => ({ screen: screenHtml(db, own(req), P(req).name) }));
-  /** A new screen: the HTML given (window.naget.app and the App parts), or one made from the template's parts. */
+  /** A new screen: the HTML given (window.hydor.app and the App parts), or one made from the template's parts. */
   app.post('/api/apps/:id/screens', { bodyLimit: 4 * 1024 * 1024 }, async (req) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     return makeScreen(db, own(req), { name: b.name, title: b.title, html: b.html, by: b.html ? 'agent' : 'made' });
@@ -490,14 +490,14 @@ function routes(d: Deps) {
   });
   app.delete('/api/apps/:id/screens/:name', async (req) => ({ app: removeScreen(db, own(req), P(req).name) }));
 
-  /** A template as one file: .naget-app (a zip, with the records it keeps when data=1) or .json. */
+  /** A template as one file: .hydor-app (a zip, with the records it keeps when data=1) or .json. */
   app.get('/api/apps/:id/export', async (req, reply) => {
     const { app: a, template } = recipeOf(db, P(req).id);
     const q = req.query as Record<string, string>;
     const pkg = packageOf(db, a ?? template!, q.data === '1' || q.data === 'true');
     const name = (a?.slug ?? template!.id).replace(/[^\w-]/g, '');
     if (q.as === 'json') return reply.header('Content-Type', 'application/json; charset=utf-8').header('Content-Disposition', `attachment; filename="${name}.json"`).send(packageJson(pkg));
-    return reply.header('Content-Type', 'application/zip').header('Content-Disposition', `attachment; filename="${name}.naget-app"`).send(zipPackage(pkg));
+    return reply.header('Content-Type', 'application/zip').header('Content-Disposition', `attachment; filename="${name}.hydor-app"`).send(zipPackage(pkg));
   });
 
   // ---- runs ----
@@ -1120,7 +1120,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Apps (the Apps page in Naget Agent) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
+  "Apps (the Apps page in Hydor) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
 
 export const apps: Feature = {
   id: 'apps',

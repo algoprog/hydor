@@ -61,7 +61,7 @@ const sleep = (ms: number, signal?: AbortSignal) =>
 
 /** Models whose server refused the extra options once: they are not sent again. */
 const plain = new Set<string>();
-const STALL_MS = Number(process.env.NAGET_AGENT_STALL_MS) || 10 * 60_000;
+const STALL_MS = Number(process.env.HYDOR_STALL_MS) || 10 * 60_000;
 
 function overflow(err: string): ContextOverflow | null {
   if (!/context.{0,30}(length|window|limit)|maximum context|too (long|many tokens)|prompt is too long|exceeds the (max|context)|context_length_exceeded|reduce the length/i.test(err)) return null;

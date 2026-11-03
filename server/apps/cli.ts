@@ -20,10 +20,10 @@ const USAGE = `usage: node dist/server/cli.js app <command>
   folder <app> [folder]         make an app's folder (it then keeps in step with the app)
   dev <app> [folder]            its folder, and each change you save there tried on its examples
   try <app> [answers]           try its examples, or one set of answers ('{"topic": "GPUs"}'); waits
-  export <app> [file]           save it as one file (.naget-app), with what it calls and its screens
+  export <app> [file]           save it as one file (.hydor-app), with what it calls and its screens
   import <file>                 say what installing an app file will do, then install it
 
-An app is its address or id. Naget Agent must be running (PORT, or NAGET_URL, says where).`;
+An app is its address or id. Hydor must be running (PORT, or HYDOR_URL, says where).`;
 
 type Call = <T = any>(method: string, p: string, body?: unknown) => Promise<T>;
 
@@ -41,12 +41,12 @@ function client(): { call: Call; base: string; raw: (p: string) => Promise<Buffe
     fs.writeFileSync(file, token, { mode: 0o600 });
   }
   db.close();
-  const base = (process.env.NAGET_URL ?? `http://127.0.0.1:${process.env.PORT ?? '8790'}`).replace(/\/$/, '');
+  const base = (process.env.HYDOR_URL ?? `http://127.0.0.1:${process.env.PORT ?? '8790'}`).replace(/\/$/, '');
   const send = async (method: string, p: string, body?: unknown) => {
     try {
       return await fetch(base + p, { method, headers: { authorization: `Bearer ${token}`, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) }, body: body !== undefined ? JSON.stringify(body) : undefined });
     } catch {
-      throw new Error(`Naget Agent does not answer at ${base}: is it running? (node dist/server/cli.js service status)`);
+      throw new Error(`Hydor does not answer at ${base}: is it running? (node dist/server/cli.js service status)`);
     }
   };
   const call: Call = async (method, p, body) => {
@@ -134,7 +134,7 @@ export async function appCommand(args: string[]): Promise<number> {
   const find = async (which: string | undefined) => {
     if (!which) throw new Error('Say which app: its address or id (app list shows them)');
     const r = await call<{ app?: AppDef }>('GET', `/api/apps/${encodeURIComponent(which)}`);
-    if (!r.app) throw new Error(`“${which}” is a ready-made app: make it yours in Naget Agent first`);
+    if (!r.app) throw new Error(`“${which}” is a ready-made app: make it yours in Hydor first`);
     return r.app;
   };
   switch (sub) {
@@ -150,7 +150,7 @@ export async function appCommand(args: string[]): Promise<number> {
         recipe: { name: first, prompt: 'Say what it does here, with {{topic}} where the answer to its question goes.', fields: [{ id: 'topic', label: 'Topic', type: 'text', required: true }], answer: [] },
       });
       const r = await call<{ folder: { path: string } }>('POST', `/api/apps/${app.id}/folder`, second ? { path: path.resolve(second) } : {});
-      console.log(`Made “${app.name}” (its address: ${app.slug}), in ${r.folder.path}\nOpen that folder in your editor: app.json is the app, and each change you save comes to Naget Agent as a version.`);
+      console.log(`Made “${app.name}” (its address: ${app.slug}), in ${r.folder.path}\nOpen that folder in your editor: app.json is the app, and each change you save comes to Hydor as a version.`);
       return 0;
     }
     case 'folder': {
@@ -194,13 +194,13 @@ export async function appCommand(args: string[]): Promise<number> {
     }
     case 'export': {
       const a = await find(first);
-      const file = path.resolve(second ?? `${a.slug}.naget-app`);
+      const file = path.resolve(second ?? `${a.slug}.hydor-app`);
       fs.writeFileSync(file, await raw(`/api/apps/${a.id}/export`));
       console.log(`Saved “${a.name}” as ${file}: import it on another computer (app import, or Install from a file on the Apps page).`);
       return 0;
     }
     case 'import': {
-      if (!first) throw new Error('Say which file: app import reading-list.naget-app');
+      if (!first) throw new Error('Say which file: app import reading-list.hydor-app');
       const sent = { name: path.basename(first), data: fs.readFileSync(path.resolve(first)).toString('base64') };
       const { preview: p } = await call<{ preview: InstallPreview }>('POST', '/api/apps/install/check', { file: sent });
       console.log(`“${p.name}”${p.description ? `: ${p.description}` : ''}`);

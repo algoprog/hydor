@@ -519,7 +519,7 @@ export async function fetchPage(input: string, o: { signal?: AbortSignal; maxByt
     const r = await fetch(url, {
       redirect: 'manual',
       signal,
-      headers: { 'user-agent': 'Mozilla/5.0 (compatible; Naget Agent)', accept: 'text/html,application/xhtml+xml,text/plain,application/json,application/pdf,*/*;q=0.8' },
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; Hydor)', accept: 'text/html,application/xhtml+xml,text/plain,application/json,application/pdf,*/*;q=0.8' },
     });
     const loc = r.headers.get('location');
     if (r.status >= 300 && r.status < 400 && loc) {

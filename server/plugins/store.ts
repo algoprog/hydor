@@ -271,7 +271,7 @@ function writeIfChanged(file: string, text: string) {
 export function pluginAdditions(db: DB, kind: PluginAgent): { mcpServers: Record<string, McpServerSpec>; instructions: string[] } {
   const mcpServers: Record<string, McpServerSpec> = {};
   const lines: string[] = [];
-  const used = new Set(['naget-agent']);
+  const used = new Set(['hydor', 'naget-agent']);
   for (const { i, m } of activePlugins(db)) {
     if (!m.agents.includes(kind)) continue;
     const data = dataOf(i.name);

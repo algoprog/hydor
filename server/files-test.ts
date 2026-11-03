@@ -1,7 +1,7 @@
 // Script tests for files: the part of a file a Range header asks for, as a video player asks to seek (and
 // Safari to play at all); copies under a free name; the trash, which knows where each thing came from and
 // puts it back; and folders as one .zip, read back with unzip. Build and run:
-//   OUTDIR=dist/dev node scripts/build-server.mjs server/files-test.ts && DATA_DIR=/tmp/naget-test-files node dist/dev/files-test.js
+//   OUTDIR=dist/dev node scripts/build-server.mjs server/files-test.ts && DATA_DIR=/tmp/hydor-test-files node dist/dev/files-test.js
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ assert.equal(byteRange('bytes=50-10', 1000), 'bad');
 assert.equal(byteRange('bytes=-0', 1000), 'bad');
 
 // Copies: under a free name beside the first, a folder with all it holds, never into itself.
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-files-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-files-test-'));
 const w = (p: string, t = 'x') => (fs.mkdirSync(path.dirname(path.join(tmp, p)), { recursive: true }), fs.writeFileSync(path.join(tmp, p), t));
 w('a/report.pdf', 'pdf');
 w('a/notes', 'no extension');

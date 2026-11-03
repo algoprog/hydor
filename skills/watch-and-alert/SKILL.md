@@ -71,7 +71,7 @@ under **Settings → Scheduled tasks**, which the person can start from.
   Read them first; write them last; keep them short.
 - Store values in a comparable form: a price as a number with its currency, text with dates and
   counters removed, addresses without tracking parts (`utm_…`).
-- Outside a scheduled task: a page's `naget.storage`, or a small file in the working folder.
+- Outside a scheduled task: a page's `hydor.storage`, or a small file in the working folder.
 
 ## 5. Decide whether it matters
 

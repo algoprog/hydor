@@ -4,7 +4,7 @@
 // with an agent's own changes; the tidy-up (with a stub in place of the helper model); the secret filter and
 // reading turns. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/memory/memory-test.ts
-//   DATA_DIR=/tmp/naget-test-memory-unit node dist/dev/memory-test.js
+//   DATA_DIR=/tmp/hydor-test-memory-unit node dist/dev/memory-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,7 +33,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-memory-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-memory-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

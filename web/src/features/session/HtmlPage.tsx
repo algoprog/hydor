@@ -21,7 +21,7 @@ import { PageOverlay } from '../pages/overlay';
 import { CANVAS_MEDIA, onScreen, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from '../pages/state';
 
 // The server was called agent-console in older sessions.
-export const isPageTool = (name: string) => /^mcp__(naget-agent|agent-console)__show_html$/.test(name);
+export const isPageTool = (name: string) => /^mcp__(hydor|naget-agent|agent-console)__show_html$/.test(name);
 
 /**
  * Choices go to the message box; a later pick in the same group takes the earlier one's place. While

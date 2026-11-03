@@ -38,8 +38,8 @@ const HOME = os.homedir();
 const TEMP = [...new Set([os.tmpdir(), '/tmp', '/var/tmp'])];
 /** The app's own data (its database, API keys, other conversations): the folder above models/agent.json. */
 const APP_DATA = (() => {
-  const models = process.env.NAGET_AGENT_MODELS ? path.dirname(process.env.NAGET_AGENT_MODELS) : '';
-  return models ? (path.basename(models) === 'models' ? path.dirname(models) : models) : path.join(HOME, '.naget-agent');
+  const models = process.env.HYDOR_MODELS ? path.dirname(process.env.HYDOR_MODELS) : '';
+  return models ? (path.basename(models) === 'models' ? path.dirname(models) : models) : ['.hydor', '.naget-agent', '.web-agent'].map((d) => path.join(HOME, d)).find((d) => fs.existsSync(d)) ?? path.join(HOME, '.hydor');
 })();
 
 /** Files that hold keys and passwords. */

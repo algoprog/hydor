@@ -14,7 +14,7 @@ import type { AppTemplate } from '../../shared/apps.ts';
 type Draft = Omit<AppTemplate, 'agent' | 'tools' | 'limits'>;
 
 /** Who is calling, for the services that ask (OpenStreetMap, CheapShark, Wikipedia). */
-const UA = 'Naget Agent (+https://github.com/Naget-Inc/naget-agent)';
+const UA = 'Hydor (+https://github.com/algoprog/hydor)';
 const HEADERS = { 'User-Agent': UA };
 
 // ---- what the programs share ----------------------------------------------------------------------------------

@@ -207,6 +207,6 @@ export const documents: Feature = {
       'Documents: read PDF, Word, Excel, PowerPoint and other documents with read_document. When you have made files for the user (a document, spreadsheet, slides, a PDF, images), finish by calling present_files with them: they show as cards the user can open and download.',
     ],
     // Where the office skills' helper scripts keep their Python environment.
-    env: { NAGET_DATA_DIR: config.dataDir },
+    env: { HYDOR_DATA_DIR: config.dataDir },
   }),
 };

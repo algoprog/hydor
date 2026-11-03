@@ -37,7 +37,7 @@ const IDLE = 5 * HOUR;
 /** The Mac app looks for a new version this often, and a minute after it starts. */
 export const APP_EVERY = 4 * HOUR;
 /** A version the Mac app downloaded by itself is said this long before it restarts into it. */
-export const NOTICE = Number(process.env.NAGET_UPDATE_NOTICE_MS) || 60_000;
+export const NOTICE = Number(process.env.HYDOR_UPDATE_NOTICE_MS) || 60_000;
 /** Later puts it off this long. */
 export const LATER = 4 * HOUR;
 /** After a download the app started by itself failed, the next one waits at least this long. */
@@ -127,7 +127,7 @@ let how: { code: number } | null | undefined;
 function restarter(): { code: number } | null {
   if (how !== undefined) return how;
   how = null;
-  if ((process.env.NAGET_AGENT_RESTARTS ?? process.env.AGENT_CONSOLE_RESTARTS) === '1') return (how = { code: 0 });
+  if ((process.env.HYDOR_RESTARTS ?? process.env.AGENT_CONSOLE_RESTARTS) === '1') return (how = { code: 0 });
   if (desktop) return (how = desktop.updatable ? { code: 0 } : null);
   if (!process.env.INVOCATION_ID) return how;
   try {
@@ -177,7 +177,7 @@ export function startUpdate(auto: boolean): UpdateState | null {
   if (!ctx) throw new HttpError(503, 'Starting up');
   if (running) throw new HttpError(409, 'An update is already running');
   if (desktop) {
-    if (!desktop.updatable) throw new HttpError(400, 'Move Naget Agent to your Applications folder to update it');
+    if (!desktop.updatable) throw new HttpError(400, 'Move Hydor to your Applications folder to update it');
     if (ready) {
       installReady(ctx.db, auto);
       return updateState();
@@ -340,10 +340,10 @@ interface Feed {
   version: string;
   files: Record<string, { url: string; sha512: string; size: number }>;
 }
-const feedUrl = () => process.env.NAGET_UPDATE_FEED || 'https://github.com/Naget-Inc/naget-agent/releases/latest/download/naget-mac.json';
+const feedUrl = () => process.env.HYDOR_UPDATE_FEED || 'https://github.com/algoprog/hydor/releases/latest/download/hydor-mac.json';
 
 async function feed(): Promise<Feed> {
-  const r = await fetch(feedUrl(), { signal: AbortSignal.timeout(30_000), headers: { 'user-agent': `naget-agent/${config.version}` } });
+  const r = await fetch(feedUrl(), { signal: AbortSignal.timeout(30_000), headers: { 'user-agent': `hydor/${config.version}` } });
   if (!r.ok) throw new Error(r.status === 404 ? 'no Mac release is published yet' : `GitHub answered ${r.status}`);
   const f = (await r.json()) as Feed;
   if (typeof f?.version !== 'string' || typeof f.files !== 'object') throw new Error('the release does not say its version');
@@ -403,7 +403,7 @@ async function fetchBuild(to: string, file: Feed['files'][string]): Promise<stri
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   const zip = path.join(dir, `${to}.zip`);
-  const r = await fetch(file.url, { signal: AbortSignal.timeout(30 * 60_000), headers: { 'user-agent': `naget-agent/${config.version}` } });
+  const r = await fetch(file.url, { signal: AbortSignal.timeout(30 * 60_000), headers: { 'user-agent': `hydor/${config.version}` } });
   if (!r.ok || !r.body) throw new Error(`the download failed (${r.status})`);
   const hash = createHash('sha512');
   const body = Readable.fromWeb(r.body as import('node:stream/web').ReadableStream);

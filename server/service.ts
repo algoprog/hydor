@@ -6,17 +6,17 @@ import os from 'node:os';
 import path from 'node:path';
 
 export const UNIT_DIR = path.join(os.homedir(), '.config/systemd/user');
-const OLD_UNIT = 'agent-console.service';
-export const UNIT = !fs.existsSync(path.join(UNIT_DIR, 'naget-agent.service')) && fs.existsSync(path.join(UNIT_DIR, OLD_UNIT)) ? OLD_UNIT : 'naget-agent.service';
+/** hydor.service, or an older install's unit (Naget Agent's, then Agent Console's) where one is there. */
+export const UNIT = ['hydor.service', 'naget-agent.service', 'agent-console.service'].find((u) => fs.existsSync(path.join(UNIT_DIR, u))) ?? 'hydor.service';
 export const UNIT_PATH = path.join(UNIT_DIR, UNIT);
 export const ENV_FILE =
-  [path.join(os.homedir(), '.config/naget-agent.env'), path.join(os.homedir(), '.config/agent-console.env')].find((f) => fs.existsSync(f)) ??
-  path.join(os.homedir(), '.config/naget-agent.env');
+  [path.join(os.homedir(), '.config/hydor.env'), path.join(os.homedir(), '.config/naget-agent.env'), path.join(os.homedir(), '.config/agent-console.env')].find((f) => fs.existsSync(f)) ??
+  path.join(os.homedir(), '.config/hydor.env');
 
 /** The unit that runs the app in `root` with this Node. */
 export function unitText(root: string): string {
   return `[Unit]
-Description=Naget Agent
+Description=Hydor
 After=network-online.target
 
 [Service]

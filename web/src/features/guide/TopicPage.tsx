@@ -105,7 +105,7 @@ export function TopicPage({ topic, topics, onOpen }: { topic: GuideTopic; topics
     const f = () => {
       requestAnimationFrame(follow);
     };
-    window.addEventListener('naget:hash', f);
+    window.addEventListener('hydor:hash', f);
     window.addEventListener('hashchange', f);
     // Find in the page (Ctrl+F) opens the section it finds words in.
     const el = list.current;
@@ -115,7 +115,7 @@ export function TopicPage({ topic, topics, onOpen }: { topic: GuideTopic; topics
     };
     el?.addEventListener('beforematch', found);
     return () => {
-      window.removeEventListener('naget:hash', f);
+      window.removeEventListener('hydor:hash', f);
       window.removeEventListener('hashchange', f);
       el?.removeEventListener('beforematch', found);
     };
@@ -128,7 +128,7 @@ export function TopicPage({ topic, topics, onOpen }: { topic: GuideTopic; topics
     e.preventDefault();
     e.stopPropagation();
     history.pushState(history.state, '', href);
-    window.dispatchEvent(new Event('naget:hash'));
+    window.dispatchEvent(new Event('hydor:hash'));
   };
 
   const toggle = (id: string) =>

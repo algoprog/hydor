@@ -1,5 +1,5 @@
 // A template's main screen, on its page in place of its form: the screen's page (Pages keeps it) in a frame
-// with window.naget.app for this template, so its App parts run its flows and keep its data. It follows the
+// with window.hydor.app for this template, so its App parts run its flows and keep its data. It follows the
 // page as it changes (an agent's new version, an edit in Pages).
 import { useEffect, useMemo, useState } from 'react';
 import type { AppDef } from '@shared/apps';

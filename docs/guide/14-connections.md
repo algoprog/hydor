@@ -12,7 +12,7 @@ Agents can do more when you give them tools. There are three places to do that:
 - **The vault** (the **Keys** tab of the same page): API keys, tokens and the passwords of sign-ins. An API key is a password a service gives you so that programs can use your account. Agents use these to call a service, sign in to a site or run a program, but never see them.
 - **MCP servers and plugins** ([Settings → MCP servers](/settings?s=mcp) and [Settings → Plugins](/settings?s=plugins)): tool servers you set up yourself in Claude Code's and Codex's own settings, and plugins that bring skills and tools to every agent (see [Plugins](/guide/plugins)).
 
-MCP (the Model Context Protocol) is the common way a service offers tools to agents. A connected account is an MCP server that Naget Agent sets up and signs in to for every agent. The MCP servers in Settings → Agents are ones you set up by hand, with a command or an address.
+MCP (the Model Context Protocol) is the common way a service offers tools to agents. A connected account is an MCP server that Hydor sets up and signs in to for every agent. The MCP servers in Settings → Agents are ones you set up by hand, with a command or an address.
 
 ## Open Connected apps
 
@@ -37,7 +37,7 @@ Each card shows the service's name, what an agent can do with it, and how it con
 - **Browser sign-in**: you sign in to your account in the browser.
 - **API key**: you paste a key the service gives you.
 - **No sign-in**: there is nothing to enter.
-- **Runs on this computer**: a program Naget Agent starts here when an agent needs it.
+- **Runs on this computer**: a program Hydor starts here when an agent needs it.
 - **Runs here, with a key**: the same, with a key you give it.
 
 A check mark beside the name means someone checked that the service's server answers as its entry says. **not checked** means nobody has yet. Services you connected show **Connected** (or **Sign in again**) where the others show **Connect**.
@@ -119,7 +119,7 @@ If the marketplace changes a service's address or how it signs in after you conn
 
 ## Disconnect an account
 
-Click **Disconnect** (an unplug icon on a phone) and confirm. The account's sign-in or key is deleted here, and agents stop getting its tools. For a browser sign-in, Naget Agent also tells the service that the tokens are no longer wanted, when the service offers a way to.
+Click **Disconnect** (an unplug icon on a phone) and confirm. The account's sign-in or key is deleted here, and agents stop getting its tools. For a browser sign-in, Hydor also tells the service that the tokens are no longer wanted, when the service offers a way to.
 
 ## Choose the accounts one session uses
 
@@ -143,7 +143,7 @@ An assistant can also turn accounts on for the sessions that start as it: see [A
 
 ## Add a service to the marketplace
 
-Anyone can add a service to the marketplace, or fix one, with a pull request to Naget Agent's repository on GitHub. **How to add one**, at the bottom of the Marketplace tab, opens the guide for it.
+Anyone can add a service to the marketplace, or fix one, with a pull request to Hydor's repository on GitHub. **How to add one**, at the bottom of the Marketplace tab, opens the guide for it.
 
 1. Write a small JSON file for the service in the repository's `catalog/` folder, as the guide there describes. It holds the service's name, one plain sentence on what an agent can do with it, its category, icon and colour, homepage and docs, its server (an address, or a command that runs here) and how it signs in (nothing, a browser sign-in, or a key), plus any fields people fill in.
 2. Use the service's own MCP server at its documented address when there is one. A program that runs here is welcome when there is no such server, or for things only a local one can do, like files on this computer.
@@ -155,7 +155,7 @@ Anyone can add a service to the marketplace, or fix one, with a pull request to 
 
 Open [the Keys tab](/apps/connected?tab=keys). The vault holds API keys, tokens and the passwords of sign-ins, which agents use without seeing them. They are encrypted on this computer and never shown again, here or to an agent: only their last characters.
 
-Agents use them through Naget Agent's own tools: its web request tool, its browser, and commands on this computer where you allow that. The app puts the key in itself, and only where you allow.
+Agents use them through Hydor's own tools: its web request tool, its browser, and commands on this computer where you allow that. The app puts the key in itself, and only where you allow.
 
 Each key in the list shows:
 
@@ -282,7 +282,7 @@ Click [Add server](/settings?s=mcp&find=Add%20server). The **Add an MCP server**
 
   Codex servers always apply to every folder.
 
-Click **Add server**. Naget Agent adds it through each agent's own command, so their settings stay the way they expect. If an agent refuses, the dialog shows that it did not add the server, with what the agent said. Fix what's wrong and click **Add server** again: only the agents that failed are tried.
+Click **Add server**. Hydor adds it through each agent's own command, so their settings stay the way they expect. If an agent refuses, the dialog shows that it did not add the server, with what the agent said. Fix what's wrong and click **Add server** again: only the agents that failed are tried.
 
 ### Check which servers connect
 
@@ -321,7 +321,7 @@ Claude Code has plugins of its own: add-ons that bundle skills, commands, agents
 
 Click **Install** and confirm. The plugin installs for every Claude Code session. Plugins can add hooks and servers that run commands on this machine, so install only plugins you trust.
 
-Naget Agent asks Claude Code for the list of plugins at most every 10 minutes, and again after each change. The first time can take a while.
+Hydor asks Claude Code for the list of plugins at most every 10 minutes, and again after each change. The first time can take a while.
 
 ### Plugin marketplaces
 

@@ -6,7 +6,7 @@
 // the captioning model or from its prompt, editing, the files served in parts, deleting. OpenRouter is a
 // stand-in (fetch), ffmpeg makes the test video. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/media/media-test.ts
-//   DATA_DIR=/tmp/naget-test-media node dist/dev/media-test.js
+//   DATA_DIR=/tmp/hydor-test-media node dist/dev/media-test.js
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -38,7 +38,7 @@ const ok = (cond: unknown, what: string) => {
   }
 };
 
-const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'naget-media-test-')));
+const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-media-test-')));
 const ff = await hasFfmpeg();
 const clip = path.join(tmp, 'clip.mp4');
 if (ff) execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=duration=3:size=640x360:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3', '-shortest', '-pix_fmt', 'yuv420p', '-c:a', 'aac', clip]);

@@ -1,4 +1,4 @@
-// Signing in to a remote MCP server the way the MCP specification describes, done by Naget itself so
+// Signing in to a remote MCP server the way the MCP specification describes, done by Hydor itself so
 // it works from any device: find the server's sign-in server (protected-resource metadata, RFC 9728;
 // authorization-server metadata, RFC 8414 or OpenID), register as a client (RFC 7591) unless a client
 // id is given, send the person there with PKCE (S256) and the resource named (RFC 8707), take the code
@@ -48,7 +48,7 @@ export interface Tokens {
 export class OAuthError extends Error {}
 
 const TIMEOUT = 20_000;
-const UA = { 'user-agent': 'Naget Agent (+https://github.com/Naget-Inc/naget-agent)' };
+const UA = { 'user-agent': 'Hydor (+https://github.com/algoprog/hydor)' };
 
 async function getJson(url: string): Promise<any | null> {
   try {
@@ -123,7 +123,7 @@ export async function discover(url: string, o: { headers?: Record<string, string
     r = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...UA, ...headers },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'naget-agent', version: '1' } } }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'hydor', version: '1' } } }),
       signal: AbortSignal.timeout(TIMEOUT),
     });
   } catch (e) {
@@ -163,15 +163,15 @@ export function resourceOf(url: string, resource: string): boolean {
   }
 }
 
-/** Registers Naget Agent as a client of the sign-in server, for `redirectUri`. */
+/** Registers Hydor as a client of the sign-in server, for `redirectUri`. */
 export async function register(as: AuthServer, redirectUri: string, scopes?: string[]): Promise<OAuthClient> {
   if (!as.registration_endpoint) throw new OAuthError(`${new URL(as.issuer || as.token_endpoint).host} does not let apps register by themselves: enter a client ID from its developer settings`);
   const r = await fetch(as.registration_endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json', ...UA },
     body: JSON.stringify({
-      client_name: 'Naget Agent',
-      client_uri: 'https://github.com/Naget-Inc/naget-agent',
+      client_name: 'Hydor',
+      client_uri: 'https://github.com/algoprog/hydor',
       redirect_uris: [redirectUri],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
@@ -183,7 +183,7 @@ export async function register(as: AuthServer, redirectUri: string, scopes?: str
     throw new OAuthError(`Could not register with the sign-in server: ${(e as Error).message}`);
   });
   const j: any = await r.json().catch(() => ({}));
-  if (!r.ok || !j.client_id) throw new OAuthError(`The sign-in server refused to register Naget Agent${j.error ? `: ${j.error_description ?? j.error}` : ` (${r.status})`}`);
+  if (!r.ok || !j.client_id) throw new OAuthError(`The sign-in server refused to register Hydor${j.error ? `: ${j.error_description ?? j.error}` : ` (${r.status})`}`);
   return { client_id: String(j.client_id), ...(j.client_secret ? { client_secret: String(j.client_secret) } : {}), auth_method: String(j.token_endpoint_auth_method ?? (j.client_secret ? 'client_secret_basic' : 'none')) };
 }
 

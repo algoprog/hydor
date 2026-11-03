@@ -4,7 +4,7 @@
 // programs play the agents; nothing real is updated (Check now only looks, at a lookup the test answers). Build and
 // run with scratch folders:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/clients-test.ts
-//   DATA_DIR=/tmp/naget-test-clients node dist/dev/clients-test.js
+//   DATA_DIR=/tmp/hydor-test-clients node dist/dev/clients-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,7 @@ if (!config.dataDir.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-clients-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-clients-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 const updated: string[][] = [];
 watchClients(db, (ids) => updated.push(ids));

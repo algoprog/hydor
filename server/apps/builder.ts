@@ -139,7 +139,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_get',
       description:
-        "The user's apps (Apps in Naget Agent: a form, a task or steps, an answer, a view, data, screens, examples). Without app: each one in a line. With app: the whole app as app_save takes it (its format: app_guide's apps and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
+        "The user's apps (Apps in Hydor: a form, a task or steps, an answer, a view, data, screens, examples). Without app: each one in a line. With app: the whole app as app_save takes it (its format: app_guide's apps and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
       inputSchema: { type: 'object', properties: { app: APP, version: { type: 'number', description: 'One of its versions, whole (its recipe as it was then).' } } },
       annotations: { readOnlyHint: true },
       async run(a) {
@@ -185,7 +185,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_save',
       description:
-        'Makes one of the user\'s apps, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its view is part of it (ui: patch one element with { ui: { elements: { "day-card": { … } } } }); its screens stay as they are (app_screen changes them). Files that come with it (pictures, videos, sounds, data its view shows as asset:<name>) go in assets: a name → a file\'s path on this computer or an https:// address (null removes one); they travel in its .naget-app. Keys it needs (API keys, tokens) go in recipe.secrets by name, never a value: the user gives them when installing it or before its first run. Say why in a few words.',
+        'Makes one of the user\'s apps, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its view is part of it (ui: patch one element with { ui: { elements: { "day-card": { … } } } }); its screens stay as they are (app_screen changes them). Files that come with it (pictures, videos, sounds, data its view shows as asset:<name>) go in assets: a name → a file\'s path on this computer or an https:// address (null removes one); they travel in its .hydor-app. Keys it needs (API keys, tokens) go in recipe.secrets by name, never a value: the user gives them when installing it or before its first run. Say why in a few words.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -295,7 +295,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_screen',
       description:
-        "Gives an app a screen (a page of its own that its page shows in place of its form), or changes one. Without html: one made from its parts (its form, its answer, a table for each list it keeps and a conversation with its agent, its runs). With html: a page that uses the App parts (<n-form flow>, <n-result>, <n-runs>, <n-table data>, <n-count data>, <n-button flow>, <n-chat>: a conversation with its agent, who can change its records and run its flows) and window.naget.app (app_guide's API topic, Apps: screens).",
+        "Gives an app a screen (a page of its own that its page shows in place of its form), or changes one. Without html: one made from its parts (its form, its answer, a table for each list it keeps and a conversation with its agent, its runs). With html: a page that uses the App parts (<n-form flow>, <n-result>, <n-runs>, <n-table data>, <n-count data>, <n-button flow>, <n-chat>: a conversation with its agent, who can change its records and run its flows) and window.hydor.app (app_guide's API topic, Apps: screens).",
       inputSchema: {
         type: 'object',
         properties: {

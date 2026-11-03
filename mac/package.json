@@ -1,9 +1,9 @@
 {
-  "name": "naget-agent-mac",
-  "productName": "Naget Agent",
+  "name": "hydor-mac",
+  "productName": "Hydor",
   "version": "0.0.0",
   "private": true,
-  "description": "Naget Agent for macOS: the app, its server and the agents, in one app that keeps itself up to date.",
+  "description": "Hydor for macOS: the app, its server and the agents, in one app that keeps itself up to date.",
   "author": "Naget, Inc.",
   "license": "MIT",
   "main": "main.cjs",

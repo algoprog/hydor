@@ -11,7 +11,7 @@ import path from 'node:path';
 import {
   AGENT_PLUGINS_MCP_SCHEMA,
   AGENT_PLUGINS_SCHEMA,
-  NAGET_EXT,
+  HYDOR_EXT,
   PLUGIN_FILE,
   PLUGIN_FILE_LIMITS,
   satisfies,
@@ -522,7 +522,7 @@ function draftOf(m: Manifest): PluginDraft {
   );
   let instructions = '';
   try {
-    instructions = fs.readFileSync(path.join(m.root, NAGET_EXT, 'instructions.md'), 'utf8');
+    instructions = fs.readFileSync(path.join(m.root, HYDOR_EXT, 'instructions.md'), 'utf8');
   } catch {}
   return {
     name: m.name,
@@ -591,7 +591,7 @@ function saveDraft(db: DB, name: string, body: Record<string, any>): { m: Manife
   try {
     old = JSON.parse(fs.readFileSync(path.join(root, 'plugin.json'), 'utf8'));
   } catch {}
-  const ext = { ...(old.extensions?.[NAGET_EXT] ?? {}), title, ...(body.category ? { category: asText(body.category, 40) } : {}), ...(body.icon ? { icon: asText(body.icon, 40) } : {}) };
+  const ext = { ...(old.extensions?.[HYDOR_EXT] ?? {}), title, ...(body.category ? { category: asText(body.category, 40) } : {}), ...(body.icon ? { icon: asText(body.icon, 40) } : {}) };
   if (!body.category) delete ext.category;
   if (!body.icon) delete ext.icon;
   const req: Record<string, unknown> = {};
@@ -614,7 +614,7 @@ function saveDraft(db: DB, name: string, body: Record<string, any>): { m: Manife
     ...(old.repository ? { repository: old.repository } : {}),
     ...(old.license ? { license: old.license } : {}),
     ...(keywords.length ? { keywords } : {}),
-    extensions: { ...(old.extensions ?? {}), [NAGET_EXT]: ext },
+    extensions: { ...(old.extensions ?? {}), [HYDOR_EXT]: ext },
   };
   const before = m.requires;
   writeAtomic(path.join(root, 'plugin.json'), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -624,9 +624,9 @@ function saveDraft(db: DB, name: string, body: Record<string, any>): { m: Manife
   for (const s of m.skills) if (!keep.has(s.name) && path.dirname(s.dir) === path.join(root, 'skills')) fs.rmSync(s.dir, { recursive: true, force: true });
   for (const s of skills) writeAtomic(path.join(root, 'skills', s.name, 'SKILL.md'), s.text);
   const instructions = asText(body.instructions, 8000).trim();
-  if (instructions) writeAtomic(path.join(root, NAGET_EXT, 'instructions.md'), `${instructions}\n`);
-  else fs.rmSync(path.join(root, NAGET_EXT, 'instructions.md'), { force: true });
-  if (!fs.existsSync(path.join(root, 'README.md'))) writeAtomic(path.join(root, 'README.md'), `# ${title}\n\n${description || 'A plugin for Naget Agent.'}\n`);
+  if (instructions) writeAtomic(path.join(root, HYDOR_EXT, 'instructions.md'), `${instructions}\n`);
+  else fs.rmSync(path.join(root, HYDOR_EXT, 'instructions.md'), { force: true });
+  if (!fs.existsSync(path.join(root, 'README.md'))) writeAtomic(path.join(root, 'README.md'), `# ${title}\n\n${description || 'A plugin for Hydor.'}\n`);
   forgetRead();
   const now = readPlugin(root);
   const key = (r: typeof before) => JSON.stringify({ npm: r.npm, pip: r.pip, python: r.python ?? '', files: r.files });
@@ -645,9 +645,9 @@ function createMine(d: Deps, body: Record<string, any>): string {
   fs.mkdirSync(root, { recursive: true });
   writeAtomic(
     path.join(root, 'plugin.json'),
-    `${JSON.stringify({ $schema: AGENT_PLUGINS_SCHEMA, name, version: '0.1.0', ...(description ? { description } : {}), extensions: { [NAGET_EXT]: { title } } }, null, 2)}\n`,
+    `${JSON.stringify({ $schema: AGENT_PLUGINS_SCHEMA, name, version: '0.1.0', ...(description ? { description } : {}), extensions: { [HYDOR_EXT]: { title } } }, null, 2)}\n`,
   );
-  writeAtomic(path.join(root, 'README.md'), `# ${title}\n\n${description || 'A plugin for Naget Agent.'}\n`);
+  writeAtomic(path.join(root, 'README.md'), `# ${title}\n\n${description || 'A plugin for Hydor.'}\n`);
   record(d.db, { name, source: { kind: 'folder', path: root, mine: true }, enabled: true, installedAt: Date.now() });
   refresh(d);
   changed(d);

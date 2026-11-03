@@ -8,7 +8,7 @@
 // to the byte, a Word file with what it loses, a LaTeX project in its folder). Through the routes, with a stand-in
 // for the session manager. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/pages-test.ts
-//   DATA_DIR=/tmp/naget-test-pages-unit node dist/dev/pages-test.js
+//   DATA_DIR=/tmp/hydor-test-pages-unit node dist/dev/pages-test.js
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -31,7 +31,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
 }
 
 // ---- a folder to publish, with what must never be served -----------------------------------------
-const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'naget-pages-test-')));
+const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-pages-test-')));
 const dist = path.join(tmp, 'dist');
 fs.mkdirSync(path.join(dist, 'assets'), { recursive: true });
 fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><html><head><title>Trail notes</title></head><body><h1>Trail notes</h1></body></html>');
@@ -266,7 +266,7 @@ let privPath = '';
 
   const sent: { key: string; data: any }[] = [];
   const dd = { ...deps, toSubscribers: (key: string, e: { data: unknown }) => void sent.push({ key, data: e.data }) } as unknown as Deps;
-  const name = 'mcp__naget-agent__show_html';
+  const name = 'mcp__hydor__show_html';
   const call = JSON.stringify({ title: 'Plan', html: '<!doctype html><h1>Plan</h1><p>Day one</p>' });
   feedDraft(dd, 'claude:s9', { id: 't1', name, at: 'start' });
   for (let i = 0; i < call.length; i += 9) feedDraft(dd, 'claude:s9', { id: 't1', name, at: 'delta', delta: call.slice(i, i + 9) });

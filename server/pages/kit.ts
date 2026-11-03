@@ -1,9 +1,9 @@
 // What every page agents make runs with, inside its sandboxed frame: a small stylesheet of ready-made
 // classes (options, picture cards, compare tables, pros and cons, buttons, fields) and the bridge
 // script. The bridge reports the page's height, sends the user's choices and form answers to the app,
-// and gives saved pages window.naget.storage; it talks to the app only by postMessage, each message
+// and gives saved pages window.hydor.storage; it talks to the app only by postMessage, each message
 // carrying the number the app gave this page. Both go in right after the page's doctype, before its
-// own styles and scripts, so its CSS wins and its scripts find window.naget from their first line.
+// own styles and scripts, so its CSS wins and its scripts find window.hydor (and window.naget, its name before) from their first line.
 //
 // The functions below run in the browser, not here: their source is sent as text (Function#toString),
 // so each uses only its arguments and the browser's own globals.
@@ -186,7 +186,7 @@ function bridge(cfg: BridgeCfg) {
     });
   }
 
-  // window.naget.storage: the app keeps a saved page's values; without the app, this page's memory does.
+  // window.hydor.storage: the app keeps a saved page's values; without the app, this page's memory does.
   const local = new Map<string, string>(Object.entries(cfg.seed ?? {}));
   const waits = new Map<number, [(v: unknown) => void, (e: Error) => void]>();
   let seq = 0;
@@ -227,15 +227,17 @@ function bridge(cfg: BridgeCfg) {
       new Promise((ok) => {
         const key = keyOf(k);
         const json = JSON.stringify(v);
-        if (json === undefined) throw new Error('naget.storage.set needs a value that JSON can hold (use remove to delete a key)');
+        if (json === undefined) throw new Error('hydor.storage.set needs a value that JSON can hold (use remove to delete a key)');
         if (json.length > cfg.max.value) throw new Error(`That value is over ${Math.round(cfg.max.value / 1024)} KB`);
         ok([key, JSON.parse(json)]);
       }).then((kv) => call('set', (kv as [string, unknown])[0], (kv as [string, unknown])[1])),
     remove: (k: unknown) => new Promise((ok) => ok(keyOf(k))).then((key) => call('remove', key as string)),
     keys: () => call('keys'),
   };
-  // Configurable, so a page's own top-level `let naget` still works. `fill`: whether the page has a window to fill.
-  Object.defineProperty(window, 'naget', { value: Object.freeze({ storage: Object.freeze(storage), fill: !P || cfg.fill === true }), enumerable: true, configurable: true });
+  // Configurable, so a page's own top-level `let hydor` still works. `fill`: whether the page has a window to fill.
+  const kit = Object.freeze({ storage: Object.freeze(storage), fill: !P || cfg.fill === true });
+  // window.naget too: pages made before the rename use it.
+  for (const name of ['hydor', 'naget']) Object.defineProperty(window, name, { value: kit, enumerable: true, configurable: true });
 
   // Choices: a click on [data-choice] selects it in its group and tells the app.
   const BOX = '[data-group],[data-multi],.n-options,.n-grid,.n-compare,form';
@@ -297,7 +299,7 @@ function bridge(cfg: BridgeCfg) {
 }
 
 /**
- * A template's screen (server/apps/screens.ts): window.naget.app, its flows and its data through the app
+ * A template's screen (server/apps/screens.ts): window.hydor.app, its flows and its data through the app
  * (pages/frame.tsx answers each call for the template the screen belongs to, never another), and the App
  * parts written on it: <n-form flow>, <n-result flow>, <n-table data>, <n-runs flow>, <n-button flow>,
  * <n-count data> and <n-chat>. Runs after the bridge, in the page; like it, uses only its argument and the browser.
@@ -396,7 +398,8 @@ function appKit(cfg: { n: string; info: any; labels: Record<string, string> }) {
     chats: () => call('chats'),
   });
   const W = window as any;
-  Object.defineProperty(window, 'naget', { value: Object.freeze({ ...(W.naget ?? {}), app: api }), enumerable: true, configurable: true });
+  const withApp = Object.freeze({ ...(W.hydor ?? W.naget ?? {}), app: api });
+  for (const name of ['hydor', 'naget']) Object.defineProperty(window, name, { value: withApp, enumerable: true, configurable: true });
 
   // ---- the App parts --------------------------------------------------------------------------------
   if (!window.customElements) return;

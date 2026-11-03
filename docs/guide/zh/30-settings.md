@@ -58,9 +58,9 @@
 
 ### 机器
 
-[设置 → 机器](/settings?s=machines)：运行 Naget Agent 的其他机器（可从这里使用），以及对本机的访问。详见[手机、其他机器和分享](/guide/devices)。
+[设置 → 机器](/settings?s=machines)：运行 Hydor 的其他机器（可从这里使用），以及对本机的访问。详见[手机、其他机器和分享](/guide/devices)。
 
-- [**添加机器**](/settings?s=machines&find=Add%20a%20machine)：另一台运行 Naget Agent 的机器，可从这里使用。
+- [**添加机器**](/settings?s=machines&find=Add%20a%20machine)：另一台运行 Hydor 的机器，可从这里使用。
 - [**从其他机器访问**](/settings?s=machines&find=Access%20from%20other%20machines)：其他机器用来访问本机的令牌。
 
 ## 智能体
@@ -184,8 +184,8 @@
 [设置 → 电脑操控](/settings?s=computer)：智能体能看到你 Mac 的屏幕，并使用它的鼠标和键盘，仅限 Mac 应用。详见[搜索和浏览器](/guide/web)。
 
 - [**允许智能体使用这台 Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac)：智能体能看到屏幕，并在任何应用中使用鼠标和键盘；每个会话都会先问你。
-- [**辅助功能**](/settings?s=computer&find=Accessibility)：macOS 允许 Naget Agent 使用鼠标和键盘的权限。
-- [**屏幕录制**](/settings?s=computer&find=Screen%20Recording)：macOS 允许 Naget Agent 查看屏幕的权限。
+- [**辅助功能**](/settings?s=computer&find=Accessibility)：macOS 允许 Hydor 使用鼠标和键盘的权限。
+- [**屏幕录制**](/settings?s=computer&find=Screen%20Recording)：macOS 允许 Hydor 查看屏幕的权限。
 
 ### 记忆
 

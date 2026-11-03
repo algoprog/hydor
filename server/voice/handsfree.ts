@@ -88,7 +88,7 @@ function byWords(text: string, focus?: string): Plan {
 
 const SYSTEM = (lang: string) =>
   [
-    'You turn what a person says aloud to Naget Agent (an app that runs AI agents, each in a session) into one action, as JSON. They are walking and listening, not looking at a screen.',
+    'You turn what a person says aloud to Hydor (an app that runs AI agents, each in a session) into one action, as JSON. They are walking and listening, not looking at a screen.',
     'Actions: "start" (a new session doing a task: text is the task, in their words, complete enough for an agent), "send" (a message to a session: text), "status" (how the sessions are doing), "read" (say a session’s latest reply), "approve" / "deny" (answer what a session asks), "stop" (stop a session’s work), "focus" (talk about another session from now on), "answer" (just reply: a question about the app, or something unclear: ask them back briefly).',
     'session: the key of the session meant (from the list; "it" or "that" means the focus), or null.',
     `say: what to say back, in ${lang}, short and natural for listening (one or two sentences, no lists, no markdown, no keys). For status, say it from the list: what is working, what needs them and what it asks, what finished lately. For start, send, approve, deny and stop, confirm briefly. For read, leave it empty.`,

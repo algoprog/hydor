@@ -2,7 +2,7 @@
 // same prompt and folder, each model in a session of its own), keeping one answer (the others archived), and
 // the ratings over decided matches. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/arena/arena-test.ts
-//   DATA_DIR=/tmp/naget-test-arena node dist/dev/arena-test.js
+//   DATA_DIR=/tmp/hydor-test-arena node dist/dev/arena-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -19,7 +19,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-arena-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-arena-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

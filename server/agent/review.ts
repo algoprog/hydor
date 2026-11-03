@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const RUNTIME = process.env.NAGET_AGENT_RUNTIME ?? '';
+const RUNTIME = process.env.HYDOR_RUNTIME ?? '';
 
 export type Decision = 'allow' | 'ask' | 'deny';
 export interface Verdict {

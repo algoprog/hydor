@@ -256,7 +256,7 @@ export function works(cmd: string, bin: string): Promise<string | null> {
       bin,
       ['app-server'],
       codexEnvFor(bin),
-      { id: 1, method: 'initialize', params: { clientInfo: { name: 'naget_agent_check', title: 'Naget Agent', version: config.version }, capabilities: { experimentalApi: true, requestAttestation: false } } },
+      { id: 1, method: 'initialize', params: { clientInfo: { name: 'hydor_check', title: 'Hydor', version: config.version }, capabilities: { experimentalApi: true, requestAttestation: false } } },
       (m, send) => {
         if (m.id === 1) {
           if (m.error) return `it answered with an error: ${String(m.error.message ?? '').slice(0, 200)}`;

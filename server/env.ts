@@ -21,7 +21,7 @@ const DROP = new Set([
   'MANAGERPID',
   'NOTIFY_SOCKET',
 ]);
-const DROP_PREFIX = ['CLAUDECODE', 'CLAUDE_CODE_', 'CODEX_THREAD', 'CODEX_MANAGED', 'VSCODE_', 'BASH_FUNC_', 'npm_', 'NODE_ENV', 'WEB_AGENT', 'NAGET_AGENT_ROOT'];
+const DROP_PREFIX = ['CLAUDECODE', 'CLAUDE_CODE_', 'CODEX_THREAD', 'CODEX_MANAGED', 'VSCODE_', 'BASH_FUNC_', 'npm_', 'NODE_ENV', 'WEB_AGENT', 'HYDOR_ROOT'];
 
 let cached: Record<string, string> | null = null;
 
@@ -33,7 +33,7 @@ export function agentBaseEnv(): Record<string, string> {
   if (cached) return cached;
   const user = os.userInfo();
   const shell = fs.existsSync('/bin/bash') ? '/bin/bash' : user.shell || '/bin/sh';
-  const marker = '__NAGET_AGENT_ENV__';
+  const marker = '__HYDOR_ENV__';
   const res = spawnSync(
     '/usr/bin/env',
     [

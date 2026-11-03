@@ -2,7 +2,7 @@
 // not know refused, the tour's version read alongside, the routes and the news to open pages.
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/tips/tips-test.ts
-//   DATA_DIR=/tmp/naget-test-tips node dist/dev/tips-test.js
+//   DATA_DIR=/tmp/hydor-test-tips node dist/dev/tips-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-tips-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-tips-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

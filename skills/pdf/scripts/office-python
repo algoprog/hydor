@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Python with the libraries for making office files: python-docx (Word), openpyxl (Excel), python-pptx
 # (PowerPoint), reportlab and pypdf (PDF). They are installed once, on first use, into a private
-# environment in Naget Agent's data folder; nothing is installed system-wide.
+# environment in Hydor's data folder; nothing is installed system-wide.
 #
 #   office-python make_report.py [args…]     run a script
 #   office-python -c 'import docx'           or anything python takes
@@ -9,9 +9,9 @@ set -euo pipefail
 
 PKGS="python-docx>=1.1,<2 openpyxl>=3.1,<4 python-pptx>=1.0,<2 reportlab>=4,<6 pypdf>=4,<8"
 
-data="${NAGET_DATA_DIR:-${DATA_DIR:-}}"
+data="${HYDOR_DATA_DIR:-${DATA_DIR:-}}"
 if [ -z "$data" ]; then
-  if [ ! -d "$HOME/.naget-agent" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.naget-agent"; fi
+  if [ ! -d "$HOME/.hydor" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.hydor"; fi
 fi
 venv="$data/office/venv"
 py="$venv/bin/python"

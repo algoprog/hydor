@@ -19,7 +19,7 @@ let spec: Spec;
 try {
   spec = JSON.parse(fs.readFileSync(file, 'utf8')) as Spec;
 } catch (e) {
-  process.stderr.write(`naget plugin launcher: cannot read ${file}: ${(e as Error).message}\n`);
+  process.stderr.write(`hydor plugin launcher: cannot read ${file}: ${(e as Error).message}\n`);
   process.exit(2);
 }
 try {
@@ -28,7 +28,7 @@ try {
 const child = spawn(spec.command, spec.args, { cwd: spec.cwd, env: { ...process.env, ...spec.env }, stdio: 'inherit' });
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(sig, () => child.kill(sig));
 child.on('error', (e) => {
-  process.stderr.write(`naget plugin launcher: could not start ${spec.command}: ${e.message}\n`);
+  process.stderr.write(`hydor plugin launcher: could not start ${spec.command}: ${e.message}\n`);
   process.exit(127);
 });
 child.on('exit', (code, signal) => {

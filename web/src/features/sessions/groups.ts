@@ -46,7 +46,7 @@ const trim = (p: string) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
  * the server; a server too old to say gets the usual ones).
  */
 export function unpickedFolders(home?: string, defaultCwd?: string, auto?: string[]): (dir: string) => boolean {
-  const own = auto ?? (home ? [`${home}/Naget`, `${home}/naget-apps`, `${home}/.naget-agent`, `${home}/.web-agent`, '/tmp'] : ['/tmp']);
+  const own = auto ?? (home ? [`${home}/Hydor`, `${home}/hydor-apps`, `${home}/.hydor`, `${home}/Naget`, `${home}/naget-apps`, `${home}/.naget-agent`, `${home}/.web-agent`, '/tmp'] : ['/tmp']);
   const roots = own.map(trim);
   const exact = new Set(['/', home, defaultCwd].filter((d): d is string => !!d).map(trim));
   return (dir) => {

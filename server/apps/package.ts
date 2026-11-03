@@ -1,5 +1,5 @@
 // Templates as one file, to keep or to share: a .json with the recipe (its form, what it does step by
-// step, what it gives back, keeps, may use and needs), or a .naget-app (a zip) with the same app.json,
+// step, what it gives back, keeps, may use and needs), or a .hydor-app (a zip) with the same app.json,
 // the records it keeps under data/ and the templates it calls under apps/. Installing reads either (or a
 // bare recipe), says before anything is made what the template will do here (its agents and modes,
 // tools, the templates that come with it, the packages it installs and commands it needs, spending,
@@ -52,7 +52,7 @@ export interface AppPackage {
   records?: Record<string, Record<string, unknown>[]>;
   /** The templates its steps call (and those they call), each a package of its own. */
   apps?: AppPackage[];
-  /** Its own files' bytes, by their names in its assets (assets/<name> in a .naget-app; base64 in a .json). */
+  /** Its own files' bytes, by their names in its assets (assets/<name> in a .hydor-app; base64 in a .json). */
   files?: Record<string, Buffer>;
   /** A ready-made app's id: installing its file brings that one back (or makes a copy of your own when you have it). */
   builtin?: string;
@@ -199,7 +199,7 @@ export function packageJson(pkg: AppPackage): string {
 }
 
 /**
- * A template as a .naget-app: app.json, its records under data/, its own files under assets/, the templates it
+ * A template as a .hydor-app: app.json, its records under data/, its own files under assets/, the templates it
  * calls under apps/ (their files under apps/<address>/), and a line on what the file is.
  */
 export function zipPackage(pkg: AppPackage): Buffer {
@@ -213,7 +213,7 @@ export function zipPackage(pkg: AppPackage): Buffer {
     files.push({ name: `apps/${slug}.json`, data: Buffer.from(`${JSON.stringify(json, null, 2)}\n`) });
     for (const [name, data] of Object.entries(theirs ?? {})) files.push({ name: `apps/${slug}/${name}`, data });
   });
-  files.push({ name: 'README.txt', data: Buffer.from(`An app for Naget Agent: “${String(rest.app.name ?? 'App')}”.\nInstall it in Naget Agent: Apps → New app → Install from a file.\n`) });
+  files.push({ name: 'README.txt', data: Buffer.from(`An app for Hydor: “${String(rest.app.name ?? 'App')}”.\nInstall it in Hydor: Apps → New app → Install from a file.\n`) });
   return zipOf(files);
 }
 
@@ -221,7 +221,7 @@ export function zipPackage(pkg: AppPackage): Buffer {
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** A package from what was sent: a .naget-app (zip) or .json file (base64), the package itself, or a bare recipe. */
+/** A package from what was sent: a .hydor-app (zip) or .json file (base64), the package itself, or a bare recipe. */
 export function readPackage(input: { file?: { name?: unknown; data?: unknown }; package?: unknown }): AppPackage {
   let pkg: any;
   if (input.package && typeof input.package === 'object') pkg = input.package;
@@ -240,7 +240,7 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
         .names()
         .filter((n) => /(^|\/)app\.json$/i.test(n) && n.split('/').length <= 2)
         .sort((a, b) => a.length - b.length)[0];
-      if (!main) throw new HttpError(400, 'This zip holds no app.json: it is not a Naget Agent app');
+      if (!main) throw new HttpError(400, 'This zip holds no app.json: it is not a Hydor app');
       const base = escape(main.slice(0, main.length - 'app.json'.length));
       const json = (n: string) => {
         try {
@@ -280,10 +280,10 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
       try {
         pkg = JSON.parse(buf.toString('utf8').replace(/^﻿/, ''));
       } catch {
-        throw new HttpError(400, 'This file is neither an app (.json) nor a packaged app (.naget-app or .zip)');
+        throw new HttpError(400, 'This file is neither an app (.json) nor a packaged app (.hydor-app or .zip)');
       }
     }
-  } else throw new HttpError(400, 'Send the app: a .json or .naget-app file');
+  } else throw new HttpError(400, 'Send the app: a .json or .hydor-app file');
   return asPackage(pkg);
 }
 
@@ -291,8 +291,8 @@ export function readPackage(input: { file?: { name?: unknown; data?: unknown }; 
 function asPackage(pkg: any, depth = 0): AppPackage {
   if (pkg && typeof pkg === 'object' && !pkg.naget && pkg.app && typeof pkg.app === 'object') pkg = { naget: 'app', format: 1, slug: pkg.app.slug, app: pkg.app, records: pkg.records, apps: pkg.apps };
   else if (pkg && typeof pkg === 'object' && !pkg.app && ('prompt' in pkg || 'flow' in pkg || 'fields' in pkg)) pkg = { naget: 'app', format: 1, slug: pkg.slug, app: pkg };
-  if (!pkg || typeof pkg !== 'object' || !pkg.app || typeof pkg.app !== 'object' || Array.isArray(pkg.app)) throw new HttpError(400, 'This is not a Naget Agent app');
-  if (Number(pkg.format) > PACKAGE_FORMAT) throw new HttpError(400, 'This app was made by a newer Naget Agent: update to install it');
+  if (!pkg || typeof pkg !== 'object' || !pkg.app || typeof pkg.app !== 'object' || Array.isArray(pkg.app)) throw new HttpError(400, 'This is not a Hydor app');
+  if (Number(pkg.format) > PACKAGE_FORMAT) throw new HttpError(400, 'This app was made by a newer Hydor: update to install it');
   const apps = depth === 0 && Array.isArray(pkg.apps) ? pkg.apps.slice(0, MAX_BUNDLED).map((p: unknown) => asPackage(p, 1)) : undefined;
   // Its own files: bytes from a zip, or base64 in a .json.
   const files: Record<string, Buffer> = {};

@@ -650,8 +650,8 @@ describe('the search service and its tools', () => {
     db.exec('create table session_notes (id text primary key, key text not null, kind text not null, at integer not null, anchor text, data text not null)');
     const items = [
       { id: 'u1', kind: 'user', text: 'find papers' },
-      { id: 'toolu_1', kind: 'tool', tool: { name: 'mcp__naget-agent__web_search' } },
-      { id: 'toolu_2', kind: 'tool', tool: { name: 'mcp__naget-agent__read_page' } },
+      { id: 'toolu_1', kind: 'tool', tool: { name: 'mcp__hydor__web_search' } },
+      { id: 'toolu_2', kind: 'tool', tool: { name: 'mcp__hydor__read_page' } },
       { id: 'a1', kind: 'assistant', text: 'Here they are.' },
     ];
     const d = { db, sessions: { timeline: async () => ({ page: () => ({ items }) }) } } as unknown as Deps;

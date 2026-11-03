@@ -6,7 +6,7 @@ category: documents
 
 # Presentations
 
-First, the app's own slides: for a new deck, make it with the `save_slides` tool (naget-agent). It
+First, the app's own slides: for a new deck, make it with the `save_slides` tool (hydor). It
 shows in the conversation as a slideshow, the user edits and presents it in Pages (as in PowerPoint
 or Google Slides), and `export_page` writes it as a .pptx or PDF to hand over with `present_files`.
 Use this skill for a .pptx built from code in a folder, a .pptx of the user's own, or when they ask
@@ -25,7 +25,7 @@ over as a file. The scripts in `scripts/` (next to this file):
 
 ## Reading one
 
-Use the `read_document` tool (naget-agent): each slide's title, text, tables, pictures (by their
+Use the `read_document` tool (hydor): each slide's title, text, tables, pictures (by their
 description), charts (title and series) and speaker notes.
 
 ## Making one

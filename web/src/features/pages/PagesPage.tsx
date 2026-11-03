@@ -103,7 +103,7 @@ function ShareMenu({ page, link, anchor, open, onClose, onPublish, onReset }: { 
   );
 }
 
-/** What a page keeps (window.naget.storage): each value, to look at, remove one, download or clear. */
+/** What a page keeps (window.hydor.storage): each value, to look at, remove one, download or clear. */
 function DataDialog({ page, open, onClose }: { page: PageInfo; open: boolean; onClose: () => void }) {
   const [list, setList] = useState<PageDataEntry[] | null>(null);
   const [shown, setShown] = useState<string | null>(null);
@@ -257,7 +257,7 @@ function PageView({ id }: { id: string }) {
   }, [id]);
   useFeatureEvent('pages', ({ data: e }) => (e as { what?: string })?.what === 'pages' && load());
   const store = useMemo(() => (old ? previewStore(id) : pageStore(id)), [id, old]);
-  // A template's screen works here as on its template's page: window.naget.app, for that template.
+  // A template's screen works here as on its template's page: window.hydor.app, for that template.
   const [screenOf, setScreenOf] = useState<AppBridge | undefined>();
   const owner = data?.page.app;
   useEffect(() => {

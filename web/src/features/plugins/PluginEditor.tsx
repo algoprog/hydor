@@ -325,7 +325,7 @@ export function PluginEditor({ name, onClose, onSaved }: { name: string; onClose
       }
       footer={
         <>
-          <Button variant="ghost" icon={<Download size={14} />} onClick={() => (location.href = mu(`/api/plugins/${enc(name)}/export`))} disabled={dirty} title={dirty ? 'Save first' : 'A .zip anyone can add to Naget Agent, or use with other tools that read Agent Plugins'}>
+          <Button variant="ghost" icon={<Download size={14} />} onClick={() => (location.href = mu(`/api/plugins/${enc(name)}/export`))} disabled={dirty} title={dirty ? 'Save first' : 'A .zip anyone can add to Hydor, or use with other tools that read Agent Plugins'}>
             Pack into a .zip
           </Button>
           <span className="flex-1" />

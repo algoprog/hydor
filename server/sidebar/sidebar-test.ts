@@ -2,7 +2,7 @@
 // order; a name it does not know refused; the usual order kept as none; the routes, and the news to open pages.
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/sidebar/sidebar-test.ts
-//   DATA_DIR=/tmp/naget-test-sidebar node dist/dev/sidebar-test.js
+//   DATA_DIR=/tmp/hydor-test-sidebar node dist/dev/sidebar-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-sidebar-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-sidebar-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

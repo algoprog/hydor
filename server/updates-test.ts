@@ -3,7 +3,7 @@
 // it had to roll that version back), when it says so and installs it (a minute later, or after Later's 4 hours), how
 // the pages see a waiting version, and how often each kind looks. desktop-test.ts runs the Mac app's whole flow.
 // Build and run:
-//   OUTDIR=dist/dev node scripts/build-server.mjs server/updates-test.ts && DATA_DIR=/tmp/naget-test-updates node dist/dev/updates-test.js
+//   OUTDIR=dist/dev node scripts/build-server.mjs server/updates-test.ts && DATA_DIR=/tmp/hydor-test-updates node dist/dev/updates-test.js
 import assert from 'node:assert/strict';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {

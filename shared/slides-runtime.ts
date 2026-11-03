@@ -1128,7 +1128,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     let ended = false;
     let endEl: HTMLElement | null = null;
     // The page fills a window of its own (its address, a published copy, a file), rather than growing with what it holds.
-    const filled = o.mode === 'full' || ((win as unknown as { naget?: { fill?: boolean } }).naget?.fill ?? win.parent === win);
+    const filled = o.mode === 'full' || ((win as unknown as { hydor?: { fill?: boolean } }).hydor?.fill ?? win.parent === win);
 
     const layout = () => {
       const r = stage.getBoundingClientRect();
@@ -1538,7 +1538,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     }
     const wrap = el('div', 'ns-wrap');
     body.appendChild(wrap);
-    if ((win as unknown as { naget?: { fill?: boolean } }).naget?.fill ?? win.parent === win) body.classList.add('ns-filled');
+    if ((win as unknown as { hydor?: { fill?: boolean } }).hydor?.fill ?? win.parent === win) body.classList.add('ns-filled');
     const s = show(wrap, deck, { mode: 'viewer', keys: true });
     // Printing from the page: every slide, a page each.
     let printed = false;

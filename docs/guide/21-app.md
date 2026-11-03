@@ -18,9 +18,9 @@ The mode is kept in this browser, so your phone and your computer can differ. Th
 
 Under the switch, the themes show as small pictures of the app in their colours, in two rows: **Dark** and **Light**. Four come with the app:
 
-- **Naget Dark**: warm near-black with a gold accent. The dark theme at first.
+- **Hydor Dark**: warm near-black with a gold accent. The dark theme at first.
 - **Midnight**: a cool blue-black with a periwinkle accent.
-- **Naget Light**: warm off-white with a deep gold accent. The light theme at first.
+- **Hydor Light**: warm off-white with a deep gold accent. The light theme at first.
 - **Sage**: a cool green-grey paper with a deep teal accent.
 
 Click a theme to use it. It becomes the theme for its mode, and the mode switches to it (unless the mode is **System**: then it shows whenever your device is in that mode). Each mode keeps its own pick, so you can have Midnight at night and Sage by day. With **System** on, the rows say which one is "showing now". Typing a theme's name in the search box finds it too, and picking it switches to it.
@@ -29,7 +29,7 @@ Each picture has a menu (⋯, shown when you point at it on a computer):
 
 - **Make a copy to edit**: opens the theme editor with a copy of it.
 - **Copy to share**: copies the theme as text, to import elsewhere.
-- **Edit** and **Delete**: only for themes you made. Deleting asks first, and devices using it go back to the Naget theme.
+- **Edit** and **Delete**: only for themes you made. Deleting asks first, and devices using it go back to the Hydor theme.
 
 Which theme shows is chosen in each browser. Themes you make are kept by the app and offered on every device you use.
 
@@ -58,7 +58,7 @@ A text colour that gets hard to read on the backgrounds it sits on shows a warni
 
 ## Share a theme or import one
 
-To give a theme to someone, or to another Naget Agent of yours:
+To give a theme to someone, or to another Hydor of yours:
 
 1. In the theme's menu (⋯), choose **Copy to share** (or **Copy** in the editor). The theme is copied as a short piece of text.
 2. Send that text.
@@ -136,16 +136,16 @@ When a newer version is out, a dot shows on **Settings** in the sidebar. A copy 
 
 [**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first) installs a newer version by itself: a copy installed from git after 5 hours without a message from you, at most once a day; the Mac app as soon as one is out, after a minute's notice. Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or the Mac app in the Applications folder); otherwise the switch is off and says why.
 
-Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Naget Agent was updated").
+Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Hydor was updated").
 
 ### Updates in the Mac app
 
 The Mac app goes by released versions instead. With [**Update automatically**](/settings?s=general&find=Update%20automatically) on, it downloads a new version as soon as it is out and checks that it is the build the release names, without waiting for you to be away. Then it tells you, in two places:
 
-- A notification from your Mac: "Naget Agent … is ready", restarting in a minute to install it. Clicking it opens the app; its **Restart Now** button installs the new version at once.
+- A notification from your Mac: "Hydor … is ready", restarting in a minute to install it. Clicking it opens the app; its **Restart Now** button installs the new version at once.
 - A note in the corner of every open page of the app that counts down the seconds ("Restarting in 42 s to install it"), with **Restart now** and **Later**.
 
-When the minute is up, the app restarts into the new version: running agents carry on, and its window comes back by itself. **Later** puts it off for 4 hours, when the notification and the note come back. Until then, **Restart to Update to …** in the menu of the app's icon in the menu bar (and in the **Naget Agent** menu) installs it whenever you like, and so does **Restart now** under **About**, which says "Version … is ready to install" and when it asks again.
+When the minute is up, the app restarts into the new version: running agents carry on, and its window comes back by itself. **Later** puts it off for 4 hours, when the notification and the note come back. Until then, **Restart to Update to …** in the menu of the app's icon in the menu bar (and in the **Hydor** menu) installs it whenever you like, and so does **Restart now** under **About**, which says "Version … is ready to install" and when it asks again.
 
 With **Update automatically** off, nothing downloads by itself: **About** says "Version … is out", and **Update now** downloads it, checks it and opens it in place of the one you run ("Downloading the new version…", then "Opening the new version, this page reconnects by itself…").
 
@@ -160,7 +160,7 @@ Every version has release notes: what changed for the people using it.
 
 The notes list every version, newest first, each with its date; the one you run is marked "This version", and Settings opens the notes there.
 
-Once after the app updates, a note in the corner says "Updated to Naget Agent …" with **What's new**, which opens the notes at that version. Each browser shows it once, and a browser's first visit doesn't.
+Once after the app updates, a note in the corner says "Updated to Hydor …" with **What's new**, which opens the notes at that version. Each browser shows it once, and a browser's first visit doesn't.
 
 ## Take the tour
 
@@ -184,7 +184,7 @@ The app has one password, chosen when it was installed. To change it, open [Sett
 
 Changing it signs out every other browser: phones, other computers, everywhere but this one. If the current password is wrong, or the two new ones differ, nothing changes and the app says why.
 
-If you have forgotten it, run this on the computer the app runs on, in the app's folder: `node dist/server/cli.js set-password` (with Docker: `docker compose exec -it naget-agent node dist/server/cli.js set-password`). Every browser is signed out, and addresses paused after wrong passwords can sign in again.
+If you have forgotten it, run this on the computer the app runs on, in the app's folder: `node dist/server/cli.js set-password` (with Docker: `docker compose exec -it hydor node dist/server/cli.js set-password`). Every browser is signed out, and addresses paused after wrong passwords can sign in again.
 
 ## Sign out of this browser
 
@@ -192,7 +192,7 @@ If you have forgotten it, run this on the computer the app runs on, in the app's
 
 ## Where the app keeps its data
 
-The app keeps its own data in one folder, its data folder: `~/.naget-agent` in your home folder (`~/.web-agent` on installs from before version 0.5, or wherever the `DATA_DIR` setting points). Files you delete on the Files page go to the trash in it; **Trash**, among the Files page's places, says where. It holds:
+The app keeps its own data in one folder, its data folder: `~/.hydor` in your home folder (`~/.web-agent` on installs from before version 0.5, or wherever the `DATA_DIR` setting points). Files you delete on the Files page go to the trash in it; **Trash**, among the Files page's places, says where. It holds:
 
 - the password, as a hash (the password itself is never stored);
 - the database with the session list, search, settings and the app's other records;
@@ -222,8 +222,8 @@ The rest is kept by the app and is the same on every device: themes you made, **
 
 - "Make me a dark theme with a deep green background and an orange accent."
 - "Delete my theme called Test."
-- "Is there a newer version of Naget Agent? What changed in it?"
-- "Install the new version of Naget Agent that is waiting, now."
+- "Is there a newer version of Hydor? What changed in it?"
+- "Install the new version of Hydor that is waiting, now."
 - "Turn off automatic updates."
 - "Make sure the app starts when this computer starts."
 - "Turn on resuming sessions after usage limits."

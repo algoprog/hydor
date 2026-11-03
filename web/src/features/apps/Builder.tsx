@@ -855,7 +855,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             <KeepsEditor recipe={recipe} onChange={set} />
           </Fold>
 
-          <Fold title="Tools" summary={recipe.tools === null ? tr('All of Naget Agent’s own tools') : tr(`${recipe.tools.length} picked`)} sub="What the runs may use from Naget Agent’s own tools (web search, pages, memory…). The agent’s own files and commands follow its mode.">
+          <Fold title="Tools" summary={recipe.tools === null ? tr('All of Hydor’s own tools') : tr(`${recipe.tools.length} picked`)} sub="What the runs may use from Hydor’s own tools (web search, pages, memory…). The agent’s own files and commands follow its mode.">
             <div className="flex items-center gap-3">
               <span className="min-w-0 flex-1 text-[13.5px]">{recipe.tools === null ? 'All of them' : `${recipe.tools.length} picked`}</span>
               <label className="flex items-center gap-2 text-[12.5px] text-fg-2">

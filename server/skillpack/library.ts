@@ -3,7 +3,7 @@
 // reads: a folder of links, one per skill, where a learned skill takes the place of a built-in one of
 // the same name. A space's sessions read a view of their own, with the space's skills too
 // (spaceSkills.ts). Claude Code loads the view as a plugin (--plugin-dir), Codex as an extra skills
-// folder (skills/extraRoots/set) and Custom from its skills list (NAGET_SKILL_DIRS). Nothing is written
+// folder (skills/extraRoots/set) and Custom from its skills list (HYDOR_SKILL_DIRS). Nothing is written
 // into the user's ~/.claude or ~/.codex.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -23,7 +23,7 @@ export interface Folders {
 let roots: Folders = {
   bundled: path.join(APP_ROOT, 'skills'),
   learned: path.join(config.dataDir, 'skills'),
-  view: path.join(config.dataDir, 'skillpack', 'naget'),
+  view: path.join(config.dataDir, 'skillpack', 'hydor'),
 };
 
 export const folders = (): Folders => roots;
@@ -241,7 +241,7 @@ function syncLinks(root: string, want: Map<string, string>, description: string)
   const dir = path.join(root, 'skills');
   fs.mkdirSync(dir, { recursive: true });
   const manifest = path.join(root, '.claude-plugin', 'plugin.json');
-  const meta = JSON.stringify({ name: 'naget', description }, null, 2) + '\n';
+  const meta = JSON.stringify({ name: 'hydor', description }, null, 2) + '\n';
   if (readOr(manifest) !== meta) {
     fs.mkdirSync(path.dirname(manifest), { recursive: true });
     fs.writeFileSync(manifest, meta);
@@ -268,18 +268,18 @@ function syncLinks(root: string, want: Map<string, string>, description: string)
 
 /** Brings the view every agent reads up to date: a link per skill, to its learned folder or else its built-in one. */
 export function syncView() {
-  syncLinks(roots.view, libraryLinks(), 'Skills that come with Naget Agent, and the ones you approved in it.');
+  syncLinks(roots.view, libraryLinks(), 'Skills that come with Hydor, and the ones you approved in it.');
 }
 
 /**
  * Brings the view of a space's sessions up to date and returns its plugin folder: the library's skills,
  * with those in `extra` folders of skills (the space's own first, then those of the spaces a group brings
- * together) in place of any of the same name. Still a plugin named "naget", so skills keep their names.
+ * together) in place of any of the same name. Still a plugin named "hydor", so skills keep their names.
  */
 export function syncSpaceView(id: string, extra: string[]): string {
   const want = libraryLinks();
   for (const dir of [...extra].reverse()) for (const s of folderSkills(dir, 'space')) if (!off.has(s.dir) || !want.has(s.dir)) want.set(s.dir, path.join(dir, s.dir));
   const root = spaceViewRoot(id);
-  syncLinks(root, want, 'Skills that come with Naget Agent, the ones you approved in it, and those of a project of yours.');
+  syncLinks(root, want, 'Skills that come with Hydor, the ones you approved in it, and those of a project of yours.');
   return root;
 }

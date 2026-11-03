@@ -134,7 +134,7 @@ export async function httpCall(c: HttpCall, o: { allowPrivate?: boolean; lookup?
     if (/[\r\n\0]/.test(value)) throw new RefusedRequest(`The ${name} header has a line break`);
     base[name] = value;
   }
-  if (!Object.keys(base).some((k) => k.toLowerCase() === 'user-agent')) base['User-Agent'] = 'Naget Agent';
+  if (!Object.keys(base).some((k) => k.toLowerCase() === 'user-agent')) base['User-Agent'] = 'Hydor';
   const a = c.auth;
   // Every key the request carries, the signing one and those written into it.
   const keys = [...(a ? [a] : []), ...(c.bound ?? [])];

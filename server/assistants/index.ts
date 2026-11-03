@@ -171,7 +171,7 @@ function routes(d: Deps) {
   });
 }
 
-/** The app's own tools as Claude Code names them ("mcp__naget-agent__web_search"), to switch off those an assistant leaves out. */
+/** The app's own tools as Claude Code names them ("mcp__hydor__web_search"), to switch off those an assistant leaves out. */
 const appTools = (s: SpawnInfo, d: Deps) =>
   runTools({ runId: s.runId, key: s.key ?? '', agent: s.agent, acpAgent: s.acpAgent, cwd: s.cwd, deps: d }).map((t) => `mcp__${PAGE_SERVER}__${t.name}`);
 

@@ -244,8 +244,8 @@ export function HandsFree() {
       // Said at once: the listening stops for it, and starts again after.
       listening.current?.abort();
     };
-    window.addEventListener('naget:notify', on);
-    return () => window.removeEventListener('naget:notify', on);
+    window.addEventListener('hydor:notify', on);
+    return () => window.removeEventListener('hydor:notify', on);
   }, [open]);
 
   useEffect(() => {
@@ -331,7 +331,7 @@ export function HandsFree() {
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-semibold">Hands-free</div>
           <div className="truncate text-[12.5px] text-fg-3" translate="no">
-            {focused ? focused.title : 'Talk to Naget Agent'}
+            {focused ? focused.title : 'Talk to Hydor'}
           </div>
         </div>
         <button type="button" onClick={close} aria-label="End hands-free" className="rounded-full p-2 text-fg-3 hover:bg-bg-2 hover:text-fg">

@@ -23,7 +23,7 @@ const tests: [string, () => void][] = [
     'a page saved again: its id is on the call as soon as it is written, before the rest of the input',
     () => {
       const t = make();
-      t.start('mcp__naget-agent__save_latex');
+      t.start('mcp__hydor__save_latex');
       t.piece('{"id":"01ab');
       assert.equal((t.tool().tool.input as { id?: string } | undefined)?.id, undefined, 'not before the whole id is there');
       t.piece('cdef23","title":"Report","source":"\\\\documentclass{article}');
@@ -39,7 +39,7 @@ const tests: [string, () => void][] = [
     'only the call’s own id: not one of a block inside it, nor one in its text',
     () => {
       const t = make();
-      t.start('mcp__naget-agent__save_doc');
+      t.start('mcp__hydor__save_doc');
       t.piece('{"title":"Letter","blocks":[{"id":"ffffffffff","text":"\\"id\\":\\"eeeeeeeeee\\""}],');
       assert.equal((t.tool().tool.input as { id?: string } | undefined)?.id, undefined);
       t.piece('"id":"0123456789"}');
@@ -50,7 +50,7 @@ const tests: [string, () => void][] = [
     'other calls are left as they were until written whole',
     () => {
       const t = make();
-      t.start('mcp__naget-agent__show_html');
+      t.start('mcp__hydor__show_html');
       t.piece('{"id":"0123456789","html":"<p>');
       assert.equal((t.tool().tool.input as { id?: string } | undefined)?.id, undefined);
     },

@@ -1,8 +1,8 @@
 ---
 name: plugin-authoring
-description: Use when the user wants to make, change, package or share a plugin for Naget Agent (skills, tool servers and instructions bundled for every agent), or to turn a skill, script or MCP server they have into one.
+description: Use when the user wants to make, change, package or share a plugin for Hydor (skills, tool servers and instructions bundled for every agent), or to turn a skill, script or MCP server they have into one.
 category: app
-triggers: [make a plugin, create a plugin, build a plugin, package a plugin, plugin for naget, turn this into a plugin]
+triggers: [make a plugin, create a plugin, build a plugin, package a plugin, plugin for hydor, turn this into a plugin]
 ---
 
 # Making a plugin

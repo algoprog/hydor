@@ -1,6 +1,6 @@
 # Phones, other machines and sharing
 
-Naget Agent works from any browser: on your phone, on another computer, and across several machines that each run it. This topic covers using it on a phone, reaching it safely from elsewhere, working with other machines from one app, sharing a session with a read-only link, letting agents elsewhere start and steer sessions here, and adding the GitHub or Gitea accounts that pull requests open with.
+Hydor works from any browser: on your phone, on another computer, and across several machines that each run it. This topic covers using it on a phone, reaching it safely from elsewhere, working with other machines from one app, sharing a session with a read-only link, letting agents elsewhere start and steer sessions here, and adding the GitHub or Gitea accounts that pull requests open with.
 
 ![The app on a phone: a session that needs you](images/devices.webp)
 
@@ -19,7 +19,7 @@ To reach the app on your phone at all, it has to be reachable from outside this 
 
 Installed on your home screen, the app opens full screen with its own icon, like any other app. This needs the app to be served over HTTPS (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
 
-- **iPhone or iPad**: open the app in the browser, tap **Share**, then **Add to Home Screen**. Open Naget Agent from its new icon from then on.
+- **iPhone or iPad**: open the app in the browser, tap **Share**, then **Add to Home Screen**. Open Hydor from its new icon from then on.
 - **Android**: open the app in your browser and use its menu's option to install the app or add it to the home screen.
 
 ### Get notifications on your phone
@@ -40,7 +40,7 @@ Out of the box, the app answers only on the computer it runs on (port 8790 of `1
 - **Cloudflare Tunnel**: point a tunnel at `http://localhost:8790`. Cloudflare Access can add a second login in front.
 - **Your own reverse proxy**, such as Caddy, sending a hostname of yours to `127.0.0.1:8790`.
 
-If the proxy changes the `Host` header, tell the app the address people open it at: `ALLOWED_ORIGINS=https://agents.example.com`. Settings like this go in `~/.config/naget-agent.env` (one `NAME=value` per line) for an app installed as a service, or in `.env` for Docker Compose; restart the app afterwards.
+If the proxy changes the `Host` header, tell the app the address people open it at: `ALLOWED_ORIGINS=https://agents.example.com`. Settings like this go in `~/.config/hydor.env` (one `NAME=value` per line) for an app installed as a service, or in `.env` for Docker Compose; restart the app afterwards.
 
 HTTPS is also what phones need to install the app and receive push notifications. Previews of dev servers use a port of their own (8791); see [Look at a dev server with Preview](/guide/files-git#look-at-a-dev-server-with-preview).
 
@@ -54,7 +54,7 @@ Behind one of the proxies above, the address counted is the visitor's own, as th
 
 ## Use other machines from one app
 
-If Naget Agent runs on more than one machine (a desktop, a GPU server, a cloud computer), you can use them all from one of them. Each machine keeps its own sessions, files, terminals, sign-ins and settings; the app you open shows one machine at a time, and the sidebar switches between them.
+If Hydor runs on more than one machine (a desktop, a GPU server, a cloud computer), you can use them all from one of them. Each machine keeps its own sessions, files, terminals, sign-ins and settings; the app you open shows one machine at a time, and the sidebar switches between them.
 
 This is set up in [Settings → App → Machines](/settings?s=machines). Its **Machines** list starts with this machine ("This server", with its version), followed by the ones you added, each with:
 
@@ -64,11 +64,11 @@ This is set up in [Settings → App → Machines](/settings?s=machines). Its **M
 
 ### Add a machine
 
-1. **On the other machine**, install Naget Agent and make an access token for this one: in its own [Settings → App → Machines](/settings?s=machines&find=Access%20from%20other%20machines) → **New token**, or by running `node dist/server/cli.js access-token "my laptop"` in its Naget Agent folder. Copy the token (it starts with `acm_`).
+1. **On the other machine**, install Hydor and make an access token for this one: in its own [Settings → App → Machines](/settings?s=machines&find=Access%20from%20other%20machines) → **New token**, or by running `node dist/server/cli.js access-token "my laptop"` in its Hydor folder. Copy the token (it starts with `acm_`).
 2. **Here**, open [Settings → App → Machines](/settings?s=machines&find=Add%20a%20machine) and click **Add a machine**.
 3. Give it a **Name** ("GPU box").
 4. Under **Reach it**, pick how this machine gets there:
-   - **Over SSH**, the simplest: the **SSH host** (a name from your `~/.ssh/config`, or `user@host`) and **Its port**, the port Naget Agent listens on there (8790). This machine opens the connection with its own SSH keys, which must work without a passphrase prompt. The other machine keeps listening only on its own `127.0.0.1`: nothing there needs opening.
+   - **Over SSH**, the simplest: the **SSH host** (a name from your `~/.ssh/config`, or `user@host`) and **Its port**, the port Hydor listens on there (8790). This machine opens the connection with its own SSH keys, which must work without a passphrase prompt. The other machine keeps listening only on its own `127.0.0.1`: nothing there needs opening.
    - **By its address**, on a private network, a VPN such as Tailscale or WireGuard, or behind HTTPS: for example `http://100.64.0.5:8790`. The app there must listen where this machine reaches it (its `HOST` setting).
 5. Paste the **Access token** and click **Connect**.
 
@@ -96,7 +96,7 @@ On another machine's pages the row is highlighted, so you know where you are, an
 
 ### Let other machines use this one
 
-Under **Access from other machines** (on another machine's pages: **Access to** that machine), you make the tokens other machines use to reach this one. Another Naget Agent with one of these tokens can do all you can here, running commands included, so make one for each machine that connects.
+Under **Access from other machines** (on another machine's pages: **Access to** that machine), you make the tokens other machines use to reach this one. Another Hydor with one of these tokens can do all you can here, running commands included, so make one for each machine that connects.
 
 1. Click **New token**.
 2. Say **Which machine will use it?** ("My laptop") and click **Make token**.
@@ -116,7 +116,7 @@ A read-only link lets someone without your password follow one session as it hap
 
 ### What the person sees
 
-The link opens the session alone, without the sidebar or anything to type in. It shows the session's title, which agent works in it, "read-only, shared from Naget Agent", and "working now" while the agent works. Below is the conversation: your messages, the agent's replies, its steps by name (with the lines each file change added and removed, and the changes themselves a click away) and pages the agent showed. It follows along by itself, every few seconds while the agent works.
+The link opens the session alone, without the sidebar or anything to type in. It shows the session's title, which agent works in it, "read-only, shared from Hydor", and "working now" while the agent works. Below is the conversation: your messages, the agent's replies, its steps by name (with the lines each file change added and removed, and the changes themselves a click away) and pages the agent showed. It follows along by itself, every few seconds while the agent works.
 
 They don't see command output, the agent's thinking, the images you attached (only that there were some) or anything else in the app, and they can't type or change anything. A link that ended or was turned off says "This link has expired or was turned off".
 
@@ -128,8 +128,8 @@ Agents running elsewhere (Claude Code on your laptop, Codex, Cursor or any clien
 2. Under **Name it after where it goes**, type something like "Claude Code on my laptop" and click **Make token**.
 3. Copy what you need now (it is not shown again):
    - **Token**, the token itself.
-   - **Claude Code**: a command that adds the server, `claude mcp add --transport http naget-agent <address>/mcp --header "Authorization: Bearer <token>"`.
-   - **Codex**: lines for `~/.codex/config.toml`, with the token in the environment variable `NAGET_AGENT_TOKEN`.
+   - **Claude Code**: a command that adds the server, `claude mcp add --transport http hydor <address>/mcp --header "Authorization: Bearer <token>"`.
+   - **Codex**: lines for `~/.codex/config.toml`, with the token in the environment variable `HYDOR_TOKEN`.
    - **Other clients (JSON)**: the usual MCP server entry.
 
 The address is the one your browser has open, so an agent on another machine must reach the app the same way your browser does (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).

@@ -33,7 +33,7 @@ import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps,
 import { getApp, getRun, getStep, listSteps, removeSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
 
 /** Public runs' throwaway folders (as for one-step public runs). */
-const PUBLIC_DIR = path.join(os.tmpdir(), 'naget-public-runs');
+const PUBLIC_DIR = path.join(os.tmpdir(), 'hydor-public-runs');
 
 interface Exec {
   run: RunRecord;
@@ -698,7 +698,7 @@ async function appStep(x: Exec, s: Extract<Step, { do: 'app' }>, scope: Scope, a
 
 // ---- models ------------------------------------------------------------------------------------------------
 
-const STEP_SYSTEM = 'You do one step of an app that runs on its own (Naget Agent): what you answer goes to its next step, not to a person, and nobody can answer questions back.';
+const STEP_SYSTEM = 'You do one step of an app that runs on its own (Hydor): what you answer goes to its next step, not to a person, and nobody can answer questions back.';
 
 /** One answer from the step's model (the public page's, or the helper model); what it cost goes on the step. */
 async function ask(x: Exec, system: string, prompt: string, model: string | undefined, cost: Cost): Promise<string> {
@@ -772,7 +772,7 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope)
   if (allowed && !allowed.includes(s.tool)) throw new Error(`The app does not let its runs use ${s.tool} (Tools, in its settings)`);
   const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal, notice: { url: `/apps/runs/${encodeURIComponent(x.run.id)}`, title: x.run.appName } };
   const tool = runTools(ctx).find((t) => t.name === s.tool);
-  if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Naget Agent turned on?`);
+  if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Hydor turned on?`);
   const out = await tool.run(valueOf(s.with ?? {}, scope) as Record<string, unknown>, ctx);
   const text = typeof out === 'string' ? out : out.text;
   if (typeof out === 'object' && out.isError) throw new Error(text.slice(0, 800) || 'The tool failed');

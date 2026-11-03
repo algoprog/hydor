@@ -15,8 +15,8 @@ function run(bin: string, args: string[], timeout = 60_000): Promise<string> {
   });
 }
 
-const FFMPEG = process.env.NAGET_FFMPEG || 'ffmpeg';
-const FFPROBE = process.env.NAGET_FFPROBE || 'ffprobe';
+const FFMPEG = process.env.HYDOR_FFMPEG || 'ffmpeg';
+const FFPROBE = process.env.HYDOR_FFPROBE || 'ffprobe';
 
 let found: Promise<boolean> | null = null;
 

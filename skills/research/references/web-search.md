@@ -1,6 +1,6 @@
 # Searching with web_search and read_page
 
-These are the app's own tools (on the naget-agent server). Which filters a provider can keep to
+These are the app's own tools (on the hydor server). Which filters a provider can keep to
 depends on the providers turned on in Settings → Search: the answer says when one was ignored.
 
 ## web_search

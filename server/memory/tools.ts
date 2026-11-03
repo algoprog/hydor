@@ -54,7 +54,7 @@ function untilOf(v: unknown, now = Date.now()): number | null | undefined {
 const REMEMBER: RunTool = {
   name: 'remember',
   description: [
-    'Save a note to the memory Naget Agent keeps across sessions: later sessions, with any agent, see it.',
+    'Save a note to the memory Hydor keeps across sessions: later sessions, with any agent, see it.',
     'scope "global": a lasting fact or preference about the user; "repo": a fact about this project (conventions, commands, where things are, decisions);',
     '"session": where this task stands. One short, self-contained sentence. Use it when the user asks you to remember something, or you learn something',
     'that will matter later. Give "until" (YYYY-MM-DD) for what is true only until a date (a trip, a deadline). To correct or update a note, give its',
@@ -171,7 +171,7 @@ const SEARCH: RunTool = {
   name: 'search_sessions',
   annotations: { readOnlyHint: true },
   description:
-    'Search past conversations in Naget Agent (every session, with any agent) by words in what the user and the agents wrote. Use it to find what was said or decided before ("what did we decide about the trip?"). read_session then gives one in full.',
+    'Search past conversations in Hydor (every session, with any agent) by words in what the user and the agents wrote. Use it to find what was said or decided before ("what did we decide about the trip?"). read_session then gives one in full.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -237,7 +237,7 @@ const SEARCH: RunTool = {
 const READ: RunTool = {
   name: 'read_session',
   annotations: { readOnlyHint: true },
-  description: 'Read a past conversation in Naget Agent by its key (from search_sessions): its messages and the titles of the steps taken, oldest first.',
+  description: 'Read a past conversation in Hydor by its key (from search_sessions): its messages and the titles of the steps taken, oldest first.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -141,7 +141,7 @@ const CALL_LINE = 1 << 20;
 export async function runCode(o: { language: 'javascript' | 'typescript' | 'python'; code: string; input: Record<string, unknown>; slug: string; requires?: Requires; seconds: number; signal?: AbortSignal; onCall?: CtxCall }): Promise<CodeOut> {
   const bwrap = sandboxAvailable();
   if (!bwrap) throw new Error('Code steps run in a sandbox (bubblewrap, bwrap), which this computer lacks');
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-code-'));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-code-'));
   try {
     const mounts: string[] = [];
     const ro = (p: string) => fs.existsSync(p) && mounts.push('--ro-bind', p, p);

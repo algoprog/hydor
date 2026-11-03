@@ -31,17 +31,17 @@ function ownUnit(): { unit: string; user: boolean } | null {
     return null;
   }
 }
-const inDocker = () => fs.existsSync('/.dockerenv') || (process.env.NAGET_AGENT_RESTARTS ?? process.env.AGENT_CONSOLE_RESTARTS) === '1';
+const inDocker = () => fs.existsSync('/.dockerenv') || (process.env.HYDOR_RESTARTS ?? process.env.AGENT_CONSOLE_RESTARTS) === '1';
 const lingers = () => /Linger=yes/.test(run('loginctl', ['show-user', user, '-p', 'Linger']).out);
 
 /** The Mac app's launch agent: opens the app, without its window, when you log in. */
-const PLIST = path.join(os.homedir(), 'Library/LaunchAgents/com.naget.agent.plist');
+const PLIST = path.join(os.homedir(), 'Library/LaunchAgents/com.hydor.app.plist');
 const xml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const plistText = (app: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.naget.agent</string>
+  <key>Label</key><string>com.hydor.app</string>
   <key>ProgramArguments</key>
   <array><string>/usr/bin/open</string><string>-g</string><string>-a</string><string>${xml(app)}</string><string>--args</string><string>--hidden</string></array>
   <key>RunAtLoad</key><true/>
@@ -116,14 +116,14 @@ export function startupDefault(db: DB) {
   const st = startupState();
   if (desktop && st.how === 'login-item' && !st.on && desktop.updatable) {
     setLoginItem(true);
-    return console.log('[naget-agent] It now opens when you log in; turn that off in Settings → General.');
+    return console.log('[hydor] It now opens when you log in; turn that off in Settings → General.');
   }
   if (st.how !== 'none' || !st.can || process.env.NODE_ENV === 'development') return;
   if (!fs.existsSync(path.join(APP_ROOT, '.git')) || APP_ROOT.startsWith(os.tmpdir())) return;
   try {
     setStartup(true);
-    console.log(`[naget-agent] It now starts when this computer starts (${UNIT}); turn that off in Settings → General.`);
+    console.log(`[hydor] It now starts when this computer starts (${UNIT}); turn that off in Settings → General.`);
   } catch (e) {
-    console.warn(`[naget-agent] Could not set it up to start with this computer: ${(e as Error).message}`);
+    console.warn(`[hydor] Could not set it up to start with this computer: ${(e as Error).message}`);
   }
 }

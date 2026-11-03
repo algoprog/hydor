@@ -9,10 +9,9 @@ import { pathToFileURL } from 'node:url';
 /** The app's data folder, worked out as the server does (server/config.ts). */
 export function dataDir(): string {
   if (process.env.DATA_DIR) return process.env.DATA_DIR;
-  if (process.env.NAGET_DATA_DIR) return process.env.NAGET_DATA_DIR;
-  const dir = path.join(os.homedir(), '.naget-agent');
-  const older = path.join(os.homedir(), '.web-agent');
-  return !fs.existsSync(dir) && fs.existsSync(older) ? older : dir;
+  if (process.env.HYDOR_DATA_DIR) return process.env.HYDOR_DATA_DIR;
+  const dir = path.join(os.homedir(), '.hydor');
+  return fs.existsSync(dir) ? dir : (['.naget-agent', '.web-agent'].map((d) => path.join(os.homedir(), d)).find((d) => fs.existsSync(d)) ?? dir);
 }
 
 const seen = new Map<string, { at: number; path: string | null }>();
@@ -82,7 +81,7 @@ export function convert(file: string, to: string, dest: string, timeout = 120_00
   const job = queue.then(async () => {
     const bin = soffice();
     if (!bin) throw new Error('LibreOffice is not installed here');
-    const work = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'naget-office-'));
+    const work = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hydor-office-'));
     try {
       const input = path.join(work, `document${path.extname(file).toLowerCase() || '.bin'}`);
       await fs.promises.copyFile(file, input);

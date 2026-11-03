@@ -1,7 +1,7 @@
 # A flashcard page
 
 A page to save with `save_page`. It shows the cards that are due, one at a time, keeps every card
-and its schedule in `naget.storage` (so progress survives, on any device that opens the page), and
+and its schedule in `hydor.storage` (so progress survives, on any device that opens the page), and
 lets the person add, list and delete cards. It uses the page kit's classes and colours, so it fits
 the app in light and dark.
 
@@ -102,7 +102,7 @@ const BOX_DAYS = [0, 1, 3, 7, 14, 30, 60]; // days until a card in each box come
 
 const DAY = 86400000;
 const $ = (id) => document.getElementById(id);
-const store = window.naget && window.naget.storage; // kept by the app; outside it, nothing is kept
+const store = window.hydor && window.hydor.storage; // kept by the app; outside it, nothing is kept
 const keyOf = (front, back) => front.trim() + "\n" + back.trim();
 const startOfDay = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 const newCard = (front, back) => ({ key: keyOf(front, back), front: front.trim(), back: back.trim(), box: 0, due: 0, reviews: 0, lapses: 0, seen: 0 });

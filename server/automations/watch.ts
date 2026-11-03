@@ -39,7 +39,7 @@ async function fetchText(input: string, local?: boolean, maxBytes = 3_000_000): 
   for (let hop = 0; ; hop++) {
     if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Only http and https addresses');
     if (!local) await assertPublic(url);
-    const r = await fetch(url, { redirect: 'manual', signal, headers: { 'user-agent': 'Mozilla/5.0 (compatible; Naget Agent watcher)', accept: '*/*' } });
+    const r = await fetch(url, { redirect: 'manual', signal, headers: { 'user-agent': 'Mozilla/5.0 (compatible; Hydor watcher)', accept: '*/*' } });
     const loc = r.headers.get('location');
     if (r.status >= 300 && r.status < 400 && loc) {
       if (hop >= 8) throw new Error('Too many redirects');

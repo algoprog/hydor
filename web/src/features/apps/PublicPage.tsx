@@ -201,7 +201,7 @@ export default function PublicAppPage({ slug }: { slug: string }) {
 
         <footer className="mt-10 flex items-center justify-center gap-2 text-[12px] text-fg-3">
           <Logo size={16} />
-          Made with Naget Agent · answers can be wrong, so check what matters
+          Made with Hydor · answers can be wrong, so check what matters
         </footer>
       </div>
     </div>

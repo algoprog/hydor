@@ -27,7 +27,7 @@ function routes(d: Deps) {
   app.post('/api/computer/permissions/:which', async (req) => {
     const which = P(req).which;
     if (which !== 'accessibility' && which !== 'screen') throw new HttpError(400, 'Which permission: accessibility or screen');
-    if (!hooks.inApp()) throw new HttpError(400, 'Computer use needs the Naget Agent Mac app');
+    if (!hooks.inApp()) throw new HttpError(400, 'Computer use needs the Hydor Mac app');
     try {
       await askDesktop({ what: 'request', which }, 15_000);
     } catch (e) {

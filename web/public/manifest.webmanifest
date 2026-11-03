@@ -1,31 +1,31 @@
 {
-  "name": "Naget Agent",
-  "short_name": "Naget Agent",
+  "name": "Hydor",
+  "short_name": "Hydor",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#121110",
   "theme_color": "#121110",
   "icons": [
     {
-      "src": "/icon-192.png?v=3",
+      "src": "/icon-192.png?v=4",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png?v=3",
+      "src": "/icon-512.png?v=4",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable-512.png?v=3",
+      "src": "/icon-maskable-512.png?v=4",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/favicon.svg?v=3",
+      "src": "/favicon.svg?v=4",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

@@ -16,7 +16,7 @@ export interface ToolStream {
   input?: Record<string, unknown>;
 }
 
-const PAGE_TOOL = /^mcp__(?:naget-agent|agent-console)__(show_html|save_page)$/;
+const PAGE_TOOL = /^mcp__(?:hydor|naget-agent|agent-console)__(show_html|save_page)$/;
 const HTML_FILE = /\.html?$/i;
 
 type Kind = PageDraft['tool'];

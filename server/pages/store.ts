@@ -1,5 +1,5 @@
 // Saved pages: the Pages library in SQLite. Each save is a new version (the oldest go past a count and
-// a size); each page keeps its own small storage (window.naget.storage) and has a link of its own,
+// a size); each page keeps its own small storage (window.hydor.storage) and has a link of its own,
 // signed with the app's key, that opens it on any device without the app's sign-in. A page of another kind
 // (slides, a document, a spreadsheet: kinds.ts) keeps its model's text in place of HTML, and its own page is made
 // from it when it shows; its pictures are kept apart (assets.ts).
@@ -332,7 +332,7 @@ function rows(db: DB, id: string) {
   return db.prepare('select key, value, bytes from page_storage where page_id = ? order by key').all(id) as { key: string; value: string; bytes: number }[];
 }
 
-/** One call of window.naget.storage: get, set, remove or keys. */
+/** One call of window.hydor.storage: get, set, remove or keys. */
 export function storageOp(db: DB, id: string, body: unknown): { value: unknown } {
   const b = (body && typeof body === 'object' ? body : {}) as { op?: unknown; key?: unknown; value?: unknown };
   mustPage(db, id);

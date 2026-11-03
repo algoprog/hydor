@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Python with the libraries for analysing data: pandas, matplotlib (charts as pictures) and openpyxl
-# (Excel files). They are installed once, on first use, into a private environment in Naget Agent's data
+# (Excel files). They are installed once, on first use, into a private environment in Hydor's data
 # folder; nothing is installed system-wide.
 #
 #   data-python analyse.py [args…]           run a script
@@ -9,9 +9,9 @@ set -euo pipefail
 
 PKGS="pandas>=2.2,<4 matplotlib>=3.8,<4 openpyxl>=3.1,<4"
 
-data="${NAGET_DATA_DIR:-${DATA_DIR:-}}"
+data="${HYDOR_DATA_DIR:-${DATA_DIR:-}}"
 if [ -z "$data" ]; then
-  if [ ! -d "$HOME/.naget-agent" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.naget-agent"; fi
+  if [ ! -d "$HOME/.hydor" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.hydor"; fi
 fi
 venv="$data/analysis/venv"
 py="$venv/bin/python"

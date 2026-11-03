@@ -22,8 +22,8 @@ export type MeaningDevice = 'auto' | 'cpu';
 
 const dir = () => path.join(config.dataDir, 'memory');
 const venv = () => path.join(dir(), 'venv');
-/** The Python that runs the worker: one given (NAGET_EMBED_PYTHON, with PyTorch and Transformers), else the private one. */
-const python = () => process.env.NAGET_EMBED_PYTHON || path.join(venv(), 'bin', 'python');
+/** The Python that runs the worker: one given (HYDOR_EMBED_PYTHON, with PyTorch and Transformers), else the private one. */
+const python = () => process.env.HYDOR_EMBED_PYTHON || path.join(venv(), 'bin', 'python');
 /** What the environment holds: another list means setting it up again. */
 const PACKAGES = 'torch transformers>=5.6,<6';
 const WORKER = path.join(APP_ROOT, 'server/memory/embed_worker.py');
@@ -40,7 +40,7 @@ const IDLE_CPU_MS = 5 * 60_000;
 export const meaningOn = (db: DB) => kvGet(db, 'memory.meaning') === '1';
 export const meaningDevice = (db: DB): MeaningDevice => (kvGet(db, 'memory.meaning.device') === 'cpu' ? 'cpu' : 'auto');
 const hasNvidia = () => fs.existsSync('/proc/driver/nvidia/version');
-const envReady = () => (process.env.NAGET_EMBED_PYTHON ? fs.existsSync(python()) : fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES);
+const envReady = () => (process.env.HYDOR_EMBED_PYTHON ? fs.existsSync(python()) : fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES);
 
 function readText(f: string): string | null {
   try {
@@ -116,13 +116,13 @@ export const setEmbedderForTests = (fn: typeof stub) => {
 };
 
 function workerEnv(db: DB): NodeJS.ProcessEnv {
-  const keep = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TMPDIR', 'XDG_CACHE_HOME', 'HF_HUB_CACHE', 'HF_TOKEN', 'CUDA_VISIBLE_DEVICES', 'NAGET_EMBED_THREADS'];
+  const keep = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TMPDIR', 'XDG_CACHE_HOME', 'HF_HUB_CACHE', 'HF_TOKEN', 'CUDA_VISIBLE_DEVICES', 'HYDOR_EMBED_THREADS'];
   const env: NodeJS.ProcessEnv = Object.fromEntries(keep.filter((k) => process.env[k] != null).map((k) => [k, process.env[k]]));
   Object.assign(env, { PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1', HF_HUB_DISABLE_PROGRESS_BARS: '1', TOKENIZERS_PARALLELISM: 'false', TRANSFORMERS_VERBOSITY: 'error' });
   const home = hfHome();
   if (home) env.HF_HOME = home;
-  if (meaningDevice(db) === 'cpu') env.NAGET_EMBED_DEVICE = 'cpu';
-  else if (process.env.NAGET_EMBED_DEVICE) env.NAGET_EMBED_DEVICE = process.env.NAGET_EMBED_DEVICE;
+  if (meaningDevice(db) === 'cpu') env.HYDOR_EMBED_DEVICE = 'cpu';
+  else if (process.env.HYDOR_EMBED_DEVICE) env.HYDOR_EMBED_DEVICE = process.env.HYDOR_EMBED_DEVICE;
   return env;
 }
 

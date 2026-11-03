@@ -21,7 +21,7 @@ import { toastError, useApp, useUI } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
-import { ARCH, NUGGET, TileGradients } from '../../components/Logo';
+import { TileGradient, WaterOmega } from '../../components/Logo';
 import { LoginDialog } from '../settings/SettingsPage';
 import { shortGpu } from '../settings/ModelsSettings';
 import { TourLocal, TourOpenRouter } from './TourModels';
@@ -173,20 +173,19 @@ function pickAgent(uses: Use[]) {
 
 // ---- the app mark, arriving ------------------------------------------------------------------------
 
-/** The app mark as Naget's film draws it: a speck of gold condenses into the nugget, the n is drawn
- * around it, and the nugget drops into place, where it glows. */
+/** The app mark coming to life: the deep blue tile settles, and water rises in its Ω until it is full, its surface
+ * a wave that calms as it reaches the top. */
 export function HeroMark({ size = 64 }: { size?: number }) {
   const id = useId();
   return (
     <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
       <span className="hero-glow" aria-hidden />
-      <svg width={size} height={size} viewBox="0 0 512 512" className="relative" aria-hidden>
+      <svg width={size} height={size} viewBox="0 0 512 512" className="relative text-white" aria-hidden>
         <defs>
-          <TileGradients id={id} />
+          <TileGradient id={`${id}t`} />
         </defs>
-        <rect className="hero-tile" x="4" y="4" width="504" height="504" rx="114" fill={`url(#${id}tile)`} stroke="rgba(0,0,0,0.10)" strokeWidth="8" />
-        <path className="hero-arch" pathLength={1} d={ARCH} fill="none" stroke={`url(#${id}ink)`} strokeWidth="66" />
-        <circle className="hero-nugget" {...NUGGET} fill={`url(#${id}gold)`} />
+        <rect className="hero-tile" x="4" y="4" width="504" height="504" rx="114" fill={`url(#${id}t)`} stroke="rgba(255,255,255,0.10)" strokeWidth="8" />
+        <WaterOmega id={id} water="hero-water" bright />
       </svg>
     </span>
   );
@@ -531,7 +530,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       id: 'welcome',
       label: 'Welcome',
       hero: true,
-      title: 'Welcome to Naget Agent',
+      title: 'Welcome to Hydor',
       body: 'AI helpers (agents) that do real work on this computer for you: research, writing, documents, files, code and everyday tasks. Use them from any browser, at your desk or on your phone. This short tour sets up the ones you want and shows you around.',
       width: 440,
       Extra: () => (

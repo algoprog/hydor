@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# Naget Agent in one container: the agent harness, Claude Code and Codex. Published for linux/amd64
-# and linux/arm64 as nagetai/naget-agent, so it runs with Docker on Linux, macOS and Windows.
+# Hydor in one container: the agent harness, Claude Code and Codex. Published for linux/amd64
+# and linux/arm64 as algoprog/hydor, so it runs with Docker on Linux, macOS and Windows.
 #
 #   docker compose up -d            the published image (see compose.yaml and the README)
 #   docker compose up -d --build    built here from this folder, with your own user ids
@@ -13,9 +13,9 @@ ARG NODE_IMAGE=node:22-bookworm-slim
 FROM ${NODE_IMAGE}
 ARG CLAUDE_CODE_VERSION=2.1.308
 ARG VERSION=dev
-LABEL org.opencontainers.image.title="Naget Agent" \
+LABEL org.opencontainers.image.title="Hydor" \
       org.opencontainers.image.description="A self-hosted agent harness for Claude Code, Codex and any model" \
-      org.opencontainers.image.source="https://github.com/Naget-Inc/naget-agent" \
+      org.opencontainers.image.source="https://github.com/algoprog/hydor" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${VERSION}"
 # The user the agents run as. Set these to your own ids (id -u, id -g) so that files the agents
@@ -79,7 +79,7 @@ COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund && npm cache clean --force
 COPY --chown=node:node . .
 # Updates come from the public repository over HTTPS, however this copy was cloned.
-RUN (git remote set-url origin https://github.com/Naget-Inc/naget-agent.git && git config --unset-all core.sshCommand || true) \
+RUN (git remote set-url origin https://github.com/algoprog/hydor.git && git config --unset-all core.sshCommand || true) \
  && npm run build
 
 ENV NODE_ENV=production \

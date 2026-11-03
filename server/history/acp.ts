@@ -11,7 +11,7 @@
 //   {"t":"goal","ts":…,"goal":{…}|null,"note":{"text":"…"},"step":"…"}   Custom's /goal (server/custom/goal.ts)
 //
 // Custom adds a usage_update after each model call: its running totals for the ACP session (tokens in
-// `_meta.naget`, the cost when it knows it). Another ACP agent may send the cost alone.
+// `_meta.hydor`, or `_meta.naget` from before the rename, the cost when it knows it). Another ACP agent may send the cost alone.
 import type { FileChange, GoalInfo, SessionStats, TimelineItem, TodoEntry, ToolCategory, ToolInfo, ToolItem } from '../../shared/types.ts';
 import { ActivityLog, clip, emptyStats, firstLine, snippetDiff, stripWrappers, wholeFileDiff, type Chunk } from './common.ts';
 import { splitHandoff } from '../handoff.ts';
@@ -61,7 +61,7 @@ const STATUS: Record<string, ToolInfo['status']> = { pending: 'running', in_prog
 export function acpBriefing(instructions: string[]): string {
   return [
     BRIEF_OPEN,
-    'Standing instructions from Naget Agent, the app this session runs in. They hold for the whole session, beside your own; follow them without mentioning them. The user’s message follows this block.',
+    'Standing instructions from Hydor, the app this session runs in. They hold for the whole session, beside your own; follow them without mentioning them. The user’s message follows this block.',
     '',
     instructions.join('\n\n'),
     BRIEF_CLOSE,
@@ -317,10 +317,10 @@ export class AcpParser {
         const category = KIND[u.kind] ?? 'other';
         const files = acpDiffs(u.content);
         const out = clip(acpText(u.content), MAX_OUTPUT);
-        // Custom calls the app's own tools "naget-agent: web_search": their full name lets their views show.
-        const own = /^naget-agent: (\w+)$/.exec(String(u.title ?? ''));
+        // Custom calls the app's own tools "hydor: web_search" ("naget-agent: …" before the rename): their full name lets their views show.
+        const own = /^(?:hydor|naget-agent): (\w+)$/.exec(String(u.title ?? ''));
         const tool: ToolInfo = {
-          name: own ? `mcp__naget-agent__${own[1]}` : String(u.kind ?? 'tool'),
+          name: own ? `mcp__hydor__${own[1]}` : String(u.kind ?? 'tool'),
           category,
           title: String(u.title ?? u.kind ?? 'Tool'),
           status: STATUS[u.status] ?? 'running',
@@ -373,7 +373,7 @@ export class AcpParser {
         return;
       }
       case 'usage_update': {
-        const n = u._meta?.naget ?? {};
+        const n = u._meta?.hydor ?? u._meta?.naget ?? {};
         const prev = this.spend.get(this.acpSession) ?? { in: 0, out: 0, cached: 0, usd: 0, priced: false };
         const count = (v: unknown, was: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : was);
         const cost = typeof u.cost?.amount === 'number' && Number.isFinite(u.cost.amount) && (u.cost.currency ?? 'USD') === 'USD' ? u.cost.amount : undefined;

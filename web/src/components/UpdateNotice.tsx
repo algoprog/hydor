@@ -71,7 +71,7 @@ export function UpdateNotice() {
       <div className="flex items-start gap-2.5">
         <CircleArrowUp size={16} className="mt-0.5 shrink-0 text-accent" />
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-fg">{`Naget Agent ${ready.version} is ready`}</div>
+          <div className="font-medium text-fg">{`Hydor ${ready.version} is ready`}</div>
           <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">
             <span className="tnum">{left > 0 ? `Restarting in ${left} s to install it. Running agents carry on.` : 'Restarting to install it. Running agents carry on.'}</span>
           </div>

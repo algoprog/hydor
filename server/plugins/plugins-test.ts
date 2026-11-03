@@ -4,7 +4,7 @@
 // instructions, skills through the library), the editor and packing a plugin, and every built-in plugin.
 //
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/plugins/plugins-test.ts
-//   DATA_DIR=/tmp/naget-test-plugins node dist/dev/plugins-test.js
+//   DATA_DIR=/tmp/hydor-test-plugins node dist/dev/plugins-test.js
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -39,7 +39,7 @@ async function test(name: string, fn: () => unknown) {
   }
 }
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-plugins-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-plugins-'));
 const BUILTIN = path.join(root, 'builtin');
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -509,8 +509,8 @@ await test('the SQLite plugin answers as an MCP server: tables, a change in one 
   setPluginRoots({ builtin: BUILTIN });
 });
 
-// With NAGET_TEST_REAL_SETUP=1: each built-in plugin set up for real (its packages downloaded), and its servers asked for their tools.
-if (process.env.NAGET_TEST_REAL_SETUP === '1')
+// With HYDOR_TEST_REAL_SETUP=1: each built-in plugin set up for real (its packages downloaded), and its servers asked for their tools.
+if (process.env.HYDOR_TEST_REAL_SETUP === '1')
   await test('every built-in plugin sets up for real, and its servers answer', async () => {
     setPluginRoots({ builtin: path.join(APP_ROOT, 'plugins') });
     const names = fs.readdirSync(path.join(APP_ROOT, 'plugins')).filter((n) => !n.startsWith('.'));

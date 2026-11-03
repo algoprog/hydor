@@ -30,9 +30,9 @@ if [ "$ext" != "pdf" ]; then
     echo "Meanwhile, check the content by reading the file back with read_document, and keep the layout simple." >&2
     exit 3
   fi
-  data="${NAGET_DATA_DIR:-${DATA_DIR:-}}"
+  data="${HYDOR_DATA_DIR:-${DATA_DIR:-}}"
   if [ -z "$data" ]; then
-    if [ ! -d "$HOME/.naget-agent" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.naget-agent"; fi
+    if [ ! -d "$HOME/.hydor" ] && [ -d "$HOME/.web-agent" ]; then data="$HOME/.web-agent"; else data="$HOME/.hydor"; fi
   fi
   profile="$data/office/lo-profile-cli"
   if [ ! -f "$profile/user/registrymodifications.xcu" ]; then

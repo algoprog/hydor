@@ -447,8 +447,8 @@ function sandbox(t: Tools): Promise<Box | null> {
 }
 
 async function probeBox(t: Tools): Promise<Box | null> {
-  // NAGET_TEX_SANDBOX=off: where bubblewrap misbehaves, TeX runs held in by its own rules only (and LuaLaTeX not at all).
-  const bwrap = process.platform === 'linux' && process.env.NAGET_TEX_SANDBOX !== 'off' ? which('bwrap') : null;
+  // HYDOR_TEX_SANDBOX=off: where bubblewrap misbehaves, TeX runs held in by its own rules only (and LuaLaTeX not at all).
+  const bwrap = process.platform === 'linux' && process.env.HYDOR_TEX_SANDBOX !== 'off' ? which('bwrap') : null;
   if (!bwrap) {
     boxState = { at: Date.now(), box: null, why: 'no bubblewrap' };
     return null;
@@ -515,7 +515,7 @@ function runHeld(cmd: string[], o: { cwd: string; env: NodeJS.ProcessEnv; box: B
     const win = process.platform === 'win32';
     const child = win
       ? spawn(argv[0], argv.slice(1), { cwd: o.cwd, env: o.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
-      : spawn('/bin/sh', ['-c', LIMITS, 'naget-tex', ...argv], { cwd: o.cwd, env: o.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      : spawn('/bin/sh', ['-c', LIMITS, 'hydor-tex', ...argv], { cwd: o.cwd, env: o.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     const take = (b: Buffer) => {
       out += b.toString('utf8');
@@ -1398,7 +1398,7 @@ const shell = (title: string, css: string, body: string) =>
   [
     '<!doctype html>',
     `<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>`,
-    '<meta name="generator" content="Naget Agent LaTeX">',
+    '<meta name="generator" content="Hydor LaTeX">',
     `<style>${css}</style></head><body>`,
     body,
     '</body></html>',

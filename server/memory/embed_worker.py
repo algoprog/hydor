@@ -1,4 +1,4 @@
-# Naget Agent's embedding worker, for memory's search by meaning (server/memory/embed.ts starts it). It reads
+# Hydor's embedding worker, for memory's search by meaning (server/memory/embed.ts starts it). It reads
 # requests as JSON lines on stdin and answers each with unit-length vectors, as base64 float32, on stdout:
 #   {"id": 1, "kind": "document" | "query", "texts": ["..."]}  ->  {"id": 1, "dim": 768, "vectors": "..."}
 # On a GPU with room the model runs in fp16. On a CPU its body runs in float32 while its 256k-word table,
@@ -29,7 +29,7 @@ def rss_mb():
 
 
 def pick_device(torch):
-    want = os.environ.get('NAGET_EMBED_DEVICE', '').strip()
+    want = os.environ.get('HYDOR_EMBED_DEVICE', '').strip()
     if want:
         return want
     # The GPU with the most free memory, when it has room for the model and its work; a GPU in a bad state
@@ -51,7 +51,7 @@ def main():
     device = pick_device(torch)
     cpu = device == 'cpu'
     if cpu:
-        torch.set_num_threads(int(os.environ.get('NAGET_EMBED_THREADS') or max(1, min(4, (os.cpu_count() or 2) // 2))))
+        torch.set_num_threads(int(os.environ.get('HYDOR_EMBED_THREADS') or max(1, min(4, (os.cpu_count() or 2) // 2))))
     say({'status': 'loading'})
     tok = AutoTokenizer.from_pretrained(MODEL)
     model = AutoModel.from_pretrained(MODEL, dtype=torch.float16)

@@ -72,7 +72,7 @@ export function switchNote(from: Assistant | null, a: Assistant, t: Target, has:
 
 /**
  * What a starting Claude Code or Codex agent gets: the instructions, and the limits its program can
- * enforce. `appTools` are the app's own tools as Claude Code names them ("mcp__naget-agent__web_search").
+ * enforce. `appTools` are the app's own tools as Claude Code names them ("mcp__hydor__web_search").
  */
 export function spawnFor(a: Assistant | null, tone: string, t: Target, appTools: string[]): SpawnAdditions {
   const text = instructionsFor(a, tone, t);

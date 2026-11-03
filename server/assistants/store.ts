@@ -14,7 +14,7 @@ const TONE = 'assistants.tone';
 const ROOT = 'assistants.taskRoot';
 const CLEAN_UP = 'assistants.cleanUp';
 
-export const DEFAULT_TASK_ROOT = path.join(config.home, 'Naget');
+export const DEFAULT_TASK_ROOT = config.taskRoot;
 export const MAX_INSTRUCTIONS = 20_000;
 export const MAX_TONE = 600;
 
@@ -125,7 +125,7 @@ export function setSettings(db: DB, b: { tone?: unknown; taskRoot?: unknown; cle
   if (typeof b.cleanUp === 'boolean') kvSet(db, CLEAN_UP, b.cleanUp ? '1' : '0');
   if (b.taskRoot !== undefined) {
     const p = expand(str(b.taskRoot, 1000));
-    if (p && !path.isAbsolute(p)) throw new HttpError(400, 'Give the full path of a folder, like ~/Naget');
+    if (p && !path.isAbsolute(p)) throw new HttpError(400, 'Give the full path of a folder, like ~/Hydor');
     kvSet(db, ROOT, p ? path.resolve(p) : '');
   }
 }

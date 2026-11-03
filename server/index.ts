@@ -1,3 +1,4 @@
+import './env-compat.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -164,7 +165,7 @@ app.addHook('onRequest', async (req, reply) => {
   if (!url.startsWith('/api/') && !url.startsWith('/ws')) return;
   // The app's own calls from inside the server (an agent's app_api): their secret stands in for the sign-in.
   if (!other && isInternal(req)) return;
-  // Another Naget Agent using this machine, with an access token: not a browser, so no origin to check.
+  // Another Hydor using this machine, with an access token: not a browser, so no origin to check.
   const token = other ? null : bearerOf(req.headers.authorization);
   // An app's API key (server/apps) opens only its run endpoints (start one, ask about one), which check the key themselves.
   const appRun = (req.method === 'POST' && /^\/api\/apps\/[^/]+\/run$/.test(url)) || (req.method === 'GET' && /^\/api\/apps\/[^/]+\/run\/[^/]+$/.test(url));
@@ -1214,7 +1215,7 @@ app.post('/api/push/unsubscribe', async (req) => {
   push.unsubscribe(String(body(req).endpoint ?? ''));
   return { ok: true };
 });
-app.post('/api/push/test', async () => ({ sent: await push.send({ key: '', kind: 'done', title: 'Naget Agent', body: 'Notifications work on this device.', url: '/', at: Date.now() }) }));
+app.post('/api/push/test', async () => ({ sent: await push.send({ key: '', kind: 'done', title: 'Hydor', body: 'Notifications work on this device.', url: '/', at: Date.now() }) }));
 
 // ---- notebooks: Jupyter kernels ------------------------------------------------------------
 
@@ -1686,7 +1687,7 @@ mcpRoutes(app, db, sessions, (key) => `${publicBase()}/s/${encodeURIComponent(ke
 
 // ---- machines -----------------------------------------------------------------------------------
 
-/** This machine, as another Naget Agent sees it. */
+/** This machine, as another Hydor sees it. */
 app.get('/api/machine', async () => machineInfo());
 
 /** The other machines this one uses (Settings → Machines); their pages are /m/<id>/… */
@@ -1772,7 +1773,7 @@ const token = auth.setupToken();
 if (token) {
   // A wildcard listen address is not one a browser can open; localhost is (Docker publishes the port there).
   const host = config.host === '0.0.0.0' || config.host === '::' ? 'localhost' : config.host;
-  console.log(`[naget-agent] No password set yet. Open http://${host}:${config.port}/setup?token=${token} to choose one (token also in ${config.dataDir}/setup-token).`);
+  console.log(`[hydor] No password set yet. Open http://${host}:${config.port}/setup?token=${token} to choose one (token also in ${config.dataDir}/setup-token).`);
 }
 
 await sessions.restore();
@@ -1792,7 +1793,7 @@ setInterval(sweep, 6 * 3600_000).unref();
 
 await app.listen({ host: config.host, port: config.port });
 startFeatures();
-console.log(`[naget-agent] listening on http://${config.host}:${config.port}`);
+console.log(`[hydor] listening on http://${config.host}:${config.port}`);
 // The Mac app opens its window now, on the setup page the first time.
 tellDesktop({ type: 'ready', url: `http://127.0.0.1:${config.port}`, setupToken: auth.setupToken() ?? undefined });
 machines.start();

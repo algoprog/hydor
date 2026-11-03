@@ -1,6 +1,6 @@
 # The plugin format
 
-Naget Agent reads plugins in the open Agent Plugins 1.0 format (agent-plugins.org), plus its own
+Hydor reads plugins in the open Agent Plugins 1.0 format (agent-plugins.org), plus its own
 extension for what the format leaves to each app. It also reads Claude Code's layout
 (`.claude-plugin/plugin.json`, `.mcp.json`) for skills and servers.
 

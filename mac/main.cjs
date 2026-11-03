@@ -1,4 +1,4 @@
-// Naget Agent for macOS: the app around the server. It runs the server that comes inside it (with the Node.js
+// Hydor for macOS: the app around the server. It runs the server that comes inside it (with the Node.js
 // that comes inside it too), shows the app in a window of its own, stays in the menu bar when the window is
 // closed, and starts the server again whenever it exits: agents carry on meanwhile, as with the Linux service.
 //
@@ -35,12 +35,20 @@ const RES = PACKAGED ? process.resourcesPath : __dirname;
 /** The server: inside the app, or (developing, `npm start` in mac/) the repository it sits in, built. */
 const SERVER = PACKAGED ? path.join(RES, 'server') : path.resolve(__dirname, '..');
 const NODE_BIN = PACKAGED ? path.join(RES, 'node/bin') : null;
-/** The .app this runs from (…/Naget Agent.app/Contents/MacOS/Naget Agent); developing, a stand-in to try updates on. */
-const BUNDLE = (!PACKAGED && process.env.NAGET_DESKTOP_BUNDLE) || path.resolve(process.execPath, '../../..');
-const REPLACEABLE = PACKAGED || !!process.env.NAGET_DESKTOP_BUNDLE;
-const DATA = app.getPath('userData'); // ~/Library/Application Support/Naget Agent
-const LOGS = app.getPath('logs'); // ~/Library/Logs/Naget Agent
-const CACHE = path.join(os.homedir(), 'Library/Caches/Naget Agent');
+/** The .app this runs from (…/Hydor.app/Contents/MacOS/Hydor); developing, a stand-in to try updates on. */
+const BUNDLE = (!PACKAGED && process.env.HYDOR_DESKTOP_BUNDLE) || path.resolve(process.execPath, '../../..');
+const REPLACEABLE = PACKAGED || !!process.env.HYDOR_DESKTOP_BUNDLE;
+// The app was called Naget Agent: its folders move over once, before anything uses them.
+for (const [base, older] of [[app.getPath('appData'), 'Naget Agent'], [path.join(os.homedir(), 'Library/Logs'), 'Naget Agent'], [path.join(os.homedir(), 'Library/Caches'), 'Naget Agent']]) {
+  try {
+    if (fs.existsSync(path.join(base, older)) && !fs.existsSync(path.join(base, 'Hydor'))) fs.renameSync(path.join(base, older), path.join(base, 'Hydor'));
+  } catch (e) {
+    console.error('[hydor] could not move', older, e);
+  }
+}
+const DATA = app.getPath('userData'); // ~/Library/Application Support/Hydor
+const LOGS = app.getPath('logs'); // ~/Library/Logs/Hydor
+const CACHE = path.join(os.homedir(), 'Library/Caches/Hydor');
 const PENDING = path.join(DATA, 'update.json');
 const PREVIOUS = path.join(DATA, 'previous.app');
 const PIDFILE = path.join(DATA, 'server.pid');
@@ -87,20 +95,20 @@ function move(from, to) {
  */
 function loginEnv() {
   const shellPath = process.env.SHELL || '/bin/zsh';
-  const mark = '__NAGET_ENV__';
+  const mark = '__HYDOR_ENV__';
   try {
     const out = execFileSync(shellPath, ['-ilc', `printf '%s' '${mark}'; command env -0`], {
       encoding: 'utf8',
       timeout: 10_000,
       stdio: ['ignore', 'pipe', 'ignore'],
-      env: { ...process.env, NAGET_READING_ENV: '1' },
+      env: { ...process.env, HYDOR_READING_ENV: '1' },
     });
     const env = {};
     for (const kv of out.slice(out.lastIndexOf(mark) + mark.length).split('\0')) {
       const i = kv.indexOf('=');
       if (i > 0) env[kv.slice(0, i)] = kv.slice(i + 1);
     }
-    for (const k of ['SHLVL', 'PWD', 'OLDPWD', '_', 'NAGET_READING_ENV']) delete env[k];
+    for (const k of ['SHLVL', 'PWD', 'OLDPWD', '_', 'HYDOR_READING_ENV']) delete env[k];
     if (env.PATH) return env;
   } catch {}
   return { ...process.env, PATH: ['/opt/homebrew/bin', '/usr/local/bin', process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'].join(':') };
@@ -109,7 +117,8 @@ function loginEnv() {
 /** Your own settings for the server (PORT, DATA_DIR…), one NAME=value a line, as on Linux. */
 function envFile() {
   const env = {};
-  for (const f of [path.join(os.homedir(), '.config/naget-agent.env')]) {
+  // Naget Agent's file first, so a setting in hydor.env wins.
+  for (const f of [path.join(os.homedir(), '.config/naget-agent.env'), path.join(os.homedir(), '.config/hydor.env')]) {
     let text = '';
     try {
       text = fs.readFileSync(f, 'utf8');
@@ -135,11 +144,11 @@ function serverEnv(extra) {
     ...extra,
     PATH: [...bins, env.PATH].join(':'),
     NODE_ENV: 'production',
-    NAGET_AGENT_ROOT: SERVER,
-    NAGET_DESKTOP: 'mac',
-    NAGET_DESKTOP_APP: BUNDLE,
-    NAGET_DESKTOP_UPDATABLE: updatable() ? '1' : '0',
-    NAGET_DESKTOP_CACHE: CACHE,
+    HYDOR_ROOT: SERVER,
+    HYDOR_DESKTOP: 'mac',
+    HYDOR_DESKTOP_APP: BUNDLE,
+    HYDOR_DESKTOP_UPDATABLE: updatable() ? '1' : '0',
+    HYDOR_DESKTOP_CACHE: CACHE,
   };
 }
 
@@ -179,10 +188,10 @@ function logFd() {
 function startServer() {
   if (server || quitting) return;
   const extra = {};
-  if (updateError) extra.NAGET_UPDATE_ERROR = JSON.stringify(updateError);
+  if (updateError) extra.HYDOR_UPDATE_ERROR = JSON.stringify(updateError);
   updateError = null;
   const fd = logFd();
-  fs.writeSync(fd, `\n---- ${new Date().toISOString()} Naget Agent ${app.getVersion()} starts the server\n`);
+  fs.writeSync(fd, `\n---- ${new Date().toISOString()} Hydor ${app.getVersion()} starts the server\n`);
   const node = NODE_BIN ? path.join(NODE_BIN, 'node') : 'node';
   const child = spawn(node, [path.join(SERVER, 'dist/server/index.js')], { cwd: SERVER, env: serverEnv(extra), stdio: ['ignore', fd, fd, 'ipc'] });
   fs.closeSync(fd);
@@ -190,7 +199,7 @@ function startServer() {
   startedAt = Date.now();
   if (child.pid) fs.writeFileSync(PIDFILE, String(child.pid));
   child.on('message', onMessage);
-  child.on('error', (e) => console.error('[naget] the server did not start:', e));
+  child.on('error', (e) => console.error('[hydor] the server did not start:', e));
   child.on('exit', (code, signal) => {
     if (server === child) server = null;
     fs.rmSync(PIDFILE, { force: true });
@@ -276,7 +285,7 @@ const updateNow = () => toServer({ type: 'update-now' });
 /** A notification from the Mac: clicking it opens the app (its note counts down, with Later); its button installs now. */
 function notify(n) {
   if (!Notification.isSupported()) return;
-  const note = new Notification({ title: String(n.title || 'Naget Agent'), body: String(n.body || ''), actions: n.action ? [{ type: 'button', text: String(n.action) }] : [] });
+  const note = new Notification({ title: String(n.title || 'Hydor'), body: String(n.body || ''), actions: n.action ? [{ type: 'button', text: String(n.action) }] : [] });
   notices.add(note);
   const done = () => notices.delete(note);
   note.on('click', () => {
@@ -297,7 +306,7 @@ function onComputer(m) {
   // ⌘⇧Esc stops it, only while an agent acts (the keys stay the other apps' otherwise).
   if (computerActive && !was) {
     try {
-      if (!globalShortcut.register(STOP_KEYS, stopComputer)) console.error('[naget] ⌘⇧Esc is taken by another app');
+      if (!globalShortcut.register(STOP_KEYS, stopComputer)) console.error('[hydor] ⌘⇧Esc is taken by another app');
     } catch {}
   } else if (!computerActive && was) {
     try {
@@ -345,7 +354,7 @@ async function answer(m) {
   try {
     if (m.what === 'permissions') return reply(permissions());
     if (m.what === 'request' && m.which === 'accessibility') {
-      // macOS asks once ("Naget Agent would like to control this computer"); its settings list the app from then on.
+      // macOS asks once ("Hydor would like to control this computer"); its settings list the app from then on.
       if (!systemPreferences.isTrustedAccessibilityClient(true)) await shell.openExternal(PANES.accessibility);
       return reply(permissions());
     }
@@ -369,7 +378,7 @@ async function install(m) {
   if (installing || !updatable()) return;
   installing = true;
   const fail = (error) => {
-    console.error('[naget] the update did not install:', error);
+    console.error('[hydor] the update did not install:', error);
     installing = false;
     updateError = { from: m.from, to: m.to, error };
     startServer();
@@ -430,7 +439,7 @@ function rollBack(why) {
       fs.rmSync(path.join(DATA, 'failed.app'), { recursive: true, force: true });
       fs.writeFileSync(PENDING, JSON.stringify({ ...p, failed: `Version ${p.to} did not start: ${why}. The version before is back.` }));
     } catch (e) {
-      console.error('[naget] could not go back to the version before:', e);
+      console.error('[hydor] could not go back to the version before:', e);
     }
     app.relaunch({ args: process.argv.slice(1) });
     app.exit(0);
@@ -467,7 +476,7 @@ const sameOrigin = (url) => {
 
 const page = (body) =>
   'data:text/html;charset=utf-8,' +
-  encodeURIComponent(`<!doctype html><meta charset="utf-8"><title>Naget Agent</title><style>
+  encodeURIComponent(`<!doctype html><meta charset="utf-8"><title>Hydor</title><style>
   :root{color-scheme:light dark;font:14px -apple-system,system-ui,sans-serif}
   body{margin:0;height:100vh;display:grid;place-items:center;background:Canvas;color:CanvasText}
   main{max-width:560px;padding:24px;text-align:center} p{opacity:.7;line-height:1.5}
@@ -485,11 +494,11 @@ function openWindow(at) {
       minWidth: 640,
       minHeight: 480,
       show: false,
-      title: 'Naget Agent',
+      title: 'Hydor',
       backgroundColor: nativeTheme.shouldUseDarkColors ? '#161616' : '#ffffff',
       webPreferences: { contextIsolation: true, sandbox: true, spellcheck: true, backgroundThrottling: false },
     });
-    win.webContents.setUserAgent(`${win.webContents.getUserAgent()} NagetAgentMac/${app.getVersion()}`);
+    win.webContents.setUserAgent(`${win.webContents.getUserAgent()} HydorMac/${app.getVersion()}`);
     win.once('ready-to-show', () => win && win.show());
     win.on('close', (e) => {
       if (quitting) return;
@@ -518,7 +527,7 @@ function openWindow(at) {
     });
   }
   if (at !== undefined && serverUrl) void win.loadURL(serverUrl + at);
-  else if (!serverUrl && !win.webContents.getURL()) void win.loadURL(page('<h2>Starting Naget Agent…</h2><p>This takes a few seconds.</p>'));
+  else if (!serverUrl && !win.webContents.getURL()) void win.loadURL(page('<h2>Starting Hydor…</h2><p>This takes a few seconds.</p>'));
   app.dock?.show();
   if (win.isMinimized()) win.restore();
   win.show();
@@ -534,7 +543,7 @@ function showProblem() {
   openWindow();
   void win.loadURL(
     page(
-      `<h2>Naget Agent could not start</h2><p>Its server stopped each time it started. The end of its log:</p><pre>${esc(tail)}</pre>` +
+      `<h2>Hydor could not start</h2><p>Its server stopped each time it started. The end of its log:</p><pre>${esc(tail)}</pre>` +
         `<p><a href="naget-action:retry">Try again</a><a href="naget-action:log">Show the log</a></p>`,
     ),
   );
@@ -543,7 +552,7 @@ function showProblem() {
 function action(what) {
   if (what === 'retry') {
     failures = 0;
-    void win?.loadURL(page('<h2>Starting Naget Agent…</h2>'));
+    void win?.loadURL(page('<h2>Starting Hydor…</h2>'));
     startServer();
   } else if (what === 'log') shell.showItemInFolder(LOG);
 }
@@ -558,7 +567,7 @@ function rebuildTray() {
     const icon = nativeImage.createFromPath(path.join(PACKAGED ? RES : path.join(__dirname, 'resources'), 'trayTemplate.png'));
     icon.setTemplateImage(true);
     tray = new Tray(icon);
-    tray.setToolTip('Naget Agent');
+    tray.setToolTip('Hydor');
   }
   // While an agent uses the Mac, the menu bar says so beside the icon, and its menu starts with Stop.
   const agent = computerActive
@@ -570,11 +579,11 @@ function rebuildTray() {
       ]
     : [];
   tray.setTitle(computerActive ? 'Agent using your Mac' : '');
-  tray.setToolTip(computerActive ? 'Naget Agent: an agent is using your Mac' : 'Naget Agent');
+  tray.setToolTip(computerActive ? 'Hydor: an agent is using your Mac' : 'Hydor');
   tray.setContextMenu(
     Menu.buildFromTemplate([
       ...agent,
-      { label: 'Open Naget Agent', click: () => go() },
+      { label: 'Open Hydor', click: () => go() },
       { label: 'Open in Browser', enabled: !!serverUrl, click: () => serverUrl && shell.openExternal(serverUrl) },
       { type: 'separator' },
       { label: 'Settings…', enabled: !!serverUrl, click: () => go('/settings') },
@@ -582,7 +591,7 @@ function rebuildTray() {
         ? { label: `Restart to Update to ${updateReady}`, click: updateNow }
         : { label: 'Check for Updates…', enabled: !!serverUrl, click: () => go('/settings?s=general&find=Check%20now') },
       { type: 'separator' },
-      { label: 'Quit Naget Agent', click: () => app.quit() },
+      { label: 'Quit Hydor', click: () => app.quit() },
     ]),
   );
 }
@@ -614,7 +623,7 @@ function appMenu() {
       {
         role: 'help',
         submenu: [
-          { label: 'Naget Agent Guide', click: () => go('/guide') },
+          { label: 'Hydor Guide', click: () => go('/guide') },
           { label: 'Open in Browser', click: () => serverUrl && shell.openExternal(serverUrl) },
           { label: 'Show the Server Log', click: () => shell.showItemInFolder(LOG) },
         ],
@@ -638,12 +647,12 @@ app.on('before-quit', (e) => {
 });
 
 app.whenReady().then(async () => {
-  app.setAboutPanelOptions({ applicationName: 'Naget Agent', applicationVersion: app.getVersion(), copyright: 'Naget, Inc.' });
+  app.setAboutPanelOptions({ applicationName: 'Hydor', applicationVersion: app.getVersion(), copyright: 'Naget, Inc.' });
   // Opened from the disk image or Downloads, it offers to move to Applications, where it can update itself.
   if (PACKAGED && !HIDDEN && !app.isInApplicationsFolder()) {
     const { response } = await dialog.showMessageBox({
       type: 'question',
-      message: 'Move Naget Agent to your Applications folder?',
+      message: 'Move Hydor to your Applications folder?',
       detail: 'From there it starts with your Mac and keeps itself up to date.',
       buttons: ['Move to Applications', 'Not Now'],
       defaultId: 0,
@@ -653,7 +662,7 @@ app.whenReady().then(async () => {
       try {
         if (app.moveToApplicationsFolder()) return;
       } catch (err) {
-        dialog.showErrorBox('Naget Agent could not move itself', String(err.message || err));
+        dialog.showErrorBox('Hydor could not move itself', String(err.message || err));
       }
     }
   }

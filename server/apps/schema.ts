@@ -95,7 +95,7 @@ export function appSchema(): Record<string, unknown> {
   };
   return {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
-    title: 'A Naget Agent app (app.json)',
+    title: 'A Hydor app (app.json)',
     type: 'object',
     $defs: { step, field, answerField, flow },
     properties: {
@@ -142,7 +142,7 @@ export function appSchema(): Record<string, unknown> {
           required: ['name', 'label'],
         },
       },
-      assets: { type: 'object', description: 'Its own files, by name (asset:<name> in its view): kept by the app, packed in its .naget-app under assets/', additionalProperties: { type: 'object', properties: { sha: { type: 'string' }, mime: { type: 'string' }, bytes: { type: 'number' }, caption: { type: 'string' } } } },
+      assets: { type: 'object', description: 'Its own files, by name (asset:<name> in its view): kept by the app, packed in its .hydor-app under assets/', additionalProperties: { type: 'object', properties: { sha: { type: 'string' }, mime: { type: 'string' }, bytes: { type: 'number' }, caption: { type: 'string' } } } },
       examples: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, inputs: { type: 'object' }, checks: { type: 'array', items: { type: 'string' } } } } },
       screens: { type: 'object', additionalProperties: { type: 'object', properties: { file: { type: 'string' }, title: { type: 'string' } } }, description: 'Its screens, each a page in screens/' },
       ui: uiSchema(),
@@ -245,7 +245,7 @@ function uiSchema(): Record<string, unknown> {
 }
 
 /** The types of a code step, for an editor to check its file with. */
-export const STEP_TYPES = `// A code step of a Naget Agent app. It runs in a sandbox: no network, none of this computer's files but
+export const STEP_TYPES = `// A code step of a Hydor app. It runs in a sandbox: no network, none of this computer's files but
 // the app's own packages (requires.node / requires.python in app.json), and a time limit (not counting
 // the time its ctx calls take). It reaches the world outside only through ctx: each call is a step of the run,
 // kept, so when the run starts again after a restart, the program runs again and a call it made before gives

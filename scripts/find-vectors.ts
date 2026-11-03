@@ -2,7 +2,7 @@
 // settings and actions, themes, app templates, built-in assistants and skills), made once here so no one's
 // computer has to (server/find/shipped-vectors.json). Run it whenever any of those change (CLAUDE.md);
 // server/find/find-test.ts fails until you do. Only texts without a vector yet are embedded, on the CPU unless
-// NAGET_EMBED_DEVICE says otherwise. It needs a Python with PyTorch and Transformers 5.6+: NAGET_EMBED_PYTHON,
+// HYDOR_EMBED_DEVICE says otherwise. It needs a Python with PyTorch and Transformers 5.6+: HYDOR_EMBED_PYTHON,
 // else the app's own one (Settings → Memory → Search by meaning sets it up in the data folder).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -17,19 +17,19 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run it as npm run find:vectors (a scratch DATA_DIR under /tmp, so nothing touches real data).');
   process.exit(2);
 }
-if (!process.env.NAGET_EMBED_PYTHON) {
-  const own = ['.naget-agent', '.web-agent'].map((d) => path.join(os.homedir(), d, 'memory', 'venv', 'bin', 'python')).find((p) => fs.existsSync(p));
+if (!process.env.HYDOR_EMBED_PYTHON) {
+  const own = ['.hydor', '.naget-agent', '.web-agent'].map((d) => path.join(os.homedir(), d, 'memory', 'venv', 'bin', 'python')).find((p) => fs.existsSync(p));
   if (!own) {
-    console.error('No Python with PyTorch and Transformers here: turn on search by meaning in Settings → Memory, or set NAGET_EMBED_PYTHON.');
+    console.error('No Python with PyTorch and Transformers here: turn on search by meaning in Settings → Memory, or set HYDOR_EMBED_PYTHON.');
     process.exit(2);
   }
-  process.env.NAGET_EMBED_PYTHON = own;
+  process.env.HYDOR_EMBED_PYTHON = own;
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-find-vectors-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-find-vectors-'));
 const db = openDb(path.join(tmp, 'v.db'));
 kvSet(db, 'memory.meaning', '1');
-if (!process.env.NAGET_EMBED_DEVICE) kvSet(db, 'memory.meaning.device', 'cpu');
+if (!process.env.HYDOR_EMBED_DEVICE) kvSet(db, 'memory.meaning.device', 'cpu');
 
 let before: Record<string, string> = {};
 try {
@@ -52,7 +52,7 @@ for (let i = 0; i < need.length; i += 64) {
     { wait: true, timeoutMs: 900_000 },
   );
   if (!vecs) {
-    console.error(`The model did not answer (${process.env.NAGET_EMBED_PYTHON}): it needs PyTorch, Transformers 5.6+ and 2.5 GB of free memory.`);
+    console.error(`The model did not answer (${process.env.HYDOR_EMBED_PYTHON}): it needs PyTorch, Transformers 5.6+ and 2.5 GB of free memory.`);
     process.exit(1);
   }
   batch.forEach(([h], k) => (out[h] = Buffer.from(quantize(vecs[k])).toString('base64')));

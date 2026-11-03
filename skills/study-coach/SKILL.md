@@ -72,7 +72,7 @@ don't lecture: ask, listen, check, adjust.
 - **The schedule:** boxes. A card answered right moves up a box and comes back later (after 1, 3, 7,
   14, 30, then 60 days); a card missed goes back to the first box and comes back the same day.
 - **A flashcard page:** `save_page` makes a page that keeps the cards and their schedule in
-  `naget.storage` and works on a phone from its own address. A tested template, with the
+  `hydor.storage` and works on a phone from its own address. A tested template, with the
   scheduling, is in `references/flashcards-page.md`.
 - **Anki and similar apps:** a CSV with front and back columns, handed over with `present_files`,
   imports straight in.

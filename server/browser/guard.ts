@@ -73,6 +73,6 @@ export async function refusal(raw: string, resourceType: string | undefined, p: 
   const doc = resourceType === 'Document';
   if (doc && p.allow.length && !onList(host, port, p.allow) && !p.local.includes(`${host}:${port}`)) return `${host} is not on the list of allowed sites`;
   if (!p.blockPrivate) return null;
-  if (p.local.includes(`${host}:${port}`)) return isLoopback(host) && Number(port) === appPort ? 'that is Naget Agent itself' : null;
+  if (p.local.includes(`${host}:${port}`)) return isLoopback(host) && Number(port) === appPort ? 'that is Hydor itself' : null;
   return (await isPrivate(u)) ? `${host} is on this machine or its network` : null;
 }

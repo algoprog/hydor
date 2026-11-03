@@ -187,7 +187,7 @@ export function docPage(db: DB, doc: Doc, title: string, mode: 'viewer' | 'print
   return [
     '<!doctype html>',
     `<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>`,
-    '<meta name="generator" content="Naget Agent documents">',
+    '<meta name="generator" content="Hydor documents">',
     fams ? `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${esc(fams)}&amp;display=swap">` : '',
     `<style>${pageCss(doc, mode)}\n${docCss(doc)}</style></head><body>`,
     `<main class="nd-doc" translate="no">${sheets.map((s) => `<div class="nd-sheet">${s.join('')}</div>`).join('')}</main>`,

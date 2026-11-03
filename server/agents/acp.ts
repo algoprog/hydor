@@ -44,7 +44,7 @@ const consoleDef = (): AcpAgentDef => ({
   name: 'Custom',
   command: process.execPath,
   args: [path.join(APP_ROOT, 'dist/server/agent.js')],
-  env: { NAGET_AGENT_MODELS: AGENT_FILE, NAGET_AGENT_STATE: path.join(MODELS_DIR, 'sessions') },
+  env: { HYDOR_MODELS: AGENT_FILE, HYDOR_STATE: path.join(MODELS_DIR, 'sessions') },
   hint: 'Built in: models from OpenRouter, Ollama and vLLM, in Settings → Models',
   builtin: true,
 });
@@ -136,7 +136,7 @@ function lastUsage(file: string, of: string): { of: string; in: number; out: num
       if (session !== of || !line.includes('"usage_update"')) continue;
       try {
         const u = JSON.parse(line).u ?? {};
-        const n = u._meta?.naget ?? {};
+        const n = u._meta?.hydor ?? u._meta?.naget ?? {};
         found = { of, in: n.tokensIn ?? found?.in ?? 0, out: n.tokensOut ?? found?.out ?? 0, cached: n.tokensCached ?? found?.cached ?? 0, usd: typeof u.cost?.amount === 'number' ? u.cost.amount : found?.usd };
       } catch {}
     }
@@ -207,7 +207,7 @@ export class AcpLive extends LiveAdapter {
     this.record({ t: 'run', run: this.runner.meta.runId });
     const init = await this.rpc.call(
       'initialize',
-      { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true }, terminal: false }, clientInfo: { name: 'naget-agent', title: 'Naget Agent', version: config.version } },
+      { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true }, terminal: false }, clientInfo: { name: 'hydor', title: 'Hydor', version: config.version } },
       60_000,
     );
     this.caps = init?.agentCapabilities ?? {};
@@ -345,7 +345,7 @@ export class AcpLive extends LiveAdapter {
    */
   private callFrom(u: Json) {
     const of = this.acpSession ?? '';
-    const n = u._meta?.naget ?? {};
+    const n = u._meta?.hydor ?? u._meta?.naget ?? {};
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
     const usd = num(u.cost?.amount) !== undefined && (u.cost.currency ?? 'USD') === 'USD' ? u.cost.amount : undefined;
     const was = this.usage?.of === of ? this.usage : lastUsage(this.o.transcript, of);

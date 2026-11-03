@@ -1,5 +1,5 @@
 // A new folder for a task, for people who do not think in folders: under the root set in Settings →
-// Assistants (~/Naget by default), named by the day and a few words of the prompt, such as
+// Assistants (~/Hydor by default), named by the day and a few words of the prompt, such as
 // 2026-10-31-plan-trip-lisbon. A name already taken gets -2, -3…
 import fs from 'node:fs';
 import path from 'node:path';

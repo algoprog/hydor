@@ -3,7 +3,7 @@
 // a group brings spaces together, a space has skills of its own that its sessions get with the skill
 // library's, and folders used lately that no space has are suggested for one. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/spaces/spaces-test.ts
-//   DATA_DIR=/tmp/naget-test-spaces node dist/dev/spaces-test.js
+//   DATA_DIR=/tmp/hydor-test-spaces node dist/dev/spaces-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -27,7 +27,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-spaces-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-spaces-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 // The skill library: the app's own skills, learned ones and the views agents read, in the scratch folder.
 setFolders({ bundled: path.join(APP_ROOT, 'skills'), learned: path.join(tmp, 'learned'), view: path.join(tmp, 'view', 'naget') });
@@ -245,9 +245,9 @@ test('a session in a space gets its skills with the library’s, its own in plac
   assert.equal(linkOf(view, 'writing'), path.join(spaceSkillsDir(kitchen.id), 'writing'));
   assert.equal(linkOf(view, 'research'), path.join(APP_ROOT, 'skills', 'research'));
   assert.ok(!fs.existsSync(path.join(view, 'skills', 'sowing-plan')), 'not another space’s');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(view, '.claude-plugin', 'plugin.json'), 'utf8')).name, 'naget', 'skills keep their names');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(view, '.claude-plugin', 'plugin.json'), 'utf8')).name, 'hydor', 'skills keep their names');
   const custom = await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'console', extra: { space: kitchen.id } }, deps);
-  assert.equal(custom?.env?.NAGET_SKILL_DIRS, path.join(view, 'skills'));
+  assert.equal(custom?.env?.HYDOR_SKILL_DIRS, path.join(view, 'skills'));
   // In the group: the spaces' skills too, the first space's before the next one's.
   const group = path.dirname((await skillpack.spawn!({ ...base, agent: 'codex', extra: { space: home.id } }, deps))!.skillRoots![0]);
   assert.equal(linkOf(group, 'sowing-plan'), path.join(spaceSkillsDir(garden.id), 'sowing-plan'));
@@ -285,7 +285,7 @@ test('deleting a space puts its skills in the skill library, named for the space
 
 test('folders sessions worked in, or changed files in, are suggested for a space until one has them', () => {
   // Its own home: an earlier test's space has the whole scratch folder.
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-suggest-test-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-suggest-test-'));
   const repo = path.join(home, 'code', 'shop');
   const notes = path.join(home, 'Documents', 'notes');
   const once = path.join(home, 'old-thing');

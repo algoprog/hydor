@@ -2,7 +2,7 @@
 //   osascript -l JavaScript -e DRIVER '<steps as JSON>'
 // which posts mouse and keyboard events through CoreGraphics (CGEvent, the ObjC bridge; event types and flags as
 // numbers, since not all of them are bridged) and reads where things are. No native module and no build step: macOS
-// has osascript. The events count as Naget Agent's, the app the server runs in, so its Accessibility permission
+// has osascript. The events count as Hydor's, the app the server runs in, so its Accessibility permission
 // is the one that matters.
 //
 // Typing text puts each character on a key event as Unicode (CGEventKeyboardSetUnicodeString), which types it whatever

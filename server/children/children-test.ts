@@ -4,7 +4,7 @@
 // message_child and child_sessions. Sessions are a stub; the helper model is a tiny fake server.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/children/children-test.ts
-//   DATA_DIR=/tmp/naget-test-children PRICES_URL= node dist/dev/children-test.js
+//   DATA_DIR=/tmp/hydor-test-children PRICES_URL= node dist/dev/children-test.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -31,7 +31,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '')
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-children-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-children-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

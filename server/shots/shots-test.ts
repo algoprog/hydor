@@ -2,7 +2,7 @@
 // the pictures it takes of a page served here before and after a change, how they pair (same session, label
 // and size, the before taken first) and the routes that give them. Needs a Chromium; without one it says so.
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/shots/shots-test.ts
-//   DATA_DIR=/tmp/naget-test-shots node dist/dev/shots-test.js
+//   DATA_DIR=/tmp/hydor-test-shots node dist/dev/shots-test.js
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -37,7 +37,7 @@ const fails = (f: () => unknown, what: string) => {
   }
 };
 
-const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'naget-shots-test-')));
+const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-shots-test-')));
 fs.writeFileSync(path.join(tmp, 'index.html'), '<!doctype html><title>Local</title><h1>Hi</h1>');
 
 // ---- where it looks -------------------------------------------------------------------------------------

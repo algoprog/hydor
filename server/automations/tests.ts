@@ -2,8 +2,8 @@
 // watcher kind against a local fixture server, run history and the pause rule, webhooks that wait,
 // and the confirm card's round trip, all with a stand-in for the session manager.
 //
-//   OUTDIR=/tmp/naget-auto-tests node scripts/build-server.mjs server/automations/tests.ts
-//   DATA_DIR=/tmp/naget-auto-tests/data node /tmp/naget-auto-tests/tests.js
+//   OUTDIR=/tmp/hydor-auto-tests node scripts/build-server.mjs server/automations/tests.ts
+//   DATA_DIR=/tmp/hydor-auto-tests/data node /tmp/hydor-auto-tests/tests.js
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -42,7 +42,7 @@ async function test(name: string, fn: () => unknown) {
 const iso = (t: number | null) => (t === null ? null : new Date(t).toISOString().slice(0, 16) + 'Z');
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-auto-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-auto-'));
 const db = openDb(path.join(root, 'test.db'));
 kvSet(db, 'user.tz', 'Europe/Athens');
 

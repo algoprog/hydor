@@ -28,7 +28,7 @@ Nothing here is built yet; it is meant to be argued with.*
 
 Say which of these are wrong; the plan changes with them.
 
-1. You (or agents working for you) make apps on your own Naget Agent. They are used by you, by people you send a link
+1. You (or agents working for you) make apps on your own Hydor. They are used by you, by people you send a link
    to, by your programs and by other agents. A shared store of strangers' apps is not a goal yet (export, import and
    a catalog come last).
 2. "Apps" becomes the name people read again, replacing "Templates" (see [Naming](#naming)).
@@ -280,23 +280,23 @@ Four levels, each enough on its own:
    chat, progress, a button that runs a flow, ask a person. The **Part** tab shows what each is tied to (which flow,
    which data). Or ask the agent to rearrange it. As in Unreal's UMG (a design, with a graph behind it), picking a
    button and choosing **When pressed** opens a flow that starts with that event.
-3. **Written**: HTML and JavaScript with `naget.app`.
+3. **Written**: HTML and JavaScript with `hydor.app`.
 
 Results can also be **views**: an output of kind *view* is a page an agent writes for that one result (a map of the
 trip, a chart of the prices), shown in the result in the same sandbox.
 
-`naget.app` sits beside `naget.storage` in the page bridge:
+`hydor.app` sits beside `hydor.storage` in the page bridge:
 
 ```js
-const run = await naget.app.run('add', { url });   // start a flow
+const run = await hydor.app.run('add', { url });   // start a flow
 run.on('step', showStep);                           // follow it live
 run.on('result', showResult);
-const items = naget.app.data('items');              // the app's data
+const items = hydor.app.data('items');              // the app's data
 await items.find({ read: false });
 items.watch(redraw);                                // its changes, live
-const chat = naget.app.chat('librarian');           // talk to one of its agents
+const chat = hydor.app.chat('librarian');           // talk to one of its agents
 await chat.send('What did I save about vLLM?');
-naget.app.user;                                     // you, a guest or a visitor
+hydor.app.user;                                     // you, a guest or a visitor
 ```
 
 The App parts are custom elements written on top of it and shipped in the page kit (like `.n-options` today), so a
@@ -380,7 +380,7 @@ An app is a folder, kept where agents can open it (outside the app's private dat
 reading-list/
   app.json            what it asks, does, gives back, keeps and may use
   instructions/       agents' instructions and long prompts, in Markdown
-  screens/main.html   pages that use naget.app
+  screens/main.html   pages that use hydor.app
   steps/*.ts          code steps, or whole flows
   examples/*.json     inputs and checks
   files/              what its agents should know
@@ -390,12 +390,12 @@ reading-list/
 - Edit it with any editor or coding agent (Claude Code or Codex in a session opened on the folder). The app watches
   the folder and reloads; the editor says **Changed outside the editor**.
 - `app.json` has a JSON Schema at `/api/apps/schema.json` for completion and checks, and there are types for code
-  steps and `ctx` (`naget-app.d.ts`).
+  steps and `ctx` (`hydor-app.d.ts`).
 - A code step exports `meta` (what it uses and gives) and a function; the editor draws its fields and pins from
   `meta`. TypeScript runs as it is (Node strips the types); Python comes later.
 - From the command line: `node dist/server/cli.js app new | dev | try | export | import`; `dev` watches, reloads and
   runs the examples.
-- The folder can be a git repository. Export is one `.naget-app` file: the folder, zipped.
+- The folder can be a git repository. Export is one `.hydor-app` file: the folder, zipped.
 
 ### Keeping the three in step
 
@@ -423,7 +423,7 @@ reading-list/
 - **Imported apps** arrive with their triggers off and a permissions card to accept.
 - **Cost**: caps per run and per day; a model per step (quick model steps, $0 on local models); reused results; an
   estimate before a CSV (as today) and per run from history; the cost of every step on every run.
-- **Sharing**: a link (the public page), API keys, other agents (MCP), the phone address, the `.naget-app` file, and
+- **Sharing**: a link (the public page), API keys, other agents (MCP), the phone address, the `.hydor-app` file, and
   later a catalog anyone can add to, like `catalog/connections/`.
 
 ## 6. What happens to today's features
@@ -499,7 +499,7 @@ what agents are told, and the release notes. Plan on about a quarter of each pha
 
 ### Phase 3: screens and data → 0.12.0
 
-- `naget.app` in the bridge, the App parts, and the App group in the Pages editor with what each part is tied to.
+- `hydor.app` in the bridge, the App parts, and the App group in the Pages editor with what each part is tied to.
 - Data with live changes, **What it keeps** and per-person collections (the Keep data step); conversations with the
   app's agents; views as outputs.
 - The layouts, the phone address, public screens, and **Turn into an app** for kept pages.
@@ -527,9 +527,9 @@ what agents are told, and the release notes. Plan on about a quarter of each pha
 
 - The app as a folder, reloading on change, the schema and types, the CLI's `app` commands, Python steps (a uv
   environment per app), and flows written as code, with replay.
-- `.naget-app` export and import with the permissions card; the gallery of apps and blocks; examples compared across
+- `.hydor-app` export and import with the permissions card; the gallery of apps and blocks; examples compared across
   versions (pass rate, time, cost).
-- **Done when** an app written in VS Code reloads live in Naget, and moves to another machine through its file and its
+- **Done when** an app written in VS Code reloads live in Hydor, and moves to another machine through its file and its
   permissions card.
 
 ### Timeline

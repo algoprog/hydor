@@ -63,7 +63,7 @@ export function WorkFolderChip({
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const phone = useSheets();
-  const root = tildify(st?.taskRoot ?? `${home}/Naget`, home);
+  const root = tildify(st?.taskRoot ?? `${home}/Hydor`, home);
   const extras = Children.toArray(children);
   const nameOf = (p: string) => (p === home ? '~' : basename(p) || '/');
   return (

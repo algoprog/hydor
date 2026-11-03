@@ -32,7 +32,7 @@ type Source = { at: number; search?: SourcesData['searches'][number]; page?: Sou
 
 const DAY = 86_400_000;
 /** The app's own tools as each agent's transcript names them. */
-const OWN_TOOL = /^mcp__(?:naget-agent|agent-console)__(?:web_search|read_page)$/;
+const OWN_TOOL = /^mcp__(?:hydor|naget-agent|agent-console)__(?:web_search|read_page)$/;
 /** The agents' own web tools: Claude Code's, and Codex's search. */
 const AGENT_WEB: Record<string, string> = { WebSearch: 'Claude Code', WebFetch: 'Claude Code', web_search: 'Codex' };
 

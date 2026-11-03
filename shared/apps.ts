@@ -118,7 +118,7 @@ export interface AppRecipe {
   assets?: Record<string, AppAsset>;
   /** More flows beside the main one, by name: what its screens (and programs) start, each with the inputs it takes. */
   flows?: Record<string, NamedFlow>;
-  /** Its screens: pages of its own ("main" opens on its page), made with naget.app and the App parts. */
+  /** Its screens: pages of its own ("main" opens on its page), made with hydor.app and the App parts. */
   screens?: Record<string, AppScreen>;
   /**
    * Its view (shared/app-ui.ts): how its answer looks and what you can do there. Elements it is drawn with
@@ -162,7 +162,7 @@ export interface AppDef extends AppRecipe {
   mcp: boolean;
   /** Agents in your sessions may run it for you (its page's Agents can use it), when it is made for that (madeForSessions). */
   agents: boolean;
-  /** Installed from a file (.naget-app or .json): uninstalling it deletes it, as for an app made here. */
+  /** Installed from a file (.hydor-app or .json): uninstalling it deletes it, as for an app made here. */
   fromFile?: boolean;
   public: PublicSettings;
   /** The template it started from. */

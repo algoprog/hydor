@@ -5,7 +5,7 @@
 // installs after its minute; Later puts it off, and the menu bar's Restart to Update installs it at once. Also the
 // channel's questions to the app and their answers. The test plays the Mac app: it starts itself again as the
 // server's side, with a message channel, as mac/main.cjs does, and stands in for macOS's ditto. Build and run:
-//   OUTDIR=dist/dev node scripts/build-server.mjs server/desktop-test.ts && DATA_DIR=/tmp/naget-test-desktop node dist/dev/desktop-test.js
+//   OUTDIR=dist/dev node scripts/build-server.mjs server/desktop-test.ts && DATA_DIR=/tmp/hydor-test-desktop node dist/dev/desktop-test.js
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -19,13 +19,13 @@ const ZIP = Buffer.from('the build, as the release carries it');
 const sha = (b: Buffer) => createHash('sha512').update(b).digest('base64');
 type Msg = { type: string; [k: string]: unknown };
 
-if (process.env.NAGET_DESKTOP !== 'mac') {
+if (process.env.HYDOR_DESKTOP !== 'mac') {
   // ---- the Mac app's side: a release to download, and the server started with a message channel ----
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-desktop-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-desktop-'));
   const bin = path.join(tmp, 'bin');
   fs.mkdirSync(bin);
   // ditto -x -k <zip> <folder> unpacks; the stand-in puts an app there.
-  fs.writeFileSync(path.join(bin, 'ditto'), '#!/bin/sh\n[ "$1" = -x ] && mkdir -p "$4/Naget Agent.app/Contents" && exit 0\nexec cp -R "$1" "$2"\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'ditto'), '#!/bin/sh\n[ "$1" = -x ] && mkdir -p "$4/Hydor.app/Contents" && exit 0\nexec cp -R "$1" "$2"\n', { mode: 0o755 });
   const server = http.createServer((req, res) => {
     const feed = (sum: string) => JSON.stringify({ version: '9.9.9', files: { [process.arch]: { url: `http://127.0.0.1:${port}/app.zip`, sha512: sum, size: ZIP.length } } });
     if (req.url === '/good.json') res.end(feed(sha(ZIP)));
@@ -45,12 +45,12 @@ if (process.env.NAGET_DESKTOP !== 'mac') {
           DATA_DIR: path.join(tmp, 'data'),
           HOME: tmp,
           PATH: `${bin}:${process.env.PATH}`,
-          NAGET_DESKTOP: 'mac',
-          NAGET_DESKTOP_APP: path.join(tmp, 'Applications/Naget Agent.app'),
-          NAGET_DESKTOP_UPDATABLE: '1',
-          NAGET_DESKTOP_CACHE: path.join(tmp, 'cache'),
-          NAGET_TEST_FEED: `http://127.0.0.1:${port}`,
-          NAGET_UPDATE_NOTICE_MS: '400',
+          HYDOR_DESKTOP: 'mac',
+          HYDOR_DESKTOP_APP: path.join(tmp, 'Applications/Hydor.app'),
+          HYDOR_DESKTOP_UPDATABLE: '1',
+          HYDOR_DESKTOP_CACHE: path.join(tmp, 'cache'),
+          HYDOR_TEST_FEED: `http://127.0.0.1:${port}`,
+          HYDOR_UPDATE_NOTICE_MS: '400',
           ...extra,
         },
         stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
@@ -75,18 +75,18 @@ if (process.env.NAGET_DESKTOP !== 'mac') {
     assert.ok(fs.existsSync(path.join(String(install.app), 'Contents')), 'the new version is unpacked where the app is told');
     console.log('  ok  a good download is unpacked and handed to the app to install');
 
-    const second = await run({ NAGET_UPDATE_ERROR: JSON.stringify({ from: '0.1.0', to: '9.9.9', error: 'Version 9.9.9 did not start' }), NAGET_TEST_ROLLED_BACK: '1' });
+    const second = await run({ HYDOR_UPDATE_ERROR: JSON.stringify({ from: '0.1.0', to: '9.9.9', error: 'Version 9.9.9 did not start' }), HYDOR_TEST_ROLLED_BACK: '1' });
     assert.equal(second.code, 0, 'the rolled-back checks passed');
     fs.rmSync(path.join(tmp, 'data'), { recursive: true, force: true });
 
     // Updates on: the new version downloads at once, the app is told it waits, and a minute (here 400 ms) later it installs.
-    const auto = await run({ NAGET_TEST_AUTO: 'countdown' });
+    const auto = await run({ HYDOR_TEST_AUTO: 'countdown' });
     assert.equal(auto.code, 0, 'the automatic checks passed');
     const told = auto.messages.filter((m) => m.type === 'update' || m.type === 'install');
     const notice = told.find((m) => m.type === 'update' && m.notice);
     assert.ok(notice, 'the app was told to show a notification');
     assert.equal(notice.version, '9.9.9');
-    assert.deepEqual(notice.notice, { title: 'Naget Agent 9.9.9 is ready', body: 'Restarting in a minute to install it. Running agents carry on.', action: 'Restart Now' });
+    assert.deepEqual(notice.notice, { title: 'Hydor 9.9.9 is ready', body: 'Restarting in a minute to install it. Running agents carry on.', action: 'Restart Now' });
     assert.ok(told.indexOf(notice) < told.findIndex((m) => m.type === 'install'), 'the notification comes before the install');
     assert.equal(told.at(-1)?.type, 'install', 'it installed by itself once its minute was up');
     console.log('  ok  a new version downloads by itself, the Mac says so, and it installs a minute later');
@@ -94,7 +94,7 @@ if (process.env.NAGET_DESKTOP !== 'mac') {
 
     // Later, then Restart to Update in the menu bar.
     let laterSeen = false;
-    const later = await run({ NAGET_TEST_AUTO: 'later' }, (m, send) => {
+    const later = await run({ HYDOR_TEST_AUTO: 'later' }, (m, send) => {
       // After Later the menu bar keeps Restart to Update (no notification); the test picks it a moment later.
       if (m.type === 'update' && m.version === '9.9.9' && !m.notice && !laterSeen) {
         laterSeen = true;
@@ -118,7 +118,7 @@ if (process.env.NAGET_DESKTOP !== 'mac') {
   fs.mkdirSync(process.env.DATA_DIR!, { recursive: true });
   const db = openDb(path.join(process.env.DATA_DIR!, 'test.db'));
   watchUpdates(db, () => {});
-  const feed = (name: string) => (process.env.NAGET_UPDATE_FEED = `${process.env.NAGET_TEST_FEED}/${name}`);
+  const feed = (name: string) => (process.env.HYDOR_UPDATE_FEED = `${process.env.HYDOR_TEST_FEED}/${name}`);
   const until = async (ok: () => boolean, what: string, ms = 5000) => {
     for (let t = Date.now(); !ok(); await new Promise((r) => setTimeout(r, 25))) if (Date.now() - t > ms) throw new Error(`waited too long for ${what}`);
   };
@@ -131,7 +131,7 @@ if (process.env.NAGET_DESKTOP !== 'mac') {
     process.send!({ type: 'passed' });
   };
 
-  if (process.env.NAGET_TEST_ROLLED_BACK) {
+  if (process.env.HYDOR_TEST_ROLLED_BACK) {
     const u = updateState() ?? (feed('good.json'), await checkUpdates())!;
     assert.equal(u.last?.ok, false);
     assert.match(u.last?.error ?? '', /did not start/);
@@ -144,7 +144,7 @@ if (process.env.NAGET_DESKTOP !== 'mac') {
     assert.equal(updateState()?.running, undefined, 'nothing downloads by itself');
     assert.equal(updateState()?.ready, undefined);
     ok('… and is not downloaded by itself again');
-  } else if (process.env.NAGET_TEST_AUTO) {
+  } else if (process.env.HYDOR_TEST_AUTO) {
     feed('good.json');
     let u = (await checkUpdates())!;
     assert.deepEqual([u.running?.phase, u.running?.auto], ['download', true], 'it downloads at once, by itself');
@@ -154,7 +154,7 @@ if (process.env.NAGET_DESKTOP !== 'mac') {
     assert.equal(u.ready?.version, '9.9.9');
     assert.ok(u.ready!.installIn! > 0 && u.ready!.installIn! <= 400, `it counts down (${u.ready?.installIn} ms left)`);
     ok('the download waits, counting down to its install');
-    if (process.env.NAGET_TEST_AUTO === 'countdown') {
+    if (process.env.HYDOR_TEST_AUTO === 'countdown') {
       await until(() => updateState()?.running?.phase === 'restart', 'the install', 3000);
       u = updateState()!;
       assert.deepEqual([u.last?.ok, u.last?.to, u.last?.auto, u.ready], [true, '9.9.9', true, undefined]);

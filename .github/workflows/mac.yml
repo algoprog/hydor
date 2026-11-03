@@ -1,5 +1,5 @@
 # The Mac app: built for Apple silicon and Intel on GitHub's Macs, and published on the repository's Releases
-# page when a version tag (v1.2.3) is pushed. Each release carries naget-mac.json, which the app's updater reads.
+# page when a version tag (v1.2.3) is pushed. Each release carries hydor-mac.json, which the app's updater reads.
 # Run it by hand (Actions → Mac app → Run workflow) to build without publishing: the builds are kept as the
 # run's artifacts.
 #
@@ -59,7 +59,7 @@ jobs:
           npm ci --no-audit --no-fund
           scripts/dist.sh
       - name: The app starts its server
-        run: mac/scripts/smoke.sh mac/dist/mac*/"Naget Agent.app"
+        run: mac/scripts/smoke.sh mac/dist/mac*/"Hydor.app"
       - uses: actions/upload-artifact@v4
         with:
           name: mac-${{ matrix.arch }}
@@ -79,10 +79,10 @@ jobs:
           path: out
           merge-multiple: true
       - name: The update feed
-        run: node mac/scripts/feed.mjs "${GITHUB_REF_NAME#v}" out > out/naget-mac.json && cat out/naget-mac.json
+        run: node mac/scripts/feed.mjs "${GITHUB_REF_NAME#v}" out > out/hydor-mac.json && cat out/hydor-mac.json
       - name: Release notes from CHANGELOG.md
         run: awk '/^## /{n++} n==1 && !/^## /' CHANGELOG.md > notes.md && cat notes.md
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" out/*.zip out/*.dmg out/naget-mac.json --title "Naget Agent ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" out/*.zip out/*.dmg out/hydor-mac.json --title "Hydor ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag

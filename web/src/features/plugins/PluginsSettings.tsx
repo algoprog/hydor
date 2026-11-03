@@ -133,7 +133,7 @@ function EveryAgent() {
   };
   const withAgent = () => {
     setMenu(false);
-    go(`/?prompt=${encodeURIComponent('Help me make a plugin for Naget Agent that ')}`);
+    go(`/?prompt=${encodeURIComponent('Help me make a plugin for Hydor that ')}`);
   };
 
   if (!list)

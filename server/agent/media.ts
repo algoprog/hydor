@@ -81,7 +81,7 @@ function converters() {
 function shrink(b: Buffer, type: string, side: number): { data: Buffer; mimeType: string } | null {
   const c = converters();
   if (!c.magick && !c.ffmpeg) return null;
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-img-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-img-'));
   try {
     const keepPng = type === 'image/png' || type === 'image/gif';
     const inp = path.join(dir, `in${EXT[type] ?? ''}`);

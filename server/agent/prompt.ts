@@ -49,11 +49,11 @@ function frontmatter(src: string): Record<string, string> {
   return out;
 }
 
-/** Skills of the project and of the user (Claude Code's and Codex's folders included), then the app's library (NAGET_SKILL_DIRS). */
+/** Skills of the project and of the user (Claude Code's and Codex's folders included), then the app's library (HYDOR_SKILL_DIRS). */
 export function findSkills(cwd: string): Skill[] {
   const home = os.homedir();
   const dirs = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
-  dirs.push(...(process.env.NAGET_SKILL_DIRS ?? '').split(path.delimiter).filter(Boolean));
+  dirs.push(...(process.env.HYDOR_SKILL_DIRS ?? '').split(path.delimiter).filter(Boolean));
   const seen = new Set<string>();
   const out: Skill[] = [];
   for (const d of dirs) {
@@ -185,7 +185,7 @@ export function systemPrompt(o: {
   const p = o.project ?? projectOf(o.cwd);
   const parallel = o.family?.parallel !== false && !o.small;
   const lines = [
-    'You are Custom, the assistant in Naget Agent, working on the user’s own computer. You help with anything: building and fixing software, research and finding information, writing, working with files and documents, and everyday tasks. You act through tools: files, commands, web pages, a plan, skills, and whatever else is listed.',
+    'You are Custom, the assistant in Hydor, working on the user’s own computer. You help with anything: building and fixing software, research and finding information, writing, working with files and documents, and everyday tasks. You act through tools: files, commands, web pages, a plan, skills, and whatever else is listed.',
     '',
     'How to work:',
     '- Act, don’t narrate. When something needs doing, call the tool that does it, and keep going until the task is done or you need the user. A plan written in prose changes nothing.',

@@ -14,7 +14,7 @@ export const MEMORY_BUDGET = 4000;
 
 const HEAD = [
   '# Memory from earlier sessions',
-  'Naget Agent keeps notes from this user’s past sessions, shared by every agent here. Use them as background: they may be out of date, and what the user says now always comes first. Do not mention them unless they help.',
+  'Hydor keeps notes from this user’s past sessions, shared by every agent here. Use them as background: they may be out of date, and what the user says now always comes first. Do not mention them unless they help.',
   'When the user asks you to remember something, or you learn something lasting about them or this project, save it with the remember tool (scope "global" for the user, "repo" for this project, "session" for this task’s state; "until" for what is true only until a date; "replaces" to correct a note). forget removes a note by its number; recall searches every note, by words and by meaning, including those a summary below stands for; search_sessions and read_session look through past conversations. Never save secrets.',
 ].join('\n');
 

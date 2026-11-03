@@ -36,7 +36,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['security', 'Password', 'App', 'The password for this app, and signing out'],
   ['scm', 'Source control', 'App', 'GitHub and Gitea accounts for opening pull requests'],
   ['connect', 'Connect other agents', 'App', 'Let agents elsewhere start and steer sessions here, through this app’s MCP server'],
-  ['machines', 'Machines', 'App', 'Other machines running Naget Agent, to use from here, and access to this one'],
+  ['machines', 'Machines', 'App', 'Other machines running Hydor, to use from here, and access to this one'],
   ['accounts', 'Accounts', 'Agents', 'The Claude Code and Codex sign-ins every session uses'],
   ['agents', 'More agents', 'Agents', 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP'],
   ['models', 'Models', 'Agents', 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM'],
@@ -88,7 +88,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['connect', 'New token', 'mcp token claude code codex connect access', 'A token for an agent elsewhere to start and steer sessions here', 'Make a token for another agent'],
   ['connect', 'What they can do', 'mcp tools list sessions start session send message', 'The tools an agent with a token gets'],
   // App › Machines
-  ['machines', 'Add a machine', 'remote ssh server computer connect', 'Another machine running Naget Agent, to use from here'],
+  ['machines', 'Add a machine', 'remote ssh server computer connect', 'Another machine running Hydor, to use from here'],
   ['machines', 'Access from other machines', 'access token remote', 'Tokens other machines use to reach this one'],
   // Agents › Accounts
   ['accounts', 'Your accounts', 'login sign in claude code codex subscription email plan second account work personal add', 'The Claude Code and Codex sign-ins sessions use, and more you add'],
@@ -156,8 +156,8 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['search', 'Results per search', 'results count number', 'How many results a search gives'],
   // Capabilities › Computer use
   ['computer', 'Let agents use this Mac', 'computer use control mac desktop apps screen mouse keyboard click type screenshot', 'Agents see the screen and use the mouse and keyboard, in any app; each session asks you first'],
-  ['computer', 'Accessibility', 'accessibility permission mouse keyboard control macos privacy', 'macOS’s permission for Naget Agent to use the mouse and keyboard', 'Accessibility permission'],
-  ['computer', 'Screen Recording', 'screen recording permission screenshot see screen macos privacy', 'macOS’s permission for Naget Agent to see the screen', 'Screen Recording permission'],
+  ['computer', 'Accessibility', 'accessibility permission mouse keyboard control macos privacy', 'macOS’s permission for Hydor to use the mouse and keyboard', 'Accessibility permission'],
+  ['computer', 'Screen Recording', 'screen recording permission screenshot see screen macos privacy', 'macOS’s permission for Hydor to see the screen', 'Screen Recording permission'],
   // Capabilities › Browser
   ['browser', 'A browser for agents', 'browser chromium chrome web pages agents', 'Agents open sites, click, type and read pages'],
   ['browser', 'Chromium', 'chrome chromium download browser', 'Which Chromium the browser runs', 'Which Chromium'],
@@ -203,9 +203,9 @@ export const OPTIONS: [string, string, string, string, string?][] = [
 
 /** The themes that come with the app: name, and whether it is dark or light. */
 export const THEMES: [string, 'dark' | 'light'][] = [
-  ['Naget Dark', 'dark'],
+  ['Hydor Dark', 'dark'],
   ['Midnight', 'dark'],
-  ['Naget Light', 'light'],
+  ['Hydor Light', 'light'],
   ['Sage', 'light'],
 ];
 

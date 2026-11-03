@@ -63,7 +63,7 @@ export function WhatsNew() {
     } catch {
       return;
     }
-    if (seen && compareVersions(version, seen) > 0) useToasts.getState().push('ok', `Updated to Naget Agent ${version}`, { label: 'What’s new', run: () => openReleaseNotes(version) });
+    if (seen && compareVersions(version, seen) > 0) useToasts.getState().push('ok', `Updated to Hydor ${version}`, { label: 'What’s new', run: () => openReleaseNotes(version) });
   }, [version]);
   return null;
 }

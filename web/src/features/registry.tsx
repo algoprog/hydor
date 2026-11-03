@@ -144,7 +144,7 @@ export const features = (): WebFeature[] =>
   ]);
 
 /** A tool of the app's own MCP server, by its bare name; null for any other tool. The server was called agent-console once. */
-export const nagetTool = (name: string): string | null => /^mcp__(?:naget-agent|agent-console)__(.+)$/.exec(name)?.[1] ?? null;
+export const nagetTool = (name: string): string | null => /^mcp__(?:hydor|naget-agent|agent-console)__(.+)$/.exec(name)?.[1] ?? null;
 
 /** How a tool call shows: the app's own tools by name; with the call itself, others a capability recognises. */
 export function toolView(name: string, t?: ToolInfo): ToolView | undefined {

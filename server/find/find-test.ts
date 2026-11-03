@@ -6,7 +6,7 @@
 // (Search in), and the places kept; and what use adds (usage.ts): picks and visits that age, and how they lift
 // what matches. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/find/find-test.ts
-//   DATA_DIR=/tmp/naget-test-find node dist/dev/find-test.js
+//   DATA_DIR=/tmp/hydor-test-find node dist/dev/find-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -30,7 +30,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-find-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-find-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

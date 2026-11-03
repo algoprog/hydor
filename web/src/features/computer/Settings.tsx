@@ -37,7 +37,7 @@ export function ComputerSettings() {
     return (
       <Section>
         <div className="py-1 text-[13px] leading-relaxed text-fg-2">
-          Computer use needs the Naget Agent Mac app: there, agents can see the Mac’s screen and use its mouse and keyboard, in any app. This copy of Naget Agent does not run in it.
+          Computer use needs the Hydor Mac app: there, agents can see the Mac’s screen and use its mouse and keyboard, in any app. This copy of Hydor does not run in it.
         </div>
       </Section>
     );
@@ -65,10 +65,10 @@ export function ComputerSettings() {
           <Row label="Let agents use this Mac" hint="Agents see the screen and use the mouse and keyboard, in any app; for websites they keep to the browser. Each session asks you first.">
             <Switch on={st.enabled} label="Let agents use this Mac" disabled={busy === 'enabled'} onChange={(on) => call('enabled', () => put<ComputerState>('/api/computer/settings', { enabled: on }))} />
           </Row>
-          <Row label="Accessibility" hint="macOS’s permission for Naget Agent to use the mouse and keyboard.">
+          <Row label="Accessibility" hint="macOS’s permission for Hydor to use the mouse and keyboard.">
             {p?.accessibility ? granted : <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => allow('accessibility')}>Allow…</Button>}
           </Row>
-          <Row label="Screen Recording" hint="macOS’s permission for Naget Agent to see the screen. If macOS asks to quit and reopen Naget Agent, do: running agents carry on.">
+          <Row label="Screen Recording" hint="macOS’s permission for Hydor to see the screen. If macOS asks to quit and reopen Hydor, do: running agents carry on.">
             {p?.screen === 'granted' ? granted : <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => allow('screen')}>Allow…</Button>}
           </Row>
           {active && (
@@ -81,8 +81,8 @@ export function ComputerSettings() {
         </div>
       </Section>
       <div className="px-1 text-[12px] leading-relaxed text-fg-3">
-        {p === null ? 'The Mac app did not say what macOS allows: quit and open Naget Agent again. ' : ''}
-        Allow… shows macOS’s own question, then its System Settings at the right place: turn on Naget Agent there. To stop an agent at any time, choose Stop in the menu bar, or press ⌘⇧Esc.
+        {p === null ? 'The Mac app did not say what macOS allows: quit and open Hydor again. ' : ''}
+        Allow… shows macOS’s own question, then its System Settings at the right place: turn on Hydor there. To stop an agent at any time, choose Stop in the menu bar, or press ⌘⇧Esc.
       </div>
     </div>
   );

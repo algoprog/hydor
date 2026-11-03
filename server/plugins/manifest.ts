@@ -5,7 +5,7 @@
 // plugin needs (other plugins, packages, programs, files, keys) and instructions for every agent.
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_PLUGINS_MCP_SCHEMA, AGENT_PLUGINS_SCHEMA, NAGET_EXT, noRequires, PLUGIN_AGENTS, validPluginName, type PluginAgent, type PluginRequires, type PluginServerInfo } from '../../shared/plugins.ts';
+import { AGENT_PLUGINS_MCP_SCHEMA, AGENT_PLUGINS_SCHEMA, HYDOR_EXT, noRequires, PLUGIN_AGENTS, validPluginName, type PluginAgent, type PluginRequires, type PluginServerInfo } from '../../shared/plugins.ts';
 import { parseSkill, SKILL_NAME } from '../../shared/skillpack.ts';
 
 type Json = Record<string, unknown>;
@@ -347,9 +347,9 @@ export function readPlugin(dirArg: string): Manifest {
   let ext: Json = {};
   if (j.extensions !== undefined) {
     if (!isObj(j.extensions)) problems.push('extensions is not an object: ignored');
-    else if (j.extensions[NAGET_EXT] !== undefined) {
-      if (isObj(j.extensions[NAGET_EXT])) ext = j.extensions[NAGET_EXT] as Json;
-      else problems.push(`extensions.${NAGET_EXT} is not an object: ignored`);
+    else if (j.extensions[HYDOR_EXT] !== undefined) {
+      if (isObj(j.extensions[HYDOR_EXT])) ext = j.extensions[HYDOR_EXT] as Json;
+      else problems.push(`extensions.${HYDOR_EXT} is not an object: ignored`);
     }
   }
   const version = str(j.version);
@@ -375,7 +375,7 @@ export function readPlugin(dirArg: string): Manifest {
     servers = tmp;
   } else servers = serversOf(path.join(root, typeof j.mcpServers === 'string' && j.mcpServers.startsWith('./') ? j.mcpServers : '.mcp.json'), root, true, '1.0.0', problems);
   // Instructions for every agent, in the extension's folder.
-  const instr = path.join(root, NAGET_EXT, 'instructions.md');
+  const instr = path.join(root, HYDOR_EXT, 'instructions.md');
   let instructions: string | undefined;
   if (exists(instr, 'file') && inside(root, path.relative(root, instr))) {
     instructions = fs.readFileSync(instr, 'utf8').slice(0, 8000).trim() || undefined;

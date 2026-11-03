@@ -24,7 +24,7 @@ import { coreOf, getApp, listApps, saveApp } from './store.ts';
 export const APP_FILE = 'app.json';
 
 /** Where a template's folder goes unless another is picked. */
-export const defaultFolder = (slug: string) => path.join(config.home, 'Naget', 'Apps', slug);
+export const defaultFolder = (slug: string) => path.join(config.taskRoot, 'Apps', slug);
 
 type Files = Record<string, string>;
 type FileRef = { file: string };
@@ -62,14 +62,14 @@ function codeOf(text: string, python: boolean): string | null {
 
 const README = (name: string) => `# ${name}
 
-This folder is the app “${name}” of Naget Agent. Change its files in any editor, or ask a coding agent to:
-each change you save comes to Naget Agent as a new version of it, and a mistake is said there in words.
+This folder is the app “${name}” of Hydor. Change its files in any editor, or ask a coding agent to:
+each change you save comes to Hydor as a new version of it, and a mistake is said there in words.
 
 - app.json: what it asks (fields), what it does (prompt, or flow: its steps), what it gives back (answer),
   what it keeps (data), its examples and the rest. .naget/app.schema.json describes each part.
 - instructions/: each step's instructions (and the task of an app without steps), in Markdown.
 - steps/: each code step, as the function it runs (.naget/step.d.ts says what it gets and gives).
-- screens/: its screens, as pages that use naget.app.
+- screens/: its screens, as pages that use hydor.app.
 - ui/: its view's elements (name.html, with name.css beside it) and style.css, and its widgets' code
   (widgets/name.js, with name.css beside it); its pages, events and libraries are in app.json, under ui.
 - graph.json: where its steps sit in the graph (leave it out, and they are laid out by themselves).

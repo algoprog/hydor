@@ -65,14 +65,14 @@ async function startServer() {
     TMPDIR: os.tmpdir(),
     LANG: 'en_US.UTF-8',
     TZ: 'America/New_York',
-    DATA_DIR: path.join(home, '.naget-agent'),
+    DATA_DIR: path.join(home, '.hydor'),
     CLAUDE_CONFIG_DIR: path.join(home, '.claude'),
     CODEX_HOME: path.join(home, '.codex'),
     CLAUDE_BIN: path.join(bin, 'claude'),
     CODEX_BIN: path.join(bin, 'codex'),
     PORT: String(o.port),
     HOST: '127.0.0.1',
-    NAGET_AGENT_ROOT: o.root,
+    HYDOR_ROOT: o.root,
     // Playwright's browsers, where the app takes pages' pictures with (its home is the demo's).
     ...(process.env.PLAYWRIGHT_BROWSERS_PATH ? { PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH } : {}),
     // A preview port of its own (the usual one may be the real app's).
@@ -147,13 +147,13 @@ async function main() {
   stubs();
   const folders = makeFiles(home, now);
   const sessions = makeSessions(home, path.join(home, '.claude/projects'), now, folders);
-  makeData(path.join(home, '.naget-agent'));
+  makeData(path.join(home, '.hydor'));
   const cookie = await startServer();
   const api = apiFor(cookie);
   await seedApi(api, home, now, sessions);
   // Sessions the API touched (a space, a pin) take the time of their last message again.
   const Database = createRequire(path.join(REPO, 'package.json'))('better-sqlite3');
-  const db = new Database(path.join(home, '.naget-agent', 'naget-agent.db'));
+  const db = new Database(path.join(home, '.hydor', 'hydor.db'));
   db.pragma('busy_timeout = 5000');
   for (const x of Object.values(sessions)) db.prepare('update app_sessions set created_at = ?, updated_at = ? where key = ?').run(x.at - 60_000, x.at, x.key);
   db.close();

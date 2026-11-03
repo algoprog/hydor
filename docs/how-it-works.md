@@ -3,7 +3,7 @@
 The architecture, what keeps sessions alive, and how the app is secured. [Back to the README](../README.md).
 
 ```
- browser ──HTTPS / WebSocket──▶ Naget Agent server (Node.js, Fastify)
+ browser ──HTTPS / WebSocket──▶ Hydor server (Node.js, Fastify)
                                   ├─ one small runner process per live session
                                   │    └─ claude (stream-json)  or  codex app-server
                                   ├─ indexer: reads the agents' transcripts into SQLite full-text search
@@ -40,6 +40,6 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
 
 ## Disclaimer
 
-Naget Agent is an independent project, not affiliated with or endorsed by Anthropic or OpenAI.
+Hydor is an independent project, not affiliated with or endorsed by Anthropic or OpenAI.
 Claude and Claude Code are trademarks of Anthropic; Codex and ChatGPT are trademarks of OpenAI. Using the
 agents through this app is subject to your agreements with those companies.

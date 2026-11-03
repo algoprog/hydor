@@ -23,8 +23,8 @@ export interface ToolInfo {
 export class Unauthorized extends Error {}
 
 const PROTOCOL = '2025-06-18';
-export const INIT_PARAMS = { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'naget-agent', title: 'Naget Agent', version: '1' } };
-const UA = 'Naget Agent (+https://github.com/Naget-Inc/naget-agent)';
+export const INIT_PARAMS = { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'hydor', title: 'Hydor', version: '1' } };
+const UA = 'Hydor (+https://github.com/algoprog/hydor)';
 
 export const isRequest = (m: Rpc) => m.id !== undefined && m.id !== null && typeof m.method === 'string';
 

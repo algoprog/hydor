@@ -2,7 +2,7 @@
 // written and, before the CLI has written it (a session just started), expected in the folder of the account
 // the session runs as, so its timeline follows the file the CLI writes. Build and run with scratch folders:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/accounts-test.ts
-//   DATA_DIR=/tmp/naget-test-accounts CLAUDE_CONFIG_DIR=/tmp/naget-test-accounts/claude node dist/dev/accounts-test.js
+//   DATA_DIR=/tmp/hydor-test-accounts CLAUDE_CONFIG_DIR=/tmp/hydor-test-accounts/claude node dist/dev/accounts-test.js
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -17,7 +17,7 @@ if (!config.dataDir.startsWith('/tmp/') || !config.claudeProjectsDir.startsWith(
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-accounts-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-accounts-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 const work = addAccount(db, 'claude', 'Work');
 const projects = path.join(accountById(db, work.id)!.dir, 'projects');

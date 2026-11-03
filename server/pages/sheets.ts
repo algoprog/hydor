@@ -468,7 +468,7 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>';
   const app =
     `${XML_HEAD}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">` +
-    `<Application>Naget Agent</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop>` +
+    `<Application>Hydor</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop>` +
     `<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${n}</vt:i4></vt:variant></vt:vector></HeadingPairs>` +
     `<TitlesOfParts><vt:vector size="${n}" baseType="lpstr">${book.sheets.map((s) => `<vt:lpstr>${xesc(s.name)}</vt:lpstr>`).join('')}</vt:vector></TitlesOfParts>` +
     '<LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0300</AppVersion></Properties>';
@@ -1066,7 +1066,7 @@ function readOds(z: Zip, notes: string[]): { book: Workbook; notes: string[] } {
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** A page is a workbook's own by its marker. */
-export const isBookPage = (html: string) => html.slice(0, 2000).includes('<meta name="generator" content="Naget Agent sheets">');
+export const isBookPage = (html: string) => html.slice(0, 2000).includes('<meta name="generator" content="Hydor sheets">');
 
 const FONT = 'var(--n-font,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif)';
 const LINE = 'var(--n-line,#e2e0da)';
@@ -1261,7 +1261,7 @@ const VIEW_COLS = 200;
 const PRINT_ROWS = 10_000;
 
 const TABS_JS =
-  "(function(){var b=document.body;if((window.naget&&window.naget.fill)||window.parent===window)b.classList.add('nb-fill');" +
+  "(function(){var b=document.body;if((window.hydor&&window.hydor.fill)||window.parent===window)b.classList.add('nb-fill');" +
   "var t=document.querySelectorAll('.nb-tabs button'),s=document.querySelectorAll('.nb-sheet');" +
   "t.forEach(function(x){x.addEventListener('click',function(){var i=x.getAttribute('data-i');s.forEach(function(e){e.hidden=e.getAttribute('data-i')!==i});t.forEach(function(y){y.setAttribute('aria-selected',String(y===x))})})})})();";
 
@@ -1273,7 +1273,7 @@ const TABS_JS =
 export function bookPage(book: Workbook, title: string, mode: 'viewer' | 'print' | 'still' = 'viewer', calc: Calc = computeBook(book)): string {
   const cls = new CssClasses();
   const head = (css: string) =>
-    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><meta name="generator" content="Naget Agent sheets"><style>${css}`;
+    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><meta name="generator" content="Hydor sheets"><style>${css}`;
   if (mode === 'still') {
     const sh = book.sheets[0];
     const e = calc.extent(0);

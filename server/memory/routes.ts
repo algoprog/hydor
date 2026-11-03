@@ -81,7 +81,7 @@ function checkExpiry(v: unknown): number | null {
 
 function exportMarkdown(list: MemoryListEntry[]): string {
   const day = (t: number) => new Date(t).toISOString().slice(0, 10);
-  const out = ['# Memory', '', `Exported from Naget Agent on ${day(Date.now())}.`];
+  const out = ['# Memory', '', `Exported from Hydor on ${day(Date.now())}.`];
   const groups = new Map<string, MemoryListEntry[]>();
   for (const e of list) {
     const k = `${e.scope}\u0000${e.scopeKey}`;
@@ -258,7 +258,7 @@ export function memoryRoutes(d: Deps) {
     const md = (req.query as { format?: string }).format === 'md';
     const list = labelled(d, entries(db));
     const day = new Date().toISOString().slice(0, 10);
-    reply.header('Content-Disposition', `attachment; filename="naget-memory-${day}.${md ? 'md' : 'json'}"`);
+    reply.header('Content-Disposition', `attachment; filename="hydor-memory-${day}.${md ? 'md' : 'json'}"`);
     if (md) return reply.type('text/markdown; charset=utf-8').send(exportMarkdown(list));
     const out = { exportedAt: new Date().toISOString(), entries: list.map((e) => ({ ...e, history: history(db, e.id), sumsUp: e.kind !== 'note' ? childrenOf(db, e.id) : undefined })) };
     return reply.type('application/json; charset=utf-8').send(JSON.stringify(out, null, 2));

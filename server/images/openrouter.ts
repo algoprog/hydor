@@ -13,7 +13,7 @@ export const PREFERRED = ['google/gemini-3.1-flash-image', 'google/gemini-2.5-fl
 export const ASPECTS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9'];
 export const SIZES = ['1K', '2K', '4K'];
 
-export const HEADERS = { 'HTTP-Referer': 'https://github.com/Naget-Inc/naget-agent', 'X-Title': 'Naget Agent' };
+export const HEADERS = { 'HTTP-Referer': 'https://github.com/algoprog/hydor', 'X-Title': 'Hydor' };
 
 let cache: { at: number; list: ImageModel[] } | null = null;
 

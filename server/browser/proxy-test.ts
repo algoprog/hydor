@@ -52,7 +52,7 @@ async function main() {
     assert.equal(splitTarget('a/b:80'), null);
   });
 
-  test('destination: private addresses and names refused, allowed ones and public ones pass, Naget itself never', async () => {
+  test('destination: private addresses and names refused, allowed ones and public ones pass, Hydor itself never', async () => {
     assert.match(String((await destination('127.0.0.1', port, policy, 65000) as any).why), /on this machine/);
     assert.match(String((await destination('localhost', port, policy, 65000) as any).why), /on this machine/);
     assert.match(String((await destination('[::1]', port, policy, 65000) as any).why), /on this machine/);
@@ -61,8 +61,8 @@ async function main() {
     assert.deepEqual(await destination('93.184.215.14', 443, policy, 65000), { ips: ['93.184.215.14'] });
     const allowed = { ...policy, local: [`127.0.0.1:${port}`, 'localhost:65000'] };
     assert.deepEqual(await destination('127.0.0.1', port, allowed, 65000), { ips: ['127.0.0.1'] });
-    assert.match(String((await destination('localhost', 65000, allowed, 65000) as any).why), /Naget Agent itself/);
-    assert.match(String((await destination('127.0.0.1', 65000, { ...policy, blockPrivate: false }, 65000) as any).why), /Naget Agent itself/);
+    assert.match(String((await destination('localhost', 65000, allowed, 65000) as any).why), /Hydor itself/);
+    assert.match(String((await destination('127.0.0.1', 65000, { ...policy, blockPrivate: false }, 65000) as any).why), /Hydor itself/);
     assert.deepEqual(await destination('10.1.2.3', 80, { ...policy, blockPrivate: false }, 65000), { ips: ['10.1.2.3'] });
   });
 

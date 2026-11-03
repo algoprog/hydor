@@ -152,20 +152,20 @@ export function resetAccess() {
 
 // ---- may this session use it now? -------------------------------------------------------------------------------
 
-export const OFF = 'Computer use is off. The user turns it on in Settings → Capabilities → Computer use (in the Naget Agent Mac app).';
+export const OFF = 'Computer use is off. The user turns it on in Settings → Capabilities → Computer use (in the Hydor Mac app).';
 
 /**
  * Null when the session's agent may go on (to see the screen, and to act on it); else what to tell it. The first time
  * in a session, the user is asked on a card.
  */
 export async function mayUse(ctx: RunCtx, need: { see: boolean; act: boolean }): Promise<string | null> {
-  if (!hooks.inApp()) return 'Computer use works only in the Naget Agent Mac app.';
+  if (!hooks.inApp()) return 'Computer use works only in the Hydor Mac app.';
   if (!computerSettings(ctx.deps.db).enabled) return OFF;
   const p = await permissions();
-  if (!p) return 'The Mac app did not say what macOS allows Naget Agent to do. Ask the user to check Settings → Capabilities → Computer use.';
+  if (!p) return 'The Mac app did not say what macOS allows Hydor to do. Ask the user to check Settings → Capabilities → Computer use.';
   const missing = [need.act && !p.accessibility ? 'Accessibility (to use the mouse and keyboard)' : '', need.see && p.screen !== 'granted' ? 'Screen Recording (to see the screen)' : ''].filter(Boolean);
   if (missing.length)
-    return `macOS does not allow Naget Agent ${missing.join(' or ')} yet. Ask the user to allow it: Settings → Capabilities → Computer use has the buttons (then macOS's System Settings → Privacy & Security). Then try again.`;
+    return `macOS does not allow Hydor ${missing.join(' or ')} yet. Ask the user to allow it: Settings → Capabilities → Computer use has the buttons (then macOS's System Settings → Privacy & Security). Then try again.`;
   const other = busyElsewhere(ctx.key);
   if (other) return `Another session (“${other.title}”) is using this Mac right now. Do other work, or try again in a minute.`;
   if (allowed.has(ctx.key)) return null;

@@ -43,17 +43,17 @@ export function activeBase(): ThemeBase {
   return m === 'dark' || (m === 'system' && systemDark()) ? 'dark' : 'light';
 }
 
-/** The theme picked for a base; its Naget theme when the pick is gone. */
+/** The theme picked for a base; its built-in theme when the pick is gone. */
 export function themeFor(base: ThemeBase): AppTheme {
   const ui = useUI.getState();
   const t = findTheme(base === 'dark' ? ui.darkTheme : ui.lightTheme);
   return t && t.base === base ? t : findTheme(DEFAULT_THEME[base])!;
 }
 
-// Naget's own themes are the stylesheet's; the others set their colours on the page.
-const isNaget = (t: AppTheme) => t.id === DEFAULT_THEME.dark || t.id === DEFAULT_THEME.light;
+// The built-in themes are the stylesheet's; the others set their colours on the page.
+const isBuiltIn = (t: AppTheme) => t.id === DEFAULT_THEME.dark || t.id === DEFAULT_THEME.light;
 const ALL_VARS = Object.keys(themeVars(BUILT_IN_THEMES[0]));
-const varsOf = (t: AppTheme) => (isNaget(t) ? {} : themeVars(t));
+const varsOf = (t: AppTheme) => (isBuiltIn(t) ? {} : themeVars(t));
 
 /** Paints a theme on the page (the editor previews drafts this way). */
 export function paintTheme(t: AppTheme) {

@@ -1,4 +1,4 @@
-// The Mac app (mac/): when the server runs inside it, the app starts it with NAGET_DESKTOP=mac and a message
+// The Mac app (mac/): when the server runs inside it, the app starts it with HYDOR_DESKTOP=mac and a message
 // channel (Node's IPC), starts it again whenever it exits (agents carry on, as with the Linux service), and
 // installs the new versions the server downloads (updates.ts). Elsewhere `desktop` is null.
 //
@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 export interface Desktop {
-  /** The app's bundle, `/Applications/Naget Agent.app`. */
+  /** The app's bundle, `/Applications/Hydor.app`. */
   app: string;
   /** Whether the app may replace itself: in a folder you can write to, not run from the disk image or a translocated copy. */
   updatable: boolean;
@@ -21,15 +21,15 @@ export interface Desktop {
 }
 
 function read(): Desktop | null {
-  if (process.env.NAGET_DESKTOP !== 'mac' || !process.env.NAGET_DESKTOP_APP) return null;
+  if (process.env.HYDOR_DESKTOP !== 'mac' || !process.env.HYDOR_DESKTOP_APP) return null;
   let updateError: Desktop['updateError'];
   try {
-    updateError = process.env.NAGET_UPDATE_ERROR ? JSON.parse(process.env.NAGET_UPDATE_ERROR) : undefined;
+    updateError = process.env.HYDOR_UPDATE_ERROR ? JSON.parse(process.env.HYDOR_UPDATE_ERROR) : undefined;
   } catch {}
   return {
-    app: process.env.NAGET_DESKTOP_APP,
-    updatable: process.env.NAGET_DESKTOP_UPDATABLE === '1',
-    cache: process.env.NAGET_DESKTOP_CACHE || path.join(os.homedir(), 'Library/Caches/Naget Agent'),
+    app: process.env.HYDOR_DESKTOP_APP,
+    updatable: process.env.HYDOR_DESKTOP_UPDATABLE === '1',
+    cache: process.env.HYDOR_DESKTOP_CACHE || path.join(os.homedir(), 'Library/Caches/Hydor'),
     updateError,
   };
 }

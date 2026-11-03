@@ -2,7 +2,7 @@
 // server behind it, an echo server, a local MCP command) and a throwaway data folder:
 //
 //   OUTDIR=dist/selftest node scripts/build-server.mjs server/connections/selftest.ts
-//   DATA_DIR=/tmp/naget-conn-selftest PORT=18877 node dist/selftest/selftest.js
+//   DATA_DIR=/tmp/hydor-conn-selftest PORT=18877 node dist/selftest/selftest.js
 //
 // The vault (sealing, rotating a key's value and the vault key), signing in (discovery, registration,
 // PKCE, the one-use state, renewal), what each kind of agent gets, the relay, http_request's host
@@ -28,8 +28,8 @@ import { connections } from './index.ts';
 import { testHooks } from './tools.ts';
 import { listSecrets, readSecret, redact, rotateVaultKey, saveSecret, seal, unseal, vaultTables } from './vault.ts';
 
-if (!/naget-conn-selftest/.test(config.dataDir)) {
-  console.error('Run with DATA_DIR=/tmp/naget-conn-selftest (it is wiped first).');
+if (!/hydor-conn-selftest/.test(config.dataDir)) {
+  console.error('Run with DATA_DIR=/tmp/hydor-conn-selftest (it is wiped first).');
   process.exit(2);
 }
 fs.rmSync(config.dataDir, { recursive: true, force: true });

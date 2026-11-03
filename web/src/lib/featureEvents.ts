@@ -30,7 +30,7 @@ export function useFeatureEvent(id: string, fn: Handler) {
  * a page. With `replace`, that earlier text gives way to this one where it still is (a choice changed).
  */
 export function composeInsert(text: string, key?: string, replace?: string) {
-  window.dispatchEvent(new CustomEvent('naget:compose', { detail: { text, key, replace } }));
+  window.dispatchEvent(new CustomEvent('hydor:compose', { detail: { text, key, replace } }));
 }
 
 /** The message box's text with `next` in: in place of `old` where that still is, else added at the end. */

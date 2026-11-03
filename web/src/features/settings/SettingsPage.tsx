@@ -60,7 +60,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
       { id: 'security', label: 'Password', icon: KeyRound, sub: 'The password for this app, and signing out' },
       { id: 'scm', label: 'Source control', icon: GitPullRequest, sub: 'GitHub and Gitea accounts for opening pull requests' },
       { id: 'connect', label: 'Connect other agents', icon: Cable, sub: 'Let agents elsewhere start and steer sessions here, through this app’s MCP server' },
-      { id: 'machines', label: 'Machines', icon: Server, sub: 'Other machines running Naget Agent, to use from here, and access to this one' },
+      { id: 'machines', label: 'Machines', icon: Server, sub: 'Other machines running Hydor, to use from here, and access to this one' },
     ],
   },
   {
@@ -460,7 +460,7 @@ function GeneralSettings() {
       <Section title="About">
         <div className="space-y-1.5 text-[13px] leading-relaxed text-fg-3">
           <div className="flex flex-wrap items-baseline gap-x-3">
-            <span className="text-fg-2">Naget Agent {boot?.version}</span>
+            <span className="text-fg-2">Hydor {boot?.version}</span>
             <button onClick={() => openReleaseNotes(boot?.version)} className="text-accent hover:underline">
               Release notes
             </button>
@@ -594,7 +594,7 @@ function UpdateLine() {
               {update.kind === 'app'
                 ? update.canRestart
                   ? 'It downloads the new version and opens it in place of this one; running agents carry on.'
-                  : 'Move Naget Agent to your Applications folder to update it.'
+                  : 'Move Hydor to your Applications folder to update it.'
                 : update.canRestart
                   ? 'It pulls, builds and restarts; running agents carry on.'
                   : 'It pulls and builds; restart the server afterwards to use it.'}
@@ -649,7 +649,7 @@ function AutoUpdateSetting() {
             ? 'Downloads a new version as soon as it is out, says so, and restarts into it a minute later (Later puts it off). Running agents carry on.'
             : 'After 5 hours without a message from you, at most once a day. Running agents carry on.'
           : update.kind === 'app'
-            ? 'Move Naget Agent to your Applications folder to update it.'
+            ? 'Move Hydor to your Applications folder to update it.'
             : 'This server cannot restart itself. Run it as a service (install.sh) or with Docker to update automatically.'
       }
     >
@@ -833,7 +833,7 @@ function NotificationSettings() {
       ? 'The Mac app shows them itself while it runs, even with its window closed (it stays in the menu bar).'
       : state === 'unsupported'
       ? appleNotInstalled
-        ? 'On iPhone or iPad: Share → Add to Home Screen, open Naget Agent from there, then turn this on.'
+        ? 'On iPhone or iPad: Share → Add to Home Screen, open Hydor from there, then turn this on.'
         : 'This browser cannot receive notifications here.'
       : state === 'denied'
         ? 'Blocked for this site in the browser settings; allow notifications there first.'

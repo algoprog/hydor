@@ -378,7 +378,7 @@ To see what a page keeps, open it and use **More** (⋯) → **What it keeps**. 
 
 ## Use a page on your phone
 
-Every kept page has an address of its own. It opens just the page, with its data, on any device, without signing in to Naget Agent: handy for a tracker you fill in on your phone.
+Every kept page has an address of its own. It opens just the page, with its data, on any device, without signing in to Hydor: handy for a tracker you fill in on your phone.
 
 1. Open the page and click **Share**.
 2. **On your phone** shows the address. Click the copy button, or the open button beside it to try it.

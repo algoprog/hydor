@@ -1,6 +1,6 @@
 // Pictures, videos, sounds and other files in apps: the ones a run's answer shows (a media answer field, a picture
 // column of a table, any value a view's image, video or audio element draws), the files that come with an app (its
-// assets, packed in its .naget-app), and the libraries a view's own scripts load. What the server and pages share.
+// assets, packed in its .hydor-app), and the libraries a view's own scripts load. What the server and pages share.
 //
 // A file shows from one of these addresses:
 //   https://…                  on the web, as it is
@@ -38,7 +38,7 @@ export const MEDIA_LIMITS = {
   file: 500 * 1024 * 1024,
   /** One of an app's own files. */
   asset: 100 * 1024 * 1024,
-  /** An app's files together (they travel in its .naget-app). */
+  /** An app's files together (they travel in its .hydor-app). */
   assets: 150 * 1024 * 1024,
   /** How many files an app may have. */
   count: 100,

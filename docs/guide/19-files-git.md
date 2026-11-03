@@ -162,7 +162,7 @@ A folder can't go into itself, and moving replaces nothing: if the place already
 - Its **More** (⋯) has **Put it in another folder** and **Delete for good**.
 - **Empty the trash** deletes everything in it for good, once you say so.
 
-The trash is a folder in the app's data folder (for example `~/.naget-agent/trash`); its page says where. Your home folder and the top folder (`/`) can't be deleted. Something on another disk than the app's data folder can't go to the trash: the app asks "Delete … for good?" first.
+The trash is a folder in the app's data folder (for example `~/.hydor/trash`); its page says where. Your home folder and the top folder (`/`) can't be deleted. Something on another disk than the app's data folder can't go to the trash: the app asks "Delete … for good?" first.
 
 ### Download
 
