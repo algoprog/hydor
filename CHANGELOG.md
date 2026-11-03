@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.20.2 · 3 November 2026
+
+A fix for the welcome tour on phones.
+
+- **System shows in the tour**: while the tour shows the tools on a phone, the System tile appears with the
+  others instead of leaving an empty space in the grid's corner.
+
 ## 0.20.1 · 3 November 2026
 
 A fix for sessions started before the rename to Hydor.
