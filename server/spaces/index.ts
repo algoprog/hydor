@@ -47,7 +47,25 @@ export function spaceViews(db: DB): SpaceView[] {
       r,
     ]),
   );
-  return allSpaces(db).map((s) => ({ ...s, sessions: counts.get(s.id)?.n ?? 0, lastAt: counts.get(s.id)?.last ?? undefined, docs: docs.get(s.id) ?? 0, skills: skillsOf(s.id).length }));
+  const kept = libraryCounts(db);
+  return allSpaces(db).map((s) => ({
+    ...s,
+    sessions: counts.get(s.id)?.n ?? 0,
+    lastAt: counts.get(s.id)?.last ?? undefined,
+    docs: docs.get(s.id) ?? 0,
+    skills: skillsOf(s.id).length,
+    library: kept.get(s.id) ?? 0,
+  }));
+}
+
+/** How many things each space holds in the Library: pages (an app's screens aside) and the pictures and videos kept. */
+function libraryCounts(db: DB): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const sql of ['select space, count(*) as n from pages where space is not null and app is null group by space', 'select space, count(*) as n from media where space is not null group by space'])
+    try {
+      for (const r of db.prepare(sql).all() as { space: string; n: number }[]) out.set(r.space, (out.get(r.space) ?? 0) + r.n);
+    } catch {}
+  return out;
 }
 
 /** A space's sessions, the last at work first. */
@@ -156,6 +174,11 @@ export function deleteSpace(db: DB, id: string): string[] {
   const s = spaceById(db, id);
   db.prepare('delete from spaces where id = ?').run(id);
   releaseSpace(db, id);
+  // What the Library kept in it stays there, in no space.
+  for (const table of ['pages', 'media'])
+    try {
+      db.prepare(`update ${table} set space = null where space = ?`).run(id);
+    } catch {}
   const skills = s ? releaseSpaceSkills(db, s) : [];
   // It leaves the groups it was in.
   for (const g of allSpaces(db).filter((x) => x.members?.includes(id))) {

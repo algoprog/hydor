@@ -35,7 +35,7 @@ type Picks = Record<string, string>;
 function PreviewCard({ p, picks, onPick, agents, onAgents, keys, onKeys }: { p: InstallPreview; picks: Picks; onPick: (key: string, value: string) => void; agents: boolean; onAgents: (on: boolean) => void; keys: KeyInput; onKeys: (k: KeyInput) => void }) {
   const needs = [...p.needs.node.map((n) => `${n} (Node)`), ...p.needs.python.map((n) => `${n} (Python)`)];
   // Models to pick, commands missing or warnings open the details by themselves.
-  const [open, setOpen] = useState(() => p.models.some((m) => m.status !== 'here') || p.needs.missing.length > 0 || p.warnings.length > 0);
+  const [open, setOpen] = useState(() => p.models.some((m) => m.status === 'missing' || m.status === 'matched') || p.needs.missing.length > 0 || p.warnings.length > 0);
   return (
     <div className="space-y-3">
       {p.problems.length > 0 && (
@@ -91,6 +91,8 @@ function PreviewCard({ p, picks, onPick, agents, onAgents, keys, onKeys }: { p: 
                     <span translate="no">{m.label}</span>
                     {m.status === 'here' ? (
                       <span className="text-fg-3">· set up here</span>
+                    ) : m.status === 'provider' ? (
+                      <span className="text-fg-3">· through OpenRouter, added to your models when it first runs</span>
                     ) : (
                       <>
                         <span className={m.status === 'missing' ? 'text-warn' : 'text-fg-3'}>{m.status === 'missing' ? '· not set up here; use' : '· here as'}</span>

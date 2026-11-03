@@ -381,7 +381,16 @@ async function modelsHere(recipes: AppRecipe[], catalog?: Catalog): Promise<Inst
       const options = own.map((m) => ({ value: m.id, label: m.label }));
       const exact = own.find((m) => m.id === n.as && (!n.provider || m.provider === n.provider) && (!n.model || m.model === n.model));
       const same = !exact && n.model ? own.find((m) => m.model === n.model && (!n.provider || m.provider === n.provider)) : undefined;
-      out.push({ as: n.as, agent: 'custom', label, status: exact ? 'here' : same ? 'matched' : 'missing', use: exact ? n.as : same ? same.id : '', options });
+      // An OpenRouter model is added to Settings → Models by itself when the app first runs (its key asked for with the app's keys).
+      const fetched = !exact && !same && n.provider === 'openrouter' && !!n.model;
+      out.push({
+        as: n.as,
+        agent: 'custom',
+        label,
+        status: exact ? 'here' : same ? 'matched' : fetched ? 'provider' : 'missing',
+        use: exact ? n.as : same ? same.id : fetched ? `openrouter/${n.model}` : '',
+        options,
+      });
     } else {
       const options = await listOf(n.agent);
       const here = options.some((o) => o.value === n.as);

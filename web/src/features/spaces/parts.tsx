@@ -48,10 +48,10 @@ export function SpaceMark({ s, size = 15, className }: { s: Pick<Space, 'name' |
   );
 }
 
-/** The start page, with this space picked: its folder, its assistant. */
-export function startInSpace(s: Space) {
+/** The start page, with this space picked: its folder, its assistant (and a message in its box, to send or change). */
+export function startInSpace(s: Space, prompt?: string) {
   saveStart({ space: s.id, cwd: s.folder, task: false, ...(s.assistant ? { assistant: s.assistant } : {}) }, true);
-  go('/');
+  go(prompt ? `/?prompt=${encodeURIComponent(prompt)}` : '/');
 }
 
 /** "Thesis, Taxes 2026 and The garden": a group's spaces, by name. */

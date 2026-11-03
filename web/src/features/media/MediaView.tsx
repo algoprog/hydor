@@ -3,20 +3,23 @@
 // length and file, the session it came from, and for a video the frames the model saw. Download, write the
 // title and description again, start a new session with it in the message box, or delete it.
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Download, Ellipsis, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, Trash2, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, Download, Ellipsis, FolderInput, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, Trash2, TriangleAlert } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { clipLength, type MediaItem } from '@shared/media';
 import { api, del, enc, patch } from '../../lib/api';
 import { bytes } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
-import { toastError } from '../../lib/store';
+import { toast, toastError } from '../../lib/store';
+import { tr } from '../../i18n/runtime';
 import { openLightbox } from '../../components/Lightbox';
 import { VideoPlayer } from '../../components/VideoPlayer';
 import { Button, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { NavButton } from '../layout/PageHeader';
-import { downloadMedia, recaption, startSessionWithMedia } from './MediaGrid';
+import { SpaceMenu } from '../spaces/SpacePick';
+import { useSpaces } from '../spaces/state';
+import { downloadMedia, recaption, startSessionWithMedia } from './parts';
 import { mediaUrl, useMedia } from './state';
 
 export function MediaRoute() {
@@ -44,6 +47,8 @@ function MediaView({ id }: { id: string }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const spaces = useSpaces();
   const moreRef = useRef<HTMLButtonElement>(null);
   const [confirm, confirmNode] = useConfirm();
   useEffect(() => {
@@ -102,7 +107,7 @@ function MediaView({ id }: { id: string }) {
       <header className="shrink-0 border-b border-line bg-bg pt-[var(--safe-top)]">
         <div className="flex h-14 items-center gap-2 px-3 sm:px-6">
           {!mobile && <NavButton />}
-          <IconButton label="The Library’s images and videos" onClick={() => go('/library?tab=media')}>
+          <IconButton label="The Library’s pictures and videos" onClick={() => go(m.space ? `/library?space=${m.space}&kind=media` : '/library?kind=media')}>
             <ArrowLeft size={18} />
           </IconButton>
           <div className="min-w-0 flex-1">
@@ -132,11 +137,33 @@ function MediaView({ id }: { id: string }) {
                 Open its session
               </MenuItem>
             )}
+            {!!spaces?.length && (
+              <MenuItem icon={<FolderInput size={14} />} hint={<span translate="no">{spaces.find((x) => x.id === m.space)?.name ?? ''}</span>} onClick={() => (setMenu(false), setMoving(true))}>
+                Move to a space
+              </MenuItem>
+            )}
             <MenuSep />
             <MenuItem icon={<Trash2 size={14} />} danger onClick={remove}>
               Delete
             </MenuItem>
           </Popover>
+          <SpaceMenu
+            anchor={moreRef}
+            open={moving}
+            onClose={() => setMoving(false)}
+            title="Move it to"
+            value={m.space ?? null}
+            onPick={(space) => {
+              if (space === (m.space ?? null)) return;
+              patch<{ item: MediaItem }>(`/api/media/${enc(m.id)}`, { space })
+                .then((r) => {
+                  useMedia.getState().put(r.item);
+                  const name = spaces?.find((x) => x.id === space)?.name;
+                  toast(name ? tr(`Moved to ${name}`) : 'Moved out of its space', 'ok');
+                })
+                .catch(toastError);
+            }}
+          />
         </div>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">

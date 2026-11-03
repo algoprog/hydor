@@ -32,6 +32,8 @@ import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { setCaptureDb } from '../capture/index.ts';
+import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
+import { allSpaces } from '../spaces/index.ts';
 import { draftsOf, endDrafts, feedDraft, type ToolStream } from './drafts.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
@@ -65,6 +67,7 @@ import {
   putValues,
   renamePage,
   resetPageLink,
+  setPageSpace,
   restoreVersion,
   storageEntries,
   storageOp,
@@ -143,7 +146,7 @@ const SAVE_PAGE: RunTool = {
     const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
     const other = id ? kindOf(mustPage(db, id).kind) : null;
     if (other) throw new Error(`Page ${id} is a ${other.noun}: change it with ${other.tool}.`);
-    const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', sessionKey: ctx.key });
+    const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
     return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.`;
@@ -161,7 +164,12 @@ const GET_PAGE: RunTool = {
     const id = typeof a.id === 'string' ? a.id.trim() : '';
     if (!id) {
       const list = listPages(db);
-      return list.length ? list.map((p) => `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`).join('\n') : 'No saved pages yet.';
+      const names = new Map(allSpaces(db).map((x) => [x.id, x.name]));
+      return list.length
+        ? list
+            .map((p) => `- ${p.id} · ${p.title}${p.kind ? ` · ${kindOf(p.kind)?.noun ?? p.kind}` : ''}${p.space && names.has(p.space) ? ` · in the space “${names.get(p.space)}”` : ''} · version ${p.version} · changed ${new Date(p.updatedAt).toISOString()}`)
+            .join('\n')
+        : 'No saved pages yet.';
     }
     const p = mustPage(db, id);
     const k = kindOf(p.kind);
@@ -190,7 +198,7 @@ function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): s
 /** Keeps what an agent made: a new version of the page it named, or a new page of its session. */
 function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown) {
   const db = ctx.deps.db;
-  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key });
+  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
   return p;
@@ -431,10 +439,12 @@ function routes(d: Deps) {
     const fresh = !page;
     if (!page) {
       const data = b.data && typeof b.data === 'object' && !Array.isArray(b.data) ? Object.entries(b.data as Record<string, unknown>).map(([k, v]) => [k, JSON.stringify(v)] as [string, string]) : [];
+      // The space picked, or (not asked) the session's.
+      const space = spaceChoice(db, b.space, sessionSpace(db, sessionKey));
       page =
         typeof b.kind === 'string' && b.kind !== 'page'
-          ? createPage(db, { title: b.title, kind: mustKindName(b.kind), model: b.model ?? mustKind(b.kind).fresh(typeof b.title === 'string' && b.title.trim() ? b.title.trim() : ''), by: 'made', sessionKey })
-          : createPage(db, { title: b.title, html: b.html, by: item ? 'user' : 'made', sessionKey, sourceItem: item });
+          ? createPage(db, { title: b.title, kind: mustKindName(b.kind), model: b.model ?? mustKind(b.kind).fresh(typeof b.title === 'string' && b.title.trim() ? b.title.trim() : ''), by: 'made', sessionKey, space })
+          : createPage(db, { title: b.title, html: b.html, by: item ? 'user' : 'made', sessionKey, sourceItem: item, space });
       try {
         if (data.length) putValues(db, page.id, data.filter(([, v]) => v !== undefined));
       } catch (e) {
@@ -470,12 +480,25 @@ function routes(d: Deps) {
     } catch (e) {
       throw new HttpError(422, `That file could not be read: ${(e as Error).message}`);
     }
-    const page = createPage(db, { title: typeof b.title === 'string' && b.title.trim() ? b.title : name.replace(/\.[^.]+$/, ''), kind, model: got.model, by: 'made', sessionKey: key(b.sessionKey) });
+    const page = createPage(db, {
+      title: typeof b.title === 'string' && b.title.trim() ? b.title : name.replace(/\.[^.]+$/, ''),
+      kind,
+      model: got.model,
+      by: 'made',
+      sessionKey: key(b.sessionKey),
+      space: spaceChoice(db, b.space, sessionSpace(db, key(b.sessionKey))),
+    });
     changed(page.id);
     return { page, notes: got.notes ?? [] };
   });
+  /** Renames a page ({ title }), or moves it to a space ({ space: a space's id, or null for none }). */
   app.patch('/api/pages/:id', async (req) => {
-    const page = renamePage(db, P(req).id, B(req).title);
+    const b = B(req);
+    const id = P(req).id;
+    if (b.title === undefined && b.space === undefined) throw new HttpError(400, 'Send its new title, or the space to move it to (space: an id, or null)');
+    let page = mustPage(db, id);
+    if (b.space !== undefined) page = setPageSpace(db, id, spaceChoice(db, b.space));
+    if (b.title !== undefined) page = renamePage(db, id, b.title);
     tell(d, { what: 'pages' });
     return { page };
   });

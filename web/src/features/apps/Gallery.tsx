@@ -1,17 +1,19 @@
-// The Apps page, in two parts. Agent apps (/apps): a box to describe a new app (with a few ideas to start from), your
-// apps (your own, then the ready-made ones, which come installed) with when each last ran, the runs to pick up
-// again, and the ready-made apps you uninstalled, each showing what you get from it (the pages of its view), to
-// install again; building blocks, apps made to be steps of others, wait folded at the end. An app file dropped on
-// it opens the card that installs it, and each app's card downloads it as a file. Connected apps (/apps/connected):
-// the services every agent can use, connected once, their marketplace and the keys in the vault.
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+// The Apps page, in two parts. Agent apps (/apps): small tools that find things out and show them clearly, each for one
+// job. A short note says what they are (fill in a few answers, or just ask in any session; the answer shows in a view
+// of its own) until you put it away; then a box to find an app and chips for its kind; the runs to pick up again;
+// your own apps; the ready-made ones (which come installed), by kind; those you uninstalled, to install again; and
+// building blocks, apps made to be steps of others, folded at the end. Each card says whether the app opens in a view
+// of its own and whether agents run it in chats. An app file dropped on the page opens the card that installs it, and
+// each app's card downloads it as a file. Connected apps (/apps/connected): the services every agent can use,
+// connected once, their marketplace and the keys in the vault.
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { ArrowRight, ChevronDown, ChevronRight, Download, FilePlus2, FileUp, Globe, LayoutGrid, MoreHorizontal, Plus, Puzzle, Sparkles } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronRight, Download, FilePlus2, FileUp, Globe, LayoutDashboard, LayoutGrid, MessagesSquare, MoreHorizontal, Plus, Puzzle, Search, Sparkles, Target, X } from 'lucide-react';
 import type { AppDef, AppRun } from '@shared/apps';
-import { APP_COLORS, inputsLine, isActive } from '@shared/apps';
+import { APP_COLORS, inputsLine, isActive, madeForSessions } from '@shared/apps';
 import { pagesFor } from '@shared/app-ui';
 import { tr } from '../../i18n/runtime';
-import { api, enc } from '../../lib/api';
+import { api } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
@@ -35,71 +37,6 @@ const STATUS: Record<AppRun['status'], { label: string; tone: 'neutral' | 'ok' |
 };
 
 export const statusBadge = (r: AppRun) => <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>;
-
-/** Ideas to start a new app from: a click puts one in the box. */
-const IDEAS = [
-  'Turn my meeting notes into tasks with owners and dates',
-  'Every Friday, sum up the links I saved this week',
-  'Plan a week of dinners from what is in my fridge',
-  'Check the prices of things I want, and tell me when they drop',
-];
-
-/** A new app: in words, for the App builder to make; or from scratch, or from a file (in the menu beside). */
-function MakeBox() {
-  const [ask, setAsk] = useState('');
-  const box = useRef<HTMLTextAreaElement>(null);
-  const make = () => ask.trim() && go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me an app: ')}${ask.trim()}`)}`);
-  return (
-    <section className="relative overflow-hidden rounded-3xl border border-line bg-panel px-5 py-6 sm:px-8 sm:py-7">
-      <div aria-hidden className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
-      <div className="relative">
-        <div className="flex items-center gap-2 text-[12.5px] font-medium tracking-wide text-accent uppercase">
-          <Sparkles size={14} />
-          New app
-        </div>
-        <h2 className="mt-1.5 text-[22px] leading-tight font-semibold tracking-tight sm:text-[24px]">What should your next app do?</h2>
-        <p className="mt-1 max-w-[620px] text-[14px] leading-relaxed text-fg-2">Say it in a sentence. An agent builds it, tries it, and shows you how it looks before you use it.</p>
-        <form
-          className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end"
-          onSubmit={(e) => {
-            e.preventDefault();
-            make();
-          }}
-        >
-          <textarea
-            ref={box}
-            rows={2}
-            value={ask}
-            onChange={(e) => setAsk(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                make();
-              }
-            }}
-            placeholder="e.g. Every Monday, read my saved links, sum each one up, and send me the three worth reading"
-            className="min-h-[84px] min-w-0 flex-1 resize-none rounded-2xl border border-line-2 bg-bg-1 px-4 py-3 text-[15px] leading-snug outline-none placeholder:text-fg-3 focus:border-accent sm:min-h-[56px]"
-          />
-          <Button type="submit" variant="primary" disabled={!ask.trim()} icon={<ArrowRight size={15} />} className="h-11 px-5">
-            Make it
-          </Button>
-        </form>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {IDEAS.map((idea, i) => (
-            <button
-              key={idea}
-              type="button"
-              onClick={() => (setAsk(tr(idea)), box.current?.focus())}
-              className={cx('rounded-full border border-line bg-bg-1 px-3 py-1.5 text-left text-[12.5px] text-fg-2 transition-colors hover:border-line-2 hover:text-fg', i > 1 && 'max-sm:hidden')}
-            >
-              {idea}
-            </button>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 /** New app: describe it, start from scratch, or install one from a file; one menu. */
 function NewAppMenu() {
@@ -161,25 +98,66 @@ function CardMenu({ a, ready }: { a: AppDef | ReadyApp; ready?: boolean }) {
   );
 }
 
-/** One of your apps (or a ready-made one installed): what it is, and when it last ran. */
-function YourApp({ a, ready }: { a: (AppDef & { lastRunAt?: number }) | ReadyApp; ready?: boolean }) {
+// ---- what apps are -------------------------------------------------------------------------------------------
+
+const INTRO_KEY = 'wa.apps.intro';
+
+/** What an app is, in three parts: its own page and view, any chat, one job. Put away with Got it, brought back by What are apps?. */
+function AppsIntro({ onHide }: { onHide: () => void }) {
+  const parts: [ReactNode, string, string][] = [
+    [<LayoutDashboard key="v" size={17} />, 'Open it here', 'Its page asks a few questions. The answer opens in a view made for it: maps, charts, tables and cards to look through.'],
+    [<MessagesSquare key="c" size={17} />, 'Or just ask in any chat', '“Plan 4 days in Lisbon in May”: the agent runs the right app for you, asks what it is missing, and shows its answer there.'],
+    [<Target key="t" size={17} />, 'One job each', 'Small and quick: each app answers one kind of question well and helps you see it clearly. It is not a big program.'],
+  ];
   return (
-    <div className="group relative">
-      <AppCard a={a} ready={ready} />
-      <CardMenu a={a} ready={ready} />
-    </div>
+    <section className="relative rounded-3xl border border-line bg-panel px-5 py-5 sm:px-7 sm:py-6">
+      <IconButton label="Got it" size="sm" onClick={onHide} className="absolute top-3 right-3">
+        <X size={15} />
+      </IconButton>
+      <div className="flex items-center gap-2 pr-8 text-[12.5px] font-medium tracking-wide text-accent uppercase">
+        <Sparkles size={14} />
+        Apps
+      </div>
+      <h2 className="mt-1 pr-8 text-[19px] leading-tight font-semibold tracking-tight sm:text-[21px]">Small tools that find things out and show them clearly</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {parts.map(([icon, title, body]) => (
+          <div key={title} className="rounded-2xl bg-bg-1 px-4 py-3.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-accent-soft text-accent">{icon}</span>
+            <div className="mt-2.5 text-[13.5px] font-semibold">{title}</div>
+            <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{body}</div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
-function AppCard({ a, ready }: { a: (AppDef & { lastRunAt?: number }) | ReadyApp; ready?: boolean }) {
+// ---- an app's card -------------------------------------------------------------------------------------------
+
+/** One of the two ways an app works, as a quiet mark on its card. */
+function Way({ icon, children, title }: { icon: ReactNode; children: ReactNode; title: string }) {
+  return (
+    <span title={title} className="inline-flex items-center gap-1 text-[12px] text-fg-3">
+      {icon}
+      {children}
+    </span>
+  );
+}
+
+type CardApp = (AppDef & { lastRunAt?: number }) | ReadyApp;
+
+/** An app's card: its face, what it does, whether it has a view of its own and works in chats, and when it last ran. */
+function AppCard({ a, ready }: { a: CardApp; ready?: boolean }) {
   const own = !ready ? (a as AppDef) : null;
-  const view = !!own && (pagesFor(own.ui, 'run').length > 0 || pagesFor(own.ui, 'app').length > 0);
+  const view = (pagesFor(a.ui, 'run').length > 0 || pagesFor(a.ui, 'app').length > 0);
+  // Agents run it in your sessions: made for that, and not turned off on its page.
+  const chats = madeForSessions(a) && (ready ? (a as ReadyApp).agents : own?.agents !== false);
   const path = appPath(ready ? `tpl:${(a as ReadyApp).id}` : a.id);
   // A ready-made app's words are the app's own (translated); yours are yours.
   const mine = ready ? undefined : 'no';
   return (
-    <button type="button" onClick={() => go(path)} className="flex h-full min-h-[132px] w-full flex-col rounded-2xl border border-line bg-panel p-4 pr-10 text-left transition-colors hover:border-line-2 hover:bg-bg-1">
-      <div className="flex w-full items-start gap-3">
+    <button type="button" onClick={() => go(path)} className="flex h-full min-h-[128px] w-full flex-col rounded-2xl border border-line bg-panel p-4 text-left transition-colors hover:border-line-2 hover:bg-bg-1">
+      <div className="flex w-full items-start gap-3 pr-7">
         <AppIcon icon={a.icon} color={a.color} size={42} />
         <div className="min-w-0 flex-1">
           <div translate={mine} className="truncate text-[15px] font-semibold tracking-tight">
@@ -190,19 +168,53 @@ function AppCard({ a, ready }: { a: (AppDef & { lastRunAt?: number }) | ReadyApp
           </div>
         </div>
       </div>
-      <div className="mt-auto flex w-full min-w-0 items-center gap-2 pt-3 text-[12px] text-fg-3">
-        <span className="truncate">{a.lastRunAt ? tr(`Last run ${timeAgo(a.lastRunAt)} ago`) : 'Not run yet'}</span>
-        <span className="flex-1" />
-        {ready && <Badge tone="neutral">Ready-made</Badge>}
-        {view && <Badge tone="neutral">Has a view</Badge>}
+      <div className="mt-auto flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 pt-3">
+        {view && (
+          <Way icon={<LayoutDashboard size={12} />} title="Its answer opens in a view of its own: maps, charts, tables">
+            Its own view
+          </Way>
+        )}
+        {chats && (
+          <Way icon={<MessagesSquare size={12} />} title="Ask for what it does in any session, and the agent runs it there">
+            Works in chats
+          </Way>
+        )}
         {own?.public.on && (
           <Badge tone="info">
             <Globe size={10} className="mr-1" />
             Public
           </Badge>
         )}
+        <span className="flex-1" />
+        {a.lastRunAt ? <span className="text-[12px] text-fg-3">{tr(`Ran ${timeAgo(a.lastRunAt)} ago`)}</span> : null}
       </div>
     </button>
+  );
+}
+
+/** A card with its More (open, download as a file). */
+function YourApp({ a, ready }: { a: CardApp; ready?: boolean }) {
+  return (
+    <div className="group relative">
+      <AppCard a={a} ready={ready} />
+      <CardMenu a={a} ready={ready} />
+    </div>
+  );
+}
+
+const GRID = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3';
+
+/** A part of the page: its title, a quiet line beside it, and what it holds. */
+function Part({ title, sub, children, action }: { title: ReactNode; sub?: ReactNode; children: ReactNode; action?: ReactNode }) {
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+        <h2 className="text-[17px] font-semibold tracking-tight">{title}</h2>
+        {sub && <span className="text-[13px] text-fg-3">{sub}</span>}
+        {action && <span className="ml-auto">{action}</span>}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -260,15 +272,28 @@ function RecentRun({ r, a }: { r: AppRun; a?: { icon: string; color: string; fie
   );
 }
 
+/** How many runs to pick up again show before Show all. */
+const RUNS = 4;
+
 export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) {
   const [g, setG] = useState<Gallery | null>(null);
   const [cat, setCat] = useState('All');
+  const [find, setFind] = useState('');
+  const [intro, setIntro] = useState(() => localStorage.getItem(INTRO_KEY) !== 'hidden');
   const [blocksOpen, setBlocksOpen] = useState(false);
+  const [allRuns, setAllRuns] = useState(false);
   const [adding, setAdding] = useState<ReadyApp | null>(null);
   const load = () => api<Gallery>('/api/apps').then(setG, toastError);
   useEffect(() => {
     if (tab === 'agent') load();
   }, [tab]);
+  const showIntro = (on: boolean) => {
+    setIntro(on);
+    try {
+      if (on) localStorage.removeItem(INTRO_KEY);
+      else localStorage.setItem(INTRO_KEY, 'hidden');
+    } catch {}
+  };
   // The connected services, for their tab's count (and the part itself).
   const connections = useConn((s) => s.connections);
   useEffect(() => {
@@ -311,17 +336,28 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   const blocks = useMemo(() => (g?.templates ?? []).filter((t) => t.block), [g]);
   const own = useMemo(() => (g?.apps ?? []).filter((a) => !a.block), [g]);
   const ownBlocks = useMemo(() => (g?.apps ?? []).filter((a) => a.block), [g]);
-  // Your apps by kind of task, once there are enough of them to look through.
-  const cats = useMemo(() => ['All', ...new Set([...own.map((a) => a.category ?? 'Other'), ...ready.map((t) => t.category ?? 'Other')])], [own, ready]);
-  const sorting = own.length + ready.length > 6 && cats.length > 2;
-  const shown = (category?: string) => !sorting || cat === 'All' || (category ?? 'Other') === cat;
+  // The kinds of apps there are, the ready-made ones' first, in their order.
+  const cats = useMemo(() => ['All', ...new Set([...ready.map((t) => t.category ?? 'Other'), ...own.map((a) => a.category ?? 'Other')])], [own, ready]);
+  const words = find.trim().toLowerCase();
+  const fits = (a: { name: string; description?: string; category?: string }) =>
+    (cat === 'All' || (a.category ?? 'Other') === cat) && (!words || `${a.name} ${a.description ?? ''} ${a.category ?? ''} ${tr(a.name)} ${tr(a.description ?? '')}`.toLowerCase().includes(words));
+  const ownShown = own.filter(fits);
+  const readyShown = ready.filter(fits);
+  // All of them, no words: the ready-made apps under their kinds.
+  const byKind = useMemo(() => {
+    if (cat !== 'All' || words) return null;
+    const out = new Map<string, ReadyApp[]>();
+    for (const t of readyShown) out.set(t.category ?? 'Other', [...(out.get(t.category ?? 'Other') ?? []), t]);
+    return [...out.entries()];
+  }, [readyShown, cat, words]);
   const faces = useMemo(() => Object.fromEntries([...(g?.apps ?? []).map((a) => [a.id, a] as const), ...(g?.templates ?? []).map((t) => [`tpl:${t.id}`, t] as const)]), [g]);
+  const runs = allRuns ? (g?.recent ?? []) : (g?.recent ?? []).slice(0, RUNS);
 
   const header = (
     <PageHeader
       title="Apps"
       tip={tab === 'connected' ? 'connections' : 'apps'}
-      sub={tab === 'connected' ? 'Services every agent can use, connected once, and the keys they use' : 'Small tools made of agents: you fill in a few answers, they come back with the finished work'}
+      sub={tab === 'connected' ? 'Services every agent can use, connected once, and the keys they use' : 'Small tools that find things out and show them clearly: open one here, or ask in any chat'}
       actions={tab === 'agent' ? <NewAppMenu /> : undefined}
     >
       <Tabs
@@ -344,6 +380,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
       </div>
     );
 
+  const nothing = !!g && !ownShown.length && !readyShown.length;
   return (
     <div className="flex h-full min-h-0 flex-col">
       {header}
@@ -362,21 +399,34 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
             <Throbber size={28} />
           </div>
         ) : (
-          <div className="mx-auto max-w-[1120px] space-y-10 px-4 py-6 sm:px-6 sm:py-8">
-            <MakeBox />
+          <div className="mx-auto max-w-[1120px] space-y-9 px-4 py-6 sm:px-6 sm:py-7">
+            {intro && <AppsIntro onHide={() => showIntro(false)} />}
 
-            <section>
-              <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
-                <h2 className="text-[17px] font-semibold tracking-tight">Your apps</h2>
-                {own.length + ready.length > 0 && <span className="text-[13px] text-fg-3">{own.length + ready.length}</span>}
-                {own.length + ready.length > 0 && <span className="text-[13px] text-fg-3">Run one here, or ask for what it does in any session</span>}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <label className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-line bg-bg-1 px-3 sm:max-w-[420px]">
+                  <Search size={15} className="shrink-0 text-fg-3" />
+                  <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find an app: weather, recipes, a trip…" className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-fg-3" />
+                  {find && (
+                    <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
+                      <X size={14} />
+                    </button>
+                  )}
+                </label>
+                <span className="flex-1" />
+                {!intro && (
+                  <button type="button" onClick={() => showIntro(true)} className="shrink-0 text-[12.5px] font-medium text-fg-3 hover:text-fg">
+                    What are apps?
+                  </button>
+                )}
               </div>
-              {sorting && (
-                <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
+              {cats.length > 2 && (
+                <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
                   {cats.map((c) => (
                     <button
                       key={c}
                       type="button"
+                      aria-pressed={cat === c}
                       onClick={() => setCat(c)}
                       className={cx('h-8 shrink-0 rounded-full border px-3.5 text-[13px] transition-colors', cat === c ? 'border-fg bg-fg text-bg' : 'border-line bg-panel text-fg-2 hover:border-line-2 hover:text-fg')}
                     >
@@ -385,54 +435,86 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                   ))}
                 </div>
               )}
-              {own.length + ready.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {own
-                    .filter((a) => shown(a.category))
-                    .map((a) => (
-                      <YourApp key={a.id} a={a} />
-                    ))}
-                  {ready
-                    .filter((t) => shown(t.category))
-                    .map((t) => (
-                      <YourApp key={`tpl:${t.id}`} a={t} ready />
-                    ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-line-2 px-5 py-6 text-center">
-                  <Empty icon={<LayoutGrid size={20} />} title="Your apps will be here">
-                    Describe one above, install a ready-made one below, or use More → Save as an app in a session’s menu.
-                  </Empty>
-                </div>
-              )}
-            </section>
+            </div>
 
-            {g.recent.length > 0 && (
-              <section>
-                <h2 className="mb-3 text-[17px] font-semibold tracking-tight">Pick up where you left off</h2>
+            {g.recent.length > 0 && !words && cat === 'All' && (
+              <Part
+                title="Pick up where you left off"
+                action={
+                  g.recent.length > RUNS ? (
+                    <button type="button" onClick={() => setAllRuns((x) => !x)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
+                      {allRuns ? 'Show fewer' : tr(`All ${g.recent.length}`)}
+                    </button>
+                  ) : undefined
+                }
+              >
                 <div className="overflow-hidden rounded-2xl border border-line bg-panel">
-                  {g.recent.map((r) => (
+                  {runs.map((r) => (
                     <RecentRun key={r.id} r={r} a={faces[r.app]} />
                   ))}
                 </div>
-              </section>
+              </Part>
             )}
 
-            {removed.length > 0 && (
-              <section>
-                <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
-                  <h2 className="text-[17px] font-semibold tracking-tight">Ready-made apps to install</h2>
-                  <span className="text-[13px] text-fg-3">The ones you uninstalled: install one again to have it back</span>
+            {ownShown.length > 0 && (
+              <Part title="Your own apps" sub={tr(`${ownShown.length}`)}>
+                <div className={GRID}>
+                  {ownShown.map((a) => (
+                    <YourApp key={a.id} a={a} />
+                  ))}
                 </div>
+              </Part>
+            )}
+
+            {readyShown.length > 0 && (
+              <Part title="Ready-made apps" sub="They come with Naget Agent: run one, or make it yours to change it">
+                {byKind ? (
+                  <div className="space-y-6">
+                    {byKind.map(([kind, list]) => (
+                      <div key={kind}>
+                        <h3 className="mb-2.5 text-[13px] font-semibold tracking-wide text-fg-3 uppercase">{kind}</h3>
+                        <div className={GRID}>
+                          {list.map((t) => (
+                            <YourApp key={`tpl:${t.id}`} a={t} ready />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={GRID}>
+                    {readyShown.map((t) => (
+                      <YourApp key={`tpl:${t.id}`} a={t} ready />
+                    ))}
+                  </div>
+                )}
+              </Part>
+            )}
+
+            {nothing && (
+              <div className="rounded-2xl border border-dashed border-line-2 px-5 py-2">
+                <Empty icon={<LayoutGrid size={20} />} title={own.length + ready.length ? 'No app does that yet' : 'Your apps will be here'}>
+                  <span className="block">{own.length + ready.length ? 'Describe it, and an agent makes a small app for it: a form, the steps, and a view of the answer.' : 'Describe one, or use More → Save as an app in a session’s menu.'}</span>
+                  <span className="mt-3 inline-flex">
+                    <Button size="sm" variant="secondary" icon={<Sparkles size={14} />} onClick={() => go(`/?assistant=app-builder${words ? `&prompt=${encodeURIComponent(`${tr('Make me an app: ')}${find.trim()}`)}` : ''}`)}>
+                      Describe it to an agent
+                    </Button>
+                  </span>
+                </Empty>
+              </div>
+            )}
+
+            {removed.length > 0 && !words && (
+              <Part title="Ready-made apps to install" sub="The ones you uninstalled: install one again to have it back">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {removed.map((t) => (
                     <ReadyMade key={t.id} t={t} onInstall={() => setAdding(t)} />
                   ))}
                 </div>
-              </section>
+              </Part>
             )}
 
-            {(blocks.length > 0 || ownBlocks.length > 0) && (
+            {(blocks.length > 0 || ownBlocks.length > 0) && !words && (
               <section className="rounded-2xl border border-line">
                 <button type="button" onClick={() => setBlocksOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left" aria-expanded={blocksOpen}>
                   <Puzzle size={17} className="shrink-0 text-fg-3" />

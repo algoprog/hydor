@@ -27,6 +27,10 @@ import { runInstructions, saveResult, startRun, startRuns } from './runs.ts';
 import * as store from './store.ts';
 import { TEMPLATES } from './templates.ts';
 import { intake, usableApps, useNote } from './use.ts';
+import { byWords, dropAppIndex, findApps, stem } from './search.ts';
+import { addModels, modelStates, needModels, setModelsHere } from './models.ts';
+import { missingSecrets, needSecrets, saveAppSecrets, secretsOf } from './secrets.ts';
+import { providerModels } from '../../shared/app-models.ts';
 import { notesOf } from '../notes.ts';
 import { appSummary } from '../../shared/app-summary.ts';
 import { madeForSessions } from '../../shared/apps.ts';
@@ -312,7 +316,7 @@ test('submit_result: only on an app run, checks the fields, saves the result; to
   assert.equal(apps.allowTool!('read_session', ctx), false);
   assert.equal(apps.allowTool!('read_session', { ...ctx, runId: 'other', key: 'claude:someone-else' }), true);
   // Another session hands in nothing: it gets what templates are built with.
-  assert.deepEqual(apps.tools!({ ...ctx, runId: 'other', key: 'claude:someone-else' }).map((t) => t.name), ['app_get', 'app_save', 'app_try', 'app_screen', 'app_data', 'use_app']);
+  assert.deepEqual(apps.tools!({ ...ctx, runId: 'other', key: 'claude:someone-else' }).map((t) => t.name), ['app_get', 'app_save', 'app_try', 'app_screen', 'app_data', 'find_apps', 'use_app']);
   sessions.end(key, 'Here is the plan.');
   await sleep(2000);
   const done = store.getRun(db, run.id)!;
@@ -786,10 +790,14 @@ test('agents in sessions: every installed app made for it, yours first; the swit
   list = usableApps(db);
   assert.ok(list.some((u) => u.app === 'tpl:news-digest') && list.some((u) => u.app === mine.id));
   assert.equal((await call('PUT', `/api/apps/${mine.id}/agents`, { on: 'yes' })).status, 400);
-  // What every session is told: the apps by name, with what each does.
-  assert.match(useNote(db)!, /use_app/);
-  assert.match(useNote(db)!, /"packing-list": Packing list/);
-  assert.match(useNote(db)!, /"(tpl:)?trip-planner": Trip planner \(ready-made\) — A day-by-day plan/);
+  // What every session is told: past ten apps, how many there are, find_apps for them, and those run most (yours first among those never run).
+  const note = useNote(db)!;
+  assert.match(note, /use_app/);
+  assert.match(note, /There are \d+: when a request might be one of their jobs, call find_apps/);
+  assert.ok(note.split('\n').filter((l) => l.startsWith('- ')).length <= 6, 'six at most');
+  assert.match(note, /"(tpl:)?trip-planner": Trip planner \(ready-made\) — A day-by-day plan/, 'one run lately');
+  // Those it does not name, find_apps finds.
+  assert.equal((await findApps(db, usableApps(db), 'packing list')).found[0].u.app, mine.id);
   for (const a of [mine, page, block]) store.deleteApp(db, a.id);
 });
 
@@ -827,9 +835,90 @@ test('use_app: answers in the form’s terms; a file by its path, a text as a fi
   assert.deepEqual(got.unknown, ['extra']);
 });
 
+test('models from a provider: an OpenRouter model asks for OpenRouter’s key with the app’s keys and is added by itself; one for Ollama is refused until set up', async () => {
+  const flow = (model: string) => ({ steps: [{ id: 'draw', title: 'Draw it', do: 'model' as const, instructions: 'Describe {{city}}', model }] });
+  const pic = cleanRecipe({ ...recipe({ name: 'Postcard maker' }), prompt: '', flow: flow('openrouter/google/gemini-2.5-flash-image') });
+  assert.deepEqual(providerModels(pic), [{ as: 'openrouter/google/gemini-2.5-flash-image', provider: 'openrouter', model: 'google/gemini-2.5-flash-image', label: 'gemini-2.5-flash-image' }]);
+  // What it needs says so too, with a name of its own and a label.
+  const named = cleanRecipe({ ...pic, requires: { models: [{ as: 'openrouter/google/gemini-2.5-flash-image', agent: 'custom', provider: 'openrouter', model: 'google/gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image' }] } });
+  assert.equal(providerModels(named)[0].label, 'Gemini 2.5 Flash Image');
+  assert.deepEqual(providerModels(recipe()), [], 'an app of Claude Code’s needs none');
+  // Settings → Models as the apps see it: no OpenRouter key yet, no models.
+  let key: string | undefined;
+  const pinned: string[] = [];
+  setModelsHere({
+    agentModels: () => (key ? pinned.map((m) => ({ id: `openrouter/${m}`, label: m, provider: 'openrouter' as const, baseUrl: '', model: m, tools: 'native' as const })) : []),
+    hasOpenRouterKey: () => !!key,
+    configure: async (p: { openrouterKey?: string | null; pin?: string }) => {
+      if (p.openrouterKey !== undefined) key = p.openrouterKey ?? undefined;
+      if (p.pin && !pinned.includes(p.pin)) pinned.push(p.pin);
+      return {} as never;
+    },
+  });
+  try {
+    assert.equal(modelStates(named)[0].state, 'key');
+    const k = secretsOf(db, named).find((x) => x.name === 'OPENROUTER_API_KEY')!;
+    assert.ok(k && !k.have && k.provider === 'openrouter' && k.url === 'https://openrouter.ai/keys');
+    assert.match(k.help!, /Gemini 2\.5 Flash Image through OpenRouter/);
+    assert.deepEqual(missingSecrets(db, named).map((x) => x.name), ['OPENROUTER_API_KEY']);
+    assert.throws(() => needSecrets(db, named), (e: HttpError) => e.status === 409 && /OpenRouter API key/.test(e.message));
+    // Given on its form or card: kept with Settings → Models, not in the vault.
+    assert.deepEqual(saveAppSecrets(db, named, { OPENROUTER_API_KEY: 'sk-or-test' }), ['OPENROUTER_API_KEY']);
+    assert.equal(key, 'sk-or-test');
+    assert.equal(missingSecrets(db, named).length, 0);
+    assert.equal(modelStates(named)[0].state, 'add', 'added when it first runs');
+    assert.deepEqual(await addModels(named), ['Gemini 2.5 Flash Image']);
+    assert.deepEqual(pinned, ['google/gemini-2.5-flash-image']);
+    assert.equal(modelStates(named)[0].state, 'ready');
+    needModels(named);
+    // One for Ollama is set up by hand: a run is refused, saying where.
+    const local = cleanRecipe({ ...pic, name: 'Local notes', flow: flow('ollama/qwen3:8b') });
+    assert.equal(modelStates(local)[0].state, 'setup');
+    assert.throws(() => needModels(local), (e: HttpError) => e.status === 409 && /Settings → Models: qwen3:8b \(pull it into Ollama\)/.test(e.message));
+    assert.ok(!secretsOf(db, local).some((x) => x.name === 'OPENROUTER_API_KEY'), 'no OpenRouter key for it');
+  } finally {
+    setModelsHere(null);
+  }
+});
+
 /** The session's own MCP context, as its tools see it. */
 const sessionCtx = (key: string): RunCtx => ({ runId: `run-${key}`, key, agent: 'claude', cwd: tmp, deps });
 const useTool = (key: string) => apps.tools!(sessionCtx(key)).find((t) => t.name === 'use_app')!;
+const findTool = (key: string) => apps.tools!(sessionCtx(key)).find((t) => t.name === 'find_apps')!;
+
+test('find_apps: the best fits for a few words (by words while search by meaning is off), plurals and word starts matching; yours lifted; at most k; none matched gives the apps by use', async () => {
+  const weather = store.saveApp(db, { recipe: recipe({ name: 'Rain or shine', description: 'The forecast for the coming days at a place: rain, wind and temperature, as charts', category: 'Weather' }) });
+  const chef = store.saveApp(db, { recipe: recipe({ name: 'Fridge chef', description: 'Recipe ideas from what is in your fridge, with the steps and timings', category: 'Food' }) });
+  dropAppIndex();
+  const list = usableApps(db);
+  assert.equal(stem('recipes'), 'recipe');
+  assert.equal(stem('matches'), 'match');
+  assert.equal(stem('movies'), 'movie');
+  assert.equal(stem('glass'), 'glass');
+  let r = await findApps(db, list, 'weather forecast for the weekend');
+  assert.ok(r.matched);
+  assert.equal(r.found[0].u.app, weather.id, 'its kind and description count');
+  r = await findApps(db, list, 'recipes for dinner from my fridge');
+  assert.equal(r.found[0].u.app, chef.id, 'a plural finds the singular');
+  assert.equal((await findApps(db, list, 'forecasting'))?.found[0]?.u.app, weather.id, 'a longer word finds its start');
+  // Among the ready-made ones alone (other tests leave apps of their own named Trip planner).
+  r = await findApps(db, list.filter((u) => !u.own), 'plan a trip itinerary day by day');
+  assert.equal(r.found[0].u.app, 'tpl:trip-planner');
+  r = await findApps(db, list, 'report', 3);
+  assert.ok(r.found.length <= 3);
+  r = await findApps(db, list, 'zzqx vvbn');
+  assert.equal(r.matched, false, 'nothing matched');
+  assert.equal(r.found.length, Math.min(20, list.length), 'the apps by use instead');
+  // The name counts most: an app named for it ranks over one that only mentions it.
+  assert.equal(byWords(list, 'fridge')[0].u.app, chef.id);
+  // The tool: each candidate with what its form asks; an empty query is refused.
+  const said = String(await findTool('claude:finder').run({ query: 'rain forecast' }, sessionCtx('claude:finder')));
+  assert.match(said, /best first/);
+  assert.match(said, /"rain-or-shine": Rain or shine — The forecast/);
+  assert.match(JSON.stringify(await findTool('claude:finder').run({ query: ' ' }, sessionCtx('claude:finder'))), /isError/);
+  for (const a of [weather, chef]) store.deleteApp(db, a.id);
+  dropAppIndex();
+});
 
 test('use_app: what the request lacks is asked on the app’s own card (optional ones may stay empty); it runs with a card in the conversation and the call gives its answer', async () => {
   const a = store.saveApp(db, { recipe: recipe({ name: 'City break' }) });
@@ -840,7 +929,10 @@ test('use_app: what the request lacks is asked on the app’s own card (optional
   sessions.answerWith = (card) => ({ decision: 'accept', form: { city: 'Porto', days: '2', kids: 'No', budget: '' } });
   const tool = useTool(key);
   assert.ok(tool, 'every session gets use_app');
-  assert.match(tool.description, /"city-break": City break\. Asks city: text, days\?: number, kids\?: yes\/no, budget\?: text\./);
+  // With many apps, use_app does not list them: find_apps gives each with what its form asks.
+  assert.match(tool.description, /find_apps/);
+  const found = String(await findTool(key).run({ query: 'city break weekend' }, sessionCtx(key)));
+  assert.match(found, /"city-break": City break\. Asks city: text, days\?: number, kids\?: yes\/no, budget\?: text\./);
   const going = tool.run({ app: 'city-break', inputs: { days: 2 } }, sessionCtx(key));
   await sleep(150);
   const card = sessions.cards[0];

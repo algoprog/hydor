@@ -71,6 +71,8 @@ export interface MediaItem {
   model?: string;
   /** The session it was saved from. */
   sessionKey?: string;
+  /** The space it is in (the Library shows each space's together); none when unset. */
+  space?: string;
   /** The file it was saved from. */
   source?: string;
   caption: CaptionStatus;

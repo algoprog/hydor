@@ -1,10 +1,8 @@
-// The Library (/library): the pages and slide decks kept from conversations, saved by agents and made here, each
-// with its picture; the images and videos you kept (Media, media/); and the sites published from pages or from a
-// project's build. /pages, its old address, opens it. A page opens at its own place
-// (/pages/<id>) to use, edit (visually or as code) and save, a deck to edit and present (/pages/<id>/show is the
-// audience's window of a presentation), with versions (view one, bring it back), Export (PDF, Word, PowerPoint,
-// a web page), the data it keeps, its own address for a phone's home screen, Publish, and Ask: an agent changes
-// it while you watch.
+// The Library's pages, each at its own place (/pages/<id>): a page to use, edit (visually or as code) and save, a deck
+// to edit and present (/pages/<id>/show is the audience's window of a presentation), with versions (view one, bring
+// it back), Export (PDF, Word, PowerPoint, a web page), the data it keeps, its own address for a phone's home screen,
+// Publish, the space it is in, and Ask: an agent changes it while you watch. The Library itself is Library.tsx;
+// /pages, its old address, opens it.
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { AppDef } from '@shared/apps';
@@ -12,59 +10,46 @@ import { appInfo } from '@shared/app-manifest';
 import { useLocation, useSearch } from 'wouter';
 import {
   AppWindow,
-  ArrowDownUp,
   ArrowLeft,
   Copy,
   Database,
   Download,
   Ellipsis,
   ExternalLink,
-  FileText,
-  Play,
-  Presentation,
-  Sheet,
-  Sigma,
+  FolderInput,
   Globe,
   GlobeLock,
   History,
-  PenLine,
   Pencil,
-  Plus,
-  Search,
   Share2,
   Smartphone,
   Sparkles,
   Trash2,
-  Upload,
-  X,
 } from 'lucide-react';
-import { VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion, type SiteInfo, type SiteVisibility } from '@shared/pages';
-import { newDeck, THEMES, type Deck, type Ratio } from '@shared/slides';
+import { VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '@shared/pages';
+import type { Deck } from '@shared/slides';
 import { api, del, enc, patch, post } from '../../lib/api';
-import { ago, basename, bytes, tildify } from '../../lib/format';
+import { ago, bytes } from '../../lib/format';
 import { useFeatureEvent } from '../../lib/featureEvents';
-import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
-import { toast, toastError, useApp } from '../../lib/store';
-import { FolderPicker } from '../../components/FolderPicker';
+import { toast, toastError } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Empty, IconButton, inputCls, MenuItem, MenuLabel, MenuSep, Popover, Segmented, Tabs, Throbber, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
+import { Button, cx, Dialog, Empty, IconButton, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton, PageHeader } from '../layout/PageHeader';
-import { SiteLink, VISIBILITY } from './cards';
+import { Library } from './Library';
+import { PublishDialog, RenameDialog } from './parts';
+import { SpaceMenu } from '../spaces/SpacePick';
+import { useSpaces } from '../spaces/state';
 import { pageStore, previewStore, type AppBridge } from './frame';
-import { absolute, usePagesStore } from './state';
+import { absolute } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
-import { STARTERS } from './templates';
 import { tr } from '../../i18n/runtime';
 import { closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
 import { loadModelVersion, type AskScope } from './kinds';
-import { EDITORS, preloadEditors } from './editors';
+import { EDITORS } from './editors';
 import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
 import { AudienceView } from './slides/Present';
-import { MediaGrid } from '../media/MediaGrid';
-import { useMedia } from '../media/state';
-import { SlideThumb } from './slides/Thumb';
 
 export function PagesRoute() {
   const [loc] = useLocation();
@@ -79,149 +64,7 @@ export function PagesRoute() {
   return id ? <PageView id={id} /> : <Library />;
 }
 
-// ---- shared bits ---------------------------------------------------------------------------------
-
-const TONES = ['from-accent/25 to-accent/5 text-accent', 'from-info/25 to-info/5 text-info', 'from-ok/25 to-ok/5 text-ok', 'from-warn/25 to-warn/5 text-warn', 'from-claude/25 to-claude/5 text-claude', 'from-codex/25 to-codex/5 text-codex'];
-const toneOf = (id: string) => TONES[parseInt(id.slice(0, 6), 16) % TONES.length];
-const firstLetter = (title: string) => [...title.trim()][0]?.toUpperCase() ?? 'P';
-
-/** A page's picture, or its first letter until the picture is ready. */
-function Thumb({ page, className }: { page: PageInfo; className?: string }) {
-  const ready = usePagesStore((s) => s.thumbs[page.id]) ?? page.thumb;
-  const [failed, setFailed] = useState<string | null>(null);
-  const show = ready && failed !== ready;
-  return (
-    <div className={cx('relative overflow-hidden bg-gradient-to-br', toneOf(page.id), className)}>
-      {show ? (
-        <img src={mu(`/api/pages/${enc(page.id)}/thumb?v=${enc(ready)}`)} alt="" loading="lazy" draggable={false} onError={() => setFailed(ready)} className="absolute inset-0 h-full w-full object-cover object-top" />
-      ) : (
-        <span className="absolute inset-0 flex items-center justify-center text-[34px] font-semibold opacity-80">{firstLetter(page.title)}</span>
-      )}
-    </div>
-  );
-}
-
-function RenameDialog({ page, open, onClose }: { page: PageInfo; open: boolean; onClose: () => void }) {
-  const [title, setTitle] = useState(page.title);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (open) setTitle(page.title);
-  }, [open, page.title]);
-  const save = async () => {
-    setBusy(true);
-    try {
-      await patch(`/api/pages/${enc(page.id)}`, { title });
-      onClose();
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="Rename the page"
-      width={420}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" disabled={busy || !title.trim()} onClick={save}>
-            Rename
-          </Button>
-        </>
-      }
-    >
-      <input autoFocus value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && save()} className={inputCls} />
-    </Dialog>
-  );
-}
-
-/** Publish a saved page, or (without one) a folder: a project's build. */
-function PublishDialog({ page, open, onClose }: { page?: { id: string; title: string }; open: boolean; onClose: () => void }) {
-  const [folder, setFolder] = useState('');
-  const [name, setName] = useState('');
-  const [vis, setVis] = useState<SiteVisibility>('private');
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<SiteInfo | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    setDone(null);
-    setFolder('');
-    setName(page?.title ?? '');
-  }, [open, page?.id]);
-  const submit = async () => {
-    setBusy(true);
-    try {
-      const r = await post<{ site: SiteInfo }>('/api/sites', { pageId: page?.id, folder: page ? undefined : folder, name, visibility: vis });
-      setDone(r.site);
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={page ? `Publish “${page.title}”` : 'Publish a folder'}
-      width={500}
-      footer={
-        done ? (
-          <Button variant="primary" onClick={onClose}>
-            Done
-          </Button>
-        ) : (
-          <>
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button variant="primary" icon={<Globe size={14} />} disabled={busy || !name.trim() || (!page && !folder.trim())} onClick={submit}>
-              Publish
-            </Button>
-          </>
-        )
-      }
-    >
-      {done ? (
-        <div className="space-y-2 text-[13.5px]">
-          <p className="text-fg-2">“{done.name}” is published. Its link:</p>
-          <SiteLink path={done.path} />
-        </div>
-      ) : (
-        <div className="space-y-3.5 text-[13.5px]">
-          {!page && (
-            <label className="block space-y-1.5">
-              <span className="text-[12.5px] font-medium text-fg-2">The folder: a built site with an index.html (dist/, build/ or out/)</span>
-              <FolderPicker
-                value={folder}
-                onChange={(v) => {
-                  setFolder(v);
-                  if (!name.trim() || name === basename(folder.replace(/\/+$/, ''))) setName(basename(v.replace(/\/+$/, '')));
-                }}
-              />
-            </label>
-          )}
-          <label className="block space-y-1.5">
-            <span className="text-[12.5px] font-medium text-fg-2">Name</span>
-            <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="My site" className={inputCls} />
-          </label>
-          <div className="space-y-1.5">
-            <Segmented<SiteVisibility> size="sm" value={vis} onChange={setVis} options={VISIBILITY.map((v) => ({ value: v.value, label: v.label }))} />
-            <p className="text-[12.5px] leading-relaxed text-fg-3">
-              {VISIBILITY.find((v) => v.value === vis)!.hint}
-              {page ? ' A published copy does not keep data: to use the page yourself on a phone, open it at its own address.' : ' It is served as it is on disk: a new build shows at once.'}
-            </p>
-          </div>
-        </div>
-      )}
-    </Dialog>
-  );
-}
+// ---- a page's own place ---------------------------------------------------------------------------
 
 /** Its own address (for a phone's home screen) and publishing, in one place. */
 function ShareMenu({ page, link, anchor, open, onClose, onPublish, onReset }: { page: PageInfo; link: string; anchor: RefObject<HTMLButtonElement | null>; open: boolean; onClose: () => void; onPublish: () => void; onReset: () => void }) {
@@ -357,512 +200,6 @@ function DataDialog({ page, open, onClose }: { page: PageInfo; open: boolean; on
 
 // ---- making a page -------------------------------------------------------------------------------------
 
-type NewKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex';
-const NEW_TITLE: Record<NewKind, string> = { page: '', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document' };
-const ASK_FOR: Record<NewKind, string> = {
-  page: 'Make me a page and keep it in my Library: ',
-  slides: 'Make me slides and keep them in my Library: ',
-  doc: 'Write me a document and keep it in my Library: ',
-  sheet: 'Make me a spreadsheet and keep it in my Library: ',
-  tex: 'Write me a LaTeX document and keep it in my Library: ',
-};
-const OPENS: Partial<Record<NewKind, string>> = { doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip' };
-const KIND_TILES: { value: NewKind; label: string; icon: ReactNode }[] = [
-  { value: 'page', label: 'A page', icon: <AppWindow size={16} /> },
-  { value: 'slides', label: 'Slides', icon: <Presentation size={16} /> },
-  { value: 'doc', label: 'Document', icon: <FileText size={16} /> },
-  { value: 'sheet', label: 'Spreadsheet', icon: <Sheet size={16} /> },
-  { value: 'tex', label: 'LaTeX', icon: <Sigma size={16} /> },
-];
-
-/** A file's bytes as base64, for the import. */
-const base64Of = (f: File) =>
-  new Promise<string>((ok, fail) => {
-    const r = new FileReader();
-    r.onload = () => ok(String(r.result).replace(/^data:[^,]*,/, ''));
-    r.onerror = () => fail(new Error('The file could not be read'));
-    r.readAsDataURL(f);
-  });
-
-function NewPageDialog({ open, onClose, kind: startKind = 'page' }: { open: boolean; onClose: () => void; kind?: NewKind }) {
-  const [kind, setKind] = useState<NewKind>(startKind);
-  const [pick, setPick] = useState(STARTERS[0].id);
-  const [title, setTitle] = useState(STARTERS[0].title);
-  const [theme, setTheme] = useState(THEMES[0].id);
-  const [ratio, setRatio] = useState<Ratio>('16:9');
-  const [ask, setAsk] = useState('');
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    setKind(startKind);
-    setPick(STARTERS[0].id);
-    setTitle(NEW_TITLE[startKind] || STARTERS[0].title);
-    setAsk('');
-  }, [open, startKind]);
-  const starter = STARTERS.find((s) => s.id === pick)!;
-  const defaultTitle = NEW_TITLE[kind] || starter.title;
-  const make = async () => {
-    setBusy(true);
-    try {
-      const t = title.trim() || defaultTitle;
-      const r =
-        kind === 'slides'
-          ? await post<{ page: PageInfo }>('/api/pages', { title: t, kind: 'slides', model: newDeck(t, theme, ratio) })
-          : kind === 'page'
-            ? await post<{ page: PageInfo }>('/api/pages', { title: t, html: starter.html(t) })
-            : await post<{ page: PageInfo }>('/api/pages', { title: t, kind });
-      onClose();
-      go(kind === 'page' ? `/pages/${r.page.id}?mode=${pick === 'blank' ? 'edit' : 'view'}` : `/pages/${r.page.id}`);
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-  /** A Word document, a spreadsheet or a CSV opened as a page of its kind. */
-  const openFile = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = OPENS[kind] ?? '';
-    input.onchange = async () => {
-      const f = input.files?.[0];
-      if (!f) return;
-      setBusy(true);
-      try {
-        const r = await post<{ page: PageInfo; notes?: string[] }>('/api/pages/import', { name: f.name, data: await base64Of(f) });
-        onClose();
-        go(`/pages/${r.page.id}`);
-        if (r.notes?.length) toast(r.notes.map((n) => tr(n)).join(' '));
-      } catch (e) {
-        toastError(e);
-      } finally {
-        setBusy(false);
-      }
-    };
-    input.click();
-  };
-  const switchKind = (k: NewKind) => {
-    if (title === defaultTitle || !title.trim()) setTitle(NEW_TITLE[k] || starter.title);
-    setKind(k);
-  };
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={kind === 'slides' ? 'New slides' : kind === 'doc' ? 'A new document' : kind === 'sheet' ? 'A new spreadsheet' : kind === 'tex' ? 'A new LaTeX document' : 'A new page'}
-      width={560}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" disabled={busy} onClick={make}>
-            Make it
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4 text-[13.5px]">
-        <div className="grid grid-cols-5 gap-1.5 max-sm:grid-cols-3" role="radiogroup" aria-label="What to make">
-          {KIND_TILES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              role="radio"
-              aria-checked={kind === t.value}
-              onClick={() => switchKind(t.value)}
-              className={cx(
-                'flex flex-col items-center gap-1 rounded-xl border px-1.5 py-2 text-[12.5px] transition-colors',
-                kind === t.value ? 'border-accent/60 bg-accent-soft font-medium text-fg' : 'border-line text-fg-2 hover:border-line-2 hover:bg-bg-1',
-              )}
-            >
-              <span className={cx(kind === t.value ? 'text-accent' : 'text-fg-3')}>{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        {kind === 'doc' || kind === 'sheet' || kind === 'tex' ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-2.5">
-            <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-fg-2">
-              {kind === 'doc'
-                ? 'A document to write and edit as in Word or Google Docs, and save as a Word file, a PDF or Markdown.'
-                : kind === 'sheet'
-                  ? 'A spreadsheet with formulas, as in Excel or Google Sheets, to save as an Excel file, a CSV or a PDF.'
-                  : 'LaTeX source beside its typeset pages, as in Overleaf, to save as a PDF or the .tex project.'}
-            </span>
-            <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={openFile}>
-              {kind === 'doc' ? 'Open a Word or text file' : kind === 'sheet' ? 'Open an Excel or CSV file' : 'Open a .tex or .zip file'}
-            </Button>
-          </div>
-        ) : kind === 'page' ? (
-          <div className="grid grid-cols-2 gap-2">
-            {STARTERS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  if (title === starter.title || !title.trim()) setTitle(s.title);
-                  setPick(s.id);
-                }}
-                className={cx('rounded-xl border px-3 py-2.5 text-left transition-colors', pick === s.id ? 'border-accent/60 bg-accent-soft' : 'border-line hover:border-line-2 hover:bg-bg-1')}
-              >
-                <span className="block font-medium text-fg">{s.label}</span>
-                <span className="block text-[12px] leading-snug text-fg-3">{s.hint}</span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-4 gap-2">
-              {THEMES.map((th) => {
-                const d = newDeck(title.trim() || 'Slides', th.id, ratio);
-                return (
-                  <button
-                    key={th.id}
-                    type="button"
-                    onClick={() => setTheme(th.id)}
-                    className={cx('overflow-hidden rounded-lg border text-left transition-colors', theme === th.id ? 'border-accent ring-2 ring-accent/30' : 'border-line hover:border-line-2')}
-                  >
-                    <SlideThumb deck={d} index={0} slide={d.slides[0]} theme={d.theme} width={118} fonts={0} />
-                    <span className="block truncate px-2 py-1 text-[12px] text-fg-2">{th.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <Segmented<Ratio>
-              size="sm"
-              value={ratio}
-              onChange={setRatio}
-              options={[
-                { value: '16:9', label: 'Wide (16:9)' },
-                { value: '4:3', label: 'Standard (4:3)' },
-              ]}
-            />
-          </>
-        )}
-        <label className="block space-y-1.5">
-          <span className="text-[12.5px] font-medium text-fg-2">Its name</span>
-          <input value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && make()} className={inputCls} />
-        </label>
-        <form
-          className="space-y-1.5 border-t border-line pt-3.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!ask.trim()) return;
-            onClose();
-            go(`/?prompt=${enc(`${tr(ASK_FOR[kind])}${ask.trim()}`)}`);
-          }}
-        >
-          <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2">
-            <Sparkles size={13} className="text-accent" />
-            Or describe it, and an agent makes it
-          </span>
-          <div className="flex gap-2">
-            <input
-              value={ask}
-              onChange={(e) => setAsk(e.target.value)}
-              placeholder={
-                kind === 'slides'
-                  ? 'A 10-minute talk on our first year'
-                  : kind === 'doc'
-                    ? 'A cover letter for a design job'
-                    : kind === 'sheet'
-                      ? 'A monthly budget for two'
-                      : kind === 'tex'
-                        ? 'A two-page paper on my results, with equations'
-                        : 'A packing list for a week of hiking'
-              }
-              className={cx(inputCls, 'min-w-0 flex-1')}
-            />
-            <Button type="submit" variant="secondary" disabled={!ask.trim()}>
-              Ask
-            </Button>
-          </div>
-        </form>
-      </div>
-    </Dialog>
-  );
-}
-
-// ---- the library ----------------------------------------------------------------------------------
-
-function PageCard({ page }: { page: PageInfo }) {
-  const [menu, setMenu] = useState(false);
-  const [rename, setRename] = useState(false);
-  const [confirm, confirmNode] = useConfirm();
-  const anchor = useRef<HTMLButtonElement>(null);
-  const open = (mode?: string) => go(`/pages/${page.id}${mode ? `?mode=${mode}` : ''}`);
-  const close = () => setMenu(false);
-  const remove = async () => {
-    close();
-    if (!(await confirm({ title: `Delete “${page.title}”?`, body: 'Its versions, what it keeps and any published copy go with it.', confirm: 'Delete', danger: true }))) return;
-    del(`/api/pages/${enc(page.id)}`).catch(toastError);
-  };
-  const duplicate = async () => {
-    close();
-    try {
-      const r = await post<{ page: PageInfo }>(`/api/pages/${enc(page.id)}/copy`);
-      toast(`Made “${r.page.title}”`, 'ok');
-    } catch (e) {
-      toastError(e);
-    }
-  };
-  const slides = page.kind === 'slides';
-  const download = async (format: ExportFormat) => {
-    close();
-    try {
-      await exportFile(page.id, format);
-    } catch (e) {
-      toastError(e);
-    }
-  };
-  return (
-    <div className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel transition-colors hover:border-line-2">
-      <button type="button" onClick={() => open()} className="block text-left" aria-label={page.title}>
-        <Thumb page={page} className="aspect-[16/10] w-full border-b border-line" />
-      </button>
-      <div className="flex min-w-0 items-start gap-1 py-2 pr-1 pl-3">
-        <button type="button" onClick={() => open()} className="min-w-0 flex-1 text-left">
-          <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
-            {page.title}
-          </span>
-          <span className="flex items-center gap-1.5 truncate text-[12px] leading-4 text-fg-3">
-            {ago(page.updatedAt)}
-            {page.version > 1 && <span>· v{page.version}</span>}
-            {slides && <Presentation size={11} className="shrink-0" aria-label="Slides" />}
-            {page.kind === 'doc' && <FileText size={11} className="shrink-0" aria-label="A document" />}
-            {page.kind === 'sheet' && <Sheet size={11} className="shrink-0" aria-label="A spreadsheet" />}
-            {page.kind === 'tex' && <Sigma size={11} className="shrink-0" aria-label="LaTeX" />}
-            {page.published && <Globe size={11} className="shrink-0 text-accent" aria-label="Published" />}
-            {page.storageBytes > 0 && <Database size={11} className="shrink-0" aria-label={`Keeps ${bytes(page.storageBytes)}`} />}
-          </span>
-        </button>
-        <IconButton ref={anchor} label="More" size="sm" onClick={() => setMenu((m) => !m)} active={menu}>
-          <Ellipsis size={15} />
-        </IconButton>
-      </div>
-      <Popover anchor={anchor} open={menu} onClose={close} align="end" width={230}>
-        {slides ? (
-          <MenuItem icon={<Play size={14} />} onClick={() => (close(), go(`/pages/${page.id}?present=1`))}>
-            Present
-          </MenuItem>
-        ) : (
-          <MenuItem icon={<PenLine size={14} />} onClick={() => (close(), open('edit'))}>
-            Edit
-          </MenuItem>
-        )}
-        <MenuItem icon={<Pencil size={14} />} onClick={() => (close(), setRename(true))}>
-          Rename
-        </MenuItem>
-        <MenuItem icon={<Copy size={14} />} onClick={duplicate}>
-          Duplicate
-        </MenuItem>
-        <MenuSep />
-        <MenuLabel>Download as</MenuLabel>
-        {EXPORTS(page.kind).map((x) => (
-          <MenuItem key={x.format} icon={x.icon} onClick={() => void download(x.format)}>
-            {x.label}
-          </MenuItem>
-        ))}
-        <MenuSep />
-        <MenuItem icon={<Trash2 size={14} />} danger onClick={remove}>
-          Delete
-        </MenuItem>
-      </Popover>
-      <RenameDialog page={page} open={rename} onClose={() => setRename(false)} />
-      {confirmNode}
-    </div>
-  );
-}
-
-function SiteRow({ site }: { site: SiteInfo }) {
-  const home = useApp((s) => s.boot?.home);
-  const [confirm, confirmNode] = useConfirm();
-  const remove = async () => {
-    if (!(await confirm({ title: `Unpublish “${site.name}”?`, body: 'Its link stops working at once. You can publish it again, under a new private link.', confirm: 'Unpublish', danger: true }))) return;
-    del(`/api/sites/${enc(site.id)}`)
-      .then(() => toast('Unpublished', 'ok'))
-      .catch(toastError);
-  };
-  return (
-    <div className="space-y-2.5 rounded-2xl border border-line bg-panel px-3.5 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent-soft text-accent">
-          {site.visibility === 'private' ? <GlobeLock size={19} strokeWidth={1.8} /> : <Globe size={19} strokeWidth={1.8} />}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-2">
-            <span translate="no" className="truncate text-[13.5px] leading-5 font-medium text-fg">
-              {site.name}
-            </span>
-            <span className={cx('shrink-0 rounded-md px-1.5 text-[11px] leading-[18px] font-medium', site.visibility === 'public' ? 'bg-warn/12 text-warn' : 'bg-bg-2 text-fg-3')}>{site.visibility === 'public' ? 'Public' : 'Private'}</span>
-          </span>
-          <span className="block truncate text-[12px] leading-4 text-fg-3" title={site.folder}>
-            {site.kind === 'page' ? `The page “${site.pageTitle ?? site.pageId}”` : tildify(site.folder ?? '', home)} · {ago(site.createdAt)}
-          </span>
-        </span>
-        <Button size="sm" variant="ghost" onClick={remove} className="h-8 px-2.5">
-          Unpublish
-        </Button>
-      </div>
-      <SiteLink path={site.path} />
-      {confirmNode}
-    </div>
-  );
-}
-
-type Tab = 'saved' | 'media' | 'published';
-type Sort = 'changed' | 'name' | 'made';
-const SORTS: { value: Sort; label: string }[] = [
-  { value: 'changed', label: 'Last changed' },
-  { value: 'name', label: 'Name' },
-  { value: 'made', label: 'Newest made' },
-];
-
-function Library() {
-  const search = useSearch();
-  const tabAsked = new URLSearchParams(search).get('tab');
-  const tab: Tab = tabAsked === 'published' || tabAsked === 'media' ? tabAsked : 'saved';
-  const media = useMedia((s) => s.items);
-  const pages = usePagesStore((s) => s.pages);
-  const sites = usePagesStore((s) => s.sites);
-  const [publish, setPublish] = useState(false);
-  const [making, setMaking] = useState<NewKind | null>(null);
-  const [find, setFind] = useState('');
-  const [sort, setSort] = useState<Sort>(() => (localStorage.getItem('wa.pages.sort') as Sort) || 'changed');
-  const [sortMenu, setSortMenu] = useState(false);
-  const sortRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    usePagesStore.getState().loadPages().catch(toastError);
-    usePagesStore.getState().loadSites().catch(toastError);
-    useMedia.getState().ensure();
-    preloadEditors();
-  }, []);
-  // The search box's "New page", "New slides"… open here with the dialog.
-  const asked = new URLSearchParams(search).get('new');
-  useEffect(() => {
-    if (!asked) return;
-    setMaking(asked === 'slides' || asked === 'doc' || asked === 'sheet' || asked === 'tex' ? asked : 'page');
-    go('/library', true);
-  }, [asked]);
-  useEffect(() => localStorage.setItem('wa.pages.sort', sort), [sort]);
-  const list = useMemo(() => {
-    const q = find.trim().toLowerCase();
-    const l = (pages ?? []).filter((p) => !q || p.title.toLowerCase().includes(q));
-    if (sort === 'name') return [...l].sort((a, b) => a.title.localeCompare(b.title));
-    if (sort === 'made') return [...l].sort((a, b) => b.createdAt - a.createdAt);
-    return l;
-  }, [pages, find, sort]);
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <PageHeader
-        title="Library"
-        tip="library"
-        sub="Small tools and pages agents made for you, the images and videos you kept, and what you published"
-        actions={
-          tab === 'published' ? (
-            <Button size="sm" variant="secondary" icon={<Upload size={14} />} onClick={() => setPublish(true)}>
-              Publish a folder
-            </Button>
-          ) : tab === 'saved' ? (
-            <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
-              New page
-            </Button>
-          ) : undefined
-        }
-      >
-        <Tabs<Tab>
-          value={tab}
-          onChange={(t) => go(t === 'saved' ? '/library' : `/library?tab=${t}`, true)}
-          options={[
-            { value: 'saved', label: 'Pages', count: pages?.length },
-            { value: 'media', label: 'Media', count: media?.length },
-            { value: 'published', label: 'Published', count: sites?.length },
-          ]}
-        />
-      </PageHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-5">
-          {tab === 'media' ? (
-            <MediaGrid />
-          ) : tab === 'saved' ? (
-            !pages ? (
-              <div className="flex justify-center py-10 text-fg-3">
-                <Throbber size={28} />
-              </div>
-            ) : !pages.length ? (
-              <Empty icon={<AppWindow size={22} />} title="No pages yet">
-                <span className="block">Keep a page an agent shows you, ask one for a small tool (a tracker, a calculator, a checklist) or for slides, or make one here. A page keeps its data, and opens on your phone.</span>
-                <span className="mt-3 inline-flex gap-2">
-                  <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
-                    New page
-                  </Button>
-                  <Button size="sm" variant="secondary" icon={<Presentation size={14} />} onClick={() => setMaking('slides')}>
-                    New slides
-                  </Button>
-                </span>
-              </Empty>
-            ) : (
-              <>
-                {pages.length > 4 && (
-                  <div className="mb-3.5 flex items-center gap-2">
-                    <label className="flex h-8.5 min-w-0 flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 sm:max-w-[320px]">
-                      <Search size={14} className="shrink-0 text-fg-3" />
-                      <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a page" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3" />
-                      {find && (
-                        <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
-                          <X size={13} />
-                        </button>
-                      )}
-                    </label>
-                    <Button ref={sortRef} size="sm" variant="ghost" icon={<ArrowDownUp size={13} />} onClick={() => setSortMenu((m) => !m)}>
-                      {SORTS.find((x) => x.value === sort)!.label}
-                    </Button>
-                    <Popover anchor={sortRef} open={sortMenu} onClose={() => setSortMenu(false)} width={180}>
-                      {SORTS.map((x) => (
-                        <MenuItem key={x.value} onClick={() => (setSort(x.value), setSortMenu(false))}>
-                          <span className={cx(sort === x.value && 'font-semibold text-fg')}>{x.label}</span>
-                        </MenuItem>
-                      ))}
-                    </Popover>
-                  </div>
-                )}
-                {!list.length ? (
-                  <p className="py-6 text-center text-[13px] text-fg-3">No page’s name has “{find}” in it.</p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] sm:gap-3.5">
-                    {list.map((p) => (
-                      <PageCard key={p.id} page={p} />
-                    ))}
-                  </div>
-                )}
-              </>
-            )
-          ) : !sites ? (
-            <div className="flex justify-center py-10 text-fg-3">
-              <Throbber size={28} />
-            </div>
-          ) : !sites.length ? (
-            <Empty icon={<Globe size={22} />} title="Nothing published">
-              Publish a saved page, or a project’s build (its dist/ folder), at a private or a public link. Agents can ask to publish too; nothing goes out until you confirm.
-            </Empty>
-          ) : (
-            <div className="mx-auto grid max-w-[920px] gap-2.5">
-              {sites.map((s) => (
-                <SiteRow key={s.id} site={s} />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      <PublishDialog open={publish} onClose={() => setPublish(false)} />
-      <NewPageDialog open={!!making} kind={making ?? 'page'} onClose={() => setMaking(null)} />
-    </div>
-  );
-}
-
-// ---- one page, full screen -------------------------------------------------------------------------
-
 interface Loaded {
   page: PageInfo;
   /** A page's HTML, or another kind's model (a deck, a document, a spreadsheet). */
@@ -893,7 +230,8 @@ function PageView({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   // An older version on view.
   const [old, setOld] = useState<{ version: number; title: string; html?: string; model?: unknown } | null>(null);
-  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | null>(null);
+  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | null>(null);
+  const spaces = useSpaces();
   const [dialog, setDialog] = useState<'rename' | 'publish' | 'data' | null>(null);
   const [scopes, setScopes] = useState<AskScope[]>([]);
   const [part, setPart] = useState<string | null>(null);
@@ -1213,6 +551,11 @@ function PageView({ id }: { id: string }) {
             <MenuItem icon={<Copy size={14} />} onClick={duplicate}>
               Duplicate
             </MenuItem>
+            {!!spaces?.length && !data.page.app && (
+              <MenuItem icon={<FolderInput size={14} />} hint={<span translate="no">{spaces.find((x) => x.id === data.page.space)?.name ?? ''}</span>} onClick={() => setMenu('space')}>
+                Move to a space
+              </MenuItem>
+            )}
             <MenuItem
               icon={<ExternalLink size={14} />}
               onClick={() => {
@@ -1227,6 +570,22 @@ function PageView({ id }: { id: string }) {
               Delete
             </MenuItem>
           </Popover>
+          <SpaceMenu
+            anchor={moreRef}
+            open={menu === 'space'}
+            onClose={() => setMenu(null)}
+            title="Move it to"
+            value={data.page.space ?? null}
+            onPick={(space) => {
+              if (space === (data.page.space ?? null)) return;
+              patch(`/api/pages/${enc(id)}`, { space })
+                .then(() => {
+                  const name = spaces?.find((x) => x.id === space)?.name;
+                  toast(name ? tr(`Moved to ${name}`) : 'Moved out of its space', 'ok');
+                })
+                .catch(toastError);
+            }}
+          />
           <RenameDialog page={data.page} open={dialog === 'rename'} onClose={() => setDialog(null)} />
           <PublishDialog page={data.page} open={dialog === 'publish'} onClose={() => setDialog(null)} />
           <DataDialog page={data.page} open={dialog === 'data'} onClose={() => setDialog(null)} />

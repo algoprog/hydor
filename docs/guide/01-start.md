@@ -69,15 +69,15 @@ Each session has a menu in the list: point at its row and click **⋯** at the e
 
 The bottom of the sidebar holds the app's tools, four to a row:
 
-- **Files**: browse, open and edit files on this computer. See [Files, Git, Terminal and Preview](/guide/files-git).
-- **Git**: your repositories, their changes, branches and history.
-- **Terminal**: shells on this computer that keep running when you leave the page.
 - **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
 - **Spaces**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Spaces and knowledge](/guide/spaces).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
-- **Preview**: look at a web app's development server running on this computer. It shows only on this machine's own pages, not while you look at another machine.
 - **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs. A thin bar under its icon shows how much is left across your paid subscriptions (or your free ones, when you have no paid ones), red when nothing is left; with no subscriptions there is no bar. See [Usage, limits and costs](/guide/usage).
+- **Files**: browse, open and edit files on this computer. See [Files, Git, Terminal and Preview](/guide/files-git).
+- **Git**: your repositories, their changes, branches and history.
+- **Terminal**: shells on this computer that keep running when you leave the page.
 - **System**: this computer's processors, GPUs, memory, disks and busiest processes, live.
+- **Preview**: look at a web app's development server running on this computer. It shows only on this machine's own pages, not while you look at another machine.
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
 - **Search**: opens the search box (the same as Ctrl+K).
 - **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
@@ -122,7 +122,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 
 ### What it finds
 
-- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Spaces, Shared knowledge, Library, Images and videos, Published pages, Preview, Usage and limits, Model arena, Activity, System and Settings.
+- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Spaces, Shared knowledge, Library, Pictures and videos, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
 - **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or space, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.

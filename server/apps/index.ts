@@ -79,7 +79,8 @@ import {
 } from './store.ts';
 import { templateById } from './templates.ts';
 import { agentsMay, builtinsOf, isInstalled, setAgents, setInstalled } from './builtins.ts';
-import { tellAsker, useAppTool, useNote } from './use.ts';
+import { findAppsTool, tellAsker, useAppTool, useNote } from './use.ts';
+import { setModelsHere } from './models.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
 import { saveAppSecrets, secretsOf } from './secrets.ts';
 
@@ -207,6 +208,8 @@ function inputsOf(schema: Record<string, unknown>): { name: string; type?: strin
 
 function routes(d: Deps) {
   const { app, db, sessions } = d;
+  // The models apps need from a provider are read from (and added to) Settings → Models.
+  setModelsHere(d.models ?? null);
   ensureTables(db);
   ensureDataTables(db);
   // The pictures, videos and files apps show, at addresses a view's frame (and a public page) can reach.
@@ -1132,7 +1135,7 @@ export const apps: Feature = {
     // A template's run gets what it hands in with and what it keeps; any other session what templates are built with.
     if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx), flowTool(ctx)].filter((t): t is RunTool => !!t);
     // Any other session: what apps are built with, and the user's apps to run for them.
-    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), useAppTool(ctx)].filter((t): t is RunTool => !!t);
+    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), findAppsTool(ctx), useAppTool(ctx)].filter((t): t is RunTool => !!t);
   },
   /** An app's run gets the tools its app allows; a public run only the answer and, if allowed, the web. */
   allowTool(name, ctx) {
@@ -1157,7 +1160,7 @@ export const apps: Feature = {
     const env = own.slug ? envVars(own, own.slug) : undefined;
     const line = own.slug ? envLine(own, own.slug) : null;
     // Its keys, by name: how to use each (never a value).
-    const keys = secretsLine(secretsOf(d.db, own));
+    const keys = secretsLine(secretsOf(d.db, own).filter((k) => !k.provider));
     return { instructions: [[runInstructions({ ...hit.run, ...own }), line, keys].filter(Boolean).join('\n')], ...(env ? { env } : {}) };
   },
   // Templates the user changed in their editor, for the agents that built them, with the next message.

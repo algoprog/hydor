@@ -112,23 +112,25 @@ export const SHOTS = [
     },
   },
   {
-    // The Apps page down to the second row of your apps: your own, then the ready-made ones that come installed.
+    // The Apps page: what apps are, finding one, your own apps, and the first kind of ready-made ones.
     id: 'apps',
     height: 1240,
     async take(p, ctx) {
       await ctx.go('/apps', { settle: 1500 });
       await p.park();
-      return p.shot(ctx.file, { clip: await main(p, await bottomOf(p, `js:document.querySelectorAll('main .grid')[0]?.children[5]`, 24)) });
+      const firstKind = `js:[...document.querySelectorAll('main section')].find((s) => /Ready-made apps/.test(s.querySelector('h2')?.textContent ?? ''))?.querySelector('.grid')?.lastElementChild`;
+      return p.shot(ctx.file, { clip: await main(p, await bottomOf(p, firstKind, 24)) });
     },
   },
   {
-    // The Library's Media tab: images and videos kept from conversations, with their titles and descriptions.
+    // The Library: its places beside the cards, each space's things under its name, then those in no space.
     id: 'library',
+    height: 900,
     async take(p, ctx) {
-      await ctx.go('/library?tab=media', { settle: 2500 });
+      await ctx.go('/library', { settle: 2500 });
       await p.park();
       await sleep(600);
-      return p.shot(ctx.file, { clip: await main(p, 420) });
+      return p.shot(ctx.file, { clip: await main(p, 700) });
     },
   },
   {

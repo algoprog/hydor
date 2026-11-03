@@ -73,6 +73,9 @@ function madeHere(db: DB): Map<string, Uint8Array> {
 
 const vectorOf = (db: DB, hash: string) => shippedVectors().get(hash) ?? madeHere(db).get(hash);
 
+/** A text's vector, shipped or made here (undefined until it is made): what agents' app search (apps/search.ts) reads. */
+export const vectorOfText = (db: DB, text: string): Uint8Array | undefined => vectorOf(db, hashOf(text));
+
 /** Texts still without a vector, made in order in the background. */
 const waiting = new Map<string, string>();
 let making: Promise<void> | null = null;

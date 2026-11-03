@@ -28,6 +28,7 @@ import { userTimezone } from '../userPrefs.ts';
 import { ensureEnv } from './env.ts';
 import { refMedia } from './media.ts';
 import { needSecrets } from './secrets.ts';
+import { addModels, modelStates, needModels } from './models.ts';
 import { getRun, insertRun, listRuns, reuseSteps, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
 
 /** Where an app's runs keep their files when the app names no folder: outside the app's data, which Custom treats as private. */
@@ -208,7 +209,11 @@ export function startRun(o: StartInput): RunRecord {
   const { values, errors } = checkedInputs(o.recipe, o.inputs, !!o.public, o.files, o.flow);
   if (errors.length) throw new HttpError(400, `Check the form: ${errors.join('; ')}`);
   // The keys it needs, before it starts (an agent step's run goes by its app's; a public run cannot use them).
-  if (!o.public && o.source !== 'step') needSecrets(d().db, o.recipe);
+  if (!o.public && o.source !== 'step') {
+    needSecrets(d().db, o.recipe);
+    // Models from a provider it needs that only you can set up (OpenRouter's are added by themselves, below).
+    needModels(o.recipe);
+  }
   const maxFile = o.public ? 3 << 20 : 25 << 20;
   for (const [id, f] of Object.entries(o.files ?? {})) {
     if (!formOf(o.recipe, o.flow).some((x) => x.id === id && x.type === 'file')) throw new HttpError(400, `There is no file field ${id}`);
@@ -234,9 +239,19 @@ function go(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe' | 'sourc
     void launch(r, o).catch(() => {});
   };
   const req = o.recipe.requires;
-  if (!o.public && (req?.python?.length || (req?.node && Object.keys(req.node).length)))
-    return void ensureEnv(o.recipe, o.slug).then(start, (e) => finish(r.id, 'failed', `What it needs could not be installed: ${(e as Error).message} (What it needs, in its settings, shows the install's output)`));
-  start();
+  const env = !o.public && (req?.python?.length || (req?.node && Object.keys(req.node).length));
+  // OpenRouter models it needs that Custom does not have yet: added to Settings → Models first (its key is set).
+  const adding = !o.public && modelStates(o.recipe).some((m) => m.state === 'add');
+  if (!env && !adding) return start();
+  const models = adding
+    ? addModels(o.recipe).then(
+        () => {},
+        (e) => Promise.reject(new Error(`The models it needs could not be added: ${(e as Error).message} (Settings → Models)`)),
+      )
+    : Promise.resolve();
+  void models
+    .then(() => (env ? ensureEnv(o.recipe, o.slug).catch((e) => Promise.reject(new Error(`What it needs could not be installed: ${(e as Error).message} (What it needs, in its settings, shows the install's output)`))) : undefined))
+    .then(start, (e) => finish(r.id, 'failed', (e as Error).message));
 }
 
 /** Starts a run that waited in line. */
