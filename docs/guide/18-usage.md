@@ -65,6 +65,7 @@ How the timing works, with the switch or with **Resume at reset**:
 
 - The session is due a minute after the limit resets, as the provider last reported it. The app reads the usage now and then while a session waits, more often as the reset nears, and moves the time if the provider moves the reset.
 - If the limit lifts early (you used a reset, or signed in with another account), the session continues right away. If it was continued early in the last 15 minutes and hit the limit again, it waits for the reset instead.
+- Only a turn the limit really stopped is continued, not one that finished just as the plan's usage reached 100%. A planned continue is dropped when the session goes on without it: you send a message or press **Stop**, or a turn finishes normally.
 - **Cancel** on the notice stops a planned continue.
 
 With more than one account for the agent, [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) carries the session on with another account right away instead, and waits only when every account is at its limit (see [Agents, accounts and models](/guide/agents-models#use-all-your-accounts-switch-at-a-limit)).

@@ -351,7 +351,8 @@ export class CodexLive extends LiveAdapter {
           if (sec > 0.1) this.state.tokPerSec = Math.round(this.lastTurnOut / sec);
         }
         this.approvals.clear();
-        if (t.status === 'failed' && usageLimitHit(t.error)) this.emit('limithit');
+        this.limitStopped = t.status === 'failed' && usageLimitHit(t.error);
+        if (this.limitStopped && !this.replaying) this.emit('limithit');
         if (t.status === 'failed' && t.error?.message) {
           let msg = String(t.error.message);
           try {
@@ -371,7 +372,7 @@ export class CodexLive extends LiveAdapter {
           }
           if (swept) this.changed();
         }, 20_000);
-        this.emit('result', t);
+        this.emit('result', t, this.replaying);
         break;
       }
       case 'item/started':
