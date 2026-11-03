@@ -28,7 +28,7 @@ import { dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
-import { accountById, accountEnv, accountOfPath, accountPool, claudeTranscriptOf, historyMoves, moveAcross } from './accounts.ts';
+import { accountById, accountEnv, accountOfPath, accountPool, autoSwitchOn, claudeTranscriptOf, historyMoves, moveAcross } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
@@ -553,7 +553,7 @@ export class SessionManager extends EventEmitter {
         const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
         const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
         if (hit || resetsAt) {
-          if (kvGet(this.db, 'auto_switch') === '1' && !s.external) this.switchAtLimit(s.key, resetsAt).catch((e) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` }));
+          if (autoSwitchOn(this.db) && !s.external) this.switchAtLimit(s.key, resetsAt).catch((e) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` }));
           else if (kvGet(this.db, 'auto_resume') === '1') this.resumeAfterLimit(s.key, resetsAt).catch(() => {});
         }
       }
@@ -922,7 +922,7 @@ export class SessionManager extends EventEmitter {
     const mode = o.mode || (o.agent === 'claude' ? 'default' : o.agent === 'codex' ? 'auto' : undefined);
     let account = o.account || undefined;
     // The account picked is at its usage limit: with Switch accounts at a limit on, one with usage left starts it.
-    if (o.agent !== 'acp' && kvGet(this.db, 'auto_switch') === '1') {
+    if (o.agent !== 'acp' && autoSwitchOn(this.db)) {
       const lim = this.controlFor(o.agent, account).lastUsage?.limited;
       if (lim?.resetsAt && lim.resetsAt > Date.now()) {
         const free = await this.freeAccount(o.agent, account);
@@ -1150,7 +1150,7 @@ export class SessionManager extends EventEmitter {
       return u.limited ? (u.limited.resetsAt ?? undefined) : null;
     };
     const own = lifts(this.accountOf(key));
-    if (kvGet(this.db, 'auto_switch') !== '1') return own;
+    if (!autoSwitchOn(this.db)) return own;
     // Switching accounts at a limit: the first of them to have usage again.
     const all = accountPool(this.db, agent).map(lifts);
     if (all.includes(null)) return null;
@@ -1247,7 +1247,7 @@ export class SessionManager extends EventEmitter {
    */
   private async switchBeforeSend(key: string) {
     const agent = agentOfKey(key);
-    if (agent === 'acp' || kvGet(this.db, 'auto_switch') !== '1' || this.switching.has(key) || this.external.get(key)) return;
+    if (agent === 'acp' || !autoSwitchOn(this.db) || this.switching.has(key) || this.external.get(key)) return;
     const st = this.lives.get(key)?.adapter.state.status;
     if (st === 'working' || st === 'waiting' || st === 'starting') return;
     if (!this.controlFor(agent, this.accountOf(key)).lastUsage?.limited) return;
@@ -1265,7 +1265,7 @@ export class SessionManager extends EventEmitter {
    */
   async beforeResume(key: string): Promise<boolean> {
     const agent = agentOfKey(key);
-    if (agent === 'acp' || kvGet(this.db, 'auto_switch') !== '1') return false;
+    if (agent === 'acp' || !autoSwitchOn(this.db)) return false;
     const from = this.accountOf(key);
     if (!SessionManager.usedUp(await this.usageOf(agent, from, 60_000))) return false;
     const to = await this.freeAccount(agent, from);

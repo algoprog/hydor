@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Clock3, RotateCcw } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Clock3, RotateCcw } from 'lucide-react';
 import type { Agent, AgentUsage, LimitReset, LimitResetResult } from '@shared/types';
-import { del, enc, post } from '../../lib/api';
+import { del, enc, post, put } from '../../lib/api';
 import { pct, untilText } from '../../lib/format';
-import { toast, toastError, useUsage } from '../../lib/store';
+import { toast, toastError, useApp, useAppSettings, usedUp, useUsage } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { Button, cx, useConfirm } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
@@ -58,6 +58,15 @@ export function useLimitReset(agent: Agent, account?: string) {
   return { use, busy, node: confirmNode };
 }
 
+/** Another signed-in account of the agent (its own sign-in or an added one) with usage left; null when none. */
+function useSpareAccount(agent: Agent, account: string | undefined): { id: string | undefined; name: string } | null {
+  const added = useApp((s) => s.boot?.accounts);
+  const usage = useUsage();
+  if (agent === 'acp') return null;
+  const pool: { id: string | undefined; name: string }[] = [{ id: undefined, name: usage[agent]?.account?.email ?? `your main ${agentName(agent)} account` }, ...(added ?? []).filter((a) => a.agent === agent).map((a) => ({ id: a.id, name: a.name }))];
+  return pool.find((a) => a.id !== account && !usedUp(a.id ? usage.accounts[a.id] : usage[agent])) ?? null;
+}
+
 /** Renders again every `ms` while `on`, so "in 1 h 31 min" keeps counting down. */
 function useTicking(on: boolean, ms = 30_000) {
   const [, set] = useState(0);
@@ -77,11 +86,25 @@ function useTicking(on: boolean, ms = 30_000) {
 export function LimitBanner({ agent, account, className, session }: { agent: Agent; account?: string; className?: string; session?: { key: string; resumeAt?: number; busy?: boolean } }) {
   const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : agent === 'acp' ? null : s[agent]));
   const reset = useLimitReset(agent, account);
-  const lim = session?.busy ? null : u?.limited;
+  const spare = useSpareAccount(agent, account);
+  const autoSwitch = useAppSettings((s) => s.autoSwitch);
+  useEffect(() => void useAppSettings.getState().load(), []);
+  // Another account has usage left and Switch accounts at a limit is on: the session (or a new one) just moves there.
+  const lim = session?.busy || (spare && autoSwitch) ? null : u?.limited;
   const resumeAt = session?.resumeAt;
   useTicking(!!lim || !!resumeAt);
   if (!lim && !resumeAt) return null;
   const cancel = () => del(`/api/sessions/${enc(session!.key)}/resume-at`).catch(toastError);
+  const turnOnSwitch = async () => {
+    useAppSettings.getState().set({ autoSwitch: true });
+    try {
+      await put('/api/app-settings', { autoSwitch: true });
+      toast('Switch accounts at a limit is on', 'ok');
+    } catch (e) {
+      useAppSettings.getState().set({ autoSwitch: false });
+      toastError(e);
+    }
+  };
   // Usage is back (or the session is going again): only the continue still to come.
   if (!lim)
     return (
@@ -135,6 +158,17 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
             </div>
           )}
         </div>
+        {spare && autoSwitch === false && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-warn/20 pt-2 text-[12.5px] text-fg-2">
+            <ArrowRightLeft size={13} className="shrink-0 text-fg-3" />
+            <span className="min-w-0 flex-1">
+              {session ? `${spare.name} still has usage left. Turn on Switch accounts at a limit and this session carries on there.` : `${spare.name} still has usage left. Turn on Switch accounts at a limit and new sessions start there.`}
+            </span>
+            <Button size="sm" variant="secondary" onClick={() => turnOnSwitch()}>
+              Turn on
+            </Button>
+          </div>
+        )}
         {resumeAt && (
           <div className="mt-2 flex items-center gap-1.5 border-t border-warn/20 pt-2 text-[12.5px] text-fg-2">
             <Clock3 size={13} className="shrink-0 text-busy" />

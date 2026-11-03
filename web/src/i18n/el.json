@@ -8199,5 +8199,8 @@
 "tracked changes":"παρακολούθηση αλλαγών",
 "Which is the document’s main file (tex.main)?":"Ποιο είναι το κύριο αρχείο του εγγράφου (tex.main);",
 "API cost:":"Κόστος API:",
-"cached ·":"στην cache ·"
+"cached ·":"στην cache ·",
+"{0} still has usage left. Turn on Switch accounts at a limit and new sessions start there.":"Ο λογαριασμός {0} έχει ακόμη χρήση. Ενεργοποιήστε το «Αλλαγή λογαριασμού στο όριο» και οι νέες συνεδρίες θα ξεκινούν εκεί.",
+"{0} still has usage left. Turn on Switch accounts at a limit and this session carries on there.":"Ο λογαριασμός {0} έχει ακόμη χρήση. Ενεργοποιήστε το «Αλλαγή λογαριασμού στο όριο» και αυτή η συνεδρία θα συνεχίσει εκεί.",
+"Switch accounts at a limit is on":"Το «Αλλαγή λογαριασμού στο όριο» είναι ενεργό"
 }

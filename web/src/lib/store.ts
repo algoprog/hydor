@@ -287,6 +287,33 @@ export const useUsage = create<{
   set: (p) => set((s) => ({ claude: p.claude ?? s.claude, codex: p.codex ?? s.codex, accounts: p.accounts ? { ...s.accounts, ...p.accounts } : s.accounts })),
 }));
 
+/** App-wide switches kept on the server (/api/app-settings); read once, then kept in step by whoever changes them. */
+export const useAppSettings = create<{
+  autoResume: boolean | null;
+  autoSwitch: boolean | null;
+  loaded: boolean;
+  load: () => Promise<void>;
+  set: (p: { autoResume?: boolean; autoSwitch?: boolean }) => void;
+}>((set, get) => ({
+  autoResume: null,
+  autoSwitch: null,
+  loaded: false,
+  load: async () => {
+    if (get().loaded) return;
+    set({ loaded: true });
+    try {
+      const r = await api<{ autoResume: boolean; autoSwitch: boolean }>('/api/app-settings');
+      set({ autoResume: r.autoResume, autoSwitch: r.autoSwitch });
+    } catch {
+      set({ loaded: false });
+    }
+  },
+  set: (p) => set(p),
+}));
+
+/** Used up: not readable, at a limit, or a window full (as the server judges it before switching). */
+export const usedUp = (u: AgentUsage | null | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
+
 /** The usage of the account a session runs as (an added one, or the agent's own sign-in). */
 export function usageOf(agent: Agent, account?: string): AgentUsage | null {
   const u = useUsage.getState();

@@ -8185,5 +8185,8 @@
 "tracked changes":"修订",
 "Which is the document’s main file (tex.main)?":"哪个是文档的主文件（tex.main）？",
 "API cost:":"API 费用：",
-"cached ·":"已缓存 ·"
+"cached ·":"已缓存 ·",
+"{0} still has usage left. Turn on Switch accounts at a limit and new sessions start there.":"{0} 还有用量。开启“达到限额时切换账户”，新会话就会从那里开始。",
+"{0} still has usage left. Turn on Switch accounts at a limit and this session carries on there.":"{0} 还有用量。开启“达到限额时切换账户”，这个会话就会在那里继续。",
+"Switch accounts at a limit is on":"“达到限额时切换账户”已开启"
 }
