@@ -52,20 +52,20 @@ When a plan's usage runs out, the agent's turn stops. A notice says "You've hit 
 
 The notice offers what you can do:
 
-- **Resume at reset** (in a session): the session continues by itself a minute after the limit resets, with the message "Continue where you left off." The notice then says "This session continues by itself when it resets", with **Cancel**.
+- **Resume at reset** (in a session, while **Resume after usage limits** is off): the session continues by itself a minute after the limit resets, with the message "Continue where you left off." The notice then says "This session continues by itself when it resets", with **Cancel**.
 - **Use a reset**, when the account holds a limit reset you can use now ("2 resets available").
 
 Once usage is back but a session is still due to continue, the notice reads "Continues by itself in …", with **Cancel**.
 
 ## Continue sessions automatically after a limit
 
-To have every session that hits a limit continue by itself, open [Settings → App → General](/settings?s=general&find=Resume%20after%20usage%20limits) and turn on **Resume after usage limits** ("When a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets"). It is off until you turn it on. It works while no browser is open.
+To have every session that hits a limit continue by itself, open [Settings → App → General](/settings?s=general&find=Resume%20after%20usage%20limits) and turn on **Resume after usage limits** ("When a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets"). It is off until you turn it on. It works while no browser is open. With it on, a session shows no warning when a limit stops it: a line above the message box says which limit and "Continues by itself in …", with **Use a reset** when the account holds one, and **Cancel**.
 
 How the timing works, with the switch or with **Resume at reset**:
 
 - The session is due a minute after the limit resets, as the provider last reported it. The app reads the usage now and then while a session waits, more often as the reset nears, and moves the time if the provider moves the reset.
 - If the limit lifts early (you used a reset, or signed in with another account), the session continues right away. If it was continued early in the last 15 minutes and hit the limit again, it waits for the reset instead.
-- Only a turn the limit really stopped is continued, not one that finished just as the plan's usage reached 100%. A planned continue is dropped when the session goes on without it: you send a message or press **Stop**, or a turn finishes normally.
+- Only a turn the limit really stopped is continued, not one that finished just as the plan's usage reached 100%. A planned continue is dropped when the session goes on without it: you send a message or press **Stop**, or a turn gets through normally. A turn the agent starts by itself while it waits (when a background helper of its own stops at the same limit) does not drop it. A session you stopped with **Stop** is never continued by itself, even when the limit's error came first, until you send it a message.
 - **Cancel** on the notice stops a planned continue.
 
 With more than one account for the agent, [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) carries the session on with another account right away instead, and waits only when every account is at its limit (see [Agents, accounts and models](/guide/agents-models#use-all-your-accounts-switch-at-a-limit)).

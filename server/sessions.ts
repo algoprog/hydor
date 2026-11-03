@@ -745,7 +745,10 @@ export class SessionManager extends EventEmitter {
         this.timelines.get(key)?.setPath(p);
       }
     });
-    adapter.on('limithit', () => this.limitHits.add(key));
+    // A turn you stopped yourself is not one the limit interrupted, even when the limit's error came first.
+    adapter.on('limithit', () => {
+      if (!this.userStopped.has(key)) this.limitHits.add(key);
+    });
     // A tool call's input as the model writes it: Pages draws a page while it is being written.
     adapter.on('toolstream', (e: unknown) => this.emit('toolstream', key, e));
     adapter.on('ratelimit', (info: any) => {
@@ -767,6 +770,7 @@ export class SessionManager extends EventEmitter {
       }
     });
     adapter.on('result', async (_result: unknown, replay?: boolean) => {
+      if (!replay && this.userStopped.has(key)) adapter.limitStopped = false;
       if (!adapter.limitStopped) {
         this.limitHits.delete(key);
         if (!replay) this.emit('resumeCancelled', key);
@@ -1230,6 +1234,8 @@ export class SessionManager extends EventEmitter {
   private switching = new Set<string>();
   /** Sessions whose running turn stopped on the plan's usage limit, as the agent said. */
   private limitHits = new Set<string>();
+  /** Sessions you stopped yourself, until your next message: they never continue by themselves after a limit. */
+  private userStopped = new Set<string>();
 
   /** Continues the session a minute after its limit lifts; when its usage did not say when, it is read first. */
   private async resumeAfterLimit(key: string, resetsAt: number | undefined) {
@@ -1242,8 +1248,9 @@ export class SessionManager extends EventEmitter {
     }
     const lifts = this.limitLiftsAt(key);
     const at = typeof lifts === 'number' ? lifts : resetsAt;
-    const adapter = this.lives.get(key)?.adapter;
-    if (adapter && (adapter.limitStopped === false || ['working', 'waiting', 'starting'].includes(adapter.state.status))) return;
+    // A turn the CLI started by itself meanwhile (a background task's notice) does not mean it went on: only a
+    // turn that got through, or your own message or stop, does.
+    if (this.lives.get(key)?.adapter.limitStopped === false || this.userStopped.has(key)) return;
     if (at && !this.resumeLookup?.(key)) this.onLimited?.(key, at + 60_000);
   }
 
@@ -1485,6 +1492,9 @@ export class SessionManager extends EventEmitter {
 
   async interrupt(key: string) {
     this.limitHits.delete(key);
+    this.userStopped.add(key);
+    const a = this.lives.get(key)?.adapter;
+    if (a) a.limitStopped = false;
     this.emit('resumeCancelled', key);
     this.holdQueue(key);
     await this.live(key).adapter.interrupt();
@@ -1715,6 +1725,7 @@ export class SessionManager extends EventEmitter {
     if (l.agent === 'acp' && ['working', 'waiting', 'starting'].includes(l.adapter.state.status)) return this.enqueue(key, text, images, files);
     await this.snapshot(key);
     this.limitHits.delete(key);
+    this.userStopped.delete(key);
     l.adapter.limitStopped = false;
     this.emit('resumeCancelled', key);
     await l.adapter.sendMessage(withNotes(key, withFiles(text, this.saveFiles(files))), this.saveImages(images));
