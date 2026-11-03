@@ -28,7 +28,7 @@ Under the search field is every session, in groups:
 
 - **Active**: all sessions with activity in the last five minutes, here or in VS Code or a terminal, including ones that have finished. After five minutes without activity they return to their usual group, even if their agent is still open. Sessions stopped by a usage limit stay here while scheduled to resume automatically; cancelling that resume restores the five-minute rule. They keep their places while listed; drag one to move it.
 - **Pinned**: the sessions you pinned, in the order you drag them into. Drag a session from the groups below onto it to pin it.
-- A group for each of your spaces, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
+- **Projects**: a group for each of your spaces, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
 - **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
 - **Snoozed**: at the bottom, until their time comes.
 
@@ -40,12 +40,12 @@ To list the sessions by day only, as before, untick **Group by folder or space**
 
 Archived sessions are not listed, but **Search sessions** still finds them. "No sessions yet." shows before your first one.
 
-Each row shows the agent's icon with a status dot, the session's title, and a second line. While the agent runs, the second line says what it is doing ("Working · 2m 10s", "Needs you", "Ready", "Working · 1 in background", "Open in VS Code"). Otherwise it shows the folder (in a space's or a folder's group, which names it already, the branch of a worktree instead, or nothing), how long ago the session was active, and how many lines it added and removed. Small marks can follow the title:
+Each row shows the agent's icon with a status dot, the session's title, and a second line. While the agent runs, the second line says what it is doing ("Working · 2m 10s", "Needs you", "Ready", "Working · 1 in background", "Open in VS Code"). Otherwise it shows the folder ("Home folder" for yours), how long ago the session was active, and how many lines it added and removed. Under **Projects**, where the group names the folder already, a row takes one line: the title, then how long ago the session was active (after a worktree's branch), or what the agent is doing while it works or needs you. Small marks can follow the title:
 
 - a dot in the accent colour: it finished since you last looked (its second line reads "Done · 5m ago"); opening it marks it read on every device;
 - a pull request badge with its state;
 - a target: the session has a goal;
-- a pin: it is pinned.
+- a pin: it is pinned (in the **Pinned** group, which says so, there is none).
 
 While Custom works or starts, its working indicator uses the Naget loading animation instead of a rotating agent icon. Loading marks sit vertically centred beside their text.
 
@@ -63,7 +63,7 @@ The browser tab shows how many sessions wait on you, as in "(2) Naget Agent".
 
 Sessions that an agent started for parts of its job (child sessions) sit folded under it, with a line such as "3 child sessions · 1 needs you · 2 working"; click it to see them. See [Child sessions](/guide/sessions#child-sessions).
 
-On a computer, right-click a session for **Rename**, **Pin** (or **Unpin**), **Snooze**, **Settle** and **Archive**. Double-click a title, or press F2 on a selected row, to rename it. All of these are explained in [Rename, pin, snooze, settle, archive or delete](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
+Each session has a menu in the list: point at its row and click **⋯** at the end, or right-click the row (on a phone, tap its **⋯**). It holds **Rename**, **Pin** (or **Unpin**), **Snooze**, **Settle**, **Archive** and **Delete**, which asks first. Double-click a title, or press F2 on a selected row, to rename it. All of these are explained in [Rename, pin, snooze, settle, archive or delete](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
 
 ### The tools at the bottom
 
@@ -177,8 +177,7 @@ On an iPhone or iPad, notifications work only in the app added to the home scree
 - Tapping a session or a tool takes you there and closes the drawer. **Close menu** (the ×) closes it too.
 - Hold a session a moment to pick it up, then drag it (to reorder Active or Pinned sessions, or to pin one).
 - Hold a tool at the bottom a moment to pick it up, then drag it to another place among them.
-- A bin at the end of each row deletes the session, after asking.
-- There is no right-click menu: rename, pin, snooze and the rest are in the session's menu (⋯) at the top right of the session.
+- The **⋯** at the end of each row opens the session's menu: **Rename**, **Pin**, **Snooze**, **Settle**, **Archive** and **Delete**, which asks first.
 
 ### Menus open as sheets
 

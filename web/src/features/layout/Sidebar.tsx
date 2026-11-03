@@ -256,7 +256,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         <MachineSwitcher onGo={mobile ? close : undefined} />
         <button
           onClick={() => nav('/')}
-          className="group flex h-9.5 w-full items-center gap-2.5 rounded-[10px] bg-bg-2 px-3 text-[13.5px] font-medium text-fg ring-1 ring-line-2 transition-colors ring-inset hover:bg-bg-3"
+          className="group flex h-9 w-full items-center gap-2.5 rounded-[10px] bg-bg-2 px-3 text-[13.5px] font-medium text-fg ring-1 ring-line-2 transition-colors ring-inset hover:bg-bg-3"
         >
           <span className="ico ico-tilt">
             <SquarePen size={16} />
@@ -343,7 +343,9 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         data-tour="sessions"
         className="min-h-0 flex-1 overflow-y-auto"
         onClick={(e) => {
-          if (mobile && (e.target as HTMLElement).closest('button')) close();
+          // A tap on a button in the list itself; not in a session's menu, which opens over it (React passes its clicks on here).
+          const t = e.target as HTMLElement;
+          if (mobile && e.currentTarget.contains(t) && t.closest('button')) close();
         }}
       >
         <SessionList query={q} />
