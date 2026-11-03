@@ -11,7 +11,9 @@
 import type { AnswerField, AppTemplate } from '../../shared/apps.ts';
 import { cleanRecipe } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
+import { MORE } from './templates-more.ts';
 import { VIEWS } from './views.ts';
+import { MORE_VIEWS } from './views-more.ts';
 
 type Draft = Omit<AppTemplate, 'agent' | 'tools' | 'limits'>;
 
@@ -121,6 +123,15 @@ The page: {{source.title}}, {{source.url}}{{#source.date}} (dated {{source.date}
 Give each fact as one short sentence, as the page states it: numbers, units, dates and names exactly, and who says so when the page quotes someone. Only what the page itself says, nothing from elsewhere. If it says nothing on the question, give no facts.`,
     outputs: FACTS,
   },
+];
+
+/** The Trip planner's days on its map. */
+const TRIP_STOPS: AnswerField['columns'] = [
+  { id: 'day', label: 'Day', type: 'number' },
+  { id: 'date', label: 'Date', type: 'date' },
+  { id: 'area', label: 'Area', type: 'text' },
+  { id: 'lat', label: 'Latitude', type: 'number' },
+  { id: 'lng', label: 'Longitude', type: 'number' },
 ];
 
 const T: Draft[] = [
@@ -570,6 +581,9 @@ return {
       },
       { id: 'confidence', label: 'Confidence', type: 'text', description: 'High, medium or low, with the reason in one sentence' },
     ],
+    examples: [
+      { id: 'heat-pumps', name: 'Heat pumps in the cold', inputs: { topic: 'How well do heat pumps work in cold climates, and what do they cost to run compared with gas?', depth: 'Quick overview' }, checks: ['{{answer.sources}} is not empty', '{{answer.report}} contains ['] },
+    ],
   },
   {
     id: 'trip-planner',
@@ -798,6 +812,7 @@ How to plan:
 - Match the pace: relaxed means two or three things a day with time to wander; packed fits more in. Suit it to the travelers (children, mobility, interests).
 - Say what should be booked ahead, and how far ahead.
 - Estimate the costs in the local currency as numbers (a low and a high for each item); the total is added up after.
+- Give each day's area its latitude and longitude (its centre, as a map gives them), for the trip's map.
 Hand in one row of the itinerary per day, in order.`,
           outputs: [
             { id: 'overview', label: 'Overview', type: 'markdown', required: true, description: 'The trip in a few sentences: the idea of the plan, where to stay, the weather to expect' },
@@ -812,6 +827,8 @@ Hand in one row of the itinerary per day, in order.`,
                 { id: 'morning', label: 'Morning', type: 'text' },
                 { id: 'afternoon', label: 'Afternoon', type: 'text' },
                 { id: 'evening', label: 'Evening', type: 'text' },
+                { id: 'lat', label: 'Latitude', type: 'number', description: 'Of the day’s area' },
+                { id: 'lng', label: 'Longitude', type: 'number', description: 'Of the day’s area' },
               ],
             },
             { id: 'book_ahead', label: 'Book ahead', type: 'list', description: 'What to book, and how far ahead' },
@@ -865,7 +882,19 @@ const budget = rows(input.costs)
 const rate = num(input.rate);
 const home = String(input.home || '').trim();
 if (budget.length) budget.push({ item: 'Total', estimate: range(low, high, cur) + (rate > 0 && home && home !== cur ? ' (about ' + range(low * rate, high * rate, home) + ')' : '') });
-return { days, budget };`,
+// The days' areas on the map: those with a place on Earth, none far (over 400 km) from the others' middle.
+const at = days.map((d, i) => {
+  const r = plan.find((x) => Number(x.day) === Number(d.day)) || plan[i] || {};
+  const lat = Number(r.lat);
+  const lng = Number(r.lng);
+  return { day: d.day, date: d.date, area: d.area, lat, lng };
+}).filter((s) => r0(s.lat, 90) && r0(s.lng, 180));
+function r0(v, most) {
+  return v !== 0 && isFinite(v) && Math.abs(v) <= most;
+}
+const mid = (k) => at.map((s) => s[k]).sort((a, b) => a - b)[Math.floor(at.length / 2)];
+const far = (s) => Math.hypot((s.lat - mid('lat')) * 111, (s.lng - mid('lng')) * 111 * Math.cos((s.lat * Math.PI) / 180)) > 400;
+return { days, budget, stops: at.filter((s) => !far(s)) };`,
           outputs: [
             {
               id: 'days',
@@ -881,11 +910,12 @@ return { days, budget };`,
               ],
             },
             { id: 'budget', label: 'Budget', type: 'table', columns: [{ id: 'item', label: 'Item', type: 'text' }, { id: 'estimate', label: 'Estimate', type: 'text' }] },
+            { id: 'stops', label: 'On the map', type: 'table', columns: TRIP_STOPS },
           ],
           failed: 'agent',
         },
       ],
-      outputs: { overview: '{{plan.overview}}', days: '{{assemble.days}}', book_ahead: '{{plan.book_ahead}}', budget: '{{assemble.budget}}', tips: '{{plan.tips}}' },
+      outputs: { overview: '{{plan.overview}}', days: '{{assemble.days}}', book_ahead: '{{plan.book_ahead}}', budget: '{{assemble.budget}}', tips: '{{plan.tips}}', stops: '{{assemble.stops}}' },
     },
     answer: [
       { id: 'overview', label: 'Overview', type: 'markdown', required: true, description: 'The trip in a few sentences: the idea of the plan, where to stay, the weather to expect' },
@@ -914,6 +944,11 @@ return { days, budget };`,
         ],
       },
       { id: 'tips', label: 'Tips', type: 'list' },
+      { id: 'stops', label: 'On the map', type: 'table', description: 'Each day’s area, with where it is', columns: TRIP_STOPS },
+    ],
+    examples: [
+      { id: 'lisbon-in-spring', name: 'Lisbon in spring', inputs: { destination: 'Lisbon', start: '2027-04-12', days: 4, travelers: 'Two adults', interests: 'Food markets, viewpoints, tiles' }, checks: ['{{answer.days}} is not empty', '{{answer.budget}} is not empty'] },
+      { id: 'a-family-trip', name: 'A relaxed family trip', inputs: { destination: 'Copenhagen', start: '2027-07-05', days: 3, travelers: 'Two adults and a six-year-old', pace: 'Relaxed' }, checks: ['{{calendar.count}} = 3'] },
     ],
   },
   {
@@ -1162,6 +1197,7 @@ const link = (v) => {
 };
 const comparison = ranked.map((r) => ({
   product: r.product,
+  score: r.total,
   price: r.f.price || '',
   strengths: r.f.strengths || '',
   weaknesses: [r.f.weaknesses, r.f.problems ? 'Known problems: ' + r.f.problems : ''].filter(Boolean).join(' '),
@@ -1188,6 +1224,7 @@ return {
               type: 'table',
               columns: [
                 { id: 'product', label: 'Product', type: 'text' },
+                { id: 'score', label: 'Score', type: 'number', description: 'Out of 100, by what matters to you' },
                 { id: 'price', label: 'Price', type: 'text' },
                 { id: 'strengths', label: 'Strengths', type: 'text' },
                 { id: 'weaknesses', label: 'Weaknesses', type: 'text' },
@@ -1237,6 +1274,7 @@ What was found about each:
         required: true,
         columns: [
           { id: 'product', label: 'Product', type: 'text' },
+          { id: 'score', label: 'Score', type: 'number', description: 'Out of 100, by what matters to you' },
           { id: 'price', label: 'Price', type: 'text' },
           { id: 'strengths', label: 'Strengths', type: 'text' },
           { id: 'weaknesses', label: 'Weaknesses', type: 'text' },
@@ -1245,6 +1283,10 @@ What was found about each:
         ],
       },
       { id: 'watch_out', label: 'Watch out for', type: 'list' },
+    ],
+    examples: [
+      { id: 'named-products', name: 'Two named headphones', inputs: { products: 'Sony WH-1000XM5\nBose QuietComfort Ultra', needs: 'Noise cancelling on flights, comfort, battery', budget: '$400' }, checks: ['{{answer.comparison}} is not empty', '{{answer.pick}} is not empty'] },
+      { id: 'a-need', name: 'A need, not products', inputs: { products: 'A quiet dishwasher under €900', needs: 'Quiet, reliable, fits 60 cm', region: 'Germany' }, checks: ['{{understand.named}} = no', '{{answer.comparison}} is not empty'] },
     ],
   },
   {
@@ -1563,6 +1605,9 @@ return { answers };`,
       },
       { id: 'summary', label: 'About the document', type: 'markdown', required: true },
     ],
+    examples: [
+      { id: 'a-lease', name: 'Questions on a lease', inputs: { document: 'lease.pdf', questions: 'When does the lease end?\nHow much notice do I need to give?' }, checks: ['{{answer.answers}} is not empty'] },
+    ],
   },
   {
     id: 'meeting-actions',
@@ -1876,6 +1921,9 @@ Open questions:
       { id: 'open_questions', label: 'Open questions', type: 'list' },
       { id: 'email', label: 'Follow-up email', type: 'markdown' },
     ],
+    examples: [
+      { id: 'weekly-sync', name: 'A weekly sync', inputs: { notes: 'Ana: launch moves to the 20th. Ben will update the pricing page by Friday. We agreed to drop the beta badge. Open: who talks to legal?', meeting: 'Weekly product sync', date: '2026-11-02', attendees: 'Ana, Ben, Chris' }, checks: ['{{answer.actions}} is not empty', '{{answer.decisions}} is not empty'] },
+    ],
   },
   {
     id: 'cover-letter',
@@ -2056,6 +2104,9 @@ return { letter, rounds, left };`,
         ],
       },
       { id: 'gaps', label: 'Gaps', type: 'list', description: 'Requirements the background does not show, and how to address each in an interview' },
+    ],
+    examples: [
+      { id: 'a-data-analyst', name: 'A data analyst role', inputs: { job: 'Data analyst at Acme: SQL, Python, dashboards in Tableau, explaining findings to managers.', background: 'Three years in marketing analytics: weekly SQL reports, a Python churn model that cut churn 8%, Looker dashboards for 40 people.', tone: 'Confident', length: 'Short' }, checks: ['{{polish.left}} is empty', '{{answer.letter}} contains Acme'] },
     ],
   },
   {
@@ -2322,6 +2373,9 @@ return { timeline, plan: out.filter(Boolean).join('\n\n'), minutes: at };`,
       { id: 'assessment', label: 'Checking understanding', type: 'markdown' },
       { id: 'plan', label: 'Full plan', type: 'markdown', required: true, description: 'The whole plan, ready to print' },
     ],
+    examples: [
+      { id: 'photosynthesis', name: 'Photosynthesis, Year 8', inputs: { topic: 'Photosynthesis', learners: 'Year 8', minutes: 50, setting: 'Classroom' }, checks: ['{{fit.minutes}} = 50', '{{answer.timeline}} is not empty'] },
+    ],
   },
   {
     id: 'news-digest',
@@ -2573,6 +2627,9 @@ return { stories: stories.concat(none), count: stories.length, quiet };`,
         ],
       },
       { id: 'digest', label: 'Digest', type: 'markdown', required: true, description: 'The whole digest, ready to read' },
+    ],
+    examples: [
+      { id: 'batteries-and-ai-rules', name: 'Batteries and AI rules', inputs: { topics: 'battery technology\nEU AI rules', length: 'Brief' }, checks: ['{{answer.stories}} is not empty', '{{answer.digest}} is not empty'] },
     ],
   },
   {
@@ -2922,6 +2979,9 @@ The contract was too long to read whole: only its first part was gone through.
       },
       { id: 'questions', label: 'Questions to ask', type: 'list' },
     ],
+    examples: [
+      { id: 'a-freelance-contract', name: 'A freelance contract', inputs: { text: '1. Term. This agreement runs for 12 months and renews automatically unless either party gives 90 days notice.\n2. Fees. The client pays within 60 days of invoice.\n3. IP. All work, including prior tools, belongs to the client.', side: 'The freelancer' }, checks: ['{{answer.red_flags}} is not empty', '{{answer.terms}} is not empty'] },
+    ],
   },
   {
     id: 'small-web-app',
@@ -3089,6 +3149,9 @@ return { summary: String(input.summary || '').trim() + '\n\n' + tested, files, n
       { id: 'how_to_open', label: 'How to open it', type: 'text', required: true },
       { id: 'next', label: 'Ideas for next', type: 'list' },
     ],
+    examples: [
+      { id: 'plant-tracker', name: 'A plant tracker', inputs: { idea: 'A tracker for my plants: when I watered each one, and which are due', style: 'Calm and minimal, big buttons for a phone' }, checks: ['{{answer.files}} contains index.html'] },
+    ],
   },
   // Blocks: small templates made to be steps of others (Add a step offers them), each a few cheap steps.
   {
@@ -3232,7 +3295,13 @@ return { summary: String(input.summary || '').trim() + '\n\n' + tested, files, n
   },
 ];
 
-/** The templates, tidied like any recipe. They run with Claude Code unless their page picks another agent. */
-export const TEMPLATES: AppTemplate[] = T.map((t) => ({ ...cleanRecipe({ ...t, agent: 'claude', tools: null, limits: {}, ...(VIEWS[t.id] ? { ui: VIEWS[t.id] } : {}) }), id: t.id }));
+/**
+ * The templates, tidied like any recipe: the ten tasks above, the apps for everyday things after them (the weather,
+ * sports, food, films and games, plans, charts: templates-more.ts), then the blocks. They run with Claude Code unless
+ * their page picks another agent.
+ */
+const ALL: Draft[] = [...T.filter((t) => !t.block), ...MORE, ...T.filter((t) => t.block)];
+const UIS = { ...VIEWS, ...MORE_VIEWS };
+export const TEMPLATES: AppTemplate[] = ALL.map((t) => ({ ...cleanRecipe({ ...t, agent: 'claude', tools: null, limits: {}, ...(UIS[t.id] ? { ui: UIS[t.id] } : {}) }), id: t.id }));
 
 export const templateById = (id: string): AppTemplate | null => TEMPLATES.find((t) => t.id === id) ?? null;

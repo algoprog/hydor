@@ -44,7 +44,9 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   spreadsheets and LaTeX to edit as in Word, Excel and Overleaf (or opened from your files), PDF, Word, PowerPoint,
   Excel and LaTeX exports, an agent that changes what you have open, pictures and short videos made with
   OpenRouter's models once you check their settings and price, all kept in your Library (each image and video with
-  a title and a description a model writes for it), and apps for tasks you repeat: one agent, or steps with data, a
+  a title and a description a model writes for it), and apps for tasks you repeat, ready-made (research, trips, comparisons, the weather, a team's matches, recipes
+  and a week's meals, gifts, what to watch, games and a quiz to play, what's on, savings, your data as charts, a topic
+  as a timeline, a place on a map) or your own: one agent, or steps with data, a
   memory and a screen of their own, their answers in views made for them (pages, elements, buttons that act,
   maps, 2D and 3D plots, pictures, videos and widgets of their own), the keys they need asked for once and kept
   in the vault, shared as one file with their own pictures and videos (ready-made ones too); ask for what one
