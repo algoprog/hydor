@@ -4,7 +4,8 @@
 // first tab going back to the folder. On a phone the folder fills the screen, the places are a sheet from the
 // page's title, and a file opens on a page of its own. Each folder has an address of its own (/files?dir=),
 // so Back goes to the folder you were in.
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearch } from 'wouter';
 import { ChevronDown, Clock, FileText, Folder, House, NotebookText, Search, Sheet, Sigma, Trash2, X } from 'lucide-react';
 import { editorKindOf } from '@shared/documents';
@@ -13,9 +14,10 @@ import { basename } from '../../lib/format';
 import { filePath, go, showInFiles } from '../../lib/nav';
 import { useApp, useUI } from '../../lib/store';
 import { FolderFinder } from '../../components/FolderPicker';
-import { cx, Throbber, IconButton, MenuBack, Popover, SheetsOnPhone, useIsMobile } from '../../components/ui';
+import { cx, Throbber, IconButton, MenuBack, Popover, SheetsOnPhone, useIsMobile, useMediaQuery } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { goFolder } from './actions';
+import { FileAskButton, FileAskPanel, FileAskPill, useFileAsk } from './FileAsk';
 import { FileEditor } from './FileEditor';
 import { FileInEditor } from './FileInEditor';
 import { FolderView } from './FolderView';
@@ -41,11 +43,44 @@ const IN_EDITOR = {
  * (a search's match) shows as text, at that line.
  */
 export function FileView({ path, line, embedded, onDirty }: { path: string; line?: number; embedded?: boolean; onDirty?: (dirty: boolean) => void }) {
+  const saveFirst = useRef<(() => Promise<boolean>) | null>(null);
+  const wide = useMediaQuery('(min-width: 1100px)');
+  const ask = useFileAsk();
+  if (embedded) return <FileBody path={path} line={line} embedded onDirty={onDirty} />;
+  // Ask an agent about the file: beside it on a wide screen, over it otherwise (folding away to watch it change).
+  const panel = ask.open && <FileAskPanel path={path} beforeSend={() => saveFirst.current?.() ?? Promise.resolve(true)} className={wide ? 'w-[400px] shrink-0 border-l border-line' : undefined} />;
+  return (
+    <div className="flex h-full min-h-0">
+      <div className="min-w-0 flex-1">
+        <FileBody path={path} line={line} onDirty={onDirty} saveFirst={saveFirst} />
+      </div>
+      {wide && panel}
+      {!wide && !ask.folded && panel && createPortal(<div className="fixed inset-0 z-50 flex flex-col bg-bg pt-[var(--safe-top)] pb-[var(--safe-bottom)]">{panel}</div>, document.body)}
+      {!wide && ask.open && ask.folded && <FileAskPill path={path} />}
+    </div>
+  );
+}
+
+/** The file itself; `saveFirst` (the Files page, not a dialog) brings the Ask button. */
+function FileBody({
+  path,
+  line,
+  embedded,
+  onDirty,
+  saveFirst,
+}: {
+  path: string;
+  line?: number;
+  embedded?: boolean;
+  onDirty?: (dirty: boolean) => void;
+  saveFirst?: MutableRefObject<(() => Promise<boolean>) | null>;
+}) {
   const notebook = path.endsWith('.ipynb');
+  const askButton = saveFirst && <FileAskButton />;
   const [source, setSource] = useState(false);
   const kind = editorKindOf(path);
   const [asText, setAsText] = useState(() => !!line);
-  if (kind && !asText) return <FileInEditor path={path} embedded={embedded} onDirty={onDirty} fileMenu={!embedded} onText={() => setAsText(true)} />;
+  if (kind && !asText) return <FileInEditor path={path} embedded={embedded} onDirty={onDirty} fileMenu={!embedded} onText={() => setAsText(true)} actions={askButton} saveFirst={saveFirst} />;
   if (notebook && !source) {
     return (
       <Suspense
@@ -67,18 +102,22 @@ export function FileView({ path, line, embedded, onDirty }: { path: string; line
       preview={embedded}
       onDirty={onDirty}
       fileMenu={!embedded}
+      saveFirst={saveFirst}
       actions={
-        notebook ? (
-          <IconButton label="Open as a notebook" size="sm" onClick={() => setSource(false)}>
-            <NotebookText size={14} />
-          </IconButton>
-        ) : (
-          kind && (
-            <IconButton label={IN_EDITOR[kind].label} size="sm" onClick={() => setAsText(false)}>
-              {IN_EDITOR[kind].icon}
+        <>
+          {notebook ? (
+            <IconButton label="Open as a notebook" size="sm" onClick={() => setSource(false)}>
+              <NotebookText size={14} />
             </IconButton>
-          )
-        )
+          ) : (
+            kind && (
+              <IconButton label={IN_EDITOR[kind].label} size="sm" onClick={() => setAsText(false)}>
+                {IN_EDITOR[kind].icon}
+              </IconButton>
+            )
+          )}
+          {askButton}
+        </>
       }
     />
   );

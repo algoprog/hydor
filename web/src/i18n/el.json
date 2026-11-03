@@ -8298,5 +8298,18 @@
 "The characters did not match the picture. Here is a new one.":"Οι χαρακτήρες δεν ταίριαξαν με την εικόνα. Ορίστε μια νέα.",
 "Too many failed sign-ins from this address. Try again in {0} minute{1}.":"Πάρα πολλές αποτυχημένες συνδέσεις από αυτή τη διεύθυνση. Δοκιμάστε ξανά σε {0} λεπ.",
 "Too many failed sign-ins. Try again later.":"Πάρα πολλές αποτυχημένες συνδέσεις. Δοκιμάστε ξανά αργότερα.",
-"Too many new pictures from this address. Try again in {0} minute{1}.":"Πάρα πολλές νέες εικόνες από αυτή τη διεύθυνση. Δοκιμάστε ξανά σε {0} λεπ."
+"Too many new pictures from this address. Try again in {0} minute{1}.":"Πάρα πολλές νέες εικόνες από αυτή τη διεύθυνση. Δοκιμάστε ξανά σε {0} λεπ.",
+"Say what to change in {0}, or ask about it. An agent works on the file, and you see each change here as soon as it is written.":"Πείτε τι να αλλάξει στο {0} ή ρωτήστε κάτι γι' αυτό. Ένας πράκτορας δουλεύει πάνω στο αρχείο, και βλέπετε κάθε αλλαγή εδώ μόλις γραφτεί.",
+"Say what to change in":"Πείτε τι να αλλάξει στο",
+", or ask about it. An agent works on the file, and you see each change here as soon as it is written.":" ή ρωτήστε κάτι γι' αυτό. Ένας πράκτορας δουλεύει πάνω στο αρχείο, και βλέπετε κάθε αλλαγή εδώ μόλις γραφτεί.",
+"Add comments where it is hard to follow":"Πρόσθεσε σχόλια όπου είναι δύσκολο να το παρακολουθήσει κανείς",
+"Explain what this file does":"Εξήγησε τι κάνει αυτό το αρχείο",
+"Find and fix any bugs":"Βρες και διόρθωσε τυχόν σφάλματα",
+"Find any mistakes in the numbers":"Βρες τυχόν λάθη στους αριθμούς",
+"Make it shorter and clearer":"Κάν' το πιο σύντομο και πιο σαφές",
+"Make it simpler without changing what it does":"Κάν' το πιο απλό χωρίς να αλλάξει αυτό που κάνει",
+"See the file":"Δείτε το αρχείο",
+"What does this say, in a few lines?":"Τι λέει αυτό, σε λίγες γραμμές;",
+"What should change in the file?":"Τι πρέπει να αλλάξει στο αρχείο;",
+"What stands out in this data?":"Τι ξεχωρίζει σε αυτά τα δεδομένα;"
 }

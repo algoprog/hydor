@@ -200,6 +200,7 @@ On a computer, the bar above the file shows its path and these buttons:
 - **Show as a page** (HTML files): runs the page in a frame sealed off from the app, able to load the files next to it. HTML files open as a page first. The page's link lasts an hour; after that, open the file again.
 - **Changes since the last commit**: the file's differences from its last commit, added lines in green and removed ones in red. It says "No changes" when the file matches its last commit or isn't in a git repository.
 - **Word wrap**: wraps long lines instead of scrolling sideways. The choice is remembered.
+- **Ask**: asks an agent to change the file, or about it ([below](#ask-an-agent-about-the-file)).
 - **Terminal in this folder**: a new shell in the file's folder.
 - **Download**.
 - **More** (⋯): **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**.
@@ -207,13 +208,22 @@ On a computer, the bar above the file shows its path and these buttons:
 
 To find text in the file, press Ctrl+F (⌘F on a Mac) while the cursor is in it: a find bar opens at the top, with replace.
 
-On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Save** (once you change something) and **More** (⋯), which holds **Find**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
+On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
+
+### Ask an agent about the file
+
+Click **Ask** in the editor's bar (✨ on a phone) and say what should change ("Find and fix any bugs", "Add a summary at the top"), or ask a question about the file. The panel opens beside the file (over it on a narrow screen), with examples to start from, and shows the agent and model you picked last on the start page.
+
+- Unsaved changes are saved first, so the agent works on them.
+- The agent starts in the file's folder, knows which file you mean, and changes that file itself. You watch each change arrive in the editor as soon as it is written, the changed lines tinted for a moment, with your place in the file kept.
+- The conversation goes on in the panel: write back to ask for more. **A new request** starts again, and **Open as a session** opens it in full; it is in your sessions too. On a phone, **See the file** folds the panel away to watch the file, and the bar at the bottom brings it back.
+- The panel stays open as you switch between files' tabs, each with its own conversation. It works the same in the Word, Excel, CSV and LaTeX editors. As with [asking from the Library](/guide/library#change-it-by-asking-an-agent), the agent's remembered model and permissions stay as they were.
 
 ### When the file changes while you have it open
 
-Agents and terminals change files all the time. Every few seconds the editor checks the file:
+Agents and terminals change files all the time. Every few seconds (every second while an agent is working) the editor checks the file:
 
-- With nothing unsaved, it loads the new version by itself.
+- With nothing unsaved, it puts in the new version by itself, where you are reading: only the lines that changed change, tinted for a moment.
 - With unsaved changes of yours, a bar says "The file changed on disk since you opened it." Choose **Reload (discard mine)** to take the new version, or **Overwrite with mine** to save yours over it.
 
 Saving never writes over a newer version without this question.
@@ -232,7 +242,7 @@ These files open in the editors the [Library](/guide/library#documents) has for 
 - **Excel files** (.xlsx), **CSV** and **TSV** files open in the spreadsheet editor, with their sheets and working formulas.
 - **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, each in a tab, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document that reads it, on the chapter's own tab.
 
-Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
+Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Ask** ([ask an agent](#ask-an-agent-about-the-file)), **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a space**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
 
 What saving keeps of the file:
 
@@ -612,6 +622,7 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 
 ## Ask an agent
 
+- "In the file I have open, add a comment over each function saying what it does."
 - "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 space."
 - "Which files in ~/code/shop mention the checkout, and what does each do with it?"
 - "Add a column to ~/Documents/people.csv with each person's share of the total."
