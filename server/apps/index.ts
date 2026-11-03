@@ -10,10 +10,12 @@
 //   submit_result              on each app run's own MCP server: the answer fields, checked
 //   app_data                   on an app run's own MCP server: the records the app keeps
 import fs from 'node:fs';
+import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
+import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
 import { builderTools } from './builder.ts';
 import { initAppEdits, noteUserEdit, takeAppEdits } from './edits.ts';
 import { isInternal } from '../internal.ts';
@@ -40,7 +42,7 @@ import { PUBLIC_RUN_ENV } from './publicRun.ts';
 import { adviceOf } from './advice.ts';
 import { defaultFolder, folderOf, folderSaved, initFolders, linkFolder, unlinkFolder, unwatch } from './folder.ts';
 import { appSchema } from './schema.ts';
-import { appChanged, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
+import { appChanged, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runFolder, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -54,6 +56,7 @@ import {
   getBatch,
   getRun,
   getVersion,
+  getView,
   KEY_PREFIX,
   lastExampleRuns,
   listApps,
@@ -64,6 +67,7 @@ import {
   revokeKey,
   runView,
   saveApp,
+  setView,
   updateRun,
   usageSince,
   type RunRecord,
@@ -84,6 +88,23 @@ function recipeOf(db: Deps['db'], id: string): { app: AppDef | null; template: A
   return { app, template: null };
 }
 
+/**
+ * The view a run's answer shows in: what a test tried; for other runs of the main flow, its app's (or ready-made
+ * app's) view as it is now, so a better view shows earlier answers too. Runs of other flows, steps and
+ * conversations show their plain answer.
+ */
+function viewOfRun(db: Deps['db'], r: RunRecord): AppUi | null {
+  if (r.flow || r.source === 'step' || r.source === 'chat') return null;
+  let ui: AppUi | undefined;
+  if (r.source === 'test' || r.app === 'test') ui = r.recipe.ui;
+  else if (r.app.startsWith('tpl:')) ui = templateById(r.app.slice(4))?.ui ?? r.recipe.ui;
+  else {
+    const a = getApp(db, r.app);
+    ui = a ? a.ui : r.recipe.ui;
+  }
+  return ui && pagesFor(ui, 'run').length ? ui : null;
+}
+
 /** Custom's models, for the public page's runs. */
 function customModels(): { id: string; label: string; provider: string }[] {
   try {
@@ -100,12 +121,16 @@ function customModels(): { id: string; label: string; provider: string }[] {
 function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
   const src = raw && typeof raw === 'object' ? raw : {};
   const recipe = cleanRecipe(src);
-  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanExamples(src.examples).errors];
+  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanExamples(src.examples).errors, ...cleanUi(src.ui).errors];
   if (!recipe.prompt.trim() && !recipe.flow) errors.push('Write the prompt: it is what the agent is asked to do');
   for (const f of recipe.fields) if (f.type === 'choice' && !f.options?.length) errors.push(`${f.label}: give the choices`);
   const checked = checkFlow(recipe);
   errors.push(...checked.errors);
   const warnings = [...checked.warnings];
+  // Its view, against what its answer gives, its form asks, its flows and what it keeps.
+  const viewed = checkUi(recipe);
+  errors.push(...viewed.errors);
+  warnings.push(...viewed.warnings);
   for (const f of [recipe.flow, ...Object.values(recipe.flows ?? {})]) for (const s of f ? allSteps(f.steps) : []) if (s.do === 'app' && !getApp(db, s.app)) warnings.push(`Step “${s.id}” calls the app “${s.app}”, which is not here`);
   return { recipe, errors: [...new Set(errors)], warnings };
 }
@@ -213,7 +238,9 @@ function routes(d: Deps) {
 
   app.get('/api/apps', async () => {
     const today = dayStart();
-    const apps = listApps(db).map((a) => ({ ...a, usage: usageShown(a.id, today) }));
+    // When each last ran (its runs, not its steps' or its conversations).
+    const last = new Map((db.prepare("select app_id as id, max(created_at) as at from app_runs where source not in ('step', 'chat') group by app_id").all() as { id: string; at: number }[]).map((r) => [r.id, r.at]));
+    const apps = listApps(db).map((a) => ({ ...a, usage: usageShown(a.id, today), ...(last.get(a.id) ? { lastRunAt: last.get(a.id) } : {}) }));
     const recent = listRuns(db, { limit: 12 })
       .filter((r) => r.source !== 'batch' && r.source !== 'public')
       .slice(0, 6)
@@ -274,7 +301,17 @@ function routes(d: Deps) {
     const { app: a, template } = recipeOf(db, P(req).id);
     if (template) return { template };
     const today = dayStart();
-    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug) };
+    // Its own page in its view: what that page keeps.
+    const own = pagesFor(a!.ui, 'app').length ? { view: getView(db, `app:${a!.id}`) } : {};
+    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), ...own };
+  });
+
+  /** One value its own page's view keeps: null removes it. Gives all it keeps now. */
+  app.put('/api/apps/:id/view', async (req) => {
+    const a = getApp(db, P(req).id);
+    if (!a) throw new HttpError(404, 'No such app');
+    const b = (req.body ?? {}) as { name?: unknown; value?: unknown };
+    return { view: setView(db, `app:${a.id}`, b.name, b.value ?? null) };
   });
 
   app.put('/api/apps/:id', async (req) => {
@@ -387,6 +424,34 @@ function routes(d: Deps) {
     return { runs: listRuns(db, { app: a?.id ?? id, limit: 50, before: Number(q.before) || undefined }).map(runView) };
   });
 
+  /**
+   * A new run of a run's app (as it is now; a test's recipe as it was tried) with the same answers but those
+   * changed, as an event of its view asks: its files come along from the run's folder, as they were sent.
+   */
+  const againWith = (old: RunRecord, a: AppDef | null, changes: Record<string, unknown>): RunRecord => {
+    if (old.flow) throw new HttpError(400, 'Only a run of its main flow runs again from its view');
+    const template = old.app.startsWith('tpl:') ? templateById(old.app.slice(4)) : null;
+    const test = old.source === 'test' || old.app === 'test';
+    const o = old.recipe;
+    const recipe: AppRecipe = test || (!a && !template) ? o : (a ?? cleanRecipe({ ...template!, agent: o.agent, acpAgent: o.acpAgent, model: o.model, mode: o.mode, effort: o.effort }));
+    const slug = a?.slug ?? template?.id ?? 'test';
+    const fields = formOf(recipe);
+    const unknown = Object.keys(changes).filter((k) => !fields.some((f) => f.id === k));
+    if (unknown.length) throw new HttpError(400, `Its form has no ${unknown.map((k) => `“${k}”`).join(', ')}`);
+    const files: Record<string, { name: string; data: string }> = {};
+    for (const f of fields) {
+      if (f.type !== 'file' || f.id in changes || !old.inputs[f.id]) continue;
+      const name = path.basename(String(old.inputs[f.id])).replace(/[^\w.\- ()]+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'file';
+      try {
+        files[f.id] = { name: String(old.inputs[f.id]), data: fs.readFileSync(path.join(runFolder(old, slug), 'uploads', name)).toString('base64') };
+      } catch {
+        throw new HttpError(409, `Its file “${old.inputs[f.id]}” is gone: run it again from its form`);
+      }
+    }
+    if (a && !test) checkDaily(db, a);
+    return startRun({ app: old.app, slug, recipe, source: test ? 'test' : 'web', inputs: { ...old.inputs, ...changes }, ...(Object.keys(files).length ? { files } : {}) });
+  };
+
   /** Why a run takes no follow-ups, or nothing when it does. */
   const noAsks = (r: RunRecord): string | undefined => {
     if (r.source === 'public') return 'Runs from the public page take no follow-ups.';
@@ -403,10 +468,13 @@ function routes(d: Deps) {
     const { name, icon, color, fields, answer, agent, acpAgent, model } = r.recipe;
     const a = r.app.startsWith('tpl:') ? null : getApp(db, r.app);
     const s = r.key ? sessions.summary(r.key) : null;
+    const ui = viewOfRun(db, r);
     return {
       run: runView(r),
       progress: isActive(r.status) ? await progressOf(r, false) : { steps: [] },
-      recipe: { name, icon, color, fields, answer, agent, acpAgent, model },
+      recipe: { name, icon, color, fields, answer, agent, acpAgent, model, ...(ui ? { ui } : {}), ...(r.flow ? {} : { steps: !!r.recipe.flow }) },
+      // What its view keeps for it (ticks, values its events kept).
+      ...(ui ? { view: getView(db, `run:${r.id}`) } : {}),
       slug: a?.slug ?? null,
       ...(r.source === 'public' ? { asks: [] } : await followUpsOf(r)),
       ...(isFlowRun(r) ? { steps: stepsOf(r.id, { values: true }) } : {}),
@@ -524,9 +592,11 @@ function routes(d: Deps) {
   app.post('/api/apps/runs/:runId/again', async (req) => {
     const old = getRun(db, P(req).runId);
     if (!old || old.source === 'step' || old.source === 'app' || old.source === 'public') throw new HttpError(404, 'No such run');
-    if (isActive(old.status)) throw new HttpError(409, 'It is still running');
-    const b = (req.body ?? {}) as { from?: unknown; recipe?: unknown };
+    const b = (req.body ?? {}) as { from?: unknown; recipe?: unknown; inputs?: unknown };
     const a = old.app.startsWith('tpl:') || old.app === 'test' ? null : getApp(db, old.app);
+    // From its view: a new run with the same answers but those given, the app as it is now, its files along.
+    if (b.inputs && typeof b.inputs === 'object' && !Array.isArray(b.inputs)) return { run: runView(againWith(old, a, b.inputs as Record<string, unknown>)) };
+    if (isActive(old.status)) throw new HttpError(409, 'It is still running');
     let recipe: AppRecipe = a ?? old.recipe;
     if (b.recipe && typeof b.recipe === 'object') {
       const { errors } = problemsOf(db, b.recipe);
@@ -568,6 +638,14 @@ function routes(d: Deps) {
     // Sent: its turn has begun (a queued one opens the run when it goes out).
     if (sessions.summary(r.key)?.live?.status === 'working') reopen(r.id);
     return { run: runView(getRun(db, r.id)!) };
+  });
+
+  /** One value a run's view keeps (a tick, a value an event kept): null removes it. Gives all it keeps now. */
+  app.put('/api/apps/runs/:runId/view', async (req) => {
+    const r = getRun(db, P(req).runId);
+    if (!r || r.source === 'public') throw new HttpError(404, 'No such run');
+    const b = (req.body ?? {}) as { name?: unknown; value?: unknown };
+    return { view: setView(db, `run:${r.id}`, b.name, b.value ?? null) };
   });
 
   app.post('/api/apps/runs/:runId/stop', async (req) => {
@@ -907,7 +985,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Apps (the Apps page in Naget Agent) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does.";
+  "Apps (the Apps page in Naget Agent) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, and events for what a click does), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views).";
 
 export const apps: Feature = {
   id: 'apps',

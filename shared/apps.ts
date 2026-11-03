@@ -3,6 +3,7 @@
 // of what the agent hands in), and CSV in and out for runs over many rows.
 import type { Agent } from './types.ts';
 import { allSteps, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppExample, type AppScreen, type CheckResult, type DataCollection, type Flow, type NamedFlow, type Requires, type Step } from './app-manifest.ts';
+import { cleanUi, type AppUi } from './app-ui.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -110,6 +111,12 @@ export interface AppRecipe {
   flows?: Record<string, NamedFlow>;
   /** Its screens: pages of its own ("main" opens on its page), made with naget.app and the App parts. */
   screens?: Record<string, AppScreen>;
+  /**
+   * Its view (shared/app-ui.ts): how its answer looks and what you can do there. Elements it is drawn with
+   * (templates its values fill), pages of them (tabs), and events (what a click does). Without one, a run's
+   * answer shows as the plain card and tables.
+   */
+  ui?: AppUi;
   /** Saved inputs with checks, to try it and to notice when it gets worse. */
   examples?: AppExample[];
   /** Where its steps sit in the graph (those not placed are laid out by themselves), and groups of steps with a note. */
@@ -752,6 +759,7 @@ export function cleanRecipe(raw: any): AppRecipe {
   const screens = cleanScreens(r.screens);
   const examples = cleanExamples(r.examples).examples;
   const graph = cleanGraph(r.graph, flow, flows);
+  const ui = cleanUi(r.ui).ui;
   return {
     name: str(r.name, 60) || 'Untitled app',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
@@ -776,6 +784,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(requires ? { requires } : {}),
     ...(flows ? { flows } : {}),
     ...(screens ? { screens } : {}),
+    ...(ui ? { ui } : {}),
     ...(examples ? { examples } : {}),
     ...(graph ? { graph } : {}),
     ...(r.block === true ? { block: true } : {}),

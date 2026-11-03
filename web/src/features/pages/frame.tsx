@@ -19,6 +19,34 @@ export interface AppBridge {
   info: AppInfo;
 }
 
+/**
+ * An app's view (shared/app-ui.ts), drawn in the frame by the view's kit: the view, its values, and what it may
+ * ask of the app. `onOp` answers what it asks (find records, keep a value, ask the agent, run a flow…); the frame
+ * passes on news of the app's runs and data (`appId`), and new values whenever `ctx` changes.
+ */
+export interface UiBridge {
+  def: unknown;
+  ctx: Record<string, unknown>;
+  can: string[];
+  appId?: string;
+  /** The page it opens on. */
+  start?: string;
+  lang?: string;
+  onOp: (op: string, args: Record<string, unknown>) => Promise<unknown>;
+}
+
+/** The words a view's kit says itself, in the app's language. */
+const uiLabels = () => ({
+  yes: tr('Yes'),
+  no: tr('No'),
+  back: tr('Back'),
+  loading: tr('Loading…'),
+  cannot: tr('This can’t be done here.'),
+  ownPage: tr('This shows on the app’s own page.'),
+  noElement: tr('No element'),
+  copied: tr('Copied'),
+});
+
 /** The App parts' words, in the app's language. */
 const appLabels = () => ({
   run: tr('Run'),
@@ -70,8 +98,8 @@ function chatOf(appId: string, d: ChatDetail) {
   return { id: d.run.id, status: d.run.status, working: busy, messages: msgs, ...(d.run.error ? { error: d.run.error } : {}) };
 }
 
-/** One call of a screen's window.naget.app, for its own template: its flows' runs and its data. */
-function appCall(appId: string, op: string, a: Record<string, unknown>): Promise<unknown> {
+/** One call of a screen's window.naget.app (or a view's), for its own template: its flows' runs and its data. */
+export function appCall(appId: string, op: string, a: Record<string, unknown>): Promise<unknown> {
   const id = enc(appId);
   const col = () => {
     if (typeof a.collection !== 'string' || !COLLECTION.test(a.collection)) throw new Error('That is not a collection');
@@ -316,6 +344,7 @@ export function PageFrame({
   className,
   fill,
   app,
+  ui,
 }: {
   html: string;
   store: Store;
@@ -327,25 +356,39 @@ export function PageFrame({
   fill?: boolean;
   /** A template's screen: window.naget.app, for that template. */
   app?: AppBridge;
+  /** An app's view, drawn in the page by the view's kit. */
+  ui?: UiBridge;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const cb = useRef({ html, store, onHeight, onPick, fill, app });
-  cb.current = { html, store, onHeight, onPick, fill, app };
+  const cb = useRef({ html, store, onHeight, onPick, fill, app, ui });
+  cb.current = { html, store, onHeight, onPick, fill, app, ui };
   const nRef = useRef('');
-  // What changes in the template's runs and data reaches its screen.
+  // What changes in the template's runs and data reaches its screen (and its view).
   const appId = app?.info.id;
+  const uiApp = ui?.appId;
   useEffect(() => {
-    if (!appId) return;
+    if (!appId && !uiApp) return;
     return onFeatureEvent('apps', (e) => {
       const w = ref.current?.contentWindow;
       const n = nRef.current;
       const d = e.data as { run?: AppRun; data?: { app: string; collection: string } } | null;
       if (!w || !n || !d) return;
-      if (d.run?.app === appId) w.postMessage({ type: 'wa-app-event', n, kind: 'run', run: d.run }, '*');
+      if (appId && d.run?.app === appId) w.postMessage({ type: 'wa-app-event', n, kind: 'run', run: d.run }, '*');
       const changed = d.data;
-      if (changed?.app === appId) w.postMessage({ type: 'wa-app-event', n, kind: 'data', collection: changed.collection }, '*');
+      if (appId && changed?.app === appId) w.postMessage({ type: 'wa-app-event', n, kind: 'data', collection: changed.collection }, '*');
+      if (uiApp && d.run && (d.run.app === uiApp || d.run.app === `tpl:${uiApp}`)) w.postMessage({ type: 'wa-ui-run', n, run: d.run }, '*');
+      if (uiApp && changed?.app === uiApp) w.postMessage({ type: 'wa-ui-data', n, collection: changed.collection }, '*');
     });
-  }, [appId]);
+  }, [appId, uiApp]);
+  // A view's new values (its run changed, a follow-up updated its answer): it draws itself again with them.
+  const uiCtx = ui?.ctx;
+  const sentCtx = useRef<unknown>(null);
+  useEffect(() => {
+    const w = ref.current?.contentWindow;
+    if (!uiCtx || !w || !nRef.current || sentCtx.current === uiCtx) return;
+    sentCtx.current = uiCtx;
+    w.postMessage({ type: 'wa-ui-ctx', n: nRef.current, ctx: uiCtx }, '*');
+  }, [uiCtx]);
   useThemeChange(() => nRef.current && ref.current?.contentWindow?.postMessage({ type: 'wa-html-theme', n: nRef.current, theme: themeNow(), css: themeCss() }, '*'));
   // Before the frame can load (it posts "ready" as soon as it does).
   useLayoutEffect(() => {
@@ -363,7 +406,10 @@ export function PageFrame({
         n = nonce();
         nRef.current = n;
         const appInfo = cb.current.app ? { info: cb.current.app.info, labels: appLabels() } : undefined;
-        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, app: appInfo }, '*');
+        const v = cb.current.ui;
+        const uiInfo = v ? { def: v.def, ctx: v.ctx, can: v.can, labels: uiLabels(), lang: v.lang ?? 'en', ...(v.start ? { start: v.start } : {}) } : undefined;
+        if (v) sentCtx.current = v.ctx;
+        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, app: appInfo, ui: uiInfo }, '*');
         return;
       }
       const { store, onHeight, onPick } = cb.current;
@@ -402,6 +448,26 @@ export function PageFrame({
             (err) => reply({ error: String((err as Error)?.message ?? err) }),
           )
           .finally(() => appBusy--);
+      } else if (d.type === 'wa-ui') {
+        // What a view asks of its app: answered by its owner, for this app and this run only.
+        const v = cb.current.ui;
+        if (!v || !Number.isInteger(d.id) || d.id < 1 || typeof d.op !== 'string' || d.op.length > 20) return;
+        const reply = (m: { value?: unknown; error?: string }) => w.postMessage({ type: 'wa-ui-reply', id: d.id, ...m }, '*');
+        if (appBusy >= 16) return reply({ error: 'Too many calls at once' });
+        const args = d.args && typeof d.args === 'object' && !Array.isArray(d.args) ? d.args : {};
+        if (JSON.stringify(args).length > 200_000) return reply({ error: 'That is too much to send' });
+        appBusy++;
+        Promise.resolve()
+          .then(() => v.onOp(d.op, args))
+          .then(
+            (value) => reply({ value: value ?? null }),
+            (err) => reply({ error: String((err as Error)?.message ?? err) }),
+          )
+          .finally(() => appBusy--);
+      } else if (d.type === 'wa-ui-top') {
+        // A view went to another page: its top comes into sight when it was scrolled past.
+        const r = ref.current?.getBoundingClientRect();
+        if (r && r.top < 0) ref.current?.scrollIntoView({ block: 'start' });
       } else if (d.type === 'wa-store') {
         if (!Number.isInteger(d.id) || d.id < 1) return;
         const reply = (m: { value?: unknown; error?: string }) => w.postMessage({ type: 'wa-store-reply', id: d.id, ...m }, '*');
@@ -430,8 +496,8 @@ export function PageFrame({
       src="/htmlframe"
       title={title}
       sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
-      // A slide deck's own page may go full screen to present.
-      allow={isDeckPage(html) ? 'fullscreen' : undefined}
+      // A slide deck's own page may go full screen to present; an app's view copies what its events copy.
+      allow={[isDeckPage(html) && 'fullscreen', ui && 'clipboard-write'].filter(Boolean).join('; ') || undefined}
       className={cx(FRAME_CLS, className)}
     />
   );

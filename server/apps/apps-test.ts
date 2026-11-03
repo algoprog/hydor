@@ -646,6 +646,82 @@ test('rows: stopping ends those waiting and interrupts those running', async () 
   assert.equal(store.getBatch(db, b.id)!.status, 'stopped');
 });
 
+// ---- views -------------------------------------------------------------------------------------------------------
+
+const VIEWED = {
+  pages: [{ id: 'main', title: 'Main', blocks: [{ element: 'day', data: 'result.days', each: true }] }, { id: 'home', title: 'Home', on: 'app', blocks: [{ element: 'form' }] }],
+  elements: { day: { html: '<p data-event="tick">{{plan}}</p>' } },
+  events: { tick: [{ do: 'toggle', name: 'done.@key', keep: true }, { do: 'again', inputs: { days: '{{inputs.days|plus:1}}' } }] },
+};
+
+test('view: a run’s page has its app’s view and what it keeps; a kept value stays, null removes it, names and sizes are checked, and it goes with the run', async () => {
+  const a = store.saveApp(db, { recipe: recipe({ name: 'Viewed', ui: VIEWED as any }) });
+  const r = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'web', inputs: { city: 'Lisbon', days: '3' }, status: 'done' });
+  const page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${r.id}` })).json();
+  assert.deepEqual(page.recipe.ui.pages.map((p: { id: string }) => p.id), ['main', 'home']);
+  assert.deepEqual(page.view, {});
+  const keep = (name: unknown, value: unknown) => http.inject({ method: 'PUT', url: `/api/apps/runs/${r.id}/view`, payload: { name, value } });
+  assert.deepEqual((await keep('done.3', true)).json().view, { done: { '3': true } });
+  assert.deepEqual((await keep('picked', { day: 2 })).json().view, { done: { '3': true }, picked: { day: 2 } });
+  assert.deepEqual((await http.inject({ method: 'GET', url: `/api/apps/runs/${r.id}` })).json().view, { done: { '3': true }, picked: { day: 2 } });
+  assert.deepEqual((await keep('done.3', null)).json().view, { done: {}, picked: { day: 2 } });
+  assert.equal((await keep('not a name!', 1)).statusCode, 400);
+  assert.equal((await keep('big', 'x'.repeat(70_000))).statusCode, 413);
+  // The app's own page keeps its own.
+  assert.deepEqual((await http.inject({ method: 'PUT', url: `/api/apps/${a.id}/view`, payload: { name: 'filter', value: 'open' } })).json().view, { filter: 'open' });
+  assert.deepEqual((await http.inject({ method: 'GET', url: `/api/apps/${a.id}` })).json().view, { filter: 'open' });
+  // A run removed takes what it kept with it.
+  await http.inject({ method: 'DELETE', url: `/api/apps/runs/${r.id}` });
+  assert.deepEqual(store.getView(db, `run:${r.id}`), {});
+});
+
+test('view: a ready-made app’s run shows in its view as it is now; a run of another flow shows its plain answer', async () => {
+  const tpl = TEMPLATES.find((t) => t.id === 'trip-planner')!;
+  const old = cleanRecipe({ ...tpl, ui: undefined });
+  const r = store.insertRun(db, { app: 'tpl:trip-planner', appName: tpl.name, recipe: old, source: 'web', inputs: { destination: 'Lisbon' }, status: 'done' });
+  const page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${r.id}` })).json();
+  assert.ok(page.recipe.ui?.elements?.['day-card'], 'the ready-made view, though the run was made before it had one');
+  assert.equal(page.recipe.steps, true);
+  const a = store.saveApp(db, { recipe: recipe({ name: 'Flows', ui: VIEWED as any, flows: { other: { steps: [{ id: 's', do: 'model', instructions: 'x' }] } } as any }) });
+  const f = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'screen', inputs: {}, flow: 'other', status: 'done' });
+  assert.equal((await http.inject({ method: 'GET', url: `/api/apps/runs/${f.id}` })).json().recipe.ui, undefined);
+});
+
+test('view: again with changed answers starts a new run with the others as they were, its files along; questions it does not have are refused', async () => {
+  const a = store.saveApp(db, { recipe: recipe({ name: 'Again', fields: [...recipe().fields, { id: 'doc', label: 'Doc', type: 'file' }], prompt: 'Plan {{days}} days in {{city}} from {{doc}}' }) });
+  const old = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'web', inputs: { city: 'Porto', days: '2', kids: 'No', budget: '', doc: 'notes.txt' }, status: 'done' });
+  // Its file, where the run kept it (the app works in the scratch folder).
+  fs.mkdirSync(path.join(tmp, 'uploads'), { recursive: true });
+  fs.writeFileSync(path.join(tmp, 'uploads', 'notes.txt'), 'see the river');
+  const made = sessions.made.length;
+  const res = await http.inject({ method: 'POST', url: `/api/apps/runs/${old.id}/again`, payload: { inputs: { days: '4' } } });
+  assert.equal(res.statusCode, 200, res.body);
+  const next = store.getRun(db, res.json().run.id)!;
+  assert.deepEqual([next.inputs.city, next.inputs.days, next.inputs.doc], ['Porto', '4', 'notes.txt']);
+  await sleep(100);
+  assert.equal(sessions.made.length, made + 1, 'its session started');
+  assert.match(sessions.made.at(-1)!.o.prompt, /Plan 4 days in Porto/);
+  assert.equal((await http.inject({ method: 'POST', url: `/api/apps/runs/${old.id}/again`, payload: { inputs: { weather: 'sun' } } })).statusCode, 400);
+  fs.rmSync(path.join(tmp, 'uploads', 'notes.txt'));
+  const gone = await http.inject({ method: 'POST', url: `/api/apps/runs/${old.id}/again`, payload: { inputs: {} } });
+  assert.equal(gone.statusCode, 409);
+  assert.match(gone.json().error, /is gone/);
+  for (const k of sessions.made.slice(made)) await sessions.interrupt(k.key);
+});
+
+test('view: a save checks its view and says what to fix; a public page has its run pages, with only what a click does on the page', async () => {
+  const bad = (await http.inject({ method: 'POST', url: '/api/apps/check', payload: { recipe: recipe({ ui: { pages: [{ id: 'main', title: 'M', blocks: [{ element: 'nope' }] }] } as any }) } })).json();
+  assert.match(bad.errors.join(' | '), /there is no element “nope”/);
+  const saved = await http.inject({ method: 'POST', url: '/api/apps', payload: { recipe: { ...recipe({ name: 'Bad view' }), ui: { pages: [{ id: 'main', title: 'M', blocks: [{ element: 'nope' }] }] } } } });
+  assert.equal(saved.statusCode, 400);
+  fs.mkdirSync(path.join(process.env.DATA_DIR!, 'models'), { recursive: true });
+  fs.writeFileSync(path.join(process.env.DATA_DIR!, 'models', 'agent.json'), JSON.stringify({ models: [{ id: 'm1', label: 'Fake', provider: 'endpoint', baseUrl: 'http://127.0.0.1:1/v1', model: 'fake', tools: 'native' }] }));
+  const a = store.saveApp(db, { recipe: recipe({ name: 'Public view', ui: VIEWED as any }), public: { on: true, model: 'm1', perIpPerHour: 2, runsPerDay: 3, spendPerDay: 1, web: false } });
+  const pub = (await http.inject({ method: 'GET', url: `/a-api/${a.slug}` })).json();
+  assert.deepEqual(pub.app.ui.pages.map((p: { id: string }) => p.id), ['main']);
+  assert.deepEqual(pub.app.ui.events, { tick: [{ do: 'toggle', name: 'done.@key' }] });
+});
+
 // A run whose session failed to start ends as failed, with the reason.
 test('a session that cannot start fails the run with the reason', async () => {
   const create = sessions.create;

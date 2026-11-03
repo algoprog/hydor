@@ -70,6 +70,8 @@ each change you save comes to Naget Agent as a new version of it, and a mistake 
 - instructions/: each step's instructions (and the task of an app without steps), in Markdown.
 - steps/: each code step, as the function it runs (.naget/step.d.ts says what it gets and gives).
 - screens/: its screens, as pages that use naget.app.
+- ui/: its view's elements (name.html, with name.css beside it) and style.css; its pages and events are in
+  app.json, under ui.
 - graph.json: where its steps sit in the graph (leave it out, and they are laid out by themselves).
 `;
 
@@ -102,6 +104,23 @@ export function filesOf(db: DB, a: AppDef): Files {
       if (html === undefined) continue;
       files[`screens/${name}.html`] = html;
       out.screens[name] = { file: `screens/${name}.html`, ...(sc.title ? { title: sc.title } : {}) };
+    }
+  }
+  // Its view's elements and style, each in a file of its own, so they read (and change) as HTML and CSS.
+  if (r.ui) {
+    for (const [name, el] of Object.entries(r.ui.elements ?? {})) {
+      files[`ui/${name}.html`] = `${el.html.replace(/\n$/, '')}\n`;
+      const ref: Record<string, unknown> = { html: { file: `ui/${name}.html` } };
+      if (el.css) {
+        files[`ui/${name}.css`] = `${el.css.replace(/\n$/, '')}\n`;
+        ref.css = { file: `ui/${name}.css` };
+      }
+      if (el.description) ref.description = el.description;
+      out.ui.elements[name] = ref;
+    }
+    if (r.ui.style) {
+      files['ui/style.css'] = `${r.ui.style.replace(/\n$/, '')}\n`;
+      out.ui.style = { file: 'ui/style.css' };
     }
   }
   if (r.graph) files['graph.json'] = `${JSON.stringify(r.graph, null, 2)}\n`;
@@ -140,6 +159,15 @@ export function readFolder(dir: string): { recipe: Record<string, any>; screens:
         s.code = code ?? '';
       }
     }
+  // Its view's elements and style, from their files.
+  if (recipe.ui && typeof recipe.ui === 'object') {
+    for (const el of Object.values((recipe.ui.elements ?? {}) as Record<string, Record<string, unknown>>)) {
+      if (!el || typeof el !== 'object') continue;
+      if (isRef(el.html)) el.html = (read(el.html.file) ?? '').replace(/\n$/, '');
+      if (isRef(el.css)) el.css = (read(el.css.file) ?? '').replace(/\n$/, '');
+    }
+    if (isRef(recipe.ui.style)) recipe.ui.style = (read(recipe.ui.style.file) ?? '').replace(/\n$/, '');
+  }
   const screens: Record<string, { html: string; title?: string }> = {};
   for (const [name, sc] of Object.entries((recipe.screens ?? {}) as Record<string, unknown>)) {
     if (!isRef(sc)) continue;
@@ -282,7 +310,7 @@ function filesOn(dir: string): Files {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.name.startsWith('.')) continue;
       if (e.isDirectory()) walk(r);
-      else if (/^(app\.json|graph\.json|instructions\/.+\.md|steps\/.+\.(js|ts|py)|screens\/.+\.html)$/.test(r)) out[r] = fs.readFileSync(path.join(dir, r), 'utf8');
+      else if (/^(app\.json|graph\.json|instructions\/.+\.md|steps\/.+\.(js|ts|py)|screens\/.+\.html|ui\/.+\.(html|css))$/.test(r)) out[r] = fs.readFileSync(path.join(dir, r), 'utf8');
     }
   };
   try {

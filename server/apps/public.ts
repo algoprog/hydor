@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AppDef, AppRun, RunProgress } from '../../shared/apps.ts';
 import { isActive } from '../../shared/apps.ts';
+import { localUi } from '../../shared/app-ui.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
 import { Limiter, waitText } from './limits.ts';
@@ -31,6 +32,8 @@ export function publicApp(a: AppDef) {
     description: a.description,
     fields: a.fields.map(({ id, label, type, required, help, placeholder, options, default: def }) => ({ id, label, type, required, help, placeholder, options, default: def })),
     answer: a.answer.map(({ id, label, type, columns }) => ({ id, label, type, columns: columns?.map(({ id: cid, label: cl, type: ct }) => ({ id: cid, label: cl, type: ct })) })),
+    // Its view, as a visitor's run shows in it: only what a click does on the page itself.
+    ...(localUi(a.ui) ? { ui: localUi(a.ui) } : {}),
   };
 }
 

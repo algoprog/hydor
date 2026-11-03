@@ -2,7 +2,7 @@
 // result (short fields as a card, long text, lists, and tables, which on a phone become a card a row
 // when they would not fit), and the agent's own reply. The owner's pages and the public page show the same.
 import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
-import { Check, ChevronRight, CircleAlert, Clock, Copy, Download, Hand, Square } from 'lucide-react';
+import { Check, ChevronRight, CircleAlert, Clock, Copy, Download, Hand, PanelsTopLeft, Square, Table2 } from 'lucide-react';
 import type { AnswerColumn, AnswerField, AppRun, RunProgress } from '@shared/apps';
 import { cellText, isActive, toCsv } from '@shared/apps';
 import { duration } from '../../lib/format';
@@ -363,6 +363,7 @@ export function RunBody({
   statusExtra,
   reply,
   followUp,
+  view,
 }: {
   run: AppRun;
   progress?: RunProgress;
@@ -372,15 +373,25 @@ export function RunBody({
   statusExtra?: ReactNode;
   reply?: string;
   followUp?: { updated: boolean };
+  /** The app's view of its answer (View.tsx), shown in place of the plain card; Plain answer shows that instead. */
+  view?: ReactNode;
 }) {
   const hasResult = !!run.result && Object.keys(run.result).length > 0;
   const text = reply ?? run.reply;
+  const [plain, setPlain] = useState(false);
+  const inView = !!view && hasResult && !plain;
   return (
     <div className="space-y-3">
       <RunStatusCard run={run} progress={progress} publicView={publicView} followUp={followUp}>
         {statusExtra}
+        {!!view && hasResult && (
+          <button type="button" onClick={() => setPlain((p) => !p)} className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
+            {plain ? <PanelsTopLeft size={13} /> : <Table2 size={13} />}
+            {plain ? 'Its view' : 'Plain answer'}
+          </button>
+        )}
       </RunStatusCard>
-      {hasResult && <ResultView answer={answer} result={run.result!} name={name} />}
+      {hasResult && (inView ? view : <ResultView answer={answer} result={run.result!} name={name} />)}
       {text && (reply !== undefined || !isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={text} folded={hasResult} />}
     </div>
   );

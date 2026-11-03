@@ -3,6 +3,7 @@
 // saved, in words: this only helps write it.
 import { STEP_KINDS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { ANSWER_TYPES, APP_COLORS, APP_ICONS, FIELD_TYPES } from '../../shared/apps.ts';
+import { BUILTIN_ELEMENTS, UI_ACTIONS } from '../../shared/app-ui.ts';
 
 const str = (description: string, more: Record<string, unknown> = {}) => ({ type: 'string', description, ...more });
 /** Text, or a file of the folder that holds it. */
@@ -123,8 +124,87 @@ export function appSchema(): Record<string, unknown> {
       requires: { type: 'object', description: 'What it needs on this computer: node and python packages, commands, models', additionalProperties: true },
       examples: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, inputs: { type: 'object' }, checks: { type: 'array', items: { type: 'string' } } } } },
       screens: { type: 'object', additionalProperties: { type: 'object', properties: { file: { type: 'string' }, title: { type: 'string' } } }, description: 'Its screens, each a page in screens/' },
+      ui: uiSchema(),
     },
     required: ['name'],
+  };
+}
+
+/** Its view: pages of blocks, elements (templates its values fill), events (what a click does). */
+function uiSchema(): Record<string, unknown> {
+  const action = {
+    type: 'object',
+    properties: {
+      do: { enum: UI_ACTIONS.map((a) => a.value), description: UI_ACTIONS.map((a) => `${a.value}: ${a.label}`).join('; ') },
+      confirm: str('Asks this first; no stops the event'),
+      page: str('page: the page to go to'),
+      item: { description: 'page: what {{page.item}} is there ("{{item}}")' },
+      name: str('set, toggle: the value’s name in the view’s state ("picked", "done.@key")'),
+      value: { description: 'set: its value' },
+      keep: { type: 'boolean', description: 'set, toggle: kept with the run (or the app)' },
+      text: str('ask, say, copy: the text, with {{values}}'),
+      flow: str('run: one of its flows ("run": the main one)'),
+      inputs: values('run, again, start: the answers (again: only those that change)'),
+      as: str('run: its run’s name in the view’s state'),
+      app: str('start: an app’s id or address, or "tpl:<id>" for a ready-made one'),
+      op: { enum: ['add', 'update', 'remove'], description: 'data: what to do' },
+      collection: str('data: the list of records'),
+      record: values('data add: the record; update: what changes'),
+      id: str('data update, remove: the record’s id ("{{item.id}}")'),
+      url: str('open: an address'),
+    },
+    required: ['do'],
+  };
+  const block = {
+    type: 'object',
+    properties: {
+      title: str('A heading over it'),
+      element: str(`One of its elements, or a built-in one: ${BUILTIN_ELEMENTS.map((e) => e.value).join(', ')}`),
+      html: str('A template of its own, for this place only'),
+      text: str('Text with {{values}}, in Markdown'),
+      data: str('What fills it: "result.days", "inputs", "data.items", "state.picked", "page.item"'),
+      each: { type: 'boolean', description: 'Drawn once for each item of the list data names' },
+      where: values('Only the items that match ({ "topic": "{{state.topic}}" }; an empty value matches all)'),
+      sort: str('The field to sort by ("-field": highest first)'),
+      limit: { type: 'number' },
+      layout: { enum: ['list', 'grid', 'row'] },
+      width: { enum: ['full', 'half', 'third', 'two-thirds'] },
+      empty: str('What shows when there is nothing'),
+      if: str('Shown only when this value is there ("result.flags", "!state.picked")'),
+      with: values('A built-in element’s settings (columns, label, value, flow…)'),
+    },
+  };
+  return {
+    type: 'object',
+    description: 'Its view: how its answer looks (pages of blocks, its own elements) and what a click does (events)',
+    properties: {
+      pages: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: str('Its name, for events ({ "do": "page", "page": "<id>" })'),
+            title: str('Its tab'),
+            on: { enum: ['run', 'app'], description: 'run: a run’s page (the default); app: the app’s own page' },
+            tab: { type: 'boolean', description: 'false: no tab, reached by an event' },
+            if: str('Shown only when this value is there'),
+            blocks: { type: 'array', items: block },
+          },
+          required: ['id', 'title', 'blocks'],
+        },
+      },
+      elements: {
+        type: 'object',
+        additionalProperties: {
+          type: 'object',
+          properties: { html: textOrFile('HTML with {{values}}, {{#list}}…{{/list}}, data-event="name"'), css: textOrFile('Its style: rules for what is inside it, & for itself'), description: str('What it shows') },
+          required: ['html'],
+        },
+      },
+      events: { type: 'object', additionalProperties: { type: 'array', items: action } },
+      style: textOrFile('CSS for the whole view'),
+    },
+    required: ['pages'],
   };
 }
 

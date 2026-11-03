@@ -6,7 +6,7 @@
 // Writes web/src/i18n/strings.json (sorted) and says how many each language still lacks.
 import fs from 'node:fs';
 import path from 'node:path';
-import { transformSync } from 'esbuild';
+import { buildSync, transformSync } from 'esbuild';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const files = (dir, re) => {
@@ -323,6 +323,21 @@ const NAMED = ['assistants/builtins', 'apps/templates', 'apps/draft', 'apps/scre
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
   for (const m of src.matchAll(/\b(name|label|description|detail|placeholder|help|title|category|note)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
+  // A ready-made app's choices, which its form shows as chips (the answer sent stays the option as written).
+  if (f === 'server/apps/templates.ts') for (const m of src.matchAll(/\boptions\s*:\s*\[([^\]]*)\]/g)) for (const o of m[1].matchAll(/'([^'\\]+)'/g)) add(o[1], f, true);
+}
+// The ready-made apps' views: the words of their pages and elements, as the pages translate them (shared/app-ui.ts).
+{
+  const built = buildSync({
+    stdin: { contents: "import { VIEWS } from './server/apps/views.ts'; import { uiTexts } from './shared/app-ui.ts'; export default Object.values(VIEWS).flatMap((v) => uiTexts(v));", resolveDir: ROOT, loader: 'ts' },
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+    logLevel: 'error',
+  });
+  const texts = (await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`)).default;
+  for (const s of texts) add(s, 'server/apps/views.ts', true);
 }
 for (const f of fs.readdirSync(path.join(ROOT, 'catalog/connections')).filter((x) => x.endsWith('.json'))) {
   const e = JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog/connections', f), 'utf8'));

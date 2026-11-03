@@ -9,6 +9,7 @@
 // so each uses only its arguments and the browser's own globals.
 import { EDITOR_SRC } from './editor.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
+import { ENGINE_SRC, UI_KIT_CSS, UI_SRC } from './ui-kit.ts';
 
 export { KIT_CSS };
 
@@ -151,7 +152,8 @@ function bridge(cfg: BridgeCfg) {
       return '#fff';
     };
     const size = () => {
-      const h = Math.max(root.scrollHeight, document.body ? document.body.scrollHeight : 0);
+      // A page that says so (an app's view: body[data-n-fit]) is as tall as what it holds, so its frame shrinks with it too.
+      const h = document.body?.hasAttribute('data-n-fit') ? Math.ceil(root.getBoundingClientRect().height) : Math.max(root.scrollHeight, document.body ? document.body.scrollHeight : 0);
       const bg = bgOf();
       if (h !== last || bg !== lastBg) post({ type: 'wa-html-size', h: (last = h), bg: (lastBg = bg) });
     };
@@ -824,7 +826,7 @@ export function injectHead(html: string, head: string): string {
  *   are held back, and the page is changed in place (what was there stays), so it grows without
  *   flashing, following its end unless the reader scrolled up.
  */
-function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string) {
+function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: string, appSrc: string, uiSrc: string, engineSrc: string, uiCss: string) {
   const num = (v: unknown, def: number) => (typeof v === 'number' && v > 0 && v < 1e8 ? v : def);
   const nonce = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
   const theme = (v: unknown) => (v === 'dark' ? 'dark' : 'light');
@@ -939,7 +941,12 @@ function frame(kit: string, bridgeSrc: string, editorSrc: string, schemeSrc: str
       const cfg = { n: nonce(d.n), theme: theme(d.theme), max: { key: num(d.max?.key, 200), value: num(d.max?.value, 524288) }, fill: d.fill === true };
       // A template's screen: its app's flows and data (no more than its parent sent, and not too much of it).
       const app = d.app && typeof d.app === 'object' && JSON.stringify(d.app).length < 400_000 ? { n: cfg.n, info: d.app.info, labels: d.app.labels } : null;
-      head = `<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}`;
+      // An app's view: drawn by the view's kit, with the template engine, from the view and its values its parent sent.
+      const ui =
+        d.ui && typeof d.ui === 'object' && JSON.stringify(d.ui).length < 2_000_000
+          ? { n: cfg.n, def: d.ui.def, ctx: d.ui.ctx, can: Array.isArray(d.ui.can) ? d.ui.can : [], labels: d.ui.labels && typeof d.ui.labels === 'object' ? d.ui.labels : {}, lang: typeof d.ui.lang === 'string' ? d.ui.lang.slice(0, 20) : 'en', css: uiCss, start: typeof d.ui.start === 'string' ? d.ui.start.slice(0, 40) : undefined }
+          : null;
+      head = `<style id="n-kit">${kit}</style><style id="n-theme">${themeText(d.css)}</style><script>(${schemeSrc})(${js(cfg.theme)})</script><script>(${bridgeSrc})(${js(cfg)})</script>${app ? `<script>(${appSrc})(${js(app)})</script>` : ''}${ui ? `<script>(${uiSrc})(${js(ui)}, (${engineSrc})())</script>` : ''}`;
     }
     const at = DOCTYPE.exec(html);
     html = at ? at[0] + head + html.slice(at[0].length) : head + html;
@@ -954,4 +961,4 @@ const asJs = (s: string) => JSON.stringify(s).replace(/</g, '\\u003c');
 
 /** The document of /htmlframe, where every page renders (sandboxed by PAGE_CSP). */
 export const frameHtml = () =>
-  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)})</script></body></html>`;
+  `<!doctype html>\n<html><head><meta charset="utf-8"></head><body><script>(${scriptSafe(frame.toString())})(${asJs(KIT_CSS)}, ${asJs(BRIDGE_SRC)}, ${asJs(EDITOR_SRC)}, ${asJs(SCHEME_SRC)}, ${asJs(APP_SRC)}, ${asJs(UI_SRC)}, ${asJs(ENGINE_SRC)}, ${asJs(UI_KIT_CSS)})</script></body></html>`;

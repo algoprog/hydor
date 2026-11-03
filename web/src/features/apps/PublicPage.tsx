@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Play } from 'lucide-react';
 import type { AnswerField, AppField, AppRun, RunProgress } from '@shared/apps';
+import type { AppUi } from '@shared/app-ui';
 import { inputsLine, isActive } from '@shared/apps';
 import { applyTheme } from '../../lib/theme';
 import { timeAgo } from '../../lib/format';
@@ -12,6 +13,7 @@ import { Button, cx, Throbber } from '../../components/ui';
 import { AppIcon } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { RunBody } from './Result';
+import { AppView } from './View';
 
 interface PublicApp {
   slug: string;
@@ -21,6 +23,8 @@ interface PublicApp {
   description: string;
   fields: AppField[];
   answer: AnswerField[];
+  /** Its view, as a public page shows it (only what a click does on the page itself). */
+  ui?: AppUi;
 }
 
 async function call<T>(path: string, body?: unknown): Promise<T> {
@@ -156,7 +160,14 @@ export default function PublicAppPage({ slug }: { slug: string }) {
 
         {shown && (
           <div id="the-run" className="mt-5 scroll-mt-4">
-            <RunBody run={shown.run} progress={shown.progress} answer={app.answer} publicView name={app.name} />
+            <RunBody
+              run={shown.run}
+              progress={shown.progress}
+              answer={app.answer}
+              publicView
+              name={app.name}
+              view={app.ui ? <AppView ui={app.ui} name={app.name} appId="public" run={shown.run} answer={app.answer} can={[]} publicView /> : undefined}
+            />
           </div>
         )}
 
