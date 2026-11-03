@@ -319,17 +319,17 @@ for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) =
   for (const s of literals(js)) add(s, f);
 }
 // The names and lines of what ships, and of the choices the server offers (permission modes, the buttons of an approval).
-const NAMED = ['assistants/builtins', 'apps/templates', 'apps/draft', 'apps/screens', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api'];
+const NAMED = ['assistants/builtins', 'apps/templates', 'apps/templates-more', 'apps/draft', 'apps/screens', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api'];
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
   for (const m of src.matchAll(/\b(name|label|description|detail|placeholder|help|title|category|note)\s*:\s*((['"`])(?:(?!\3)[^\\]|\\.)*\3)/g)) for (const s of literals(m[2])) add(s, f);
   // A ready-made app's choices, which its form shows as chips (the answer sent stays the option as written).
-  if (f === 'server/apps/templates.ts') for (const m of src.matchAll(/\boptions\s*:\s*\[([^\]]*)\]/g)) for (const o of m[1].matchAll(/'([^'\\]+)'/g)) add(o[1], f, true);
+  if (/^server\/apps\/templates(-more)?\.ts$/.test(f)) for (const m of src.matchAll(/\boptions\s*:\s*\[([^\]]*)\]/g)) for (const o of m[1].matchAll(/'([^'\\]+)'/g)) add(o[1], f, true);
 }
 // The ready-made apps' views: the words of their pages and elements, as the pages translate them (shared/app-ui.ts).
 {
   const built = buildSync({
-    stdin: { contents: "import { VIEWS } from './server/apps/views.ts'; import { uiTexts } from './shared/app-ui.ts'; export default Object.values(VIEWS).flatMap((v) => uiTexts(v));", resolveDir: ROOT, loader: 'ts' },
+    stdin: { contents: "import { VIEWS } from './server/apps/views.ts'; import { MORE_VIEWS } from './server/apps/views-more.ts'; import { uiTexts } from './shared/app-ui.ts'; export default [...Object.values(VIEWS), ...Object.values(MORE_VIEWS)].flatMap((v) => uiTexts(v));", resolveDir: ROOT, loader: 'ts' },
     bundle: true,
     format: 'esm',
     platform: 'node',
