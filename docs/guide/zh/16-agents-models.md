@@ -145,7 +145,7 @@ Claude Code 和 Codex 需要先登录才能工作。打开[设置 → 智能体 
 - Codex 的目标会随会话一起移过去，并继续进行。
 - 如果每个账户都达到了限额，就什么都不会移动。开启**用量限制解除后继续**时，会话会在第一个账户重置时，在那个账户上继续。更多内容见[用量、限额和费用](/guide/usage#continue-sessions-automatically-after-a-limit)。
 - 在已达到限额的账户上开始的新会话，会改在还有用量的账户上开始；你发给某个会话的消息，如果它的账户已达到限额，会先把会话移过去，这样消息就不会被拒。
-- 在 VS Code 或终端里打开的会话会留在原来的账户上。
+- 应用自己向 Claude Code 或 Codex 提的简短问题（**自动**模式下的辅助模型、应用的快速模型步骤、拉取请求说明、命令建议）在某个账户达到限额或已退出登录时，也会同样交给你下一个已登录的账户。
 
 ## 添加 Gemini CLI、OpenCode 和其他 ACP 智能体
 
@@ -213,7 +213,7 @@ Custom 可以运行你在[设置 → 智能体 → 模型](/settings?s=models)�
 
 打开[设置 → 智能体 → 模型](/settings?s=models&find=Helper%20model)，点击**辅助模型**旁边的菜单：
 
-- **自动**（默认）：通过 Claude Code 使用 Claude Haiku，Claude Code 无法回答时则用 Codex。
+- **自动**（默认）：通过 Claude Code 使用 Claude Haiku，Claude Code 无法回答时则用 Codex。达到用量限额的账户会先把问题交给你下一个已登录的账户（需开启**达到限额时切换账户**）。都无法回答时，错误信息会分别说明原因：“You've hit your weekly limit”、你的 Codex 套餐不提供的模型……
 - Custom 的任何一个模型，注明它在哪里运行（openrouter、ollama、vllm 或 endpoint），能看图片的还会标有“能看图片”。
 
 “自动”看不了图片。如果你在 Custom 中使用的模型看不了图片，请选一个能看图片的辅助模型，否则 Custom 就没法请辅助模型描述你的图片。

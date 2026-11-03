@@ -29,7 +29,8 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
   OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
   shows its own usage and limits. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
-  account runs out of usage moves, with its history, to another account with usage left and carries on.
+  account runs out of usage moves, with its history, to another account with usage left and carries on, and the app's own quick
+  questions (the helper model, apps' model steps) go to the next signed-in account too.
 
 ## Help with anything
 

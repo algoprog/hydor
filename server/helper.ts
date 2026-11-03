@@ -21,7 +21,7 @@ export interface HelperAsk {
   model?: string;
   maxTokens?: number;
   timeoutMs?: number;
-  /** Stops the call (one of Custom's models; "auto" runs to its end or its timeout). */
+  /** Stops the call (on "auto", its program ends). */
   signal?: AbortSignal;
   /** Told what the call cost, in US dollars, when that is known ($0 on a model on this computer). */
   onCost?: (usd: number) => void;
@@ -72,7 +72,13 @@ export async function helper(db: DB, q: HelperAsk): Promise<string> {
   const timeout = q.timeoutMs ?? 90_000;
   if (id === 'auto') {
     if (q.images?.length) throw new HttpError(400, 'The helper model cannot see images: pick one that does in Settings → Models');
-    return oneShot({ system: q.system, prompt: q.prompt, timeoutMs: timeout });
+    try {
+      return await oneShot({ system: q.system, prompt: q.prompt, timeoutMs: timeout, signal: q.signal });
+    } catch (e) {
+      // Neither CLI answered: another helper model needs neither.
+      if (e instanceof HttpError && e.status === 502 && !q.signal?.aborted) throw new HttpError(502, `${e.message} Settings → Models → Helper model can use another model.`);
+      throw e;
+    }
   }
   let m = customModels().find((x) => x.id === id);
   if (!m) throw new HttpError(400, 'The helper model is gone: pick another in Settings → Models');
