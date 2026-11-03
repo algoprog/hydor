@@ -76,7 +76,7 @@ The bottom of the sidebar holds the app's tools, four to a row:
 - **Spaces**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Spaces and knowledge](/guide/spaces).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
 - **Preview**: look at a web app's development server running on this computer. It shows only on this machine's own pages, not while you look at another machine.
-- **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs. A thin bar under its icon shows the plan limit you have used most, red when you are at a limit. See [Usage, limits and costs](/guide/usage).
+- **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs. A thin bar under its icon shows how much is left across your paid subscriptions (or your free ones, when you have no paid ones), red when nothing is left; with no subscriptions there is no bar. See [Usage, limits and costs](/guide/usage).
 - **System**: this computer's processors, GPUs, memory, disks and busiest processes, live.
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
 - **Search**: opens the search box (the same as Ctrl+K).

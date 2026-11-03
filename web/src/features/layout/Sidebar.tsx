@@ -23,21 +23,44 @@ import { openPalette } from '../palette/CommandPalette';
 import { machineId } from '../../lib/machine';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
 import { features } from '../registry';
+import type { AgentUsage } from '@shared/types';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 
-/** The most-used plan window, as a tiny meter under "Usage". */
+/** A subscription on a free plan (Codex "free", a Claude free account); any other plan counts as paid. */
+const freePlan = (u: AgentUsage) => /free/i.test(u.account?.plan ?? '');
+
+/** What one subscription has left: none at a limit, else what its fullest window leaves. */
+function leftOf(u: AgentUsage): number {
+  if (u.limited) return 0;
+  const used = Math.max(0, ...u.windows.map((w) => w.usedPercent ?? 0));
+  return Math.max(0, 100 - Math.min(100, used));
+}
+
+/**
+ * What is left across the subscriptions, as a tiny meter under "Usage": the paid ones, or the free ones when there
+ * are no paid ones, each counted once (an added account can be the agent's own sign-in too). No subscriptions, no bar.
+ */
 function UsageHint() {
-  const { claude, codex } = useUsage();
-  const all = [...(claude?.windows ?? []), ...(codex?.windows ?? [])].filter((w) => w.usedPercent != null);
-  if (!all.length) return null;
-  const top = all.reduce((a, b) => ((b.usedPercent ?? 0) > (a.usedPercent ?? 0) ? b : a));
-  const limited = !!(claude?.limited || codex?.limited);
-  const title = [claude, codex]
-    .flatMap((u) => (u?.windows ?? []).filter((w) => w.usedPercent != null).map((w) => `${u!.agent === 'claude' ? 'Claude' : 'Codex'} ${w.label}: ${pct(w.usedPercent)} used`))
-    .join('\n');
+  const { claude, codex, accounts } = useUsage();
+  const seen = new Set<string>();
+  const subs = [claude, codex, ...Object.values(accounts)].filter((u): u is AgentUsage => {
+    if (!u?.ok || !u.windows.some((w) => w.usedPercent != null)) return false;
+    const key = u.account?.email ? `${u.agent}:${u.account.email.toLowerCase()}` : null;
+    if (key && seen.has(key)) return false;
+    if (key) seen.add(key);
+    return true;
+  });
+  const paid = subs.filter((u) => !freePlan(u));
+  const counted = paid.length ? paid : subs;
+  if (!counted.length) return null;
+  const left = counted.reduce((n, u) => n + leftOf(u), 0) / counted.length;
+  const title = [
+    `${Math.round(left)}% left across ${counted.length} ${paid.length ? 'paid' : 'free'} subscription${counted.length === 1 ? '' : 's'}`,
+    ...counted.map((u) => `${u.agent === 'claude' ? 'Claude' : 'Codex'}${u.account?.email ? ` (${u.account.email})` : ''}: ${pct(leftOf(u))} left`),
+  ].join('\n');
   return (
     <span className="absolute bottom-[7px] left-1/2 h-[3px] w-8 -translate-x-1/2 overflow-hidden rounded-full bg-fg/10" title={title}>
-      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, top.usedPercent ?? 0)}%`, background: limited ? 'var(--err)' : severityColor(top.usedPercent) }} />
+      <span className="block h-full rounded-full" style={{ width: `${left}%`, background: left <= 0 ? 'var(--err)' : severityColor(100 - left) }} />
     </span>
   );
 }
