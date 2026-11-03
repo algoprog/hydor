@@ -30,7 +30,7 @@ import { Elapsed } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
-import { ACTIVE_MS, GROUP_ROWS, groupSessions, isFolded, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
+import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
@@ -567,8 +567,9 @@ export function SessionList({ query }: { query: string }) {
   // Move sessions out of Active even when no new session events arrive.
   useEffect(() => {
     const active = groups.find((g) => g.kind === 'active');
-    // Scheduled resumes stay Active until the server clears them, even if their reset time passes.
-    const expiring = active?.items.filter((s) => s.resumeAt == null) ?? [];
+    // Scheduled resumes stay Active until the server clears them, even if their reset time passes; sessions with
+    // background tasks stay while those run (their end changes the session, which groups the list again).
+    const expiring = active?.items.filter((s) => s.resumeAt == null && !hasBackgroundWork(s)) ?? [];
     if (!expiring.length) return;
     const expiresAt = Math.min(...expiring.map((s) => lastActivityAt(s) + ACTIVE_MS));
     const timer = setTimeout(() => setGroupTime(Date.now()), Math.max(1, expiresAt - Date.now()));

@@ -29,8 +29,11 @@ export const FOLDER_MIN = 2;
 export const GROUP_ROWS = 5;
 /** A space or folder group with no session this recent starts folded. */
 export const STALE_MS = 7 * 86400_000;
-/** Active means recent activity, or a session scheduled to resume after a usage limit. */
+/** Active means recent activity, background tasks (agents, commands, monitors) still running, or a session scheduled to resume after a usage limit. */
 export const ACTIVE_MS = 5 * 60_000;
+/** Background tasks still run: the agent picks up again when they finish, though its transcript may be quiet meanwhile. */
+export const hasBackgroundWork = (s: SessionSummary) =>
+  !!(s.live && s.live.status !== 'exited' && s.live.status !== 'error' && s.live.backgroundTasks?.length) || !!s.external?.backgroundTasks?.length;
 export const lastActivityAt = (s: SessionSummary) => Math.max(s.updatedAt ?? s.createdAt ?? 0, s.doneAt ?? 0, s.live?.startedAt ?? 0, s.live?.turnStartedAt ?? 0, s.external?.since ?? 0);
 
 /** Whether a space or folder group shows folded: as you left it, else when none of its sessions was at work this week. */
@@ -92,7 +95,7 @@ export function groupSessions(list: SessionSummary[], o: { now: Date; byFolder: 
     const dir = o.byFolder && !space ? folderOf(s) : undefined;
     // Snoozed ones wait at the bottom until their time (or until they need you).
     if (s.snoozedUntil && s.snoozedUntil > t) put(s, 'snoozed', 'snoozed', 'Snoozed');
-    else if (s.resumeAt != null || lastActivityAt(s) > t - ACTIVE_MS) put(s, 'active', 'active', 'Active');
+    else if (s.resumeAt != null || hasBackgroundWork(s) || lastActivityAt(s) > t - ACTIVE_MS) put(s, 'active', 'active', 'Active');
     else if (s.pinned) put(s, 'pinned', 'pinned', 'Pinned');
     else if (space) put(s, `space:${space.id}`, 'space', space.name, { space });
     else if (dir && (inFolder.get(dir) ?? 0) >= FOLDER_MIN) put(s, `dir:${dir}`, 'folder', basename(dir) || dir, { path: dir });
