@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunSource, RunStatus, StepStatus } from '../../shared/apps.ts';
 import type { CheckResult } from '../../shared/app-manifest.ts';
 import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
+import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { changesOf } from './edits.ts';
 
@@ -98,6 +99,8 @@ export function ensureTables(db: DB) {
   // Each save that changed what a template is: a version, with who saved it and what changed; a run keeps the version it ran.
   db.exec('create table if not exists app_versions (app_id text not null, n integer not null, at integer not null, by text not null, line text not null, recipe text not null, primary key (app_id, n))');
   if (!cols.has('version')) db.exec('alter table app_runs add column version integer');
+  // What a view keeps (ticks, a value an event set with keep): by its run ("run:<id>"), or its app's own page ("app:<id>").
+  db.exec('create table if not exists app_views (owner text primary key, state text not null, updated_at integer not null)');
 }
 
 // ---- apps --------------------------------------------------------------------------------------------
@@ -197,6 +200,48 @@ export function deleteApp(db: DB, id: string) {
   db.prepare('delete from apps where id = ?').run(id);
   db.prepare('delete from app_versions where app_id = ?').run(id);
   db.prepare('delete from app_keys where app_id = ?').run(id);
+  db.prepare('delete from app_views where owner = ?').run(`app:${id}`);
+}
+
+// ---- what views keep -----------------------------------------------------------------------------------
+
+/** What a view keeps for a run ("run:<id>") or an app's own page ("app:<id>"): names to values, nested by their dots. */
+export function getView(db: DB, owner: string): Record<string, unknown> {
+  const r = db.prepare('select state from app_views where owner = ?').get(owner) as { state: string } | undefined;
+  try {
+    return r ? (JSON.parse(r.state) as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** A view's name ("done.3", "picked") as the parts it is kept under; null when it cannot be one. */
+export function viewPath(name: unknown): string[] | null {
+  const parts = String(name ?? '').split('.').map((p) => p.trim());
+  if (!parts.length || parts.length > 4 || parts.some((p) => !/^[\w-]{1,60}$/.test(p))) return null;
+  return parts;
+}
+
+const leaves = (v: unknown): number => (v && typeof v === 'object' && !Array.isArray(v) ? Object.values(v).reduce((n: number, x) => n + leaves(x), 0) : 1);
+
+/** Keeps one value of a view (null removes it), within its limits; gives what it keeps now. */
+export function setView(db: DB, owner: string, name: unknown, value: unknown, max = { bytes: 64 * 1024, keys: 500 }): Record<string, unknown> {
+  const path = viewPath(name);
+  if (!path) throw new HttpError(400, 'A kept value’s name is up to four parts of letters, digits, - or _, joined by dots (“done.3”)');
+  const state = getView(db, owner);
+  let at: Record<string, unknown> = state;
+  for (const k of path.slice(0, -1)) {
+    if (!at[k] || typeof at[k] !== 'object' || Array.isArray(at[k])) at[k] = {};
+    at = at[k] as Record<string, unknown>;
+  }
+  const last = path[path.length - 1];
+  if (value === null || value === undefined) delete at[last];
+  else at[last] = value;
+  const json = JSON.stringify(state);
+  if (json.length > max.bytes) throw new HttpError(413, `A view keeps at most ${Math.round(max.bytes / 1024)} KB`);
+  if (leaves(state) > max.keys) throw new HttpError(413, `A view keeps at most ${max.keys} values`);
+  db.prepare('insert into app_views (owner, state, updated_at) values (?, ?, ?) on conflict(owner) do update set state = excluded.state, updated_at = excluded.updated_at').run(owner, json, Date.now());
+  return state;
 }
 
 // ---- runs --------------------------------------------------------------------------------------------
@@ -398,6 +443,7 @@ export function usageSince(db: DB, app: string, since: number, source?: RunSourc
 
 export function deleteRuns(db: DB, app: string) {
   db.prepare('delete from app_steps where run_id in (select id from app_runs where app_id = ?)').run(app);
+  db.prepare("delete from app_views where owner in (select 'run:' || id from app_runs where app_id = ?)").run(app);
   db.prepare('delete from app_runs where app_id = ?').run(app);
   db.prepare('delete from app_batches where app_id = ?').run(app);
 }
@@ -407,6 +453,7 @@ export function deleteRun(db: DB, id: string) {
   for (const c of db.prepare("select id from app_runs where parent = ? and source = 'step'").all(id) as { id: string }[]) deleteRun(db, c.id);
   db.prepare('delete from app_steps where run_id = ?').run(id);
   db.prepare('delete from app_runs where id = ?').run(id);
+  db.prepare('delete from app_views where owner = ?').run(`run:${id}`);
 }
 
 // ---- the steps of runs with steps ----------------------------------------------------------------------

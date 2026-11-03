@@ -12,7 +12,7 @@ export interface Usage {
 }
 
 export interface Gallery {
-  apps: (AppDef & { usage: Usage })[];
+  apps: (AppDef & { usage: Usage; lastRunAt?: number })[];
   templates: AppTemplate[];
   recent: AppRun[];
 }
@@ -34,9 +34,15 @@ export interface AppDetail {
   workDir?: string;
   /** How what it needs stands on this computer (its packages, commands). */
   env?: EnvView;
+  /** What its own page's view keeps (an app whose view has pages for its own page). */
+  view?: Record<string, unknown>;
 }
 
-export type RunRecipe = Pick<AppRecipe, 'name' | 'icon' | 'color' | 'fields' | 'answer' | 'agent' | 'acpAgent' | 'model'>;
+/** What a run's page knows of its app: its face, form and answer, and the view its answer shows in (when it has one). */
+export type RunRecipe = Pick<AppRecipe, 'name' | 'icon' | 'color' | 'fields' | 'answer' | 'agent' | 'acpAgent' | 'model' | 'ui'> & {
+  /** Its main flow works in steps (a one-task app's run takes follow-ups). */
+  steps?: boolean;
+};
 
 export interface RunDetail {
   run: AppRun;
@@ -56,6 +62,8 @@ export interface RunDetail {
   steps?: RunStepView[];
   /** An Ask a person step waiting for the answer: where, what it asks, and its form (none: yes or no). */
   question?: { step: string; question: string; fields?: AppField[]; since: number };
+  /** What its view keeps for it: ticks, values its events kept. */
+  view?: Record<string, unknown>;
 }
 
 export interface BatchDetail {

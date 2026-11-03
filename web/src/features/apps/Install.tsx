@@ -1,7 +1,7 @@
 // A template from a file and to a file: the link on the New template page that installs one (after a card
 // saying what it will do here), the dialog that downloads one, and the line on a template's page that
 // says how the packages it needs stand.
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Download, FileUp } from 'lucide-react';
 import type { AppDef } from '@shared/apps';
 import type { EnvView, InstallPreview } from '@shared/app-manifest';
@@ -152,7 +152,8 @@ function PreviewCard({ p, picks, onPick }: { p: InstallPreview; picks: Picks; on
 }
 
 /** "Install a template from a file": picks a .naget-app or .json, shows what it will do, installs it. */
-export function InstallFromFile() {
+/** `trigger`: what opens the file picker, in place of the usual link (a menu item, say). */
+export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => ReactNode } = {}) {
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<{ name: string; data: string } | null>(null);
   const [preview, setPreview] = useState<InstallPreview | null>(null);
@@ -188,10 +189,14 @@ export function InstallFromFile() {
   const close = () => (setPreview(null), setFile(null));
   return (
     <>
-      <button type="button" onClick={() => input.current?.click()} className="inline-flex items-center gap-1.5 text-[13px] text-fg-3 hover:text-fg">
-        <FileUp size={14} />
-        Install an app from a file
-      </button>
+      {trigger ? (
+        trigger(() => input.current?.click())
+      ) : (
+        <button type="button" onClick={() => input.current?.click()} className="inline-flex items-center gap-1.5 text-[13px] text-fg-3 hover:text-fg">
+          <FileUp size={14} />
+          Install an app from a file
+        </button>
+      )}
       <input
         ref={input}
         type="file"

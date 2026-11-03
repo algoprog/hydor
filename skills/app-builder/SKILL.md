@@ -1,14 +1,15 @@
 ---
 name: app-builder
-description: Use when making or changing one of the user's apps (made here: a form, steps, data, screens and examples), or when they want a tool they will run again and again, or work that runs by itself.
+description: Use when making or changing one of the user's apps (made here: a form, steps, a view, data, screens and examples), or when they want a tool they will run again and again, or work that runs by itself.
 triggers: [make a template, build a template, make an app, build an app, an app that, a tool that, every time I, automate, workflow]
 ---
 
 # Building apps
 
 An app is what it asks (a form), what it does (one agent's task, or steps), what it gives back
-(answer fields), what it keeps (lists of records, a memory), how it looks (a screen), when it runs (its form, a
-schedule, a webhook, a watcher) and examples to try it with. Build them with app_get, app_save, app_try,
+(answer fields), how its answer looks (a view: pages, elements, events), what it keeps (lists of records, a
+memory), its own page (a screen, or view pages for it), when it runs (its form, a schedule, a webhook, a watcher)
+and examples to try it with. Build them with app_get, app_save, app_try,
 app_screen and app_data (its records: start it off with some, or see what its runs kept); app_guide's apps
 topic says what each part does, and its API topic gives the format.
 
@@ -55,20 +56,43 @@ topic says what each part does, and its API topic gives the format.
 - Each save that changes it is a version, its line app_save's why: try the examples on each saved version (Versions
   compares them), and when a change made it worse, app_get with version gives the one before to save again.
 
-## 4. Safe and cheap
+## 4. Design how its answer looks
+
+Give every app people will read a view (`ui`, saved with app_save): its answer then opens in pages made for it,
+not a plain card. The format is in app_guide's API topic (Apps: views).
+
+- **Pages** are tabs, one for each thing a person comes back to (the trip, the days, what to book, the budget),
+  at most four or five; a detail page (`tab: false`) opens from a click on an item (a day, a product).
+- **Elements** are small HTML templates that the answer fills: `{{result.overview}}`, a day card drawn once for
+  each day (`data: "result.days", each: true`, with `{{date|weekday}}` inside), a big number (`{{result.flags|count}}`).
+  Give each element its own CSS (rules for what is inside it, `&` for itself), with the page kit's colours only
+  (`var(--n-card)`, `--n-line`, `--n-muted`, `--n-accent`, `--n-accent-soft`, `--n-ok`, `--n-warn`, `--n-err`,
+  `--n-radius`), so it fits the app in light and dark; no fixed widths; no animations; text people read at 14–15px.
+  Built-in elements save work: text (Markdown with values), markdown, list, checklist (ticks kept with the run),
+  table, chart.
+- **Events** make it useful: `data-event="name"` on a button, mapped to actions. Go to a detail page with the item;
+  tick something off and keep it (`toggle`, `name: "done.@key"`, `keep: true`); filter with `set` and a block's
+  `where`; copy the part people paste elsewhere; run it again with one answer changed (`again`: a slower pace,
+  one more day, a more formal letter, new questions); start another app on part of it (`start`). `ask` (a
+  follow-up to the agent) works only for one-task apps; with steps, use `again` or a flow (`run`, with `as` to
+  show its answer).
+- Save, then app_try a run and read its `view`: the names it uses that the answer did not give show empty. Send
+  the user the run's link (the view opens there) and say what its buttons do.
+
+## 5. Safe and cheap
 
 - Limits: runs a day and the most a run may spend. Tools: only those it needs.
 - A step that may fail says what happens then (If it fails…: go on without it, other steps, or `failed: "agent"`:
   an agent does a tool, model, code, data or app step's work with what it was given, and the run goes on).
 - Nothing reaches outside data and private data and sends things out in one step without an Ask a person first.
 
-## 5. Firm it up later
+## 6. Firm it up later
 
 - app_get's advice says what an app's runs showed: a step that failed and had an agent do its work (fix it so
   it works by itself), and an agent step that did the same each time, with the fixed steps that could do it.
   Put those in its place, try them on the examples (app_try with the recipe), compare time and cost, then save.
 
-## 6. Hand it over
+## 7. Hand it over
 
 - A screen (app_screen) when it will be used often or keeps data: start from the one made from its parts. Its
   `<n-chat>` part lets people ask the app's agent about its records, or to change them or run its flows.

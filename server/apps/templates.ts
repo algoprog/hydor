@@ -11,6 +11,7 @@
 import type { AnswerField, AppTemplate } from '../../shared/apps.ts';
 import { cleanRecipe } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
+import { VIEWS } from './views.ts';
 
 type Draft = Omit<AppTemplate, 'agent' | 'tools' | 'limits'>;
 
@@ -1217,15 +1218,17 @@ What was found about each:
 {{score.comparison}}`,
           outputs: [
             { id: 'recommendation', label: 'Recommendation', type: 'text', required: true, description: 'The pick, in one sentence' },
+            { id: 'pick', label: 'The pick', type: 'text', required: true, description: 'The product recommended: its name exactly as it is written in the list above' },
             { id: 'why', label: 'Why', type: 'markdown', required: true, description: 'The reasoning, against what matters to the user, and the runner-up' },
             { id: 'watch_out', label: 'Watch out for', type: 'list', description: 'Known problems, models about to be replaced, prices that vary' },
           ],
         },
       ],
-      outputs: { recommendation: '{{verdict.recommendation}}', why: '{{verdict.why}}', comparison: '{{score.comparison}}', watch_out: '{{verdict.watch_out}}' },
+      outputs: { recommendation: '{{verdict.recommendation}}', pick: '{{verdict.pick}}', why: '{{verdict.why}}', comparison: '{{score.comparison}}', watch_out: '{{verdict.watch_out}}' },
     },
     answer: [
       { id: 'recommendation', label: 'Recommendation', type: 'text', required: true, description: 'The pick, in one sentence' },
+      { id: 'pick', label: 'The pick', type: 'text', description: 'The product recommended, by its name as the comparison lists it' },
       { id: 'why', label: 'Why', type: 'markdown', required: true, description: 'The reasoning, against what matters to the user, and the runner-up' },
       {
         id: 'comparison',
@@ -3230,6 +3233,6 @@ return { summary: String(input.summary || '').trim() + '\n\n' + tested, files, n
 ];
 
 /** The templates, tidied like any recipe. They run with Claude Code unless their page picks another agent. */
-export const TEMPLATES: AppTemplate[] = T.map((t) => ({ ...cleanRecipe({ ...t, agent: 'claude', tools: null, limits: {} }), id: t.id }));
+export const TEMPLATES: AppTemplate[] = T.map((t) => ({ ...cleanRecipe({ ...t, agent: 'claude', tools: null, limits: {}, ...(VIEWS[t.id] ? { ui: VIEWS[t.id] } : {}) }), id: t.id }));
 
 export const templateById = (id: string): AppTemplate | null => TEMPLATES.find((t) => t.id === id) ?? null;

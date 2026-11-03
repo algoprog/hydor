@@ -1,6 +1,6 @@
 # Apps
 
-An app is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result as a card or a table. This topic covers the ready-made apps, running one and refining its result, making your own (with steps, data, memory and a screen of its own too), sharing one through an API key, other agents, a public page or a spreadsheet of rows, and passing one on as a file.
+An app is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result, in a view made for it (pages you click through, tick off and act on) or as a card and tables. This topic covers the ready-made apps, running one and working with its result, making your own (with steps, a view, data, memory and a screen of its own too), sharing one through an API key, other agents, a public page or a spreadsheet of rows, and passing one on as a file.
 
 ![Apps: your own, and ready-made ones to start from](images/apps.webp)
 
@@ -19,13 +19,13 @@ Open the Apps page from the **Apps** tile at the bottom of the sidebar, or go to
 
 ## Find your way around the Apps page
 
-The page is headed **Apps**, with a **New app** button at the top. Below it:
+The page is headed **Apps**, with **New app** at the top: its menu has **Describe it to an agent**, **Start from scratch** and **Install from a file**. Below it:
 
-- **Describe an app, and an agent makes it**: write what the app should do and press **Make it**; a session starts as the **App builder**, which makes it, tries it and hands it over. Under the box, **Start from scratch** opens the builder and **Install an app from a file** installs one.
-- **Your apps**: a card for each app you made, with its icon, name and description, what it is made of (how many steps, and whether they work **side by side**, run **code**, **ask you**, **keep data** or have **a screen**; for one task, the agent that runs it), a **Public** badge when its public page is open, and how many times it ran today. With none yet, the page suggests starting from a ready-made one, building one from scratch, or using **More → Save as an app** in a session's menu.
-- **Your blocks**: the apps you made to be steps of others (those marked **A block**), which **Add a step** offers in every app's steps.
-- **Latest runs**: your last six runs, with the answers they were given, how they stand, and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
-- **Ready-made**: the apps that come with Naget Agent. Chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning**, **Build** and **Blocks**. Each card shows its kind and what it is made of.
+- **What should your next app do?**: say it in a sentence and press **Make it** (or Enter); a session starts as the **App builder**, which makes the app, tries it and shows it to you. The ideas under the box put one in it with a click.
+- **Your apps**: a card for each app you made, with its icon, name and description, when it last ran (**Not run yet** before its first run), **Has a view** when its answer opens in a view of its own, and **Public** when its public page is open. With none yet, the page says how to make one.
+- **Pick up where you left off**: your last six runs, with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
+- **Ready-made apps**: the apps that come with Naget Agent. Chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning** and **Build**. Each card shows its kind, what it does and what you get from it: the pages of its view (the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**). **Try it** opens it.
+- **Building blocks** (folded): small apps made to be steps of your own (sum up a page, translate, answer from the web, sort into kinds, pull out the facts), with the blocks you made yourself; **Add a step** offers them in every app's steps.
 
 A run's state shows as a badge: **Waiting** (in line), **Starting**, **Working**, **Needs you** (it waits for an approval or an answer), **Done**, **Failed** or **Stopped**.
 
@@ -33,26 +33,26 @@ On a phone the cards stack in one column and the kind chips scroll sideways.
 
 ## Use a ready-made app
 
-These come with Naget Agent. Each works in steps: its page shows **How it works**, and **See it as a graph** (or **Make it mine**) opens them in the builder. Their agent steps run with Claude Code unless you pick another agent on their page; their quick steps ask the helper model (Settings → Models). The ones with a "Let me…" question wait for you partway only when you tick it and run them from their form.
+These come with Naget Agent. Each works in steps: its page shows **How it works**, and **As a graph** (or **Make it mine**) opens them in the builder. Each hands back its answer in a view of its own, with pages for its parts and buttons that do things (see [Its view](#its-view)). Their agent steps run with Claude Code unless you pick another agent on their page; their quick steps ask the helper model (Settings → Models). The ones with a "Let me…" question wait for you partway only when you tick it and run them from their form.
 
-- **Deep research report**: a sourced report on any question, with the web searched, facts cross-checked and every claim cited. You give the topic, what to focus on, the depth and who it is for. It plans the questions, searches them three at a time, ranks the sources, reads the best pages side by side, searches again where a question is short of sources, and writes the report with numbered citations; **Let me check the questions first** has it wait for you to keep or change them.
-- **Trip planner**: a day-by-day plan checked against your dates (opening hours, events, travel times), with a budget and what to book ahead. It works out the dates, then looks up events and holidays, the weather (the forecast when the trip is ten days away or less), what to see and where to stay, and getting around, side by side, before it plans the days and adds up the budget; **Let me choose before it plans** has it ask you where to stay and what must be in.
-- **Compare products**: current prices, independent reviews and known problems, weighed against what matters to you, with a clear pick. When you describe a need instead of naming products, it finds the options first (**Let me pick which ones to compare**); then it looks into each, three at a time, scores them and ranks them by what matters to you.
-- **Document Q&A**: answers from a document you attach, each with the exact passage and where it is. It reads the document, finds the passages for each question, answers three at a time with a summary beside them, and has an agent read all of it when a question is still unanswered.
-- **Meeting notes to actions**: decisions, action items with owners and dates, open questions and a follow-up email, from raw notes or a transcript. It splits the notes, pulls out what was decided, works out the due dates from today, and asks you who takes the actions nobody took (**Ask me who takes what nobody took**).
-- **Cover letter**: a letter for one job, built on real evidence from your background, with the gaps named honestly. It reads the posting, works out what the job asks for, looks the company up while it matches your evidence, writes the letter, then checks and revises it up to twice.
-- **Lesson plan**: a timed lesson planned back from its goals, with activities, checks for understanding, support and stretch. It checks the facts it teaches and shares out the minutes so they add up.
-- **Weekly news digest**: the past week on the topics you follow, from original reporting, with duplicates merged and why each story matters. It searches each topic's week, three at a time, merges the same stories, reads the best and chooses which to keep.
-- **Explain a contract**: what an agreement says in plain words: key terms, dates, what is unusual, and what to ask before signing. Attach the file or paste the text. It splits it into its clauses, reads the parts side by side, and has an agent take a second look at anything serious.
-- **Build a small web app**: a working app from a description, in plain HTML, CSS and JavaScript that opens from a file, tested before it is handed over. It plans the app (**Let me check the plan before it is built**), builds it, tests it and fixes it until the tests pass, twice at most.
+- **Deep research report**: a sourced report on any question, with the web searched, facts cross-checked and every claim cited. You give the topic, what to focus on, the depth and who it is for. It plans the questions, searches them three at a time, ranks the sources, reads the best pages side by side, searches again where a question is short of sources, and writes the report with numbered citations; **Let me check the questions first** has it wait for you to keep or change them. Its view has **Summary** (the question, how sure it is, and the key findings, each with **Dig deeper**, which starts a report of its own on it), **Full report** (with **Copy the report**) and **Sources**, which you can show by publisher.
+- **Trip planner**: a day-by-day plan checked against your dates (opening hours, events, travel times), with a budget and what to book ahead. It works out the dates, then looks up events and holidays, the weather (the forecast when the trip is ten days away or less), what to see and where to stay, and getting around, side by side, before it plans the days and adds up the budget; **Let me choose before it plans** has it ask you where to stay and what must be in. Its view has **Your trip** (the trip in numbers, the plan, the days at a glance and tips; **Relaxed**, **Balanced** or **Packed**, and **+ One more day**, plan it again that way), **Day by day** (a timeline where you tick off each morning, afternoon and evening, with a map of each day's area), a page for each day (with **Copy the day** and **Research** its area), **Book ahead** (a list to tick off as you book) and **Budget** (a chart and each estimate).
+- **Compare products**: current prices, independent reviews and known problems, weighed against what matters to you, with a clear pick. When you describe a need instead of naming products, it finds the options first (**Let me pick which ones to compare**); then it looks into each, three at a time, scores them and ranks them by what matters to you. Its view has **The pick** (the product, its price and why, and the others it weighed), **Side by side** (each one's strengths and weaknesses, the pick marked), a page for each product (with **Research how it holds up**) and **Watch out**. Its answer names **The pick** too, as the comparison lists it, for programs.
+- **Document Q&A**: answers from a document you attach, each with the exact passage and where it is. It reads the document, finds the passages for each question, answers three at a time with a summary beside them, and has an agent read all of it when a question is still unanswered. Its view has **Answers** (each with its passage and where it is; **Find a question** narrows them, and **Ask more about this document** runs it again with new questions and the same file) and **The document**.
+- **Meeting notes to actions**: decisions, action items with owners and dates, open questions and a follow-up email, from raw notes or a transcript. It splits the notes, pulls out what was decided, works out the due dates from today, and asks you who takes the actions nobody took (**Ask me who takes what nobody took**). Its view has **Overview** (who came, the meeting in numbers, the summary and what was decided), **Actions** (tick each one off as it is done, or show one person's), **Follow-up email** (with **Copy the email**) and **Still open**.
+- **Cover letter**: a letter for one job, built on real evidence from your background, with the gaps named honestly. It reads the posting, works out what the job asks for, looks the company up while it matches your evidence, writes the letter, then checks and revises it up to twice. Its view has **The letter** (on a page of its own, with **Copy the letter**; **Warm**, **Confident** or **Formal**, and **Short** or **Standard**, write it again that way), **Why you fit** (each requirement beside your evidence) and **Gaps to prepare for**, to tick off.
+- **Lesson plan**: a timed lesson planned back from its goals, with activities, checks for understanding, support and stretch. It checks the facts it teaches and shares out the minutes so they add up. Its view has **Overview** (the objectives, and the materials to tick off as you get them ready), **Timeline** (the lesson as one strip, each activity as wide as its minutes, then each activity), **Support and checks** and **Whole plan** (with **Copy the plan**).
+- **Weekly news digest**: the past week on the topics you follow, from original reporting, with duplicates merged and why each story matters. It searches each topic's week, three at a time, merges the same stories, reads the best and chooses which to keep. Its view has **Stories** (show one topic's, mark each one read, or **Research** one) and **The digest** (with **Copy the digest**).
+- **Explain a contract**: what an agreement says in plain words: key terms, dates, what is unusual, and what to ask before signing. Attach the file or paste the text. It splits it into its clauses, reads the parts side by side, and has an agent take a second look at anything serious. Its view has **In short** (what it says, the red flags in numbers, and the questions to ask, with **Copy the questions**), **Red flags** (by how serious, to show one kind), **Key terms** and **Dates**.
+- **Build a small web app**: a working app from a description, in plain HTML, CSS and JavaScript that opens from a file, tested before it is handed over. It plans the app (**Let me check the plan before it is built**), builds it, tests it and fixes it until the tests pass, twice at most. Its view has **What was built** (how to open it, its files, and **Build it again with a change**) and **Next steps**, to tick off.
 
 You can't change a ready-made app itself. To adjust one, open it and press **Make it mine** (on a phone, **Edit**): the builder opens with a copy that becomes your own app when you create it.
 
 ## Run an app
 
-1. Open the app from the Apps page or the search box. An app with steps shows **How it works** above its form: its steps in order, each with how it runs (**for each** item, several **at once**, **side by side**), and **See it as a graph**, which opens them in the builder.
+1. Open the app from the Apps page or the search box. Its page says what it does at the top, with **Your answers** (its form) under it, and beside them (under them on a phone) **What you get** (the pages its answer opens in, or its answer fields), **Latest runs** (each opens its run) and, for an app with steps, **How it works**: its steps in order, each with how it runs (**for each** item, several **at once**, **side by side**), and **As a graph**, which opens them in the builder.
 2. Fill in the form. Questions marked with a red **\*** are needed.
-3. On a ready-made app, pick who does it (see below). Your own apps show a line such as "Claude Code · Sonnet · high effort · Auto" instead: change it with **Edit**.
+3. The line under the form says who runs it, such as "Claude Code · Sonnet · high effort · Auto". On a ready-made app, **Change** shows the pickers (see below); on your own, change it with **Edit**.
 4. Press **Run**. The run's page opens and follows the work live.
 
 If something is missing, the page says "Fill in the questions marked first" and names the problem under each question ("Needed", "A number, please", "Choose a file").
@@ -70,7 +70,7 @@ A question may have a line of help under it, an example answer in the box, and a
 
 ### Pick the agent, model, effort and mode
 
-On a ready-made app, pickers sit next to **Run**:
+On a ready-made app, **Change** beside the line under the form shows the pickers (and **Done** folds them away):
 
 - **Agent**: Claude Code, Codex, Custom (Naget Agent's own agent for any model) or another agent you added.
 - **Model**: the agent's models.
@@ -91,7 +91,7 @@ The session of a run you start from the form shows in the sidebar's session list
 
 ## Follow a run and read its result
 
-The run's page shows the app's name, where the run came from ("From the form", "Test run", "From the API", "From another agent", "Public page", "Row 3") and when it started.
+The run's page shows the app's name, the answers it was given in a line ("Lisbon · 2026-11-20 · 3"), where it came from ("From the form", "Test run", "From the API", "From another agent", "Public page", "Row 3") and when it started. Once it has ended, **Run again** at the top opens the form filled in the same way.
 
 The status card at the top says where it stands:
 
@@ -100,7 +100,7 @@ The status card at the top says where it stands:
 - **Done in** the time it took, with what it cost.
 - **Stopped**, or **It did not finish** with the reason.
 
-Below it comes the result:
+Below it comes the result. An app with a view shows it there (see [Its view](#its-view)); **Plain answer**, in the status card, shows it as the plain card and tables instead, and **Its view** goes back. Without a view:
 
 - Short answer fields (text, numbers, dates, links, yes or no) sit together in one card.
 - Long text, lists and tables each get a card under their heading. Long text has a **Copy** button; tables have **Copy** and **CSV** (a download).
@@ -113,6 +113,19 @@ The agent is reminded once if it finishes without handing in the answer fields. 
 At the bottom, **Run again with these answers** opens the form filled in the same way, ready to change and run. Files are not carried over: choose them again.
 
 **Open the session** (on a phone, **Session**) at the top opens the run's full conversation.
+
+### Its view
+
+An app's view is made for its answer: pages that show it in elements of their own (cards, timelines, charts, lists to tick off), and buttons that do things with it.
+
+- **Pages**: the tabs at its top; the first opens first. Some pages open from a click (a day of a trip, a product) and have a way back at their top.
+- **Ticks and choices**: what you tick off (a booking made, an action done) stays with the run, on every device; filters and picks (a topic, an owner) last while the page is open.
+- **Buttons that run it again**: **Relaxed** or **+ One more day** on a trip, **Formal** on a letter, a box of new questions about the same document. Each asks first, then starts a new run with your other answers as they were (its files too) and opens it.
+- **Buttons that start another app**: **Research** on a news story or a trip's area, **Dig deeper** on a finding: each asks first, then starts that app's run and opens it.
+- **Copy**: a part to paste elsewhere (an email, a letter, the questions to ask).
+- On an app of your own, a view can also ask its agent for a change (an app without steps), run one of its other flows, or keep a record in what it keeps.
+
+A view shows on the run's page, in its session's **Result**, and on the app's public page, where its pages and ticks work but nothing reaches the app (no run again, no new runs, nothing kept).
 
 ## Ask for changes to the result
 
@@ -157,7 +170,7 @@ There are four ways to start:
 
 You can also ask an agent in any session to make an app for you (see [Ask an agent](#ask-an-agent)).
 
-The builder opens under the title **New app**: its name, description and icon on top, then its parts as tabs, **What it does** first, then **Form**, **Answer**, **Examples** and **Settings** (who does it, its tools, its limits, what it keeps, whether it is a block, and, once saved, its folder and versions, each folded to a line that says how it is set until you open it). Fill them in, try it with **Test run**, then press **Create**. The app's page opens, ready to run.
+The builder opens under the title **New app**: its name, description and icon on top, then its parts as tabs, **What it does** first, then **Form**, **Answer**, **Design**, **Examples** and **Settings** (who does it, its tools, its limits, what it keeps, whether it is a block, and, once saved, its folder and versions, each folded to a line that says how it is set until you open it). Fill them in, try it with **Test run**, then press **Create**. The app's page opens, ready to run.
 
 ### Name, description and icon
 
@@ -393,6 +406,20 @@ An app can remember across its runs: its agents keep what later runs should know
 
 An app can need things on this computer: Node or Python packages its agents use, and commands such as ffmpeg. The packages install in the app's own folder, never for the whole computer, as soon as you install or change the app, and its first run waits for them. On the app's page, a line says while they install or when they could not, with **Show the output** and **Install again**. A command it uses that this computer lacks is named there too: install that one yourself.
 
+## Design how it looks
+
+An app's view is how its answer looks: pages (tabs, and pages a click opens), elements made for its answer (a day card, a product with its strengths and weaknesses), and events, which say what a click does. Without one, its answer shows as a plain card and tables.
+
+In an app's **Edit**, the **Design** tab shows its view with its latest run's answer; **Made-up answer** shows one in its shape instead, and what to fix in it is listed under it. In the preview, a click goes to pages and ticks things off; what reaches the app (asking its agent, running it again) works on a run's page.
+
+- **Ask an agent to design it** (once the app is saved): a session starts as the **App builder** with a message about it, or, with the app open beside a conversation, the message goes to that agent. It writes the view, tries it with a run and fixes what does not fit.
+- **Start from its answer**: a page with a block for each answer field, to change from there.
+- **Ask an agent to change it**: as above, for a view it has.
+- **Change it as code**: the view as JSON, its pages, elements (HTML with values such as `{{result.days}}`, and CSS) and events, as the guide's API topic describes them ([Apps: views](/guide/api#apps-views)); the preview follows what you type.
+- **Remove its view**: its answer shows as a plain card again once you save.
+
+A view's events can go to a page (with the item clicked), tick something off or set a filter (kept with the run when it says so), copy, open an address, ask the run's agent for a change (an app without steps), run one of its other flows, run it again with some answers changed, start another app, and add, change or remove a record it keeps. Pages marked for the app's own page show there in place of its form, with what it keeps and its latest run. A view is part of the app: it has versions with it, travels in its file, and its elements are files of its own in its folder (ui/).
+
 ## Give an app a screen
 
 An app can have a screen of its own: a page in place of its form, that runs it and shows what it keeps. A reading list can show its links in a table you search and tidy, a small CRM its clients with a button that drafts a follow-up, a tracker a count of what it logged. The screen works live: what you send in its form runs the app, its answer shows when it is ready, and its tables change as its steps and agents change the records.
@@ -429,5 +456,7 @@ Agents in Naget Agent can make and run apps for you through its API, with your O
 - "Add a step to my Competitor watch app that tells me only when something changed."
 - "Install the app in reading-list.naget-app from my Downloads folder."
 - "Give my Reading list a screen with the unread links on top and a button that makes this week's digest."
+- "Design a view for my Weekly report app: a page with the summary and the numbers on top, and a page that shows each change as a card I can tick off."
+- "In my Price check app's view, add a button on each shop that runs it again for that shop only."
 - "Firm up my Link digest app, and try it on its examples first."
 - "Make the Look up its title step of my Link digest hand its work to an agent when it fails."

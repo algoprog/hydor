@@ -128,12 +128,26 @@ agents that speak ACP and take MCP servers.
   a tracker, and see or clear the data a page keeps. Export a page as a PDF, a Word document (headings, lists,
   tables, links, charts as pictures) or a web page; ask an agent to change the page, slides, document, spreadsheet
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
-  watch it change as it saves. Apps are tasks you repeat, each with a form: ready-made or your own (described in a
-  box at the top of the Apps page for the App builder to make, or built from scratch, each card saying what it is
-  made of), run from the Apps page, the API, MCP, a public page, or once for each row of a CSV. The ready-made ones
-  work in steps (Deep research plans its questions, searches them a few at a time, ranks the sources in code,
-  reads the best in parallel, searches again for gaps and writes a cited report), and an app's page shows how it
-  works with a way to its graph. Follow-ups refine a run's
+  watch it change as it saves. Apps are tasks you repeat, each with a form: ready-made or your own (described in
+  a sentence at the top of the Apps page for the App builder to make, with ideas to start from, built from
+  scratch, or installed from a file, all under one New app menu; your apps say when each last ran, the runs to
+  pick up again come next, and each ready-made app shows what you get from it), run from the Apps page, the API,
+  MCP, a public page, or once for each row of a CSV. An app's page has its form beside what you get, its latest
+  runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
+  ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
+  sources in code, reads the best in parallel, searches again for gaps and writes a cited report), and each hands
+  back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
+  off, a page for each day, a list to book and a budget chart; Compare products' pick and products side by side;
+  the news digest's stories by topic), with buttons that run it again with a change (a slower pace, one more day,
+  a more formal letter, new questions about the same document) or start another app on part of it (research a
+  story, a finding or a product). An app's view is part of it: elements (HTML templates its values fill, each
+  with its own style), pages of them (tabs, and pages a click opens) and events (go to a page, tick something off
+  and keep it with the run, set a filter, copy, open, ask its agent, run a flow, run it again with changed
+  answers, start another app, keep a record), designed in its Edit's Design tab (seen with its latest run or a
+  made-up answer, what to fix listed under it; asked of an agent, started from its answer, or changed as code)
+  or by an agent, checked when it is saved, drawn in the pages' sandbox, shown on the run's page (Plain answer
+  shows the card and tables), in its session and on its public page (where nothing reaches the app), and kept in
+  its versions, its file and its folder. Follow-ups refine a run's
   result, asked on its page or in its session, which opens on that result with a switch to the conversation.
   An app can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
   repeat over a list or until something holds, branches side by side, another app, its own data, a question
@@ -164,8 +178,9 @@ agents that speak ACP and take MCP servers.
   app and its folder, try its examples as you save, and export and import it. Describe one on the New
   app page and the App builder assistant makes it. Save as an app turns a session that went well into one,
   with steps drafted from the tools it called (read a page, search the web) when they check out. Agents build
-  apps with tools of their own: app_get, app_save (checked first; whole, a patch or one step), app_try (its
-  examples or a set of answers, waited for), app_screen and app_data (the records it keeps: read, or added to). A
+  apps with tools of their own: app_get, app_save (checked first; whole, a patch or one step; its view too),
+  app_try (its examples or a set of answers, waited for, with the names its view uses that a try did not give),
+  app_screen and app_data (the records it keeps: read, or added to). A
   app an agent saves opens beside its conversation, where what you change and save reaches the agent with
   your next message (its next save reads your version first). A tool, model, code, data or app step that fails
   can have an agent do its work, so the run goes on; Edit shows the steps that had to, with Ask an agent to fix

@@ -1,11 +1,13 @@
 // An app's page (or a template's): its form and Run, its past runs, runs over the rows of a CSV, and
 // how to reach it from outside (API keys, other agents, the public page). A template runs as it is,
 // with the agent and model picked here, or becomes an app of your own.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppWindow, ArrowLeft, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
 import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
-import { inputsLine } from '@shared/apps';
+import { appInfo } from '@shared/app-manifest';
+import { pagesFor } from '@shared/app-ui';
+import { inputsLine, isActive } from '@shared/apps';
 import { api, del, enc, post } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -20,9 +22,10 @@ import { AppIcon } from './AppIcon';
 import { BatchTab } from './Batch';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { statusBadge } from './Gallery';
-import { FlowStrip } from './FlowStrip';
+import { FlowList } from './FlowStrip';
 import { DownloadDialog, EnvLine } from './Install';
 import { AppScreen } from './Screen';
+import { AppView } from './View';
 import { Schedules } from './Schedules';
 import { ShareTab } from './Share';
 
@@ -45,6 +48,93 @@ export function RunsWith({ agent, acpAgent, model, effort, mode }: { agent: Agen
   );
 }
 
+/** The app, big: its icon, name and what it does, and what kind of app it is. */
+function AppIntro({ recipe, template }: { recipe: AppDef | AppTemplate; template: boolean }) {
+  const view = pagesFor(recipe.ui, 'run').length > 0;
+  return (
+    <div className="flex items-start gap-4">
+      <AppIcon icon={recipe.icon} color={recipe.color} size={58} />
+      <div className="min-w-0 flex-1 pt-0.5">
+        <h1 className="text-[23px] leading-tight font-semibold tracking-tight" translate={template ? undefined : 'no'}>
+          {recipe.name}
+        </h1>
+        {recipe.description && (
+          <p className="mt-1 text-[14.5px] leading-relaxed text-fg-2" translate={template ? undefined : 'no'}>
+            {recipe.description}
+          </p>
+        )}
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          <span className="rounded-full bg-bg-2 px-2.5 py-0.5 text-[12px] text-fg-2">{template ? 'Ready-made' : 'Your app'}</span>
+          {recipe.category && <span className="rounded-full bg-bg-2 px-2.5 py-0.5 text-[12px] text-fg-2">{recipe.category}</span>}
+          {view && <span className="rounded-full bg-accent/12 px-2.5 py-0.5 text-[12px] text-accent">Opens in a view of its own</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** What a run gives: the pages of its view, or the fields of its answer. */
+function WhatYouGet({ recipe, template }: { recipe: AppDef | AppTemplate; template: boolean }) {
+  const pages = pagesFor(recipe.ui, 'run').filter((p) => p.tab !== false);
+  if (!pages.length && !recipe.answer.length) return null;
+  return (
+    <section className="rounded-2xl border border-line bg-panel px-4 py-3.5">
+      <h3 className="text-[13px] font-semibold">What you get</h3>
+      <p className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{pages.length ? 'Its answer opens in a view of its own, page by page:' : 'Its answer, as a card you can copy or download:'}</p>
+      <ol className="mt-3 space-y-2">
+        {(pages.length ? pages.map((p) => ({ id: p.id, title: p.title })) : recipe.answer.map((f) => ({ id: f.id, title: f.label }))).map((x, i) => (
+          <li key={x.id} className="flex items-center gap-2.5 text-[13.5px]">
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent/12 text-[12px] font-semibold text-accent">{i + 1}</span>
+            <span className="min-w-0 truncate" translate={template ? undefined : 'no'}>
+              {x.title}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+const DOT: Record<AppRun['status'], string> = { queued: 'bg-fg-3', starting: 'bg-busy', running: 'bg-busy', waiting: 'bg-warn', done: 'bg-ok', failed: 'bg-err', stopped: 'bg-fg-3' };
+
+/** Its latest runs, to open again: what each was asked, how it went, and when. */
+function LatestRuns({ id, recipe, template }: { id: string; recipe: AppDef | AppTemplate; template: boolean }) {
+  const [runs, setRuns] = useState<AppRun[] | null>(null);
+  const load = () => api<{ runs: AppRun[] }>(`/api/apps/${enc(id)}/runs`).then((r) => setRuns(r.runs.filter((x) => !x.flow && !x.parent && x.source !== 'chat').slice(0, 5)), () => setRuns([]));
+  useEffect(() => {
+    void load();
+  }, [id]);
+  useRunEvents((r) => r.app === id && !r.parent && void load());
+  if (!runs) return null;
+  return (
+    <section className="overflow-hidden rounded-2xl border border-line bg-panel">
+      <div className="flex items-center gap-2 px-4 pt-3.5 pb-1.5">
+        <h3 className="flex-1 text-[13px] font-semibold">Latest runs</h3>
+        {!template && runs.length > 0 && (
+          <button type="button" onClick={() => go(`${appPath(id)}?tab=runs`)} className="text-[12.5px] text-fg-3 hover:text-fg">
+            All runs
+          </button>
+        )}
+      </div>
+      {runs.length ? (
+        <div className="pb-1.5">
+          {runs.map((r) => (
+            <button key={r.id} type="button" onClick={() => go(runPath(r.id))} className="flex w-full items-center gap-2.5 px-4 py-2 text-left hover:bg-bg-1">
+              <span className={cx('h-2 w-2 shrink-0 rounded-full', DOT[r.status])} title={r.status} />
+              <span className="min-w-0 flex-1 truncate text-[13px]" translate="no">
+                {inputsLine(recipe.fields, r.inputs, 60) || '—'}
+              </span>
+              <span className="shrink-0 text-[11.5px] text-fg-3">{isActive(r.status) ? 'now' : timeAgo(r.endedAt ?? r.createdAt)}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="px-4 pb-3.5 text-[12.5px] leading-snug text-fg-3">Its runs show here once it has run: each opens to its answer.</p>
+      )}
+    </section>
+  );
+}
+
 function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null }) {
   const [values, setValues] = useState<FormValues>(() => initialValues(recipe.fields));
   // "Run again": the answers of an earlier run (files are chosen afresh).
@@ -58,7 +148,8 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
   const [files, setFiles] = useState<FormFiles>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  // A template runs with the agent picked here (the last one used for it, else its own).
+  // A ready-made app runs with the agent picked here (the last one used for one, else its own), changed behind one line.
+  const [picking, setPicking] = useState(false);
   const remembered = (() => {
     try {
       return JSON.parse(localStorage.getItem('wa.apps.agent') ?? 'null') as { agent: Agent; acpAgent?: string; model?: string | null; effort?: string | null; mode?: string | null } | null;
@@ -88,25 +179,31 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
     }
   };
   return (
-    <div className="mx-auto max-w-[760px] space-y-4 px-4 py-6 sm:px-6">
-      <Section>
-        <AppForm
-          fields={recipe.fields}
-          values={values}
-          files={files}
-          errors={errors}
-          disabled={busy}
-          onChange={(k, v) => (setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))}
-          onFile={(k, v) => setFiles((x) => {
-            const next = { ...x };
-            if (v) next[k] = v;
-            else delete next[k];
-            return next;
-          })}
-        />
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          {template ? (
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+    <div className="mx-auto grid max-w-[1120px] items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8 lg:py-8">
+      <div className="min-w-0 space-y-5">
+        <AppIntro recipe={recipe} template={template} />
+        <section className="overflow-hidden rounded-2xl border border-line bg-panel">
+          <div className="px-5 pt-4 pb-5 sm:px-6">
+            <h2 className="mb-4 text-[15px] font-semibold">{recipe.fields.length ? 'Your answers' : 'Ready to run'}</h2>
+            <AppForm
+              fields={recipe.fields}
+              values={values}
+              files={files}
+              errors={errors}
+              disabled={busy}
+              onChange={(k, v) => (setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))}
+              onFile={(k, v) =>
+                setFiles((x) => {
+                  const next = { ...x };
+                  if (v) next[k] = v;
+                  else delete next[k];
+                  return next;
+                })
+              }
+            />
+          </div>
+          {template && picking && (
+            <div className="flex flex-wrap items-center gap-1 border-t border-line bg-bg-1 px-4 py-2.5">
               <AgentPicker
                 agent={agent}
                 acpId={acpAgent}
@@ -123,26 +220,53 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
               <EffortPicker agent={agent} acp={acpAgent ?? undefined} model={model} value={effort} onChange={setEffort} />
               <ModePicker agent={agent} acp={acpAgent ?? undefined} value={mode ?? (agent === 'acp' && acpAgent !== 'console' ? null : 'auto')} onChange={setMode} />
             </div>
-          ) : (
-            <div className="min-w-0 flex-1">
-              <RunsWith agent={recipe.agent} acpAgent={recipe.acpAgent} model={recipe.model} effort={recipe.effort} mode={recipe.mode ?? 'auto'} />
-            </div>
           )}
-          <Button variant="primary" icon={busy ? <Throbber /> : <Play size={14} fill="currentColor" />} onClick={run} disabled={busy} className="max-sm:w-full">
-            {busy ? 'Starting…' : 'Run'}
-          </Button>
-        </div>
-      </Section>
-      <p className="px-1 text-[12.5px] leading-relaxed text-fg-3">
-        {recipe.flow
-          ? recipe.answer.length
-            ? 'A run goes through its steps with your answers; its result comes back as a card you can copy or download.'
-            : 'A run goes through its steps with your answers; its result is what its last step gives.'
-          : recipe.answer.length
-            ? 'A run starts a session with the filled-in task; its result comes back as a card you can copy or download.'
-            : 'A run starts a session with the filled-in task; its result is the agent’s reply.'}{' '}
-        Nobody needs to watch it: it makes sensible assumptions instead of asking.
-      </p>
+          <div className="flex flex-wrap items-center gap-3 border-t border-line px-5 py-3.5 sm:px-6">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <RunsWith agent={agent} acpAgent={acpAgent ?? undefined} model={model ?? undefined} effort={effort ?? undefined} mode={mode ?? 'auto'} />
+              {template && (
+                <button type="button" onClick={() => setPicking((p) => !p)} className="shrink-0 text-[12.5px] font-medium text-accent hover:underline">
+                  {picking ? 'Done' : 'Change'}
+                </button>
+              )}
+            </div>
+            <Button variant="primary" icon={busy ? <Throbber /> : <Play size={14} fill="currentColor" />} onClick={run} disabled={busy} className="h-10 px-5 max-sm:w-full">
+              {busy ? 'Starting…' : 'Run'}
+            </Button>
+          </div>
+        </section>
+        <p className="px-1 text-[12.5px] leading-relaxed text-fg-3">Nobody needs to watch a run: it makes sensible assumptions instead of asking, and you can leave this page while it works.</p>
+      </div>
+      <aside className="space-y-4">
+        <WhatYouGet recipe={recipe} template={template} />
+        <LatestRuns id={id} recipe={recipe} template={template} />
+        {recipe.flow && <FlowList flow={recipe.flow} own={!template} onGraph={() => go(template ? `/apps/new?template=${enc(id.slice(4))}` : `/apps/${enc(id)}/edit`)} />}
+      </aside>
+    </div>
+  );
+}
+
+/**
+ * The app's own page in its view (its pages with on: "app"), in place of its form: what it keeps, its latest run
+ * of its main flow (`last`), and its events, with everything an owner's page may do.
+ */
+function HomeView({ app, view }: { app: AppDef; view?: Record<string, unknown> }) {
+  const [last, setLast] = useState<AppRun | null | undefined>(undefined);
+  const load = () => api<{ runs: AppRun[] }>(`/api/apps/${enc(app.id)}/runs`).then((r) => setLast(r.runs.find((x) => x.status === 'done' && !x.flow && !x.parent && x.source !== 'chat') ?? null), () => setLast(null));
+  useEffect(() => {
+    void load();
+  }, [app.id]);
+  useRunEvents((r) => r.app === app.id && !r.flow && !r.parent && r.status === 'done' && void load());
+  const info = useMemo(() => appInfo(app.id, app), [app]);
+  if (last === undefined)
+    return (
+      <div className="flex justify-center py-20 text-fg-3">
+        <Throbber size={28} />
+      </div>
+    );
+  return (
+    <div className="mx-auto max-w-[920px] px-4 py-6 sm:px-6">
+      <AppView ui={app.ui!} name={app.name} description={app.description} appId={app.id} on="app" last={last} answer={app.answer} view={view} info={info} can={['keep', 'run', 'start', 'data']} />
     </div>
   );
 }
@@ -339,21 +463,15 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                 <EnvLine appId={d.app.id} env={d.env} onChange={load} />
               </div>
             )}
-            {/* Its screen, in place of its form (the form comes back to run again with earlier answers). */}
-            {tab === 'run' && d?.app?.screens?.main && !again ? (
+            {/* Its view's own page, or its screen, in place of its form (the form comes back to run again with earlier answers). */}
+            {tab === 'run' && d?.app && pagesFor(d.app.ui, 'app').length > 0 && !again ? (
+              <HomeView app={d.app} view={d.view} />
+            ) : tab === 'run' && d?.app?.screens?.main && !again ? (
               <div className="h-full min-h-[420px]">
                 <AppScreen app={d.app} />
               </div>
             ) : (
-              <>
-                {recipe.description && (tab === 'run' || template) && <p className={cx('mx-auto max-w-[760px] px-5 pt-5 text-[13.5px] leading-relaxed text-fg-2 sm:px-7')}>{recipe.description}</p>}
-                {recipe.flow && (tab === 'run' || template) && (
-                  <div className="mx-auto max-w-[760px] px-5 pt-4 sm:px-7">
-                    <FlowStrip flow={recipe.flow} own={!template} onGraph={() => go(template ? `/apps/new?template=${enc(id.slice(4))}` : `/apps/${enc(id)}/edit`)} />
-                  </div>
-                )}
-                {(tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} />}
-              </>
+              (tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} />
             )}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} def={d?.app} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}

@@ -24,6 +24,8 @@ import { appPath, useRunEvents, type RunDetail } from './api';
 import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { RunBody } from './Result';
+import { DesignEditor } from './Design';
+import { AppView } from './View';
 import { InstallFromFile } from './Install';
 import { Advice } from './Advice';
 import { ExamplesEditor } from './Examples';
@@ -40,7 +42,7 @@ const oneTask = (flow: Flow): string | null => {
 };
 
 /** The builder's parts, one on screen at a time: what it does first. */
-type Part = 'does' | 'form' | 'answer' | 'examples' | 'settings';
+type Part = 'does' | 'form' | 'answer' | 'design' | 'examples' | 'settings';
 /** How its steps show on a computer, as last picked: the graph unless the list was. */
 const VIEW_KEY = 'naget.apps.view';
 const viewWas = (): 'list' | 'graph' => {
@@ -83,19 +85,33 @@ const BLANK: AppRecipe = {
 
 // Every part of the recipe, so a save keeps what this page does not show yet (its data, memory, needs, other flows).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples, graph, block } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, examples, graph, block };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, ui, examples, graph, block } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, flows, screens, ui, examples, graph, block };
 };
 
-/** A text box that grows with what is written in it. */
+/** A text box that grows with what is written in it, and with how narrow it is. */
 function Grow(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
+  const fit = () => {
     const el = ref.current;
     if (!el) return;
     el.style.height = '0px';
     el.style.height = `${Math.min(el.scrollHeight + 2, 240)}px`;
-  }, [props.value]);
+  };
+  useLayoutEffect(fit, [props.value]);
+  // A tab that makes the page wider or narrower (the graph's, Design's), a phone turned: its lines change, so does its height.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return <textarea ref={ref} rows={1} {...props} className={cx(inputCls, 'block h-auto resize-none py-2', props.className)} />;
 }
 
@@ -370,7 +386,13 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
               }
             />
           )}
-          <RunBody run={run.run} progress={run.progress} answer={recipe.answer} name={recipe.name} />
+          <RunBody
+            run={run.run}
+            progress={run.progress}
+            answer={recipe.answer}
+            name={recipe.name}
+            view={recipe.ui ? <AppView ui={recipe.ui} name={recipe.name} appId={appId ?? 'test'} run={run.run} answer={recipe.answer} can={['keep', 'run', ...(appId ? (['data'] as const) : [])]} /> : undefined}
+          />
         </div>
       ) : (
         <AppForm
@@ -605,7 +627,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
         }
       />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className={cx('mx-auto space-y-4 px-4 py-6 pb-24 sm:px-6', part === 'does' && mode === 'graph' ? 'max-w-[1240px]' : 'max-w-[820px]')}>
+        <div className={cx('mx-auto space-y-4 px-4 py-6 pb-24 sm:px-6', part === 'does' && mode === 'graph' ? 'max-w-[1240px]' : part === 'design' ? 'max-w-[980px]' : 'max-w-[820px]')}>
           {note && (
             <div ref={noteBox} className="scroll-mt-16 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">
               {note}
@@ -646,6 +668,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               { value: 'does', label: 'What it does', count: recipe.flow ? allSteps(recipe.flow.steps).length : undefined },
               { value: 'form', label: 'Form', count: recipe.fields.length },
               { value: 'answer', label: 'Answer', count: recipe.answer.length },
+              { value: 'design', label: 'Design' },
               { value: 'examples', label: 'Examples', count: recipe.examples?.length },
               { value: 'settings', label: 'Settings' },
             ]}
@@ -757,6 +780,12 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 Add an answer field
               </Button>
             </div>
+          </Section>
+          )}
+
+          {part === 'design' && (
+          <Section title="How its answer looks" sub="Its view: pages of elements made for its answer, filled in by each run, and what a click there does.">
+            <DesignEditor recipe={recipe} appId={saved?.id ?? null} template={template} session={session} onChange={set} />
           </Section>
           )}
 

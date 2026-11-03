@@ -7,6 +7,7 @@ import type { AppDef, AppRecipe } from '../../shared/apps.ts';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
 import { allSteps, asText, innerLists } from '../../shared/app-manifest.ts';
+import { missingIn, pagesFor } from '../../shared/app-ui.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { dropEdits, noteBuilder, seenBy, userEditAt } from './edits.ts';
 import { collectionsOf, dataOp } from './data.ts';
@@ -74,7 +75,7 @@ export function withStep(raw: Record<string, any>, change: Record<string, unknow
 /** A template in a few lines, for a list. */
 const lineOf = (a: AppDef) => {
   const steps = a.flow ? allSteps(a.flow.steps).length : 0;
-  return { id: a.id, name: a.name, address: a.slug, description: a.description || undefined, steps: steps || undefined, examples: a.examples?.length || undefined, screens: a.screens ? Object.keys(a.screens) : undefined, ...(a.block ? { block: true } : {}), link: `/apps/${a.id}` };
+  return { id: a.id, name: a.name, address: a.slug, description: a.description || undefined, steps: steps || undefined, examples: a.examples?.length || undefined, screens: a.screens ? Object.keys(a.screens) : undefined, ...(a.ui ? { view: a.ui.pages.map((p) => p.title) } : {}), ...(a.block ? { block: true } : {}), link: `/apps/${a.id}` };
 };
 
 /** A step's values, each kept short: long text and big values as the start of their text. */
@@ -100,8 +101,17 @@ function runOf(r: RunRecord, steps = true) {
       : {}),
     ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}),
     ...(took !== undefined ? { seconds: took } : {}),
+    ...viewOf(r),
     link: `/apps/runs/${r.id}`,
   };
+}
+
+/** How its view took this run's answer: the names its templates use that the answer and the form do not give. */
+function viewOf(r: RunRecord) {
+  const ui = r.recipe.ui;
+  if (!ui || r.flow || r.status !== 'done' || !pagesFor(ui, 'run').length) return {};
+  const missing = missingIn(ui, { result: r.result, inputs: r.inputs });
+  return { view: missing.length ? { missing, said: 'Its view uses these names, which this run’s answer and answers did not give: they show empty. Change the view, or what the run gives.' } : { ok: 'Every name its view uses had a value.' } };
 }
 
 /** Waits for runs to end, at most `ms`, then reads them. */
@@ -127,7 +137,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_get',
       description:
-        "The user's apps (Apps in Naget Agent: a form, a task or steps, an answer, data, screens, examples). Without app: each one in a line. With app: the whole app as app_save takes it (its format: app_guide's apps and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
+        "The user's apps (Apps in Naget Agent: a form, a task or steps, an answer, a view, data, screens, examples). Without app: each one in a line. With app: the whole app as app_save takes it (its format: app_guide's apps and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
       inputSchema: { type: 'object', properties: { app: APP, version: { type: 'number', description: 'One of its versions, whole (its recipe as it was then).' } } },
       annotations: { readOnlyHint: true },
       async run(a) {
@@ -173,12 +183,12 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_save',
       description:
-        'Makes one of the user\'s apps, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its screens stay as they are (app_screen changes them). Say why in a few words.',
+        'Makes one of the user\'s apps, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its view is part of it (ui: patch one element with { ui: { elements: { "day-card": { … } } } }); its screens stay as they are (app_screen changes them). Say why in a few words.',
       inputSchema: {
         type: 'object',
         properties: {
           app: { ...APP, description: 'The app to change; none: a new one.' },
-          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form), prompt (a task for one agent) or flow (its steps), answer, data, memory, requires, flows, examples, tools, limits, agent, model, mode…' },
+          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form), prompt (a task for one agent) or flow (its steps), answer, ui (its view: how its answer looks and what a click there does; app_guide\'s API topic, Apps: views), data, memory, requires, flows, examples, tools, limits, agent, model, mode…' },
           patch: { type: 'object', description: 'Merged into the app as saved (or into recipe).' },
           step: { type: 'object', description: 'One step: { id, …its fields } changes it; { id, remove: true } removes it; a new id adds it (after: the step it follows; none: at the end).' },
           why: { type: 'string', description: 'What changed, in a few words ("Added a step that checks prices").' },
@@ -216,7 +226,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_try',
       description:
-        "Tries an app as a test run and waits for it (at most wait seconds): its examples (examples: true, or their ids), or one set of answers (inputs). recipe tries a version that is not saved. Gives each run's status, answer, steps with their values, checks, cost and time; runs not done when the wait ends can be read again with runs.",
+        "Tries an app as a test run and waits for it (at most wait seconds): its examples (examples: true, or their ids), or one set of answers (inputs). recipe tries a version that is not saved. Gives each run's status, answer, steps with their values, checks, cost and time, and, for an app with a view, the names its view uses that the run did not give; runs not done when the wait ends can be read again with runs. The user sees a try's answer in its view on its page (link).",
       inputSchema: {
         type: 'object',
         properties: {

@@ -2,7 +2,7 @@
 // asked, the follow-ups that refined it and a box for the next one, and a link to the full session.
 import { useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ChevronRight, MessageSquareText, RotateCcw, Square, Trash2 } from 'lucide-react';
-import { isActive } from '@shared/apps';
+import { inputsLine, isActive } from '@shared/apps';
 import { del, enc, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
@@ -17,6 +17,7 @@ import { AskBox, FollowUps } from './FollowUps';
 import { AppForm, formErrors, initialValues, type FormValues } from './Form';
 import { RunBody } from './Result';
 import { RunSteps } from './Steps';
+import { AppView, type ViewCan } from './View';
 
 function Asked({ d }: { d: RunDetail }) {
   const [open, setOpen] = useState(false);
@@ -91,8 +92,22 @@ function AnswerCard({ runId, q }: { runId: string; q: NonNullable<RunDetail['que
   );
 }
 
+/** What a run's view may ask of its app, on its owner's pages: everything that fits the run. */
+export function viewCan(d: RunDetail): ViewCan[] {
+  const r = d.run;
+  const own = !r.app.startsWith('tpl:') && r.app !== 'test';
+  return [
+    'keep',
+    'run',
+    ...(r.source !== 'test' ? (['again', 'start'] as const) : []),
+    ...(own ? (['data'] as const) : []),
+    // A one-task run's agent takes follow-ups (a run with steps does not).
+    ...(!d.recipe.steps && r.key && !d.noAsks ? (['ask'] as const) : []),
+  ];
+}
+
 /** A run as its person sees it, on its page and in its session: the result, what was asked, the follow-ups. */
-export function RunView({ d, statusExtra }: { d: RunDetail; statusExtra?: ReactNode }) {
+export function RunView({ d, statusExtra, onAsked }: { d: RunDetail; statusExtra?: ReactNode; onAsked?: () => void }) {
   const r = d.run;
   // A step asking you: the card below asks it, and the line above names it.
   const asking = d.question ? d.steps?.find((s) => s.path === d.question!.step)?.title : undefined;
@@ -107,6 +122,11 @@ export function RunView({ d, statusExtra }: { d: RunDetail; statusExtra?: ReactN
         statusExtra={statusExtra}
         reply={d.asks.length ? (d.first ?? '') : undefined}
         followUp={d.asks.at(-1) && { updated: d.asks.at(-1)!.updated && d.recipe.answer.length > 0 }}
+        view={
+          d.recipe.ui ? (
+            <AppView ui={d.recipe.ui} name={d.recipe.name} appId={r.app} run={r} answer={d.recipe.answer} view={d.view} can={viewCan(d)} translate={r.app.startsWith('tpl:')} onAsked={onAsked} />
+          ) : undefined
+        }
       />
       {d.question && <AnswerCard runId={r.id} q={d.question} />}
       {d.steps && (
@@ -156,7 +176,21 @@ export function RunPage({ id }: { id: string }) {
             <span className="truncate">{d?.recipe.name ?? 'Run'}</span>
           </span>
         }
-        sub={r ? `${SOURCE_LABEL[r.source]}${r.row ? ` ${r.row}` : ''} · started ${ago(r.createdAt)}` : undefined}
+        sub={
+          r ? (
+            <span className="flex min-w-0 items-center gap-1.5">
+              {inputsLine(d!.recipe.fields, r.inputs, 70) && (
+                <>
+                  <span className="truncate text-fg-2" translate="no">
+                    {inputsLine(d!.recipe.fields, r.inputs, 70)}
+                  </span>
+                  <span className="shrink-0">·</span>
+                </>
+              )}
+              <span className="shrink-0">{`${SOURCE_LABEL[r.source]}${r.row ? ` ${r.row}` : ''} · started ${ago(r.createdAt)}`}</span>
+            </span>
+          ) : undefined
+        }
         actions={
           r && (
             <>
@@ -172,6 +206,11 @@ export function RunPage({ id }: { id: string }) {
                 >
                   <span className="max-sm:hidden">Open the session</span>
                   <span className="sm:hidden">Session</span>
+                </Button>
+              )}
+              {!active && (d!.slug || r.app.startsWith('tpl:')) && r.source !== 'public' && (
+                <Button size="sm" variant="ghost" icon={<RotateCcw size={14} />} onClick={() => go(`${appPath(r.app)}?again=${enc(r.id)}`)}>
+                  <span className="max-sm:hidden">Run again</span>
                 </Button>
               )}
               {active ? (
@@ -200,7 +239,7 @@ export function RunPage({ id }: { id: string }) {
           </div>
         ) : (
           <div className="mx-auto max-w-[860px] space-y-3 px-4 py-5 sm:px-6">
-            <RunView d={d} statusExtra={d.steps ? undefined : <span className="max-sm:hidden"><RunsWith agent={d.recipe.agent} acpAgent={d.recipe.acpAgent} model={d.recipe.model} /></span>} />
+            <RunView d={d} onAsked={() => void load()} statusExtra={d.steps ? undefined : <span className="max-sm:hidden"><RunsWith agent={d.recipe.agent} acpAgent={d.recipe.acpAgent} model={d.recipe.model} /></span>} />
             {d.noAsks && d.run.key && <p className="pt-1 text-center text-[12.5px] text-fg-3">{d.noAsks}</p>}
           </div>
         )}

@@ -4,6 +4,7 @@
 // change asks it to read their version first (app_get), unless it means to write over it (force).
 import type { AppRecipe } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
+import type { AppUi } from '../../shared/app-ui.ts';
 import { allSteps, STEP_KINDS, titleOf } from '../../shared/app-manifest.ts';
 import type { DB } from '../db.ts';
 
@@ -53,6 +54,25 @@ const stepsById = (r: AppRecipe) => new Map<string, Step>([...(r.flow ? allSteps
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /** What changed between two versions of a template, a line each. */
+/** What changed in a view, in a few words: its pages, its elements, its events. */
+function uiChanges(a: AppUi, b: AppUi): string[] {
+  const out: string[] = [];
+  const pa = new Map(a.pages.map((p) => [p.id, p]));
+  const pb = new Map(b.pages.map((p) => [p.id, p]));
+  const added = b.pages.filter((p) => !pa.has(p.id)).map((p) => `“${p.title}”`);
+  const gone = a.pages.filter((p) => !pb.has(p.id)).map((p) => `“${p.title}”`);
+  const changed = b.pages.filter((p) => pa.has(p.id) && !same(pa.get(p.id), p)).map((p) => `“${p.title}”`);
+  if (added.length) out.push(`added the page ${added.join(', ')}`);
+  if (gone.length) out.push(`removed the page ${gone.join(', ')}`);
+  if (changed.length) out.push(`changed the page ${changed.join(', ')}`);
+  const ea = a.elements ?? {};
+  const eb = b.elements ?? {};
+  const els = [...new Set([...Object.keys(ea), ...Object.keys(eb)])].filter((k) => !same(ea[k], eb[k]));
+  if (els.length) out.push(`the element${els.length > 1 ? 's' : ''} ${els.join(', ')}`);
+  if (!same(a.events, b.events)) out.push('what its events do');
+  return out;
+}
+
 export function changesOf(before: AppRecipe, after: AppRecipe): string[] {
   const out: string[] = [];
   if (before.name !== after.name) out.push(`Its name: “${before.name}” → “${after.name}”.`);
@@ -79,6 +99,7 @@ export function changesOf(before: AppRecipe, after: AppRecipe): string[] {
   if (!same(before.flow?.outputs, after.flow?.outputs)) out.push('Where its answer comes from changed.');
   if (!same(before.answer, after.answer)) out.push('Its answer fields changed.');
   if (!same(before.data, after.data)) out.push('What it keeps changed.');
+  if (!same(before.ui, after.ui)) out.push(!before.ui ? 'It has a view of its own now.' : !after.ui ? 'Its view was removed: its answer shows as a plain card.' : `Its view changed (${uiChanges(before.ui, after.ui).join(', ') || 'its style'}).`);
   if (!same(before.examples, after.examples)) out.push(`Its examples changed (${after.examples?.length ?? 0} now).`);
   const others = (['agent', 'acpAgent', 'model', 'effort', 'mode', 'assistant', 'tools', 'limits', 'memory', 'requires', 'description', 'icon', 'color'] as const).filter((k) => !same(before[k], after[k]));
   if (others.length) out.push(`Also changed: ${others.join(', ')}.`);
