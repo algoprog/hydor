@@ -216,7 +216,7 @@ The message box of a session has the start page's **Assistant** and its three ch
 
 ## Quote part of a reply
 
-Select text in one of the agent's replies: a **Quote** button appears above it (below it on a touch screen). It puts the text in the message box as a quote, with the cursor after it, so you can answer that part.
+Select text in one of the agent's replies, or in one of your own messages: a **Quote** button appears above it (below it on a touch screen). It puts the text in the message box as a quote, with the cursor after it, so you can answer that part or bring back something you said earlier.
 
 ## Find text in a session
 

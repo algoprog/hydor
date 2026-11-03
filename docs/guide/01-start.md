@@ -188,7 +188,7 @@ On a phone, the choices under the start page's message box (Agent, Model, Folder
 - The start page lists your six latest sessions under the message box, as **Recent**; **All sessions** opens the drawer.
 - Enter starts a new line. Tap the round arrow to start a session or send a message (with a keyboard attached, Ctrl+Enter or ⌘Enter sends too).
 - In a session, the message box shows one chip with the model (and the effort and permissions when they are not the usual). It opens a sheet with **Model**, **Effort**, **Permissions** and how much of the conversation's room is used, with **Compact**.
-- To quote part of a reply, select it: **Quote** appears just below the selection.
+- To quote part of a reply or of your own message, select it: **Quote** appears just below the selection.
 - **Details** opens over the conversation, only when you ask.
 - The search box fills the screen; **Cancel** closes it.
 - The screenshot button is only on computers.
