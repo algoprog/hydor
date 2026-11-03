@@ -70,6 +70,8 @@ export abstract class LiveAdapter extends EventEmitter {
   transcriptPath?: string;
   exited = false;
   lastActivity = Date.now();
+  /** The last completed turn actually stopped at a usage limit; undefined until its outcome is known. */
+  limitStopped?: boolean;
   /** Cards the app asks for itself (a connected app's form), beside the agent's own approvals: answered here. */
   private asides = new Map<string, { done: (a: ApprovalAnswer | null) => void; check?: (a: ApprovalAnswer) => string | null }>();
 

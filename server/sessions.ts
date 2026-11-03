@@ -547,12 +547,12 @@ export class SessionManager extends EventEmitter {
       }
       // A turn that ended because the plan's usage ran out: another account with usage left takes the session
       // over now, or it continues by itself after the reset, as you asked.
-      // The turn says so itself (limitHits), or the account's usage does.
+      // Only the turn's own limit error proves interruption: an account can reach 100% as work finishes.
       const hit = this.limitHits.delete(s.key);
       if ((st === 'idle' || st === 'error') && busy(prev.status) && s.agent !== 'acp' && this.onLimited && !this.resumeLookup?.(s.key)) {
         const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
         const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
-        if (hit || resetsAt) {
+        if (hit) {
           if (autoSwitchOn(this.db) && !s.external) this.switchAtLimit(s.key, resetsAt).catch((e) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` }));
           else if (kvGet(this.db, 'auto_resume') === '1') this.resumeAfterLimit(s.key, resetsAt).catch(() => {});
         }
@@ -766,7 +766,11 @@ export class SessionManager extends EventEmitter {
         } else this.usageOf('codex', account).catch(() => {});
       }
     });
-    adapter.on('result', async () => {
+    adapter.on('result', async (_result: unknown, replay?: boolean) => {
+      if (!adapter.limitStopped) {
+        this.limitHits.delete(key);
+        if (!replay) this.emit('resumeCancelled', key);
+      }
       const tl = this.timelines.get(key);
       if (tl) {
         await tl.readMore().catch(() => {});
@@ -1238,6 +1242,8 @@ export class SessionManager extends EventEmitter {
     }
     const lifts = this.limitLiftsAt(key);
     const at = typeof lifts === 'number' ? lifts : resetsAt;
+    const adapter = this.lives.get(key)?.adapter;
+    if (adapter && (adapter.limitStopped === false || ['working', 'waiting', 'starting'].includes(adapter.state.status))) return;
     if (at && !this.resumeLookup?.(key)) this.onLimited?.(key, at + 60_000);
   }
 
@@ -1478,6 +1484,8 @@ export class SessionManager extends EventEmitter {
   }
 
   async interrupt(key: string) {
+    this.limitHits.delete(key);
+    this.emit('resumeCancelled', key);
     this.holdQueue(key);
     await this.live(key).adapter.interrupt();
   }
@@ -1706,6 +1714,9 @@ export class SessionManager extends EventEmitter {
     // ACP agents take one message at a time: one sent mid-turn waits in the queue.
     if (l.agent === 'acp' && ['working', 'waiting', 'starting'].includes(l.adapter.state.status)) return this.enqueue(key, text, images, files);
     await this.snapshot(key);
+    this.limitHits.delete(key);
+    l.adapter.limitStopped = false;
+    this.emit('resumeCancelled', key);
     await l.adapter.sendMessage(withNotes(key, withFiles(text, this.saveFiles(files))), this.saveImages(images));
     this.touchApp(key);
   }

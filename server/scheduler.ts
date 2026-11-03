@@ -253,6 +253,7 @@ export class Scheduler extends EventEmitter {
     setInterval(() => this.tick(), 20_000).unref();
     setTimeout(() => this.tick(), 5_000).unref();
     sessions.resumeLookup = (key) => this.resumeFor(key)?.nextAt;
+    sessions.on('resumeCancelled', (key: string) => this.cancelResume(key));
     sessions.noticeGate = (n) => this.gate(n);
   }
 
@@ -560,6 +561,13 @@ export class Scheduler extends EventEmitter {
     const now = Date.now();
     for (const r of this.db.prepare('select * from tasks where resume = 1').all() as Row[]) {
       const key = r.target!;
+      const live = this.sessions.lives?.get(key)?.adapter;
+      // A newer successful turn or manual continuation supersedes an older limit interruption.
+      // The adapter reconstructs the last outcome when its runner is replayed after a server restart.
+      if (live?.limitStopped === false || (live && ['working', 'waiting'].includes(live.state.status))) {
+        this.cancelResume(key);
+        continue;
+      }
       const lifts = this.sessions.limitLiftsAt(key);
       if (lifts === undefined) continue;
       let at: number;

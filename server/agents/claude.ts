@@ -183,7 +183,10 @@ export class ClaudeLive extends LiveAdapter {
         break;
       case 'assistant':
         // "You've hit your session limit": the plan's usage ran out mid-turn.
-        if (!replay && m.error === 'rate_limit') this.emit('limithit');
+        if (!m.parent_tool_use_id && m.error === 'rate_limit') {
+          this.limitStopped = true;
+          if (!replay) this.emit('limithit');
+        }
         if (!replay) this.callFrom(m);
         if (!m.parent_tool_use_id) this.onAssistant(m);
         break;
@@ -450,7 +453,8 @@ export class ClaudeLive extends LiveAdapter {
 
   /** `replay`: re-read after a restart; an old turn's error is already in the transcript, so it is not re-added. */
   private onResult(m: Json, replay = false) {
-    if (!replay && m.is_error && /hit your .*limit/i.test(String(m.result ?? ''))) this.emit('limithit');
+    this.limitStopped = !!m.is_error && (this.limitStopped === true || /hit your .*limit/i.test(String(m.result ?? '')));
+    if (!replay && this.limitStopped) this.emit('limithit');
     this.approvals.clear();
     this.state.status = 'idle';
     this.state.turnStartedAt = undefined;
@@ -480,7 +484,7 @@ export class ClaudeLive extends LiveAdapter {
       const id = `result:${m.uuid ?? Date.now()}`;
       this.overlayItems.set(id, { kind: 'system', id, seq: 0, ts: Date.now(), level: internal ? 'warn' : 'error', text, detail: internal ? raw : undefined });
     }
-    this.emit('result', m);
+    this.emit('result', m, replay);
   }
 
   // ---- actions -------------------------------------------------------------
