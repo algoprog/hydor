@@ -21,9 +21,10 @@ Everything Naget Agent does, by area. [Back to the README](../README.md).
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
-  after a usage limit stay in Active until that scheduled resume is cleared. Pinned comes next, then a group for each space and each folder you picked
-  (task folders, the home folder and temporary ones go by day), foldable, with a pen to start a new session
-  there, then the rest by day. Snooze one until later, or settle it when you are done for now.
+  after a usage limit stay in Active until that scheduled resume is cleared. Pinned comes next, then Projects: a group for each space and each folder you picked
+  (task folders, the home folder and temporary ones go by day), foldable, a line per session, with a pen to
+  start a new session there; then the rest by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
+  (until later), settles (done for now), archives or deletes the session, on phones too.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
   OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each

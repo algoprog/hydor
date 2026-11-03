@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoute } from 'wouter';
-import { AlarmClock, Archive, CheckCheck, ChevronRight, Folder, Pencil, Pin, PinOff, SquarePen, Target, Trash2 } from 'lucide-react';
+import { AlarmClock, Archive, CheckCheck, ChevronRight, Ellipsis, Folder, Pencil, Pin, PinOff, SquarePen, Target, Trash2 } from 'lucide-react';
 import {
   closestCenter,
   DndContext,
@@ -25,7 +25,7 @@ import { activityOf, inBackground, isBusy, isWorking } from '../../lib/activity'
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat } from '../../components/DiffView';
-import { cx, IconButton, Throbber, MenuItem, Popover, useConfirm, useMediaQuery } from '../../components/ui';
+import { cx, IconButton, Throbber, MenuItem, MenuSep, Popover, useConfirm, useMediaQuery } from '../../components/ui';
 import { Elapsed } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
@@ -52,10 +52,13 @@ function pruneActive(active: Set<string>) {
   for (const k of activeSince.keys()) if (!active.has(k)) activeSince.delete(k);
 }
 
-/** The folder a session works in, as a short name ("~" for the home folder). */
+/** What the home folder is called where a session's folder is named (translated, unlike folders' own names). */
+export const HOME_FOLDER = 'Home folder';
+
+/** The folder a session works in, as a short name ("Home folder" for the home folder). */
 export function folderName(cwd: string | undefined, home?: string): string {
   if (!cwd) return '';
-  if (home && cwd === home) return '~';
+  if (home && cwd.replace(/\/+$/, '') === home.replace(/\/+$/, '')) return HOME_FOLDER;
   return basename(cwd) || '/';
 }
 
@@ -93,6 +96,8 @@ export function StatusDot({ s, className }: { s: SessionSummary; className?: str
 
 /** Rows of these groups keep the order you drag them into; the others go newest first. */
 const orderable = (kind: GroupKind) => kind === 'active' || kind === 'pinned';
+/** A space's or a folder's group: under Projects, with a heading that folds it. */
+const isPlace = (g: SessionGroup) => g.kind === 'space' || g.kind === 'folder';
 const PIN_ZONE = 'zone:pin';
 /** A drop ends with a click on the row under the pointer; that click is ignored. */
 let lastDragEnd = 0;
@@ -144,13 +149,20 @@ interface RowProps {
   home?: string;
   renaming: boolean;
   onRename: (key: string | null) => void;
+  /** A right-click on the row (on a computer). */
   onMenu: (s: SessionSummary, el: HTMLElement) => void;
-  /** Touch screens: a delete button at the row's end. */
-  onDelete?: (s: SessionSummary) => void;
+  /** The row's ⋯: its menu, by the button. */
+  onMore: (s: SessionSummary, el: HTMLElement) => void;
+  /** Its menu is open. */
+  menuOpen: boolean;
+  /** A touch screen: the ⋯ always shows at the row's end (on a computer, only while the pointer is on the row). */
+  touch: boolean;
   /** Near the top: always drawn, so the list is ready the moment it shows (the drawer opening). */
   eager?: boolean;
   /** In a space's or a folder's group, which names the folder. */
   place?: boolean;
+  /** In the Pinned group, which says so: no pin mark. */
+  inPinned?: boolean;
 }
 
 /** Asking before a session is deleted: its transcript goes, for every app that shows it. */
@@ -161,97 +173,169 @@ export const deleteDialog = (s: SessionSummary) => ({
   danger: true,
 });
 
-/** What a row shows; also the floating copy while it is dragged. */
+/** The end of a row's text fades out under its ⋯ (on a computer, while it shows). */
+const FADE = '[mask-image:linear-gradient(to_left,transparent_26px,black_54px)]';
+const HOVER_FADE = 'group-hover:[mask-image:linear-gradient(to_left,transparent_26px,black_54px)] group-focus-within:[mask-image:linear-gradient(to_left,transparent_26px,black_54px)]';
+
+/**
+ * What a row shows; also the floating copy while it is dragged. Two lines: the title, then what the agent is doing,
+ * or the folder and when it was last active. In a space's or a folder's group, which names the folder, one line:
+ * the title, then the time, or what the agent is doing.
+ */
 const RowBody = memo(function RowBody({
   s,
   active,
   home,
   renaming,
   onRename,
-  onDelete,
+  onMore,
+  menuOpen,
+  touch,
   lifted,
   place,
-}: Pick<RowProps, 's' | 'active' | 'home' | 'onDelete' | 'place'> & { renaming?: boolean; onRename?: RowProps['onRename']; lifted?: boolean }) {
+  inPinned,
+}: Pick<RowProps, 's' | 'active' | 'home' | 'place' | 'inPinned'> & {
+  renaming?: boolean;
+  onRename?: RowProps['onRename'];
+  onMore?: RowProps['onMore'];
+  menuOpen?: boolean;
+  touch?: boolean;
+  lifted?: boolean;
+}) {
   const a = activityOf(s);
   const running = !!a;
   // A turn finished since the session was last looked at.
   const unread = !active && !!s.doneAt && s.doneAt > (s.seenAt ?? 0) && !(a && (isWorking(a) || a.status === 'waiting'));
-  return (
-    <span
+  const where = folderName(s.cwd, home);
+  // On a computer the ⋯ shows over the row's end while the pointer is on the row, or while its menu is open.
+  const overlay = !!onMore && !touch && !renaming;
+  const fade = overlay && (menuOpen ? FADE : HOVER_FADE);
+  const title =
+    renaming && onRename ? (
+      <RenameInput s={s} onDone={() => onRename(null)} />
+    ) : (
+      <span
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          onRename?.(s.key);
+        }}
+        className={cx('min-w-0 flex-1 truncate text-[13.5px]', active || unread ? 'font-medium text-fg' : 'text-fg')}
+        translate="no"
+      >
+        {s.title}
+      </span>
+    );
+  const marks = !renaming && (
+    <>
+      {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
+      {s.pr && <PrBadge pr={s.pr} />}
+      {s.goal && (
+        <span title={`Goal: ${s.goal.objective}`} className="shrink-0">
+          <Target size={11} className={s.goal.status === 'active' ? 'text-accent' : 'text-warn'} />
+        </span>
+      )}
+      {/* In the Pinned group, which says so already, it needs no mark. */}
+      {s.pinned && !inPinned && <Pin size={11} className="shrink-0 text-fg-3" />}
+    </>
+  );
+  const more = onMore && !renaming && (
+    <button
+      type="button"
+      aria-label="Session menu"
+      title="Session menu"
+      aria-haspopup="menu"
+      aria-expanded={!!menuOpen}
+      // Its own press: not the row's (open it, or pick it up to drag).
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onMore(s, e.currentTarget);
+      }}
       className={cx(
-        'group flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors',
-        lifted ? 'bg-bg-2 shadow-lg ring-1 ring-line-2' : active ? 'bg-bg-3' : 'hover:bg-bg-2',
+        'flex shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors',
+        touch
+          ? cx('-my-1 -mr-1.5 h-9 w-9 self-center active:bg-bg-3 active:text-fg', menuOpen && 'bg-bg-3 text-fg')
+          : cx('absolute top-1/2 right-1.5 h-7 w-7 -translate-y-1/2 hover:bg-fg/10 hover:text-fg focus-visible:opacity-100', menuOpen ? 'text-fg opacity-100' : 'opacity-0 group-hover:opacity-100'),
       )}
     >
-      <span className="relative mt-[3px] shrink-0">
-        <AgentIcon agent={s.agent} name={s.acpName} size={15} />
-        <StatusDot s={s} className={cx('absolute -right-0.5 -bottom-0.5 ring-2', active ? 'ring-bg-3' : 'ring-sidebar group-hover:ring-bg-2')} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          {renaming && onRename ? (
-            <RenameInput s={s} onDone={() => onRename(null)} />
-          ) : (
-            <span
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onRename?.(s.key);
-              }}
-              className={cx('min-w-0 flex-1 truncate text-[13.5px]', active || unread ? 'font-medium text-fg' : 'text-fg')}
-              translate="no"
-            >
-              {s.title}
-            </span>
-          )}
-          {unread && !renaming && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
-          {s.pr && !renaming && <PrBadge pr={s.pr} />}
-          {s.goal && !renaming && (
-            <span title={`Goal: ${s.goal.objective}`} className="shrink-0">
-              <Target size={11} className={s.goal.status === 'active' ? 'text-accent' : 'text-warn'} />
-            </span>
-          )}
-          {s.pinned && !renaming && <Pin size={11} className="shrink-0 text-fg-3" />}
+      <Ellipsis size={touch ? 17 : 15} />
+    </button>
+  );
+  const icon = (
+    <span className={cx('relative shrink-0', !place && 'mt-[3px]')}>
+      <AgentIcon agent={s.agent} name={s.acpName} size={15} />
+      <StatusDot s={s} className={cx('absolute -right-0.5 -bottom-0.5 ring-2', active ? 'ring-bg-3' : menuOpen ? 'ring-bg-2' : 'ring-sidebar group-hover:ring-bg-2')} />
+    </span>
+  );
+  const row = cx(
+    'group relative flex w-full gap-2.5 rounded-[10px] px-2.5 text-left transition-colors',
+    lifted ? 'bg-bg-2 shadow-lg ring-1 ring-line-2' : active ? 'bg-bg-3' : menuOpen ? 'bg-bg-2' : 'hover:bg-bg-2',
+  );
+
+  if (place) {
+    // A turn running or waiting says so; ready, or stopped, the time (its dot says it is ready).
+    const doing = a && (isBusy(a) || inBackground(a) || a.status === 'waiting' || a.status === 'stopping');
+    return (
+      <span className={cx(row, 'items-center py-2')}>
+        {icon}
+        <span className={cx('flex min-w-0 flex-1 items-center gap-1.5', fade)}>
+          {title}
+          {marks}
+          {!renaming &&
+            (doing ? (
+              <ActivityText s={s} className="ml-1 max-w-[55%] shrink-0 text-[12px]" />
+            ) : (
+              <span className="ml-1 flex shrink-0 items-center gap-1 text-[12px] text-fg-3">
+                {/* A worktree's branch says which copy of the folder. */}
+                {s.worktree && (
+                  <>
+                    <span className="max-w-[90px] truncate" translate="no">
+                      {s.worktree.branch}
+                    </span>
+                    <span aria-hidden>·</span>
+                  </>
+                )}
+                <span>{timeAgo(s.updatedAt)}</span>
+              </span>
+            ))}
         </span>
-        <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-fg-3">
+        {more}
+      </span>
+    );
+  }
+
+  return (
+    <span className={cx(row, 'items-start py-[7px]')}>
+      {icon}
+      <span className={cx('min-w-0 flex-1', fade)}>
+        <span className="flex items-center gap-1.5">
+          {title}
+          {marks}
+        </span>
+        <span className="mt-0.5 flex items-center gap-1 text-[12px] leading-4 text-fg-3">
           {unread && a && !isWorking(a) && !inBackground(a) ? (
             <span className="min-w-0 truncate text-ok">Done · {timeAgo(s.doneAt)}</span>
           ) : running ? (
             <ActivityText s={s} className="min-w-0" />
-          ) : place ? (
-            // Its group names the folder; a worktree's branch says which copy of it.
-            s.worktree && (
-              <span className="min-w-0 truncate" translate="no">
-                {s.worktree.branch}
-              </span>
-            )
           ) : (
-            <span className="min-w-0 truncate" translate="no">
-              {folderName(s.cwd, home) || '—'}
-            </span>
+            <>
+              <span className="min-w-0 truncate" translate={where === HOME_FOLDER ? undefined : 'no'}>
+                {where || '—'}
+              </span>
+              <span className="shrink-0" aria-hidden>
+                ·
+              </span>
+              <span className="shrink-0">{timeAgo(s.updatedAt)}</span>
+            </>
           )}
-          {!running && (place && !s.worktree ? <span className="shrink-0">{timeAgo(s.updatedAt)}</span> : <span className="shrink-0">· {timeAgo(s.updatedAt)}</span>)}
           <span className="flex-1" />
-          {!running && <DiffStat added={s.stats.linesAdded} removed={s.stats.linesRemoved} className="text-[11px] opacity-75" compact />}
+          {!running && <DiffStat added={s.stats.linesAdded} removed={s.stats.linesRemoved} className="text-[11px] opacity-70" compact />}
         </span>
       </span>
-      {onDelete && !renaming && (
-        <button
-          type="button"
-          aria-label="Delete session"
-          title="Delete session"
-          // Its own tap: not the row's (open, or pick up to drag).
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(s);
-          }}
-          className="-my-1 -mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center self-center rounded-lg text-fg-3 transition-colors active:bg-bg-3 active:text-err"
-        >
-          <Trash2 size={15} />
-        </button>
-      )}
+      {more}
     </span>
   );
 });
@@ -263,7 +347,7 @@ interface DragBits {
   lifted: boolean;
 }
 
-function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, eager, place, drag }: RowProps & { drag: DragBits }) {
+function RowShell({ s, active, home, renaming, onRename, onMenu, onMore, menuOpen, touch, eager, place, inPinned, drag }: RowProps & { drag: DragBits }) {
   return (
     <div
       ref={drag.ref}
@@ -290,11 +374,11 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, onDelete, eager
         // Their stand-in is a row's exact height, so drawing one never changes the list's height (Safari
         // keeps no scroll anchor: rows above that grew as they were drawn moved what was on screen).
         'cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50',
-        !eager && '[contain-intrinsic-size:auto_56.25px] [content-visibility:auto]',
+        !eager && (place ? '[contain-intrinsic-size:auto_36.25px] [content-visibility:auto]' : '[contain-intrinsic-size:auto_52.25px] [content-visibility:auto]'),
         drag.lifted && 'opacity-40',
       )}
     >
-      <RowBody s={s} active={active} home={home} renaming={renaming} onRename={onRename} onDelete={onDelete} place={place} />
+      <RowBody s={s} active={active} home={home} renaming={renaming} onRename={onRename} onMore={onMore} menuOpen={menuOpen} touch={touch} place={place} inPinned={inPinned} />
     </div>
   );
 }
@@ -391,7 +475,7 @@ const shownWhole = new Set<string>();
 function PlaceHead({ g, folded, home, onFold }: { g: SessionGroup; folded: boolean; home?: string; onFold: () => void }) {
   const unread = folded && g.items.some(unreadOf);
   return (
-    <div data-tip="groups" className="group/head sticky top-0 z-[1] flex items-center gap-0.5 bg-sidebar pt-1 pb-0.5">
+    <div data-tip="groups" className="group/head sticky top-0 z-[1] flex items-center gap-0.5 bg-sidebar py-0.5">
       <button
         type="button"
         aria-expanded={!folded}
@@ -401,15 +485,17 @@ function PlaceHead({ g, folded, home, onFold }: { g: SessionGroup; folded: boole
           e.stopPropagation();
           onFold();
         }}
-        className="flex h-7 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-left text-[12.5px] font-medium text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg max-md:h-8"
+        className="flex h-7 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg max-md:h-8"
       >
         <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
-        <span className="min-w-0 truncate" translate="no">
-          {g.label}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate" translate="no">
+            {g.label}
+          </span>
+          {folded && <span className="tnum shrink-0 text-[11.5px] font-normal text-fg-3">{g.items.length}</span>}
+          {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
+          <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
         </span>
-        {folded && <span className="tnum -ml-1 shrink-0 text-[11.5px] font-normal text-fg-3">{g.items.length}</span>}
-        {unread && <span className="-ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
-        <ChevronRight size={12} className={cx('-ml-1 shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
       </button>
       <IconButton
         size="sm"
@@ -443,6 +529,8 @@ export function SessionList({ query }: { query: string }) {
   const [menu, setMenu] = useState<SessionSummary | null>(null);
   const [snoozing, setSnoozing] = useState(false);
   const menuAnchor = useRef<HTMLElement | null>(null);
+  /** Opened by a row's ⋯ (it lines up with the button's end), or by a right-click on the row (under its start). */
+  const [menuByButton, setMenuByButton] = useState(false);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overGroup, setOverGroup] = useState<string | null>(null);
   const [confirm, confirmNode] = useConfirm();
@@ -546,12 +634,21 @@ export function SessionList({ query }: { query: string }) {
   const onRename = useCallback((key: string | null) => setRenaming(key), []);
   const onMenu = useCallback(
     (s: SessionSummary, el: HTMLElement) => {
-      if (coarse) return; // a long press on a phone picks the row up; rename from the session's ⋯ menu there
+      if (coarse) return; // a long press on a phone picks the row up; its ⋯ has the menu there
       menuAnchor.current = el;
+      setMenuByButton(false);
+      setSnoozing(false);
       setMenu(s);
     },
     [coarse],
   );
+  // The ⋯ again, with its menu open, closes it.
+  const onMore = useCallback((s: SessionSummary, el: HTMLElement) => {
+    menuAnchor.current = el;
+    setMenuByButton(true);
+    setSnoozing(false);
+    setMenu((m) => (m?.key === s.key ? null : s));
+  }, []);
 
   // The open session, read when a delete goes through: a handler that changed with it redrew every row
   // each time you moved to another session.
@@ -588,9 +685,9 @@ export function SessionList({ query }: { query: string }) {
   const zoneAt = datedDrag && !groups.some((g) => g.kind === 'pinned') ? (groups[0]?.kind === 'active' ? 1 : 0) : -1;
   // What each group shows: a space's or a folder's newest few (all once asked, none while folded), and the session open.
   const now = Date.now();
-  const shut = new Set(groups.filter((g) => (g.kind === 'space' || g.kind === 'folder') && isFolded(g, folds, now)).map((g) => g.id));
+  const shut = new Set(groups.filter((g) => isPlace(g) && isFolded(g, folds, now)).map((g) => g.id));
   const shownRows = groups.map((g) => {
-    if (g.kind !== 'space' && g.kind !== 'folder') return g.items;
+    if (!isPlace(g)) return g.items;
     const rows = shut.has(g.id) ? [] : shownWhole.has(g.id) ? g.items : g.items.slice(0, GROUP_ROWS);
     const open = activeKey ? g.items.find((s) => s.key === activeKey) : undefined;
     return open && !rows.includes(open) ? [...rows, open] : rows;
@@ -615,18 +712,36 @@ export function SessionList({ query }: { query: string }) {
       <div ref={touchDragArea}>
         {groups.map((g, i) => {
           const sortable = orderable(g.kind);
-          const place = g.kind === 'space' || g.kind === 'folder';
+          const place = isPlace(g);
           const visible = shownRows[i];
           const before = shownRows.slice(0, i).reduce((n, x) => n + x.length, 0);
           const rows = visible.map((s, k) => {
-            const p: RowProps = { s, active: s.key === activeKey, home, renaming: renaming === s.key, onRename, onMenu, onDelete: coarse ? onDelete : undefined, eager: before + k < 30, place };
+            const p: RowProps = {
+              s,
+              active: s.key === activeKey,
+              home,
+              renaming: renaming === s.key,
+              onRename,
+              onMenu,
+              onMore,
+              menuOpen: menu?.key === s.key,
+              touch: coarse,
+              eager: before + k < 30,
+              place,
+              inPinned: g.kind === 'pinned',
+            };
             const row = sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
             const kids = nest.byParent.get(s.key);
             if (!kids) return row;
             return (
               <Fragment key={s.key}>
                 {row}
-                <ChildNest parent={s.key} kids={kids} activeKey={activeKey} row={(c, active) => <RowBody s={c} active={active} home={home} />} />
+                <ChildNest
+                  parent={s.key}
+                  kids={kids}
+                  activeKey={activeKey}
+                  row={(c, active) => <RowBody s={c} active={active} home={home} onMore={onMore} menuOpen={menu?.key === c.key} touch={coarse} place={place} />}
+                />
               </Fragment>
             );
           });
@@ -634,10 +749,21 @@ export function SessionList({ query }: { query: string }) {
           // Rows left out, or all of them shown since asked: a line to show them, or fewer again.
           const more = g.items.length - visible.length;
           const whole = shownWhole.has(g.id);
+          // The spaces' and folders' groups go under one heading, Projects; folded ones close up into a list of them.
+          const prev = groups[i - 1];
+          const afterPlace = !!prev && isPlace(prev);
           return (
             <Fragment key={g.id}>
               {i === zoneAt && <PinZone hot={overGroup === 'pinned'} />}
-              <div className={cx('px-2 transition-colors', shutNow && !visible.length ? 'pb-1' : 'pb-3', datedDrag && g.kind === 'pinned' && overGroup === 'pinned' && 'rounded-xl bg-accent/[0.06]')}>
+              <div
+                className={cx(
+                  'px-2 transition-colors',
+                  i > 0 && (!place || !afterPlace ? 'mt-2' : !shut.has(prev.id) && 'mt-1.5'),
+                  !shutNow && 'pb-1',
+                  datedDrag && g.kind === 'pinned' && overGroup === 'pinned' && 'rounded-xl bg-accent/[0.06]',
+                )}
+              >
+                {place && !afterPlace && <div className="px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">Projects</div>}
                 {place ? (
                   <PlaceHead g={g} folded={shutNow} home={home} onFold={() => fold(g)} />
                 ) : (
@@ -671,7 +797,7 @@ export function SessionList({ query }: { query: string }) {
       </div>
       {confirmNode}
       {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : null}</DragOverlay>, document.body)}
-      <Popover anchor={menuAnchor} open={!!menu} onClose={() => (setMenu(null), setSnoozing(false))} width={snoozing ? 240 : 190}>
+      <Popover anchor={menuAnchor} open={!!menu} onClose={() => (setMenu(null), setSnoozing(false))} width={snoozing ? 240 : 190} align={menuByButton ? 'end' : 'start'}>
         {menu && snoozing && <SnoozeItems s={menu} onDone={() => (setMenu(null), setSnoozing(false))} />}
         {menu && !snoozing && (
           <>
@@ -719,6 +845,17 @@ export function SessionList({ query }: { query: string }) {
               }}
             >
               Archive
+            </MenuItem>
+            <MenuSep />
+            <MenuItem
+              danger
+              icon={<Trash2 size={14} />}
+              onClick={() => {
+                setMenu(null);
+                void onDelete(menu);
+              }}
+            >
+              Delete
             </MenuItem>
           </>
         )}
