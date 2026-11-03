@@ -43,4 +43,4 @@ node dist/server/cli.js set-password                                        # wi
 docker compose exec -it naget-agent node dist/server/cli.js set-password  # with Docker
 ```
 
-Either way, every browser is signed out.
+Either way, every browser is signed out, and addresses paused after ten wrong passwords can sign in again.

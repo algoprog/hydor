@@ -170,7 +170,7 @@ The app has one password, chosen when it was installed. To change it, open [Sett
 
 Changing it signs out every other browser: phones, other computers, everywhere but this one. If the current password is wrong, or the two new ones differ, nothing changes and the app says why.
 
-If you have forgotten it, run this on the computer the app runs on, in the app's folder: `node dist/server/cli.js set-password` (with Docker: `docker compose exec -it naget-agent node dist/server/cli.js set-password`). Every browser is signed out.
+If you have forgotten it, run this on the computer the app runs on, in the app's folder: `node dist/server/cli.js set-password` (with Docker: `docker compose exec -it naget-agent node dist/server/cli.js set-password`). Every browser is signed out, and addresses paused after wrong passwords can sign in again.
 
 ## Sign out of this browser
 

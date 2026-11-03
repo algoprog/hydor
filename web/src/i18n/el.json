@@ -8288,5 +8288,15 @@
 "Work that starts by itself":"Δουλειά που ξεκινά μόνη της",
 "Write once how you like to work, and every agent here follows it. A space, or a single session, can have its own.":"Γράψτε μία φορά πώς σας αρέσει να δουλεύετε, και κάθε πράκτορας εδώ το ακολουθεί. Ένας χώρος, ή μία μόνο συνεδρία, μπορεί να έχει τις δικές του.",
 "Your Library":"Η Βιβλιοθήκη σας",
-"Your other machines":"Τα άλλα σας μηχανήματα"
+"Your other machines":"Τα άλλα σας μηχανήματα",
+"Characters in the picture":"Χαρακτήρες της εικόνας",
+"Characters to type":"Χαρακτήρες προς πληκτρολόγηση",
+"New picture":"Νέα εικόνα",
+"After {0} more wrong password{1}, signing in from this address stops for an hour.":"Λάθος κωδικοί που απομένουν πριν σταματήσει η σύνδεση από αυτή τη διεύθυνση για μία ώρα: {0}.",
+"Type the characters in the picture as well":"Πληκτρολογήστε και τους χαρακτήρες της εικόνας",
+"That picture has expired. Here is a new one.":"Αυτή η εικόνα έληξε. Ορίστε μια νέα.",
+"The characters did not match the picture. Here is a new one.":"Οι χαρακτήρες δεν ταίριαξαν με την εικόνα. Ορίστε μια νέα.",
+"Too many failed sign-ins from this address. Try again in {0} minute{1}.":"Πάρα πολλές αποτυχημένες συνδέσεις από αυτή τη διεύθυνση. Δοκιμάστε ξανά σε {0} λεπ.",
+"Too many failed sign-ins. Try again later.":"Πάρα πολλές αποτυχημένες συνδέσεις. Δοκιμάστε ξανά αργότερα.",
+"Too many new pictures from this address. Try again in {0} minute{1}.":"Πάρα πολλές νέες εικόνες από αυτή τη διεύθυνση. Δοκιμάστε ξανά σε {0} λεπ."
 }

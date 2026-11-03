@@ -21,7 +21,15 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
 
 ## Security
 
-- Password stored as a scrypt hash; logins rate-limited.
+- Password stored as a scrypt hash.
+- Wrong passwords are counted by address over an hour (IPv6 by its /64). From the third, the sign-in page also
+  asks for the characters in a picture the server draws itself, with no outside service; each picture is good for
+  one try, and a misread costs none. The tenth stops sign-ins from that address for an hour. Ten from anywhere bring
+  the picture to everyone, sixty stop every sign-in. The counts are kept in the database, so a restart lifts no
+  pause; `set-password` clears them.
+- A visitor's address comes from `X-Forwarded-For` only when the request reaches the app from this computer or a
+  private network (a proxy, Docker's network), read from the end the proxy adds to; otherwise it is the
+  connection's own, so no one can claim a new address for each try.
 - Session cookie is `HttpOnly`, `SameSite=Strict`, and `Secure` over HTTPS.
 - Every state-changing request and WebSocket has its `Origin` checked.
 - Strict Content Security Policy.

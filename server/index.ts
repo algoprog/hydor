@@ -10,7 +10,7 @@ import websocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
 import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
 import type { SessionExtra } from '../shared/features.ts';
-import { AuthManager, HttpError, SESSION_COOKIE } from './auth.ts';
+import { AuthManager, clientAddress, HttpError, SESSION_COOKIE } from './auth.ts';
 import { isInternal } from './internal.ts';
 import { config, ensureDirs, paths } from './config.ts';
 import { kvGet, kvSet, openDb } from './db.ts';
@@ -113,8 +113,9 @@ app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string
 
 const allowed = new Set([...config.allowedOrigins, `http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`]);
 
+/** The visitor's address, as a proxy on this computer or a private network passes it on (server/auth.ts). */
 function clientIp(req: FastifyRequest): string {
-  return String(req.headers['cf-connecting-ip'] ?? req.ip ?? 'unknown');
+  return clientAddress(req.socket.remoteAddress ?? '', req.headers['x-forwarded-for']);
 }
 
 function isHttps(req: FastifyRequest): boolean {
@@ -147,7 +148,7 @@ function setSessionCookie(req: FastifyRequest, reply: FastifyReply, token: strin
   });
 }
 
-const PUBLIC = new Set(['/api/health', '/api/auth/state', '/api/auth/login', '/api/auth/setup']);
+const PUBLIC = new Set(['/api/health', '/api/auth/state', '/api/auth/login', '/api/auth/setup', '/api/auth/captcha']);
 
 app.addHook('onRequest', async (req, reply) => {
   reply.header('X-Content-Type-Options', 'nosniff');
@@ -178,7 +179,7 @@ app.addHook('onRequest', async (req, reply) => {
 app.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
   const status = err instanceof HttpError ? err.status : err.statusCode && err.statusCode < 600 ? err.statusCode : 500;
   if (status >= 500) app.log.error(err);
-  reply.code(status).send({ error: err.message || 'Error' });
+  reply.code(status).send({ ...(err instanceof HttpError ? err.extra : undefined), error: err.message || 'Error' });
 });
 
 // ---- auth ---------------------------------------------------------------------------
@@ -189,26 +190,31 @@ app.get('/api/auth/state', async (req) => ({ setup: auth.isSetup(), authenticate
 
 app.post('/api/auth/setup', async (req, reply) => {
   const b = (req.body ?? {}) as { token?: string; password?: string };
-  auth.checkRateLimit(clientIp(req));
-  try {
-    await auth.setup(b.token ?? '', b.password ?? '');
-  } catch (e) {
-    auth.recordFailure(clientIp(req));
-    throw e;
-  }
-  setSessionCookie(req, reply, auth.createSession(clientIp(req), String(req.headers['user-agent'] ?? '')));
+  // Once there is a password nothing here can be guessed, so nothing is counted either (it would only help a bot
+  // stop everyone's sign-ins without reading a picture).
+  if (auth.isSetup()) throw new HttpError(409, 'Password is already set');
+  const ip = clientIp(req);
+  // Counted like a password; a wrong token stays counted.
+  const at = auth.beginTry(ip, null, false);
+  await auth.setup(b.token ?? '', b.password ?? '');
+  auth.rightTry(ip, at);
+  setSessionCookie(req, reply, auth.createSession(ip, String(req.headers['user-agent'] ?? '')));
   return { ok: true };
+});
+
+// What the sign-in page shows besides the password: a picture to read once an address has had wrong passwords
+// (server/auth.ts). A POST, so another site can't use up an address's pictures from a visitor's browser.
+app.post('/api/auth/captcha', async (req, reply) => {
+  reply.header('Cache-Control', 'no-store');
+  return auth.picture(clientIp(req));
 });
 
 app.post('/api/auth/login', async (req, reply) => {
   const ip = clientIp(req);
-  auth.checkRateLimit(ip);
-  const b = (req.body ?? {}) as { password?: string };
-  if (!(await auth.verifyPassword(b.password ?? ''))) {
-    auth.recordFailure(ip);
-    throw new HttpError(401, 'Wrong password');
-  }
-  auth.recordSuccess(ip);
+  const b = (req.body ?? {}) as { password?: string; captcha?: { id?: string; answer?: string } };
+  const at = auth.beginTry(ip, b.captcha);
+  if (!(await auth.verifyPassword(b.password ?? ''))) auth.wrongTry(ip);
+  auth.rightTry(ip, at);
   setSessionCookie(req, reply, auth.createSession(ip, String(req.headers['user-agent'] ?? '')));
   return { ok: true };
 });

@@ -44,7 +44,13 @@ If the proxy changes the `Host` header, tell the app the address people open it 
 
 HTTPS is also what phones need to install the app and receive push notifications. Previews of dev servers use a port of their own (8791); see [Look at a dev server with Preview](/guide/files-git#look-at-a-dev-server-with-preview).
 
-The password guards everything. A browser stays signed in for 30 days after you sign in, and after a few wrong passwords the sign-in page makes you wait before trying again. See [Change your password](/guide/app#change-your-password).
+The password guards everything. A browser stays signed in for 30 days after you sign in. Wrong passwords are counted by the address they come from, over the last hour:
+
+- After three, the sign-in page also shows a picture of five characters to type into **Characters in the picture**, so a program can't go on guessing. Typing them wrong costs nothing, and **New picture** (the round arrow beside it) brings another.
+- After ten, that address can't sign in for an hour, not even with the right password. The page says how long is left.
+- After ten from anywhere, everyone gets the picture; after sixty, no one can sign in until the hour is up.
+
+Behind one of the proxies above, the address counted is the visitor's own, as the proxy passes it on. If you lock yourself out, sign in from another network (a phone's mobile data, say), wait, or set a new password on the computer itself, which lifts every pause. See [Change your password](/guide/app#change-your-password).
 
 ## Use other machines from one app
 

@@ -378,3 +378,7 @@ programs shows each program's version and what is out, with Check now, Update no
 - Starts when the computer starts (on by default; Settings → General), as a service of your user.
 - Several machines: add other machines running Naget Agent, over SSH or by address, and switch between
   them from the sidebar. Notices from all of them reach you wherever you are.
+- One password guards the app, and a browser stays signed in for 30 days. Wrong passwords are counted by the
+  address they come from: after three in an hour the sign-in page also shows a picture of characters to type,
+  drawn by the app itself (no outside service), and after ten that address can't sign in for an hour. Ten from
+  anywhere bring the picture to everyone.

@@ -19,4 +19,9 @@ layer in front instead of opening the port:
 
 If the proxy changes the `Host` header, set `ALLOWED_ORIGINS=https://agents.example.com`.
 
+Wrong passwords are counted by the visitor's address (a picture to read after three, an hour's pause after ten).
+The app takes it from the `X-Forwarded-For` header that a proxy on this computer or your own network adds; Cloudflare
+Tunnel and Caddy add it by themselves, and nginx needs `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`.
+Without it every visitor counts as the proxy, so one person's wrong passwords would pause everyone.
+
 HTTPS is also what phones need for push notifications and to install the app.
