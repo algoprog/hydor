@@ -3,6 +3,14 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.20.1 · 3 November 2026
+
+A fix for sessions started before the rename to Hydor.
+
+- **One card for a page saved again, in older sessions too**: in a Claude Code session started before the rename, a
+  page, deck, document, spreadsheet or LaTeX document the agent saves again shows as one card while it is being
+  written, as it does in new sessions, instead of a second one until the save is done.
+
 ## 0.20.0 · 3 November 2026
 
 Naget Agent is now Hydor: a new name and a new logo, and everything you had keeps working.

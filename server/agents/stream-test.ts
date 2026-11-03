@@ -47,6 +47,15 @@ const tests: [string, () => void][] = [
     },
   ],
   [
+    'a session started before the rename to Hydor: its saves, named naget-agent, too',
+    () => {
+      const t = make();
+      t.start('mcp__naget-agent__save_page');
+      t.piece('{"id":"0123456789","html":"<p>');
+      assert.deepEqual(t.tool().tool.input, { id: '0123456789' });
+    },
+  ],
+  [
     'other calls are left as they were until written whole',
     () => {
       const t = make();
