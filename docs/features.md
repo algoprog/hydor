@@ -274,8 +274,9 @@ programs shows each program's version and what is out, with Check now, Update no
 
 ## Following along
 - A readable timeline: the agent's messages read like a chat, and its commands fold into small boxes with
-  plain-words names ("Run the tests", "Read index.ts"), each a click away from its full output. A reply starts
-  near the top of the screen and stays there as it grows, so you read it from its beginning.
+  plain-words names ("Run the tests", "Read index.ts"), each a click away from its full output. A reply long enough
+  to fill the screen stops at its first line as it grows, so you read it from its beginning; a short one sits
+  under what came before, with no empty space below it.
 - Agents can answer with a page (a chart, a report, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen.
 - Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
