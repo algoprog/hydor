@@ -83,7 +83,7 @@ plan first, and make those changes after a yes.
 Keep the review where next week's can find it; the format is in `references/review-template.md`.
 
 - `save_doc` keeps it in the Library, to read and print. A page made with `save_page` can hold the
-  week's priorities as a checklist that keeps its ticks (`naget.storage`). A Markdown file suits
+  week's priorities as a checklist that keeps its ticks (`hydor.storage`). A Markdown file suits
   someone who keeps their notes in a folder.
 - Next week, start by comparing: which priorities happened, which carried over, and why.
 

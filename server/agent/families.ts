@@ -77,7 +77,7 @@ export function requestOptions(m: AgentModel, fam: Family): Record<string, unkno
   // vLLM already uses the model's own generation settings; others get the maker's recommendation.
   const keys: (keyof Sampling)[] = m.provider === 'openrouter' ? ['temperature', 'top_p', 'top_k', 'min_p', 'repetition_penalty'] : m.provider === 'endpoint' ? ['temperature', 'top_p', 'top_k', 'min_p'] : m.provider === 'ollama' ? ['temperature', 'top_p'] : [];
   for (const k of keys) if (s[k] !== undefined) out[k] = s[k];
-  const effort = (process.env.NAGET_AGENT_EFFORT ?? 'medium').toLowerCase();
+  const effort = (process.env.HYDOR_EFFORT ?? 'medium').toLowerCase();
   if (m.provider === 'openrouter' && m.reasoning && effort !== 'default') out.reasoning = { effort };
   else if (fam.effort && (m.provider === 'vllm' || m.provider === 'ollama') && /^(low|medium|high)$/.test(effort)) out.reasoning_effort = effort;
   return out;

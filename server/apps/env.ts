@@ -103,7 +103,7 @@ async function install(r: Requires, slug: string, hash: string) {
   };
   try {
     if (r.node && Object.keys(r.node).length) {
-      fs.writeFileSync(path.join(dir, 'package.json'), `${JSON.stringify({ name: `naget-template-${slug}`, private: true, dependencies: r.node }, null, 2)}\n`);
+      fs.writeFileSync(path.join(dir, 'package.json'), `${JSON.stringify({ name: `hydor-template-${slug}`, private: true, dependencies: r.node }, null, 2)}\n`);
       await step('Installing its Node packages', 'npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--omit=dev']);
     }
     if (r.python?.length) {

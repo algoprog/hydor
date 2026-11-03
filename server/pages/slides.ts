@@ -92,7 +92,7 @@ export function deckPage(db: DB, deck: Deck, title: string, mode: 'viewer' | 'pr
   return [
     '<!doctype html>',
     `<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>`,
-    '<meta name="generator" content="Naget Agent slides">',
+    '<meta name="generator" content="Hydor slides">',
     fams ? `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${esc(fams)}&amp;display=swap">` : '',
     `<style>${PAGE_CSS}</style></head><body>`,
     `<script type="application/json" id="n-deck">${json}</script>`,

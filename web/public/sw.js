@@ -1,4 +1,4 @@
-// Naget Agent service worker: shows a pushed notification (a session finished, failed or needs
+// Hydor service worker: shows a pushed notification (a session finished, failed or needs
 // you) when no page of the app is in view, and opens that session when the notification is tapped.
 // A session waiting on a plain yes or no gets Approve and Deny buttons, answered from here.
 self.addEventListener('install', () => self.skipWaiting());
@@ -15,11 +15,11 @@ self.addEventListener('push', (e) => {
       // A page in view shows its own toast.
       if (pages.some((p) => p.visibilityState === 'visible')) return;
       const a = n.kind === 'waiting' && n.approval && n.approval.approve && n.approval.deny ? n.approval : null;
-      await self.registration.showNotification(n.title || 'Naget Agent', {
+      await self.registration.showNotification(n.title || 'Hydor', {
         body: n.body || '',
-        tag: n.key || 'naget-agent',
+        tag: n.key || 'hydor',
         renotify: true,
-        icon: '/icon-192.png?v=3',
+        icon: '/icon-192.png?v=4',
         actions: a ? [{ action: 'approve', title: a.approve.label }, { action: 'deny', title: a.deny.label }] : [],
         data: { url: n.url || '/', api: n.api || '', key: n.key || '', approval: a },
       });
@@ -63,7 +63,7 @@ self.addEventListener('notificationclick', (e) => {
       if (!choice) return open(url);
       // Answered here; when it cannot be, the session opens to answer it there.
       if (!(await answer(d, choice))) return open(url);
-      await self.registration.showNotification(e.notification.title, { body: `${choice.label}: ${a.title}`, tag: d.key || 'naget-agent', icon: '/icon-192.png?v=3', silent: true, data: { url } });
+      await self.registration.showNotification(e.notification.title, { body: `${choice.label}: ${a.title}`, tag: d.key || 'hydor', icon: '/icon-192.png?v=4', silent: true, data: { url } });
     })(),
   );
 });

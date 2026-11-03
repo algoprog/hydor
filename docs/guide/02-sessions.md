@@ -29,7 +29,7 @@ The **Folder** chip says where the agent works. Its menu ("Project or folder to 
 
 - your projects, by name (the three used last, and the one picked). Picking a project sets the folder to the project's own, its assistant, and its guidelines for the session; the chip then reads **Project** and shows the project's name. A group of projects works the same way, with all its projects. See [Projects and knowledge](/guide/spaces) and [Agent Guidelines](/guide/guidelines).
 - the folder in use and the three folders you picked last;
-- **New task folder**: a fresh folder for this task, named by the day and a few words of your message (such as `2026-11-01-plan-trip-lisbon`), in `~/Naget` unless you set another place in [Task folders](/settings?s=assistants&find=Task%20folders) (Settings → Capabilities → Assistants);
+- **New task folder**: a fresh folder for this task, named by the day and a few words of your message (such as `2026-11-01-plan-trip-lisbon`), in `~/Hydor` unless you set another place in [Task folders](/settings?s=assistants&find=Task%20folders) (Settings → Capabilities → Assistants);
 - **New project**: makes a project (sessions, files and memory together) and picks it.
 
 Type in the field to find more:

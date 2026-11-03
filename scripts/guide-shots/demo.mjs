@@ -113,11 +113,11 @@ export function makeFiles(home, now) {
   // Documents agents read and made (only their names and sizes show).
   const pad = (n) => crypto.randomBytes(n);
   write(path.join(home, 'Documents/Q3-report.pdf'), pad(184_000));
-  write(path.join(home, 'Naget/Tasks/2026-10-31-q3-report-summary/Q3-summary.docx'), pad(36_000));
-  write(path.join(home, 'Naget/Tasks/2026-10-31-q3-report-summary/revenue-by-region.xlsx'), pad(21_000));
-  write(path.join(home, 'Naget/Tasks/2026-11-01-compare-e-bikes/e-bikes-compared.xlsx'), pad(18_000));
-  fs.mkdirSync(path.join(home, 'Naget/Tasks/2026-10-31-lisbon-trip'), { recursive: true });
-  fs.mkdirSync(path.join(home, 'Naget/Tasks/2026-11-01-browser-settings'), { recursive: true });
+  write(path.join(home, 'Hydor/Tasks/2026-10-31-q3-report-summary/Q3-summary.docx'), pad(36_000));
+  write(path.join(home, 'Hydor/Tasks/2026-10-31-q3-report-summary/revenue-by-region.xlsx'), pad(21_000));
+  write(path.join(home, 'Hydor/Tasks/2026-11-01-compare-e-bikes/e-bikes-compared.xlsx'), pad(18_000));
+  fs.mkdirSync(path.join(home, 'Hydor/Tasks/2026-10-31-lisbon-trip'), { recursive: true });
+  fs.mkdirSync(path.join(home, 'Hydor/Tasks/2026-11-01-browser-settings'), { recursive: true });
   return { shop, blog };
 }
 
@@ -188,7 +188,7 @@ class Transcript {
   }
 }
 
-const naget = (tool) => `mcp__naget-agent__${tool}`;
+const own = (tool) => `mcp__hydor__${tool}`;
 const numbered = (text) =>
   text
     .split('\n')
@@ -197,7 +197,7 @@ const numbered = (text) =>
 
 /** Every session Alex has, newest work first. Returns them by name, each with its key. */
 export function makeSessions(home, projects, now, { shop, blog }) {
-  const tasks = path.join(home, 'Naget/Tasks');
+  const tasks = path.join(home, 'Hydor/Tasks');
   const out = {};
 
   // Fixing the checkout tests: steps, an edit, and the agent waiting to run the test suite.
@@ -261,7 +261,7 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     const t = new Transcript({ cwd, at: now - 2 * HOUR - 14 * MIN });
     t.user('Find the best e-bike under $2,000 for my hilly commute: 9 km each way, with two steep hills.');
     const q1 = 'best commuter e-bike under $2000 for steep hills 2026';
-    t.tool(naget('web_search'), { query: q1 }, {
+    t.tool(own('web_search'), { query: q1 }, {
       say: "I'll look for recent reviews of commuter e-bikes that climb well, then compare the best few.",
       text: formatSearch({
         query: q1,
@@ -277,16 +277,16 @@ export function makeSessions(home, projects, now, { shop, blog }) {
       ms: 5200,
     });
     t.wait(25_000);
-    t.tool(naget('read_page'), { url: 'https://www.ebiketest.example/velora-ridge-e5', question: 'How does it do on steep hills and what does it cost?' }, {
+    t.tool(own('read_page'), { url: 'https://www.ebiketest.example/velora-ridge-e5', question: 'How does it do on steep hills and what does it cost?' }, {
       text: formatPage({ title: 'Velora Ridge E5 review', url: 'https://www.ebiketest.example/velora-ridge-e5', detail: 'the parts that answer the question', body: 'On our 12% test climb the Ridge E5 held 17–18 km/h in its second assist level. The torque sensor makes it feel natural from a standstill. Price: $1,890 with lights and a rear rack.' }),
       ms: 3800,
     });
-    t.tool(naget('read_page'), { url: 'https://www.cyclingreview.example/best-e-bikes-hills', question: 'Which models were best on steep climbs?' }, {
+    t.tool(own('read_page'), { url: 'https://www.cyclingreview.example/best-e-bikes-hills', question: 'Which models were best on steep climbs?' }, {
       text: formatPage({ title: 'The best electric bikes for hills in 2026, tested', url: 'https://www.cyclingreview.example/best-e-bikes-hills', detail: 'the parts that answer the question', body: 'Best for steep commutes: Velora Ridge E5 (85 Nm), Urbana Climb 2 (75 Nm). Hub-drive bikes such as the Commuter Pro 3 slowed to 11 km/h on the 12% section.' }),
       ms: 4100,
     });
     t.wait(70_000);
-    t.tool(naget('present_files'), { files: [{ path: path.join(cwd, 'e-bikes-compared.xlsx'), caption: 'Five e-bikes side by side: price, motor, battery and how each did on the test climb' }] }, { text: 'Shown to the user.', ms: 400 });
+    t.tool(own('present_files'), { files: [{ path: path.join(cwd, 'e-bikes-compared.xlsx'), caption: 'Five e-bikes side by side: price, motor, battery and how each did on the test climb' }] }, { text: 'Shown to the user.', ms: 400 });
     t.say(
       [
         "**The Velora Ridge E5 ($1,890) is the best fit for your commute.** Its mid-drive motor uses the bike's gears, so it keeps its pull on steep hills, where hub-motor bikes slow down.\n\n| | Price | Motor | Battery | On a 12% climb |\n|---|---|---|---|---|\n| **Velora Ridge E5** | $1,890 | 85 Nm mid-drive | 625 Wh | 17–18 km/h |\n| Urbana Climb 2 | $1,749 | 75 Nm mid-drive | 540 Wh | 15 km/h |\n| Commuter Pro 3 | $1,599 | 50 Nm hub | 500 Wh | 11 km/h |\n\nWith 18 km a day, the Ridge E5's battery lasts about four days between charges. If you'd rather save $140, the Urbana Climb 2 is a close second.",
@@ -302,14 +302,14 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     const cwd = path.join(tasks, '2026-11-01-browser-settings');
     const t = new Transcript({ cwd, at: now - 2 * MIN });
     t.user("Turn off the browser's screenshots, and keep the pages it opens off my home network.");
-    t.tool(naget('app_guide'), { query: 'browser screenshots and private network' }, {
+    t.tool(own('app_guide'), { query: 'browser screenshots and private network' }, {
       text: 'From the guide, for “browser screenshots and private network”:\n\n## Browser settings (Search and the browser · web#browser-settings)\n…',
       ms: 900,
     });
-    t.tool(naget('app_api'), { method: 'GET', path: '/api/browser/settings' }, { text: '{"enabled":true,"headless":true,"blockPrivate":false,"screenshots":true,"allow":[],"block":[]}', ms: 300 });
+    t.tool(own('app_api'), { method: 'GET', path: '/api/browser/settings' }, { text: '{"enabled":true,"headless":true,"blockPrivate":false,"screenshots":true,"allow":[],"block":[]}', ms: 300 });
     t.t = now - 35_000;
     const change = t.tool(
-      naget('app_api'),
+      own('app_api'),
       { method: 'PUT', path: '/api/browser/settings', body: { screenshots: false, blockPrivate: true }, summary: 'Turn off the browser’s screenshots and keep its pages off your network' },
       { say: 'Both are in **Settings → Browser**. Here is the change for you to confirm:', pending: true },
     );
@@ -322,14 +322,14 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     const cwd = path.join(tasks, '2026-10-31-q3-report-summary');
     const t = new Transcript({ cwd, at: now - 26 * HOUR });
     t.user('Summarize the Q3 report in ~/Documents for the board: one page, with a chart of revenue by region.');
-    t.tool(naget('read_document'), { path: path.join(home, 'Documents/Q3-report.pdf') }, {
+    t.tool(own('read_document'), { path: path.join(home, 'Documents/Q3-report.pdf') }, {
       say: "I'll read the report first.",
       text: 'Q3-report.pdf · 18 pages\n\nRevenue grew 14% to $4.2M. Europe +22%, North America +9%, Asia +17%. Gross margin 61%…',
       ms: 6400,
     });
     t.wait(50_000);
     t.tool('Bash', { command: 'python3 make_summary.py', description: 'Write the summary and the chart' }, { text: 'Wrote Q3-summary.docx and revenue-by-region.xlsx', result: { stdout: 'Wrote Q3-summary.docx and revenue-by-region.xlsx', stderr: '', interrupted: false }, ms: 8200 });
-    t.tool(naget('present_files'), {
+    t.tool(own('present_files'), {
       files: [
         { path: path.join(cwd, 'Q3-summary.docx'), caption: 'The one-page summary for the board' },
         { path: path.join(cwd, 'revenue-by-region.xlsx'), caption: 'Revenue by region, with the chart' },
@@ -352,12 +352,12 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     const t = new Transcript({ cwd, at: now - 50 * MIN });
     t.user('Make me a picture of a yellow Lisbon tram on a sunny hill street for my trip blog, then a short clip of it climbing.');
     const prompt = 'A yellow Lisbon tram climbing a narrow sunny street between tiled houses, two people walking beside it, bright flat illustration';
-    t.tool(naget('generate_image'), { prompt, aspect_ratio: '4:3' }, {
+    t.tool(own('generate_image'), { prompt, aspect_ratio: '4:3' }, {
       say: "I'll make the picture first.",
       text: `Made an image with recraft/recraft-v4.1-flash ($0.007), 4:3:\n${pic} (800×590, 96 KB)\nThe user sees it with your reply, a tap away from full size, download and keeping it in their Library: don’t repeat it or its path. To look at it yourself, open the file.`,
       ms: 14_000,
     });
-    t.tool(naget('generate_video'), { prompt: 'The yellow tram climbs the street towards the camera, warm afternoon light, gentle camera follow', first_frame: pic }, {
+    t.tool(own('generate_video'), { prompt: 'The yellow tram climbs the street towards the camera, warm afternoon light, gentle camera follow', first_frame: pic }, {
       say: 'Now a short clip that starts from it.',
       text: `Made a video with x-ai/grok-imagine-video-1.5 ($0.42), 3 s, 16:9, 720p, with sound:\n${clip} (640×362, 3.1 s, 101 KB)\nThe user sees it with your reply, where they can play it, download it and keep it in their Library: don’t repeat it or its path.`,
       ms: 52_000,
@@ -370,9 +370,9 @@ export function makeSessions(home, projects, now, { shop, blog }) {
   // Plain conversations, for the session list.
   const plain = [
     ['lisbon', path.join(tasks, '2026-10-31-lisbon-trip'), 30 * HOUR, 'Plan a 4-day trip to Lisbon in May: two adults, mid-range hotels, lots of walking.', 'Here is a day-by-day plan, with the neighbourhoods to stay in and what to book ahead.', '4 days in Lisbon in May'],
-    ['thesis', path.join(home, 'Naget/Projects/thesis'), 3 * HOUR, 'Outline chapter 3: the method, the survey and how I analysed the answers.', 'Here is an outline in five parts, with what each needs from your notes.', 'Outline chapter 3'],
-    ['garden', path.join(home, 'Naget/Projects/the-garden'), 50 * HOUR, 'Which vegetables can I still sow in November?', 'In zone 5b, garlic and broad beans go in now; spinach and lettuce under cover.', 'What to sow in November'],
-    ['taxes', path.join(home, 'Naget/Projects/taxes-2026'), 4 * DAY, 'Sort the receipts in this folder by quarter and add them up.', 'Done: 46 receipts in four folders, with a table of the totals.', 'Receipts by quarter'],
+    ['thesis', path.join(home, 'Hydor/Projects/thesis'), 3 * HOUR, 'Outline chapter 3: the method, the survey and how I analysed the answers.', 'Here is an outline in five parts, with what each needs from your notes.', 'Outline chapter 3'],
+    ['garden', path.join(home, 'Hydor/Projects/the-garden'), 50 * HOUR, 'Which vegetables can I still sow in November?', 'In zone 5b, garlic and broad beans go in now; spinach and lettuce under cover.', 'What to sow in November'],
+    ['taxes', path.join(home, 'Hydor/Projects/taxes-2026'), 4 * DAY, 'Sort the receipts in this folder by quarter and add them up.', 'Done: 46 receipts in four folders, with a table of the totals.', 'Receipts by quarter'],
     ['blog', blog, 3 * DAY, 'Add an RSS feed to the blog.', 'The feed is at /feed.xml, built with the posts. I added a link to it in the header.', 'RSS feed for the blog'],
     ['darkmode', blog, 6 * DAY, 'Give the blog a dark mode that follows the system setting.', 'Done: the colours follow your system, with a switch in the footer to override it.', 'Dark mode for the blog'],
     ['search', shop, 5 * HOUR, 'Product search is slow with more than 1,000 products. Make it faster.', 'Search now uses an index on the product names: 40 ms instead of 1.2 s for 5,000 products.', 'Faster product search'],
@@ -417,7 +417,7 @@ export async function seedApi(api, home, now, s) {
   // No tips over the pictures (a shot that shows one turns them on).
   await api('PUT', '/api/tips', { on: false });
   await api('PUT', '/api/me/timezone', { tz: 'America/New_York' });
-  await api('PUT', '/api/guidelines', { global: 'Answer in plain English, short and to the point. Ask before deleting anything. Keep what you make for me in ~/Naget.' });
+  await api('PUT', '/api/guidelines', { global: 'Answer in plain English, short and to the point. Ask before deleting anything. Keep what you make for me in ~/Hydor.' });
   // Two built-in plugins with nothing to set up, and one switched off (Settings → Plugins).
   for (const name of ['sqlite', 'library-docs']) await api('POST', '/api/plugins/install', { name }).catch(() => {});
   for (let i = 0; i < 50 && (await api('GET', '/api/plugins')).installed.length < 2; i++) await new Promise((r) => setTimeout(r, 100));
@@ -461,7 +461,7 @@ export async function seedApi(api, home, now, s) {
       name: t.name,
       prompt: t.prompt,
       agent: 'claude',
-      cwd: t.cwd ?? path.join(home, 'Naget/Tasks'),
+      cwd: t.cwd ?? path.join(home, 'Hydor/Tasks'),
       model: 'sonnet',
       schedule: { kind: 'daily', time: t.time, ...(t.days ? { days: t.days } : {}) },
       ...(t.extra ? { extra: t.extra } : {}),

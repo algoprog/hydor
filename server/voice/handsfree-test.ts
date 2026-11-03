@@ -2,7 +2,7 @@
 // page's picks, a message sent, an approval answered, a session stopped, a reply read as its gist), plain
 // words understood without a helper, and the answer in the user's language. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/voice/handsfree-test.ts
-//   DATA_DIR=/tmp/naget-test-handsfree node dist/dev/handsfree-test.js
+//   DATA_DIR=/tmp/hydor-test-handsfree node dist/dev/handsfree-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,7 +21,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-handsfree-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-handsfree-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 setSettings(db, { taskRoot: path.join(tmp, 'Naget') });
 let passed = 0;

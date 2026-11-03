@@ -30,7 +30,7 @@ export interface StudioDoc {
   base?: string;
   /** A saved page's storage; a shown page keeps what it stores while on screen. */
   store: Store;
-  /** A template's screen: window.naget.app for it, in Use (the editor holds its scripts back). */
+  /** A template's screen: window.hydor.app for it, in Use (the editor holds its scripts back). */
   app?: AppBridge;
 }
 

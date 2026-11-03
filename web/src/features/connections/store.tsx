@@ -105,4 +105,4 @@ export function serverLine(a: CatalogApp): string {
   }
 }
 
-export const REPO_CATALOG = 'https://github.com/Naget-Inc/naget-agent/tree/main/catalog';
+export const REPO_CATALOG = 'https://github.com/algoprog/hydor/tree/main/catalog';

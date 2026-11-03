@@ -2,7 +2,7 @@
 // another order, the spaces around fragments), every shipped translation keeping its values, how much of
 // the app each language covers, and agents asked to write in the user's language. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/language/language-test.ts
-//   DATA_DIR=/tmp/naget-test-language node dist/dev/language-test.js
+//   DATA_DIR=/tmp/hydor-test-language node dist/dev/language-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,7 +21,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-language-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-language-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

@@ -187,7 +187,7 @@ export async function runSetup(name: string, r: PluginRequires, data: string, re
     if (Object.keys(r.npm).length) {
       const dir = nodeDir(data);
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'package.json'), `${JSON.stringify({ name: `naget-plugin-${name.replace(/\./g, '-')}`, private: true, dependencies: r.npm }, null, 2)}\n`);
+      fs.writeFileSync(path.join(dir, 'package.json'), `${JSON.stringify({ name: `hydor-plugin-${name.replace(/\./g, '-')}`, private: true, dependencies: r.npm }, null, 2)}\n`);
       await step(`Installing Node packages: ${Object.keys(r.npm).join(', ')}`, 'npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--omit=dev'], dir);
     }
     if (r.pip.length) {

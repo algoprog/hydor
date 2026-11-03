@@ -921,7 +921,7 @@ export class GitRepos {
       .split(/^(?=@@ )/m)
       .find((h) => h.replace(/\n+$/, '') === want);
     if (!found) throw new HttpError(409, 'The file changed since you looked: look at its changes again');
-    const tmp = path.join(os.tmpdir(), `naget-hunk-${crypto.randomBytes(6).toString('hex')}.patch`);
+    const tmp = path.join(os.tmpdir(), `hydor-hunk-${crypto.randomBytes(6).toString('hex')}.patch`);
     fs.writeFileSync(tmp, `${header}${found.replace(/\n*$/, '\n')}`);
     try {
       return this.result(repoPath, await git(repoPath, ['apply', '-R', '--whitespace=nowarn', '--', tmp], 20_000));

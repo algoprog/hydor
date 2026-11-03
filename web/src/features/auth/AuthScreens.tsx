@@ -4,23 +4,24 @@ import { post, type ApiError } from '../../lib/api';
 import { useApp } from '../../lib/store';
 import { Button, cx, IconButton, inputCls } from '../../components/ui';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Aurora, HeroMark, setupDone, TOUR_SETUP_STEPS, TourProgress } from '../tour/Tour';
+import { Aurora, setupDone, TOUR_SETUP_STEPS, TourProgress } from '../tour/Tour';
+import { Wordmark } from '../../components/Logo';
 
 const n = (i: number) => ({ '--i': i }) as CSSProperties;
 
-/** The sign-in screens: the mark draws itself over soft drifting light, then the card rises in. */
+/** The sign-in screens: the full logo over soft drifting light, then the card rises in. */
 function Shell({ title, sub, leaving, children }: { title: string; sub: ReactNode; leaving?: boolean; children: ReactNode }) {
   return (
     <div className="relative flex min-h-full items-center justify-center bg-bg px-4 py-10">
       <Aurora className="aurora-page" />
       <div className="relative w-full max-w-[380px]">
         <div className="mb-7 flex flex-col items-center gap-3.5 text-center">
-          <HeroMark size={52} />
           <div className="tour-rise">
-            <h1 className="text-[20px] font-semibold tracking-tight" style={n(3)}>
-              {title}
-            </h1>
-            <p className="mt-1 text-[14px] text-fg-3" style={n(4)}>
+            <h1 className="sr-only">{title}</h1>
+            <div className="flex justify-center text-fg" style={n(3)}>
+              <Wordmark height={28} />
+            </div>
+            <p className="mt-4 text-[14px] text-fg-3" style={n(4)}>
               {sub}
             </p>
           </div>
@@ -112,7 +113,7 @@ export function Login() {
   };
 
   return (
-    <Shell title="Naget Agent" sub="Sign in to continue.">
+    <Shell title="Hydor" sub="Sign in to continue.">
       <form onSubmit={submit} className="space-y-3">
         <div className="relative">
           <Lock size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
@@ -189,7 +190,7 @@ export function Setup() {
     }
   };
   return (
-    <Shell title="Welcome to Naget Agent" sub="Let’s get you set up. It takes about a minute." leaving={leaving}>
+    <Shell title="Welcome to Hydor" sub="Let’s get you set up. It takes about a minute." leaving={leaving}>
       <div className="mb-4 flex items-center gap-3">
         <TourProgress at={0} total={TOUR_SETUP_STEPS} />
         <span className="ml-auto text-[12px] text-fg-3">Step 1</span>
@@ -204,7 +205,7 @@ export function Setup() {
               <input className={`${input} pl-9 font-mono text-[13px]`} placeholder="Setup token" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" autoFocus />
             </div>
             <p className="mt-1.5 text-[11.5px] leading-snug text-fg-3">
-              Shows that you run this computer. It is in <span className="font-mono">setup-token</span> in the app’s data folder (<span className="font-mono">~/.naget-agent</span>), and in the link the server printed when it started.
+              Shows that you run this computer. It is in <span className="font-mono">setup-token</span> in the app’s data folder (<span className="font-mono">~/.hydor</span>), and in the link the server printed when it started.
             </p>
           </div>
         )}

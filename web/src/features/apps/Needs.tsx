@@ -1,6 +1,6 @@
 // Two parts of an app's Edit: the keys it needs (Settings: each by its name in the vault, what it is, where it may
 // go and where to get one; values are never part of the app), and its own files (Design: pictures, videos, sounds and
-// data its view shows as asset:<name>, which travel in its .naget-app). A file is kept as soon as it is picked; the app
+// data its view shows as asset:<name>, which travel in its .hydor-app). A file is kept as soon as it is picked; the app
 // names it once Edit saves.
 import { useRef, useState } from 'react';
 import { Copy, FileAudio, FileText, FileVideo, Plus, Trash2, Upload } from 'lucide-react';
@@ -115,7 +115,7 @@ export function FilesEditor({ recipe, onChange }: { recipe: AppRecipe; onChange:
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] leading-snug text-fg-3">
-        Its view shows one as <code className="rounded bg-bg-2 px-1 font-mono text-[11.5px]">asset:name</code> (in an image, video or audio block, or a template’s src). They travel in its .naget-app.
+        Its view shows one as <code className="rounded bg-bg-2 px-1 font-mono text-[11.5px]">asset:name</code> (in an image, video or audio block, or a template’s src). They travel in its .hydor-app.
       </p>
       {names.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">

@@ -6,7 +6,7 @@ category: documents
 
 # Spreadsheets
 
-First, the app's own spreadsheets: for a new one, make it with the `save_sheet` tool (naget-agent),
+First, the app's own spreadsheets: for a new one, make it with the `save_sheet` tool (hydor),
 with its formulas. It shows in the conversation, the user edits it in Pages (as in Excel or Google
 Sheets), and `export_page` writes it as an .xlsx, CSV or PDF file to hand over with `present_files`.
 Use this skill for what those lack (charts, conditional formatting, pivot tables, data validation, the
@@ -25,7 +25,7 @@ scripts in `scripts/` (next to this file):
 
 ## Reading one
 
-Use the `read_document` tool (naget-agent): every sheet comes as a table with its row numbers and
+Use the `read_document` tool (hydor): every sheet comes as a table with its row numbers and
 column letters, numbers as formatted, and some formulas. Big sheets show their first rows; for the
 whole of a big one, load it in Python: `load_workbook(path, read_only=True, data_only=True)` gives
 the values as last calculated (`data_only=False` gives the formulas). CSV: the `csv` module.

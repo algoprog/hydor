@@ -1,6 +1,6 @@
 # Agents, accounts and models
 
-Naget Agent runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI or OpenCode. This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
+Hydor runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI or OpenCode. This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
 
 ![Picking the agent on the start page: Claude Code, Codex or Custom](images/agents-models.webp)
 

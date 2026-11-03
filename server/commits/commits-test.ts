@@ -1,7 +1,7 @@
 // Script tests for the commits a turn made: reading git's "[main 1a2b3c4] subject" lines from the turn's
 // commands (in the session's folder, after a `cd`, with `git -C`), leaving out a commit amended away, and the
 // note under the turn that the commit's details come from. Build and run:
-//   OUTDIR=dist/dev node scripts/build-server.mjs server/commits/commits-test.ts && DATA_DIR=/tmp/naget-test-commits node dist/dev/commits-test.js
+//   OUTDIR=dist/dev node scripts/build-server.mjs server/commits/commits-test.ts && DATA_DIR=/tmp/hydor-test-commits node dist/dev/commits-test.js
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -20,7 +20,7 @@ if (!config.dataDir.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-commits-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-commits-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 const env = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 'Bea', GIT_AUTHOR_EMAIL: 'bea@example.com', GIT_COMMITTER_NAME: 'Bea', GIT_COMMITTER_EMAIL: 'bea@example.com' };
 const sh = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();

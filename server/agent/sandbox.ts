@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const RUNTIME = process.env.NAGET_AGENT_RUNTIME ?? '';
+const RUNTIME = process.env.HYDOR_RUNTIME ?? '';
 
 let bwrap: string | null | undefined;
 
@@ -71,7 +71,7 @@ export async function sandboxShell(cwd: string, mode: string): Promise<((command
   const tmp = real(os.tmpdir());
   const binds = [...new Set([real(cwd), tmp, '/tmp', gitDir(cwd)].filter((d): d is string => !!d && fs.existsSync(d)))];
   // Package managers keep their caches in the home folder, which is read-only here: these go to /tmp.
-  const cache = path.join(tmp, `naget-sandbox-${os.userInfo().uid}`);
+  const cache = path.join(tmp, `hydor-sandbox-${os.userInfo().uid}`);
   const env = {
     npm_config_cache: path.join(cache, 'npm'),
     YARN_CACHE_FOLDER: path.join(cache, 'yarn'),

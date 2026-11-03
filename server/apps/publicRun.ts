@@ -2,11 +2,11 @@
 // agent gets no shell, no files, none of the user's MCP servers, skills or instructions, and nothing the
 // app's other capabilities would tell it. Only a plan, the app's own tools that the run allows
 // (submit_result; web search when the owner allows it) and, with the web, Custom's page reader, which
-// reaches public addresses only. The apps capability asks for it through NAGET_AGENT_PUBLIC_RUN ("1",
+// reaches public addresses only. The apps capability asks for it through HYDOR_PUBLIC_RUN ("1",
 // or "web"). Imports nothing from the server: Custom's own process reads it.
 import type { ToolSchema } from '../agent/llm.ts';
 
-export const PUBLIC_RUN_ENV = 'NAGET_AGENT_PUBLIC_RUN';
+export const PUBLIC_RUN_ENV = 'HYDOR_PUBLIC_RUN';
 
 export interface PublicRun {
   /** Custom's own tools the run keeps. */

@@ -96,7 +96,7 @@ export function startPreviewServer(): http.Server | null {
     if (url.pathname === '/__ac/open') {
       const raw = url.searchParams.get('t') ?? '';
       const t = readLink<{ k: string; port: number; e: number }>(raw);
-      if (t?.k !== 'preview-open' || used.has(raw)) return page(res, 403, 'This preview link has expired. Open the preview again from Naget Agent.');
+      if (t?.k !== 'preview-open' || used.has(raw)) return page(res, 403, 'This preview link has expired. Open the preview again from Hydor.');
       used.set(raw, t.e);
       const https = req.headers['x-forwarded-proto'] === 'https' || String(req.headers['cf-visitor'] ?? '').includes('https');
       const session = signLink({ k: 'preview', port: t.port }, SESSION_MS);
@@ -108,7 +108,7 @@ export function startPreviewServer(): http.Server | null {
       return res.end();
     }
     const port = portOf(req);
-    if (!port) return page(res, 403, 'Open this preview from Naget Agent (Preview in the menu).');
+    if (!port) return page(res, 403, 'Open this preview from Hydor (Preview in the menu).');
     // localhost, trying both address families: dev servers listen on 127.0.0.1, ::1 or both.
     const opts = { host: 'localhost', port, autoSelectFamily: true, method: req.method, path: req.url, headers: forwarded(req, port) } as http.RequestOptions;
     const up = http.request(opts, (r) => {
@@ -180,7 +180,7 @@ export interface DevServer {
 /** What answers on a port: a web page (with its title and what made it) or something else. */
 async function probe(port: number): Promise<{ web: boolean; title?: string; hint: string }> {
   return new Promise((resolve) => {
-    const req = http.get({ host: 'localhost', port, path: '/', autoSelectFamily: true, timeout: 1500, headers: { accept: 'text/html', 'user-agent': 'NagetAgent-Preview' } } as http.RequestOptions, (r) => {
+    const req = http.get({ host: 'localhost', port, path: '/', autoSelectFamily: true, timeout: 1500, headers: { accept: 'text/html', 'user-agent': 'Hydor-Preview' } } as http.RequestOptions, (r) => {
       const type = String(r.headers['content-type'] ?? '');
       const hint = `${r.headers['x-powered-by'] ?? ''} ${r.headers.server ?? ''}`;
       // A page that says it is not there (an API's 404) is no web app to look at.

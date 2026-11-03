@@ -4,7 +4,7 @@
 /** macOS's answer for Screen Recording (Electron's getMediaAccessStatus). */
 export type ScreenAccess = 'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown';
 
-/** What macOS lets Naget Agent do; the programs its server starts do it in the app's name. */
+/** What macOS lets Hydor do; the programs its server starts do it in the app's name. */
 export interface ComputerPermissions {
   /** Accessibility: use the mouse and keyboard. */
   accessibility: boolean;

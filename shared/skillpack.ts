@@ -165,7 +165,7 @@ export interface SkillLibrary {
 export const SKILL_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 const clean = (s: string): string | null => {
-  const n = s.trim().replace(/^naget:/, '').replace(/^\/+/, '');
+  const n = s.trim().replace(/^(?:hydor|naget):/, '').replace(/^\/+/, '');
   return /^[\w.:-]{1,80}$/.test(n) ? n : null;
 };
 

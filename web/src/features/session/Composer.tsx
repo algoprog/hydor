@@ -181,8 +181,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
       setText((cur) => putText(cur, d.text, d.replace));
       ta.current?.focus();
     };
-    window.addEventListener('naget:compose', on);
-    return () => window.removeEventListener('naget:compose', on);
+    window.addEventListener('hydor:compose', on);
+    return () => window.removeEventListener('hydor:compose', on);
   }, [key]);
   useEffect(() => {
     const on = (e: Event) => {

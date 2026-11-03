@@ -1,6 +1,6 @@
 # Custom，应用自己的智能体
 
-Custom 是 Naget Agent 自己的智能体：它可以运行你添加的任何模型，无论来自 OpenRouter、Ollama、vLLM 还是其他兼容 OpenAI 的服务器，并且拥有和 Claude Code、Codex 相同的工具、技能和连接。本主题介绍它能做什么、它的权限模式以及它如何检查命令、自动模式、命令沙盒、目标、它如何应对长时间的工作和能力较弱的模型，以及它的设置。
+Custom 是 Hydor 自己的智能体：它可以运行你添加的任何模型，无论来自 OpenRouter、Ollama、vLLM 还是其他兼容 OpenAI 的服务器，并且拥有和 Claude Code、Codex 相同的工具、技能和连接。本主题介绍它能做什么、它的权限模式以及它如何检查命令、自动模式、命令沙盒、目标、它如何应对长时间的工作和能力较弱的模型，以及它的设置。
 
 ![设置 → 模型：辅助模型，以及这台电脑上的模型](images/custom.webp)
 

@@ -1,8 +1,8 @@
-// Writes naget-mac.json, which each release carries: the version, and for each Mac processor its build's
+// Writes hydor-mac.json, which each release carries: the version, and for each Mac processor its build's
 // address, size and SHA-512. The app's updater (server/updates.ts) reads it from the newest release and checks
 // the download against it.
-//   node mac/scripts/feed.mjs <version> <folder with the .zip builds>  >  naget-mac.json
-// Settings (environment): GITHUB_REPOSITORY (owner/name; default Naget-Inc/naget-agent)
+//   node mac/scripts/feed.mjs <version> <folder with the .zip builds>  >  hydor-mac.json
+// Settings (environment): GITHUB_REPOSITORY (owner/name; default algoprog/hydor)
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,10 +12,10 @@ if (!version || !dir) {
   console.error('usage: node feed.mjs <version> <folder with the .zip builds>');
   process.exit(2);
 }
-const repo = process.env.GITHUB_REPOSITORY || 'Naget-Inc/naget-agent';
+const repo = process.env.GITHUB_REPOSITORY || 'algoprog/hydor';
 const files = {};
 for (const name of fs.readdirSync(dir)) {
-  const m = /^Naget-Agent-(.+)-(arm64|x64)-mac\.zip$/.exec(name);
+  const m = /^Hydor-(.+)-(arm64|x64)-mac\.zip$/.exec(name);
   if (!m) continue;
   if (m[1] !== version) throw new Error(`${name} is not version ${version}`);
   const buf = fs.readFileSync(path.join(dir, name));

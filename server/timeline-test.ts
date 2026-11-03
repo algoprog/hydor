@@ -2,7 +2,7 @@
 // else than where it was expected (another account's folder) is found and read there, so the session's steps
 // end as done rather than showing running forever. Build and run with scratch folders:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/timeline-test.ts
-//   DATA_DIR=/tmp/naget-test-timeline CLAUDE_CONFIG_DIR=/tmp/naget-test-timeline/claude node dist/dev/timeline-test.js
+//   DATA_DIR=/tmp/hydor-test-timeline CLAUDE_CONFIG_DIR=/tmp/hydor-test-timeline/claude node dist/dev/timeline-test.js
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -16,7 +16,7 @@ if (!config.dataDir.startsWith('/tmp/') || !config.claudeProjectsDir.startsWith(
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-timeline-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-timeline-test-'));
 const account = path.join(tmp, 'account', 'projects');
 agentRoots.claudeProjects = [config.claudeProjectsDir, account];
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));

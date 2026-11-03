@@ -388,7 +388,7 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
       case 'form':
       case 'runs':
       case 'chat': {
-        if (!(window as any).naget?.app) return `<p class="n-ui-note">${esc(L('ownPage', 'This shows on the app’s own page.'))}</p>`;
+        if (!(window as any).hydor?.app) return `<p class="n-ui-note">${esc(L('ownPage', 'This shows on the app’s own page.'))}</p>`;
         const flow = typeof w.flow === 'string' ? w.flow : 'run';
         if (name === 'form') return `<n-form flow="${esc(flow)}"${w.submit ? ` submit="${esc(w.submit)}"` : ''}${w.keep ? ' keep' : ''}></n-form>`;
         if (name === 'runs') return `<n-runs flow="${esc(flow)}" limit="${esc(String(w.limit ?? 5))}"></n-runs>`;

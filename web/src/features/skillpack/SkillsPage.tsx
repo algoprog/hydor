@@ -525,7 +525,7 @@ function HowItWorks({ lib, onClose }: { lib: SkillLibrary; onClose: () => void }
       <div className="space-y-3 pb-2 text-[13.5px] leading-relaxed text-fg-2">
         <p>A skill is a written method for one kind of work. Agents see each skill’s name and when to use it, and read the rest only when a task calls for it.</p>
         <p>
-          Every session this app starts gets the built-in skills, yours and your plugins’: Claude Code as its plugin “naget” (they show as naget:research and so on), Codex as an extra skills folder, Custom
+          Every session this app starts gets the built-in skills, yours and your plugins’: Claude Code as its plugin “hydor” (they show as hydor:research and so on), Codex as an extra skills folder, Custom
           in its skills list, and other agents as a list of files to read. Claude Code’s and Codex’s own skills stay theirs. Sessions started outside the app do not get these.
         </p>
         <p>

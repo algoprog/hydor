@@ -1,6 +1,6 @@
 # Custom, the app's own agent
 
-Custom is Naget Agent's own agent: it runs any model you add, from OpenRouter, Ollama, vLLM or another OpenAI-compatible server, with the same tools, skills and connections as Claude Code and Codex. This topic covers what it can do, its permission modes and how it checks commands, Auto mode, the sandbox for commands, goals, how it copes with long work and weaker models, and its settings.
+Custom is Hydor's own agent: it runs any model you add, from OpenRouter, Ollama, vLLM or another OpenAI-compatible server, with the same tools, skills and connections as Claude Code and Codex. This topic covers what it can do, its permission modes and how it checks commands, Auto mode, the sandbox for commands, goals, how it copes with long work and weaker models, and its settings.
 
 ![Settings → Models: the helper model, and models on this computer](images/custom.webp)
 

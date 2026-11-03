@@ -235,7 +235,7 @@ export async function writeCaption(db: DB, d: Pick<Deps, 'models'>, m: MediaItem
   const fallback = { title: titleFrom({ ...m, name: m.source ? path.basename(m.source) : undefined }), description: (m.prompt ?? '').replace(/\s+/g, ' ').trim().slice(0, 600) };
   const w = await captionWriter(db, d).catch((e) => ({ why: String((e as Error).message ?? e) }));
   if ('why' in w) return { ...fallback, error: w.why };
-  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'naget-caption-'));
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hydor-caption-'));
   try {
     const pic = await pictureOf(m, tmp);
     if (!pic) return { ...fallback, error: m.kind === 'video' ? 'ffmpeg is not on this computer, so the video’s frames could not be taken.' : 'The picture could not be read.' };

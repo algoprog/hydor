@@ -8,7 +8,7 @@ from datasets import load_dataset
 
 PY, WORKER, OUT, DATA = sys.argv[1:5]
 env = {k: os.environ[k] for k in ('PATH', 'HOME', 'LANG') if k in os.environ}
-env.update(NAGET_EMBED_DEVICE='cpu', NAGET_EMBED_THREADS='4', CUDA_VISIBLE_DEVICES='', PYTHONDONTWRITEBYTECODE='1', HF_HUB_DISABLE_PROGRESS_BARS='1', TOKENIZERS_PARALLELISM='false', TRANSFORMERS_VERBOSITY='error')
+env.update(HYDOR_EMBED_DEVICE='cpu', HYDOR_EMBED_THREADS='4', CUDA_VISIBLE_DEVICES='', PYTHONDONTWRITEBYTECODE='1', HF_HUB_DISABLE_PROGRESS_BARS='1', TOKENIZERS_PARALLELISM='false', TRANSFORMERS_VERBOSITY='error')
 t0 = time.time()
 p = subprocess.Popen([PY, '-I', WORKER], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env, text=True, bufsize=1)
 

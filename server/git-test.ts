@@ -4,7 +4,7 @@
 // (continued once settled, or stopped), the history with parents, branches and tags and its search, branches
 // (rename, merge, compare, what deleting one loses), revert and undo, stashes, putting back one part of a
 // file's changes, ignoring a file, and which addresses a clone takes. Build and run:
-//   OUTDIR=dist/dev node scripts/build-server.mjs server/git-test.ts && DATA_DIR=/tmp/naget-test-git node dist/dev/git-test.js
+//   OUTDIR=dist/dev node scripts/build-server.mjs server/git-test.ts && DATA_DIR=/tmp/hydor-test-git node dist/dev/git-test.js
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ if (!config.dataDir.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-git-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-git-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 const repos = new GitRepos(db);
 

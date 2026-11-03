@@ -27,5 +27,5 @@ export function noticeLine(n: { kind: NotifyEvent['kind']; body?: string }): { s
  */
 export function noticeText(n: NotifyEvent, tr: (s: string) => string = (s) => s): { title: string; body: string } {
   const { status, detail } = noticeLine(n);
-  return { title: shortTitle(n.title || 'Naget Agent'), body: detail ? `${tr(status)} · ${n.kind === 'failed' ? tr(detail) : detail}` : tr(status) };
+  return { title: shortTitle(n.title || 'Hydor'), body: detail ? `${tr(status)} · ${n.kind === 'failed' ? tr(detail) : detail}` : tr(status) };
 }

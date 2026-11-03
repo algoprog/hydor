@@ -1,8 +1,8 @@
 // The app's side of a page's frame (/htmlframe, sandboxed; the bridge inside is server/pages/kit.ts).
 // It posts the page with a fresh number each time the frame is ready, and takes only messages from
 // that frame, carrying that number, of a known shape and size: the page's height, a choice or a form
-// to put in the message box, and calls of window.naget.storage, which a store answers. A template's
-// screen also gets window.naget.app: its calls are answered here, for that template only (its runs,
+// to put in the message box, and calls of window.hydor.storage, which a store answers. A template's
+// screen also gets window.hydor.app: its calls are answered here, for that template only (its runs,
 // its data), and what changes in them is passed on to it.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
@@ -148,7 +148,7 @@ function chatOf(appId: string, d: ChatDetail) {
   return { id: d.run.id, status: d.run.status, working: busy, messages: msgs, ...(d.run.error ? { error: d.run.error } : {}) };
 }
 
-/** One call of a screen's window.naget.app (or a view's), for its own template: its flows' runs and its data. */
+/** One call of a screen's window.hydor.app (or a view's), for its own template: its flows' runs and its data. */
 export function appCall(appId: string, op: string, a: Record<string, unknown>): Promise<unknown> {
   const id = enc(appId);
   const col = () => {
@@ -404,7 +404,7 @@ export function PageFrame({
   className?: string;
   /** The frame fills a space of its own (over everything), rather than growing with the page. */
   fill?: boolean;
-  /** A template's screen: window.naget.app, for that template. */
+  /** A template's screen: window.hydor.app, for that template. */
   app?: AppBridge;
   /** An app's view, drawn in the page by the view's kit. */
   ui?: UiBridge;

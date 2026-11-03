@@ -175,7 +175,7 @@ function routes(d: Deps) {
       .header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'")
       .type('text/html; charset=utf-8')
       .send(
-        `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Naget Agent</title><body style="font:15px/1.5 system-ui,sans-serif;max-width:420px;margin:15vh auto;padding:0 20px;color:#222"><p>${(r.error ?? 'Signing in did not finish.').replace(/[<>&]/g, '')}</p><p><a href="/apps/connected">Back to Connected apps</a></p></body>`,
+        `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hydor</title><body style="font:15px/1.5 system-ui,sans-serif;max-width:420px;margin:15vh auto;padding:0 20px;color:#222"><p>${(r.error ?? 'Signing in did not finish.').replace(/[<>&]/g, '')}</p><p><a href="/apps/connected">Back to Connected apps</a></p></body>`,
       );
   });
 

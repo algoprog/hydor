@@ -1,6 +1,6 @@
 # 智能体、账户和模型
 
-Naget Agent 可以运行好几种 AI 智能体：Claude Code、Codex、Custom（应用自己的智能体，可用于任何模型），以及其他支持 ACP 的智能体，比如 Gemini CLI 或 OpenCode。本主题会讲它们有什么不同、它们的程序如何安装并保持最新、如何登录它们（包括登录多个账户），以及 Custom 的模型从哪里来：OpenRouter、Ollama、在这台电脑上运行的 Hugging Face 模型，或者任何兼容 OpenAI 的端点。
+Hydor 可以运行好几种 AI 智能体：Claude Code、Codex、Custom（应用自己的智能体，可用于任何模型），以及其他支持 ACP 的智能体，比如 Gemini CLI 或 OpenCode。本主题会讲它们有什么不同、它们的程序如何安装并保持最新、如何登录它们（包括登录多个账户），以及 Custom 的模型从哪里来：OpenRouter、Ollama、在这台电脑上运行的 Hugging Face 模型，或者任何兼容 OpenAI 的端点。
 
 ![在开始页面选智能体：Claude Code、Codex 或 Custom](images/agents-models.webp)
 

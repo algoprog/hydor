@@ -703,7 +703,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   parts.push({ name: 'docProps/core.xml', data: coreXml(o.title) });
   parts.push({
     name: 'docProps/app.xml',
-    data: `${XML_HEAD}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Naget Agent</Application><PresentationFormat>${deck.ratio === '4:3' ? 'Custom' : 'Widescreen'}</PresentationFormat><Slides>${slides.length}</Slides><Notes>${slides.filter((s) => s.notes).length}</Notes></Properties>`,
+    data: `${XML_HEAD}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Hydor</Application><PresentationFormat>${deck.ratio === '4:3' ? 'Custom' : 'Widescreen'}</PresentationFormat><Slides>${slides.length}</Slides><Notes>${slides.filter((s) => s.notes).length}</Notes></Properties>`,
   });
 
   const presRels = new Rels();
@@ -723,7 +723,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   parts.push({ name: 'ppt/presProps.xml', data: `${XML_HEAD}<p:presentationPr ${NS}/>` });
   parts.push({ name: 'ppt/viewProps.xml', data: `${XML_HEAD}<p:viewPr ${NS}><p:normalViewPr><p:restoredLeft sz="15620"/><p:restoredTop sz="94660"/></p:normalViewPr><p:gridSpacing cx="76200" cy="76200"/></p:viewPr>` });
   parts.push({ name: 'ppt/tableStyles.xml', data: `${XML_HEAD}<a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>` });
-  parts.push({ name: 'ppt/theme/theme1.xml', data: themeXml(t.id ? `Naget ${t.id}` : 'Naget', t) });
+  parts.push({ name: 'ppt/theme/theme1.xml', data: themeXml(t.id ? `Hydor ${t.id}` : 'Hydor', t) });
   parts.push({ name: 'ppt/slideMasters/slideMaster1.xml', data: masterXml(t) });
   parts.push({
     name: 'ppt/slideMasters/_rels/slideMaster1.xml.rels',

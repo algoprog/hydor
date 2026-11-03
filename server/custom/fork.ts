@@ -16,7 +16,7 @@ import { HttpError } from '../auth.ts';
 import { acpText } from '../history/acp.ts';
 import { MODELS_DIR } from '../models/config.ts';
 
-/** Where Custom keeps its sessions' state (its NAGET_AGENT_STATE). */
+/** Where Custom keeps its sessions' state (its HYDOR_STATE). */
 export const STATE_DIR = path.join(MODELS_DIR, 'sessions');
 const stateFile = (id: string) => path.join(STATE_DIR, `${id.replace(/[^\w-]/g, '')}.json`);
 

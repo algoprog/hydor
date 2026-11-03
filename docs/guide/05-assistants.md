@@ -242,7 +242,7 @@ An imported file shows **Update** instead of **Import** in the list. **Update** 
 
 ## Task folders: where a task without a folder works
 
-Many tasks don't belong in any folder: a trip plan, a letter, a question. For those, the folder chip on the start page shows **New task folder**, and when you press **Start** the app makes a fresh folder for the session, named by the day and a few words of your message, such as `~/Naget/2026-10-31-plan-trip-lisbon`. The agent saves its work there, and you find it again in [Files](/files).
+Many tasks don't belong in any folder: a trip plan, a letter, a question. For those, the folder chip on the start page shows **New task folder**, and when you press **Start** the app makes a fresh folder for the session, named by the day and a few words of your message, such as `~/Hydor/2026-10-31-plan-trip-lisbon`. The agent saves its work there, and you find it again in [Files](/files).
 
 How the name is made:
 
@@ -254,7 +254,7 @@ How the name is made:
 
 Open the folder chip on the start page:
 
-- **New task folder** ("in ~/Naget") makes a fresh folder for each session.
+- **New task folder** ("in ~/Hydor") makes a fresh folder for each session.
 - Pick a project, a folder you used lately, or any folder you find by typing its name or path, and the session works there instead (see [Projects](/guide/spaces) and [Sessions](/guide/sessions)).
 
 Until you choose, the assistant decides: the built-ins other than Coder, and your own set to "A new task folder", use a task folder; Coder and assistants set to "The folder on the start page" use the folder shown. The start page remembers what you chose. Picking another assistant hands the choice back to it, unless you picked a folder since the page opened.
@@ -266,7 +266,7 @@ Task folders don't crowd the folder menu: the folders used lately that it lists 
 1. In [Settings → Capabilities → Assistants](/settings?s=assistants&find=Task%20folders), find **Task folders** ("A session started without a folder gets a new one here, named by the day and the task").
 2. Click the folder's name. Under **Folder to work in**, type a path (it suggests folders as you type, and folders you used lately) and click **Use this folder**. Give a full path, or one starting with `~` for your home folder.
 
-New task folders go there from then on; folders already made stay where they are. **Back to ~/Naget** appears once you've changed it, to go back to the default. The line under it shows what new ones look like. New projects that get a folder of their own get it here too, in a **Projects** folder inside (see [Projects](/guide/spaces)).
+New task folders go there from then on; folders already made stay where they are. **Back to ~/Hydor** appears once you've changed it, to go back to the default. The line under it shows what new ones look like. New projects that get a folder of their own get it here too, in a **Projects** folder inside (see [Projects](/guide/spaces)).
 
 ## Clean up after a task
 

@@ -1,8 +1,8 @@
 # Remote access
 
-Using Naget Agent from your phone or another computer. [Back to the README](../README.md).
+Using Hydor from your phone or another computer. [Back to the README](../README.md).
 
-Naget Agent can run any command as your user, so treat access to it like SSH access to your machine.
+Hydor can run any command as your user, so treat access to it like SSH access to your machine.
 It listens on `127.0.0.1` only by default. To use it from your phone or another computer, put an HTTPS
 layer in front instead of opening the port:
 

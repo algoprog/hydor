@@ -84,7 +84,7 @@ Bars week by week can be drawn with formulas, one column per week. The full layo
 `save_sheet` example, is in `references/plan-sheet.md`.
 
 **A page** with `save_page` when the plan is looked at more than edited: bars on a timeline,
-milestones, a line for today, and tasks ticked off and kept with `naget.storage`; it opens on a
+milestones, a line for today, and tasks ticked off and kept with `hydor.storage`; it opens on a
 phone at its own address.
 
 ## 7. Keep it up to date

@@ -6,7 +6,7 @@
 // the setting. Sessions are a stub.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/swarm/swarm-test.ts
-//   DATA_DIR=/tmp/naget-test-swarm PRICES_URL= node dist/dev/swarm-test.js
+//   DATA_DIR=/tmp/hydor-test-swarm PRICES_URL= node dist/dev/swarm-test.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -29,7 +29,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '')
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-swarm-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-swarm-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

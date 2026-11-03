@@ -3,7 +3,7 @@
 // where its settings say nothing, the clean-up of inactive sessions (the setting, and what it leaves alone), and
 // Activity by agent (Custom by name) and by model. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/keep/keep-test.ts
-//   DATA_DIR=/tmp/naget-test-keep node dist/dev/keep-test.js
+//   DATA_DIR=/tmp/hydor-test-keep node dist/dev/keep-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,7 +21,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-keep-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-keep-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

@@ -75,7 +75,7 @@ export function SearchSettings() {
       </Section>
       <p className="px-1 text-[12.5px] leading-relaxed text-fg-3">
         Search results and pages are outside data: agents are told to use them as information, never as instructions. Another provider can be added in one file:{' '}
-        <a className="text-accent hover:underline" href="https://github.com/Naget-Inc/naget-agent/blob/main/docs/search-providers.md" target="_blank" rel="noreferrer">
+        <a className="text-accent hover:underline" href="https://github.com/algoprog/hydor/blob/main/docs/search-providers.md" target="_blank" rel="noreferrer">
           how to add a provider
         </a>
         .

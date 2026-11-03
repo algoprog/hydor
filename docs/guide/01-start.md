@@ -1,12 +1,12 @@
 # Getting started
 
-This topic shows you around Naget Agent: what it is, what is on the screen, how to start your first session, how to find anything with the search box, and how to use the app on a phone. It ends with every keyboard shortcut in one table.
+This topic shows you around Hydor: what it is, what is on the screen, how to start your first session, how to find anything with the search box, and how to use the app on a phone. It ends with every keyboard shortcut in one table.
 
 ![The app: the sidebar with your sessions on the left, and the start page, where you say what you want done](images/start.webp)
 
-## What Naget Agent is
+## What Hydor is
 
-Naget Agent runs AI agents on your own computer, and you use them from any browser, at your desk or on your phone. An agent is a program that works on a task for you: it reads and writes files, runs commands, searches the web and tells you what it did. You can use Claude Code and Codex with your own subscriptions, Custom (the app's own agent, which works with any model, including open models on your own computer), and other agents such as Gemini CLI or OpenCode. Each conversation with an agent is a **session**. Sessions keep running when you close the page, so you can start one at your desk and answer it from your phone. Many people use it for code, but it helps with anything: research, writing, documents, planning and everyday tasks.
+Hydor runs AI agents on your own computer, and you use them from any browser, at your desk or on your phone. An agent is a program that works on a task for you: it reads and writes files, runs commands, searches the web and tells you what it did. You can use Claude Code and Codex with your own subscriptions, Custom (the app's own agent, which works with any model, including open models on your own computer), and other agents such as Gemini CLI or OpenCode. Each conversation with an agent is a **session**. Sessions keep running when you close the page, so you can start one at your desk and answer it from your phone. Many people use it for code, but it helps with anything: research, writing, documents, planning and everyday tasks.
 
 ## Find your way around
 
@@ -14,7 +14,7 @@ The screen has two parts: the **sidebar** on the left, and the page you are on (
 
 ### The top of the sidebar
 
-- **Naget Agent**, with the logo. A crossed-out Wi-Fi icon appears beside the name while the page reconnects to the app.
+- **Hydor**, with the logo. A crossed-out Wi-Fi icon appears beside the name while the page reconnects to the app.
 - **Inbox** (the tray icon): everything waiting on you, such as approvals, questions and forms, from every session, scheduled task and machine. A number on its corner says how many sessions wait on you right now. See [Inbox and notifications](/guide/inbox).
 - **Hide sidebar** (Ctrl+B). While the sidebar is hidden, the button at the top left of each page shows it again. On a phone this button is **Close menu**.
 - A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
@@ -47,7 +47,7 @@ Each row shows the agent's icon with a status dot, the session's title, and a se
 - a target: the session has a goal;
 - a pin: it is pinned (in the **Pinned** group, which says so, there is none).
 
-While Custom works or starts, its working indicator uses the Naget loading animation instead of a rotating agent icon. Loading marks sit vertically centred beside their text.
+While Custom works or starts, its working indicator uses the Hydor loading animation (water rising and falling in its Ω) instead of a rotating agent icon. Loading marks sit vertically centred beside their text.
 
 The status dot says how a session is doing:
 
@@ -59,7 +59,7 @@ The status dot says how a session is doing:
 | Grey | Open in VS Code or a terminal, and idle there |
 | No dot | Stopped: the agent is not running; your next message starts it again |
 
-The browser tab shows how many sessions wait on you, as in "(2) Naget Agent".
+The browser tab shows how many sessions wait on you, as in "(2) Hydor".
 
 Sessions that an agent started for parts of its job (child sessions) sit folded under it, with a line such as "3 child sessions · 1 needs you · 2 working"; click it to see them. See [Child sessions](/guide/sessions#child-sessions).
 
@@ -102,7 +102,7 @@ Everything on the start page is explained in [Start a session](/guide/sessions#s
 4. Press **Folder** and pick where the agent works:
    - one of the folders you used last, or another one: type its name or its path in **Find a folder, or type its path**;
    - a project, by its name, to work in that project's folder with its documents and guidelines;
-   - **New task folder**, for a fresh folder named after your task (in `~/Naget` unless you change it in [Settings → Capabilities → Assistants](/settings?s=assistants&find=Task%20folders)).
+   - **New task folder**, for a fresh folder named after your task (in `~/Hydor` unless you change it in [Settings → Capabilities → Assistants](/settings?s=assistants&find=Task%20folders)).
 
    Most assistants start in a new task folder unless you pick a folder; Coder works in the folder you pick.
 5. Type what you want done in the message box: describe a task, ask a question or paste an error. Add files with the paperclip, or drop them on the box. Files already on this computer come along from the Files page: **Start a session with it** in a file's menu (see [Start a session with files](/guide/files-git#start-a-session-with-files)).
@@ -118,7 +118,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 
 ### What it finds
 
-- **Go to**: Naget Agent's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Projects, Shared knowledge, Library, Pictures, Videos, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
+- **Go to**: Hydor's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Projects, Shared knowledge, Library, Pictures, Videos, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
 - **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or project, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.

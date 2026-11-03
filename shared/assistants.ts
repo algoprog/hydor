@@ -143,8 +143,8 @@ export const CLAUDE_TOOLS: Record<ToolKind, string[]> = {
   mcp: [],
 };
 
-/** The app's own session server (Custom spells it naget_agent in tool names); its tools are the app's capabilities. */
-const APP_SERVERS = ['naget-agent', 'naget_agent'];
+/** The app's own session server (hydor; naget-agent, or Custom's naget_agent, before the rename); its tools are the app's capabilities. */
+const APP_SERVERS = ['hydor', 'naget-agent', 'naget_agent'];
 
 /** How Custom writes a server's name inside its tools' names. */
 const cleanServer = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '_');
@@ -160,7 +160,7 @@ function kindByName(n: string): ToolKind | null {
 
 /**
  * Which kind a tool is, by its name: one of Custom's own (read_file, bash…), one of the app's own (Custom
- * calls them by their short names, web_search; elsewhere "mcp__naget-agent__web_search"), or another MCP
+ * calls them by their short names, web_search; elsewhere "mcp__hydor__web_search"), or another MCP
  * server's ("mcp__server__tool"). Null for those always there: the plan, skills, the app's own tools beyond
  * the web and files (pages, memory…), and those of `given` servers (the connections the app gave the
  * session), which have their own settings. Other MCP servers, the user's own, are "mcp".

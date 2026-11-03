@@ -20,7 +20,7 @@ import { LOCALE } from '../../i18n/locale';
 type Block = { kind: 'item'; item: TimelineItem } | { kind: 'group'; id: string; items: TimelineItem[] };
 
 /**
- * Custom works with Naget's loading mark; other agents keep their own animation. `name`: an agent of Settings → More
+ * Custom works with Hydor's loading mark; other agents keep their own animation. `name`: an agent of Settings → More
  * agents by name, for a session not in the list yet (one starting); otherwise the session's own.
  */
 function WorkingIcon({ agent, name, size, spinning, className }: { agent: Agent; name?: string; size: number; spinning?: boolean; className?: string }) {

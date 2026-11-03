@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Packs the Mac app from what scripts/stage.sh put in build/: dist/Naget-Agent-<version>-<arch>-mac.zip (what the
+# Packs the Mac app from what scripts/stage.sh put in build/: dist/Hydor-<version>-<arch>-mac.zip (what the
 # app's updater downloads) and .dmg (what people download). The version is the repository's (package.json).
 set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"

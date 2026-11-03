@@ -40,7 +40,7 @@ interface Call {
 
 /** A tool call as a tool step would make it (Claude's own web tools as the app's), "around" for one that is not part of the work, or null for one no step can make. */
 export function asStepCall(t: ToolItem['tool']): Call | 'around' | null {
-  const n = t.name.replace(/^mcp__(?:naget-agent|agent-console)__/, '');
+  const n = t.name.replace(/^mcp__(?:hydor|naget-agent|agent-console)__/, '');
   if (AROUND.has(n)) return 'around';
   const i = (t.input && typeof t.input === 'object' ? t.input : {}) as Record<string, unknown>;
   if (n === 'WebFetch') return typeof i.url === 'string' ? { tool: 'read_page', with: { url: i.url } } : null;

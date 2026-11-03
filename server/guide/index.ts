@@ -21,7 +21,7 @@ const SECTION_MAX = 4500;
 const TOPIC_MAX = 40_000;
 
 function contents(topics: GuideTopic[], base: string): string {
-  const lines = [`Naget Agent’s guide (${base}/guide): its topics and their sections.`];
+  const lines = [`Hydor’s guide (${base}/guide): its topics and their sections.`];
   for (const t of topics) {
     lines.push('', `- ${t.id} · ${t.title}${AGENT_TOPICS.includes(t.id) ? ' (for agents)' : ''}: ${t.summary.slice(0, 220)}`);
     if (t.sections.length) lines.push(`  ${t.sections.map((s) => `${s.title} [${s.id}]`).join(' · ')}`);
@@ -34,7 +34,7 @@ const APP_GUIDE: RunTool = {
   name: 'app_guide',
   annotations: { readOnlyHint: true },
   description: [
-    'The guide to Naget Agent, the app you run in: what every part of it does, where each setting is and how to use it, as the user sees it.',
+    'The guide to Hydor, the app you run in: what every part of it does, where each setting is and how to use it, as the user sees it.',
     'Use it to answer the user’s questions about the app (how do I…, where is…, what does … do, why…), and before changing something in the app with app_api: its topic "api" lists the app’s endpoints and their bodies.',
     'With no arguments: the topics and their sections. query: the sections that answer a question, in full. topic (and section): a whole topic, or one section.',
     'Answer from it in the user’s language, briefly, with the steps and the place in the app; its links are the app’s own addresses, ready to give the user.',
@@ -85,7 +85,7 @@ const APP_GUIDE: RunTool = {
 const APP_API: RunTool = {
   name: 'app_api',
   description: [
-    'Do in Naget Agent what the user could do in its pages: read its state, change a setting, or make, change and delete things (projects, assistants, scheduled tasks, apps, pages, memory notes, connections, guidelines…), through the app’s own API as the signed-in user.',
+    'Do in Hydor what the user could do in its pages: read its state, change a setting, or make, change and delete things (projects, assistants, scheduled tasks, apps, pages, memory notes, connections, guidelines…), through the app’s own API as the signed-in user.',
     'app_guide topic "api" lists the endpoints and their bodies; read the current state (GET) before changing it.',
     'Reading runs at once. A change shows the user a card with what changes (before → after) and waits for their answer, up to about nine minutes; give summary, the change in a few plain words, as its title.',
     'To have the user fill in or check details on that card, give form: fields as a JSON schema’s properties, each named by its address in body ("name", "settings.results") and filled in from body; their answers go into body.',
@@ -138,14 +138,14 @@ const ASK_FORM: RunTool = {
 
 /** Every agent hears of the tools: Claude Code sees an MCP tool's name only until it looks it up. */
 export const GUIDE_INSTRUCTIONS =
-  'Naget Agent, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask you to change one of its settings or to make, change or remove something in it (a project, an assistant, a scheduled task, an app, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound) change with app_api on /device.';
+  'Hydor, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask you to change one of its settings or to make, change or remove something in it (a project, an assistant, a scheduled task, an app, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound) change with app_api on /device.';
 
 /** A question asked on the Help page (`extra.help`: true, or the topic open there): the session is about the app. */
 export function helpInstructions(help: unknown): string | null {
   if (!help) return null;
   const topic = typeof help === 'string' ? guideTopics().find((t) => t.id === help) : undefined;
   return [
-    `The user asked this from the app's Help page${topic ? `, while reading the guide's topic "${topic.title}" (${topic.id})` : ''}: their message is about Naget Agent.`,
+    `The user asked this from the app's Help page${topic ? `, while reading the guide's topic "${topic.title}" (${topic.id})` : ''}: their message is about Hydor.`,
     'Answer from the guide (app_guide), not from memory: briefly, in a few short paragraphs or numbered steps, in their language, with the place in the app as a link and the guide section that says more (/guide/<topic>#<section>).',
     'If they ask you to change a setting or set something up, do it with app_api as usual. Keep to the app: this session works in their home folder only because it needs one.',
   ].join(' ');

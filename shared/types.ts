@@ -425,14 +425,14 @@ export interface NotifyEvent {
   url?: string;
 }
 
-/** Another machine running Naget Agent that this one uses (Settings → Machines); its token stays on the server. */
+/** Another machine running Hydor that this one uses (Settings → Machines); its token stays on the server. */
 export interface MachineView {
   /** Its pages are /m/<id>/… */
   id: string;
   name: string;
   via: 'url' | 'ssh';
   url?: string;
-  /** SSH host (from ~/.ssh/config, or user@host) and the port Naget Agent listens on there. */
+  /** SSH host (from ~/.ssh/config, or user@host) and the port Hydor listens on there. */
   ssh?: string;
   port?: number;
   status: MachineStatus;
@@ -440,7 +440,7 @@ export interface MachineView {
 
 export interface MachineStatus {
   state: 'connecting' | 'online' | 'offline';
-  /** Its hostname and Naget Agent version, once reached. */
+  /** Its hostname and Hydor version, once reached. */
   host?: string;
   version?: string;
   error?: string;

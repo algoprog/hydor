@@ -490,7 +490,7 @@ const NOTIFY_USER: RunTool = {
     if (recent.length >= 5) throw new Error('Five notifications in ten minutes is the most: put the rest in your answer');
     sentLately.set(ctx.key, [...recent, now]);
     const s = ctx.deps.sessions.summary(ctx.key);
-    const title = String(a.title ?? '').trim().slice(0, 80) || ctx.notice?.title || s?.title || 'Naget Agent';
+    const title = String(a.title ?? '').trim().slice(0, 80) || ctx.notice?.title || s?.title || 'Hydor';
     // Straight out, not as a session's turn notice (a scheduled run's gate would take it for the run's own).
     ctx.deps.sessions.emit('notify', { key: ctx.key, kind: 'done', title, body: message, agent: ctx.agent, at: now, ...(ctx.notice ? { url: ctx.notice.url } : s ? {} : { url: '/' }) } satisfies NotifyEvent);
     return 'Sent.';

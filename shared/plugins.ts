@@ -1,5 +1,5 @@
 // Plugins, shared by the server and the pages. A plugin is a folder in the open Agent Plugins 1.0 format
-// (agent-plugins.org): a plugin.json, skills in skills/ and MCP servers in mcp.json. Naget Agent reads
+// (agent-plugins.org): a plugin.json, skills in skills/ and MCP servers in mcp.json. Hydor reads
 // Claude Code's plugin layout too (.claude-plugin/plugin.json, .mcp.json). What only this app does (other
 // plugins and packages a plugin needs, files to download, keys, instructions for every agent) goes under
 // the manifest's extension "com.naget.agent" and the folder of that name. Every agent the app runs gets an
@@ -8,7 +8,7 @@
 export const AGENT_PLUGINS_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json';
 export const AGENT_PLUGINS_MCP_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json';
 /** The manifest extension and folder this app reads (Agent Plugins §8). */
-export const NAGET_EXT = 'com.naget.agent';
+export const HYDOR_EXT = 'com.naget.agent';
 
 /** A plugin's name (Agent Plugins §5.5): lowercase letters, digits, dashes and dots, no -- or .., letters or digits at both ends. */
 export function validPluginName(n: unknown): n is string {

@@ -896,7 +896,7 @@ export class SessionManager extends EventEmitter {
     if (!fs.existsSync(transcript)) fs.writeFileSync(transcript, JSON.stringify({ t: 'meta', ts: Date.now(), agent: def.id, name: def.name, cwd }) + '\n', { mode: 0o600 });
     const runId = crypto.randomBytes(6).toString('hex');
     // Console asks the app to get its model ready (start a vLLM server) at this run's own address.
-    if (def.id === CONSOLE_ID) env.NAGET_AGENT_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
+    if (def.id === CONSOLE_ID) env.HYDOR_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
     const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt });
     Object.assign(env, add.env);
     const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, pageServer: pageServerUrl(runId), add };

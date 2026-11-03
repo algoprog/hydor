@@ -1,6 +1,6 @@
 # Installation
 
-How to run Naget Agent as the Mac app, with Docker or as a service of your user, and keep it up to date. [Back to the README](../README.md).
+How to run Hydor as the Mac app, with Docker or as a service of your user, and keep it up to date. [Back to the README](../README.md).
 
 ## Requirements
 
@@ -21,27 +21,27 @@ How to run Naget Agent as the Mac app, with Docker or as a service of your user,
 
 ## The Mac app
 
-Download `Naget-Agent-<version>-arm64-mac.dmg` (Apple silicon) or `…-x64-mac.dmg` (Intel) from the
-[Releases page](https://github.com/Naget-Inc/naget-agent/releases/latest), open it and drag **Naget Agent** to
+Download `Hydor-<version>-arm64-mac.dmg` (Apple silicon) or `…-x64-mac.dmg` (Intel) from the
+[Releases page](https://github.com/algoprog/hydor/releases/latest), open it and drag **Hydor** to
 **Applications**. Open it from there: its window opens on the page where you choose a password, and the welcome
 tour does the rest. Until the releases are signed with an Apple Developer ID, macOS asks the first time whether
 to open an app from an unidentified developer: right-click the app, choose **Open**, then **Open** again (or
 **System Settings → Privacy & Security → Open Anyway**).
 
-The app runs the server inside it, with the Node.js and tmux that come with it, and shows Naget Agent in its own
-window. Closing the window keeps it running, with its icon in the menu bar (**Open Naget Agent**, **Open in
-Browser**, **Settings…**, **Quit Naget Agent**). Other devices reach it as they would any copy: see
+The app runs the server inside it, with the Node.js and tmux that come with it, and shows Hydor in its own
+window. Closing the window keeps it running, with its icon in the menu bar (**Open Hydor**, **Open in
+Browser**, **Settings…**, **Quit Hydor**). Other devices reach it as they would any copy: see
 [Remote access](remote-access.md). It opens in the background when you log in (Settings → General → **Start
 when this computer starts**).
 
 - Sessions run as you, with your `~/.claude` and `~/.codex`, and with the `PATH` your login shell sets up, so
   the programs you installed with Homebrew or npm are found.
-- Its data is in `~/.naget-agent`, as on Linux. Settings such as `PORT` or `DATA_DIR` go in
-  `~/.config/naget-agent.env`, one `NAME=value` per line; quit and open the app to apply them.
-- The server's log is in `~/Library/Logs/Naget Agent/server.log` (**Help → Show the Server Log**).
-- **Quit Naget Agent** stops the server; running agents carry on and are picked up again the next time it opens.
+- Its data is in `~/.hydor`, as on Linux. Settings such as `PORT` or `DATA_DIR` go in
+  `~/.config/hydor.env`, one `NAME=value` per line; quit and open the app to apply them.
+- The server's log is in `~/Library/Logs/Hydor/server.log` (**Help → Show the Server Log**).
+- **Quit Hydor** stops the server; running agents carry on and are picked up again the next time it opens.
 - Computer use: agents can see your Mac's screen and use its mouse and keyboard, once you turn it on in Settings →
-  Computer use and give Naget Agent macOS's Accessibility and Screen Recording permissions (its **Allow…** buttons
+  Computer use and give Hydor macOS's Accessibility and Screen Recording permissions (its **Allow…** buttons
   ask). Each session asks you first; **Stop** in the menu bar or ⌘⇧Esc stops it. Builds not signed with a Developer
   ID may need the permissions given again after an update (macOS ties them to the app's signature).
 - Not in the Mac app yet: **Run code** steps in apps and the agent sandbox need Linux's bubblewrap.
@@ -51,15 +51,15 @@ update itself.
 
 ## With Docker
 
-The image is published as [`nagetai/naget-agent`](https://hub.docker.com/r/nagetai/naget-agent) for
+The image is published as [`algoprog/hydor`](https://hub.docker.com/r/algoprog/hydor) for
 `linux/amd64` and `linux/arm64`, so it runs with Docker on Linux and with Docker Desktop on macOS (Intel or
 Apple silicon) and Windows. Pull it and run it:
 
 ```bash
 mkdir -p workspace                                        # the folder the agents work in
-docker run -d --name naget-agent --restart unless-stopped -p 127.0.0.1:8790:8790 \
-  -v naget-agent-home:/home/node -v "$PWD/workspace:/workspace" nagetai/naget-agent
-docker logs naget-agent | grep setup                      # your one-time setup link
+docker run -d --name hydor --restart unless-stopped -p 127.0.0.1:8790:8790 \
+  -v hydor-home:/home/node -v "$PWD/workspace:/workspace" algoprog/hydor
+docker logs hydor | grep setup                      # your one-time setup link
 ```
 
 The published image runs the agents as user id 1000, the first user on most Linux systems. If yours is
@@ -67,7 +67,7 @@ another (`id -u`), build the image yourself so the files the agents create in yo
 macOS and Windows, Docker Desktop takes care of this. To build it, from a clone of the repository:
 
 ```bash
-git clone https://github.com/Naget-Inc/naget-agent naget-agent && cd naget-agent
+git clone https://github.com/algoprog/hydor hydor && cd hydor
 printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env   # files the agents create will be yours
 mkdir -p workspace                                        # the folder the agents work in
 docker compose up -d --build                              # without --build: the published image
@@ -78,8 +78,8 @@ Open the setup link from the log (`http://localhost:8790/setup?token=…`), choo
 welcome tour sets up what you want to use: Claude Code, Codex, models or other agents.
 
 It starts again with the computer as long as Docker does (the restart policy `unless-stopped`; Docker
-Desktop has a setting to start when you sign in). To move to a newer image: `docker pull nagetai/naget-agent`,
-then remove the container and run it again (the `naget-agent-home` volume keeps your data), or
+Desktop has a setting to start when you sign in). To move to a newer image: `docker pull algoprog/hydor`,
+then remove the container and run it again (the `hydor-home` volume keeps your data; one made before the rename is called `naget-agent-home`, so give that name instead), or
 `docker compose pull && docker compose up -d`.
 
 What the container keeps:
@@ -100,7 +100,7 @@ Codex and says why in the mode menu. Claude Code's permission prompts work as us
 ## Without Docker
 
 ```bash
-git clone https://github.com/Naget-Inc/naget-agent naget-agent && cd naget-agent
+git clone https://github.com/algoprog/hydor hydor && cd hydor
 ./install.sh
 ```
 
@@ -109,8 +109,8 @@ builds the app and runs it as a systemd **user** service that starts at boot: no
 setup link (`http://localhost:8790/setup?token=…`): open it, choose a password, and the welcome tour does the
 rest.
 
-Without cloning first: `curl -fsSL https://raw.githubusercontent.com/Naget-Inc/naget-agent/main/install.sh | bash`
-clones into `~/naget-agent` (or `NAGET_AGENT_DIR`; `NAGET_AGENT_REPO` installs from another copy). `PORT=…` picks another port; `NO_SERVICE=1` only builds, and then
+Without cloning first: `curl -fsSL https://raw.githubusercontent.com/algoprog/hydor/main/install.sh | bash`
+clones into `~/hydor`, or updates a copy from before the rename in `~/naget-agent` (or `HYDOR_DIR`; `HYDOR_REPO` installs from another copy). `PORT=…` picks another port; `NO_SERVICE=1` only builds, and then
 `npm start` runs it.
 
 Sessions run as the user who runs the server, with that user's `~/.claude` and `~/.codex`.
@@ -124,7 +124,7 @@ node dist/server/cli.js service uninstall   # stop it and remove the unit (your 
 node dist/server/cli.js service install     # put it back
 ```
 
-Settings such as `PORT`, `HOST`, `DATA_DIR` or `ALLOWED_ORIGINS` go in `~/.config/naget-agent.env`, one
+Settings such as `PORT`, `HOST`, `DATA_DIR` or `ALLOWED_ORIGINS` go in `~/.config/hydor.env`, one
 `NAME=value` per line. Restarting the service never interrupts a running agent: the server reconnects to it.
 
 **Start when this computer starts** (Settings → General) is on by default: the service starts at boot, even
@@ -138,18 +138,18 @@ If you missed the setup link, `node dist/server/cli.js setup-token` prints the t
 
 ## Apps from the command line
 
-With Naget Agent running, the `app` commands work on your apps through its API, with a key of their own
+With Hydor running, the `app` commands work on your apps through its API, with a key of their own
 (Settings → Machines lists it as “This computer’s command line”):
 
 ```bash
 node dist/server/cli.js app new "Reading list"   # an app, and its folder of files to write in any editor
 node dist/server/cli.js app dev reading-list     # each change saved in its folder, tried on its examples
 node dist/server/cli.js app try reading-list     # try its examples once (exit 1 when a check fails)
-node dist/server/cli.js app export reading-list  # one file (.naget-app) to carry to another computer
-node dist/server/cli.js app import reading-list.naget-app   # says what it will do, then installs it
+node dist/server/cli.js app export reading-list  # one file (.hydor-app) to carry to another computer
+node dist/server/cli.js app import reading-list.hydor-app   # says what it will do, then installs it
 ```
 
-`app help` lists them all. `PORT`, or `NAGET_URL`, says where Naget Agent is.
+`app help` lists them all. `PORT`, or `HYDOR_URL`, says where Hydor is.
 
 ## Updates
 
@@ -186,7 +186,9 @@ updater (`claude update`, `codex update`…), and a new version that does not wo
 undone. Settings → Accounts → Agent programs has **Update now** and a switch to turn this off. The Docker image's
 Claude Code is left to the image (it sets `DISABLE_AUTOUPDATER=1`, and it is installed for all users).
 
-The app was called Agent Console before version 0.5. Installs from then keep working as they are: the
-service stays `agent-console`, the data stays in `~/.web-agent`, and `~/.config/agent-console.env` is
-still read. With Docker the service is now named `naget-agent`, so rebuild with
+The app was called Naget Agent before version 0.20, and Agent Console before 0.5. Installs from then keep working
+as they are: the service keeps its name (`naget-agent` or `agent-console`), the data stays in `~/.naget-agent` or
+`~/.web-agent`, the folders it made stay in `~/Naget` and `~/naget-apps`, `~/.config/naget-agent.env` and
+`~/.config/agent-console.env` are still read, and so are settings named `NAGET_…` (now `HYDOR_…`). With Docker the
+service is now named `hydor`, so rebuild with
 `docker compose up -d --build --remove-orphans` (your data volume stays).

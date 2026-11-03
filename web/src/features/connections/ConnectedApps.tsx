@@ -160,7 +160,7 @@ function Marketplace({ onOpen }: { onOpen: (a: CatalogApp) => void }) {
       <div className="flex gap-3 rounded-2xl border border-dashed border-line-2 px-4 py-3.5 text-[13px] leading-relaxed text-fg-2">
         <GitPullRequest size={17} className="mt-0.5 shrink-0 text-fg-3" />
         <div>
-          Missing a service? Anyone can add one: a small JSON file in the <code className="rounded bg-bg-2 px-1 font-mono text-[12px]">catalog/</code> folder of Naget Agent’s repository, sent as a pull request.{' '}
+          Missing a service? Anyone can add one: a small JSON file in the <code className="rounded bg-bg-2 px-1 font-mono text-[12px]">catalog/</code> folder of Hydor’s repository, sent as a pull request.{' '}
           <a href={REPO_CATALOG} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
             How to add one <ExternalLink size={11} />
           </a>

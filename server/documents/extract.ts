@@ -251,7 +251,7 @@ async function readLegacy(file: string, ext: string, o: ReadOptions): Promise<Do
       parts: [],
       notes: [`This is an old binary ${what} file (.${ext}). Reading it needs LibreOffice, which is not installed here: ask for it saved as .${to}, or install LibreOffice.`],
     };
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-doc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-doc-'));
   try {
     const out = await convert(file, to, path.join(dir, `document.${to}`));
     const doc = await readDocument(out, o);

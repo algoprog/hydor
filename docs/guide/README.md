@@ -1,4 +1,4 @@
-# The Naget Agent guide
+# The Hydor guide
 
 Every part of the app, described for the people using it. The app shows this guide under **Help** in the sidebar, its search box (Ctrl+K) finds its sections, and the agents in the app read it to answer questions about the app and to change things in it for you. Links that start with `/` point to places in the app.
 

@@ -82,8 +82,8 @@ export function shellPage(token: string, title: string): { html: string; csp: st
 <meta name="theme-color" content="#151412" media="(prefers-color-scheme: dark)">
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="${base}/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <style>html,body{margin:0;height:100%;background:#fff}@media (prefers-color-scheme:dark){html,body{background:#151412;color:#a39b8e}}iframe{position:fixed;inset:0;display:block;width:100%;height:100%;border:0}.msg{max-width:28rem;margin:0 auto;padding:48px 24px;font:15px/1.5 system-ui,sans-serif;color:#675f52;text-align:center}</style>
 </head><body>
 <iframe id="page" src="/htmlframe" title="${t}" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals" allow="fullscreen"></iframe>
@@ -117,9 +117,9 @@ export function shellManifest(token: string, title: string) {
     background_color: '#ffffff',
     theme_color: '#ffffff',
     icons: [
-      { src: '/icon-192.png?v=3', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/icon-512.png?v=3', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: '/icon-maskable-512.png?v=3', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      { src: '/icon-192.png?v=4', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png?v=4', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-maskable-512.png?v=4', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   };
 }

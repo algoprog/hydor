@@ -386,7 +386,7 @@ export const skillpack: Feature = {
     // Claude Code: the view is a plugin for this session only. Codex: an extra folder of skills.
     if (s.agent === 'claude') return (await claudeTakesPlugins()) ? { args: ['--plugin-dir', view] } : undefined;
     if (s.agent === 'codex') return { skillRoots: [path.join(view, 'skills')] };
-    if (s.agent === 'acp' && s.acpAgent === CONSOLE_ID) return { env: { NAGET_SKILL_DIRS: path.join(view, 'skills') } };
+    if (s.agent === 'acp' && s.acpAgent === CONSOLE_ID) return { env: { HYDOR_SKILL_DIRS: path.join(view, 'skills') } };
     // Other ACP agents (Gemini CLI, OpenCode…) have no skills of their own: the list, to read when one fits.
     if (s.agent === 'acp') {
       const index = skillIndex();

@@ -159,7 +159,7 @@ export function ShareTab({ detail, onChange }: { detail: AppDetail; onChange: ()
         />
       </Section>
 
-      <Section title="Other agents" sub="Claude Code, Cursor or another agent connected to Naget Agent’s MCP server can run it as a tool.">
+      <Section title="Other agents" sub="Claude Code, Cursor or another agent connected to Hydor’s MCP server can run it as a tool.">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1 text-[13.5px]">
             Offer it as the tool <code className="font-mono text-[12.5px]">app_{app.slug.replace(/-/g, '_')}</code>

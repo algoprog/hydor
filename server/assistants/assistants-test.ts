@@ -4,7 +4,7 @@
 // agent against a fake runtime, a fake model and fake MCP servers. Build and run with a scratch data folder:
 //   npm run build:server   (Custom's agent.js, for the last test)
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/assistants/assistants-test.ts
-//   DATA_DIR=/tmp/naget-test-asst-unit node dist/dev/assistants-test.js
+//   DATA_DIR=/tmp/hydor-test-asst-unit node dist/dev/assistants-test.js
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -38,7 +38,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-asst-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-asst-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
@@ -55,7 +55,7 @@ const offline: Assistant = { id: 'offline-0001', name: 'Offline', icon: 'shield'
 const claude = { agent: 'claude' as const };
 const codex = { agent: 'codex' as const };
 const custom = { agent: 'acp' as const, acpAgent: 'console' };
-const appTools = ['mcp__naget-agent__show_html', 'mcp__naget-agent__web_search', 'mcp__naget-agent__read_page', 'mcp__naget-agent__remember', 'mcp__naget-agent__http_request'];
+const appTools = ['mcp__hydor__show_html', 'mcp__hydor__web_search', 'mcp__hydor__read_page', 'mcp__hydor__remember', 'mcp__hydor__http_request'];
 
 // ---- instructions per agent ------------------------------------------------------------------------
 
@@ -103,15 +103,15 @@ test('Claude Code: --disallowedTools for what is off (the app’s web tools too)
   assert.equal(a.strictMcp, true);
   const b = spawnFor(offline, '', claude, appTools);
   assert.ok(b.disallowedTools!.includes('WebFetch') && b.disallowedTools!.includes('WebSearch'));
-  assert.ok(b.disallowedTools!.includes('mcp__naget-agent__web_search') && b.disallowedTools!.includes('mcp__naget-agent__read_page') && b.disallowedTools!.includes('mcp__naget-agent__http_request'));
-  assert.ok(!b.disallowedTools!.includes('mcp__naget-agent__show_html') && !b.disallowedTools!.includes('mcp__naget-agent__remember'));
+  assert.ok(b.disallowedTools!.includes('mcp__hydor__web_search') && b.disallowedTools!.includes('mcp__hydor__read_page') && b.disallowedTools!.includes('mcp__hydor__http_request'));
+  assert.ok(!b.disallowedTools!.includes('mcp__hydor__show_html') && !b.disallowedTools!.includes('mcp__hydor__remember'));
   assert.equal(b.codexConfig, undefined);
 });
 
 test('Codex: web_search "disabled" and the app’s web tools off, only without the web', () => {
   const a = spawnFor(offline, '', codex, appTools);
   assert.deepEqual(a.codexConfig, { web_search: 'disabled' });
-  assert.deepEqual(a.disallowedTools, ['mcp__naget-agent__web_search', 'mcp__naget-agent__read_page', 'mcp__naget-agent__http_request']);
+  assert.deepEqual(a.disallowedTools, ['mcp__hydor__web_search', 'mcp__hydor__read_page', 'mcp__hydor__http_request']);
   assert.equal(a.strictMcp, undefined);
   const b = spawnFor(reader, '', codex, appTools);
   assert.equal(b.codexConfig, undefined);
@@ -146,7 +146,7 @@ test('the feature through the registry: Claude Code’s command line', async () 
   assert.equal(own.length, 1);
   assert.match(own[0], /# Assistant: Offline/);
   assert.ok(add.instructions.some((t) => t.startsWith('Pages:')));
-  assert.ok(add.disallowedTools.includes('mcp__naget-agent__web_search') && add.disallowedTools.includes('mcp__naget-agent__read_page'));
+  assert.ok(add.disallowedTools.includes('mcp__hydor__web_search') && add.disallowedTools.includes('mcp__hydor__read_page'));
   const spec = claudeSpec({ cwd: tmp, sessionId: '00000000-0000-4000-8000-000000000001', pageServer: 'http://127.0.0.1:1/mcp/run/x', add }, {});
   const at = spec.args.indexOf('--disallowedTools');
   assert.ok(at > 0, 'has --disallowedTools');
@@ -154,7 +154,7 @@ test('the feature through the registry: Claude Code’s command line', async () 
   assert.ok(spec.args.includes('--strict-mcp-config'));
   // Claude Code would give up on the app's own tools after a minute (a video takes several).
   const mcp = JSON.parse(fs.readFileSync(spec.args[spec.args.indexOf('--mcp-config') + 1], 'utf8'));
-  assert.equal(mcp.mcpServers['naget-agent'].timeout, 600_000);
+  assert.equal(mcp.mcpServers.hydor.timeout, 600_000);
   assert.match(spec.args[spec.args.indexOf('--append-system-prompt') + 1], /# Assistant: Offline/);
   // No assistant and no tone: no limits, and only the capabilities' notes in the instructions.
   const plain = claudeSpec({ cwd: tmp, sessionId: '00000000-0000-4000-8000-000000000002', add: await spawnAdditions(info('claude', {})) }, {});
@@ -183,15 +183,15 @@ test('the feature through the registry: what Codex’s thread starts with', asyn
   await lv.boot();
   const start = runner.calls.find((c) => c.method === 'thread/start')!.params;
   assert.equal(start.config.web_search, 'disabled');
-  assert.deepEqual(start.config.mcp_servers['naget-agent'].disabled_tools, ['web_search', 'read_page']);
-  assert.equal(start.config.mcp_servers['naget-agent'].default_tools_approval_mode, 'approve');
+  assert.deepEqual(start.config.mcp_servers.hydor.disabled_tools, ['web_search', 'read_page']);
+  assert.equal(start.config.mcp_servers.hydor.default_tools_approval_mode, 'approve');
   assert.match(start.config.developer_instructions, /# Assistant: Offline[\s\S]*Use the shell only to read/);
   // An assistant that allows everything changes nothing in Codex's settings.
   const r2 = new FakeRunner();
   await new CodexLive(r2 as any, { cwd: tmp, pageServer: 'http://127.0.0.1:1/mcp/run/x', add: await spawnAdditions(info('codex', { assistant: 'writer' })) }).boot();
   const s2 = r2.calls.find((c) => c.method === 'thread/start')!.params;
   assert.equal(s2.config.web_search, undefined);
-  assert.equal(s2.config.mcp_servers['naget-agent'].disabled_tools, undefined);
+  assert.equal(s2.config.mcp_servers.hydor.disabled_tools, undefined);
 });
 
 test('Custom: nothing at its start (it reads the context before each turn), the same block there', async () => {
@@ -593,7 +593,7 @@ test('tool kinds: Custom’s own, the app’s (by name, both spellings), given s
   assert.deepEqual(['read_file', 'list_dir', 'glob', 'grep', 'write_file', 'edit_file', 'bash', 'web_fetch', 'todo_write', 'skill'].map(k), ['read', 'read', 'read', 'read', 'edit', 'edit', 'run', 'web', null, null]);
   assert.deepEqual(['multi_edit', 'apply_patch', 'bash_output', 'bash_kill', 'find_tools'].map(k), ['edit', 'edit', 'run', 'run', null]);
   assert.equal(k('mcp__naget_agent__web_search'), 'web');
-  assert.equal(k('mcp__naget-agent__read_page'), 'web');
+  assert.equal(k('mcp__hydor__read_page'), 'web');
   assert.equal(k('mcp__naget_agent__http_request'), 'web');
   assert.equal(k('mcp__naget_agent__show_html'), null);
   assert.equal(k('mcp__naget_agent__remember'), null);
@@ -622,7 +622,7 @@ test('Custom offers the model only the tools its assistant allows (a real run of
   let offered: string[] | null = null;
   let allowed: string[] | null = ['read'];
   const servers: Record<string, (b: any) => unknown> = {
-    'naget-agent': mcpHandler(['show_html', 'web_search', 'read_page', 'remember']),
+    hydor: mcpHandler(['show_html', 'web_search', 'read_page', 'remember']),
     notion: mcpHandler(['search_pages']),
     mine: mcpHandler(['do_thing']),
   };
@@ -659,7 +659,7 @@ test('Custom offers the model only the tools its assistant allows (a real run of
   const models = path.join(tmp, 'models.json');
   fs.writeFileSync(models, JSON.stringify({ models: [{ id: 'fake', label: 'Fake', provider: 'openai', baseUrl: `${base}/v1`, model: 'fake', tools: 'native', contextLength: 65536 }] }));
   const p = spawn(process.execPath, [agentJs], {
-    env: { PATH: process.env.PATH, HOME: home, CODEX_HOME: path.join(home, '.codex'), NAGET_AGENT_MODELS: models, NAGET_AGENT_STATE: path.join(tmp, 'custom-state'), NAGET_AGENT_RUNTIME: `${base}/agent/run/tok` },
+    env: { PATH: process.env.PATH, HOME: home, CODEX_HOME: path.join(home, '.codex'), HYDOR_MODELS: models, HYDOR_STATE: path.join(tmp, 'custom-state'), HYDOR_RUNTIME: `${base}/agent/run/tok` },
     stdio: ['pipe', 'pipe', 'inherit'],
   });
   const waiting = new Map<number, (m: any) => void>();
@@ -684,7 +684,7 @@ test('Custom offers the model only the tools its assistant allows (a real run of
   try {
     await call('initialize', { protocolVersion: 1 });
     const given = [
-      { type: 'http', name: 'naget-agent', url: `${base}/mcp/naget-agent`, headers: [] },
+      { type: 'http', name: 'hydor', url: `${base}/mcp/hydor`, headers: [] },
       { type: 'http', name: 'notion', url: `${base}/mcp/notion`, headers: [] },
     ];
     const { sessionId } = await call('session/new', { cwd: tmp, mcpServers: given });

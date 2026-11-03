@@ -1,6 +1,6 @@
-// Colour themes: Naget's dark and light palettes, two more, and any the user makes. A theme has a base,
+// Colour themes: Hydor's dark and light palettes, two more, and any the user makes. A theme has a base,
 // dark or light, which picks the syntax colours, the terminal's ANSI colours and the shadows; its own
-// colours cover everything else, and any it leaves out come from the base's Naget palette.
+// colours cover everything else, and any it leaves out come from the base's Hydor palette.
 
 export type ThemeBase = 'dark' | 'light';
 
@@ -42,8 +42,8 @@ export interface AppTheme {
   colors: Partial<ThemeColors>;
 }
 
-/** The stylesheet's palettes (styles.css); the built-in Naget themes apply no colours of their own. */
-export const NAGET_DARK: ThemeColors = {
+/** The stylesheet's palettes (styles.css); the built-in Hydor themes apply no colours of their own. */
+export const HYDOR_DARK: ThemeColors = {
   bg: '#121110',
   sidebar: '#151412',
   panel: '#1b1a17',
@@ -70,7 +70,7 @@ export const NAGET_DARK: ThemeColors = {
   'term-fg': '#ddd7cc',
 };
 
-export const NAGET_LIGHT: ThemeColors = {
+export const HYDOR_LIGHT: ThemeColors = {
   bg: '#f6f5f1',
   sidebar: '#f0eee8',
   panel: '#ffffff',
@@ -100,10 +100,10 @@ export const NAGET_LIGHT: ThemeColors = {
 export const DEFAULT_THEME: Record<ThemeBase, string> = { dark: 'naget-dark', light: 'naget-light' };
 
 export const BUILT_IN_THEMES: AppTheme[] = [
-  { id: 'naget-dark', name: 'Naget Dark', base: 'dark', colors: NAGET_DARK },
-  { id: 'naget-light', name: 'Naget Light', base: 'light', colors: NAGET_LIGHT },
+  { id: 'naget-dark', name: 'Hydor Dark', base: 'dark', colors: HYDOR_DARK },
+  { id: 'naget-light', name: 'Hydor Light', base: 'light', colors: HYDOR_LIGHT },
   {
-    // A cool blue-black, in small steps like Naget Dark, with a periwinkle accent.
+    // A cool blue-black, in small steps like Hydor Dark, with a periwinkle accent.
     id: 'midnight',
     name: 'Midnight',
     base: 'dark',
@@ -172,7 +172,7 @@ export const isBuiltIn = (id: string) => BUILT_IN_THEMES.some((t) => t.id === id
 
 /** A theme's colours, with the ones it leaves out taken from its base. */
 export function themeColors(t: AppTheme): ThemeColors {
-  return { ...(t.base === 'dark' ? NAGET_DARK : NAGET_LIGHT), ...t.colors };
+  return { ...(t.base === 'dark' ? HYDOR_DARK : HYDOR_LIGHT), ...t.colors };
 }
 
 /** The CSS variables a theme sets: its colours and the tints made from them. */

@@ -1,5 +1,5 @@
 // A template's screens: pages of its own (Pages keeps them, with versions and the visual editor; the
-// library leaves them out), shown on the template's page in place of its form, with window.naget.app to
+// library leaves them out), shown on the template's page in place of its form, with window.hydor.app to
 // run its flows and keep its data (server/pages/kit.ts), and the App parts written on it. A screen made
 // for a template is a page of App parts: its form, its answer, a table for each collection it keeps (and
 // a conversation with its agent about them), its earlier runs. Agents make and change screens with these routes (through app_api); people in

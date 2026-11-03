@@ -58,9 +58,9 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Machines
 
-[Settings → Machines](/settings?s=machines): other machines running Naget Agent, to use from here, and access to this one. More in [Phones, other machines and sharing](/guide/devices).
+[Settings → Machines](/settings?s=machines): other machines running Hydor, to use from here, and access to this one. More in [Phones, other machines and sharing](/guide/devices).
 
-- [**Add a machine**](/settings?s=machines&find=Add%20a%20machine): Another machine running Naget Agent, to use from here.
+- [**Add a machine**](/settings?s=machines&find=Add%20a%20machine): Another machine running Hydor, to use from here.
 - [**Access from other machines**](/settings?s=machines&find=Access%20from%20other%20machines): Tokens other machines use to reach this one.
 
 ## Agents
@@ -184,8 +184,8 @@ You don’t have to know where an option lives: type what you want in the search
 [Settings → Computer use](/settings?s=computer): agents see your Mac’s screen and use its mouse and keyboard, in the Mac app. More in [Search and the browser](/guide/web).
 
 - [**Let agents use this Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac): Agents see the screen and use the mouse and keyboard, in any app; each session asks you first.
-- [**Accessibility**](/settings?s=computer&find=Accessibility): macOS’s permission for Naget Agent to use the mouse and keyboard.
-- [**Screen Recording**](/settings?s=computer&find=Screen%20Recording): macOS’s permission for Naget Agent to see the screen.
+- [**Accessibility**](/settings?s=computer&find=Accessibility): macOS’s permission for Hydor to use the mouse and keyboard.
+- [**Screen Recording**](/settings?s=computer&find=Screen%20Recording): macOS’s permission for Hydor to see the screen.
 
 ### Memory
 

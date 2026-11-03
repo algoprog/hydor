@@ -4,7 +4,7 @@
 // session manager (agent steps), a model server (model steps) and the tools.
 // Build and run with scratch folders:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/apps/flow-test.ts
-//   DATA_DIR=/tmp/naget-test-flow NAGET_APPS_DIR=/tmp/naget-test-flow-apps node dist/dev/flow-test.js
+//   DATA_DIR=/tmp/hydor-test-flow HYDOR_APPS_DIR=/tmp/hydor-test-flow-apps node dist/dev/flow-test.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -41,12 +41,12 @@ import { MEMORY_MARK, runFolder, saveResult, startRun, startRuns, stopRun, waitF
 import * as store from './store.ts';
 import { templateById } from './templates.ts';
 
-if (!process.env.DATA_DIR?.startsWith('/tmp/') || !process.env.NAGET_APPS_DIR?.startsWith('/tmp/')) {
-  console.error('Run with DATA_DIR=/tmp/… and NAGET_APPS_DIR=/tmp/… so nothing touches real data.');
+if (!process.env.DATA_DIR?.startsWith('/tmp/') || !process.env.HYDOR_APPS_DIR?.startsWith('/tmp/')) {
+  console.error('Run with DATA_DIR=/tmp/… and HYDOR_APPS_DIR=/tmp/… so nothing touches real data.');
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-flow-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-flow-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 store.ensureTables(db);
 let passed = 0;
@@ -459,7 +459,7 @@ test('advice: a step an agent had to do the work of, and an agent step that did 
     const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { url } });
     let child: store.RunRecord | undefined;
     for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: r.id }).find((x) => x.key)); i++) await sleep(25);
-    sessions.items.set(child!.key!, [called('ToolSearch', { query: 'select:read_page' }), called(url.includes('c.') ? 'WebFetch' : 'mcp__naget-agent__read_page', { url }), called('mcp__naget-agent__submit_result', {})]);
+    sessions.items.set(child!.key!, [called('ToolSearch', { query: 'select:read_page' }), called(url.includes('c.') ? 'WebFetch' : 'mcp__hydor__read_page', { url }), called('mcp__hydor__submit_result', {})]);
     await agentAnswers(r.id, 'sum', { summary: `About ${url}` });
     assert.equal((await ended(r.id)).status, 'done');
   }
@@ -516,7 +516,7 @@ test('advice: a step an agent had to do the work of, and an agent step that did 
 
 test('Save as template drafts steps from the tools the session called; steps that do not check out are left out, the task for one agent staying', async () => {
   const key = await sessions.create({});
-  sessions.items.set(key, [{ kind: 'user', id: 'u1', seq: 0, text: 'Read https://example.org/solar and sum it up in three lines.' }, called('Bash', { command: 'date' }), called('mcp__naget-agent__read_page', { url: 'https://example.org/solar' })]);
+  sessions.items.set(key, [{ kind: 'user', id: 'u1', seq: 0, text: 'Read https://example.org/solar and sum it up in three lines.' }, called('Bash', { command: 'date' }), called('mcp__hydor__read_page', { url: 'https://example.org/solar' })]);
   sessions.end(key, 'Solar roofs last longer than promised.');
   const draft = {
     name: 'Page summary',
@@ -707,7 +707,7 @@ test('a template as a folder: its files written out and read back the same; a ch
     },
     graph: { at: { say: { x: 3, y: 4 } } },
   });
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-folder-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-folder-'));
   const made = await http.inject({ method: 'POST', url: `/api/apps/${a.id}/folder`, payload: { path: dir } });
   assert.equal(made.statusCode, 200, made.body);
   const file = (rel: string) => fs.readFileSync(path.join(dir, rel), 'utf8');
@@ -749,7 +749,7 @@ test('a template as a folder: its files written out and read back the same; a ch
   await sleep(700);
   assert.equal(store.listVersions(db, a.id)[0].by, 'you', 'its own write is no change from the folder');
   // A folder with other files in it is not taken.
-  const busy = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-folder-busy-'));
+  const busy = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-folder-busy-'));
   fs.writeFileSync(path.join(busy, 'notes.txt'), 'mine');
   assert.match((await http.inject({ method: 'POST', url: `/api/apps/${a.id}/folder`, payload: { path: busy } })).json().error, /other files in it/);
   // Stopped: the files stay, and changes there come no more.
@@ -759,7 +759,7 @@ test('a template as a folder: its files written out and read back the same; a ch
   await sleep(700);
   assert.equal(step(0).instructions, 'Say {{topic}} warmly');
   // The schema an editor checks app.json with.
-  assert.equal((await http.inject({ method: 'GET', url: '/api/apps/schema.json' })).json().title, 'A Naget Agent app (app.json)');
+  assert.equal((await http.inject({ method: 'GET', url: '/api/apps/schema.json' })).json().title, 'A Hydor app (app.json)');
   fs.rmSync(dir, { recursive: true, force: true });
   fs.rmSync(busy, { recursive: true, force: true });
 });
@@ -1558,7 +1558,7 @@ test('a template that remembers: its runs share a project memory of its own; tur
 
 // ---- as a file ----------------------------------------------------------------------------------------------
 
-test('a template as a file: .naget-app and .json round trips with its records; installing says what changes; what cannot work stops it', async () => {
+test('a template as a file: .hydor-app and .json round trips with its records; installing says what changes; what cannot work stops it', async () => {
   const a = app({
     name: 'Shared list',
     cwd: tmp,
@@ -1573,8 +1573,8 @@ test('a template as a file: .naget-app and .json round trips with its records; i
   await http.inject({ method: 'POST', url: `/api/apps/${a.id}/data/items`, payload: { record: { id: 'r2', title: 'Two', score: 2 } } });
   const zip = await http.inject({ method: 'GET', url: `/api/apps/${a.id}/export?data=1` });
   assert.equal(zip.headers['content-type'], 'application/zip');
-  assert.match(String(zip.headers['content-disposition']), /shared-list\.naget-app/);
-  const file = { name: 'shared-list.naget-app', data: zip.rawPayload.toString('base64') };
+  assert.match(String(zip.headers['content-disposition']), /shared-list\.hydor-app/);
+  const file = { name: 'shared-list.hydor-app', data: zip.rawPayload.toString('base64') };
   const check = await http.inject({ method: 'POST', url: '/api/apps/install/check', payload: { file } });
   const p = check.json().preview;
   assert.deepEqual([p.name, p.steps, p.memory, p.data], ['Shared list', 1, true, [{ name: 'items', records: 2 }]]);
@@ -1605,7 +1605,7 @@ test('a template as a file: .naget-app and .json round trips with its records; i
   assert.equal(junk.statusCode, 400);
   assert.match(junk.json().error, /neither an app/);
   const newer = await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: { naget: 'app', format: 99, app: { name: 'N', prompt: 'x' } } } });
-  assert.match(newer.json().error, /newer Naget Agent/);
+  assert.match(newer.json().error, /newer Hydor/);
   const broken = await http.inject({ method: 'POST', url: '/api/apps/install', payload: { package: { naget: 'app', format: 1, app: { name: 'B', flow: { steps: [{ id: 'a', do: 'model', instructions: '{{b.text}}' }, { id: 'b', do: 'model', instructions: 'x' }] } } } } });
   assert.equal(broken.statusCode, 400);
   assert.match(broken.json().error, /comes later/);
@@ -1676,7 +1676,7 @@ test('a template with the templates it calls: they come in its file, install fir
   assert.equal((store.getApp(db, same.app.id)!.flow!.steps[0] as any).app, helper.slug);
   // Yours changed since: the one in the file installs beside it, and the new template's step calls that one.
   store.saveApp(db, { id: helper.id, recipe: cleanRecipe({ ...helper, prompt: 'Changed {{topic}}' }) });
-  const file = { name: 'uses-helper.naget-app', data: zipPackage(pkg).toString('base64') };
+  const file = { name: 'uses-helper.hydor-app', data: zipPackage(pkg).toString('base64') };
   const p = (await http.inject({ method: 'POST', url: '/api/apps/install/check', payload: { file } })).json().preview;
   assert.deepEqual(p.bundled, [{ name: 'Helper step', from: helper.slug, installs: 'new' }]);
   const beside = (await http.inject({ method: 'POST', url: '/api/apps/install', payload: { file } })).json();
@@ -1971,5 +1971,5 @@ for (const [name, fn] of tests) {
 console.log(`\n${passed} of ${tests.length} passed`);
 srv.close();
 fs.rmSync(tmp, { recursive: true, force: true });
-fs.rmSync(process.env.NAGET_APPS_DIR!, { recursive: true, force: true });
+fs.rmSync(process.env.HYDOR_APPS_DIR!, { recursive: true, force: true });
 process.exit(process.exitCode ?? 0);

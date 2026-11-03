@@ -5,7 +5,7 @@
 // Guidelines (the levels, most general first; changed ones start an idle agent afresh; the old tone moves in).
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts
-//   DATA_DIR=/tmp/naget-test-guide node dist/dev/guide-test.js
+//   DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -34,7 +34,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-guide-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-guide-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 setSettings(db, { taskRoot: path.join(tmp, 'Naget') });
 let passed = 0;

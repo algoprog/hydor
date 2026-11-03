@@ -22,7 +22,7 @@ someone could check.
 
 ## 2. Search wide, then narrow
 
-With `web_search` (one of the naget-agent tools; details in `references/web-search.md`):
+With `web_search` (one of the hydor tools; details in `references/web-search.md`):
 
 - **A quick look:** the default number of results is enough.
 - **Deeper work** (papers, patents, people's own pages, covering a field): ask for many results, up to

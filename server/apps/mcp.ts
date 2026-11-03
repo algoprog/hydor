@@ -54,7 +54,7 @@ export function appMcpTools(): ExternalTool[] {
   if (!list.length) return [];
   const tools: ExternalTool[] = list.map((a) => ({
     name: toolName(a.slug),
-    description: `${a.name}: ${a.description || 'an app in Naget Agent'} (Runs the app “${a.name}” in Naget Agent and returns its answer${a.answer.length ? `, with a result object of ${a.answer.map((f) => f.id).join(', ')}` : ''}.)`,
+    description: `${a.name}: ${a.description || 'an app in Hydor'} (Runs the app “${a.name}” in Hydor and returns its answer${a.answer.length ? `, with a result object of ${a.answer.map((f) => f.id).join(', ')}` : ''}.)`,
     inputSchema: inputSchema(a),
     async run(args) {
       const { wait, ...inputs } = args ?? {};

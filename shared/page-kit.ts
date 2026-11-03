@@ -1,6 +1,6 @@
 // The page kit's stylesheet: the ready-made classes every page agents make can use (options, picture cards,
 // compare tables, pros and cons, buttons, fields), and the colours, font and corners they take, as CSS
-// variables. Its colours are Naget's own, light, and dark for a page with body.n-page in the dark; inside
+// variables. Its colours are Hydor's own, light, and dark for a page with body.n-page in the dark; inside
 // the app, the app gives the page its current theme's colours and font in their place (pages/frame.tsx), so a
 // page made with them looks like part of the app. Shared: the server puts it in every page, and a page saved
 // as a file takes it along.

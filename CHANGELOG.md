@@ -1,7 +1,32 @@
 # Release notes
 
-What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
+What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
+
+## 0.20.0 · 3 November 2026
+
+Naget Agent is now Hydor: a new name and a new logo, and everything you had keeps working.
+
+- **A new name**: the app is now Hydor, from ὕδωρ, "water" in ancient Greek, which takes the shape of whatever holds
+  it. The window and the browser tab, the Mac app, the guide in English, Chinese and Greek, and the Docker image
+  (`algoprog/hydor`) all use it.
+- **A new logo**: HYDΩR, in thin capitals of one even stroke as Greek inscriptions are cut, the Greek Ω in the sea's
+  blue. It stands alone at the top left of the app and on the sign-in screen. The app's icon is that Ω on a deep blue
+  tile, and Custom's mark and the loading animation are the same Ω, with water rising and falling in it while it
+  works. The two built-in themes are now called Hydor Dark and Hydor Light.
+- **Everything you had stays**: your data folder, your settings file, the folders the app made for tasks, projects
+  and apps (`~/Naget`, `~/naget-apps`), the service that starts it, apps saved as `.naget-app` files, and pages that
+  keep their data with `naget.storage` all keep working as they are. New installs use `~/.hydor`, `~/Hydor`,
+  `~/hydor-apps` and `hydor.service`.
+- **New names where you type them**: settings in the environment are now `HYDOR_…` (the `NAGET_…` ones still
+  apply), apps are shared as `.hydor-app` files, pages keep their data with `hydor.storage`, the agents' tools
+  come from the server called `hydor` (as Settings → Connect other agents shows), and the app's own
+  skills are `hydor:research`, `hydor:writing` and so on.
+- **The Mac app** moves its own folders over the first time it starts as Hydor; macOS asks once more for the
+  permissions computer use needs.
+- **With Docker**, the image `algoprog/hydor` comes with each release for Intel/AMD and ARM computers, and the
+  container and the Compose service are now called `hydor`. The README's command keeps your
+  data in a volume called `hydor-home`; to go on with one from before, give its name (`naget-agent-home`) instead.
 
 ## 0.19.0 · 3 November 2026
 

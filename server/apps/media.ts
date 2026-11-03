@@ -1,6 +1,6 @@
 // The files apps show (shared/app-media.ts): the pictures, videos, sounds and other files their runs hand in (a
 // photo an agent found on this computer, a chart a program drew, a picture made as a data: address) and the files
-// that come with an app (its assets, packed in its .naget-app). Each is kept once, by the hash of its bytes, under
+// that come with an app (its assets, packed in its .hydor-app). Each is kept once, by the hash of its bytes, under
 // the data folder, and noted for what shows it ("run:<id>", "app:<id>"); a file nothing shows any more goes a day
 // later.
 //
@@ -358,7 +358,7 @@ export async function putAsset(db: DB, name: string, from: { path?: string; url?
   return { sha: m.sha, mime: m.mime, bytes: m.bytes, ...(caption ? { caption: caption.slice(0, 300) } : {}) };
 }
 
-/** A kept file's bytes (to pack an app's files into its .naget-app). */
+/** A kept file's bytes (to pack an app's files into its .hydor-app). */
 export function mediaBytes(db: DB, sha: string): Buffer | null {
   try {
     return fs.readFileSync(fileOf(sha));

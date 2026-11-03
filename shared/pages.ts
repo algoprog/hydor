@@ -1,7 +1,7 @@
 // Pages that stay: what server and app share about saved pages (the Pages library), their versions and
 // storage, and sites published at a link.
 
-/** What a saved page's window.naget.storage may hold. */
+/** What a saved page's window.hydor.storage may hold. */
 export const STORAGE_LIMITS = {
   /** Longest key, in characters. */
   key: 200,
@@ -51,7 +51,7 @@ export interface PageVersion {
   by: 'agent' | 'user' | 'restore' | 'edit' | 'made';
 }
 
-/** One of a page's stored values (window.naget.storage), as the Data view lists them. */
+/** One of a page's stored values (window.hydor.storage), as the Data view lists them. */
 export interface PageDataEntry {
   key: string;
   value: unknown;

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const home = os.homedir();
 const here = path.dirname(fileURLToPath(import.meta.url));
 // dist/server/*.js -> project root is two levels up
-export const APP_ROOT = path.resolve(process.env.NAGET_AGENT_ROOT ?? process.env.WEB_AGENT_ROOT ?? path.join(here, '..', '..'));
+export const APP_ROOT = path.resolve(process.env.HYDOR_ROOT ?? process.env.WEB_AGENT_ROOT ?? path.join(here, '..', '..'));
 
 function packageVersion(): string {
   try {
@@ -33,18 +33,19 @@ const vendoredCodex = codexTarget && path.join(APP_ROOT, `node_modules/@openai/$
 /** The ripgrep that comes with Codex, when this platform's package has one. */
 export const bundledRg = codexTarget && firstExisting(path.join(APP_ROOT, `node_modules/@openai/${codexTarget[0]}/vendor/${codexTarget[1]}/codex-path/rg`));
 
-/** The app's own data: ~/.naget-agent, or ~/.web-agent where an older install keeps it. */
+/** The app's own data: ~/.hydor, or where an older install keeps it (~/.naget-agent, ~/.web-agent). */
 function dataDir(): string {
   if (process.env.DATA_DIR) return process.env.DATA_DIR;
-  const dir = path.join(home, '.naget-agent');
-  const older = path.join(home, '.web-agent');
-  return !fs.existsSync(dir) && fs.existsSync(older) ? older : dir;
+  const dir = path.join(home, '.hydor');
+  return fs.existsSync(dir) ? dir : (['.naget-agent', '.web-agent'].map((d) => path.join(home, d)).find((d) => fs.existsSync(d)) ?? dir);
 }
 
 export const config = {
   host: process.env.HOST ?? '127.0.0.1',
   port: Number(process.env.PORT ?? 8790),
   dataDir: dataDir(),
+  /** Where new tasks, spaces and apps get their folders unless Settings says otherwise: ~/Hydor, or ~/Naget where an older install made it. */
+  taskRoot: [path.join(home, 'Hydor'), path.join(home, 'Naget')].find((d) => fs.existsSync(d)) ?? path.join(home, 'Hydor'),
   home,
   defaultCwd: process.env.DEFAULT_CWD ?? home,
   claudeBin: process.env.CLAUDE_BIN ?? firstExisting(path.join(home, '.local/bin/claude')) ?? 'claude',
@@ -77,7 +78,7 @@ export const agentRoots = {
 };
 
 export const paths = {
-  db: path.join(config.dataDir, fs.existsSync(path.join(config.dataDir, 'web-agent.db')) ? 'web-agent.db' : 'naget-agent.db'),
+  db: path.join(config.dataDir, ['web-agent.db', 'naget-agent.db'].find((f) => fs.existsSync(path.join(config.dataDir, f))) ?? 'hydor.db'),
   auth: path.join(config.dataDir, 'auth.json'),
   setupToken: path.join(config.dataDir, 'setup-token'),
   runs: path.join(config.dataDir, 'runs'),

@@ -96,7 +96,7 @@ export function GuidePage() {
     const to = m ? `/guide/${m.to}${h ? `#${m.sections[h] ?? h}` : ''}` : id && RENAMED[id]?.[h] ? `/guide/${id}#${RENAMED[id][h]}` : null;
     if (!to) return;
     go(to, true);
-    window.dispatchEvent(new Event('naget:hash'));
+    window.dispatchEvent(new Event('hydor:hash'));
   }, [id]);
 
   // Another page opens at its top; one with a section in its address scrolls to it by itself.
@@ -165,7 +165,7 @@ export function GuidePage() {
   ) : (
     <PageHeader
       title={home}
-      sub={topic ? undefined : 'The guide to every part of Naget Agent'}
+      sub={topic ? undefined : 'The guide to every part of Hydor'}
       actions={
         <>
           {topic ? (

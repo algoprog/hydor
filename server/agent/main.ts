@@ -1,9 +1,10 @@
-// Custom (its id is still console): Naget Agent's own agent, for any model from OpenRouter, Ollama, vLLM or another
+// Custom (its id is still console): Hydor's own agent, for any model from OpenRouter, Ollama, vLLM or another
 // OpenAI-compatible endpoint. It speaks the Agent Client Protocol on stdio like the other ACP agents
 // the app drives: the app opens sessions, sends prompts and answers permission requests; Console runs
 // the model with its tools, skills and MCP servers, keeps the conversation inside the model's context,
 // and saves it (models/sessions/<id>.json) to continue after a restart. What it keeps beside the
 // conversation (long output, fetched pages, images, background logs) is in models/sessions/<id>/.
+import './../env-compat.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,11 +34,11 @@ import { offer } from './toolsearch.ts';
 import { endTurn, track, type TurnLog } from './turns.ts';
 import { wire } from './wire.ts';
 
-const MODELS_FILE = process.env.NAGET_AGENT_MODELS ?? '';
-const STATE_DIR = process.env.NAGET_AGENT_STATE ?? '';
-const RUNTIME = process.env.NAGET_AGENT_RUNTIME ?? '';
+const MODELS_FILE = process.env.HYDOR_MODELS ?? '';
+const STATE_DIR = process.env.HYDOR_STATE ?? '';
+const RUNTIME = process.env.HYDOR_RUNTIME ?? '';
 /** The app's own MCP server: its tools run without asking, under their own short names. */
-const OWN = 'naget-agent';
+const OWN = 'hydor';
 /** A public app's run (server/apps/publicRun.ts): no shell, no files, only the app's own server. */
 const PUBLIC_RUN = publicRunOf(process.env[PUBLIC_RUN_ENV]);
 const MAX_STEPS = 200;
@@ -294,7 +295,7 @@ function account(s: Session, m: AgentModel, u: Reply['usage']) {
     used: u.prompt + u.completion,
     size: window(s, m),
     ...(t.unpriced ? {} : { cost: { amount: Math.round(t.usd * 1e6) / 1e6, currency: 'USD' } }),
-    _meta: { naget: { tokensIn: t.in, tokensOut: t.out, tokensCached: t.cached, model: m.id } },
+    _meta: { hydor: { tokensIn: t.in, tokensOut: t.out, tokensCached: t.cached, model: m.id } },
   });
 }
 

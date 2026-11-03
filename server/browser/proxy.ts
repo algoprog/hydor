@@ -39,7 +39,7 @@ export async function destination(rawHost: string, port: number, p: Policy, appP
   if (onList(host, String(port), p.block)) return { why: `${host} is on the list of blocked sites` };
   const ips = await lookup(host);
   if (!ips.length) return { why: `${host} does not resolve` };
-  if (port === appPort && ips.some(isLoopbackIp)) return { why: 'that is Naget Agent itself' };
+  if (port === appPort && ips.some(isLoopbackIp)) return { why: 'that is Hydor itself' };
   // An address the session allowed (its own dev server), or no limits on private addresses.
   if (p.local.includes(`${host}:${port}`) || !p.blockPrivate) return { ips };
   if (named(host) || ips.some(privateIp)) return { why: `${host} is on this machine or its network` };

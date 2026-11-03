@@ -4,7 +4,7 @@
 // posts, typing by Unicode or by pasting); and the tools with stand-ins for the Mac: off by default, macOS's permissions,
 // the card each session shows first, one session at a time, Stop, and the step pictures. What only a Mac can show (that
 // macOS takes the events and the screenshots) is not tried here. Build and run:
-//   OUTDIR=dist/dev node scripts/build-server.mjs server/computer/computer-test.ts && DATA_DIR=/tmp/naget-test-computer node dist/dev/computer-test.js
+//   OUTDIR=dist/dev node scripts/build-server.mjs server/computer/computer-test.ts && DATA_DIR=/tmp/hydor-test-computer node dist/dev/computer-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +14,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
   process.exit(2);
 }
-process.env.NAGET_COMPUTER_SETTLE_MS = '1';
+process.env.HYDOR_COMPUTER_SETTLE_MS = '1';
 fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true });
 fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
 
@@ -292,7 +292,7 @@ test('macOS’s permissions first: a missing one is named, with where the user a
   const r = await call('a', 'computer_act', { action: 'wait' });
   assert.equal(r.isError, undefined, 'waiting needs no permission');
   const r2 = await call('a', 'computer_act', { action: 'key', text: 'return', screenshot: false });
-  assert.match(r2.text, /does not allow Naget Agent Accessibility/);
+  assert.match(r2.text, /does not allow Hydor Accessibility/);
   assert.match(r2.text, /Settings → Capabilities → Computer use/);
   perms = { accessibility: true, screen: 'denied' as never };
   access.resetAccess();

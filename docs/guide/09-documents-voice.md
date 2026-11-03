@@ -1,6 +1,6 @@
 # Documents, images, videos and voice
 
-Agents in Naget Agent read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures and short videos, or change yours, with image and video models, and you can keep what they make in your Library. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
+Agents in Hydor read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures and short videos, or change yours, with image and video models, and you can keep what they make in your Library. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
 
 ![An agent that read a report and made a one-page Word summary and a spreadsheet with a chart](images/documents-voice.webp)
 
@@ -8,7 +8,7 @@ Agents in Naget Agent read PDFs, Word, Excel, PowerPoint and other documents, ma
 
 Every agent the app runs can read documents: Claude Code, Codex, Custom, and the agents that speak ACP and take MCP servers. You don't need to convert anything first. Give it the document in one of these ways:
 
-1. **Attach it to your message**: the paperclip (**Attach files**) in the message box, or drag the file onto the box, or paste it. Pictures go to the model as pictures; any other file is saved on the computer that runs Naget Agent, and its path is added to your message so the agent can open it. One message carries up to 25 MB of files.
+1. **Attach it to your message**: the paperclip (**Attach files**) in the message box, or drag the file onto the box, or paste it. Pictures go to the model as pictures; any other file is saved on the computer that runs Hydor, and its path is added to your message so the agent can open it. One message carries up to 25 MB of files.
 2. **Name a file on this computer**: "Summarize ~/Documents/lease.pdf". A path that doesn't start with `/` or `~` starts in the session's folder.
 3. **Keep documents in a project or in the shared knowledge**, so that sessions can search them and cite the page: see [Projects and knowledge](/guide/spaces).
 
@@ -100,7 +100,7 @@ Reports, invoices, certificates, flyers, letters and forms.
 
 ### What the computer needs
 
-These are about the computer that runs Naget Agent, not the device you use it from.
+These are about the computer that runs Hydor, not the device you use it from.
 
 - **Python 3**, with its venv module: needed to make documents. The first time, the skills install a few Python libraries for Office files and PDFs into a private folder of the app (about 30 MB, once, from the internet); nothing is installed system-wide. If Python is missing, the agent tells you the one command to run (on Debian or Ubuntu `sudo apt install python3 python3-venv`; on a Mac `brew install python`).
 - **LibreOffice** (optional): previews as laid-out pages in the file viewer, reading old .doc, .xls and .ppt files, agents looking at Office documents as pages, formula checks, and PDFs from Office files. On Debian or Ubuntu: `sudo apt install libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui`; on a Mac: `brew install --cask libreoffice`.
@@ -219,7 +219,7 @@ The language chip on the panel ("DE", "PT-BR") changes the language while you sp
 
 The microphone shows only where dictation can work: when the browser recognizes speech itself (Chrome, Edge, Safari), or when the server does (see [Speech recognition on the server](/guide/documents-voice#speech-recognition-on-the-server)). When it can't start, it says why and what to do:
 
-- **The microphone needs a secure connection**: browsers allow it only on an HTTPS address, or at localhost on the computer itself. Open Naget Agent through an HTTPS address (see [Phones, other machines and sharing](/guide/devices)).
+- **The microphone needs a secure connection**: browsers allow it only on an HTTPS address, or at localhost on the computer itself. Open Hydor through an HTTPS address (see [Phones, other machines and sharing](/guide/devices)).
 - **The microphone is blocked for this site**: allow it in the browser's site settings (on an iPhone: **aA** in the address bar, then **Website Settings → Microphone**), then try again.
 - **No microphone was found**, or **The microphone is busy** (another app uses it).
 - **Speech recognition is off here**: on an iPhone, turn on Dictation in Settings → General → Keyboard; or let the server recognize speech.
@@ -250,7 +250,7 @@ The language and **Recognize with** are kept in this browser, so each of your de
 **[Speech recognition on the server](/settings?s=voice&find=Speech%20recognition%20on%20the%20server)** is for browsers that can't recognize speech themselves, or to keep your voice on your machine. It is off until you turn it on, and nothing is downloaded before. It is set once for the app, on every device. Pick one of three:
 
 - **Off**.
-- **On this machine**: whisper.cpp runs on the computer that runs Naget Agent, on its processor, and your voice stays there.
+- **On this machine**: whisper.cpp runs on the computer that runs Hydor, on its processor, and your voice stays there.
   - **Model**: **Tiny** (74 MB; the fastest, it mishears a word now and then), **Base** (141 MB; quick and good enough for most dictation, the default), **Small** (465 MB; hears better, a few seconds per sentence on a CPU) or **Medium** (1.4 GB; hears best, slow without a fast CPU).
   - **Languages**: **Any language** (it follows the language you speak) or **English only** (a little more accurate in English).
   - **Turn on · download …** says how much it downloads: the model, and whisper.cpp itself the first time (when everything is already there, picking **On this machine** turns it on at once). A bar shows the download; **Cancel** stops it and turns recognition on the server off. On Linux the app downloads a ready-made whisper.cpp; where that doesn't run, it builds whisper.cpp on this computer, which needs a C++ compiler (on Debian or Ubuntu: `sudo apt install build-essential cmake`). A whisper.cpp of your own on the computer (one built for your GPU, say) is used as it is.
@@ -290,7 +290,7 @@ Hands-free mode is for when you can't look at the screen, such as while walking:
 - On the start page, the same button opens it following no session in particular.
 - In the search box (Ctrl+K, ⌘K on a Mac), the action **Talk hands-free** opens it too.
 
-It fills the screen, says "I'm listening", and asks the device to keep the screen on while it is open. At the top you see the session it follows (or "Talk to Naget Agent"). The big round button shows what it is doing: **Listening…**, **Working on it…**, **Speaking** or **Paused: tap to listen**. Under it you see what it heard, in quotes, and its answer.
+It fills the screen, says "I'm listening", and asks the device to keep the screen on while it is open. At the top you see the session it follows (or "Talk to Hydor"). The big round button shows what it is doing: **Listening…**, **Working on it…**, **Speaking** or **Paused: tap to listen**. Under it you see what it heard, in quotes, and its answer.
 
 - Tap the round button while it speaks to cut it short; tap it at other times to pause or go on listening.
 - To end it, say "Goodbye" (or "Bye", "That's all", "Stop listening", "End hands-free", "Exit"), or tap the cross at the top right.

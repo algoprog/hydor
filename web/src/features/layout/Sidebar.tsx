@@ -13,7 +13,7 @@ import { MOD, pct } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { useApp, useSessions, useUI, useUsage } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Logo } from '../../components/Logo';
+import { Wordmark } from '../../components/Logo';
 import { severityColor } from '../../components/charts';
 import { cx, IconButton, Kbd, MenuItem, MenuSep, Popover, useMediaQuery } from '../../components/ui';
 import { SpaceMark } from '../spaces/parts';
@@ -228,10 +228,9 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
       className={cx('flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)]', mobile ? 'select-none [-webkit-touch-callout:none] [&_input]:select-text' : 'border-r border-line')}
     >
       <div data-tour="sidebar-top" className="flex h-14 shrink-0 items-center gap-2.5 px-4">
-        <span className="group inline-flex">
-          <Logo />
+        <span className="group flex min-w-0 flex-1 items-center text-fg">
+          <Wordmark height={16} />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold tracking-tight">Naget Agent</span>
         {!connected && (
           <span title="Reconnecting…" className="text-warn">
             <WifiOff size={15} />

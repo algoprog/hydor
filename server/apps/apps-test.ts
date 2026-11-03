@@ -3,7 +3,7 @@
 // (through its routes, with a stand-in for the session manager), and CSV in and out with runs over rows.
 // Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/apps/apps-test.ts
-//   DATA_DIR=/tmp/naget-test-apps-unit node dist/dev/apps-test.js
+//   DATA_DIR=/tmp/hydor-test-apps-unit node dist/dev/apps-test.js
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -42,7 +42,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-apps-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-apps-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 store.ensureTables(db);
 let passed = 0;
@@ -382,7 +382,7 @@ test('nudge: a run that ends without its result is reminded once, then ends', as
 
 /** What a transcript holds: a message, the answer handed in. */
 const message = (text: string) => ({ kind: 'user', id: `u-${Math.random().toString(36).slice(2, 8)}`, seq: 0, ts: Date.now(), text });
-const handedIn = () => ({ kind: 'tool', id: `t-${Math.random().toString(36).slice(2, 8)}`, seq: 0, tool: { name: 'mcp__naget-agent__submit_result', category: 'other', title: 'submit_result', status: 'ok' } });
+const handedIn = () => ({ kind: 'tool', id: `t-${Math.random().toString(36).slice(2, 8)}`, seq: 0, tool: { name: 'mcp__hydor__submit_result', category: 'other', title: 'submit_result', status: 'ok' } });
 
 test('follow-ups: one from the run’s page opens the run again; its new result and reply land, and the page lists it', async () => {
   const app = store.saveApp(db, { recipe: recipe({ name: 'Refined' }) });
@@ -582,7 +582,7 @@ test('public page: visitor sees the form only; runs use Custom without shell or 
   assert.match(made.o.prompt, /submit_result/, 'what it needs to know comes with the message');
   // Its agent gets the switch that takes away shell, files and the user's servers.
   const add = await apps.spawn!({ agent: 'acp', acpAgent: 'console', key: made.key, cwd: made.o.cwd, runId: 'pub-run', resume: false, extra: made.o.extra }, deps);
-  assert.deepEqual(add, { env: { NAGET_AGENT_PUBLIC_RUN: '1' } });
+  assert.deepEqual(add, { env: { HYDOR_PUBLIC_RUN: '1' } });
   const ctx: RunCtx = { runId: 'pub-run', key: made.key, agent: 'acp', acpAgent: 'console', cwd: made.o.cwd, deps };
   for (const t of ['web_search', 'read_page', 'remember', 'read_session', 'http_request', 'show_html']) assert.equal(apps.allowTool!(t, ctx), false, t);
   assert.equal(apps.allowTool!('submit_result', ctx), true);

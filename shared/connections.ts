@@ -47,7 +47,7 @@ export type CatalogServer =
 
 export type CatalogAuth =
   | { type: 'none' }
-  /** Signed in in the browser; Naget registers itself with the app's sign-in server (or uses clientId). */
+  /** Signed in in the browser; Hydor registers itself with the app's sign-in server (or uses clientId). */
   | { type: 'oauth'; scopes?: string[]; clientId?: string; help?: string; /** Extra parameters for the sign-in address (Google: access_type=offline). */ params?: Record<string, string> }
   /**
    * A key: a remote server gets it in a header (Authorization: Bearer … unless said otherwise); a local

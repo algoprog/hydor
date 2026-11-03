@@ -10,7 +10,7 @@ export const CATALOG_DIR = path.join(APP_ROOT, 'catalog', 'connections');
 
 export const APP_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 /** Ids an app cannot have: the app's own MCP server's names, and words its addresses use. */
-export const RESERVED_IDS = new Set(['naget-agent', 'agent-console', 'catalog', 'secrets', 'requests', 'session', 'flows', 'callback', 'mcp', 'launch']);
+export const RESERVED_IDS = new Set(['hydor', 'naget-agent', 'agent-console', 'catalog', 'secrets', 'requests', 'session', 'flows', 'callback', 'mcp', 'launch']);
 const FIELD = /^[A-Z][A-Z0-9_]{0,63}$/;
 const PLACEHOLDER = /\{\{([A-Za-z0-9_]+)\}\}/g;
 

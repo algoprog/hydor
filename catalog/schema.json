@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Naget-Inc/naget-agent/blob/main/catalog/schema.json",
-  "title": "A connected app in Naget Agent's catalog",
+  "$id": "https://github.com/algoprog/hydor/blob/main/catalog/schema.json",
+  "title": "A connected app in Hydor's catalog",
   "description": "One file per app: catalog/connections/<id>.json. See catalog/CONTRIBUTING.md; node scripts/check-catalog.mjs checks every file.",
   "type": "object",
   "additionalProperties": false,

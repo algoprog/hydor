@@ -26,7 +26,7 @@ The first three make up the skill library, which every agent the app starts gets
 
 Every session the app starts gets the skill library:
 
-- **Claude Code** gets it as a plugin named "naget", so its skills show with that name in front: naget:research, naget:writing and so on.
+- **Claude Code** gets it as a plugin named "hydor", so its skills show with that name in front: hydor:research, hydor:writing and so on.
 - **Codex** gets it as an extra folder of skills.
 - **Custom**, the app's own agent, gets it in its list of skills. See [Custom](/guide/custom).
 - **Other agents** (Gemini CLI, OpenCode and the rest) get the list of skills, each with the file to read when one fits.
@@ -201,7 +201,7 @@ Built-in skills can't be removed, but you can switch any of them off, or change 
 6. Under **Who gets it**, keep **Every agent**, or pick **Claude Code** or **Codex** for a skill only that agent gets. For Claude Code, pick **All folders** or **This folder** (the folder picked at the top).
 7. Click **Add skill**.
 
-A skill for every agent is saved in your skills folder (in the app's data folder, `~/.naget-agent/skills` unless your install keeps its data elsewhere) and shows under **Yours**. A Claude Code skill goes in `~/.claude/skills` (or the folder's `.claude/skills`), a Codex one in `~/.agents/skills`, which Codex reads in every folder. If a skill of that name is already there, the app says so and saves nothing.
+A skill for every agent is saved in your skills folder (in the app's data folder, `~/.hydor/skills` unless your install keeps its data elsewhere) and shows under **Yours**. A Claude Code skill goes in `~/.claude/skills` (or the folder's `.claude/skills`), a Codex one in `~/.agents/skills`, which Codex reads in every folder. If a skill of that name is already there, the app says so and saves nothing.
 
 To change one of yours, open it and click **Change**: the same fields, saved with **Save**. Each change is kept in its history. You can also put skills in your skills folder yourself: one folder per skill, named in lowercase letters, digits and dashes, with its SKILL.md inside. They show under **Yours**.
 

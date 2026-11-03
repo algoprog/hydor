@@ -113,7 +113,7 @@ Saving checks everything first: a skill must say when to use it, a tool server's
 
 Plugins you make are kept in the app's data folder (plugins/mine). To change one later, open it and pick **Change it** in its **⋯** menu.
 
-**Make one with an agent** opens a new session with the start of a request ("Help me make a plugin for Naget Agent that…"): say what it should do, and the agent writes it, checks it, and adds it from its folder with your yes.
+**Make one with an agent** opens a new session with the start of a request ("Help me make a plugin for Hydor that…"): say what it should do, and the agent writes it, checks it, and adds it from its folder with your yes.
 
 ## Share a plugin
 

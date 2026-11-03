@@ -82,7 +82,7 @@ async function saveThemes(list: AppTheme[]) {
 async function copyTheme(t: { name: string; base: ThemeBase; colors: Partial<ThemeColors> }) {
   try {
     await navigator.clipboard.writeText(JSON.stringify({ name: t.name, base: t.base, colors: t.colors }, null, 2));
-    toast('Copied. Paste it into Import in another Naget Agent to add it there.', 'ok');
+    toast('Copied. Paste it into Import in another Hydor to add it there.', 'ok');
   } catch {
     toast('Could not reach the clipboard here', 'error');
   }
@@ -105,7 +105,7 @@ export function ThemeSettings() {
   const current = all.find((t) => t.id === picked(showing))!;
 
   const remove = async (t: AppTheme) => {
-    if (!(await confirm({ title: `Delete ${t.name}?`, body: 'Devices using it go back to the Naget theme.', confirm: 'Delete', danger: true }))) return;
+    if (!(await confirm({ title: `Delete ${t.name}?`, body: 'Devices using it go back to the Hydor theme.', confirm: 'Delete', danger: true }))) return;
     try {
       await saveThemes(custom.filter((x) => x.id !== t.id));
       const ui = useUI.getState();

@@ -3,7 +3,7 @@
 // tabs, asking the user, taking over, and the live view's frames. Build it and run it with a scratch data folder:
 //
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/browser/selftest.ts
-//   DATA_DIR=/tmp/naget-browser-test node dist/dev/selftest.js
+//   DATA_DIR=/tmp/hydor-browser-test node dist/dev/selftest.js
 //
 // It needs a Chromium (see chrome.ts); it starts its own and closes it at the end.
 import assert from 'node:assert/strict';
@@ -22,9 +22,9 @@ import { browserTools } from './tools.ts';
 
 if (!process.env.DATA_DIR) throw new Error('Set DATA_DIR to a scratch folder');
 const KEY = 'claude:selftest';
-const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-browser-cwd-'));
+const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-browser-cwd-'));
 fs.writeFileSync(path.join(cwd, 'resume.txt'), 'my resume');
-const outside = path.join(os.tmpdir(), `naget-outside-${process.pid}.txt`);
+const outside = path.join(os.tmpdir(), `hydor-outside-${process.pid}.txt`);
 fs.writeFileSync(outside, 'secret');
 
 // ---- the test site, and a "private" server the guard must keep pages away from ----

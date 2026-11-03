@@ -1,13 +1,13 @@
-# Naget Agent with Docker Compose.
+# Hydor with Docker Compose.
 #
-#   docker compose up -d                 # the published image, nagetai/naget-agent
+#   docker compose up -d                 # the published image, algoprog/hydor
 #   docker compose up -d --build         # or built here from this folder (with UID/GID from .env)
 #   docker compose logs | grep setup     # the one-time link for choosing your password
 #
 # Then open http://localhost:8790. See the README for remote access and other options.
 services:
-  naget-agent:
-    image: nagetai/naget-agent:latest
+  hydor:
+    image: algoprog/hydor:latest
     build:
       context: .
       args:

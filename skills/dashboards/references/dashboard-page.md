@@ -96,7 +96,7 @@ const SOURCE = null;
 // ---- The rest stays as it is -------------------------------------------------------------------
 
 const $ = (id) => document.getElementById(id);
-const store = window.naget && window.naget.storage;
+const store = window.hydor && window.hydor.storage;
 const charts = [];
 let shown = null;
 

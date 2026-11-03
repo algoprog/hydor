@@ -90,7 +90,7 @@ export class ModelManager {
           vision: m?.vision,
           reasoning: m?.reasoning,
           maxOutput: m?.maxOutput,
-          headers: { 'HTTP-Referer': 'https://github.com/Naget-Inc/naget-agent', 'X-Title': 'Naget Agent' },
+          headers: { 'HTTP-Referer': 'https://github.com/algoprog/hydor', 'X-Title': 'Hydor' },
         });
       }
     for (const m of this.ollamaModels)

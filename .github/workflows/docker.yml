@@ -1,0 +1,54 @@
+# The Docker image: built for Intel/AMD (linux/amd64) and ARM (linux/arm64) on GitHub's runners, and pushed to
+# Docker Hub as algoprog/hydor:<version> and algoprog/hydor:latest when a version tag (v1.2.3) is pushed, beside
+# the Mac app's release. Run it by hand (Actions → Docker image → Run workflow) to build both without pushing.
+#
+# Repository secret:
+#   DOCKERHUB_TOKEN   a Docker Hub access token of the algoprog account, with Read & Write
+name: Docker image
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    # ARM is built under emulation (QEMU), which takes a while.
+    timeout-minutes: 120
+    steps:
+      # The image is a git checkout of the app, so it can update itself in place.
+      - uses: actions/checkout@v4
+      - name: The version
+        id: version
+        run: |
+          v=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$v" ]; then
+            echo "The tag $GITHUB_REF_NAME does not match package.json's version $v" >&2
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Sign in to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: algoprog
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build, and push for a version tag
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ steps.version.outputs.version }}
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            algoprog/hydor:${{ steps.version.outputs.version }}
+            algoprog/hydor:latest
+          labels: org.opencontainers.image.version=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,11 +1,12 @@
 // Maintenance commands, run on the host:
 //   node dist/server/cli.js set-password        prompts; resets the web password, signs everyone out, lifts sign-in pauses
 //   node dist/server/cli.js setup-token         prints the one-time token for first setup
-//   node dist/server/cli.js access-token [name] prints a new token for another Naget Agent to use this machine
+//   node dist/server/cli.js access-token [name] prints a new token for another Hydor to use this machine
 //   node dist/server/cli.js service install     runs the app as a systemd user service (no root needed)
 //   node dist/server/cli.js service uninstall | status | logs
 //   node dist/server/cli.js update              pulls the latest code, builds it and restarts the service
 //   node dist/server/cli.js app …               templates: new, folder, dev, try, export, import (server/apps/cli.ts)
+import './env-compat.ts';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -83,7 +84,7 @@ if (cmd === 'set-password') {
   const t = a.setupToken();
   console.log(t ?? 'A password is already set (use set-password to reset it).');
 } else if (cmd === 'access-token') {
-  // For another machine's Naget Agent (its Settings → Machines): it can then do all you can here.
+  // For another machine's Hydor (its Settings → Machines): it can then do all you can here.
   const { db } = await auth();
   const { createAccessToken } = await import('./machines.ts');
   console.log(createAccessToken(db, process.argv.slice(3).join(' ') || 'Another machine').token);
@@ -98,7 +99,7 @@ if (cmd === 'set-password') {
   if (systemctl('daemon-reload') !== 0 || systemctl('enable', '--now', UNIT) !== 0) process.exit(1);
   // Without lingering, user services stop when you log out.
   const linger = spawnSync('loginctl', ['enable-linger', os.userInfo().username], { stdio: 'ignore' }).status === 0;
-  console.log(`\nNaget Agent runs as a service of your user${linger ? ', also while you are logged out' : ''}.`);
+  console.log(`\nHydor runs as a service of your user${linger ? ', also while you are logged out' : ''}.`);
   if (!linger) console.log(`To keep it running after you log out: sudo loginctl enable-linger ${os.userInfo().username}`);
   const { auth: a } = await auth();
   const t = a.setupToken();

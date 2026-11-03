@@ -6,7 +6,7 @@ Agents work on their own, but now and then they need you: an approval, an answer
 
 ## Open the inbox
 
-The inbox is the tray button at the top of the sidebar, beside the name Naget Agent. On a phone, open the sidebar with **Menu** (≡) first: the button is at the top of the drawer. You can also type "inbox" in the search box (Ctrl+K, ⌘K on a Mac). [Open the inbox](/inbox).
+The inbox is the tray button at the top of the sidebar, beside the name Hydor. On a phone, open the sidebar with **Menu** (≡) first: the button is at the top of the drawer. You can also type "inbox" in the search box (Ctrl+K, ⌘K on a Mac). [Open the inbox](/inbox).
 
 Its header says how many things wait on you ("3 waiting on you"). The newest are at the top. The list updates by itself as sessions start and stop waiting, and checks again every few seconds while you look at it.
 
@@ -50,7 +50,7 @@ The other items are answered where they wait. Each has an icon, what is asked, a
 
 ## Things waiting on your other machines
 
-If you added other machines running Naget Agent ([Use other machines from one app](/guide/devices#use-other-machines-from-one-app)), the inbox asks each one that is online and lists what waits there too. The list is then grouped by machine, under each machine's name; **shown now** marks the machine the app is showing at the moment. You answer approvals, questions and forms from another machine right here, as you would for this one.
+If you added other machines running Hydor ([Use other machines from one app](/guide/devices#use-other-machines-from-one-app)), the inbox asks each one that is online and lists what waits there too. The list is then grouped by machine, under each machine's name; **shown now** marks the machine the app is showing at the moment. You answer approvals, questions and forms from another machine right here, as you would for this one.
 
 A machine that can't send its list (one running an older version, for example) shows as one line instead, "2 sessions wait on you there", with **Open** to go to that machine.
 
@@ -62,7 +62,7 @@ The number counts sessions, not items, so a session with two approvals counts on
 
 ## The count in the browser tab
 
-While sessions on the machine the app shows wait for your approval or answer, the browser tab's title starts with their number: "(2) Naget Agent". You see it from other tabs, without switching back.
+While sessions on the machine the app shows wait for your approval or answer, the browser tab's title starts with their number: "(2) Hydor". You see it from other tabs, without switching back.
 
 ## How the app tells you
 

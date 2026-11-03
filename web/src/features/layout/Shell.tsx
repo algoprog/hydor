@@ -127,11 +127,11 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
-/** "(2) Naget Agent" while sessions wait for an approval or an answer. */
+/** "(2) Hydor" while sessions wait for an approval or an answer. */
 function useTitleBadge() {
   const waiting = useSessions((s) => Object.values(s.byKey).filter((x) => activityOf(x)?.status === 'waiting').length);
   useEffect(() => {
-    document.title = waiting ? `(${waiting}) Naget Agent` : 'Naget Agent';
+    document.title = waiting ? `(${waiting}) Hydor` : 'Hydor';
   }, [waiting]);
 }
 

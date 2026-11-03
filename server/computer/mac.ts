@@ -43,7 +43,7 @@ export interface Shot {
 
 /** The main display, scaled down to MAX_SIDE on its longer side, as a JPEG; and where it is in points. */
 export async function screenshot(signal?: AbortSignal): Promise<Shot> {
-  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'naget-screen-'));
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hydor-screen-'));
   try {
     const png = path.join(dir, 'screen.png');
     const [, out] = await Promise.all([exec('/usr/sbin/screencapture', ['-x', '-m', '-t', 'png', png], 20_000, signal), drive([{ op: 'info' }], signal)]);

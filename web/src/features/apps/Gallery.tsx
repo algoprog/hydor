@@ -393,7 +393,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
             <div className="text-center">
               <FileUp size={28} className="mx-auto text-accent" />
               <div className="mt-2 text-[15px] font-semibold">Drop an app file to install it</div>
-              <div className="text-[13px] text-fg-3">A .naget-app or .json: you see what it does before anything is installed</div>
+              <div className="text-[13px] text-fg-3">A .hydor-app or .json: you see what it does before anything is installed</div>
             </div>
           </div>
         )}
@@ -470,7 +470,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
             )}
 
             {readyShown.length > 0 && (
-              <Part title="Ready-made apps" sub="They come with Naget Agent: run one, or make it yours to change it">
+              <Part title="Ready-made apps" sub="They come with Hydor: run one, or make it yours to change it">
                 {byKind ? (
                   <div className="space-y-6">
                     {byKind.map(([kind, list]) => (

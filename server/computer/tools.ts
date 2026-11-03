@@ -16,7 +16,7 @@ const geos = new Map<string, Geometry>();
 export const forgetGeometry = (key: string) => geos.delete(key);
 
 /** A moment for the screen to show what an action did, before the screenshot after it. */
-const SETTLE_MS = Number(process.env.NAGET_COMPUTER_SETTLE_MS) || 700;
+const SETTLE_MS = Number(process.env.HYDOR_COMPUTER_SETTLE_MS) || 700;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The screenshot in words: its size, what it shows, the app in front and the pointer. */

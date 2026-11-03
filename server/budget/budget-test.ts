@@ -4,7 +4,7 @@
 // usage chat() reads, and the usage_update lines the ACP parser turns into tokens and dollars.
 // Build and run with a scratch data folder (PRICES_URL= keeps the price table offline):
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/budget/budget-test.ts
-//   DATA_DIR=/tmp/naget-test-budget PRICES_URL= node dist/dev/budget-test.js
+//   DATA_DIR=/tmp/hydor-test-budget PRICES_URL= node dist/dev/budget-test.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -33,7 +33,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '')
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-budget-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-budget-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];

@@ -1,10 +1,10 @@
 // Script tests for what apps need and show beyond words: the keys an app needs (asked for before it runs, saved to
 // the vault with its hosts, never travelling with it), pictures, videos and files in answers (taken in from this
 // computer, served where a view's frame can reach them, and never able to run on the app's own address), an app's
-// own files in its .naget-app, a ready-made app's file coming back as itself, and views' widgets and libraries.
+// own files in its .hydor-app, a ready-made app's file coming back as itself, and views' widgets and libraries.
 // Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/apps/media-test.ts
-//   DATA_DIR=/tmp/naget-test-media node dist/dev/media-test.js
+//   DATA_DIR=/tmp/hydor-test-media node dist/dev/media-test.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -37,7 +37,7 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-media-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-media-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 store.ensureTables(db);
 vaultTables(db);
@@ -253,9 +253,9 @@ test('media kept while what shows it is: a run’s files go a day after the run'
   store.deleteApp(db, a.id);
 });
 
-// ---- an app's own files, and its .naget-app ---------------------------------------------------------------------
+// ---- an app's own files, and its .hydor-app ---------------------------------------------------------------------
 
-test('an app’s own files: kept by name, packed in its .naget-app under assets/, installed with it; its keys travel by name only', async () => {
+test('an app’s own files: kept by name, packed in its .hydor-app under assets/, installed with it; its keys travel by name only', async () => {
   const cover = await putAsset(db, 'cover.png', { data: PNG }, 'The cover');
   const a = store.saveApp(db, { recipe: recipe({ name: 'Postcards', assets: { 'cover.png': cover } } as Partial<AppRecipe>) });
   saveSecret(db, { name: 'WEATHER_KEY', value: 'wk_secret_value_1', domains: ['api.weather.test'] });
@@ -263,7 +263,7 @@ test('an app’s own files: kept by name, packed in its .naget-app under assets/
   assert.deepEqual(Object.keys(pkg.files ?? {}), ['cover.png']);
   const zip = zipPackage(pkg);
   assert.equal(zip.includes(Buffer.from('wk_secret_value_1')), false, 'no key travels');
-  const back = readPackage({ file: { name: 'postcards.naget-app', data: zip.toString('base64') } });
+  const back = readPackage({ file: { name: 'postcards.hydor-app', data: zip.toString('base64') } });
   assert.ok(back.files?.['cover.png']?.equals(PNG), 'its file comes back from assets/');
   const { preview } = await previewOf(db, back);
   assert.deepEqual(preview.files.map((f) => [f.name, f.mime, f.bytes]), [['cover.png', 'image/png', PNG.length]]);

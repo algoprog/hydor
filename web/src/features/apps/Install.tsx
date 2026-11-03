@@ -183,7 +183,7 @@ export interface InstallHandle {
   open: (f: File) => void;
 }
 
-/** "Install a template from a file": picks a .naget-app or .json, shows what it will do, installs it. */
+/** "Install a template from a file": picks a .hydor-app or .json, shows what it will do, installs it. */
 /** `trigger`: what opens the file picker, in place of the usual link (a menu item, say); none: only `open`. */
 export const InstallFromFile = forwardRef<InstallHandle, { trigger?: (open: () => void) => ReactNode }>(function InstallFromFile({ trigger }, handle) {
   const input = useRef<HTMLInputElement>(null);
@@ -196,7 +196,7 @@ export const InstallFromFile = forwardRef<InstallHandle, { trigger?: (open: () =
   const pick = async (f: File | undefined) => {
     if (!f) return;
     if (f.size > MAX_FILE) return toast(`An app file is at most ${MAX_FILE >> 20} MB`, 'error');
-    if (!/\.(naget-app|zip|json)$/i.test(f.name)) return toast('That is not an app file (.naget-app or .json)', 'error');
+    if (!/\.(hydor-app|naget-app|zip|json)$/i.test(f.name)) return toast('That is not an app file (.hydor-app or .json)', 'error');
     try {
       const sent = { name: f.name, data: await fileToBase64(f) };
       const r = await post<{ preview: InstallPreview }>('/api/apps/install/check', { file: sent });
@@ -238,7 +238,7 @@ export const InstallFromFile = forwardRef<InstallHandle, { trigger?: (open: () =
       <input
         ref={input}
         type="file"
-        accept=".naget-app,.zip,.json,application/json,application/zip"
+        accept=".hydor-app,.zip,.json,application/json,application/zip"
         className="hidden"
         onChange={(e) => {
           void pick(e.target.files?.[0]);
@@ -267,13 +267,13 @@ export const InstallFromFile = forwardRef<InstallHandle, { trigger?: (open: () =
   );
 });
 
-/** Downloads a template as a .naget-app; one that keeps data asks whether its records go too. */
+/** Downloads a template as a .hydor-app; one that keeps data asks whether its records go too. */
 export function DownloadDialog({ app, open, onClose }: { app: AppDef; open: boolean; onClose: () => void }) {
   const [records, setRecords] = useState(false);
   const download = () => {
     const a = document.createElement('a');
     a.href = `/api/apps/${enc(app.id)}/export${records ? '?data=1' : ''}`;
-    a.download = `${app.slug}.naget-app`;
+    a.download = `${app.slug}.hydor-app`;
     document.body.append(a);
     a.click();
     a.remove();
@@ -297,7 +297,7 @@ export function DownloadDialog({ app, open, onClose }: { app: AppDef; open: bool
       }
     >
       <div className="space-y-3 text-[13.5px]">
-        <p className="text-fg-2">One file with everything it does and needs, and the apps its steps call, to keep or to install on another Naget Agent. Its folder, keys and public page stay here.</p>
+        <p className="text-fg-2">One file with everything it does and needs, and the apps its steps call, to keep or to install on another Hydor. Its folder, keys and public page stay here.</p>
         {app.data && (
           <label className="flex items-center justify-between gap-3">
             <span>Include the records it keeps</span>

@@ -190,7 +190,7 @@ When a page opens a pop-up (an alert, a yes-or-no question, a prompt for text, o
 
 With [Keep pages off this machine and its network](/settings?s=browser&find=Keep%20pages%20off%20this%20machine%20and%20its%20network) on (as it is at first), pages can't reach this computer or other devices on its network. When an agent wants one, for example a website you are building that runs on this computer (a dev server), it asks first: "Wants to open localhost:3000, on this machine or its network", with **Don’t allow** and **Allow for this session**. Allowing it lets this session's browser open that address from then on, and the agent is told to open it again.
 
-An address on this computer or its network that you type yourself while you drive is allowed for the session the same way. **Sites for this session**, in the browser's menu, lists what you allowed under "Allowed on this machine or its network"; the × beside one takes it away. Naget Agent itself can never be opened from the browser.
+An address on this computer or its network that you type yourself while you drive is allowed for the session the same way. **Sites for this session**, in the browser's menu, lists what you allowed under "Allowed on this machine or its network"; the × beside one takes it away. Hydor itself can never be opened from the browser.
 
 ## The browser's menu
 
@@ -245,7 +245,7 @@ If Chrome's own sandbox (the wall between pages and the rest of the computer) ca
 
 ### Keep pages off this machine and its network
 
-[Keep pages off this machine and its network](/settings?s=browser&find=Keep%20pages%20off%20this%20machine%20and%20its%20network) is on at first. Pages can't reach this computer or private addresses on its network (routers, printers, this app), whether by a live connection or by a site name that later leads to such an address: every connection goes through a checkpoint of the app's. A session can still open its own dev server once you allow it (see [Let a session open a site on this computer or your network](/guide/web#let-a-session-open-a-site-on-this-computer-or-your-network)). Turned off, pages can reach your network, but Naget Agent itself stays off limits.
+[Keep pages off this machine and its network](/settings?s=browser&find=Keep%20pages%20off%20this%20machine%20and%20its%20network) is on at first. Pages can't reach this computer or private addresses on its network (routers, printers, this app), whether by a live connection or by a site name that later leads to such an address: every connection goes through a checkpoint of the app's. A session can still open its own dev server once you allow it (see [Let a session open a site on this computer or your network](/guide/web#let-a-session-open-a-site-on-this-computer-or-your-network)). Turned off, pages can reach your network, but Hydor itself stays off limits.
 
 ### Screenshots for models that see images
 
@@ -282,8 +282,8 @@ In the Mac app, agents can also use the Mac itself, like a person at it: they se
 Open [Settings → Capabilities → Computer use](/settings?s=computer) ("Agents see your Mac’s screen and use its mouse and keyboard, in the Mac app"):
 
 1. Turn on [**Let agents use this Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac).
-2. Beside [**Accessibility**](/settings?s=computer&find=Accessibility), macOS's permission to use the mouse and keyboard, press **Allow…**. macOS asks whether Naget Agent may control this computer, and its System Settings open at **Privacy & Security → Accessibility**: turn on **Naget Agent** there.
-3. Beside [**Screen Recording**](/settings?s=computer&find=Screen%20Recording), macOS's permission to see the screen, press **Allow…**, and turn on **Naget Agent** under **Screen Recording** (**Screen & System Audio Recording** on macOS 15). If macOS asks to quit and reopen Naget Agent, do: running agents carry on.
+2. Beside [**Accessibility**](/settings?s=computer&find=Accessibility), macOS's permission to use the mouse and keyboard, press **Allow…**. macOS asks whether Hydor may control this computer, and its System Settings open at **Privacy & Security → Accessibility**: turn on **Hydor** there.
+3. Beside [**Screen Recording**](/settings?s=computer&find=Screen%20Recording), macOS's permission to see the screen, press **Allow…**, and turn on **Hydor** under **Screen Recording** (**Screen & System Audio Recording** on macOS 15). If macOS asks to quit and reopen Hydor, do: running agents carry on.
 
 A permission macOS gave shows **Allowed**. The section is in Settings everywhere, but only the Mac app can do this: elsewhere it says so.
 

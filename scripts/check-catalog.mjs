@@ -74,7 +74,7 @@ function validate(s, v, at, errs) {
 // ---- the rules beyond the schema ------------------------------------------------------------------------
 
 const PLACEHOLDER = /\{\{([A-Za-z0-9_]+)\}\}/g;
-const RESERVED = new Set(['naget-agent', 'agent-console', 'catalog', 'secrets', 'requests', 'session', 'flows', 'callback', 'mcp', 'launch']);
+const RESERVED = new Set(['hydor', 'naget-agent', 'agent-console', 'catalog', 'secrets', 'requests', 'session', 'flows', 'callback', 'mcp', 'launch']);
 const GLYPHS = new Set(['folder', 'git', 'globe', 'brain', 'clock', 'database', 'browser', 'search', 'terminal', 'mail', 'calendar', 'chat', 'key', 'cloud', 'list']);
 
 function safeSvg(svg) {
@@ -114,7 +114,7 @@ function rules(a, file) {
 
 // ---- probing ------------------------------------------------------------------------------------------
 
-const UA = { 'user-agent': 'Naget Agent catalog check (+https://github.com/Naget-Inc/naget-agent)' };
+const UA = { 'user-agent': 'Hydor catalog check (+https://github.com/algoprog/hydor)' };
 const fillDefaults = (u, fields) => u.replace(PLACEHOLDER, (_m, n) => fields?.find((f) => f.name === n)?.default ?? fields?.find((f) => f.name === n)?.placeholder ?? 'example');
 
 async function getJson(u) {
@@ -179,7 +179,7 @@ async function probeRemote(a) {
     r = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...UA },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'naget-catalog-check', version: '1' } } }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'hydor-catalog-check', version: '1' } } }),
       signal: AbortSignal.timeout(20_000),
     });
   } catch (e) {

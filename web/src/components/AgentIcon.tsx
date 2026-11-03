@@ -1,18 +1,14 @@
 import { useId } from 'react';
 import type { Agent } from '@shared/types';
-import { ARCH, GoldGradient, MARK_BOX, NUGGET } from './Logo';
+import { MARK_BOX, WaterOmega } from './Logo';
 import { cx } from './ui';
 
-/** Custom, the app's own agent: the app's mark without its tile; the nugget lifts while it works. */
+/** Custom, the app's own agent: the app's mark without its tile, the Ω full of water; it ebbs and flows while it works. */
 function CustomMark({ size, className, working }: { size: number; className?: string; working?: boolean }) {
   const id = useId();
   return (
-    <svg width={size} height={size} viewBox={MARK_BOX} className={cx('shrink-0 text-fg-2', working && 'mark-working', className)} aria-label="Custom" role="img">
-      <defs>
-        <GoldGradient id={id} />
-      </defs>
-      <path d={ARCH} fill="none" stroke="currentColor" strokeWidth="66" />
-      <circle className="mark-nugget" {...NUGGET} fill={`url(#${id})`} />
+    <svg width={size} height={size} viewBox={MARK_BOX} className={cx('shrink-0 text-fg-2', className)} aria-label="Custom" role="img">
+      <WaterOmega id={id} water={working ? 'throbber-water' : undefined} />
     </svg>
   );
 }

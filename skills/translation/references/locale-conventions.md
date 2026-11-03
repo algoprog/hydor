@@ -53,7 +53,7 @@ Keep it as a table in a file beside the work, or at the top of a long job. One r
 | --- | --- | --- | --- |
 | dashboard | tableau de bord | noun, masculine; not "dashboard" | Ouvrez le tableau de bord. |
 | sign in | se connecter | verb; the button says "Connexion" | Connectez-vous avec votre e-mail. |
-| Naget Agent | Naget Agent | product name: never translated | |
+| Hydor | Hydor | product name: never translated | |
 | you | vous | formal throughout this client's texts | |
 ```
 

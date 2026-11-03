@@ -4,7 +4,7 @@
 // views (each checks out, and every name it uses is there in an answer of its app's shape).
 // Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/apps/ui-test.ts
-//   DATA_DIR=/tmp/naget-test-ui node dist/dev/ui-test.js
+//   DATA_DIR=/tmp/hydor-test-ui node dist/dev/ui-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -209,7 +209,7 @@ test('a version says what changed in a view', () => {
 });
 
 test('a view in an app’s folder: each element as HTML and CSS of its own, read back as it was', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-ui-test-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ui-test-'));
   const db = openDb(path.join(tmp, 'test.db'));
   store.ensureTables(db);
   const a = store.saveApp(db, { recipe: recipe({ ui: { ...VIEW, style: '.x { color: red }' } as unknown as AppUi }) });

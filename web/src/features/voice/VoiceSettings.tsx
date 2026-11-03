@@ -63,7 +63,7 @@ function DictationSettings() {
         {!window.isSecureContext && (
           <Note icon={<Lock size={14} />} tone="warn">
             The microphone needs a secure connection: HTTPS, or localhost on this computer. This page is at <span className="font-mono text-[12px]">{location.origin}</span>, so dictation cannot
-            start here. Open Naget Agent through an HTTPS address to use it.
+            start here. Open Hydor through an HTTPS address to use it.
           </Note>
         )}
         {own ? (

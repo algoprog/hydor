@@ -115,7 +115,7 @@ function topicTitle(lang, id) {
   return id;
 }
 
-const PROPER = /^(CLAUDE|Gemini|GitHub|Claude|Codex|OpenRouter|Ollama|MCP|ACP|Naget)/;
+const PROPER = /^(CLAUDE|Gemini|GitHub|Claude|Codex|OpenRouter|Ollama|MCP|ACP|Naget|Hydor)/;
 const lower = (s, lang) => (PROPER.test(s) || lang === 'zh' ? s : s[0].toLocaleLowerCase(lang) + s.slice(1));
 
 for (const lang of ['en', 'zh', 'el']) {

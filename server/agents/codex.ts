@@ -40,7 +40,7 @@ function codexServers(o: CodexOpts): Record<string, unknown> {
     out[name] = { ...(d.type === 'http' ? { url: d.url, ...(d.headers ? { http_headers: d.headers } : {}) } : { command: d.command, args: d.args ?? [], env: d.env ?? {} }), tool_timeout_sec: 600 };
   // Its tools may take minutes (an image model at work): Codex would give up after 60 seconds.
   if (o.pageServer) out[PAGE_SERVER] = { url: o.pageServer, default_tools_approval_mode: 'approve', tool_timeout_sec: 600 };
-  // Tools an assistant leaves out ("mcp__naget-agent__web_search"), off on their server.
+  // Tools an assistant leaves out ("mcp__hydor__web_search"), off on their server.
   for (const m of (o.add?.disallowedTools ?? []).map((t) => /^mcp__(.+?)__(.+)$/.exec(t))) if (m && out[m[1]]) ((out[m[1]].disabled_tools ??= []) as string[]).push(m[2]);
   return out;
 }

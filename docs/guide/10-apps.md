@@ -15,7 +15,7 @@ An app holds everything a task needs except the details that change each time:
 - **The answer**: the fields of the result (a summary, a list, a table) that the agent fills in when it is done. An app without answer fields gives the agent's reply instead.
 - **Who does it**: the agent, its model, its mode, and the tools it may use.
 
-Each time you run an app, Naget Agent starts a session with the filled-in task. The agent works through it from start to finish without stopping to ask you things: it makes sensible assumptions and says what they were. That one go is called a **run**. You can then ask for changes to the result, and the agent hands in an updated one.
+Each time you run an app, Hydor starts a session with the filled-in task. The agent works through it from start to finish without stopping to ask you things: it makes sensible assumptions and says what they were. That one go is called a **run**. You can then ask for changes to the result, and the agent hands in an updated one.
 
 Open the Apps page from the **Apps** tile at the bottom of the sidebar, or go to [/apps](/apps). On a phone the sidebar is a drawer: open it first. You can also find any app, yours or ready-made, by typing its name in the search box (Ctrl+K, ⌘K on a Mac).
 
@@ -27,19 +27,19 @@ The page is headed **Apps**, with two tabs: **Agent apps**, the apps this topic 
 - **Find an app**: a box that narrows the apps by their names, descriptions and kinds as you type, and under it chips for their kinds (**All**, then each kind, the ready-made apps' first).
 - **Pick up where you left off**: your latest runs (four, with **All** for up to six), with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
 - **Your own apps**: the ones you made or installed from a file.
-- **Ready-made apps**: the ones that come with Naget Agent, installed, under their kinds (**Research**, **Planning**, **Shopping**, **Weather**, **Sports**, **Food**, **Fun** and the rest). Each card, yours too, has its icon, name and description, **Its own view** when its answer opens in a view of its own (maps, charts, tables), **Works in chats** when agents run it for you in your sessions, **Public** when its public page is open, and when it last ran. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open** and **Download as a file**. When nothing matches what you typed, the page says "No app does that yet", with **Describe it to an agent**, which starts the App builder with your words.
+- **Ready-made apps**: the ones that come with Hydor, installed, under their kinds (**Research**, **Planning**, **Shopping**, **Weather**, **Sports**, **Food**, **Fun** and the rest). Each card, yours too, has its icon, name and description, **Its own view** when its answer opens in a view of its own (maps, charts, tables), **Works in chats** when agents run it for you in your sessions, **Public** when its public page is open, and when it last ran. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open** and **Download as a file**. When nothing matches what you typed, the page says "No app does that yet", with **Describe it to an agent**, which starts the App builder with your words.
 - **Ready-made apps to install**: there once you uninstall a ready-made app. Each card shows its kind, what it does and what you get from it (the pages of its view, such as the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**), and **Install** (see [Install or uninstall a ready-made app](#install-or-uninstall-a-ready-made-app)).
 - **Building blocks** (folded): small apps made to be steps of your own (sum up a page, translate, answer from the web, sort into kinds, pull out the facts), with the blocks you made yourself; **Add a step** offers them in every app's steps.
 
 A run's state shows as a badge: **Waiting** (in line), **Starting**, **Working**, **Needs you** (it waits for an approval or an answer), **Done**, **Failed** or **Stopped**.
 
-Drop an app's file (`.naget-app` or `.json`) anywhere on the page to install it: the card that says what it is opens first (see [Share an app as a file](#share-an-app-as-a-file)).
+Drop an app's file (`.hydor-app` or `.json`) anywhere on the page to install it: the card that says what it is opens first (see [Share an app as a file](#share-an-app-as-a-file)).
 
 On a phone the cards stack in one column and the kind chips scroll sideways.
 
 ## Use a ready-made app
 
-These come with Naget Agent, installed: they are among **Your apps** from the start, and agents can run them for you in your sessions (see [Have an agent run an app for you](#have-an-agent-run-an-app-for-you)). Each works in steps: its page shows **How it works**, and **As a graph** (or **Make it mine**) opens them in the builder. Each hands back its answer in a view of its own, with pages for its parts and buttons that do things (see [Its view](#its-view)). Their agent steps run with Claude Code unless you pick another agent on their page; their quick steps ask the helper model (Settings → Models). The ones with a "Let me…" question wait for you partway only when you tick it and someone is there to answer: run from their form, or by an agent in one of your sessions.
+These come with Hydor, installed: they are among **Your apps** from the start, and agents can run them for you in your sessions (see [Have an agent run an app for you](#have-an-agent-run-an-app-for-you)). Each works in steps: its page shows **How it works**, and **As a graph** (or **Make it mine**) opens them in the builder. Each hands back its answer in a view of its own, with pages for its parts and buttons that do things (see [Its view](#its-view)). Their agent steps run with Claude Code unless you pick another agent on their page; their quick steps ask the helper model (Settings → Models). The ones with a "Let me…" question wait for you partway only when you tick it and someone is there to answer: run from their form, or by an agent in one of your sessions.
 
 - **Deep research report**: a sourced report on any question, with the web searched, facts cross-checked and every claim cited. You give the topic, what to focus on, the depth and who it is for. It plans the questions, searches them three at a time, ranks the sources, reads the best pages side by side, searches again where a question is short of sources, and writes the report with numbered citations; **Let me check the questions first** has it wait for you to keep or change them. Its view has **Summary** (the question, how sure it is, and the key findings, each with **Dig deeper**, which starts a report of its own on it), **Full report** (with **Copy the report**) and **Sources**, which you can show by publisher.
 - **Trip planner**: a day-by-day plan checked against your dates (opening hours, events, travel times), with a budget and what to book ahead. It works out the dates, then looks up events and holidays, the weather (the forecast when the trip is ten days away or less), what to see and where to stay, and getting around, side by side, before it plans the days and adds up the budget; **Let me choose before it plans** has it ask you where to stay and what must be in. Its view has **Your trip** (the trip in numbers, the plan, the days at a glance and tips; **Relaxed**, **Balanced** or **Packed**, and **+ One more day**, plan it again that way), **Day by day** (a timeline where you tick off each morning, afternoon and evening, with a map of each day's area), a page for each day (with **Copy the day** and **Research** its area), **Map** (each day's area on a map, numbered and joined in order), **Book ahead** (a list to tick off as you book) and **Budget** (a chart and each estimate).
@@ -103,7 +103,7 @@ A question may have a line of help under it, an example answer in the box, and a
 
 On a ready-made app, **Change** beside the line under the form shows the pickers (and **Done** folds them away):
 
-- **Agent**: Claude Code, Codex, Custom (Naget Agent's own agent for any model) or another agent you added.
+- **Agent**: Claude Code, Codex, Custom (Hydor's own agent for any model) or another agent you added.
 - **Model**: the agent's models.
 - **Effort**: how hard the model thinks, for models that offer levels (not for Custom and the other added agents).
 - **Mode**: what the agent may do without asking you. It starts at **Auto**, because nobody watches a run. A mode that asks before each step leaves the run waiting for you.
@@ -128,7 +128,7 @@ Some apps use a model through OpenRouter (one that draws pictures, say). Those a
 
 ### Where a run works
 
-Each run gets a new folder of its own, inside a `naget-apps` folder in your home folder, named after the app and the time. An app can name a folder instead (see [Who does it](#who-does-it)); then every run works there.
+Each run gets a new folder of its own, inside a `hydor-apps` folder in your home folder, named after the app and the time. An app can name a folder instead (see [Who does it](#who-does-it)); then every run works there.
 
 The session of a run you start from the form shows in the sidebar's session list like any other, titled with the app's name and your first answers. Runs from the API, other agents, a public page or rows of a CSV are archived, so they stay out of the list and show under their app.
 
@@ -276,9 +276,9 @@ The fields the agent fills in when it is done. They show as a card or a table, a
 - **What goes here, for the agent (optional)**: a hint for the agent.
 - For a **Table**: its **Columns**, each with a name and a kind (**Text**, **Number**, **Yes / no**, **Date**, **Link** or **Picture**). **Add a column** adds one; a table keeps at least one.
 
-A **Pictures, videos or files** field (and a **Picture** column) takes what the agent found or made: an address on the web, or a file on this computer (a photo in your Pictures folder, a chart it drew, a recording), each with a caption. Naget Agent keeps a copy of a file on this computer, and of a picture on the web (up to 15 MB), so it shows wherever the answer does; videos on the web stay links. A public page's runs may only point at the web.
+A **Pictures, videos or files** field (and a **Picture** column) takes what the agent found or made: an address on the web, or a file on this computer (a photo in your Pictures folder, a chart it drew, a recording), each with a caption. Hydor keeps a copy of a file on this computer, and of a picture on the web (up to 15 MB), so it shows wherever the answer does; videos on the web stay links. A public page's runs may only point at the web.
 
-Naget Agent checks what the agent hands in: numbers must be numbers, dates real dates, links full web addresses. When something doesn't fit, the agent is told what to fix. An app can have up to 30 answer fields, and a table up to 12 columns. A new answer field takes its name for programs from its heading when you save; after that the name stays, so programs that read it keep working.
+Hydor checks what the agent hands in: numbers must be numbers, dates real dates, links full web addresses. When something doesn't fit, the agent is told what to fix. An app can have up to 30 answer fields, and a table up to 12 columns. A new answer field takes its name for programs from its heading when you save; after that the name stays, so programs that read it keep working.
 
 ### Examples
 
@@ -296,7 +296,7 @@ The section reads: "Runs go ahead without anyone watching, so pick a mode that d
 
 ### Tools
 
-What the runs may use from Naget Agent's own tools: web search, the browser, pages, memory and the rest. **All** is on at first. Turn it off to see a list with each tool's name and what it does, and tick the ones runs may use. The agent's own file and command tools follow its mode, not this list.
+What the runs may use from Hydor's own tools: web search, the browser, pages, memory and the rest. **All** is on at first. Turn it off to see a list with each tool's name and what it does, and tick the ones runs may use. The agent's own file and command tools follow its mode, not this list.
 
 ### Keys it needs
 
@@ -327,9 +327,9 @@ Each save that changes what an app does is a version: **Versions**, near the end
 
 ### Work on it as files
 
-**Its folder**, near the end of a saved app's **Edit**, puts the app in a folder of files (**Make its folder**; by default in Naget/Apps in your home folder), to change it in any editor or with a coding agent opened on that folder. app.json is the app (what it asks, does and gives back), instructions/ holds each step's instructions in Markdown, steps/ each code step as the function it runs, screens/ its screens, and graph.json where its steps sit; .naget/ has a schema of app.json and the types of a code step, so your editor completes and checks them. Each change you save there comes here as a version by **Its folder**, and the app open in its **Edit** changes with it (or says **It changed in its folder while you changed it here.**); a mistake there is said here and changes nothing. A save here writes the folder again, and **Stop keeping it in step** leaves the files where they are. Its data stays here, not in the folder.
+**Its folder**, near the end of a saved app's **Edit**, puts the app in a folder of files (**Make its folder**; by default in Hydor/Apps in your home folder), to change it in any editor or with a coding agent opened on that folder. app.json is the app (what it asks, does and gives back), instructions/ holds each step's instructions in Markdown, steps/ each code step as the function it runs, screens/ its screens, and graph.json where its steps sit; .naget/ has a schema of app.json and the types of a code step, so your editor completes and checks them. Each change you save there comes here as a version by **Its folder**, and the app open in its **Edit** changes with it (or says **It changed in its folder while you changed it here.**); a mistake there is said here and changes nothing. A save here writes the folder again, and **Stop keeping it in step** leaves the files where they are. Its data stays here, not in the folder.
 
-On the computer Naget Agent runs on, the command line does the same, in its folder: `node dist/server/cli.js app new "Reading list"` makes an app and its folder, `app folder <app>` makes an app's, `app dev <app>` tries its examples each time you save a change there, `app try <app>` tries it once (and fails when a check does), and `app export` and `app import` carry it to another computer as one file, saying what it will do there before it is installed. `app help` lists them; they use a key of their own, which **Settings → Machines** lists as “This computer’s command line”.
+On the computer Hydor runs on, the command line does the same, in its folder: `node dist/server/cli.js app new "Reading list"` makes an app and its folder, `app folder <app>` makes an app's, `app dev <app>` tries its examples each time you save a change there, `app try <app>` tries it once (and fails when a check does), and `app export` and `app import` carry it to another computer as one file, saying what it will do there before it is installed. `app help` lists them; they use a key of their own, which **Settings → Machines** lists as “This computer’s command line”.
 
 ## Call an app from your own programs
 
@@ -338,7 +338,7 @@ Scripts, shortcuts and other programs can run your app with a key and get its an
 1. Press **New key**, say what will use it (to tell keys apart), and press **Make the key**.
 2. Copy the key right away: "Your new key. Copy it now: it is not shown again."
 
-A key opens this app only, nothing else in Naget Agent. The list shows each key's name, its first and last characters, and when it was last used. **Revoke** ends a key: programs using it stop working at once.
+A key opens this app only, nothing else in Hydor. The list shows each key's name, its first and last characters, and when it was last used. **Revoke** ends a key: programs using it stop working at once.
 
 The tab shows an example call with your app's address and sample answers. For an app of yours named Trip planner, it looks something like this:
 
@@ -355,11 +355,11 @@ curl -X POST https://your-address/api/apps/trip-planner/run \
 - A run still going can be asked about at `GET …/run/<run>?wait=60`.
 - Behind a proxy that cuts long requests (Cloudflare's stops at 100 seconds), wait less and ask again.
 
-A key may make up to 30 calls a minute, and the app's daily limit applies. More on Naget Agent's own API in [The app's API](/guide/api).
+A key may make up to 30 calls a minute, and the app's daily limit applies. More on Hydor's own API in [The app's API](/guide/api).
 
 ## Let other agents run an app as a tool
 
-Claude Code, Cursor or another agent connected to Naget Agent's own MCP server (a standard way for agents to reach tools) can run your app as a tool. Under **API & sharing** → **Other agents**, the switch **Offer to other agents** offers it as a tool named after its address, like `app_trip_planner`. It is on for new apps. The agent fills in the form as the tool's input and waits for the answer; a long run comes back with its id, which the agent checks with a second tool, `app_run_status`. The address and the tokens such agents need are in [Settings → App → Connect other agents](/settings?s=connect).
+Claude Code, Cursor or another agent connected to Hydor's own MCP server (a standard way for agents to reach tools) can run your app as a tool. Under **API & sharing** → **Other agents**, the switch **Offer to other agents** offers it as a tool named after its address, like `app_trip_planner`. It is on for new apps. The agent fills in the form as the tool's input and waits for the answer; a long run comes back with its id, which the agent checks with a second tool, `app_run_status`. The address and the tokens such agents need are in [Settings → App → Connect other agents](/settings?s=connect).
 
 ## Open a public page anyone can use
 
@@ -368,7 +368,7 @@ A public page lets anyone with the link fill in the form and see the answer, wit
 Public runs always use Custom, so first add a model for Custom in [Settings → Agents → Models](/settings?s=models). Then:
 
 1. Turn on the switch. The state changes from **Closed** to **Open to anyone with the link**, and Custom's first model is picked for it (change it below).
-2. Copy the link (Naget Agent's address followed by `/a/` and the app's address), or **Open** it.
+2. Copy the link (Hydor's address followed by `/a/` and the app's address), or **Open** it.
 3. Set the rest:
    - **Model (one of Custom's)**: the model public runs use.
    - **Search and read the web**: on at first. Off, the agent answers from what it knows.
@@ -390,7 +390,7 @@ Run your app on a whole list at once: one run per row of a spreadsheet saved as 
 4. Read the cost estimate (see [What a run costs](#what-a-run-costs)) and choose how many run **At once**: 1, 2, 3, 4 or 6 (2 at first).
 5. Press **Run** and the number of rows.
 
-A file question takes its cell as text: a path on this computer, or a web address. A row whose values don't fit the form fails at once, with the reason in the table, so you know what to fix. If the rows would take the app past its daily limit, Naget Agent refuses before starting.
+A file question takes its cell as text: a path on this computer, or a web address. A row whose values don't fit the form fails at once, with the reason in the table, so you know what to fix. If the rows would take the app past its daily limit, Hydor refuses before starting.
 
 While the rows run, a table fills in: the row number, the first two questions, the state, up to four answer fields (or the reply), and a link to each run. Above it: how many are done, how many did not finish, the cost so far and how many run at once, with a progress bar.
 
@@ -398,7 +398,7 @@ While the rows run, a table fills in: the row number, the first two questions, t
 - **CSV** downloads the results: each row's answers, every answer field, its state, any error, its cost and a link to its session. Cells a spreadsheet would treat as a formula start with an apostrophe.
 - The **×** closes the table.
 
-Rows keep going if Naget Agent restarts. **Earlier tables** lists your past runs of rows (the last 30) with their progress and whether they are **Running**, **Stopped** or **Finished**; click one to open its table again.
+Rows keep going if Hydor restarts. **Earlier tables** lists your past runs of rows (the last 30) with their progress and whether they are **Running**, **Stopped** or **Finished**; click one to open its table again.
 
 ## Run an app by itself
 
@@ -412,7 +412,7 @@ An app can run by itself: at a time of day, every so often, once, when another s
 
 Each run's cost shows on its page once it ends, and in the **Runs** list. It is the figure the agent reports, or its use priced at API rates (for Custom, estimated from what it read and wrote); models running on this computer cost $0.
 
-Before you run a CSV, Naget Agent estimates the whole batch: "About $… for … rows", from the middle cost of the app's last finished runs (up to 30). With a cap per run, it adds the most the rows could spend. When the app has never finished a run, it says "Run the app once to see what a run costs."
+Before you run a CSV, Hydor estimates the whole batch: "About $… for … rows", from the middle cost of the app's last finished runs (up to 30). With a cap per run, it adds the most the rows could spend. When the app has never finished a run, it says "Run the app once to see what a run costs."
 
 To keep costs in hand, set **Most one run may spend (US$)** and **Runs a day (from anywhere)** under the app's **Limits**, and, for a public page, its daily budget. See [Usage, limits and costs](/guide/usage) for what all sessions spend.
 
@@ -436,7 +436,7 @@ The kinds of steps:
 
 - **Ask an agent**: a session works on its part with its tools and hands in what it found. Each has a session of its own, which you can open from the run's page.
 - **Ask a model**: one quick answer from a model, with no tools: sort, pull out, sum up. It costs little, and nothing with a model on this computer.
-- **Use a tool**: one of Naget Agent's own tools with set inputs: search the web, read a page, call an address with a saved key, read a document, make a picture, or send you a notification.
+- **Use a tool**: one of Hydor's own tools with set inputs: search the web, read a page, call an address with a saved key, read a document, make a picture, or send you a notification.
 - **Decide**: one way or the other, by a rule ("the price is under 100") or by a question in words that the helper model answers.
 - **Repeat**: its steps once for each item of a list (a few at a time, if you like), or again until something holds.
 - **At the same time**: branches that run side by side; the flow goes on when they have all ended.
@@ -514,10 +514,10 @@ A screen is a page of the app's own: it does not show in your Library, it goes w
 
 ## Share an app as a file
 
-An app can travel as one file, to keep or to install on another Naget Agent.
+An app can travel as one file, to keep or to install on another Hydor.
 
-- **To download one**: open the app, then **More** (⋯) → **Download as a file**, or use **More** (⋯) on its card on the Apps page. Ready-made apps download the same way. The file (`.naget-app`) holds everything it does and needs, its own files (pictures, videos, data), and the apps its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here: the keys it needs travel by their names only, and are asked for where it is installed.
-- **To install one**: press **New app** on the Apps page, then **Install from a file**, and pick a `.naget-app`, `.zip` or `.json` file (up to 160 MB); or drop the file on the Apps page. Before anything is made, a card shows what it is, in plain words: its name and what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works**, **Agents can use it**, with a switch to keep agents from running it, and **A key it needs** (or **Keys it needs**), to give now or at its first run. **What it uses here** (folded, and open by itself when something needs a look) lists who does the work, its steps, its own files, its view's scripts and the libraries they load, its screens, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, through OpenRouter (added to your models when it first runs, its key asked for with the app's keys), or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
+- **To download one**: open the app, then **More** (⋯) → **Download as a file**, or use **More** (⋯) on its card on the Apps page. Ready-made apps download the same way. The file (`.hydor-app`) holds everything it does and needs, its own files (pictures, videos, data), and the apps its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here: the keys it needs travel by their names only, and are asked for where it is installed.
+- **To install one**: press **New app** on the Apps page, then **Install from a file**, and pick a `.hydor-app`, `.zip` or `.json` file (up to 160 MB); or drop the file on the Apps page. Before anything is made, a card shows what it is, in plain words: its name and what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works**, **Agents can use it**, with a switch to keep agents from running it, and **A key it needs** (or **Keys it needs**), to give now or at its first run. **What it uses here** (folded, and open by itself when something needs a look) lists who does the work, its steps, its own files, its view's scripts and the libraries they load, its screens, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, through OpenRouter (added to your models when it first runs, its key asked for with the app's keys), or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
 
 Some things change on the way in, and the card says which: a folder it worked in elsewhere is left out (each run gets one of its own), a mode that allows every step without asking starts as **Auto** instead, and an assistant this computer lacks is dropped. An app that comes with it and is the same as one you have is used again; otherwise it installs beside yours. Its public page starts closed, and it has no API keys.
 
@@ -525,7 +525,7 @@ A ready-made app's file says which app it is: where you uninstalled that app, in
 
 ## Ask an agent
 
-Agents in Naget Agent can make and run apps for you through its API, with your OK on a card. For example:
+Agents in Hydor can make and run apps for you through its API, with your OK on a card. For example:
 
 - "Make an app called Weekly report that asks for a project and a date range, and answers with a summary and a table of what changed."
 - "Turn this session into an app I can run again."
@@ -540,7 +540,7 @@ Agents in Naget Agent can make and run apps for you through its API, with your O
 - "Uninstall the Weekly news digest app, and stop agents from running my Price check app in sessions."
 - "Make an app with steps that reads each link I send, sums it up with a quick model and keeps it in a reading list."
 - "Add a step to my Competitor watch app that tells me only when something changed."
-- "Install the app in reading-list.naget-app from my Downloads folder."
+- "Install the app in reading-list.hydor-app from my Downloads folder."
 - "Make an app that sums up the weather for a city from OpenWeather. It needs my OpenWeather API key."
 - "Add a map of the stops and a chart of what each day costs to my City break app's view."
 - "Add the photos in ~/Pictures/Lisbon to my City break app, and show them on its first page."

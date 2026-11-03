@@ -1,14 +1,14 @@
 // A small program agents start for their connected apps (built as dist/server/connbridge.js), so no key
 // is ever written into an agent's MCP settings:
 //
-//   connbridge launch unix:<socket> <path>   asks Naget Agent for a local app's command and environment (its
+//   connbridge launch unix:<socket> <path>   asks Hydor for a local app's command and environment (its
 //                                 keys among them) on the app's own socket, which only this user can open
 //                                 (or at an http address when that socket is off), runs it, and passes its
 //                                 MCP messages through: only the tools that are on, keys masked in replies.
-//                                 A form the app asks for mid-call (MCP elicitation) goes to Naget Agent,
+//                                 A form the app asks for mid-call (MCP elicitation) goes to Hydor,
 //                                 which shows it in the session; the answer goes back to the app.
 //   connbridge relay <address>    MCP over stdin and stdout, for an agent that cannot reach an address
-//                                 itself, carried to Naget Agent's relay for a remote app.
+//                                 itself, carried to Hydor's relay for a remote app.
 //
 // Messages are JSON-RPC, one per line. Imports nothing from the server.
 import { spawn } from 'node:child_process';
@@ -19,7 +19,7 @@ type Msg = { jsonrpc?: string; id?: string | number | null; method?: string; par
 const [mode, address, socketPath] = process.argv.slice(2);
 const out = (m: Msg) => process.stdout.write(`${JSON.stringify(m)}\n`);
 const die = (text: string) => {
-  process.stderr.write(`[naget-agent] ${text}\n`);
+  process.stderr.write(`[hydor] ${text}\n`);
   process.exit(1);
 };
 
@@ -89,10 +89,10 @@ async function launch() {
   let spec: { name: string; command: string; args: string[]; env: Record<string, string>; only: string[] | null; skip: string[]; mask: string[] };
   try {
     const r = address.startsWith('unix:') ? await getUnix(address.slice(5), socketPath ?? '') : await fetch(address, { signal: AbortSignal.timeout(20_000) }).then(async (x) => ({ status: x.status, body: await x.json().catch(() => ({})) }));
-    if (r.status !== 200) return die(r.body?.error ?? `Naget Agent answered ${r.status}`);
+    if (r.status !== 200) return die(r.body?.error ?? `Hydor answered ${r.status}`);
     spec = r.body;
   } catch (e) {
-    return die(`Could not reach Naget Agent: ${(e as Error).message}`);
+    return die(`Could not reach Hydor: ${(e as Error).message}`);
   }
   const only = spec.only ? new Set(spec.only) : null;
   const skip = new Set(spec.skip ?? []);
@@ -108,7 +108,7 @@ async function launch() {
   // tools/list requests on their way, so their answers can be trimmed to the tools that are on.
   const listing = new Set<string>();
   const off = (m: Msg) => m.method === 'tools/call' && !on(m.params?.name);
-  // Forms the app asks for: to Naget Agent, beside the address the command came from.
+  // Forms the app asks for: to Hydor, beside the address the command came from.
   const asking = new Set<AbortController>();
   const toApp = (m: Msg) => child.stdin!.write(`${JSON.stringify(m)}\n`);
   const askUser = async (m: Msg) => {
@@ -139,7 +139,7 @@ async function launch() {
       }
       // Calls to tools that are off are answered here (or dropped, without an id), in a batch too.
       each(v, (m) => {
-        // The app may ask for forms: Naget Agent shows them, whatever the agent itself can.
+        // The app may ask for forms: Hydor shows them, whatever the agent itself can.
         if (m.method === 'initialize') m.params = { ...(m.params ?? {}), capabilities: { ...(m.params?.capabilities ?? {}), elicitation: { form: {}, url: {} } } };
         // The agent gave up on a call: a form it was waiting on ends.
         if (m.method === 'notifications/cancelled') for (const ac of asking) ac.abort();
@@ -186,7 +186,7 @@ async function launch() {
 
 function relay() {
   let session: string | undefined;
-  /** The agent's initialize, to introduce it again when Naget Agent or the app has forgotten the session. */
+  /** The agent's initialize, to introduce it again when Hydor or the app has forgotten the session. */
   let init: string | undefined;
   let again: Promise<void> | null = null;
   let pending = 0;
@@ -222,7 +222,7 @@ function relay() {
         try {
           if (again) await again;
           let r = await post(line);
-          // The session is gone (Naget Agent or the app restarted): introduced again, then once more.
+          // The session is gone (Hydor or the app restarted): introduced again, then once more.
           if (r.status === 404 && session && init && init !== line) {
             await r.text().catch(() => '');
             await reintroduce();
@@ -233,9 +233,9 @@ function relay() {
           const j = await r.json().catch(() => null);
           if (j && typeof j === 'object' && !Array.isArray(j) && 'jsonrpc' in j) out(j as Msg);
           else if (Array.isArray(j)) j.forEach((x) => out(x));
-          else if (m.id != null) out({ jsonrpc: '2.0', id: m.id, error: { code: -32000, message: (j as any)?.error ?? `Naget Agent answered ${r.status}` } });
+          else if (m.id != null) out({ jsonrpc: '2.0', id: m.id, error: { code: -32000, message: (j as any)?.error ?? `Hydor answered ${r.status}` } });
         } catch (e) {
-          if (m.id != null) out({ jsonrpc: '2.0', id: m.id, error: { code: -32000, message: `Could not reach Naget Agent: ${(e as Error).message}` } });
+          if (m.id != null) out({ jsonrpc: '2.0', id: m.id, error: { code: -32000, message: `Could not reach Hydor: ${(e as Error).message}` } });
         } finally {
           pending--;
           finish();

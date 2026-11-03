@@ -51,7 +51,7 @@ Under the projects, **Folders you work in** lists folders your sessions used lat
    - **Other folders it uses**: more folders of yours its agents work with, where they are; nothing is copied. **Add a folder** adds one, up to 12; ✕ leaves one out again.
 4. Click **Make the project**, or press Enter in the name field.
 
-A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Naget/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/assistants#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Projects page, the new project's page opens. Made from the start page, the new project is picked for the session you are about to start.
+A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Hydor/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/assistants#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Projects page, the new project's page opens. Made from the start page, the new project is picked for the session you are about to start.
 
 Two more things are set on the project's **Settings** tab afterwards: the assistant its sessions start as, and the projects it brings together. Its documents go on its **Knowledge** tab, its skills on its **Skills** tab, and more folders on its **Files** tab.
 
@@ -162,7 +162,7 @@ Each skill shows as a row: its name, when to use it, how often agents in the pro
 
 ### How agents get them
 
-Every Claude Code, Codex and Custom session started in the project gets its skills together with your skill library: Claude Code in the same plugin named "naget" (naget:citation-style), Codex in the same extra folder of skills, Custom in its list of skills. The agent is also told which skills are the project's own, and to use one when it fits the task. Custom has a skill you add or change from its next turn; Claude Code and Codex from their next session.
+Every Claude Code, Codex and Custom session started in the project gets its skills together with your skill library: Claude Code in the same plugin named "hydor" (hydor:citation-style), Codex in the same extra folder of skills, Custom in its list of skills. The agent is also told which skills are the project's own, and to use one when it fits the task. Custom has a skill you add or change from its next turn; Claude Code and Codex from their next session.
 
 The skills are kept in the app's data folder, not in the project's folder, so your files stay as they are. A group's sessions also get the skills of the projects it brings together (see [What sessions in a group get](#what-sessions-in-a-group-get)).
 
@@ -268,7 +268,7 @@ The files come from the device you are using. On a phone, **choose files** opens
 
 The folder is read where it is: nothing is copied. It shows as a chip on the base, and the base keeps up with it. A minute after the app starts, and every hour after that, the app reads what is new or changed in the folder and drops what was deleted. To read it at once, pick **Read again now** in the base's menu.
 
-"This computer" is the one Naget Agent runs on, which may not be the device in front of you.
+"This computer" is the one Hydor runs on, which may not be the device in front of you.
 
 To stop reading a folder, click the × on its chip. Its documents leave the base; the folder and its files are untouched.
 

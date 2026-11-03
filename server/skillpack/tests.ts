@@ -5,7 +5,7 @@
 // proposals in a space (kept for the space alone, or changing one of its own skills).
 //
 //   OUTDIR=dist/skill-tests node scripts/build-server.mjs server/skillpack/tests.ts
-//   DATA_DIR=/tmp/naget-skill-tests node dist/skill-tests/tests.js
+//   DATA_DIR=/tmp/hydor-skill-tests node dist/skill-tests/tests.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -44,7 +44,7 @@ async function test(name: string, fn: () => unknown) {
   }
 }
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-skills-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-skills-'));
 const BUNDLED = path.join(APP_ROOT, 'skills');
 setFolders({ bundled: BUNDLED, learned: path.join(root, 'learned'), view: path.join(root, 'view', 'naget') });
 const db = openDb(path.join(root, 'test.db'));
@@ -138,7 +138,7 @@ await test('the view links every bundled skill, and is a Claude Code plugin', ()
     assert.ok(fs.existsSync(path.join(view, n, 'SKILL.md')));
   }
   const manifest = JSON.parse(fs.readFileSync(path.join(folders().view, '.claude-plugin', 'plugin.json'), 'utf8'));
-  assert.equal(manifest.name, 'naget');
+  assert.equal(manifest.name, 'hydor');
 });
 
 await test('a learned skill joins the view, takes the place of a built-in one of its name, and gives it back when removed', () => {
@@ -172,8 +172,8 @@ await test("Custom's skills list: the project's own first, then the library (bun
   const proj = path.join(root, 'project');
   write(path.join(proj, '.claude', 'skills', 'writing', 'SKILL.md'), '---\nname: writing\ndescription: Use when writing for this project.\n---\n\n# Project writing\n');
   write(path.join(proj, '.agents', 'skills', 'deploy', 'SKILL.md'), '---\nname: deploy\ndescription: Use when deploying this project.\n---\n\n# Deploy\n');
-  const before = process.env.NAGET_SKILL_DIRS;
-  process.env.NAGET_SKILL_DIRS = viewSkills();
+  const before = process.env.HYDOR_SKILL_DIRS;
+  process.env.HYDOR_SKILL_DIRS = viewSkills();
   try {
     const list = findSkills(proj);
     const by = new Map(list.map((s) => [s.name, s]));
@@ -181,8 +181,8 @@ await test("Custom's skills list: the project's own first, then the library (bun
     assert.ok(by.has('deploy'), 'the project’s .agents skills');
     for (const n of ['clarify-first', 'research', 'troubleshooting', 'my-notes', 'pdf']) assert.ok(by.get(n)?.file.startsWith(viewSkills()), `${n} from the view`);
   } finally {
-    if (before === undefined) delete process.env.NAGET_SKILL_DIRS;
-    else process.env.NAGET_SKILL_DIRS = before;
+    if (before === undefined) delete process.env.HYDOR_SKILL_DIRS;
+    else process.env.HYDOR_SKILL_DIRS = before;
   }
   const vis = visibleSkills(proj);
   assert.equal(vis.find((s) => s.name === 'writing')?.source, 'own');
@@ -205,7 +205,7 @@ await test('what each agent is given: a plugin folder, an extra skills folder, a
   const codex = await skillpack.spawn!({ ...base, agent: 'codex' }, deps);
   assert.deepEqual(codex?.skillRoots, [viewSkills()]);
   const custom = await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'console' }, deps);
-  assert.equal(custom?.env?.NAGET_SKILL_DIRS, viewSkills());
+  assert.equal(custom?.env?.HYDOR_SKILL_DIRS, viewSkills());
   // Other ACP agents have no skills of their own: they get the list, each with the SKILL.md to read.
   const other = (await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'gemini' }, deps))?.instructions?.join('\n') ?? '';
   assert.match(other, /read its SKILL\.md with your file tools/);
@@ -275,7 +275,7 @@ await test("Custom's instructions: the routing rule, the triggered skill's text,
 console.log('skills being loaded');
 
 await test('recognised in every agent’s steps', () => {
-  assert.equal(skillLoaded({ name: 'Skill', title: 'Skill naget:research', input: { skill: 'naget:research' } }), 'research');
+  assert.equal(skillLoaded({ name: 'Skill', title: 'Skill hydor:research', input: { skill: 'hydor:research' } }), 'research');
   assert.equal(skillLoaded({ name: 'read', title: 'Skill clarify-first', input: { name: 'clarify-first' } }), 'clarify-first');
   assert.equal(skillLoaded({ name: 'exec_command', title: "sed -n '1,200p' /data/skillpack/naget/skills/troubleshooting/SKILL.md", input: {} }), 'troubleshooting');
   assert.equal(skillLoaded({ name: 'exec_command', title: 'cat ~/.agents/skills/deploy/SKILL.md', input: {} }), 'deploy');
@@ -289,7 +289,7 @@ await test('recognised in every agent’s steps', () => {
 
 await test('counted once per step, from the timelines', () => {
   skillpack.start!(deps);
-  const item = { kind: 'tool', id: 't1', seq: 0, ts: Date.now(), tool: { name: 'Skill', category: 'other', title: 'Skill naget:research', status: 'ok', input: { skill: 'naget:research' } } };
+  const item = { kind: 'tool', id: 't1', seq: 0, ts: Date.now(), tool: { name: 'Skill', category: 'other', title: 'Skill hydor:research', status: 'ok', input: { skill: 'hydor:research' } } };
   sessions.emit('items', 'claude:s9', [item]);
   sessions.emit('items', 'claude:s9', [item]);
   sessions.emit('items', 'claude:s9', [{ ...item, id: 't2', tool: { ...item.tool, status: 'running' } }]);
@@ -526,7 +526,7 @@ await test('in a space: kept for the space alone or for every session as the use
   assert.equal((await app.inject({ method: 'GET', url: '/api/skillpack/skills/sowing-plan' })).statusCode, 404);
   // Custom in the space has its skills in its list, and its keywords bring them in.
   const custom = await skillpack.spawn!({ cwd: root, runId: 'r', resume: false, agent: 'acp', acpAgent: 'console', extra: { space: sp.id } }, deps);
-  const dirs = custom!.env!.NAGET_SKILL_DIRS;
+  const dirs = custom!.env!.HYDOR_SKILL_DIRS;
   assert.equal(fs.readlinkSync(path.join(dirs, 'sowing-plan')), path.join(spaceSkillsDir(sp.id), 'sowing-plan'));
   assert.equal(fs.readlinkSync(path.join(dirs, 'troubleshooting')), path.join(spaceSkillsDir(sp.id), 'troubleshooting'));
 });

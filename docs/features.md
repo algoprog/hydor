@@ -1,6 +1,6 @@
 # Features
 
-Everything Naget Agent does, by area. [Back to the README](../README.md).
+Everything Hydor does, by area. [Back to the README](../README.md).
 
 ## Sessions
 - The prompt bar’s Stop button shows a rotating ring while a session starts or works, paused while
@@ -43,7 +43,7 @@ agents that speak ACP and take MCP servers.
 - **Assistants**: start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or App builder (it makes
   apps), or one of your own (its instructions, model, tools and connected accounts; import Claude Code's agent
   files), and switch to another in the session's message box when the work changes. A task without a folder gets
-  one of its own (`~/Naget/<date>-<task>`).
+  one of its own (`~/Hydor/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
   how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,
   Codex, Custom or an ACP agent. Three levels: every session (Settings → Agents → Agent Guidelines), a project, and
@@ -238,7 +238,7 @@ agents that speak ACP and take MCP servers.
   its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
   edited in the Library's page editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
   flows and a conversation with its agent, who finds and changes its records and runs its flows for you (the
-  latest conversation shows on return; earlier ones a click away). Apps travel as one file (.naget-app or .json, with their records, screens, own files and the apps they
+  latest conversation shows on return; earlier ones a click away). Apps travel as one file (.hydor-app or .json, with their records, screens, own files and the apps they
   call; the keys they need by name only), downloaded from an app's page or its card's More, the ready-made ones too (a ready-made app's file brings it
   back where it was uninstalled), and installed from New app or by dropping the file on the Apps page, after a card that says what they ask, give and do, in plain words, with the keys they need,
   then what they will use here (folded: their files, their view's scripts and libraries, models, packages), offering one of your models for any they ask for that is not set up here; uninstalling one deletes it.
@@ -301,7 +301,7 @@ agents that speak ACP and take MCP servers.
 
 OpenRouter session costs and token usage show above the message box without a spending cap. Charges come from OpenRouter automatically, with its generation records and catalog prices as fallbacks; its catalog also supplies Usage estimates, so no manual prices are required.
 
-Custom is the app's own agent, for models beyond Claude Code's and Codex's. Its working and starting indicators use the Naget loading animation, vertically centred beside their text. It works like them: it reads,
+Custom is the app's own agent, for models beyond Claude Code's and Codex's. Its working and starting indicators use the Hydor loading animation (water rising and falling in its Ω), vertically centred beside their text. It works like them: it reads,
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
 Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context. In Auto mode routine steps go ahead and a quick check asks you
@@ -478,7 +478,7 @@ programs shows each program's version and what is out, with Check now, Update no
   it, and the agent can set things up for you there too. Its sections show in the search box as well. The same
   guide is in [docs/guide](guide/).
 - Starts when the computer starts (on by default; Settings → General), as a service of your user.
-- Several machines: add other machines running Naget Agent, over SSH or by address, and switch between
+- Several machines: add other machines running Hydor, over SSH or by address, and switch between
   them from the sidebar. Notices from all of them reach you wherever you are.
 - One password guards the app, and a browser stays signed in for 30 days. Wrong passwords are counted by the
   address they come from: after three in an hour the sign-in page also shows a picture of characters to type,

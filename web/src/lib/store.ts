@@ -100,7 +100,7 @@ export const toastError = (e: unknown) => toast(e instanceof Error ? e.message :
 export interface Bootstrap {
   version: string;
   home: string;
-  /** The app's own data folder (~/.naget-agent, or ~/.web-agent on older installs). */
+  /** The app's own data folder (~/.hydor, or ~/.naget-agent or ~/.web-agent on older installs). */
   dataDir?: string;
   defaultCwd: string;
   /** Folders no one picks (task folders' place, apps' runs, worktrees, the temporary folder…); missing on older servers. */
@@ -461,7 +461,7 @@ function newerBuild(build: string) {
     sessionStorage.removeItem('wa.updating');
   } catch {}
   if (asked) return location.reload();
-  const offer = () => useToasts.getState().push('info', 'Naget Agent was updated', { label: 'Reload', run: () => location.reload() }, 'Reload to use the new version');
+  const offer = () => useToasts.getState().push('info', 'Hydor was updated', { label: 'Reload', run: () => location.reload() }, 'Reload to use the new version');
   if (document.visibilityState === 'visible') offer();
   else document.addEventListener('visibilitychange', offer, { once: true });
 }

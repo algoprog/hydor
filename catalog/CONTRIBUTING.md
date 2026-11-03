@@ -2,7 +2,7 @@
 
 Apps → Connected apps lists the apps in `catalog/connections/`, one JSON file per app. Anyone can add
 one, or fix one, with a pull request. Once connected, an app's tools reach every agent the person runs
-in Naget Agent: Claude Code, Codex, ACP agents and Custom.
+in Hydor: Claude Code, Codex, ACP agents and Custom.
 
 ## What makes a good entry
 
@@ -47,9 +47,9 @@ check a file against it through the `$schema` line.
 ### auth
 
 - `{ "type": "none" }`: nothing to sign in to.
-- `{ "type": "oauth" }`: the person signs in in their browser. Naget finds the sign-in server from
+- `{ "type": "oauth" }`: the person signs in in their browser. Hydor finds the sign-in server from
   the MCP server's own metadata, registers itself as a client, and uses PKCE. The sign-in comes back
-  to Naget's own address, so it works from a phone too.
+  to Hydor's own address, so it works from a phone too.
   - A sign-in server that does not let apps register by themselves needs the person's own client ID.
     Say how to get one in `"help"`.
   - Add `"scopes"` only when the server's metadata does not say which to ask for.
@@ -91,5 +91,5 @@ node scripts/check-catalog.mjs --probe example    # ask the server itself how it
 
 The probe sends a remote server an MCP `initialize` and looks up its sign-in (whether it asks for
 one, where, and whether apps can register by themselves). For a local server it looks the package
-up on npm or PyPI. Nothing is installed or run. If you connected the app in Naget Agent and its Test
+up on npm or PyPI. Nothing is installed or run. If you connected the app in Hydor and its Test
 listed the tools, say so in the pull request.

@@ -12,7 +12,7 @@ import { LiveView, type LiveViewApi } from './LiveView';
 import { SessionSites, ProfilePicker } from './Options';
 
 /** Opens a session's browser view from elsewhere (a card in the conversation, the session's menu). */
-export const showBrowser = (key: string) => window.dispatchEvent(new CustomEvent('naget:browser', { detail: { key } }));
+export const showBrowser = (key: string) => window.dispatchEvent(new CustomEvent('hydor:browser', { detail: { key } }));
 
 /** The user takes the wheel: on a phone, the page is laid out for its screen meanwhile. */
 export function takeOver(key: string, phone: boolean) {
@@ -290,8 +290,8 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
       if (mobile) setFull(true);
       else setExpanded(true);
     };
-    window.addEventListener('naget:browser', h);
-    return () => window.removeEventListener('naget:browser', h);
+    window.addEventListener('hydor:browser', h);
+    return () => window.removeEventListener('hydor:browser', h);
   }, [key, mobile]);
   // Opened for what needed the user: closed again once it is settled (unless they opened it themselves).
   const auto = useRef(false);
