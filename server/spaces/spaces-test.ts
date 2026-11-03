@@ -1,7 +1,7 @@
 // Script tests for spaces: a new space gets a folder of its own (or uses one given), its fields are cleaned,
 // its sessions are counted, it can leave the shared knowledge out, a session in it is told its instructions,
-// a group brings spaces together, and a space has skills of its own that its sessions get with the skill
-// library's. Build and run with a scratch data folder:
+// a group brings spaces together, a space has skills of its own that its sessions get with the skill
+// library's, and folders used lately that no space has are suggested for one. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/spaces/spaces-test.ts
 //   DATA_DIR=/tmp/naget-test-spaces node dist/dev/spaces-test.js
 import assert from 'node:assert/strict';
@@ -20,6 +20,7 @@ import { skillpack } from '../skillpack/index.ts';
 import { folders, librarySkills, parseSkill, setFolders, skillText } from '../skillpack/library.ts';
 import { copyToSpace, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, spaceSkillsDir, spaceSkillsView, spaceSkillText } from '../skillpack/spaceSkills.ts';
 import { createSpace, deleteSpace, sessionsIn, spaceById, spaces, spaceViews, updateSpace } from './index.ts';
+import { hideSuggestion, spaceSuggestions } from './suggest.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -280,6 +281,71 @@ test('deleting a space puts its skills in the skill library, named for the space
   assert.ok(!fs.existsSync(spaceSkillsDir(sp.id)), 'its own folder of skills is gone');
   assert.ok(fs.existsSync(path.join(folders().view, 'skills', 'citation-style')), 'in the library’s view');
   for (const n of ['citation-style', 'research-thesis-2026']) fs.rmSync(path.join(folders().learned, n), { recursive: true });
+});
+
+test('folders sessions worked in, or changed files in, are suggested for a space until one has them', () => {
+  // Its own home: an earlier test's space has the whole scratch folder.
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'naget-suggest-test-'));
+  const repo = path.join(home, 'code', 'shop');
+  const notes = path.join(home, 'Documents', 'notes');
+  const once = path.join(home, 'old-thing');
+  for (const d of [path.join(repo, '.git'), path.join(repo, 'web', 'src'), notes, once, path.join(home, '.config', 'x')]) fs.mkdirSync(d, { recursive: true });
+  const now = Date.now();
+  const DAY = 86_400_000;
+  const row = db.prepare(`insert into sessions (key, agent, id, path, cwd, updated_at, hidden, user_msgs, state) values (?, 'claude', ?, ?, ?, ?, 0, 1, ?)`);
+  let n = 0;
+  const add = (cwd: string, ago: number, files: string[] = []) => {
+    const key = `claude:sug${++n}`;
+    row.run(
+      key,
+      `sug${n}`,
+      `/nowhere/${n}.jsonl`,
+      cwd,
+      now - ago * DAY,
+      JSON.stringify({
+        files: Object.fromEntries(files.map((f) => [f, [1, 0]])),
+      }),
+    );
+    return key;
+  };
+  // In the repository (a folder inside it counts as the repository), changing a note elsewhere.
+  add(repo, 1);
+  add(path.join(repo, 'web'), 2, [path.join(repo, 'web', 'src', 'a.ts'), path.join(notes, 'todo.md')]);
+  add(repo, 3);
+  add(once, 80);
+  add(once, 200); // too long ago to count
+  add(home, 1); // the home folder itself is no project
+  add(path.join(home, '.config', 'x'), 1);
+  add(path.join(tmp, 'Naget', 'tasks'), 1); // the app's own task folders
+  // A session started in a space belongs to it, wherever it ran.
+  fs.mkdirSync(path.join(home, 'elsewhere'));
+  const sp = createSpace(db, { name: 'Elsewhere' });
+  setSessionExtra(db, add(path.join(home, 'elsewhere'), 1), { space: sp.id });
+  const opts = { home, now };
+  let got = spaceSuggestions(db, opts);
+  assert.deepEqual(
+    got.map((s) => s.path),
+    [repo, notes, once],
+  );
+  assert.equal(got[0].sessions, 3);
+  assert.deepEqual([got[1].sessions, got[1].changed], [1, 1], 'the note only changed from the repository’s session');
+  // A space that has the folder, or one inside it, takes it off the list.
+  const shop = createSpace(db, { name: 'Shop', folder: repo });
+  got = spaceSuggestions(db, opts);
+  assert.deepEqual(
+    got.map((s) => s.path),
+    [notes, once],
+  );
+  updateSpace(db, shop.id, { folders: [notes] });
+  assert.deepEqual(
+    spaceSuggestions(db, opts).map((s) => s.path),
+    [once],
+  );
+  hideSuggestion(db, once);
+  assert.deepEqual(spaceSuggestions(db, opts), [], 'Not a project hides it');
+  deleteSpace(db, shop.id);
+  deleteSpace(db, sp.id);
+  fs.rmSync(home, { recursive: true, force: true });
 });
 
 for (const [name, fn] of tests) {

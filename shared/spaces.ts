@@ -61,3 +61,14 @@ export const MAX_FOLDERS = 12;
 
 /** A space that brings others together. */
 export const isGroup = (s: Pick<Space, 'members'>) => !!s.members?.length;
+
+/** A folder worth a space of its own (the Spaces page's suggestions): sessions worked in it lately, or changed its files, and no space has it yet. */
+export interface SpaceSuggestion {
+  path: string;
+  /** Sessions that worked in it or changed files in it, in the last 90 days. */
+  sessions: number;
+  /** Of those, how many only changed its files (they ran in another folder). */
+  changed: number;
+  /** When one of them was last at work. */
+  lastAt: number;
+}

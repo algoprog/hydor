@@ -17,6 +17,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
+import { hideSuggestion, spaceSuggestions } from './suggest.ts';
 import { copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, skillsOf, spaceSkillDoc, spaceSkillsView } from '../skillpack/spaceSkills.ts';
 
 const made = new WeakSet<DB>();
@@ -256,6 +257,15 @@ export const spaces: Feature = {
       const s = createSpace(d.db, body(req));
       changed();
       return s;
+    });
+    // Folders sessions worked in lately that no space has yet (server/spaces/suggest.ts).
+    d.app.get('/api/spaces/suggestions', async () => ({ folders: spaceSuggestions(d.db) }));
+    d.app.post('/api/spaces/suggestions/hide', async (req) => {
+      const folder = typeof body(req).folder === 'string' ? String(body(req).folder).trim() : '';
+      if (!folder.startsWith('/')) throw new HttpError(400, 'Which folder?');
+      hideSuggestion(d.db, folder);
+      changed();
+      return { folders: spaceSuggestions(d.db) };
     });
     d.app.get('/api/spaces/:id', async (req) => {
       const s = spaceById(d.db, id(req));
