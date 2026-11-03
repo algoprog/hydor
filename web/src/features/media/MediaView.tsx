@@ -1,9 +1,9 @@
 // One image or video in the Library (/media/<id>): the picture (a tap away from full size) or the video to play,
 // its title and description (written by a model, or by you: Edit), what it was made from and with, its size,
 // length and file, the session it came from, and for a video the frames the model saw. Download, write the
-// title and description again, or delete it.
+// title and description again, start a new session with it in the message box, or delete it.
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Download, Ellipsis, MessagesSquare, Pencil, RefreshCw, Settings2, Trash2, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, Download, Ellipsis, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, Trash2, TriangleAlert } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { clipLength, type MediaItem } from '@shared/media';
 import { api, del, enc, patch } from '../../lib/api';
@@ -16,7 +16,7 @@ import { VideoPlayer } from '../../components/VideoPlayer';
 import { Button, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { NavButton } from '../layout/PageHeader';
-import { downloadMedia, recaption } from './MediaGrid';
+import { downloadMedia, recaption, startSessionWithMedia } from './MediaGrid';
 import { mediaUrl, useMedia } from './state';
 
 export function MediaRoute() {
@@ -111,6 +111,9 @@ function MediaView({ id }: { id: string }) {
             </h1>
             <div className="truncate text-[11.5px] text-fg-3">{m.kind === 'video' ? (m.duration ? `A video, ${clipLength(m.duration)}` : 'A video') : 'An image'}</div>
           </div>
+          <Button size="sm" variant="primary" icon={<MessageSquarePlus size={14} />} onClick={() => startSessionWithMedia(m)} title="Start a session with it" aria-label="Start a session with it">
+            <span className="max-sm:hidden">Start a session with it</span>
+          </Button>
           <Button size="sm" variant="secondary" icon={<Download size={14} />} onClick={() => downloadMedia(m)}>
             <span className="max-sm:hidden">Download</span>
           </Button>

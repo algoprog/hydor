@@ -63,9 +63,10 @@ export async function readAttachments(files: FileList | File[], have: Attachment
 }
 
 /** A file or folder on the host as an attachment: shown like the others, sent by its path. */
-export function hostAttachment(path: string, o: { size?: number; dir?: boolean } = {}): Attachment {
-  const name = path.split('/').filter(Boolean).pop() ?? path;
-  const image = !o.dir && /\.(png|jpe?g|gif|webp)$/i.test(name);
+export function hostAttachment(path: string, o: { size?: number; dir?: boolean; name?: string } = {}): Attachment {
+  const file = path.split('/').filter(Boolean).pop() ?? path;
+  const name = o.name || file;
+  const image = !o.dir && /\.(png|jpe?g|gif|webp)$/i.test(file);
   return { id: nextId++, name, mediaType: '', size: o.size ?? 0, data: '', image, url: image ? mu(`/api/fs/raw?path=${encodeURIComponent(path)}`) : undefined, path, dir: o.dir };
 }
 
