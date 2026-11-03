@@ -3,6 +3,20 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.14.2 · 3 November 2026
+
+Ask an agent about a file without leaving it, a sidebar that lists your projects, and a sharp browser in full screen.
+
+- **Ask beside a file**: **Ask** in a file's editor bar (✨ on a phone) opens a panel next to the file. Say what to
+  change or ask about it, and the agent edits the file in place while you watch. The conversation stays with the
+  file, and **Open as a session** takes it further. The editor now takes in changes made on disk without starting
+  again, so your place, cursor and scroll stay, and the changed lines light up for a moment.
+- **Projects in the sidebar**: folders and spaces sit under a **Projects** heading, one line per session with how
+  long ago it was active (or what the agent is doing). Every row has a **⋯** menu, on phones too, now with
+  **Delete**.
+- **Browser in full screen**: the page no longer shows up small and blurry. The small picture in the browser's bar
+  kept asking for small frames, and full screen stretched them.
+
 ## 0.14.1 · 3 November 2026
 
 A picture to read after wrong passwords and an hour's pause after ten, and sessions that wait out a usage limit only
