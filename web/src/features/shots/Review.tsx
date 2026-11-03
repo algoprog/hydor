@@ -9,6 +9,7 @@ import { ArrowLeftRight, ChevronLeft, ChevronRight, Columns2, Image as ImageIcon
 import type { UiShot } from '@shared/shots';
 import type { TimelineItem, ToolItem } from '@shared/types';
 import { api, enc } from '../../lib/api';
+import { mu } from '../../lib/machine';
 import { composeInsert } from '../../lib/featureEvents';
 import { openLightbox } from '../../components/Lightbox';
 import { tr } from '../../i18n/runtime';
@@ -16,7 +17,7 @@ import { Button, cx, IconButton, Segmented, Throbber } from '../../components/ui
 import { PageOverlay } from '../pages/overlay';
 import { CANVAS_MEDIA, onScreen, useCanvas } from '../pages/state';
 
-const src = (s: UiShot) => `/api/shots/${enc(s.id)}`;
+const src = (s: UiShot) => mu(`/api/shots/${enc(s.id)}`);
 
 /** The shots a call took, from what it answered: "(shot <id>, <id>)". */
 export const shotIds = (output?: string): string[] => /\(shot ([a-f0-9, ]+)\)/.exec(output ?? '')?.[1].split(/,\s*/).filter((x) => /^[a-f0-9]{12}$/.test(x)) ?? [];
