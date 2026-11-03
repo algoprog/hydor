@@ -9842,5 +9842,11 @@
 "Your shelf":"你的书架",
 "Play the quiz":"玩测验",
 "The timeline":"时间线",
-"What the data shows":"数据说明了什么"
+"What the data shows":"数据说明了什么",
+"images pictures photos drawings media kept saved generated library titles descriptions captions":"图片 照片 绘图 媒体 保留 保存 生成 资料库 标题 说明",
+"The Library’s pictures":"资料库中的图片",
+"The Library’s videos":"资料库中的视频",
+"The pictures agents made that you kept, each with a title and a description":"智能体做的、你保留下来的图片，每张都有标题和说明",
+"The videos agents made that you kept, each with a title and a description":"智能体做的、你保留下来的视频，每段都有标题和说明",
+"videos clips movies films media kept saved generated library titles descriptions captions frames":"视频 片段 影片 媒体 保留 保存 生成 资料库 标题 说明 帧"
 }

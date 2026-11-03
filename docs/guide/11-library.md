@@ -159,7 +159,7 @@ Above the cards:
 
 - **Find by name** narrows them by their titles (and a picture's description).
 - The button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
-- When a place holds more than one kind, **All**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX** and **Pictures and videos** show one kind at a time. [Show the pictures and videos](/library?kind=media).
+- When a place holds more than one kind, **All**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX**, **Pictures** and **Videos** show one kind at a time. [Show the pictures](/library?kind=image).
 
 With nothing kept yet, the Library says "Your Library is empty", with **New page** and **New slides**.
 
@@ -178,7 +178,7 @@ A space's own page shows what it holds in the Library too, on its **Overview** a
 
 Pictures and videos agents make for you stay in the session's folder (see [Ask for a picture, or have one changed](/guide/documents-voice#ask-for-a-picture-or-have-one-changed) and [Ask for a video](/guide/documents-voice#ask-for-a-video)). To keep one, click **Save to Library** under it in the conversation (with spaces, pick the one it goes in): a copy goes into your Library, where it stays after the session's folder is cleaned up, and a model writes its title and description (see [Titles and descriptions](#titles-and-descriptions)). The button then reads **In your Library** and opens it there.
 
-They show among the Library's other things; **Pictures and videos** above the cards shows them alone ([Show the pictures and videos](/library?kind=media)). Each is a card with a still of it and its title (while it is being written, "Writing its title…"); a video's card shows its length on the still. Click a card to open it (see [Open an image or a video](#open-an-image-or-a-video)). Its **More** (⋯) has **Start a session with it**, **Move to a space**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
+They show among the Library's other things; **Pictures** and **Videos** above the cards show each kind alone ([Show the videos](/library?kind=video)). Each is a card with a still of it and its title (while it is being written, "Writing its title…"); a video's card shows its length on the still. Click a card to open it (see [Open an image or a video](#open-an-image-or-a-video)). Its **More** (⋯) has **Start a session with it**, **Move to a space**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
 
 The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF) and videos (MP4, WebM, MOV), up to 1 GB each and 5,000 in all, in the app's data folder. Agents can work from what you kept: ask "use the boat picture from my Library for a birthday card", and the agent finds it there.
 
@@ -198,7 +198,7 @@ When no model could write them, they come from the words the image or video was 
 
 ## Open an image or a video
 
-An image or a video opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures and videos**), its title with "An image" or "A video" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Download** and **More** (⋯): **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from), **Move to a space** (the space it is in shows beside it) and **Delete**.
+An image or a video opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures**, or **The Library’s videos**), its title with "An image" or "A video" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Download** and **More** (⋯): **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from), **Move to a space** (the space it is in shows beside it) and **Delete**.
 
 Below, the picture (click it for full size) or the video, to play, and beside it (under it on a phone):
 

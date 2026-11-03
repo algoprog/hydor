@@ -3,6 +3,13 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.17.1 · 3 November 2026
+
+Pictures and videos each have their own place in the Library.
+
+- **Pictures** and **Videos** are separate in the Library: each kind has a chip of its own above the cards, and in
+  the search box. A picture's or video's page goes back to its own kind.
+
 ## 0.17.0 · 3 November 2026
 
 The Library and Spaces sorted by project, a clearer Apps page with many more ready-made apps, agents that find the

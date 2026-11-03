@@ -278,7 +278,9 @@ test('places: each address as the search box lists it', () => {
   assert.equal(placeOf('/apps/ab12', '', pages), 'app:ab12');
   assert.equal(placeOf('/apps/new', '', pages), 'go:new-app');
   assert.equal(placeOf('/library', '?tab=published', pages), 'go:published');
-  assert.equal(placeOf('/library', '?kind=media', pages), 'go:media');
+  assert.equal(placeOf('/library', '?kind=image', pages), 'go:media');
+  assert.equal(placeOf('/library', '?kind=video', pages), 'go:videos');
+  assert.equal(placeOf('/library', '?kind=media', pages), 'go:media', 'pictures and videos together, as the pictures');
   assert.equal(placeOf('/library', '?tab=media', pages), 'go:media', 'the old Media tab’s address');
   assert.equal(placeOf('/library', '', pages), 'go:library');
   assert.equal(placeOf('/pages/p1', '', pages), 'page:p1');

@@ -103,7 +103,7 @@ agents that speak ACP and take MCP servers.
   agent stops waiting, and plays in the app's own player. **Save to Library** keeps one in the Library, where a
   model that sees images writes its title and description (a video's from ten of its frames on one picture, with
   ffmpeg): the app's choice, any of OpenRouter's vision models, Claude through Claude Code, or a model of your own
-  (Ollama, vLLM, an endpoint). The Library shows them among its other things (Pictures and videos shows them alone), and finds, plays, downloads and edits them; **Start a session with it** opens a new
+  (Ollama, vLLM, an endpoint). The Library shows them among its other things (Pictures and Videos show each kind alone), and finds, plays, downloads and edits them; **Start a session with it** opens a new
   session with one in the message box, and agents can work from them.
 - **Connected apps**: on the Apps page beside your agent apps (Apps → Connected apps, which was Settings →
   Connections), a marketplace of services (Notion, Linear, GitHub, Google, Stripe and more), signed
@@ -126,7 +126,7 @@ agents that speak ACP and take MCP servers.
   ask which space when there are spaces (the session's first), New makes it in the space you look at, and More →
   Move to a space moves anything; its places (Everything, each space's things under its name, Not in a space,
   Published) sit beside the cards, with Find by name, sorting and kind chips (Pages, Slides, Documents,
-  Spreadsheets, LaTeX, Pictures and videos). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
+  Spreadsheets, LaTeX, Pictures, Videos). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too: click or tap a part to rewrite its words
   (bold, italic, links), restyle it (this part, every part of its kind or class, on hover, or for tablets and
