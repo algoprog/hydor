@@ -132,7 +132,7 @@ function OrKey() {
           Create one at openrouter.ai
           <ArrowUpRight size={13} />
         </a>{' '}
-        You pay OpenRouter for what you use.
+        Make an account there, add some credit, and create a key. You pay OpenRouter only for what you use.
       </p>
     </div>
   );
@@ -189,7 +189,7 @@ function OrModels({ st }: { st: ModelsState }) {
             ))}
           </div>
         ) : (
-          <p className="text-[13.5px] text-fg-3">None yet. Add one or more below: they show in the model menu once Custom is the agent.</p>
+          <p className="text-[13.5px] text-fg-3">None yet. Add one or more below: you pick them under the message box when Custom is the agent.</p>
         )}
       </div>
       <div>
@@ -197,7 +197,7 @@ function OrModels({ st }: { st: ModelsState }) {
         {hits && (
           <div className="mt-6">
             <Label aside={list.length > FIRST && <More n={list.length} open={all} onToggle={() => setAll((x) => !x)} />}>
-              {words ? (list.length ? 'Found' : 'Nothing found by that name') : 'The newest that use tools'}
+              {words ? (list.length ? 'Found' : 'Nothing found by that name') : 'The newest that can do tasks'}
             </Label>
             {list.length > 0 && (
               <div className={panel}>
@@ -221,14 +221,14 @@ function OrRow({ m, added, onToggle }: { m: OpenRouterModel; added: boolean; onT
     org,
     m.contextLength ? `${tokens(m.contextLength)} context` : '',
     free ? 'free' : m.price ? `${dollars(m.price.input)} in, ${dollars(m.price.output)} out` : '',
-    m.tools && m.tools !== 'native' ? 'no tool calls of its own' : '',
+    m.tools && m.tools !== 'native' ? 'less reliable at tasks' : '',
   ].filter(Boolean);
   return (
     <div className="flex items-center gap-3.5 px-4 py-3 transition-colors hover:bg-fg/[0.025]">
       <Mark name={org} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[14px] font-medium text-fg">{m.label}</div>
-        <div className="tnum mt-0.5 text-[12.5px] text-fg-3 sm:truncate" title="Prices are per million tokens">
+        <div className="tnum mt-0.5 text-[12.5px] text-fg-3 sm:truncate" title="Context: how much it can read at once. Prices are per million tokens (a token is about ¾ of a word): in is what it reads, out is what it writes">
           {facts.join(' · ')}
         </div>
       </div>
@@ -290,13 +290,13 @@ function Machine({ st }: { st: ModelsState }) {
           <div className="mt-1 text-[13.5px] text-fg-3">{[each, `${size(m.ramBytes)} of memory`, `${size(st.storage.freeBytes)} free for models`].filter(Boolean).join(' · ')}</div>
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px]">
             <Runtime name="Ollama" version={st.ollama.version} get="https://ollama.com/download" />
-            <Runtime name="vLLM" version={st.vllm.path ? (st.vllm.version ?? 'found') : undefined} hint="pip install vllm, for NVIDIA cards" />
+            <Runtime name="vLLM" version={st.vllm.path ? (st.vllm.version ?? 'found') : undefined} hint="Optional, for advanced setups: pip install vllm, for NVIDIA cards" />
           </div>
         </div>
       </div>
       <p className="mt-5 flex items-center gap-2 text-[14px] text-fg-2">
         <Check size={15} strokeWidth={2.6} className="shrink-0 text-ok" />
-        {best ? `Models up to about ${aboutParams(best.freeBytes)}B parameters run well here, on one card.` : 'Small models run on the processor; bigger ones are slow without a graphics card.'}
+        {best ? `Models up to about ${aboutParams(best.freeBytes)}B in size (billions of parameters, a model’s size) run well here.` : 'Small models run here, slowly; bigger ones need a graphics card.'}
       </p>
     </div>
   );
@@ -393,11 +393,11 @@ function Have({ m }: { m: LocalModel }) {
 function Runs({ fit }: { fit: ModelFit }) {
   const [tone, words] =
     fit.verdict === 'good'
-      ? ['text-ok', `Runs well${fit.tokensPerSec ? `, about ${fit.tokensPerSec} tokens/s` : ''}`]
+      ? ['text-ok', `Runs well${fit.tokensPerSec ? `, about ${Math.max(1, Math.round(fit.tokensPerSec * 0.75))} words a second` : ''}`]
       : fit.verdict === 'slow'
-        ? ['text-warn', 'Runs on the processor, slowly']
+        ? ['text-warn', 'Runs slowly here']
         : fit.verdict === 'tight'
-          ? ['text-warn', 'Runs on the processor, very slowly']
+          ? ['text-warn', 'Runs very slowly here']
           : ['text-err', 'Too big for this computer'];
   return (
     <span className={cx('inline-flex items-center gap-1.5 font-medium', tone)}>
@@ -474,7 +474,7 @@ function FromHf({ st }: { st: ModelsState }) {
   };
   return (
     <div>
-      <Find value={q} onChange={setQ} placeholder="Search Hugging Face, or paste org/name" busy={busy} onEnter={() => direct && void get(direct)} />
+      <Find value={q} onChange={setQ} placeholder="Search free models: qwen, gemma, llama…" busy={busy} onEnter={() => direct && void get(direct)} />
       {hits && (
         <div className="mt-6">
           <Label aside={rows.length > FIRST && <More n={rows.length} open={all} onToggle={() => setAll((x) => !x)} />}>
@@ -571,7 +571,7 @@ function Ways({ info, st, onCheck, onStarted }: { info: HfInspect; st: ModelsSta
     return (
       <div className="space-y-2">
         {gated}
-        {!st.ollama.version && note('Ollama runs these files, and it is not running here yet: install it, then come back.')}
+        {!st.ollama.version && note('This needs Ollama, a free program that runs models, and it is not running here yet: install it (the Install link above), then come back.')}
         {best && row(best, true)}
         {rest.length > 0 && (
           <>
@@ -593,7 +593,7 @@ function Ways({ info, st, onCheck, onStarted }: { info: HfInspect; st: ModelsSta
           <div className="flex items-center gap-3 py-1">
             <div className="min-w-0 flex-1">
               <div className="text-[13.5px] text-fg">
-                Its full weights, with vLLM <span className="text-fg-3">· {size(v.fit.downloadBytes)}</span>
+                The full model, with vLLM <span className="text-fg-3">· {size(v.fit.downloadBytes)}</span>
               </div>
               <div className="mt-0.5 text-[12.5px]">
                 <Runs fit={v.fit} />
@@ -604,13 +604,13 @@ function Ways({ info, st, onCheck, onStarted }: { info: HfInspect; st: ModelsSta
             </Button>
           </div>
         ) : (
-          note(v.supported === null ? 'vLLM runs these weights, and it is not installed here.' : (v.reason ?? 'vLLM can’t run this model here.'))
+          note(v.supported === null ? 'This one needs vLLM, a program for advanced setups, and it is not installed here.' : (v.reason ?? 'vLLM can’t run this model here.'))
         )}
         {info.ggufRepo &&
           v.supported !== true &&
           note(
             <>
-              Its 4-bit version runs with Ollama:{' '}
+              A smaller version runs with Ollama:{' '}
               <button type="button" className="font-medium text-accent hover:underline" onClick={() => onCheck(info.ggufRepo!)}>
                 {info.ggufRepo}
               </button>
@@ -619,5 +619,5 @@ function Ways({ info, st, onCheck, onStarted }: { info: HfInspect; st: ModelsSta
       </div>
     );
   }
-  return note('It has no files this app can run: GGUF for Ollama, or safetensors for vLLM.');
+  return note('This model can’t run here: it has no files Ollama or vLLM can use.');
 }

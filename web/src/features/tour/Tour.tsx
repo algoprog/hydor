@@ -295,11 +295,11 @@ const Connected = ({ label = 'Connected' }: { label?: string }) => (
 
 
 const TILES: { id: Use; title: string; sub: string; icon: ReactNode }[] = [
-  { id: 'claude', title: 'Claude Code', sub: 'With your Claude plan or an API key', icon: <AgentIcon agent="claude" size={18} /> },
-  { id: 'codex', title: 'Codex', sub: 'With your ChatGPT plan', icon: <AgentIcon agent="codex" size={18} /> },
-  { id: 'openrouter', title: 'Models through OpenRouter', sub: 'DeepSeek, Qwen, GLM, Kimi and hundreds more, paid per use', icon: <Cloud size={17} /> },
-  { id: 'local', title: 'Models on this computer', sub: 'Open models on your own hardware, with Ollama or vLLM', icon: <Cpu size={17} /> },
-  { id: 'agents', title: 'Other agents', sub: 'Gemini CLI, OpenCode, Qwen Code, Goose and more', icon: <Blocks size={17} /> },
+  { id: 'claude', title: 'Claude Code', sub: 'Anthropic’s Claude, with your Claude subscription', icon: <AgentIcon agent="claude" size={18} /> },
+  { id: 'codex', title: 'Codex', sub: 'OpenAI’s agent, with your ChatGPT subscription', icon: <AgentIcon agent="codex" size={18} /> },
+  { id: 'openrouter', title: 'Many AI models, pay as you go', sub: 'Hundreds of models (DeepSeek, Qwen, Kimi…) with one OpenRouter account', icon: <Cloud size={17} /> },
+  { id: 'local', title: 'AI on this computer', sub: 'Free models that run here, so nothing leaves your computer', icon: <Cpu size={17} /> },
+  { id: 'agents', title: 'Other agents', sub: 'If you already use Gemini CLI, OpenCode, Goose or the like', icon: <Blocks size={17} /> },
 ];
 
 /** The choice the tour adapts to; what is set up already starts ticked. */
@@ -343,7 +343,7 @@ function UsesPicker() {
     if (u === 'local') {
       if (models.local.length) return `${models.local.length} model${models.local.length > 1 ? 's' : ''} here already`;
       const g = models.machine.gpus[0];
-      return g ? `Open models on your ${shortGpu(g.name)}, with Ollama or vLLM` : 'Small open models on the processor, with Ollama';
+      return g ? `Free models on your ${shortGpu(g.name)}, so nothing leaves your computer` : 'Small free models; bigger ones need a graphics card';
     }
     return null;
   };
@@ -412,7 +412,7 @@ function AccountsSetup() {
                     ? `${s.email ?? 'Signed in'}${s.plan ? ` · ${planName(s.plan)}` : ''}`
                     : missing.includes(a)
                       ? 'Not on this computer yet: signing in installs it first'
-                      : (s.error ?? (a === 'claude' ? 'Claude Pro, Max or Team, or an Anthropic Console account' : 'A ChatGPT plan: Plus, Pro, Business or Enterprise'))}
+                      : (s.error ?? (a === 'claude' ? 'A Claude subscription (Pro, Max or Team) or an Anthropic Console account' : 'A ChatGPT subscription: Plus, Pro, Business or Enterprise'))}
               </div>
             </div>
             {s &&
@@ -452,7 +452,7 @@ function AgentsSetup() {
           <div className="min-w-0 flex-1">
             <div className="text-[13.5px] font-medium text-fg">{a.name}</div>
             <div className="truncate text-[12px] text-fg-3">
-              {a.installed ? (added ? 'Ready: sign in once in its own CLI' : 'Installed on this computer') : added ? (installs(a) ? 'Installing…' : `Install it: ${a.hint}`) : installs(a) ? 'The app installs it' : `Install it first: ${a.hint}`}
+              {a.installed ? (added ? 'Ready: sign in to it once in its own program' : 'Installed on this computer') : added ? (installs(a) ? 'Installing…' : `Install it: ${a.hint}`) : installs(a) ? 'The app installs it' : `Install it first: ${a.hint}`}
             </div>
           </div>
           {added ? (
@@ -532,15 +532,15 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       label: 'Welcome',
       hero: true,
       title: 'Welcome to Naget Agent',
-      body: 'Run agents on this computer from any browser, at your desk or on your phone: Claude Code, Codex, open models and more, for code, research, documents and everyday tasks. This short tour sets up the ones you want and shows you around.',
+      body: 'AI helpers (agents) that do real work on this computer for you: research, writing, documents, files, code and everyday tasks. Use them from any browser, at your desk or on your phone. This short tour sets up the ones you want and shows you around.',
       width: 440,
       Extra: () => (
         <div className="stagger grid gap-3 sm:grid-cols-3">
-          <Highlight i={0} icon={<FolderOpen size={16} />} title="Any agent, any folder">
-            Start one in any folder on this computer, with any model.
+          <Highlight i={0} icon={<FolderOpen size={16} />} title="Works with your files">
+            Point it at any folder on this computer, and pick the AI it uses.
           </Highlight>
           <Highlight i={1} icon={<Eye size={16} />} title="Follow it live">
-            Watch its work, approve what it asks and clarify.
+            See what it does as it works, say yes or no to what it asks, and answer its questions.
           </Highlight>
           <Highlight i={2} icon={<Smartphone size={16} />} title="On your phone too">
             Pick up anywhere, and get a notification when it’s done.
@@ -552,7 +552,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     id: 'choose',
     label: 'What to use',
     title: 'What would you like to use?',
-    body: 'Pick one or more. The tour sets up each, and Settings adds others any time.',
+    body: 'Pick one or more. Not sure? If you pay for Claude or ChatGPT already, start with that one. You can add the others later in Settings.',
     Extra: UsesPicker,
     width: 620,
     ready: (u) => u.length > 0,
@@ -564,10 +564,10 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       title: claude && codex ? 'Connect your subscriptions' : `Sign in to ${cliNames}`,
       body:
         claude && codex
-          ? 'Claude Code and Codex run on your own plans. Sign in to each here; Settings → Accounts changes them later.'
+          ? 'Claude Code and Codex use the subscriptions you already pay for. Sign in to each here; Settings → Accounts changes them later.'
           : claude
-            ? 'It runs on your Claude plan or an Anthropic API key. Sign in once; Settings → Accounts changes it later.'
-            : 'It runs on your ChatGPT plan. Sign in once; Settings → Accounts changes it later.',
+            ? 'It uses your Claude subscription (Pro or Max) or an Anthropic Console account. Sign in once; Settings → Accounts changes it later.'
+            : 'It uses your ChatGPT subscription. Sign in once; Settings → Accounts changes it later.',
       Extra: AccountsSetup,
       width: 460,
     });
@@ -575,8 +575,8 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     list.push({
       id: 'openrouter',
       label: 'OpenRouter',
-      title: 'Models through OpenRouter',
-      body: 'Hundreds of models through one key. Custom, the app’s own agent, runs them with the same tools, skills and MCP servers as the other agents.',
+      title: 'Many AI models, pay as you go',
+      body: 'OpenRouter is a service that gives you hundreds of AI models from many companies with one account: you add some credit there and pay only for what you use. Connect it with your key (a code from your OpenRouter account, like a password), then pick the models you want. Custom, the app’s own agent, works with them.',
       Extra: TourOpenRouter,
       width: 560,
     });
@@ -584,8 +584,8 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     list.push({
       id: 'local',
       label: 'On this computer',
-      title: 'Models on this computer',
-      body: 'Custom, the app’s own agent, runs open models on your own hardware, and nothing leaves it. Search Hugging Face: each model shows how it would run here before anything downloads.',
+      title: 'AI on this computer',
+      body: 'Custom, the app’s own agent, can work with free AI models that run right here, so nothing you do leaves this computer. They need Ollama, a free program that runs them. Pick a model below: each says how well it would run here before anything downloads. A computer with a good graphics card runs them best.',
       Extra: TourLocal,
       width: 560,
     });
@@ -594,7 +594,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       id: 'agents',
       label: 'More agents',
       title: 'More agents',
-      body: 'Agents that speak ACP run here too. Add the ones you use: the app installs those it knows, and each signs in once in its own CLI.',
+      body: 'If you already use other AI agents, such as Gemini CLI or Goose, they work here too. Add the ones you use: the app installs those it knows, and each asks you to sign in once in its own program.',
       Extra: AgentsSetup,
       width: 480,
     });
@@ -616,7 +616,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       target: 'composer',
       route: '/',
       title: 'Say what you want done',
-      body: 'Describe a task, ask a question or paste an error. Drop in screenshots and files, type @ to point at a file, or / for the agent’s commands. Enter starts the session.',
+      body: 'Ask a question or describe a task in your own words, like “sort the photos in my Downloads folder” or “sum up this PDF”. Drop in pictures and files too, or type @ to name a file. Press Enter to start: each conversation is called a session.',
     },
     {
       id: 'start-bar',
@@ -625,7 +625,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       focus: 'composer',
       route: '/',
       title: 'Pick an agent and a folder',
-      body: `Under the message box: the agent${names.length ? ` (${either(names)})` : ''}, its model${modelFrom}, the folder on this computer it works in, and the assistant it starts as. What you pick stays for next time. The folder’s menu also opens the AGENTS.md or CLAUDE.md the agent reads there.`,
+      body: `Under the message box you choose the agent that does the work${names.length ? ` (${either(names)})` : ''}, the AI model it uses${modelFrom}, the folder on this computer it works in, and the assistant it starts as (ready-made instructions for a kind of work). What you pick stays for next time.`,
     },
     {
       id: 'pickers',
@@ -634,7 +634,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       focus: 'composer',
       route: '/',
       title: cli ? 'Effort, permissions and more' : 'Permissions and more',
-      body: `Options holds ${cli ? 'how hard the model thinks, ' : ''}permissions, memory and a spending cap, and names any you change. Permissions set what the agent may do without asking you first, from checking with you before every change to full access. Shift+Tab switches them.`,
+      body: `Options sets ${cli ? 'how hard the agent thinks, ' : ''}what it may do without asking you first (from checking with you before every change to doing everything on its own), whether it remembers things for next time, and how much it may spend.`,
     },
     {
       id: 'sessions',
@@ -642,7 +642,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       target: 'sessions',
       sidebar: true,
       title: 'Every session, live',
-      body: `${cli ? `All ${cliNames} sessions on this computer show up here, even ones open in VS Code or a terminal.` : 'Every session you start shows up here, and keeps going when you close the page.'} The dot says what each one is doing: blue working, amber needs you, green done. ${MOD}K finds any of them.`,
+      body: `${cli ? `Every ${cliNames} session on this computer shows up here, even ones started outside the app, and keeps going when you close the page.` : 'Every session you start shows up here, and keeps going when you close the page.'} The dot says what each one is doing: blue working, amber needs you, green done. ${MOD}K finds any of them.`,
     },
     {
       id: 'tools',
@@ -650,7 +650,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       target: 'tools',
       sidebar: true,
       title: 'Your computer, from anywhere',
-      body: `Files to browse and edit, Git to review and push changes, a Terminal that survives reloads${cli ? ', Usage for your plan limits and when they reset,' : ''} and System for CPU, memory and GPUs.`,
+      body: `Files to look through and change what is on this computer${cli ? ', Usage to see how much of your subscription is left and when it resets,' : ''} and System to see how busy the computer is. Git and Terminal are there for programmers.`,
     },
     {
       id: 'notify',
@@ -658,7 +658,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       target: 'nav-settings',
       sidebar: true,
       title: 'Get notified',
-      body: 'Hear when a session finishes or needs your answer, even with the app closed. Settings also holds your accounts, models, MCP servers, skills and the guidelines every agent follows.',
+      body: 'Hear when a session finishes or needs your answer, even with the app closed. Settings also holds your accounts, AI models, connected services and the guidelines every agent follows.',
       Extra: NotifySetup,
     },
     {
@@ -670,21 +670,21 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       Extra: () => (
         <div className="stagger space-y-2.5">
           <Feature i={0} icon={<MessageSquareText size={15} />}>
-            The agent’s messages read like a chat; its commands fold into small boxes you can open.
+            The agent’s messages read like a chat; the steps it takes fold into small boxes you can open.
           </Feature>
           <Feature i={1} icon={<ShieldCheck size={15} />}>
             Approve or deny what it wants to do, and answer its questions.
           </Feature>
           <Feature i={2} icon={<CornerDownLeft size={15} />}>
-            Message it while it works: your note joins the turn, or {MOD}Enter queues it for after.
+            Message it while it works: it reads your note right away, or {MOD}Enter keeps it for when it’s done.
           </Feature>
           {cli && (
             <Feature i={3} icon={<GitFork size={15} />}>
-              {claude && codex ? 'Fork a session, or hand it to the other agent with the whole conversation.' : 'Fork a session to try another way.'}
+              {claude && codex ? 'Copy a session to try another way (Fork), or hand it to the other agent with the whole conversation.' : 'Copy a session to try another way (Fork).'}
             </Feature>
           )}
           <Feature i={4} icon={<FileDiff size={15} />}>
-            Review every file it changed. {MOD}F finds text in the conversation.
+            See every file it changed, and what changed in each. {MOD}F finds words in the conversation.
           </Feature>
           <div className="pt-1 text-[12.5px] text-fg-3" style={{ '--i': 5 } as CSSProperties}>
             Help (<CircleHelp size={13} className="inline -translate-y-px" />) explains every part of the app, and takes you on this tour again. As you go on, tips point out the rest, one part at a time.
