@@ -3,6 +3,44 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.17.0 · 3 November 2026
+
+The Library and Spaces sorted by project, a clearer Apps page with many more ready-made apps, agents that find the
+right app among many, updates that install themselves in the Mac app, and computer use there.
+
+- **The Library, by space**: what you keep belongs to a space or to none. What an agent saves goes in its
+  session's space; **Keep** and **Save to Library** ask which space when you have spaces (the session's first);
+  **New** makes it in the space you are looking at; **More → Move to a space** moves anything. The Library itself
+  is new: its places (Everything, each space, Not in a space, Published) beside the cards, each space's things
+  together, and **Find by name**, sorting and kinds above them.
+- **Spaces, redesigned**: each space is a card in its colour with what it holds and **New session**. A space's
+  page opens on **Overview**: its sessions, what it holds in the Library, and where it works, what its agents
+  follow, its documents, skills and assistant at a glance; **Library** has everything it holds there, and
+  **Settings** comes in four plain parts.
+- **The Apps page, redesigned**: the "What should your next app do?" box is gone (**New app** does that). A short
+  note says what apps are: small tools for one job that find things out and show them clearly, opened here or just
+  asked for in any chat. Find an app by name or kind; each card says whether it has its own view and works in
+  chats; ready-made apps show under their kinds.
+- **16 new ready-made apps**, each with a view made for its answer: **Weather outlook** and **Best time to go**
+  (charts of the days and months ahead), **Team tracker** and **Match preview**, **Cook with what you have** and
+  **Meal plan and shopping list**, **Gift ideas**, **What to watch** (and where it streams), **Game finder**, a
+  **Quiz on any topic** to play on its page, **Book finder**, **What's on** in a city (on a map, with each day's
+  weather), **Savings plan**, **Chart my data** (a spreadsheet or numbers as charts), **A topic as a timeline** and
+  **Explore a place** on a map. None needs a key. The **Trip planner** has a map of each day, and **Compare
+  products** scores each product.
+- **Agents find the right app among many**: a session is no longer told of every app, only the few you run most;
+  agents search the rest by what they do, by words and by meaning, and pick from the best twenty.
+- **Apps that need a model from a provider**: an app that uses a model through OpenRouter asks for your OpenRouter
+  key with its other keys, and adds the model to your models by itself the first time it runs.
+- **Mac app updates install themselves**: a new version downloads in the background, then a notice (in the app and
+  from macOS) counts down a minute before it restarts to install it, with **Restart now** and **Later**. Agents
+  keep running through the restart.
+- **Computer use in the Mac app**: with **Settings → Capabilities → Computer use** on, agents can see your Mac's
+  screen and use its mouse and keyboard, in any app, after you allow it once per session. The menu bar shows when
+  an agent is at work, and **Stop** (or ⌘⇧Esc) ends it at once. Off until you turn it on.
+- **The sidebar's tools** now start with Library, Spaces, Apps and Usage. A reply with many before-and-after
+  screenshots shows one row of them, with **Show all**.
+
 ## 0.16.0 · 3 November 2026
 
 Your apps work in any session and show maps, charts, pictures and videos; Connections join the Apps page; apps ask
