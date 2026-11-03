@@ -11,9 +11,9 @@ module.exports = {
   directories: { output: 'dist', buildResources: 'resources' },
   files: ['main.cjs', 'package.json'],
   extraResources: [
-    { from: 'build/server', to: 'server' },
-    { from: 'build/node', to: 'node' },
-    { from: 'build/bin', to: 'bin' },
+    // build/ as a whole, not build/server: electron-builder always leaves out a node_modules at the top of
+    // a folder it copies, and the server's packages are in server/node_modules.
+    { from: 'build', to: '.', filter: ['server/**/*', 'node/**/*', 'bin/**/*'] },
     { from: 'resources', to: '.', filter: ['trayTemplate*.png'] },
   ],
   electronLanguages: ['en', 'zh_CN', 'el'],
