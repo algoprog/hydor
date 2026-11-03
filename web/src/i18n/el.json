@@ -8202,5 +8202,8 @@
 "cached ·":"στην cache ·",
 "{0} still has usage left. Turn on Switch accounts at a limit and new sessions start there.":"Ο λογαριασμός {0} έχει ακόμη χρήση. Ενεργοποιήστε το «Αλλαγή λογαριασμού στο όριο» και οι νέες συνεδρίες θα ξεκινούν εκεί.",
 "{0} still has usage left. Turn on Switch accounts at a limit and this session carries on there.":"Ο λογαριασμός {0} έχει ακόμη χρήση. Ενεργοποιήστε το «Αλλαγή λογαριασμού στο όριο» και αυτή η συνεδρία θα συνεχίσει εκεί.",
-"Switch accounts at a limit is on":"Το «Αλλαγή λογαριασμού στο όριο» είναι ενεργό"
+"Switch accounts at a limit is on":"Το «Αλλαγή λογαριασμού στο όριο» είναι ενεργό",
+"Attach files or a screenshot":"Επισύναψη αρχείων ή στιγμιότυπου οθόνης",
+"{0}% of the context in use":"Σε χρήση το {0}% του πλαισίου",
+"{0}% of the context in use ({1} of {2} tokens) · click to compact":"Σε χρήση το {0}% του πλαισίου ({1} από {2} tokens) · κάντε κλικ για συμπύκνωση"
 }

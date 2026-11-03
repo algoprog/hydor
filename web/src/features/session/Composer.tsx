@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowRightLeft, ArrowUp, ChevronDown, ListTodo, MonitorUp, Paperclip, SlidersHorizontal, Square, X } from 'lucide-react';
+import { ArrowRightLeft, ArrowUp, ChevronDown, ListTodo, MonitorUp, Paperclip, Plus, SlidersHorizontal, Square, X } from 'lucide-react';
 import type { Agent, BackgroundTask, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
 import { enc, post } from '../../lib/api';
@@ -7,7 +7,7 @@ import { openSession } from '../../lib/nav';
 import { toast, toastError, useLive, useTimeline } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
-import { cx, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
+import { cx, MenuItem, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
 import { confirmResume, takeoverDialog } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, releaseSentPictures, sendingPictures, type Attachment } from '../../lib/attachments';
 import { clearDraft, draftFiles, draftText, keepDraftFiles, keepDraftText } from '../../lib/drafts';
@@ -43,11 +43,10 @@ export function followUpPref(): FollowUp {
 }
 
 /**
- * Where the box is narrow (a phone, a small window): the assistant and the model, with the effort and
- * permissions when they are set, as one chip, and those four (and the context) in its menu, a sheet from the
- * bottom on a phone.
+ * The assistant and the model, with the effort and permissions when they are not the usual, as one chip; those
+ * four and the context in its menu (a sheet from the bottom on a phone), so the box shows little at once.
  */
-function OptionsChip({ summary, title, children }: { summary: string; title: string; children: ReactNode }) {
+function OptionsChip({ summary, title, warn, children }: { summary: string; title: string; warn?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   return (
@@ -58,7 +57,11 @@ function OptionsChip({ summary, title, children }: { summary: string; title: str
         title={title}
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={cx('inline-flex h-8 min-w-0 items-center gap-1.5 rounded-lg px-2 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg', open && 'bg-bg-2 text-fg')}
+        className={cx(
+          'inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-line-2 px-3 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg',
+          open && 'bg-bg-2 text-fg',
+          warn && 'border-warn/40 text-warn hover:text-warn',
+        )}
       >
         <SlidersHorizontal size={13} className="shrink-0" />
         <span className="truncate">{summary}</span>
@@ -68,6 +71,56 @@ function OptionsChip({ summary, title, children }: { summary: string; title: str
         <SettingLayout.Provider value="row">{children}</SettingLayout.Provider>
       </Popover>
     </SheetsOnPhone.Provider>
+  );
+}
+
+/** Attach files, or a screenshot where the browser can take one: one + button, its menu only when there are two. */
+function AddButton({ onFiles, onScreen, disabled }: { onFiles: () => void; onScreen?: () => void; disabled?: boolean }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const cls = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-50';
+  if (!onScreen)
+    return (
+      <button type="button" className={cls} onClick={onFiles} disabled={disabled} title="Attach files" aria-label="Attach files">
+        <Paperclip size={16} />
+      </button>
+    );
+  return (
+    <>
+      <button ref={ref} type="button" className={cx(cls, open && 'bg-bg-2 text-fg')} onClick={() => setOpen((o) => !o)} disabled={disabled} title="Attach files or a screenshot" aria-label="Attach" aria-expanded={open}>
+        <Plus size={18} className={cx('transition-transform duration-150', open && 'rotate-45')} />
+      </button>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={220} prefer="above" sheet>
+        <MenuItem icon={<Paperclip size={15} />} onClick={() => (setOpen(false), onFiles())}>
+          Attach files
+        </MenuItem>
+        <MenuItem icon={<MonitorUp size={15} />} onClick={() => (setOpen(false), onScreen())}>
+          Attach a screenshot
+        </MenuItem>
+      </Popover>
+    </>
+  );
+}
+
+/** How full the context is: a small ring and its percentage, amber above 85%. */
+function ContextRing({ pct, title, disabled, onClick }: { pct: number; title: string; disabled?: boolean; onClick: () => void }) {
+  const r = 7;
+  const len = 2 * Math.PI * r;
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+      aria-label={`${pct}% of the context in use`}
+      className={cx('tnum inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px] transition-colors hover:bg-bg-2 disabled:pointer-events-none', pct > 85 ? 'text-warn' : 'text-fg-3')}
+    >
+      <svg viewBox="0 0 18 18" width="15" height="15" className="-rotate-90" aria-hidden>
+        <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+        <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray={`${(len * Math.min(100, pct)) / 100} ${len}`} />
+      </svg>
+      {pct}%
+    </button>
   );
 }
 
@@ -263,13 +316,15 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const ctx = live?.contextTokens && live?.contextWindow ? Math.round((live.contextTokens / live.contextWindow) * 100) : null;
   const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   const canSend = (!!(text.trim() || atts.length) || !!move) && !busy && !locked;
-  // The narrow box's chip: the assistant and the model, then the effort and permissions when they are not the usual.
+  // The options chip: the assistant and the model, then the effort and permissions when they are not the usual.
   const on = move ? { c: moveCat, model: move.model, effort: move.effort, mode: move.mode } : { c: cat, model, effort, mode };
   const assistantOn = !move && assistant ? assistant.name : null;
   const effortOn = on.effort ? on.effort[0].toUpperCase() + on.effort.slice(1) : null;
   const modeOn = on.c && on.mode && on.mode !== on.c.defaultMode ? (on.c.modes.find((m) => m.value === on.mode)?.label ?? null) : null;
   const modeNow = on.c?.modes.find((m) => m.value === (on.mode ?? on.c?.defaultMode))?.label;
   const summary = [assistantOn, on.c ? modelLabel(on.c, on.model) : '…', effortOn, modeOn].filter(Boolean).join(' · ');
+  // Running without asking: the chip turns amber, so it is not forgotten.
+  const unguarded = on.mode === 'bypassPermissions' || on.mode === 'full';
   const optionsTitle = [
     assistantOn && `Assistant: ${assistantOn}`,
     `Model: ${on.c ? modelLabel(on.c, on.model) : '…'}`,
@@ -425,55 +480,50 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             className="block max-h-[40vh] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none disabled:cursor-not-allowed"
           />
           <div className="flex items-center gap-1 px-2.5 pt-0.5 pb-2.5">
-            <div className="flex min-w-0 flex-1 items-center gap-0.5">
-              {/* Wide: the assistant, model, effort and permissions side by side. Narrow: one chip, the four in its menu. */}
-              <span className="hidden @2xl:contents">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <AddButton
+                onFiles={() => fileRef.current?.click()}
+                onScreen={
+                  canCaptureScreen()
+                    ? async () => {
+                        const f = await captureScreen();
+                        if (f) attach([f]);
+                      }
+                    : undefined
+                }
+                disabled={locked}
+              />
+              {/* The assistant, model, effort and permissions: one chip, the four (and the context) in its menu. */}
+              <OptionsChip summary={summary} title={optionsTitle} warn={unguarded}>
                 {move ? (
                   <>
-                    <ModelPicker agent={move.agent} acp={move.acp} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
-                    <EffortPicker agent={move.agent} acp={move.acp} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
-                    <ModePicker agent={move.agent} acp={move.acp} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
+                    <ModelPicker label="Model" agent={move.agent} acp={move.acp} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
+                    <EffortPicker label="Effort" agent={move.agent} acp={move.acp} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
+                    <ModePicker label="Permissions" agent={move.agent} acp={move.acp} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
                   </>
                 ) : (
                   <>
-                    <SessionAssistantPicker s={s} onConfig={assistantSet} />
-                    <ModelPicker agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
-                    <EffortPicker agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
-                    <ModePicker agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
+                    <SessionAssistantPicker s={s} label="Assistant" onConfig={assistantSet} />
+                    <ModelPicker label="Model" agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
+                    <EffortPicker label="Effort" agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
+                    <ModePicker label="Permissions" agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
+                    {ctx != null && (
+                      <button
+                        type="button"
+                        disabled={working}
+                        onClick={() => void compact()}
+                        title="Compact the conversation: the history so far becomes a summary, which frees context"
+                        className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50 max-sm:h-11 max-sm:text-[14.5px]"
+                      >
+                        <span className="shrink-0 text-fg-2">Context</span>
+                        <span className={cx('tnum ml-auto min-w-0 truncate pl-3 font-medium', ctx > 85 ? 'text-warn' : 'text-fg')}>{ctx}% in use</span>
+                        <span className="shrink-0 text-[12.5px] font-medium text-accent">Compact</span>
+                      </button>
+                    )}
+                    <SessionMeters live={live} />
                   </>
                 )}
-              </span>
-              <span className="contents @2xl:hidden">
-                <OptionsChip summary={summary} title={optionsTitle}>
-                  {move ? (
-                    <>
-                      <ModelPicker label="Model" agent={move.agent} acp={move.acp} value={move.model} onChange={(v) => setMove({ ...move, model: v })} />
-                      <EffortPicker label="Effort" agent={move.agent} acp={move.acp} model={move.model} value={move.effort} onChange={(v) => setMove({ ...move, effort: v })} />
-                      <ModePicker label="Permissions" agent={move.agent} acp={move.acp} value={move.mode} onChange={(v) => setMove({ ...move, mode: v })} />
-                    </>
-                  ) : (
-                    <>
-                      <SessionAssistantPicker s={s} label="Assistant" onConfig={assistantSet} />
-                      <ModelPicker label="Model" agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} />
-                      <EffortPicker label="Effort" agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
-                      <ModePicker label="Permissions" agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
-                      {ctx != null && (
-                        <button
-                          type="button"
-                          disabled={working}
-                          onClick={() => void compact()}
-                          title="Compact the conversation: the history so far becomes a summary, which frees context"
-                          className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50 max-sm:h-11 max-sm:text-[14.5px]"
-                        >
-                          <span className="shrink-0 text-fg-2">Context</span>
-                          <span className={cx('tnum ml-auto min-w-0 truncate pl-3 font-medium', ctx > 85 ? 'text-warn' : 'text-fg')}>{ctx}% in use</span>
-                          <span className="shrink-0 text-[12.5px] font-medium text-accent">Compact</span>
-                        </button>
-                      )}
-                    </>
-                  )}
-                </OptionsChip>
-              </span>
+              </OptionsChip>
               {tasks.length > 0 && (
                 <>
                   <button
@@ -503,35 +553,15 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 </>
               )}
             </div>
-            <SessionMeters live={live} />
             {ctx != null && (
-              <button
-                type="button"
+              <ContextRing
+                pct={ctx}
                 disabled={working}
                 onClick={() => void compact()}
-                className={cx('tnum mr-1 hidden rounded-md px-1 text-[11.5px] transition-colors hover:bg-bg-2 disabled:pointer-events-none @2xl:inline', ctx > 85 ? 'text-warn' : 'text-fg-3')}
-                title={`${live?.contextTokens?.toLocaleString()} of ${live?.contextWindow?.toLocaleString()} context tokens · click to compact`}
-              >
-                {ctx}% context
-              </button>
+                data-tip="context"
+                title={`${ctx}% of the context in use (${live?.contextTokens?.toLocaleString()} of ${live?.contextWindow?.toLocaleString()} tokens) · click to compact`}
+              />
             )}
-            {canCaptureScreen() && (
-              <button
-                className="rounded-lg p-2 text-fg-3 hover:bg-bg-2 hover:text-fg disabled:opacity-50"
-                onClick={async () => {
-                  const f = await captureScreen();
-                  if (f) attach([f]);
-                }}
-                disabled={locked}
-                title="Attach a screenshot of a screen, window or tab"
-                aria-label="Attach a screenshot"
-              >
-                <MonitorUp size={17} />
-              </button>
-            )}
-            <button className="rounded-lg p-2 text-fg-3 hover:bg-bg-2 hover:text-fg disabled:opacity-50" onClick={() => fileRef.current?.click()} disabled={locked} title="Attach files" aria-label="Attach files">
-              <Paperclip size={17} />
-            </button>
             <FeatureComposerButtons s={s} insert={insertText} disabled={locked} />
             <input
               ref={fileRef}

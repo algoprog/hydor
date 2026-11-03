@@ -37,7 +37,7 @@ On a phone, each of these menus opens as a sheet from the bottom of the screen.
 
 ## Switch models in the middle of a session
 
-In a session, the model, effort and permissions sit under the message box. In a wide window they are three separate menus. In a narrow window or on a phone they are one chip that reads like "Opus 5.5 · High · Plan": tap it for **Model**, **Effort** and **Permissions**.
+In a session, the model, effort and permissions sit under the message box. They are one chip that reads like "Opus 5.5 · High · Plan": click it for **Model**, **Effort** and **Permissions**.
 
 Pick another model and the session carries on with it:
 
