@@ -342,7 +342,7 @@ When another of that agent's accounts still has usage left, you see no banner wh
 
 - **Resume at reset** continues the session by itself a minute after the limit resets, with the message "Continue where you left off." The banner then says when, with **Cancel**.
 - **Use a reset**: when your account holds limit resets, the banner says how many, and this uses one now.
-- [Resume after usage limits](/settings?s=general&find=Resume%20after%20usage%20limits) in Settings → App → General does this for every session a limit stops.
+- [Resume after usage limits](/settings?s=general&find=Resume%20after%20usage%20limits) in Settings → App → General does this for every session a limit stops. With it on, you see no warning in the session: a line above the message box says which limit and when it continues ("Weekly · all models · Continues by itself in 2 days"), with **Use a reset** when you have one, and **Cancel**. A session you stopped yourself with **Stop** does not continue by itself.
 
 The time follows the limit: if the reset moves, or usage comes back early, the session continues then. See [Usage, limits and costs](/guide/usage).
 

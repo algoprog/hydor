@@ -562,9 +562,10 @@ export class Scheduler extends EventEmitter {
     for (const r of this.db.prepare('select * from tasks where resume = 1').all() as Row[]) {
       const key = r.target!;
       const live = this.sessions.lives?.get(key)?.adapter;
-      // A newer successful turn or manual continuation supersedes an older limit interruption.
-      // The adapter reconstructs the last outcome when its runner is replayed after a server restart.
-      if (live?.limitStopped === false || (live && ['working', 'waiting'].includes(live.state.status))) {
+      // A newer turn that got through, or your own message or stop, supersedes an older limit interruption
+      // (the adapter reconstructs the last outcome when its runner is replayed after a server restart). A turn
+      // the CLI starts by itself meanwhile (a background task's notice) does not: the session still waits.
+      if (live?.limitStopped === false) {
         this.cancelResume(key);
         continue;
       }
