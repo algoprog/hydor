@@ -36,6 +36,7 @@ function List() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Spaces"
+        tip="spaces"
         sub="Each project’s sessions, documents and guidelines, together"
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMade('space')}>

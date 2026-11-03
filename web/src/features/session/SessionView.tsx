@@ -141,12 +141,13 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
           variant="ghost"
           className={cx('px-2.5', detailsOpen && 'bg-bg-2 text-fg')}
           onClick={onDetails}
+          data-tip="details"
           title="Changes, commands and session info"
           icon={<PanelRight size={16} />}
         >
           {!mobile && (st.linesAdded || st.linesRemoved ? <DiffStat added={st.linesAdded} removed={st.linesRemoved} compact className="text-[12px]" /> : <span>Details</span>)}
         </Button>
-        <IconButton ref={menuRef} label="Session menu" onClick={() => setMenu((m) => !m)}>
+        <IconButton ref={menuRef} data-tip="session-menu" label="Session menu" onClick={() => setMenu((m) => !m)}>
           <MoreHorizontal size={18} />
         </IconButton>
         <SessionMenu
@@ -260,7 +261,7 @@ function MovedOn({ s }: { s: SessionSummary }) {
 /** A session a capability shows its own way (an app's run as its result): that view, or the conversation. */
 function PaneSwitch({ pane, show, onChange }: { pane: SessionPane; show: SessionShow; onChange: (v: SessionShow) => void }) {
   return (
-    <div className="flex shrink-0 justify-center border-b border-line px-3 py-1.5">
+    <div data-tip="pane" className="flex shrink-0 justify-center border-b border-line px-3 py-1.5">
       <Segmented
         size="sm"
         value={show}

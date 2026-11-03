@@ -78,6 +78,7 @@ function LeadDock({ s, r }: { s: SessionSummary; r: ResearchSettings }) {
           : `Round ${Math.min(rounds, r.depth)} of ${r.depth}`;
   return (
     <div
+      data-tip="research"
       className={DOCK}
       title={
         r.format === 'document'

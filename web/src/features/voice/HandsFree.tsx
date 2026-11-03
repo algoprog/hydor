@@ -385,6 +385,7 @@ export function HandsFreeButton({ s }: { s?: { key: string }; insert: (text: str
   return (
     <button
       type="button"
+      data-tip="handsfree"
       onClick={() => openHandsFree(s?.key)}
       title="Hands-free: talk to the app, and hear what it did"
       aria-label="Hands-free"

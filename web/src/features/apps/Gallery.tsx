@@ -133,6 +133,7 @@ export function GalleryPage() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Apps"
+        tip="apps"
         sub="Tasks you run again and again: fill in a form, and an agent does the job"
         actions={
           <Button size="sm" variant="primary" icon={<Plus size={15} />} onClick={() => go('/apps/new')}>

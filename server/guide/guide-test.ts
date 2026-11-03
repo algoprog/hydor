@@ -13,6 +13,7 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import { OPTIONS, SECTIONS } from '../../shared/find-catalog.ts';
 import { headingId, parseTopic, topicId, translatedTopic } from '../../shared/guide.ts';
+import { TIP_GUIDE } from '../../shared/tips.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
 import { setSettings, toneOf } from '../assistants/store.ts';
@@ -116,6 +117,16 @@ test('the guide’s links land: other topics and their sections, Settings sectio
       if (!pages.test(href)) bad.push(`${t.id}: ${href} (not one of the app’s pages)`);
     }
   assert.deepEqual(bad, []);
+});
+
+test('the tips’ Learn more links land in the guide: each tip’s topic and section', () => {
+  const bad: string[] = [];
+  for (const [tip, href] of Object.entries(TIP_GUIDE)) {
+    const g = /^\/guide\/([a-z0-9-]+)#([^)]+)$/.exec(href);
+    const to = g && byId.get(g[1]);
+    if (!g || !to || !headingIds(to.body).has(g[2])) bad.push(`${tip}: ${href}`);
+  }
+  assert.deepEqual(bad, [], 'shared/tips.ts TIP_GUIDE: a link to a topic or section that is not there');
 });
 
 /** Every heading's id in a topic, `### ` ones too, counted as the page counts them. */

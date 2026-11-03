@@ -150,7 +150,7 @@ export function AskBox({
   );
 
   return (
-    <div ref={wrap} className={cx('relative', className)}>
+    <div ref={wrap} data-tip={hero ? 'ask' : undefined} className={cx('relative', className)}>
       <div
         className={cx(
           'flex items-center gap-2 border bg-panel transition-colors focus-within:border-accent/50',

@@ -86,7 +86,8 @@ git clone https://github.com/Naget-Inc/naget-agent && cd naget-agent
 ```
 
 Open the setup link it prints, choose a password, and a short tour sets up what you want to use: Claude Code,
-Codex, models through OpenRouter or on your own GPU, or other agents.
+Codex, models through OpenRouter or on your own GPU, or other agents. After it, tips introduce the rest of the
+app the first time you come to each part.
 To use it from your phone, put HTTPS in front of it: see [remote access](docs/remote-access.md).
 
 ## Documentation

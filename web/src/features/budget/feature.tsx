@@ -34,7 +34,7 @@ function CapDock({ s }: { s: SessionSummary }) {
         </div>
       )}
       {cap != null && (
-        <div className="mx-3 mb-2 flex items-center gap-2.5 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
+        <div data-tip="budget" className="mx-3 mb-2 flex items-center gap-2.5 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
           <Wallet size={14} className={cx('shrink-0', reached ? 'text-err' : near ? 'text-warn' : 'text-fg-3')} />
           <span className="tnum shrink-0" title={st?.childrenUsd ? `This session ${usd(st.ownUsd)}, its child sessions ${usd(st.childrenUsd)}` : 'Spent at API prices'}>
             <span className="font-medium text-fg">{st ? usd(spent) : '…'}</span>

@@ -121,6 +121,7 @@ export function ReviewPage({ sessionKey }: { sessionKey: string }) {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={s ? `Review: ${s.title}` : 'Review'}
+        tip="review"
         sub={r ? `${r.head} against ${r.base} · ${r.files.length} file${r.files.length === 1 ? '' : 's'}${r.uncommitted ? ` · ${r.uncommitted} not committed` : ''}` : 'What the session’s branch changes'}
         actions={
           <div className="flex items-center gap-1.5">

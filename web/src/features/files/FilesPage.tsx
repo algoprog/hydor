@@ -269,7 +269,7 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
     return (
       <SheetsOnPhone.Provider value>
         <div className="flex h-full min-h-0 flex-col">
-          <PageHeader title={title} />
+          <PageHeader title={title} tip="files" />
           <div className="min-h-0 flex-1">{main}</div>
           {placesMenu}
         </div>
@@ -279,7 +279,7 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
 
   return (
     <div ref={pageRef} className="flex h-full min-h-0 flex-col">
-      <PageHeader title={fold ? title : 'Files'} />
+      <PageHeader title={fold ? title : 'Files'} tip="files" />
       <div className="flex min-h-0 flex-1">
         {!fold && (
           <nav aria-label="Places" className="w-[232px] shrink-0 overflow-y-auto border-r border-line bg-bg-1">

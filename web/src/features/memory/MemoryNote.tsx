@@ -254,6 +254,7 @@ export function MemoryNote({ note, sessionKey, more }: { note: SessionNote; sess
         <button
           onClick={() => setOpen(true)}
           aria-expanded={false}
+          data-tip="memory-note"
           title="What memory kept from this turn"
           className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full border border-line bg-panel px-2.5 text-[12.5px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
         >

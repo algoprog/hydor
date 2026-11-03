@@ -236,7 +236,7 @@ export function QueueList({ s }: { s: SessionSummary }) {
     });
   };
   return (
-    <div ref={touchDragArea} className="mb-2 space-y-1.5">
+    <div ref={touchDragArea} data-tip="queue" className="mb-2 space-y-1.5">
       {s.queueHeld && (
         <div className="flex items-center gap-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-1.5 text-[12.5px]">
           <span className="min-w-0 flex-1">The queue is paused (the agent was stopped, or the server restarted).</span>

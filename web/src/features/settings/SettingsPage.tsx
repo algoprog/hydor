@@ -21,6 +21,8 @@ import { PageHeader } from '../layout/PageHeader';
 import { followUpPref, type FollowUp } from '../session/Composer';
 import { InstructionsSettings, McpSettings, PluginsSettings, SkillsSettings } from './AgentSettings';
 import { startTour } from '../tour/Tour';
+import { setTipsOn, useTips } from '../tips/state';
+import type { TipId } from '@shared/tips';
 import { TasksSettings } from './TasksSettings';
 import { ModelsSettings } from './ModelsSettings';
 import { ThemeSettings } from './Themes';
@@ -448,6 +450,7 @@ function GeneralSettings() {
               Take the tour
             </Button>
           </SettingRow>
+          <TipsSetting />
         </div>
       </Section>
       <Section title="About">
@@ -559,6 +562,19 @@ function UpdateLine() {
     </div>
   );
 }
+
+/** Tips after the tour (features/tips): on until skipped, the same on every device. */
+function TipsSetting() {
+  const on = useTips((s) => s.on);
+  return (
+    <SettingRow label="Tips" hint="Points out a part of the app the first time you come to it, after the welcome tour">
+      <Switch on={on} label="Tips" onChange={setTipsOn} />
+    </SettingRow>
+  );
+}
+
+/** Settings sections with a tip that says what they are for, the first time they open (features/tips). */
+const SECTION_TIPS: Partial<Record<string, TipId>> = { tasks: 'tasks', memory: 'memory', guidelines: 'guidelines', assistants: 'assistants', connections: 'connections', skillpack: 'skills' };
 
 /** New versions install themselves while you are away, for a copy that can restart itself. */
 function AutoUpdateSetting() {
@@ -1285,7 +1301,9 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
             {page && (
               <div key={page.id} className="h-full overflow-y-auto">
                 <div className="space-y-4 px-4 pt-4 pb-8">
-                  <p className="text-[13px] leading-snug text-fg-3">{page.sub}</p>
+                  <p data-tip={SECTION_TIPS[page.id]} className="text-[13px] leading-snug text-fg-3">
+                    {page.sub}
+                  </p>
                   {folder}
                   {body}
                 </div>
@@ -1314,7 +1332,9 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
             <div key={def.id} className="max-w-[920px] min-w-0 flex-1 pt-6 pb-10">
               <header className="mb-5 flex flex-wrap items-start gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-[19px] font-semibold tracking-tight">{def.label}</h2>
+                  <h2 className="text-[19px] font-semibold tracking-tight">
+                    <span data-tip={SECTION_TIPS[def.id]}>{def.label}</span>
+                  </h2>
                   <p className="mt-0.5 text-[13px] text-fg-3">{def.sub}</p>
                 </div>
                 {folder}

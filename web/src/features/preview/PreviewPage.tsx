@@ -418,6 +418,7 @@ export function PreviewPage() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Preview"
+        tip="preview"
         sub="The web apps running on this computer, to look at from any device"
         actions={
           <IconButton label="Refresh" onClick={load}>

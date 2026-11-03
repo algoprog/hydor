@@ -44,7 +44,7 @@ export function GoalBar({ s, className }: { s: SessionSummary; className?: strin
   // Codex and Custom (the app's own loop) can pause a goal and pick it up again.
   const codex = s.agent === 'codex' || (s.agent === 'acp' && s.acpAgent === 'console');
   return (
-    <div className={cx('anim-expand flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
+    <div data-tip="goal" className={cx('anim-expand flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
       <Target size={15} className={cx('mt-0.5 shrink-0', g.status === 'active' ? 'text-accent' : 'text-warn')} />
       {/* The buttons move under the text when there is not room beside it. */}
       <div className="min-w-[min(100%,240px)] flex-1">

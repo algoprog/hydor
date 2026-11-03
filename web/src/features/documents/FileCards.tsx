@@ -116,7 +116,7 @@ export function FileCards({ item, sessionKey }: { item: ToolItem; sessionKey: st
   }
   if (!cards.length) return null;
   return (
-    <div className={cx('tl-item my-1.5 grid gap-2', cards.length > 1 ? 'sm:grid-cols-2' : 'sm:max-w-[30rem]')}>
+    <div data-tip="files-made" className={cx('tl-item my-1.5 grid gap-2', cards.length > 1 ? 'sm:grid-cols-2' : 'sm:max-w-[30rem]')}>
       {cards.map((c) => (
         <FileCard key={c.path} card={c} stat={done ? stats[c.path] : undefined} />
       ))}

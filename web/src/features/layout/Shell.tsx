@@ -23,6 +23,7 @@ import { CountVisits } from '../palette/usage';
 import { ReleaseNotes, WhatsNew } from '../settings/Releases';
 import { Lightbox } from '../../components/Lightbox';
 import { HelpButton, Tour } from '../tour/Tour';
+import { Tips } from '../tips/Tips';
 import { HandsFree } from '../voice/HandsFree';
 import { ReviewPage } from '../review/ReviewPage';
 import { PreviewPage } from '../preview/PreviewPage';
@@ -211,6 +212,7 @@ export function Shell() {
         <FilePeek />
         <Lightbox />
         <Tour />
+        <Tips />
         <HandsFree />
       </div>
     );
@@ -246,6 +248,7 @@ export function Shell() {
       <Lightbox />
       {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}
       <Tour />
+      <Tips />
       <HandsFree />
     </div>
   );

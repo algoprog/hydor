@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { TipId } from '@shared/tips';
 import { Menu, PanelLeftOpen } from 'lucide-react';
 import { MOD } from '../../lib/format';
 import { useUI } from '../../lib/store';
@@ -20,14 +21,25 @@ export function NavButton() {
   );
 }
 
-/** The top bar of a page: title, optional subtitle and actions, optional tabs underneath. */
-export function PageHeader({ title, sub, actions, children, className }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; children?: ReactNode; className?: string }) {
+/**
+ * The top bar of a page: title, optional subtitle and actions, optional tabs underneath. `tip`: the tip that says
+ * what the page is for, the first time it opens (features/tips), pointing at its title.
+ */
+export function PageHeader({ title, sub, actions, children, className, tip }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; children?: ReactNode; className?: string; tip?: TipId }) {
   return (
     <header className={cx('shrink-0 border-b border-line bg-bg pt-[var(--safe-top)]', className)}>
       <div className="flex h-14 items-center gap-2 px-3 sm:px-6">
         <NavButton />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[16px] font-semibold tracking-tight">{title}</h1>
+          <h1 className="truncate text-[16px] font-semibold tracking-tight">
+            {tip ? (
+              <span data-tip={tip} className="inline-block max-w-full truncate align-top">
+                {title}
+              </span>
+            ) : (
+              title
+            )}
+          </h1>
           {sub && <div className="truncate text-[12.5px] text-fg-3">{sub}</div>}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
