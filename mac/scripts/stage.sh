@@ -24,12 +24,13 @@ mkdir -p "$out/server" "$out/node" "$out/bin"
 echo "== The server"
 cd "$root"
 # What the server reads from its own folder as it runs (APP_ROOT in server/config.ts).
-rsync -a --relative \
+# (tar rather than rsync: macOS 15 ships openrsync, which lacks some of rsync's options.)
+tar -cf - \
   package.json package-lock.json CHANGELOG.md LICENSE \
   dist/server dist/web \
   server/find/shipped-vectors.json server/memory/embed_worker.py \
-  web/src/i18n docs/guide catalog skills \
-  "$out/server/"
+  web/src/i18n docs/guide catalog skills |
+  tar -xf - -C "$out/server"
 (cd "$out/server" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
 # Prebuilt binaries for other systems are dead weight (and Apple's notary checks every binary).
 find "$out/server/node_modules" -type d -path '*/prebuilds/*' -maxdepth 6 ! -name "darwin-$arch" ! -name 'darwin-x64+arm64' ! -name prebuilds -prune -exec rm -rf {} + 2>/dev/null || true
