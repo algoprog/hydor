@@ -287,7 +287,7 @@ export async function tellAsker(d: Deps, r: RunRecord) {
   updateRun(d.db, r.id, { told: true });
   const head =
     r.status === 'done'
-      ? `[${r.appName} finished] The run you started for the user is done; they see its answer in its card in the conversation. Reply in a sentence or two (what came of it, what to look at), without repeating it.`
+      ? `[${r.appName} finished] The run you started for the user is done; its card with the answer shows right under your reply. Reply in a sentence or two (what came of it, what to look at), without repeating it.`
       : `[${r.appName} ${r.status === 'stopped' ? 'was stopped' : 'failed'}] The run you started for the user did not finish${r.error ? `: ${r.error}` : ''}.`;
   try {
     await d.sessions.deliverOrQueue(r.askedBy, `${head}\n\n${runText(r)}`);

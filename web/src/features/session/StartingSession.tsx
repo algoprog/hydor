@@ -12,7 +12,7 @@ import { forget, useStarting } from '../../lib/starting';
 import { useApp } from '../../lib/store';
 import { NavButton } from '../layout/PageHeader';
 import { isTouch, workingPlaceholder } from './Composer';
-import { dayLabel, DayLine, LiveHead } from './Timeline';
+import { LiveHead } from './Timeline';
 
 export function StartingSession({ id }: { id: string }) {
   const st = useStarting((x) => x.byId[id]);
@@ -56,7 +56,6 @@ export function StartingSession({ id }: { id: string }) {
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-x-0 top-px bottom-px overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable_both-edges]">
           <div className="mx-auto w-full max-w-[848px] space-y-8 px-3 pt-6 pb-10 sm:px-6">
-            <DayLine day={dayLabel(st.at)} />
             <section className="space-y-2">
               <div className="group/u flex flex-col items-end gap-1.5">
                 {pictures.length > 0 && (
