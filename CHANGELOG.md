@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.20.4 · 3 November 2026
+
+The agent points the right way to an app's answer.
+
+- **"Below", not "above"**: when an agent tells you about an app it ran for you, it now knows the app's card
+  shows under its words, so it no longer sends you to "the card above".
+
 ## 0.20.3 · 3 November 2026
 
 Tidier conversations when an agent runs an app for you.
