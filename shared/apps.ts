@@ -123,6 +123,11 @@ export interface AppRecipe {
   graph?: AppGraph;
   /** A block: made to be a step of other templates (Add a step offers it); its form is what it is given, its answer what it gives. */
   block?: boolean;
+  /**
+   * Made to be run by agents in the user's sessions (use_app: its form asked there, its answer shown there). Unset:
+   * yes, unless it is a block. false: an app made to be used on its own page (its screens, a view of what it keeps).
+   */
+  sessions?: boolean;
 }
 
 /** The graph's layout, which the editor keeps and agents may leave out. */
@@ -146,6 +151,10 @@ export interface AppDef extends AppRecipe {
   slug: string;
   /** Offered as a tool to other agents on the app's MCP server (/mcp). */
   mcp: boolean;
+  /** Agents in your sessions may run it for you (its page's Agents can use it), when it is made for that (madeForSessions). */
+  agents: boolean;
+  /** Installed from a file (.naget-app or .json): uninstalling it deletes it, as for an app made here. */
+  fromFile?: boolean;
   public: PublicSettings;
   /** The template it started from. */
   template?: string;
@@ -155,8 +164,11 @@ export interface AppDef extends AppRecipe {
   updatedAt: number;
 }
 
-/** Where a run came from; 'chat': a conversation with the template's agent on its screen (its messages are its follow-ups). */
-export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app' | 'screen' | 'task' | 'chat';
+/**
+ * Where a run came from; 'chat': a conversation with the template's agent on its screen (its messages are its follow-ups);
+ * 'session': an agent ran it for the user in one of their sessions (use_app), where its card shows it.
+ */
+export type RunSource = 'web' | 'test' | 'api' | 'mcp' | 'public' | 'batch' | 'step' | 'app' | 'screen' | 'task' | 'chat' | 'session';
 export type RunStatus = 'queued' | 'starting' | 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
 
 export interface AppRun {
@@ -788,8 +800,15 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(examples ? { examples } : {}),
     ...(graph ? { graph } : {}),
     ...(r.block === true ? { block: true } : {}),
+    ...(typeof r.sessions === 'boolean' ? { sessions: r.sessions } : {}),
   };
 }
+
+/**
+ * Whether an app is made to be run by agents in sessions: its author's say (sessions), a block only when it says so,
+ * and only with something to run (steps or a task).
+ */
+export const madeForSessions = (r: Pick<AppRecipe, 'sessions' | 'block' | 'flow' | 'prompt'>): boolean => (r.sessions ?? !r.block) && (!!r.flow || !!r.prompt.trim());
 
 /** The graph's layout, for the steps there are: places as whole numbers, groups of steps that are there, with short notes. */
 function cleanGraph(raw: any, flow: Flow | undefined, flows: Record<string, NamedFlow> | undefined): AppGraph | undefined {

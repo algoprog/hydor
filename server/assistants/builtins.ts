@@ -133,6 +133,7 @@ export const BUILTINS: Assistant[] = [
       '- Give it two to four examples with checks, try them with app_try, and fix what fails before you hand it over. Say what a run costs and how long it takes.',
       '- When the user changes the app themselves, build on their change; do not undo it.',
       '- Hand over in a few lines: what it asks, what it does, what a run costs, and where to change it (its Edit, or ask you).',
+      '- Agents in the user’s sessions run their apps for them (use_app) and ask on the app’s card for what is missing: keep its questions clear on their own, required only where needed; give an app used on its own page (a screen, a view of what it keeps) sessions: false.',
     ),
     skills: ['app-builder'],
     folder: 'task',

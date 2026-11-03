@@ -1,16 +1,16 @@
 // A template from a file and to a file: the link on the New template page that installs one (after a card
-// saying what it will do here), the dialog that downloads one, and the line on a template's page that
-// says how the packages it needs stand.
+// saying what it is, in plain terms, and what it will do here), the dialog that downloads one, and the line on
+// a template's page that says how the packages it needs stand.
 import { useRef, useState, type ReactNode } from 'react';
-import { Download, FileUp } from 'lucide-react';
+import { ChevronRight, Download, FileUp } from 'lucide-react';
 import type { AppDef } from '@shared/apps';
 import type { EnvView, InstallPreview } from '@shared/app-manifest';
 import { enc, post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, Dialog, Switch } from '../../components/ui';
+import { AppAbout } from './About';
 import { appPath, fileToBase64, money } from './api';
-import { AppIcon } from './AppIcon';
 
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -24,24 +24,16 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
 /** The model each one it asks for becomes here: its own name, another model of yours, or "" for the default. */
 type Picks = Record<string, string>;
 
-/** What a template from a file will do here, before it is installed. */
-function PreviewCard({ p, picks, onPick }: { p: InstallPreview; picks: Picks; onPick: (key: string, value: string) => void }) {
+/**
+ * What a template from a file is and will do here, before it is installed: in plain terms first (what it asks,
+ * what you get, how it works, whether agents may run it), then what it uses here, folded unless something needs a look.
+ */
+function PreviewCard({ p, picks, onPick, agents, onAgents }: { p: InstallPreview; picks: Picks; onPick: (key: string, value: string) => void; agents: boolean; onAgents: (on: boolean) => void }) {
   const needs = [...p.needs.node.map((n) => `${n} (Node)`), ...p.needs.python.map((n) => `${n} (Python)`)];
+  // Models to pick, commands missing or warnings open the details by themselves.
+  const [open, setOpen] = useState(() => p.models.some((m) => m.status !== 'here') || p.needs.missing.length > 0 || p.warnings.length > 0);
   return (
     <div className="space-y-3">
-      <div className="flex items-start gap-3">
-        <AppIcon icon={p.icon} color={p.color} size={36} />
-        <div className="min-w-0">
-          <div className="text-[15px] font-semibold" translate="no">
-            {p.name}
-          </div>
-          {p.description && (
-            <div className="text-[13px] text-fg-2" translate="no">
-              {p.description}
-            </div>
-          )}
-        </div>
-      </div>
       {p.problems.length > 0 && (
         <div className="rounded-xl border border-err/40 bg-err/10 px-3 py-2 text-[13px]">
           <div className="font-medium">It cannot be installed:</div>
@@ -52,87 +44,94 @@ function PreviewCard({ p, picks, onPick }: { p: InstallPreview; picks: Picks; on
           </ul>
         </div>
       )}
-      <div className="divide-y divide-line rounded-xl border border-line px-3">
-        <Line label="Who does the work">{p.agents.join(', ') || '—'}</Line>
-        <Line label="What it does">{p.steps ? `${p.steps} steps` : 'One agent does the task'}</Line>
-        {p.screens.length > 0 && (
-          <Line label="Its screens">
-            <span translate="no">{p.screens.join(', ')}</span>
-          </Line>
-        )}
-        <Line label="Tools it may use">{p.tools === null ? 'All of the app’s tools' : p.tools.length ? p.tools.join(', ') : 'None of the app’s tools'}</Line>
-        {p.models.length > 0 && (
-          <Line label="Models it uses">
-            {p.models.map((m) => {
-              const key = `${m.agent}:${m.as}`;
-              return (
-                <div key={key} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
-                  <span translate="no">{m.label}</span>
-                  {m.status === 'here' ? (
-                    <span className="text-fg-3">· set up here</span>
-                  ) : (
-                    <>
-                      <span className={m.status === 'missing' ? 'text-warn' : 'text-fg-3'}>{m.status === 'missing' ? '· not set up here; use' : '· here as'}</span>
-                      <select className="rounded-md border border-line bg-bg-1 px-1.5 py-0.5 text-[12.5px]" value={picks[key] ?? m.use ?? ''} onChange={(e) => onPick(key, e.target.value)}>
-                        <option value="">{m.agent === 'custom' ? 'The default model' : 'Its default model'}</option>
-                        {m.options.map((o) => (
-                          <option key={o.value} value={o.value} translate="no">
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </>
-                  )}
+      <AppAbout name={p.name} description={p.description} icon={p.icon} color={p.color} category={p.category} origin="From a file" summary={p.summary} agents={agents} onAgents={onAgents} />
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 rounded-xl px-1 py-1 text-left text-[13px] font-medium text-fg-2 hover:text-fg" aria-expanded={open}>
+        <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform', open && 'rotate-90')} />
+        What it uses here
+      </button>
+      {open && (
+        <div className="divide-y divide-line rounded-xl border border-line px-3">
+          <Line label="Who does the work">{p.agents.join(', ') || '—'}</Line>
+          <Line label="What it does">{p.steps ? `${p.steps} steps` : 'One agent does the task'}</Line>
+          {p.screens.length > 0 && (
+            <Line label="Its screens">
+              <span translate="no">{p.screens.join(', ')}</span>
+            </Line>
+          )}
+          <Line label="Tools it may use">{p.tools === null ? 'All of the app’s tools' : p.tools.length ? p.tools.join(', ') : 'None of the app’s tools'}</Line>
+          {p.models.length > 0 && (
+            <Line label="Models it uses">
+              {p.models.map((m) => {
+                const key = `${m.agent}:${m.as}`;
+                return (
+                  <div key={key} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
+                    <span translate="no">{m.label}</span>
+                    {m.status === 'here' ? (
+                      <span className="text-fg-3">· set up here</span>
+                    ) : (
+                      <>
+                        <span className={m.status === 'missing' ? 'text-warn' : 'text-fg-3'}>{m.status === 'missing' ? '· not set up here; use' : '· here as'}</span>
+                        <select className="rounded-md border border-line bg-bg-1 px-1.5 py-0.5 text-[12.5px]" value={picks[key] ?? m.use ?? ''} onChange={(e) => onPick(key, e.target.value)}>
+                          <option value="">{m.agent === 'custom' ? 'The default model' : 'Its default model'}</option>
+                          {m.options.map((o) => (
+                            <option key={o.value} value={o.value} translate="no">
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </Line>
+          )}
+          {p.bundled.length > 0 && (
+            <Line label="Comes with">
+              {p.bundled.map((b) => (
+                <div key={b.from || b.name}>
+                  <span translate="no">{b.name}</span> <span className="text-fg-3">· {b.installs === 'reuse' ? 'you have it: used again' : 'installed too'}</span>
                 </div>
-              );
-            })}
-          </Line>
-        )}
-        {p.bundled.length > 0 && (
-          <Line label="Comes with">
-            {p.bundled.map((b) => (
-              <div key={b.from || b.name}>
-                <span translate="no">{b.name}</span> <span className="text-fg-3">· {b.installs === 'reuse' ? 'you have it: used again' : 'installed too'}</span>
-              </div>
-            ))}
-          </Line>
-        )}
-        {needs.length > 0 && (
-          <Line label="It installs">
-            <span translate="no">{needs.join(', ')}</span>
-            <div className="text-fg-3">In a folder of its own, not for the whole computer</div>
-          </Line>
-        )}
-        {p.needs.commands.length > 0 && (
-          <Line label="Commands it uses">
-            {p.needs.commands.map((c) => (
-              <div key={c}>
-                <span className={cx('font-mono text-[12.5px]', p.needs.missing.includes(c) && 'text-warn')} translate="no">
-                  {c}
-                </span>
-                {p.needs.missing.includes(c) && <span className="text-warn"> (not on this computer)</span>}
-              </div>
-            ))}
-          </Line>
-        )}
-        {p.data.length > 0 && (
-          <Line label="What it keeps">
-            {p.data.map((d) => (
-              <div key={d.name}>
-                <span translate="no">{d.name}</span>
-                {d.records > 0 && <span className="text-fg-3"> {`(${d.records} records)`}</span>}
-              </div>
-            ))}
-          </Line>
-        )}
-        {p.memory && <Line label="Memory">Remembers across its runs, in a memory of its own</Line>}
-        {(p.limits.capUsd || p.limits.runsPerDay) && (
-          <Line label="Limits">
-            {p.limits.capUsd && <div>{`${money(p.limits.capUsd)} a run at most`}</div>}
-            {p.limits.runsPerDay && <div>{`${p.limits.runsPerDay} runs a day`}</div>}
-          </Line>
-        )}
-      </div>
+              ))}
+            </Line>
+          )}
+          {needs.length > 0 && (
+            <Line label="It installs">
+              <span translate="no">{needs.join(', ')}</span>
+              <div className="text-fg-3">In a folder of its own, not for the whole computer</div>
+            </Line>
+          )}
+          {p.needs.commands.length > 0 && (
+            <Line label="Commands it uses">
+              {p.needs.commands.map((c) => (
+                <div key={c}>
+                  <span className={cx('font-mono text-[12.5px]', p.needs.missing.includes(c) && 'text-warn')} translate="no">
+                    {c}
+                  </span>
+                  {p.needs.missing.includes(c) && <span className="text-warn"> (not on this computer)</span>}
+                </div>
+              ))}
+            </Line>
+          )}
+          {p.data.length > 0 && (
+            <Line label="What it keeps">
+              {p.data.map((d) => (
+                <div key={d.name}>
+                  <span translate="no">{d.name}</span>
+                  {d.records > 0 && <span className="text-fg-3"> {`(${d.records} records)`}</span>}
+                </div>
+              ))}
+            </Line>
+          )}
+          {p.memory && <Line label="Memory">Remembers across its runs, in a memory of its own</Line>}
+          {(p.limits.capUsd || p.limits.runsPerDay) && (
+            <Line label="Limits">
+              {p.limits.capUsd && <div>{`${money(p.limits.capUsd)} a run at most`}</div>}
+              {p.limits.runsPerDay && <div>{`${p.limits.runsPerDay} runs a day`}</div>}
+            </Line>
+          )}
+        </div>
+      )}
       {p.notes.length > 0 && (
         <ul className="list-disc space-y-1 pl-5 text-[13px] text-fg-2">
           {p.notes.map((n) => (
@@ -158,6 +157,7 @@ export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => R
   const [file, setFile] = useState<{ name: string; data: string } | null>(null);
   const [preview, setPreview] = useState<InstallPreview | null>(null);
   const [picks, setPicks] = useState<Picks>({});
+  const [agents, setAgents] = useState(true);
   const [busy, setBusy] = useState(false);
   const pick = async (f: File | undefined) => {
     if (!f) return;
@@ -167,6 +167,7 @@ export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => R
       const r = await post<{ preview: InstallPreview }>('/api/apps/install/check', { file: sent });
       setFile(sent);
       setPicks({});
+      setAgents(true);
       setPreview(r.preview);
     } catch (e) {
       toastError(e);
@@ -176,7 +177,7 @@ export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => R
     if (!file) return;
     setBusy(true);
     try {
-      const r = await post<{ app: AppDef }>('/api/apps/install', { file, models: picks });
+      const r = await post<{ app: AppDef }>('/api/apps/install', { file, models: picks, ...(preview?.summary.sessions ? { agents } : {}) });
       const needs = preview && preview.needs.node.length + preview.needs.python.length > 0;
       toast(needs ? 'Installed. What it needs is installing; its first run waits for it.' : 'Installed', 'ok');
       go(appPath(r.app.id));
@@ -211,7 +212,7 @@ export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => R
         open={!!preview}
         onClose={close}
         title="Install this app?"
-        width={560}
+        width={600}
         footer={
           <>
             <Button variant="ghost" onClick={close}>
@@ -223,7 +224,7 @@ export function InstallFromFile({ trigger }: { trigger?: (open: () => void) => R
           </>
         }
       >
-        {preview && <PreviewCard p={preview} picks={picks} onPick={(k, v) => setPicks((x) => ({ ...x, [k]: v }))} />}
+        {preview && <PreviewCard p={preview} picks={picks} onPick={(k, v) => setPicks((x) => ({ ...x, [k]: v }))} agents={agents} onAgents={setAgents} />}
       </Dialog>
     </>
   );

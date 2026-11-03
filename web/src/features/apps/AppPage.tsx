@@ -1,14 +1,16 @@
 // An app's page (or a template's): its form and Run, its past runs, runs over the rows of a CSV, and
-// how to reach it from outside (API keys, other agents, the public page). A template runs as it is,
-// with the agent and model picked here, or becomes an app of your own.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppWindow, ArrowLeft, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
+// how to reach it from outside (API keys, other agents, the public page), and whether agents in your sessions
+// may run it. A template runs as it is, with the agent and model picked here, or becomes an app of your own;
+// one you uninstalled shows what it is, to install it again.
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AppWindow, ArrowLeft, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
 import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
 import { appInfo } from '@shared/app-manifest';
 import { pagesFor } from '@shared/app-ui';
-import { inputsLine, isActive } from '@shared/apps';
-import { api, del, enc, post } from '../../lib/api';
+import { inputsLine, isActive, madeForSessions } from '@shared/apps';
+import { appSummary } from '@shared/app-summary';
+import { api, del, enc, post, put } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
@@ -17,6 +19,7 @@ import { EffortPicker, ModelPicker, ModePicker, modelLabel, useCatalog } from '.
 import { Button, cx, Empty, IconButton, MenuItem, Popover, Section, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
+import { AgentsCard, AppAbout } from './About';
 import { appPath, money, runPath, SOURCE_LABEL, useRunEvents, type AppDetail, type RunDetail } from './api';
 import { AppIcon } from './AppIcon';
 import { BatchTab } from './Batch';
@@ -135,7 +138,7 @@ function LatestRuns({ id, recipe, template }: { id: string; recipe: AppDef | App
   );
 }
 
-function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null }) {
+function RunTab({ id, recipe, template, again, agents }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; agents?: ReactNode }) {
   const [values, setValues] = useState<FormValues>(() => initialValues(recipe.fields));
   // "Run again": the answers of an earlier run (files are chosen afresh).
   useEffect(() => {
@@ -239,9 +242,41 @@ function RunTab({ id, recipe, template, again }: { id: string; recipe: AppDef | 
       </div>
       <aside className="space-y-4">
         <WhatYouGet recipe={recipe} template={template} />
+        {agents}
         <LatestRuns id={id} recipe={recipe} template={template} />
         {recipe.flow && <FlowList flow={recipe.flow} own={!template} onGraph={() => go(template ? `/apps/new?template=${enc(id.slice(4))}` : `/apps/${enc(id)}/edit`)} />}
       </aside>
+    </div>
+  );
+}
+
+/** A ready-made app you uninstalled: what it is, in plain terms, to install it again (its past runs are still here). */
+function NotInstalled({ id, t, onInstalled }: { id: string; t: AppTemplate; onInstalled: () => void }) {
+  const [agents, setAgents] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const summary = useMemo(() => appSummary(t), [t]);
+  const install = async () => {
+    setBusy(true);
+    try {
+      await post(`/api/apps/${enc(id)}/install`);
+      if (!agents && summary.sessions) await put(`/api/apps/${enc(id)}/agents`, { on: false });
+      toast('Installed', 'ok');
+      onInstalled();
+    } catch (e) {
+      toastError(e);
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mx-auto max-w-[760px] space-y-4 px-4 py-6 sm:px-6 lg:py-8">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3">
+        <span className="min-w-0 flex-1 text-[13.5px] text-fg-2">You uninstalled it. Install it again to run it here and to let agents run it in your sessions.</span>
+        <Button variant="primary" icon={busy ? <Throbber /> : <Plus size={15} />} onClick={install} disabled={busy}>
+          Install
+        </Button>
+      </div>
+      <AppAbout name={t.name} description={t.description} icon={t.icon} color={t.color} category={t.category} origin="Ready-made" summary={summary} translate agents={agents} onAgents={setAgents} block={t.block} />
+      <LatestRuns id={id} recipe={t} template />
     </div>
   );
 }
@@ -336,7 +371,44 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
   }, [d?.env?.state]);
   const template = id.startsWith('tpl:');
   const recipe = d?.app ?? d?.template;
+  // A ready-made app comes installed; one you uninstalled shows what it is, to install it again.
+  const installed = !template || d?.installed !== false;
   const setTab = (t: Tab) => go(`${appPath(id)}${t === 'run' ? '' : `?tab=${t}`}`, true);
+  const uninstall = async () => {
+    setMenu(false);
+    if (!recipe) return;
+    if (template) {
+      if (!(await ask({ title: `Uninstall ${recipe.name}?`, body: 'It leaves your apps, and agents stop running it in your sessions. It waits under Ready-made apps to install on the Apps page, to install again whenever you like; its runs stay.', confirm: 'Uninstall', danger: true }))) return;
+      try {
+        await post(`/api/apps/${enc(id)}/uninstall`);
+        go('/apps');
+      } catch (e) {
+        toastError(e);
+      }
+      return;
+    }
+    const file = !!d?.app?.fromFile;
+    const body = file ? 'It is deleted completely: its runs, keys, public page and the data it keeps go with it. The sessions it started stay. To have it again, install its file again.' : 'Its runs, keys, public page and the data it keeps go with it. The sessions it started stay.';
+    if (!(await ask({ title: file ? `Uninstall ${recipe.name}?` : `Delete ${recipe.name}?`, body, confirm: file ? 'Uninstall' : 'Delete', danger: true }))) return;
+    try {
+      await del(`/api/apps/${enc(id)}`);
+      go('/apps');
+    } catch (e) {
+      toastError(e);
+    }
+  };
+  // Whether agents in your sessions may run it: the switch beside its form.
+  const agentsOn = template ? d?.agents !== false : d?.app?.agents !== false;
+  const agentsCard = recipe && installed && (
+    <AgentsCard
+      id={id}
+      made={madeForSessions(recipe)}
+      on={agentsOn}
+      block={recipe.block}
+      ownPage={!!d?.app?.screens?.main || pagesFor(recipe.ui, 'app').length > 0}
+      onChange={(on) => setD((x) => (x ? (template ? { ...x, agents: on } : x.app ? { ...x, app: { ...x.app, agents: on } } : x) : x))}
+    />
+  );
   if (err) return <Empty title="This app could not be opened">{err}</Empty>;
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -357,10 +429,22 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
         actions={
           recipe &&
           (template ? (
-            <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`/apps/new?template=${enc(id.slice(4))}`)}>
-              <span className="max-sm:hidden">Make it mine</span>
-              <span className="sm:hidden">Edit</span>
-            </Button>
+            installed && (
+              <>
+                <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`/apps/new?template=${enc(id.slice(4))}`)}>
+                  <span className="max-sm:hidden">Make it mine</span>
+                  <span className="sm:hidden">Edit</span>
+                </Button>
+                <IconButton label="More" ref={more} onClick={() => setMenu((m) => !m)}>
+                  <MoreHorizontal size={17} />
+                </IconButton>
+                <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={220}>
+                  <MenuItem icon={<Trash2 size={15} />} danger onClick={uninstall}>
+                    Uninstall
+                  </MenuItem>
+                </Popover>
+              </>
+            )
           ) : (
             <>
               <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`${appPath(id)}/edit`)}>
@@ -416,21 +500,8 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
                 >
                   Download as a file
                 </MenuItem>
-                <MenuItem
-                  icon={<Trash2 size={15} />}
-                  danger
-                  onClick={async () => {
-                    setMenu(false);
-                    if (!(await ask({ title: `Delete ${recipe.name}?`, body: 'Its runs, keys, public page and the data it keeps go with it. The sessions it started stay.', confirm: 'Delete', danger: true }))) return;
-                    try {
-                      await del(`/api/apps/${enc(id)}`);
-                      go('/apps');
-                    } catch (e) {
-                      toastError(e);
-                    }
-                  }}
-                >
-                  Delete
+                <MenuItem icon={<Trash2 size={15} />} danger onClick={uninstall}>
+                  {d?.app?.fromFile ? 'Uninstall' : 'Delete'}
                 </MenuItem>
               </Popover>
               {d?.app && <DownloadDialog app={d.app} open={saving} onClose={() => setSaving(false)} />}
@@ -464,14 +535,16 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
               </div>
             )}
             {/* Its view's own page, or its screen, in place of its form (the form comes back to run again with earlier answers). */}
-            {tab === 'run' && d?.app && pagesFor(d.app.ui, 'app').length > 0 && !again ? (
+            {template && !installed && d?.template ? (
+              <NotInstalled id={id} t={d.template} onInstalled={load} />
+            ) : tab === 'run' && d?.app && pagesFor(d.app.ui, 'app').length > 0 && !again ? (
               <HomeView app={d.app} view={d.view} />
             ) : tab === 'run' && d?.app?.screens?.main && !again ? (
               <div className="h-full min-h-[420px]">
                 <AppScreen app={d.app} />
               </div>
             ) : (
-              (tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} />
+              (tab === 'run' || template) && <RunTab key={id} id={id} recipe={recipe} template={template} again={again} agents={agentsCard} />
             )}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} def={d?.app} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}

@@ -5,7 +5,7 @@
 // (sources ranked, dates worked out, minutes that add up, the tables of the result); an agent only where judgement
 // or a session's tools are needed (a report written from what was found, the files of a web app). Repeat and At
 // the same time do work side by side, Decide makes the real choices, and Ask a person waits only when someone is
-// there to answer: when its form says so and the run comes from the form or a test, never from the API, rows or a
+// there to answer: when its form says so and the run comes from the form, a test or a session, never from the API, rows or a
 // schedule. The programs run in a sandbox (bubblewrap); where it cannot run, an agent does their work. The blocks
 // after them are small templates made to be steps of others.
 import type { AnswerField, AppTemplate } from '../../shared/apps.ts';
@@ -15,8 +15,8 @@ import { VIEWS } from './views.ts';
 
 type Draft = Omit<AppTemplate, 'agent' | 'tools' | 'limits'>;
 
-/** An Ask a person step's rule: the form's yes/no says to ask, and someone is there (the form, or a test). */
-const someoneThere = (field: string) => `{{${field}}} and {{run.source}} = web or {{${field}}} and {{run.source}} = test`;
+/** An Ask a person step's rule: the form's yes/no says to ask, and someone is there (the form, a test, or a session whose agent ran it). */
+const someoneThere = (field: string) => `{{${field}}} and {{run.source}} = web or {{${field}}} and {{run.source}} = test or {{${field}}} and {{run.source}} = session`;
 
 // ---- what the programs share ----------------------------------------------------------------------------------
 // The programs are JavaScript (or Python) as the code steps show them: String.raw keeps their backslashes as

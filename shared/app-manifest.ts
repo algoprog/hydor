@@ -16,6 +16,7 @@
 // inside functions only, never while the modules load.
 import type { Agent } from './types.ts';
 import type { AnswerField, AppField, AppRecipe } from './apps.ts';
+import type { AppSummary } from './app-summary.ts';
 import { ANSWER_TYPES, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
 
 // ---- the format ---------------------------------------------------------------------------------------
@@ -406,7 +407,7 @@ export const BUILTIN_VALUES = [
   { ref: 'now', label: 'Now', hint: 'The date and time, as 2026-11-02 14:30' },
   { ref: 'weekday', label: 'The day of the week', hint: 'Monday, Tuesday…' },
   { ref: 'timezone', label: 'The time zone', hint: 'Where those are, as Europe/Athens' },
-  { ref: 'run.source', label: 'What started the run', hint: 'web (its form), test, api, mcp, public, batch, task, screen, chat, app' },
+  { ref: 'run.source', label: 'What started the run', hint: 'web (its form), test, api, mcp, public, batch, task, screen, chat, app, session (an agent ran it for you in a session)' },
   { ref: 'run.id', label: 'The run', hint: 'Its id, as its page has it' },
 ] as const;
 /** The names those values go by. */
@@ -1389,6 +1390,9 @@ export interface InstallPreview {
   description: string;
   icon: string;
   color: string;
+  category?: string;
+  /** What it asks, gives and does, in plain terms (shared/app-summary.ts), for the card's first part. */
+  summary: AppSummary;
   /** How many steps it has (0: one agent does the task). */
   steps: number;
   /** Who does the work: each agent (and model) once. */

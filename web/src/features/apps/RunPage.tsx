@@ -44,7 +44,7 @@ function Asked({ d }: { d: RunDetail }) {
 }
 
 /** An Ask a person step waiting: its question, and yes or no or its form, answered here (the run goes on). */
-function AnswerCard({ runId, q }: { runId: string; q: NonNullable<RunDetail['question']> }) {
+export function AnswerCard({ runId, q }: { runId: string; q: NonNullable<RunDetail['question']> }) {
   const [values, setValues] = useState<FormValues>(() => initialValues(q.fields ?? []));
   const [busy, setBusy] = useState(false);
   const send = async (body: Record<string, unknown>) => {

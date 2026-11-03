@@ -131,9 +131,14 @@ agents that speak ACP and take MCP servers.
   or LaTeX you have open (this slide, every slide, a section, the cells picked, the part picked, all of it) and
   watch it change as it saves. Apps are tasks you repeat, each with a form: ready-made or your own (described in
   a sentence at the top of the Apps page for the App builder to make, with ideas to start from, built from
-  scratch, or installed from a file, all under one New app menu; your apps say when each last ran, the runs to
-  pick up again come next, and each ready-made app shows what you get from it), run from the Apps page, the API,
-  MCP, a public page, or once for each row of a CSV. An app's page has its form beside what you get, its latest
+  scratch, or installed from a file, all under one New app menu; your apps, the ready-made ones among them, say
+  when each last ran, the runs to pick up again come next, and ready-made apps you uninstalled wait to be installed
+  again, each showing what you get from it), run from the Apps page, the API, MCP, a public page, or once for each
+  row of a CSV. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
+  that says in plain words what it asks, gives and does. Agents in any session run your apps for you (use_app):
+  ask to plan a trip and the Trip planner runs there, the questions your message left out asked on the app's own
+  card (the optional ones may stay empty), its run and its view shown in the conversation; each app's Agents can
+  use it switch keeps agents from running it, and blocks and apps made for their own page stay out. An app's page has its form beside what you get, its latest
   runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
   ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
   sources in code, reads the best in parallel, searches again for gaps and writes a cited report), and each hands
@@ -194,8 +199,8 @@ agents that speak ACP and take MCP servers.
   edited in the Library's page editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
   flows and a conversation with its agent, who finds and changes its records and runs its flows for you (the
   latest conversation shows on return; earlier ones a click away). Apps travel as one file (.naget-app or .json, with their records, screens and the apps they
-  call), installed after a card that says what they will do here and offers one of your models for any it asks
-  for that is not set up here.
+  call), installed after a card that says what they ask, give and do, in plain words, then what they will use here
+  (folded), offering one of your models for any they ask for that is not set up here; uninstalling one deletes it.
 - **Slides**: decks kept in the Library, made by an agent (save_slides, from layouts or parts placed by position) or
   from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
   layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and

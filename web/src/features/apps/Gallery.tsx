@@ -1,9 +1,10 @@
-// The Apps page (/apps): a box to describe a new app (with a few ideas to start from), your own apps with when each
-// last ran, the runs to pick up again, and the ready-made apps by kind of task, each showing what you get from it
-// (the pages of its view). Building blocks, apps made to be steps of others, wait folded at the end.
+// The Apps page (/apps): a box to describe a new app (with a few ideas to start from), your apps (your own, then the
+// ready-made ones, which come installed) with when each last ran, the runs to pick up again, and the ready-made apps
+// you uninstalled, each showing what you get from it (the pages of its view), to install again. Building blocks,
+// apps made to be steps of others, wait folded at the end.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ChevronDown, ChevronRight, FilePlus2, FileUp, Globe, LayoutGrid, Plus, Puzzle, Sparkles } from 'lucide-react';
-import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
+import type { AppDef, AppRun } from '@shared/apps';
 import { APP_COLORS, inputsLine, isActive } from '@shared/apps';
 import { pagesFor } from '@shared/app-ui';
 import { tr } from '../../i18n/runtime';
@@ -13,7 +14,8 @@ import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Badge, Button, cx, Empty, MenuItem, Popover, Throbber } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
-import { appPath, runPath, useRunEvents, type Gallery } from './api';
+import { InstallReadyDialog } from './About';
+import { appPath, runPath, useRunEvents, type Gallery, type ReadyApp } from './api';
 import { AppIcon } from './AppIcon';
 import { InstallFromFile } from './Install';
 
@@ -123,18 +125,22 @@ function NewAppMenu() {
   );
 }
 
-/** One of your apps: what it is, and when it last ran. */
-function YourApp({ a }: { a: AppDef & { usage: { runs: number }; lastRunAt?: number } }) {
-  const view = pagesFor(a.ui, 'run').length > 0 || pagesFor(a.ui, 'app').length > 0;
+/** One of your apps (or a ready-made one installed): what it is, and when it last ran. */
+function YourApp({ a, ready }: { a: (AppDef & { lastRunAt?: number }) | ReadyApp; ready?: boolean }) {
+  const own = !ready ? (a as AppDef) : null;
+  const view = !!own && (pagesFor(own.ui, 'run').length > 0 || pagesFor(own.ui, 'app').length > 0);
+  const path = appPath(ready ? `tpl:${(a as ReadyApp).id}` : a.id);
+  // A ready-made app's words are the app's own (translated); yours are yours.
+  const mine = ready ? undefined : 'no';
   return (
-    <button type="button" onClick={() => go(appPath(a.id))} className="group flex min-h-[132px] flex-col rounded-2xl border border-line bg-panel p-4 text-left transition-colors hover:border-line-2 hover:bg-bg-1">
+    <button type="button" onClick={() => go(path)} className="group flex min-h-[132px] flex-col rounded-2xl border border-line bg-panel p-4 text-left transition-colors hover:border-line-2 hover:bg-bg-1">
       <div className="flex w-full items-start gap-3">
         <AppIcon icon={a.icon} color={a.color} size={42} />
         <div className="min-w-0 flex-1">
-          <div translate="no" className="truncate text-[15px] font-semibold tracking-tight">
+          <div translate={mine} className="truncate text-[15px] font-semibold tracking-tight">
             {a.name}
           </div>
-          <div translate={a.description ? 'no' : undefined} className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-fg-3">
+          <div translate={a.description ? mine : undefined} className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-fg-3">
             {a.description || 'No description'}
           </div>
         </div>
@@ -142,8 +148,9 @@ function YourApp({ a }: { a: AppDef & { usage: { runs: number }; lastRunAt?: num
       <div className="mt-auto flex w-full min-w-0 items-center gap-2 pt-3 text-[12px] text-fg-3">
         <span className="truncate">{a.lastRunAt ? tr(`Last run ${timeAgo(a.lastRunAt)} ago`) : 'Not run yet'}</span>
         <span className="flex-1" />
+        {ready && <Badge tone="neutral">Ready-made</Badge>}
         {view && <Badge tone="neutral">Has a view</Badge>}
-        {a.public.on && (
+        {own?.public.on && (
           <Badge tone="info">
             <Globe size={10} className="mr-1" />
             Public
@@ -154,12 +161,12 @@ function YourApp({ a }: { a: AppDef & { usage: { runs: number }; lastRunAt?: num
   );
 }
 
-/** A ready-made app: a band of its colour, what it does, and what you get (the pages of its view). */
-function ReadyMade({ t }: { t: AppTemplate }) {
+/** A ready-made app you uninstalled: a band of its colour, what it does, what you get (the pages of its view), and Install. */
+function ReadyMade({ t, onInstall }: { t: ReadyApp; onInstall: () => void }) {
   const c = APP_COLORS[t.color] ?? APP_COLORS.blue;
   const pages = pagesFor(t.ui, 'run').filter((p) => p.tab !== false);
   return (
-    <button type="button" onClick={() => go(appPath(`tpl:${t.id}`))} className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel text-left transition-colors hover:border-line-2">
+    <button type="button" onClick={onInstall} className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel text-left transition-colors hover:border-line-2">
       <div className="relative h-[72px] w-full" style={{ background: `linear-gradient(120deg, color-mix(in oklab, ${c} 24%, transparent), color-mix(in oklab, ${c} 6%, transparent))` }}>
         <span className="absolute top-3 right-4 text-[11.5px] font-medium tracking-wide uppercase" style={{ color: c }}>
           {t.category}
@@ -181,7 +188,7 @@ function ReadyMade({ t }: { t: AppTemplate }) {
           </div>
         )}
         <span className="mt-auto flex items-center gap-1 pt-4 text-[13px] font-medium text-fg-3 transition-colors group-hover:text-accent">
-          Try it <ArrowRight size={14} />
+          <Plus size={14} /> Install
         </span>
       </div>
     </button>
@@ -212,6 +219,7 @@ export function GalleryPage() {
   const [g, setG] = useState<Gallery | null>(null);
   const [cat, setCat] = useState('All');
   const [blocksOpen, setBlocksOpen] = useState(false);
+  const [adding, setAdding] = useState<ReadyApp | null>(null);
   const load = () => api<Gallery>('/api/apps').then(setG, toastError);
   useEffect(() => {
     load();
@@ -224,11 +232,16 @@ export function GalleryPage() {
       return run.source === 'web' || run.source === 'test' ? { ...x, recent: [run, ...x.recent].slice(0, 6) } : x;
     }),
   );
-  const ready = useMemo(() => (g?.templates ?? []).filter((t) => !t.block), [g]);
+  // Ready-made apps come installed: those you uninstalled wait below, to install again.
+  const ready = useMemo(() => (g?.templates ?? []).filter((t) => !t.block && t.installed), [g]);
+  const removed = useMemo(() => (g?.templates ?? []).filter((t) => !t.block && !t.installed), [g]);
   const blocks = useMemo(() => (g?.templates ?? []).filter((t) => t.block), [g]);
   const own = useMemo(() => (g?.apps ?? []).filter((a) => !a.block), [g]);
   const ownBlocks = useMemo(() => (g?.apps ?? []).filter((a) => a.block), [g]);
-  const cats = useMemo(() => ['All', ...new Set(ready.map((t) => t.category ?? 'Other'))], [ready]);
+  // Your apps by kind of task, once there are enough of them to look through.
+  const cats = useMemo(() => ['All', ...new Set([...own.map((a) => a.category ?? 'Other'), ...ready.map((t) => t.category ?? 'Other')])], [own, ready]);
+  const sorting = own.length + ready.length > 6 && cats.length > 2;
+  const shown = (category?: string) => !sorting || cat === 'All' || (category ?? 'Other') === cat;
   const faces = useMemo(() => Object.fromEntries([...(g?.apps ?? []).map((a) => [a.id, a] as const), ...(g?.templates ?? []).map((t) => [`tpl:${t.id}`, t] as const)]), [g]);
 
   return (
@@ -244,20 +257,42 @@ export function GalleryPage() {
             <MakeBox />
 
             <section>
-              <div className="mb-3 flex items-baseline gap-3">
+              <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
                 <h2 className="text-[17px] font-semibold tracking-tight">Your apps</h2>
-                {own.length > 0 && <span className="text-[13px] text-fg-3">{own.length}</span>}
+                {own.length + ready.length > 0 && <span className="text-[13px] text-fg-3">{own.length + ready.length}</span>}
+                {own.length + ready.length > 0 && <span className="text-[13px] text-fg-3">Run one here, or ask for what it does in any session</span>}
               </div>
-              {own.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {own.map((a) => (
-                    <YourApp key={a.id} a={a} />
+              {sorting && (
+                <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
+                  {cats.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCat(c)}
+                      className={cx('h-8 shrink-0 rounded-full border px-3.5 text-[13px] transition-colors', cat === c ? 'border-fg bg-fg text-bg' : 'border-line bg-panel text-fg-2 hover:border-line-2 hover:text-fg')}
+                    >
+                      {c}
+                    </button>
                   ))}
+                </div>
+              )}
+              {own.length + ready.length ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {own
+                    .filter((a) => shown(a.category))
+                    .map((a) => (
+                      <YourApp key={a.id} a={a} />
+                    ))}
+                  {ready
+                    .filter((t) => shown(t.category))
+                    .map((t) => (
+                      <YourApp key={`tpl:${t.id}`} a={t} ready />
+                    ))}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-line-2 px-5 py-6 text-center">
                   <Empty icon={<LayoutGrid size={20} />} title="Your apps will be here">
-                    Describe one above, try a ready-made one below and choose Make it mine, or use More → Save as an app in a session’s menu.
+                    Describe one above, install a ready-made one below, or use More → Save as an app in a session’s menu.
                   </Empty>
                 </div>
               )}
@@ -274,31 +309,19 @@ export function GalleryPage() {
               </section>
             )}
 
-            <section>
-              <div className="mb-1 flex flex-wrap items-baseline gap-x-3">
-                <h2 className="text-[17px] font-semibold tracking-tight">Ready-made apps</h2>
-                <span className="text-[13px] text-fg-3">Try one as it is, or make it your own and change it</span>
-              </div>
-              <div className="mt-3 mb-4 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
-                {cats.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCat(c)}
-                    className={cx('h-8 shrink-0 rounded-full border px-3.5 text-[13px] transition-colors', cat === c ? 'border-fg bg-fg text-bg' : 'border-line bg-panel text-fg-2 hover:border-line-2 hover:text-fg')}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {ready
-                  .filter((t) => cat === 'All' || (t.category ?? 'Other') === cat)
-                  .map((t) => (
-                    <ReadyMade key={t.id} t={t} />
+            {removed.length > 0 && (
+              <section>
+                <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
+                  <h2 className="text-[17px] font-semibold tracking-tight">Ready-made apps to install</h2>
+                  <span className="text-[13px] text-fg-3">The ones you uninstalled: install one again to have it back</span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {removed.map((t) => (
+                    <ReadyMade key={t.id} t={t} onInstall={() => setAdding(t)} />
                   ))}
-              </div>
-            </section>
+                </div>
+              </section>
+            )}
 
             {(blocks.length > 0 || ownBlocks.length > 0) && (
               <section className="rounded-2xl border border-line">
@@ -333,6 +356,7 @@ export function GalleryPage() {
           </div>
         )}
       </div>
+      {adding && <InstallReadyDialog t={adding} open onClose={() => setAdding(null)} />}
     </div>
   );
 }

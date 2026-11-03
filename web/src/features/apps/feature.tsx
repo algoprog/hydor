@@ -7,7 +7,8 @@
 //   /apps/runs/<run>      a run's result, its follow-ups and a box for the next one
 //   /a/<slug>             the public page (main.tsx, without the sign-in)
 //
-// A run's session opens on the same result (SessionPane), with a switch to its conversation.
+// A run's session opens on the same result (SessionPane), with a switch to its conversation. An app an agent ran for
+// you in another session shows there as its card (InSession), under the turn that asked for it.
 import { ClipboardCheck, LayoutGrid } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import type { ToolItem } from '@shared/types';
@@ -24,6 +25,7 @@ import { GalleryPage } from './Gallery';
 import { ResultView } from './Result';
 import { RunPage } from './RunPage';
 import { AppSessionPane, runOfSession } from './SessionPane';
+import { AppRunNote, USE_APP_VIEW } from './InSession';
 import { AppSide, BUILDER_VIEWS, closeAppSide, useAppSideOpen } from './Beside';
 
 function AppsRoutes() {
@@ -74,7 +76,8 @@ export const appsFeature: WebFeature = {
   id: 'apps',
   routes: [{ match: (p) => p === '/apps' || p.startsWith('/apps/'), Page: AppsRoutes }],
   nav: [{ id: 'apps', path: '/apps', label: 'Apps', icon: <LayoutGrid size={17} />, match: (p) => p === '/apps' || p.startsWith('/apps/') }],
-  toolViews: { submit_result: { place: 'answer', Row: SubmitRow }, ...BUILDER_VIEWS },
+  toolViews: { submit_result: { place: 'answer', Row: SubmitRow }, use_app: USE_APP_VIEW, ...BUILDER_VIEWS },
+  noteViews: { 'app-run': AppRunNote },
   // A template an agent builds, beside its conversation while it is new.
   sessionSide: { useOpen: useAppSideOpen, close: closeAppSide, Panel: AppSide },
   sessionPane: { label: 'Result', icon: <ClipboardCheck size={13} />, match: (s) => !!runOfSession(s), placeholder: 'Ask for a change to the result…', Body: AppSessionPane },

@@ -26,6 +26,10 @@ import { publicRunOf, publicRunPrompt } from './publicRun.ts';
 import { runInstructions, saveResult, startRun, startRuns } from './runs.ts';
 import * as store from './store.ts';
 import { TEMPLATES } from './templates.ts';
+import { intake, usableApps, useNote } from './use.ts';
+import { notesOf } from '../notes.ts';
+import { appSummary } from '../../shared/app-summary.ts';
+import { madeForSessions } from '../../shared/apps.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -77,6 +81,15 @@ class FakeSessions extends EventEmitter {
   async deliverOrQueue(key: string, text: string) {
     this.sent.push({ key, text });
     this.status.set(key, 'working');
+  }
+  enqueue(key: string, text: string) {
+    this.sent.push({ key, text });
+  }
+  /** The cards shown in a session (an app's form), and how the user answers the next one. */
+  cards: any[] = [];
+  answerWith: ((card: any) => any) | null = null;
+  adapterByRun(_runId: string) {
+    return { ask: async (card: any) => (this.cards.push(card), this.answerWith ? this.answerWith(card) : null) } as any;
   }
   /** Ends a session's turn with a reply. */
   end(key: string, reply = 'All done.') {
@@ -207,9 +220,9 @@ test('templates: ten tasks in steps, each checking out as a save checks it, usin
     }
     assert.ok(new Set(steps.map((s) => s.do)).size >= 4, `${t.id}: several kinds of step`);
     assert.ok(steps.every((s) => s.title), `${t.id}: each step says what it does`);
-    // A person is asked only when the form says so and the run comes from the form (or a test): never the API, rows or a schedule; nobody answering does not stop it.
+    // A person is asked only when the form says so and the run comes from the form, a test or a session (an agent ran it for them there): never the API, rows or a schedule; nobody answering does not stop it.
     for (const s of steps.filter((x) => x.do === 'ask')) {
-      assert.match(s.if ?? '', /^\{\{(\w+)\}\} and \{\{run\.source\}\} = web or \{\{\1\}\} and \{\{run\.source\}\} = test$/, `${t.id}: ${s.id} asks only when someone is there`);
+      assert.match(s.if ?? '', /^\{\{(\w+)\}\} and \{\{run\.source\}\} = web or \{\{\1\}\} and \{\{run\.source\}\} = test or \{\{\1\}\} and \{\{run\.source\}\} = session$/, `${t.id}: ${s.id} asks only when someone is there`);
       const field = t.fields.find((f) => f.id === /^\{\{(\w+)\}\}/.exec(s.if!)![1]);
       assert.equal(field?.type, 'yesno', `${t.id}: ${s.id} asks when a yes/no on the form says so`);
       assert.equal(s.failed, 'skip', `${t.id}: ${s.id} goes on when nobody answers`);
@@ -299,7 +312,7 @@ test('submit_result: only on an app run, checks the fields, saves the result; to
   assert.equal(apps.allowTool!('read_session', ctx), false);
   assert.equal(apps.allowTool!('read_session', { ...ctx, runId: 'other', key: 'claude:someone-else' }), true);
   // Another session hands in nothing: it gets what templates are built with.
-  assert.deepEqual(apps.tools!({ ...ctx, runId: 'other', key: 'claude:someone-else' }).map((t) => t.name), ['app_get', 'app_save', 'app_try', 'app_screen', 'app_data']);
+  assert.deepEqual(apps.tools!({ ...ctx, runId: 'other', key: 'claude:someone-else' }).map((t) => t.name), ['app_get', 'app_save', 'app_try', 'app_screen', 'app_data', 'use_app']);
   sessions.end(key, 'Here is the plan.');
   await sleep(2000);
   const done = store.getRun(db, run.id)!;
@@ -720,6 +733,167 @@ test('view: a save checks its view and says what to fix; a public page has its r
   const pub = (await http.inject({ method: 'GET', url: `/a-api/${a.slug}` })).json();
   assert.deepEqual(pub.app.ui.pages.map((p: { id: string }) => p.id), ['main']);
   assert.deepEqual(pub.app.ui.events, { tick: [{ do: 'toggle', name: 'done.@key' }] });
+});
+
+// ---- ready-made apps installed, and agents in sessions running the user's apps ---------------------------
+
+const call = async (method: 'GET' | 'POST' | 'PUT', url: string, body?: unknown) => {
+  const r = await http.inject({ method, url, ...(body !== undefined ? { payload: body as any } : {}) });
+  return { status: r.statusCode, body: r.json() as any };
+};
+
+test('ready-made apps: installed from the start; one uninstalled leaves your apps and runs no more until installed again, its runs kept', async () => {
+  let g = await call('GET', '/api/apps');
+  assert.ok(g.body.templates.length >= 15 && g.body.templates.every((t: any) => t.installed === true && t.agents === true));
+  assert.equal((await call('POST', '/api/apps/tpl:trip-planner/uninstall')).status, 200);
+  g = await call('GET', '/api/apps');
+  assert.equal(g.body.templates.find((t: any) => t.id === 'trip-planner').installed, false);
+  assert.equal((await call('GET', '/api/apps/tpl:trip-planner')).body.installed, false);
+  const refused = await call('POST', '/api/apps/tpl:trip-planner/runs', { inputs: { destination: 'Lisbon', start: '2027-05-03', days: '4' } });
+  assert.equal(refused.status, 409);
+  assert.match(refused.body.error, /not installed/);
+  assert.ok(!usableApps(db).some((u) => u.app === 'tpl:trip-planner'), 'agents no longer get it');
+  assert.equal((await call('POST', '/api/apps/tpl:trip-planner/install')).status, 200);
+  assert.equal((await call('GET', '/api/apps/tpl:trip-planner')).body.installed, true);
+  // Named by its id, or as tpl:<id> while an app of yours has that address (the tests' own Trip planner).
+  assert.ok(usableApps(db).some((u) => u.app === 'tpl:trip-planner' && /^(tpl:)?trip-planner$/.test(u.ref)));
+  assert.equal((await call('POST', '/api/apps/tpl:no-such/install')).status, 404);
+});
+
+test('agents in sessions: every installed app made for it, yours first; the switch turns one off and on; blocks and apps for their own page stay out', async () => {
+  const mine = store.saveApp(db, { recipe: recipe({ name: 'Packing list', cwd: undefined }) });
+  const page = store.saveApp(db, { recipe: recipe({ name: 'Dashboard', sessions: false }) });
+  const block = store.saveApp(db, { recipe: recipe({ name: 'A block', block: true }) });
+  assert.equal(madeForSessions(page), false);
+  assert.equal(madeForSessions(block), false);
+  let list = usableApps(db);
+  assert.ok(list.some((u) => u.app === mine.id && u.own));
+  assert.ok(!list.some((u) => u.app === page.id || u.app === block.id));
+  assert.ok(!list.some((u) => TEMPLATES.find((t) => `tpl:${t.id}` === u.app)?.block), 'ready-made blocks stay out');
+  assert.ok(list.findIndex((u) => u.app === mine.id) < list.findIndex((u) => !u.own), 'yours come first');
+  const before = store.getApp(db, mine.id)!.updatedAt;
+  let r = await call('PUT', `/api/apps/${mine.id}/agents`, { on: false });
+  assert.deepEqual(r.body, { agents: false, made: true });
+  assert.equal(store.getApp(db, mine.id)!.agents, false);
+  assert.equal(store.getApp(db, mine.id)!.updatedAt, before, 'the switch does not move it up the list');
+  assert.ok(!usableApps(db).some((u) => u.app === mine.id));
+  r = await call('PUT', '/api/apps/tpl:news-digest/agents', { on: false });
+  assert.equal(r.body.agents, false);
+  assert.equal((await call('GET', '/api/apps/tpl:news-digest')).body.agents, false);
+  assert.ok(!usableApps(db).some((u) => u.app === 'tpl:news-digest'));
+  await call('PUT', '/api/apps/tpl:news-digest/agents', { on: true });
+  await call('PUT', `/api/apps/${mine.id}/agents`, { on: true });
+  list = usableApps(db);
+  assert.ok(list.some((u) => u.app === 'tpl:news-digest') && list.some((u) => u.app === mine.id));
+  assert.equal((await call('PUT', `/api/apps/${mine.id}/agents`, { on: 'yes' })).status, 400);
+  // What every session is told: the apps by name, with what each does.
+  assert.match(useNote(db)!, /use_app/);
+  assert.match(useNote(db)!, /"packing-list": Packing list/);
+  assert.match(useNote(db)!, /"(tpl:)?trip-planner": Trip planner \(ready-made\) — A day-by-day plan/);
+  for (const a of [mine, page, block]) store.deleteApp(db, a.id);
+});
+
+test('what an app is, in plain terms: its questions (optional ones marked), what you get, how it works, whether agents may run it', () => {
+  const trip = appSummary(TEMPLATES.find((t) => t.id === 'trip-planner')!);
+  assert.deepEqual(trip.asks.slice(0, 3), [
+    { label: 'Where to', optional: false },
+    { label: 'First day', optional: false },
+    { label: 'How many days', optional: true },
+  ]);
+  assert.ok(trip.inView && trip.gets.length >= 3);
+  assert.ok(trip.how.some((h) => h.kind === 'tool' && h.tool === 'web_search') && trip.how.some((h) => h.kind === 'model') && trip.how.some((h) => h.kind === 'ask'));
+  assert.ok(trip.steps > 5 && trip.sessions && !trip.ownPage);
+  const one = appSummary(recipe());
+  assert.deepEqual(one.how, [{ kind: 'one' }]);
+  assert.deepEqual(one.gets, ['Summary', 'Cost', 'Days']);
+  assert.equal(one.inView, false);
+});
+
+test('use_app: answers in the form’s terms; a file by its path, a text as a file; a path that is no file is asked for', () => {
+  const fields = cleanRecipe({ fields: [
+    { id: 'city', label: 'City', type: 'text', required: true },
+    { id: 'kids', label: 'Kids', type: 'yesno' },
+    { id: 'pace', label: 'Pace', type: 'choice', options: ['Relaxed', 'Packed'] },
+    { id: 'notes', label: 'Notes', type: 'file' },
+    { id: 'more', label: 'More', type: 'file' },
+    { id: 'gone', label: 'Gone', type: 'file' },
+  ] }).fields;
+  fs.writeFileSync(path.join(tmp, 'notes.md'), '# Notes');
+  const got = intake(fields, { City: 'Lisbon', kids: true, pace: 'relaxed', notes: 'notes.md', more: 'Line one\nline two', gone: '/no/such/file.pdf', extra: 1 }, tmp);
+  assert.deepEqual(got.values, { city: 'Lisbon', kids: 'Yes', pace: 'Relaxed', notes: 'notes.md', more: 'more.txt' });
+  assert.equal(Buffer.from(got.files.notes.data, 'base64').toString(), '# Notes');
+  assert.equal(Buffer.from(got.files.more.data, 'base64').toString(), 'Line one\nline two');
+  assert.deepEqual(got.unread, ['gone']);
+  assert.deepEqual(got.unknown, ['extra']);
+});
+
+/** The session's own MCP context, as its tools see it. */
+const sessionCtx = (key: string): RunCtx => ({ runId: `run-${key}`, key, agent: 'claude', cwd: tmp, deps });
+const useTool = (key: string) => apps.tools!(sessionCtx(key)).find((t) => t.name === 'use_app')!;
+
+test('use_app: what the request lacks is asked on the app’s own card (optional ones may stay empty); it runs with a card in the conversation and the call gives its answer', async () => {
+  const a = store.saveApp(db, { recipe: recipe({ name: 'City break' }) });
+  const key = 'claude:asker-1';
+  sessions.items.set(key, [{ kind: 'user', id: 'u1', seq: 0, text: 'Plan a city break' }]);
+  sessions.cards = [];
+  // The user gives the city on the card and leaves the budget empty.
+  sessions.answerWith = (card) => ({ decision: 'accept', form: { city: 'Porto', days: '2', kids: 'No', budget: '' } });
+  const tool = useTool(key);
+  assert.ok(tool, 'every session gets use_app');
+  assert.match(tool.description, /"city-break": City break\. Asks city: text, days\?: number, kids\?: yes\/no, budget\?: text\./);
+  const going = tool.run({ app: 'city-break', inputs: { days: 2 } }, sessionCtx(key));
+  await sleep(150);
+  const card = sessions.cards[0];
+  assert.equal(card.title, 'City break');
+  assert.equal(card.app.id, a.id);
+  assert.deepEqual(card.app.given, [{ label: 'Days', value: '2' }]);
+  assert.deepEqual(card.form.fields.map((f: any) => f.id), ['city', 'kids', 'budget'], 'the questions left: the one it needs and the optional ones');
+  const run = store.listRuns(db, { app: a.id, limit: 5 }).find((r) => r.source === 'session')!;
+  assert.ok(run, 'it runs once the card is answered');
+  assert.equal(run.askedBy, key);
+  assert.deepEqual(run.inputs, { city: 'Porto', days: '2', kids: 'No', budget: '' });
+  const note = notesOf(db, key, 'app-run')[0];
+  assert.deepEqual({ run: (note.data as any).run, anchor: note.anchor }, { run: run.id, anchor: 'u1' });
+  // Its agent hands in the answer; the call returns it.
+  await sleep(100);
+  const done = store.getRun(db, run.id)!;
+  saveResult(done.id, { summary: 'Two days in Porto', days: [{ day: 1, date: '2027-05-03', plan: 'Ribeira' }] });
+  await sessions.endFully(done.key!);
+  const said = String(await going);
+  assert.match(said, /City break is done/);
+  assert.match(said, /Two days in Porto/);
+  assert.equal(store.getRun(db, run.id)!.told, true);
+  // Closing the card runs nothing.
+  sessions.answerWith = () => ({ decision: 'decline' });
+  const closed = String(await useTool(key).run({ app: 'city-break', inputs: {} }, sessionCtx(key)));
+  assert.match(closed, /closed City break's card without running it/);
+  assert.equal(store.listRuns(db, { app: a.id, limit: 9 }).filter((r) => r.source === 'session').length, 1);
+  sessions.answerWith = null;
+  store.deleteApp(db, a.id);
+});
+
+test('use_app: everything given runs at once; a run that outlasts the call comes to the session as a message when it ends', async () => {
+  const a = store.saveApp(db, { recipe: recipe({ name: 'Day trip' }) });
+  const key = 'claude:asker-2';
+  sessions.cards = [];
+  const said = String(await useTool(key).run({ app: 'day-trip', inputs: { city: 'Sintra', days: 1 }, wait: 1 }, sessionCtx(key)));
+  assert.equal(sessions.cards.length, 0, 'nothing to ask');
+  assert.match(said, /still running/);
+  const run = store.listRuns(db, { app: a.id, limit: 5 })[0];
+  assert.equal(run.told, false);
+  const before = sessions.sent.length;
+  saveResult(run.id, { summary: 'Sintra in a day', days: [] });
+  await sessions.endFully(store.getRun(db, run.id)!.key!);
+  await sleep(100);
+  const msg = sessions.sent.slice(before).find((m) => m.key === key);
+  assert.ok(msg, 'the asking session hears of it');
+  assert.match(msg!.text, /^\[Day trip finished\]/);
+  assert.match(msg!.text, /Sintra in a day/);
+  assert.equal(store.getRun(db, run.id)!.told, true);
+  // Waiting for it again by its run gives the answer; another session's run is not this one's.
+  assert.match(String(await useTool(key).run({ run: run.id }, sessionCtx(key))), /Day trip is done/);
+  assert.match(JSON.stringify(await useTool('claude:other').run({ run: run.id }, sessionCtx('claude:other'))), /No run with that id/);
+  store.deleteApp(db, a.id);
 });
 
 // A run whose session failed to start ends as failed, with the reason.

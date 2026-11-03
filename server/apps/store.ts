@@ -101,6 +101,9 @@ export function ensureTables(db: DB) {
   if (!cols.has('version')) db.exec('alter table app_runs add column version integer');
   // What a view keeps (ticks, a value an event set with keep): by its run ("run:<id>"), or its app's own page ("app:<id>").
   db.exec('create table if not exists app_views (owner text primary key, state text not null, updated_at integer not null)');
+  // Runs an agent started for the user in a session (use_app): that session, and whether it heard how the run ended.
+  if (!cols.has('asked_by')) db.exec('alter table app_runs add column asked_by text');
+  if (!cols.has('told')) db.exec('alter table app_runs add column told integer not null default 0');
 }
 
 // ---- apps --------------------------------------------------------------------------------------------
@@ -115,7 +118,19 @@ interface AppRow {
 
 function toApp(r: AppRow): AppDef {
   const d = JSON.parse(r.data);
-  return { ...cleanRecipe(d), id: r.id, slug: r.slug, mcp: d.mcp !== false, public: cleanPublic(d.public, DEFAULT_PUBLIC), template: d.template || undefined, ...(typeof d.folder === 'string' && d.folder ? { folder: d.folder } : {}), createdAt: r.created_at, updatedAt: r.updated_at };
+  return {
+    ...cleanRecipe(d),
+    id: r.id,
+    slug: r.slug,
+    mcp: d.mcp !== false,
+    agents: d.agents !== false,
+    public: cleanPublic(d.public, DEFAULT_PUBLIC),
+    template: d.template || undefined,
+    ...(typeof d.folder === 'string' && d.folder ? { folder: d.folder } : {}),
+    ...(d.fromFile === true ? { fromFile: true } : {}),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
 }
 
 export function listApps(db: DB): AppDef[] {
@@ -147,7 +162,7 @@ export function coreOf(r: AppRecipe): string {
   return JSON.stringify(core);
 }
 
-export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: AppRecipe; mcp?: boolean; public?: Partial<PublicSettings>; template?: string; by?: VersionBy; why?: string; folder?: string | null }): AppDef {
+export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: AppRecipe; mcp?: boolean; agents?: boolean; public?: Partial<PublicSettings>; template?: string; by?: VersionBy; why?: string; folder?: string | null; fromFile?: boolean }): AppDef {
   const now = Date.now();
   const prev = input.id ? getApp(db, input.id) : null;
   const id = prev?.id ?? newId(6);
@@ -155,9 +170,11 @@ export function saveApp(db: DB, input: { id?: string; slug?: string; recipe: App
   const data = {
     ...cleanRecipe(input.recipe),
     mcp: input.mcp ?? prev?.mcp ?? true,
+    agents: input.agents ?? prev?.agents ?? true,
     public: cleanPublic(input.public ?? {}, prev?.public ?? DEFAULT_PUBLIC),
     template: input.template ?? prev?.template,
     folder: input.folder === null ? undefined : (input.folder ?? prev?.folder),
+    ...(input.fromFile || prev?.fromFile ? { fromFile: true } : {}),
   };
   if (prev) db.prepare('update apps set slug = ?, data = ?, updated_at = ? where id = ?').run(slug, JSON.stringify(data), now, id);
   else db.prepare('insert into apps (id, slug, data, created_at, updated_at) values (?, ?, ?, ?, ?)').run(id, slug, JSON.stringify(data), now, now);
@@ -194,6 +211,16 @@ export function listVersions(db: DB, app: string, limit = 50): AppVersion[] {
 export function getVersion(db: DB, app: string, n: number): (AppVersion & { recipe: AppRecipe }) | null {
   const r = db.prepare('select n, at, by, line, recipe from app_versions where app_id = ? and n = ?').get(app, n) as (AppVersion & { recipe: string }) | undefined;
   return r ? { ...r, recipe: cleanRecipe(JSON.parse(r.recipe)) } : null;
+}
+
+/** Changes what is kept beside an app's recipe (whether agents may run it), not what it is: no version, and it keeps its place in the list. */
+export function setAppFlags(db: DB, id: string, flags: { agents?: boolean }): AppDef | null {
+  const r = db.prepare('select data from apps where id = ?').get(id) as { data: string } | undefined;
+  if (!r) return null;
+  const data = JSON.parse(r.data);
+  if (flags.agents !== undefined) data.agents = flags.agents;
+  db.prepare('update apps set data = ? where id = ?').run(JSON.stringify(data), id);
+  return getApp(db, id);
 }
 
 export function deleteApp(db: DB, id: string) {
@@ -270,6 +297,8 @@ interface RunRow {
   checks: string | null;
   version: number | null;
   nudged: number;
+  asked_by: string | null;
+  told: number | null;
   created_at: number;
   started_at: number | null;
   ended_at: number | null;
@@ -281,6 +310,10 @@ export interface RunRecord extends AppRun {
   visitor?: string;
   ip?: string;
   nudged: boolean;
+  /** The session whose agent ran it for the user (use_app). */
+  askedBy?: string;
+  /** That session heard how it ended (in the call that ran it, or by a message after). */
+  told?: boolean;
 }
 
 const parse = <T>(s: string | null, d: T): T => {
@@ -320,6 +353,7 @@ function toRun(r: RunRow): RunRecord {
     checks: r.checks ? parse<CheckResult[]>(r.checks, []) : undefined,
     ...(r.version ? { version: r.version } : {}),
     nudged: !!r.nudged,
+    ...(r.asked_by ? { askedBy: r.asked_by, told: !!r.told } : {}),
     createdAt: r.created_at,
     startedAt: r.started_at ?? undefined,
     endedAt: r.ended_at ?? undefined,
@@ -328,19 +362,19 @@ function toRun(r: RunRow): RunRecord {
 
 /** What the pages see of a run (no recipe, no visitor). */
 export function runView(r: RunRecord): AppRun {
-  const { recipe: _r, visitor: _v, ip: _i, nudged: _n, ...view } = r;
+  const { recipe: _r, visitor: _v, ip: _i, nudged: _n, askedBy: _a, told: _t, ...view } = r;
   return view;
 }
 
-export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string }): RunRecord {
+export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string; askedBy?: string }): RunRecord {
   const id = newId(8);
   // The version it runs, when it runs the template as saved (a try of changes not saved yet runs none).
   const last = r.source === 'step' ? null : latestVersion(db, r.app);
   const version = last && last.core === coreOf(r.recipe) ? last.n : null;
   db.prepare(
-    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, Date.now());
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, asked_by, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, r.askedBy ?? null, Date.now());
   return getRun(db, id)!;
 }
 
@@ -391,7 +425,7 @@ export function runIdByKey(db: DB, key: string): string | null {
   return r?.id ?? null;
 }
 
-export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: RunStatus; result: Record<string, unknown> | null; reply: string; error: string | null; costUsd: number; nudged: boolean; startedAt: number; endedAt: number | null; checks: CheckResult[] }>) {
+export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: RunStatus; result: Record<string, unknown> | null; reply: string; error: string | null; costUsd: number; nudged: boolean; startedAt: number; endedAt: number | null; checks: CheckResult[]; told: boolean }>) {
   const sets: string[] = [];
   const vals: unknown[] = [];
   const put = (col: string, v: unknown) => {
@@ -408,6 +442,7 @@ export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: 
   if (p.startedAt !== undefined) put('started_at', p.startedAt);
   if (p.endedAt !== undefined) put('ended_at', p.endedAt);
   if (p.checks !== undefined) put('checks', JSON.stringify(p.checks));
+  if (p.told !== undefined) put('told', p.told ? 1 : 0);
   if (!sets.length) return;
   db.prepare(`update app_runs set ${sets.join(', ')} where id = ?`).run(...vals, id);
 }

@@ -1,8 +1,8 @@
 # Apps
 
-An app is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result, in a view made for it (pages you click through, tick off and act on) or as a card and tables. This topic covers the ready-made apps, running one and working with its result, making your own (with steps, a view, data, memory and a screen of its own too), sharing one through an API key, other agents, a public page or a spreadsheet of rows, and passing one on as a file.
+An app is a task you run again and again: you fill in a short form, press Run, and an agent does the job on its own and hands back the result, in a view made for it (pages you click through, tick off and act on) or as a card and tables. This topic covers the ready-made apps (they come installed), running one and working with its result, having an agent run one for you in any session, making your own (with steps, a view, data, memory and a screen of its own too), sharing one through an API key, other agents, a public page or a spreadsheet of rows, and passing one on as a file.
 
-![Apps: your own, and ready-made ones to start from](images/apps.webp)
+![Apps: your own and the ready-made ones, which come installed](images/apps.webp)
 
 ## What an app is
 
@@ -22,9 +22,9 @@ Open the Apps page from the **Apps** tile at the bottom of the sidebar, or go to
 The page is headed **Apps**, with **New app** at the top: its menu has **Describe it to an agent**, **Start from scratch** and **Install from a file**. Below it:
 
 - **What should your next app do?**: say it in a sentence and press **Make it** (or Enter); a session starts as the **App builder**, which makes the app, tries it and shows it to you. The ideas under the box put one in it with a click.
-- **Your apps**: a card for each app you made, with its icon, name and description, when it last ran (**Not run yet** before its first run), **Has a view** when its answer opens in a view of its own, and **Public** when its public page is open. With none yet, the page says how to make one.
+- **Your apps**: your own apps, then the ready-made ones, which come installed. Each card has its icon, name and description, when it last ran (**Not run yet** before its first run), **Ready-made** on the ones that come with Naget Agent, **Has a view** when your own app's answer opens in a view of its own, and **Public** when its public page is open. With more than six, chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning**, **Build**, and your own apps' kinds. With none, the page says how to get one.
 - **Pick up where you left off**: your last six runs, with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
-- **Ready-made apps**: the apps that come with Naget Agent. Chips filter them by kind: **All**, **Research**, **Planning**, **Shopping**, **Work**, **Writing**, **Learning** and **Build**. Each card shows its kind, what it does and what you get from it: the pages of its view (the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**). **Try it** opens it.
+- **Ready-made apps to install**: there once you uninstall a ready-made app. Each card shows its kind, what it does and what you get from it (the pages of its view, such as the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**), and **Install** (see [Install or uninstall a ready-made app](#install-or-uninstall-a-ready-made-app)).
 - **Building blocks** (folded): small apps made to be steps of your own (sum up a page, translate, answer from the web, sort into kinds, pull out the facts), with the blocks you made yourself; **Add a step** offers them in every app's steps.
 
 A run's state shows as a badge: **Waiting** (in line), **Starting**, **Working**, **Needs you** (it waits for an approval or an answer), **Done**, **Failed** or **Stopped**.
@@ -33,7 +33,7 @@ On a phone the cards stack in one column and the kind chips scroll sideways.
 
 ## Use a ready-made app
 
-These come with Naget Agent. Each works in steps: its page shows **How it works**, and **As a graph** (or **Make it mine**) opens them in the builder. Each hands back its answer in a view of its own, with pages for its parts and buttons that do things (see [Its view](#its-view)). Their agent steps run with Claude Code unless you pick another agent on their page; their quick steps ask the helper model (Settings → Models). The ones with a "Let me…" question wait for you partway only when you tick it and run them from their form.
+These come with Naget Agent, installed: they are among **Your apps** from the start, and agents can run them for you in your sessions (see [Have an agent run an app for you](#have-an-agent-run-an-app-for-you)). Each works in steps: its page shows **How it works**, and **As a graph** (or **Make it mine**) opens them in the builder. Each hands back its answer in a view of its own, with pages for its parts and buttons that do things (see [Its view](#its-view)). Their agent steps run with Claude Code unless you pick another agent on their page; their quick steps ask the helper model (Settings → Models). The ones with a "Let me…" question wait for you partway only when you tick it and someone is there to answer: run from their form, or by an agent in one of your sessions.
 
 - **Deep research report**: a sourced report on any question, with the web searched, facts cross-checked and every claim cited. You give the topic, what to focus on, the depth and who it is for. It plans the questions, searches them three at a time, ranks the sources, reads the best pages side by side, searches again where a question is short of sources, and writes the report with numbered citations; **Let me check the questions first** has it wait for you to keep or change them. Its view has **Summary** (the question, how sure it is, and the key findings, each with **Dig deeper**, which starts a report of its own on it), **Full report** (with **Copy the report**) and **Sources**, which you can show by publisher.
 - **Trip planner**: a day-by-day plan checked against your dates (opening hours, events, travel times), with a budget and what to book ahead. It works out the dates, then looks up events and holidays, the weather (the forecast when the trip is ten days away or less), what to see and where to stay, and getting around, side by side, before it plans the days and adds up the budget; **Let me choose before it plans** has it ask you where to stay and what must be in. Its view has **Your trip** (the trip in numbers, the plan, the days at a glance and tips; **Relaxed**, **Balanced** or **Packed**, and **+ One more day**, plan it again that way), **Day by day** (a timeline where you tick off each morning, afternoon and evening, with a map of each day's area), a page for each day (with **Copy the day** and **Research** its area), **Book ahead** (a list to tick off as you book) and **Budget** (a chart and each estimate).
@@ -48,9 +48,15 @@ These come with Naget Agent. Each works in steps: its page shows **How it works*
 
 You can't change a ready-made app itself. To adjust one, open it and press **Make it mine** (on a phone, **Edit**): the builder opens with a copy that becomes your own app when you create it.
 
+### Install or uninstall a ready-made app
+
+A ready-made app you don't use can go: open it, then **More** (⋯) → **Uninstall**, and confirm. It leaves **Your apps**, agents stop running it in your sessions, and it waits under **Ready-made apps to install** on the Apps page. Its runs stay.
+
+To have it back, click its card there. A card shows what it is before anything changes: what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works** in plain words, and **Agents can use it**, with a switch. **Install** puts it back among your apps and opens it. Its own page says "You uninstalled it", with **Install** too.
+
 ## Run an app
 
-1. Open the app from the Apps page or the search box. Its page says what it does at the top, with **Your answers** (its form) under it, and beside them (under them on a phone) **What you get** (the pages its answer opens in, or its answer fields), **Latest runs** (each opens its run) and, for an app with steps, **How it works**: its steps in order, each with how it runs (**for each** item, several **at once**, **side by side**), and **As a graph**, which opens them in the builder.
+1. Open the app from the Apps page or the search box. Its page says what it does at the top, with **Your answers** (its form) under it, and beside them (under them on a phone) **What you get** (the pages its answer opens in, or its answer fields), **In your sessions** (whether agents may run it for you: see [Have an agent run an app for you](#have-an-agent-run-an-app-for-you)), **Latest runs** (each opens its run) and, for an app with steps, **How it works**: its steps in order, each with how it runs (**for each** item, several **at once**, **side by side**), and **As a graph**, which opens them in the builder.
 2. Fill in the form. Questions marked with a red **\*** are needed.
 3. The line under the form says who runs it, such as "Claude Code · Sonnet · high effort · Auto". On a ready-made app, **Change** shows the pickers (see below); on your own, change it with **Edit**.
 4. Press **Run**. The run's page opens and follows the work live.
@@ -88,6 +94,19 @@ A file question shows **Choose a file**, or you can drop a file on it (on a comp
 Each run gets a new folder of its own, inside a `naget-apps` folder in your home folder, named after the app and the time. An app can name a folder instead (see [Who does it](#who-does-it)); then every run works there.
 
 The session of a run you start from the form shows in the sidebar's session list like any other, titled with the app's name and your first answers. Runs from the API, other agents, a public page or rows of a CSV are archived, so they stay out of the list and show under their app.
+
+## Have an agent run an app for you
+
+You don't have to open an app to use it: ask for what it does in any session ("Plan a 4-day trip to Lisbon in May for the two of us"), and the agent runs it there.
+
+1. The agent picks the app that does what you asked, and puts in what you said: the place, the days, who's going.
+2. When the app needs something you didn't say, its card appears in the conversation, with the app's icon and name, **From your message:** and what it took from your words, and the questions left. Fill in the ones marked with a red **\***, and leave the optional ones empty if you don't mind. A question it could not take as you said it ("in May" for a date) shows your words under it. **Run it** runs the app; **Not now** closes the card and runs nothing. While the card waits, the session shows **Needs you**, and the inbox lists it.
+3. The app's card stays in the conversation, under the agent's reply, and follows the run: where it stands and the steps going by, then its answer as the app shows it (its view, with its pages and buttons; **Plain answer** shows the card and tables). A question one of its steps asks (a "Let me…" one) waits there too. **Open** goes to the run's page, and the app's name to the app.
+4. The agent then says in a line or two what came of it. A long run goes on after the agent stops waiting: its card keeps following it, and the agent hears its answer when it ends.
+
+Its runs show **From a session** in the app's runs.
+
+Each app's page has **In your sessions** beside its form, with the switch **Agents can use it** (your own apps have it under **API & sharing** too). Turn it off, and agents no longer run that app; turn it on again whenever you like. Every app starts with it on. Building blocks, and apps made to be used on their own page (with a screen, or a view of what they keep), say so there instead, and agents don't run them. When an app of yours does the same as a ready-made one, agents prefer yours.
 
 ## Follow a run and read its result
 
@@ -251,7 +270,9 @@ On your app's page:
 
 - **Edit** opens the builder, titled **Edit** followed by the app's name. Press **Save** when done. Changes apply to the next runs; runs already going keep the version they started with.
 - **More** (⋯) → **Duplicate** makes a copy named with " copy" at the end, at an address of its own. Its screen comes along as a page of its own; its public page starts closed, and its keys and the records it keeps are not copied.
-- **More** (⋯) → **Delete** asks "Delete …?": its runs, keys and public page go with it, and runs still going are stopped. The sessions it started stay.
+- **More** (⋯) → **Delete** asks "Delete …?": its runs, keys and public page go with it, and runs still going are stopped. The sessions it started stay. An app you installed from a file says **Uninstall** instead: it is deleted completely, the same way, and to have it again you install its file again.
+
+A ready-made app's **More** (⋯) has **Uninstall**, which keeps it under **Ready-made apps to install** (see [Install or uninstall a ready-made app](#install-or-uninstall-a-ready-made-app)).
 
 ### Versions
 
@@ -437,7 +458,7 @@ A screen is a page of the app's own: it does not show in your Library, it goes w
 An app can travel as one file, to keep or to install on another Naget Agent.
 
 - **To download one**: open your app, then **More** (⋯) → **Download as a file**. The file (`.naget-app`) holds everything it does and needs, and the apps its steps call. When it keeps data, **Include the records it keeps** puts those in too. Its folder, keys and public page stay here.
-- **To install one**: press **New app** on the Apps page, then **Install an app from a file**, and pick a `.naget-app`, `.zip` or `.json` file. Before anything is made, a card says what it will do here: who does the work, its steps, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
+- **To install one**: press **New app** on the Apps page, then **Install from a file**, and pick a `.naget-app`, `.zip` or `.json` file. Before anything is made, a card shows what it is, in plain words: its name and what it does, **What it asks you** (the optional questions marked), **What you get**, **How it works**, and **Agents can use it**, with a switch to keep agents from running it. **What it uses here** (folded, and open by itself when something needs a look) lists who does the work, its steps, the tools it may use, the models it uses, the apps that come with it, what it installs and the commands it uses, what it keeps, whether it remembers, and its limits. Each model is shown as set up here, here under another name, or not set up here: for those, pick one of your models to stand in, or leave it to the agent's default. Press **Install**.
 
 Some things change on the way in, and the card says which: a folder it worked in elsewhere is left out (each run gets one of its own), a mode that allows every step without asking starts as **Auto** instead, and an assistant this computer lacks is dropped. An app that comes with it and is the same as one you have is used again; otherwise it installs beside yours. Its public page starts closed, and it has no API keys.
 
@@ -447,11 +468,13 @@ Agents in Naget Agent can make and run apps for you through its API, with your O
 
 - "Make an app called Weekly report that asks for a project and a date range, and answers with a summary and a table of what changed."
 - "Turn this session into an app I can run again."
+- "Plan a 4-day trip to Lisbon in May for the two of us." (the Trip planner runs here, and asks for what it needs)
 - "Run the Trip planner app for Lisbon, four days from 20 November, and show me the result when it's done."
 - "Run my Company research app for each of these 20 companies and give me the table."
 - "Run my Trip planner every Friday at 18:00 for Lisbon, three days."
 - "Open a public page for my Cover letter app, with at most $1 a day."
 - "Stop all runs of my Price check app, and revoke its API keys."
+- "Uninstall the Weekly news digest app, and stop agents from running my Price check app in sessions."
 - "Make an app with steps that reads each link I send, sums it up with a quick model and keeps it in a reading list."
 - "Add a step to my Competitor watch app that tells me only when something changed."
 - "Install the app in reading-list.naget-app from my Downloads folder."

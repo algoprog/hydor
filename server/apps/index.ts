@@ -9,11 +9,12 @@
 //   /a-api/:slug…              the public page's form and the visitor's own runs (public.ts)
 //   submit_result              on each app run's own MCP server: the answer fields, checked
 //   app_data                   on an app run's own MCP server: the records the app keeps
+//   use_app                    on every other session's: the user's apps an agent may run for them (use.ts)
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
-import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
+import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
 import { builderTools } from './builder.ts';
@@ -68,11 +69,14 @@ import {
   runView,
   saveApp,
   setView,
+  setAppFlags,
   updateRun,
   usageSince,
   type RunRecord,
 } from './store.ts';
-import { templateById, TEMPLATES } from './templates.ts';
+import { templateById } from './templates.ts';
+import { agentsMay, builtinsOf, isInstalled, setAgents, setInstalled } from './builtins.ts';
+import { tellAsker, useAppTool, useNote } from './use.ts';
 
 const keyLimiter = new Limiter();
 
@@ -86,6 +90,18 @@ function recipeOf(db: Deps['db'], id: string): { app: AppDef | null; template: A
   const app = getApp(db, id);
   if (!app) throw new HttpError(404, 'No such app');
   return { app, template: null };
+}
+
+/** A ready-made app by its id ("tpl:<id>", or the id alone). */
+function builtinOf(id: string): AppTemplate {
+  const t = templateById(id.startsWith('tpl:') ? id.slice(4) : id);
+  if (!t) throw new HttpError(404, 'No such ready-made app');
+  return t;
+}
+
+/** A ready-made app that was uninstalled does not run until it is installed again. */
+function installedOr409(db: Deps['db'], t: AppTemplate | null) {
+  if (t && !isInstalled(db, t.id)) throw new HttpError(409, `${t.name} is not installed: install it again on the Apps page`);
 }
 
 /**
@@ -142,7 +158,7 @@ function saveInput(db: Deps['db'], b: any, prev?: AppDef) {
   const pub = b?.public && typeof b.public === 'object' ? b.public : undefined;
   if (pub?.on && !(pub.model ?? prev?.public.model)) throw new HttpError(400, 'Pick the model public runs use (one of Custom’s)');
   if (pub?.model && !customModels().some((m) => m.id === pub.model)) throw new HttpError(400, 'That model is not one of Custom’s: add it in Settings → Models');
-  return { recipe, warnings, mcp: typeof b?.mcp === 'boolean' ? b.mcp : undefined, public: pub, slug: typeof b?.slug === 'string' ? b.slug : undefined, template: typeof b?.template === 'string' ? b.template : undefined, why: typeof b?.why === 'string' ? b.why.slice(0, 300) : undefined };
+  return { recipe, warnings, mcp: typeof b?.mcp === 'boolean' ? b.mcp : undefined, agents: typeof b?.agents === 'boolean' ? b.agents : undefined, public: pub, slug: typeof b?.slug === 'string' ? b.slug : undefined, template: typeof b?.template === 'string' ? b.template : undefined, why: typeof b?.why === 'string' ? b.why.slice(0, 300) : undefined };
 }
 
 /** A rough cost for a number of runs: from the app's own runs, else from the model's price. */
@@ -218,6 +234,8 @@ function routes(d: Deps) {
   });
   onFinished((r) => {
     if (r.source === 'task') d.scheduler?.appRunEnded(r.id, taskEnd(r));
+    // A run an agent started in a session, ended after its call stopped waiting: the session hears of it.
+    if (r.askedBy) void tellAsker(d, r).catch(() => {});
     // A run that tried an example: how its checks went.
     const checks = checkRun(db, r);
     if (checks) {
@@ -245,7 +263,9 @@ function routes(d: Deps) {
       .filter((r) => r.source !== 'batch' && r.source !== 'public')
       .slice(0, 6)
       .map(runView);
-    return { apps, templates: TEMPLATES, recent };
+    // The ready-made apps, each installed or not, whether agents may run it, and when it last ran.
+    const templates = builtinsOf(db).map((t) => ({ ...t, ...(last.get(`tpl:${t.id}`) ? { lastRunAt: last.get(`tpl:${t.id}`) } : {}) }));
+    return { apps, templates, recent };
   });
 
   /** The tools of the app's own MCP server an app may allow (from every capability), for the builder. */
@@ -294,12 +314,12 @@ function routes(d: Deps) {
 
   app.post('/api/apps/install', { bodyLimit: 30 * 1024 * 1024 }, async (req) => {
     const b = (req.body ?? {}) as Record<string, any>;
-    return installPackage(db, readPackage(b), { models: b.models && typeof b.models === 'object' ? b.models : undefined, catalog });
+    return installPackage(db, readPackage(b), { models: b.models && typeof b.models === 'object' ? b.models : undefined, catalog, agents: typeof b.agents === 'boolean' ? b.agents : undefined });
   });
 
   app.get('/api/apps/:id', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
-    if (template) return { template };
+    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id) };
     const today = dayStart();
     // Its own page in its view: what that page keeps.
     const own = pagesFor(a!.ui, 'app').length ? { view: getView(db, `app:${a!.id}`) } : {};
@@ -352,6 +372,38 @@ function routes(d: Deps) {
     return { ok: true };
   });
 
+  // ---- ready-made apps installed or not, and whether agents in sessions may run an app ----
+
+  /** A ready-made app ("tpl:<id>") installed again: back among your apps, and agents may run it unless you said no. */
+  app.post('/api/apps/:id/install', async (req) => {
+    const t = builtinOf(P(req).id);
+    setInstalled(db, t.id, true);
+    return { template: t, installed: true, agents: agentsMay(db, t.id) };
+  });
+
+  /** A ready-made app uninstalled: it leaves your apps and agents' tools, and waits under Ready-made apps to be installed again. Its runs stay. */
+  app.post('/api/apps/:id/uninstall', async (req) => {
+    const t = builtinOf(P(req).id);
+    setInstalled(db, t.id, false);
+    return { template: t, installed: false, agents: agentsMay(db, t.id) };
+  });
+
+  /** Whether agents in your sessions may run it for you: an app of yours, or a ready-made one ("tpl:<id>"). `made`: whether it is made for that at all. */
+  app.put('/api/apps/:id/agents', async (req) => {
+    const on = (req.body as { on?: unknown } | undefined)?.on;
+    if (typeof on !== 'boolean') throw new HttpError(400, 'on: true or false');
+    const id = P(req).id;
+    if (id.startsWith('tpl:')) {
+      const t = builtinOf(id);
+      setAgents(db, t.id, on);
+      return { agents: on, made: madeForSessions(t) };
+    }
+    const a = getApp(db, id);
+    if (!a) throw new HttpError(404, 'No such app');
+    const saved = setAppFlags(db, a.id, { agents: on })!;
+    return { agents: saved.agents, made: madeForSessions(saved) };
+  });
+
   // ---- its screens ----
 
   app.get('/api/apps/:id/screens', async (req) => ({ screens: screensOf(db, own(req)) }));
@@ -393,6 +445,7 @@ function routes(d: Deps) {
       if (errors.length) throw new HttpError(400, errors.length === 1 ? errors[0] : `Fix these first: ${errors.join('; ')}`);
     }
     if (!recipe.prompt.trim() && !recipe.flow) throw new HttpError(400, 'The prompt is empty');
+    installedOr409(db, template);
     if (a) checkDaily(db, a);
     const r = startRun({
       app: a?.id ?? (template ? `tpl:${template.id}` : 'test'),
@@ -431,6 +484,7 @@ function routes(d: Deps) {
   const againWith = (old: RunRecord, a: AppDef | null, changes: Record<string, unknown>): RunRecord => {
     if (old.flow) throw new HttpError(400, 'Only a run of its main flow runs again from its view');
     const template = old.app.startsWith('tpl:') ? templateById(old.app.slice(4)) : null;
+    installedOr409(db, template);
     const test = old.source === 'test' || old.app === 'test';
     const o = old.recipe;
     const recipe: AppRecipe = test || (!a && !template) ? o : (a ?? cleanRecipe({ ...template!, agent: o.agent, acpAgent: o.acpAgent, model: o.model, mode: o.mode, effort: o.effort }));
@@ -594,6 +648,7 @@ function routes(d: Deps) {
     if (!old || old.source === 'step' || old.source === 'app' || old.source === 'public') throw new HttpError(404, 'No such run');
     const b = (req.body ?? {}) as { from?: unknown; recipe?: unknown; inputs?: unknown };
     const a = old.app.startsWith('tpl:') || old.app === 'test' ? null : getApp(db, old.app);
+    if (old.app.startsWith('tpl:')) installedOr409(db, templateById(old.app.slice(4)));
     // From its view: a new run with the same answers but those given, the app as it is now, its files along.
     if (b.inputs && typeof b.inputs === 'object' && !Array.isArray(b.inputs)) return { run: runView(againWith(old, a, b.inputs as Record<string, unknown>)) };
     if (isActive(old.status)) throw new HttpError(409, 'It is still running');
@@ -985,7 +1040,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Apps (the Apps page in Naget Agent) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, and events for what a click does), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views).";
+  "Apps (the Apps page in Naget Agent) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, and events for what a click does), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
 
 export const apps: Feature = {
   id: 'apps',
@@ -999,7 +1054,8 @@ export const apps: Feature = {
   tools(ctx) {
     // A template's run gets what it hands in with and what it keeps; any other session what templates are built with.
     if (runOfCtx(ctx)) return [submitTool(ctx), dataTool(ctx), flowTool(ctx)].filter((t): t is RunTool => !!t);
-    return builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare });
+    // Any other session: what apps are built with, and the user's apps to run for them.
+    return [...builderTools(ctx, { problemsOf: (raw) => problemsOf(ctx.deps.db, raw), prepare }), useAppTool(ctx)].filter((t): t is RunTool => !!t);
   },
   /** An app's run gets the tools its app allows; a public run only the answer and, if allowed, the web. */
   allowTool(name, ctx) {
@@ -1013,7 +1069,7 @@ export const apps: Feature = {
   },
   spawn(s, d) {
     const mark = markOf(s.extra);
-    if (!mark) return { instructions: [BUILDER_NOTE] };
+    if (!mark) return { instructions: [BUILDER_NOTE, useNote(d.db)].filter((x): x is string => !!x) };
     noteAgentRun(s.runId, mark);
     const hit = runOfCtx({ runId: s.runId, key: s.key ?? '' });
     if (!hit) return;
