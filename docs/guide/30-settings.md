@@ -168,6 +168,14 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Sites**](/settings?s=browser&find=Sites): Only these sites, or never these.
 - [**Profiles**](/settings?s=browser&find=Profiles): Separate sign-ins for the browser.
 
+### Computer use
+
+[Settings → Computer use](/settings?s=computer): agents see your Mac’s screen and use its mouse and keyboard, in the Mac app. More in [Search and the browser](/guide/web).
+
+- [**Let agents use this Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac): Agents see the screen and use the mouse and keyboard, in any app; each session asks you first.
+- [**Accessibility**](/settings?s=computer&find=Accessibility): macOS’s permission for Naget Agent to use the mouse and keyboard.
+- [**Screen Recording**](/settings?s=computer&find=Screen%20Recording): macOS’s permission for Naget Agent to see the screen.
+
 ### Memory
 
 [Settings → Memory](/settings?s=memory): what agents remember about you, your projects and each session, and when it was written. More in [Memory](/guide/memory).

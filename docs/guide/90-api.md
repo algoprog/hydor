@@ -9,7 +9,7 @@ Everything the app's pages do goes through its HTTP API, and agents use the same
 - To have the user fill in or check details on that card, give `form`: fields as a JSON schema's properties (`type`, `title`, `description`, `enum`, `default`, `format`…), each named by its address in `body` (`name`, `settings.results`), filled in from `body`; the user's answers go into `body` before the call.
 - Read the current state before changing it: most settings are read with `GET` at the same address their `PUT` or `PATCH` writes.
 - In Plan mode (and Codex's Read only) an agent only reads. With Claude Code's Bypass or Codex's Full access no card shows; Custom's Full access asks only for the changes that ask every time.
-- Never through app_api: the password and signing in, keys' values (ask with request_secret), making access tokens and API keys, answering approval cards and the cards that ask the user to decide, a session's permissions and spending cap, files, terminals, notebooks and git (agents use their own tools), the live browser (the browser tools).
+- Never through app_api: the password and signing in, keys' values (ask with request_secret), making access tokens and API keys, answering approval cards and the cards that ask the user to decide, a session's permissions and spending cap, files, terminals, notebooks and git (agents use their own tools), the live browser (the browser tools), the Mac's screen, mouse and keyboard and macOS's permissions for them (the computer tools; the user allows those in Settings).
 - Links for the user: the app's address plus the page: `/s/<session key>`, `/spaces/<id>`, `/apps/<id>`, `/pages/<id>`, `/settings?s=<section>`, `/guide/<topic>#<section>`.
 
 ## Settings kept on each device
@@ -233,6 +233,15 @@ These are the agents' own skills (Settings → Agents → Skills), not the app's
 - `POST /api/browser/profiles` — makes a profile. Body: `{ name: string — 1–40 characters, not the same as another's, ignoring case }`. Returns: `{ profile: { id, name, createdAt }, …same as GET }`. Errors: 400 with no name, 409 when the name is taken. Signing in to sites in it is the user's job.
 - `PATCH /api/browser/profiles/:id` — renames a profile. Body: `{ name: string — 1–40 characters }`. Returns: same as GET.
 - `DELETE /api/browser/profiles/:id` — deletes a profile with its sign-ins, and closes the browsers using it. Returns: same as GET.
+
+## Computer use (the Mac app)
+
+Agents see the Mac's screen and use its mouse and keyboard with their own tools (computer_screenshot, computer_act), only in the Mac app with Computer use on, and only after the user allowed it on a card in the session. **ComputerState**: `{ available: boolean — the server runs in the Mac app (elsewhere nothing works), enabled: boolean — Let agents use this Mac (off at first), permissions?: { accessibility: boolean — macOS lets Naget Agent use the mouse and keyboard, screen: 'granted'|'denied'|'not-determined'|'restricted'|'unknown' — Screen Recording } | null — null when the Mac app did not say, active: { key, title, since } | null — the session whose agent is using the Mac now, allowed: number — sessions the user allowed (until Stop or the app restarts) }`.
+
+- `GET /api/computer` — Settings → Computer use. Returns: ComputerState.
+- `PUT /api/computer/settings` — turns computer use on or off. Body: `{ enabled: boolean }`. Turning it off stops what an agent is doing, and every session asks again. Returns: ComputerState.
+- `POST /api/computer/permissions/:which` — `accessibility` or `screen`: macOS's own question the first time, then its System Settings at the right place, where the user turns Naget Agent on. Only the user does this (agents are refused). Returns: ComputerState with the permissions read again. 400 outside the Mac app.
+- `POST /api/computer/stop` — Stop: what agents do on the Mac ends, and every session asks again before its agent goes on. Returns: ComputerState.
 
 ## Deep research
 

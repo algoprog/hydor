@@ -40,6 +40,10 @@ when this computer starts**).
   `~/.config/naget-agent.env`, one `NAME=value` per line; quit and open the app to apply them.
 - The server's log is in `~/Library/Logs/Naget Agent/server.log` (**Help → Show the Server Log**).
 - **Quit Naget Agent** stops the server; running agents carry on and are picked up again the next time it opens.
+- Computer use: agents can see your Mac's screen and use its mouse and keyboard, once you turn it on in Settings →
+  Computer use and give Naget Agent macOS's Accessibility and Screen Recording permissions (its **Allow…** buttons
+  ask). Each session asks you first; **Stop** in the menu bar or ⌘⇧Esc stops it. Builds not signed with a Developer
+  ID may need the permissions given again after an update (macOS ties them to the app's signature).
 - Not in the Mac app yet: **Run code** steps in apps and the agent sandbox need Linux's bubblewrap.
 
 Opened from the disk image or the Downloads folder, the app offers to move itself to Applications, where it can

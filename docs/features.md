@@ -400,6 +400,13 @@ programs shows each program's version and what is out, with Check now, Update no
   checks a new build as soon as it is out, says so (a notification from the Mac, and a note in every open page that
   counts down a minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the menu
   bar), swaps it in with agents carrying on, and goes back to the version before if the new one does not start.
+- Computer use in the Mac app (Settings → Computer use, off at first): agents see the Mac's screen and use its
+  mouse and keyboard in any app (screenshots of the main display at about 1280 pixels, clicks, drags, scrolls,
+  typing in any language, keys and shortcuts, opening apps by name), beside the browser, which stays the way for
+  websites. Settings asks macOS for its Accessibility and Screen Recording permissions; each session asks on a card
+  before its agent starts; one session at a time; the menu bar says when an agent is at the Mac, with Stop (and
+  ⌘⇧Esc, or Stop in the session); each step shows in the conversation with the screen after it. Agents are told to
+  look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
 - The tools at the bottom of the sidebar (Files, Git, Terminal, Library, Spaces, Apps, Usage, Settings…) stay in

@@ -8,6 +8,7 @@ import { budget } from '../budget/index.ts';
 import { children } from '../children/index.ts';
 import { cleanup } from '../cleanup/index.ts';
 import { commits } from '../commits/index.ts';
+import { computer } from '../computer/index.ts';
 import { connections } from '../connections/index.ts';
 import { custom } from '../custom/index.ts';
 import { documents } from '../documents/index.ts';
@@ -36,4 +37,4 @@ import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
 // The user's guidelines lead what an agent is told.
-export const FEATURES: Feature[] = [guidelines, pages, shots, search, browser, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
+export const FEATURES: Feature[] = [guidelines, pages, shots, search, browser, computer, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, automations, voice, assistants, apps, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
