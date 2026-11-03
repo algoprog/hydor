@@ -1222,12 +1222,29 @@ export interface UpdateState {
   checkedAt: number;
   /** Why the upstream could not be reached (the counts are then from the last time it could). */
   error?: string;
-  /** Updates install themselves after 5 hours without a message from you, at most once a day. */
+  /**
+   * Updates install themselves: from git, after 5 hours without a message from you, at most once a day; the Mac app
+   * downloads a new version as soon as it is out, says so, and restarts into it a minute later.
+   */
   auto: boolean;
   /** The server comes back by itself after it exits, its agents left running (the installer's service, the Docker image, the Mac app in a folder it may replace itself in). */
   canRestart: boolean;
-  running?: { phase: 'pull' | 'install' | 'build' | 'restart'; since: number; auto: boolean };
+  /** download: the Mac app getting and checking a new version. */
+  running?: { phase: 'pull' | 'download' | 'install' | 'build' | 'restart'; since: number; auto: boolean };
+  /** The Mac app: a new version downloaded and checked, waiting to be installed. */
+  ready?: UpdateReady;
   last?: UpdateResult;
+}
+
+/** A new version of the Mac app, downloaded and checked, waiting for the app to restart into it. */
+export interface UpdateReady {
+  version: string;
+  /** When it was ready. */
+  at: number;
+  /** Milliseconds until it installs by itself (the notice in the pages counts down); absent when it does not now. */
+  installIn?: number;
+  /** Put off with Later: when it asks again (ms since 1970). Absent with installIn, and when automatic updates are off. */
+  later?: number;
 }
 
 // ---- models for Console, the app's own agent ---------------------------------------------------------

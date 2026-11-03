@@ -42,7 +42,7 @@ import { ModelManager } from './models/manager.ts';
 import { clients as agentClients, clientUpdates, ensureCommand, install as installClient, setClientAutoUpdate, startClientUpdates, watchClients } from './clients.ts';
 import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
-import { checkUpdates, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
+import { checkUpdates, installUpdateNow, laterUpdate, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { accountEnv, accountPool, addAccount, addedAccounts, autoSwitchOn, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { devServerShot, listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
@@ -261,6 +261,9 @@ app.post('/api/update-check', async () => ({ update: await checkUpdates() }));
 /** Pulls, builds and restarts now; progress arrives as update events. */
 app.post('/api/update', async () => ({ update: startUpdate(false) }));
 app.put('/api/update/auto', async (req) => ({ update: setAutoUpdate(!!(req.body as { on?: boolean } | undefined)?.on) }));
+/** The Mac app: Restart now (the version downloaded and waiting installs at once), and Later (it asks again in 4 hours). */
+app.post('/api/update/install', async () => ({ update: installUpdateNow() }));
+app.post('/api/update/later', async () => ({ update: laterUpdate() }));
 app.get('/api/startup', async () => startupState());
 /** The start page's picks as they change (the agent, model, folder, assistant…), so it opens that way next time, on any device. */
 app.put('/api/start', async (req) => {

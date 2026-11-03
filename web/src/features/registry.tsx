@@ -15,6 +15,7 @@ import { automationsFeature } from './automations/feature';
 import { browserFeature } from './browser/feature';
 import { budgetFeature } from './budget/feature';
 import { childrenFeature } from './children/feature';
+import { computerFeature } from './computer/feature';
 import { connectionsFeature } from './connections/feature';
 import { customFeature } from './custom/feature';
 import { documentsFeature } from './documents/feature';
@@ -111,6 +112,7 @@ export const features = (): WebFeature[] =>
     shotsFeature,
     searchFeature,
     browserFeature,
+    computerFeature,
     memoryFeature,
     knowledgeFeature,
     spacesFeature,

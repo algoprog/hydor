@@ -125,7 +125,7 @@ It is kept by the app, so it works with no browser open.
 
 ## Keep the app up to date
 
-For a copy installed from git (the installer's, or Docker's), and for the Mac app, the app looks for a newer version a few minutes after it starts and then once a day. **About**, at the bottom of [Settings → App → General](/settings?s=general&find=Check%20now), shows the version you run and how things stand:
+A copy installed from git (the installer's, or Docker's) looks for a newer version a few minutes after it starts and then once a day; the Mac app looks a minute after it opens and then every 4 hours. **About**, at the bottom of [Settings → App → General](/settings?s=general&find=Check%20now), shows the version you run and how things stand:
 
 - "Up to date · checked … ago", with **Check now** to look again at once.
 - When a newer version is out: "… updates out", the latest change's title, and **Update now**. It gets the new version, builds it and restarts the app; running agents carry on through the restart, and this tab reloads into the new version by itself. If the app can't restart itself, it gets and builds the new version, and you restart the app to use it.
@@ -134,11 +134,22 @@ For a copy installed from git (the installer's, or Docker's), and for the Mac ap
 
 When a newer version is out, a dot shows on **Settings** in the sidebar. A copy not installed from git can't check: **Check now** says so.
 
-The Mac app goes by released versions instead: "Version … is out", and **Update now** downloads it, checks that it is the build the release names, and opens it in place of the one you run ("Opening the new version, this page reconnects by itself…"). Running agents carry on. If the new version does not start, the version before comes back by itself and the line under **About** says why; that version then installs only when you press **Update now**. The Mac app can update itself only from the Applications folder (or another folder you can write to): opened from the disk image, it says to move it there.
-
-[**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first) installs a newer version by itself after 5 hours without a message from you, at most once a day. Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or the Mac app in the Applications folder); otherwise the switch is off and says why.
+[**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first) installs a newer version by itself: a copy installed from git after 5 hours without a message from you, at most once a day; the Mac app as soon as one is out, after a minute's notice. Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or the Mac app in the Applications folder); otherwise the switch is off and says why.
 
 Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Naget Agent was updated").
+
+### Updates in the Mac app
+
+The Mac app goes by released versions instead. With [**Update automatically**](/settings?s=general&find=Update%20automatically) on, it downloads a new version as soon as it is out and checks that it is the build the release names, without waiting for you to be away. Then it tells you, in two places:
+
+- A notification from your Mac: "Naget Agent … is ready", restarting in a minute to install it. Clicking it opens the app; its **Restart Now** button installs the new version at once.
+- A note in the corner of every open page of the app that counts down the seconds ("Restarting in 42 s to install it"), with **Restart now** and **Later**.
+
+When the minute is up, the app restarts into the new version: running agents carry on, and its window comes back by itself. **Later** puts it off for 4 hours, when the notification and the note come back. Until then, **Restart to Update to …** in the menu of the app's icon in the menu bar (and in the **Naget Agent** menu) installs it whenever you like, and so does **Restart now** under **About**, which says "Version … is ready to install" and when it asks again.
+
+With **Update automatically** off, nothing downloads by itself: **About** says "Version … is out", and **Update now** downloads it, checks it and opens it in place of the one you run ("Downloading the new version…", then "Opening the new version, this page reconnects by itself…").
+
+If the new version does not start, the version before comes back by itself and the line under **About** says why; that version then installs only when you press **Update now**. The Mac app can update itself only from the Applications folder (or another folder you can write to): opened from the disk image, it says to move it there.
 
 ## Read the release notes
 
@@ -212,6 +223,7 @@ The rest is kept by the app and is the same on every device: themes you made, **
 - "Make me a dark theme with a deep green background and an orange accent."
 - "Delete my theme called Test."
 - "Is there a newer version of Naget Agent? What changed in it?"
+- "Install the new version of Naget Agent that is waiting, now."
 - "Turn off automatic updates."
 - "Make sure the app starts when this computer starts."
 - "Turn on resuming sessions after usage limits."

@@ -23,7 +23,7 @@
 - [**用量限制解除后继续**](/settings?s=general&find=Resume%20after%20usage%20limits)：在套餐额度重置一分钟后继续会话。
 - [**删除不活跃的会话**](/settings?s=general&find=Delete%20inactive%20sessions)：删除一年（或你选择的时长）无人使用的会话；在此之前，每个对话都会保留。
 - [**开机时启动**](/settings?s=general&find=Start%20when%20this%20computer%20starts)：电脑启动时自动启动本应用。
-- [**自动更新**](/settings?s=general&find=Update%20automatically)：在你一段时间没有使用时自动更新。
+- [**自动更新**](/settings?s=general&find=Update%20automatically)：自动安装新版本：Mac 应用在新版本一发布时安装，并提前一分钟告诉你；从 git 安装的副本则在你一段时间没有使用时安装。
 - [**开始导览**](/settings?s=general&find=Take%20the%20tour)：了解应用各部分的作用。
 - [**小贴士**](/settings?s=general&find=Tips)：欢迎导览之后，在你第一次用到应用的某个部分时为你指出它。
 - [**立即检查**](/settings?s=general&find=Check%20now)：立即检查新版本。
@@ -167,6 +167,14 @@
 - [**为能看图片的模型提供截图**](/settings?s=browser&find=Screenshots%20for%20models%20that%20see%20images)：能看图的模型会收到页面截图。
 - [**网站**](/settings?s=browser&find=Sites)：仅限这些网站，或绝不访问这些网站。
 - [**个人资料**](/settings?s=browser&find=Profiles)：浏览器的独立登录。
+
+### 电脑操控
+
+[设置 → 电脑操控](/settings?s=computer)：智能体能看到你 Mac 的屏幕，并使用它的鼠标和键盘，仅限 Mac 应用。详见[搜索和浏览器](/guide/web)。
+
+- [**允许智能体使用这台 Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac)：智能体能看到屏幕，并在任何应用中使用鼠标和键盘；每个会话都会先问你。
+- [**辅助功能**](/settings?s=computer&find=Accessibility)：macOS 允许 Naget Agent 使用鼠标和键盘的权限。
+- [**屏幕录制**](/settings?s=computer&find=Screen%20Recording)：macOS 允许 Naget Agent 查看屏幕的权限。
 
 ### 记忆
 

@@ -153,7 +153,7 @@ test('the guide covers the app: every Settings section by its name', () => {
 });
 
 /** Routes agents are never to use, which the API topic leaves out (app_api refuses them too). */
-const UNDOCUMENTED = /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads|auth)\/|^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)$|^\/api\/browser\/sessions\/|^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|health)$|^\/api\/voice\/(transcribe|command|cancel)$/;
+const UNDOCUMENTED = /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads|auth)\/|^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)$|^\/api\/(browser|computer)\/sessions\/|^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|health)$|^\/api\/voice\/(transcribe|command|cancel)$/;
 
 test('the guide covers the app: every API route is in the API topic, or one agents never use', () => {
   const api = byId.get('api')!.body;

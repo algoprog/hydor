@@ -47,6 +47,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['tasks', 'Scheduled tasks', 'Agents', 'Agent work that starts by itself: on a schedule, once, or when a webhook calls'],
   ['search', 'Search', 'Capabilities', 'How agents search the web: Naget Search and other providers'],
   ['browser', 'Browser', 'Capabilities', 'A web browser agents use, which you can watch and take over'],
+  ['computer', 'Computer use', 'Capabilities', 'Agents see your Mac’s screen and use its mouse and keyboard, in the Mac app'],
   ['memory', 'Memory', 'Capabilities', 'What agents remember about you, your projects and each session, and when it was written'],
   ['children', 'Child sessions', 'Capabilities', 'Agents handing parts of a job to other agents, and swarms for hard problems'],
   ['images', 'Images and video', 'Capabilities', 'Pictures and videos agents make for you through OpenRouter, and who writes their captions in the Library'],
@@ -71,7 +72,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['general', 'Resume after usage limits', 'limit reset continue automatically plan', 'Continues a session a minute after a plan’s limit resets'],
   ['general', 'Delete inactive sessions', 'delete old sessions clean up retention history keep conversations inactive year months', 'Deletes sessions nobody used for a year, or as long as you choose; until then every conversation is kept'],
   ['general', 'Start when this computer starts', 'boot startup login service autostart systemd', 'Starts the app when the computer starts'],
-  ['general', 'Update automatically', 'updates upgrade auto update new version', 'Updates itself when you have not used it for a while'],
+  ['general', 'Update automatically', 'updates upgrade auto update new version restart install', 'Installs new versions by itself: the Mac app as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while'],
   ['general', 'Take the tour', 'tour help guide onboarding welcome', 'See what each part of the app does', 'Welcome tour'],
   ['general', 'Tips', 'tips hints help onboarding introduce features skip guide', 'Points out a part of the app the first time you come to it, after the welcome tour'],
   ['general', 'Check now', 'update upgrade new version about', 'Look for a newer version now', 'Check for updates'],
@@ -143,6 +144,10 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['search', 'Brave Search', 'brave search api key', 'Web search with a Brave key'],
   ['search', 'DuckDuckGo', 'duckduckgo ddg search', 'Web search without a key'],
   ['search', 'Results per search', 'results count number', 'How many results a search gives'],
+  // Capabilities › Computer use
+  ['computer', 'Let agents use this Mac', 'computer use control mac desktop apps screen mouse keyboard click type screenshot', 'Agents see the screen and use the mouse and keyboard, in any app; each session asks you first'],
+  ['computer', 'Accessibility', 'accessibility permission mouse keyboard control macos privacy', 'macOS’s permission for Naget Agent to use the mouse and keyboard', 'Accessibility permission'],
+  ['computer', 'Screen Recording', 'screen recording permission screenshot see screen macos privacy', 'macOS’s permission for Naget Agent to see the screen', 'Screen Recording permission'],
   // Capabilities › Browser
   ['browser', 'A browser for agents', 'browser chromium chrome web pages agents', 'Agents open sites, click, type and read pages'],
   ['browser', 'Chromium', 'chrome chromium download browser', 'Which Chromium the browser runs', 'Which Chromium'],
