@@ -3,6 +3,22 @@
 What changed in each version of Naget Agent, newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.14.1 · 3 November 2026
+
+A picture to read after wrong passwords and an hour's pause after ten, and sessions that wait out a usage limit only
+when one really stopped them.
+
+- **Wrong passwords**: after three from the same address within an hour, the sign-in page also shows a picture of
+  five characters to type, so a program can't go on guessing. Typing them wrong costs nothing, and **New picture**
+  brings another. After ten, that address can't sign in for an hour, not even with the right password, and the page
+  says how long is left. When many wrong passwords come in from anywhere, everyone gets the picture. If you lock
+  yourself out, a new password set on the computer itself (`set-password`) lifts every pause.
+- **Your visitors' own addresses**: wrong passwords are counted by the address of whoever is behind Cloudflare
+  Tunnel, Caddy or Docker's network, and a program can no longer pretend to come from a new address for each try.
+- **Usage limits**: a session waits to carry on after a limit only when its turn was really stopped by one, not when
+  your plan's usage reached 100% just as the work finished. Sending a message, pressing **Stop**, or a turn that
+  finishes normally cancels the wait.
+
 ## 0.14.0 · 3 November 2026
 
 Tips that go on showing you the app after the welcome tour, a simpler message box, one list of your accounts that
