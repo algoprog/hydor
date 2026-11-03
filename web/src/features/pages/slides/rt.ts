@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react';
 import { deckFonts, FONT_TABLE, FONTS, type Deck } from '@shared/slides';
 import { slidesRuntime, type DrawOpts } from '@shared/slides-runtime';
 import { tr } from '../../../i18n/runtime';
+import { mu } from '../../../lib/machine';
 
 export const RT = slidesRuntime(window, FONT_TABLE);
 RT.style();
 
 /** Where the app finds a deck's pictures. */
 export const PICS: Pick<DrawOpts, 'asset' | 'web' | 'hint'> = {
-  asset: (sha) => `/api/pages/assets/${sha}`,
-  web: (url) => `/api/pages/picture?url=${encodeURIComponent(url)}`,
+  asset: (sha) => mu(`/api/pages/assets/${sha}`),
+  web: (url) => mu(`/api/pages/picture?url=${encodeURIComponent(url)}`),
   hint: tr,
 };
 

@@ -43,6 +43,7 @@ import { newDeck, THEMES, type Deck, type Ratio } from '@shared/slides';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { ago, basename, bytes, tildify } from '../../lib/format';
 import { useFeatureEvent } from '../../lib/featureEvents';
+import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
@@ -92,7 +93,7 @@ function Thumb({ page, className }: { page: PageInfo; className?: string }) {
   return (
     <div className={cx('relative overflow-hidden bg-gradient-to-br', toneOf(page.id), className)}>
       {show ? (
-        <img src={`/api/pages/${enc(page.id)}/thumb?v=${enc(ready)}`} alt="" loading="lazy" draggable={false} onError={() => setFailed(ready)} className="absolute inset-0 h-full w-full object-cover object-top" />
+        <img src={mu(`/api/pages/${enc(page.id)}/thumb?v=${enc(ready)}`)} alt="" loading="lazy" draggable={false} onError={() => setFailed(ready)} className="absolute inset-0 h-full w-full object-cover object-top" />
       ) : (
         <span className="absolute inset-0 flex items-center justify-center text-[34px] font-semibold opacity-80">{firstLetter(page.title)}</span>
       )}

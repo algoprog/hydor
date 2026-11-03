@@ -10,6 +10,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, Sparkles, Unlink } from 'lucide-react';
 import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, type Doc, type ImageBlock } from '@shared/docs';
 import { post } from '../../../lib/api';
+import { mu } from '../../../lib/machine';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { LOCALE } from '../../../i18n/locale';
@@ -28,7 +29,7 @@ const OUTLINE_KEY = 'wa.docs.outline';
 
 /** Where a picture of a document shows from in the app (whose own pages load no picture from the web). */
 const pictureSrc = (s: string) =>
-  s.startsWith('naget-asset:') ? `/api/pages/assets/${s.slice('naget-asset:'.length)}` : /^https?:/i.test(s) ? `/api/pages/picture?url=${encodeURIComponent(s)}` : s;
+  s.startsWith('naget-asset:') ? mu(`/api/pages/assets/${s.slice('naget-asset:'.length)}`) : /^https?:/i.test(s) ? mu(`/api/pages/picture?url=${encodeURIComponent(s)}`) : s;
 
 /** A picture from the web (or inside pasted words) kept by the app: its kept source. */
 const takeIn = (src: string) => post<{ src: string }>('/api/pages/assets', src.startsWith('data:') ? { data: src } : { url: src }).then((r) => r.src);
