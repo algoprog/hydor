@@ -107,16 +107,24 @@ agents that speak ACP and take MCP servers.
   turns that off.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
-- **Images and videos**: agents make pictures (or change yours) and short videos (from words, from a picture to
-  start or end on, or by changing a video) with OpenRouter's image and video models, the ones picked in Settings →
-  Images and video or one you name. First a form in the conversation shows the settings that model takes (shape,
-  resolution, quality, how many, length, sound) and what the result costs; it comes once per model in a session,
-  and scheduled tasks and apps' runs go without it. A video is a job the app follows to its end, also after the
-  agent stops waiting, and plays in the app's own player. **Save to Library** keeps one in the Library, where a
-  model that sees images writes its title and description (a video's from ten of its frames on one picture, with
-  ffmpeg): the app's choice, any of OpenRouter's vision models, Claude through Claude Code, or a model of your own
-  (Ollama, vLLM, an endpoint). The Library shows them among its other things (Pictures and Videos show each kind alone), and finds, plays, downloads and edits them; **Start a session with it** opens a new
-  session with one in the message box, and agents can work from them.
+- **Images, videos and audio**: agents make pictures (or change yours), short videos (from words, from a picture
+  to start or end on, or by changing a video) and sound with OpenRouter's image, video and audio models, the ones
+  picked in Settings → Images, video and audio or one you name. The app's choices are ByteDance's Seedream 5.0 for
+  pictures and Seedance 2.5 for videos, Google's Lyria 3 for music (whole songs with or without singing, from the
+  agent's description and lyrics) and ByteDance's Seed Audio for voices and sounds (voice-overs in a voice described
+  or copied from 1–3 recordings, conversations, sound effects and ambience); any of OpenRouter's speech models
+  (ElevenLabs, Gemini TTS, Fish Audio, MAI…) and gpt-audio voices can be picked instead. First a form in the
+  conversation shows the settings that model takes (shape, resolution, quality, how many, length, sound; for audio,
+  singing or not, length, voice and file) and what the result costs; it comes once per model in a session, and
+  scheduled tasks and apps' runs go without it. A video is a job the app follows to its end, also after the agent
+  stops waiting, and plays in the app's own player; a sound plays in the app's own audio player, its shape (read
+  from the file) the bar to seek along, with a song's lyrics under it. **Save to Library** keeps one in the
+  Library, where a model that sees images writes its title and description (a video's from ten of its frames on
+  one picture, with ffmpeg; a sound's from its prompt, lyrics and model, since no model hears it): the app's
+  choice, any of OpenRouter's vision models, Claude through Claude Code, or a model of your own (Ollama, vLLM, an
+  endpoint). The Library shows them among its other things (Pictures, Videos and Audio show each kind alone, a
+  sound's card playing it in place), and finds, plays, downloads and edits them; **Start a session with it** opens
+  a new session with one in the message box, and agents can work from them.
 - **Connected apps**: on the Apps page beside your agent apps (Apps → Connected apps, which was Settings →
   Connections), a marketplace of services (Notion, Linear, GitHub, Google, Stripe and more), signed
   in once for every agent and app; anyone can add one with a pull request to `catalog/`. Keys and sign-ins live in an
@@ -138,7 +146,7 @@ agents that speak ACP and take MCP servers.
   ask which project when there are projects (the session's first), New makes it in the project you look at, and More →
   Move to a project moves anything; its places (Everything, each project's things under its name, Not in a project,
   Published) sit beside the cards, with Find by name, sorting and kind chips (Pages, Slides, Documents,
-  Spreadsheets, LaTeX, Pictures, Videos). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
+  Spreadsheets, LaTeX, Pictures, Videos, Audio). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too: click or tap a part to rewrite its words
   (bold, italic, links), restyle it (this part, every part of its kind or class, on hover, or for tablets and

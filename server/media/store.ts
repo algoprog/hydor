@@ -1,7 +1,7 @@
-// The Library's images and videos: a row each in SQLite (its title and description, what it was made from and
-// with, its size and length), and its file copied into the app's data folder (media/<id>.<ext>), with a still
-// to show it by (<id>.still.jpg) and, for a video, its frames on one picture (<id>.frames.jpg). The copy stays
-// when the session's folder is cleaned up or the original is moved.
+// The Library's images, videos and audio: a row each in SQLite (its title and description, what it was made from
+// and with, its size and length, a sound's shape and words), and its file copied into the app's data folder
+// (media/<id>.<ext>), with a still to show it by (<id>.still.jpg) and, for a video, its frames on one picture
+// (<id>.frames.jpg). The copy stays when the session's folder is cleaned up or the original is moved.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,9 +42,11 @@ export function initMedia(db: DB) {
     );
     create index if not exists media_source on media(source);
   `);
-  // The space it belongs to (shared/spaces.ts), or none, as the Library's pages have.
+  // The space it belongs to (shared/spaces.ts), or none, as the Library's pages have; a sound's shape (JSON) and words.
   const cols = (db.prepare('pragma table_info(media)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('space')) db.exec('alter table media add column space text');
+  if (!cols.includes('peaks')) db.exec('alter table media add column peaks text');
+  if (!cols.includes('lyrics')) db.exec('alter table media add column lyrics text');
 }
 
 interface Row {
@@ -66,8 +68,21 @@ interface Row {
   caption_error: string | null;
   caption_by: string | null;
   space: string | null;
+  peaks: string | null;
+  lyrics: string | null;
   created_at: number;
   updated_at: number;
+}
+
+/** A sound's shape as kept: levels from 0 to 1, or nothing when it does not read as one. */
+function peaksOf(raw: string | null): number[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const p = JSON.parse(raw);
+    return Array.isArray(p) && p.length && p.every((x) => typeof x === 'number') ? p : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const toItem = (r: Row): MediaItem => ({
@@ -80,6 +95,8 @@ const toItem = (r: Row): MediaItem => ({
   ...(r.width ? { width: r.width } : {}),
   ...(r.height ? { height: r.height } : {}),
   ...(r.duration ? { duration: r.duration } : {}),
+  ...(peaksOf(r.peaks) ? { peaks: peaksOf(r.peaks) } : {}),
+  ...(r.lyrics ? { lyrics: r.lyrics } : {}),
   ...(r.prompt ? { prompt: r.prompt } : {}),
   ...(r.model ? { model: r.model } : {}),
   ...(r.session_key ? { sessionKey: r.session_key } : {}),
@@ -106,7 +123,7 @@ export function getMedia(db: DB, id: string): MediaItem | null {
 
 export function mustMedia(db: DB, id: string): MediaItem {
   const m = /^[a-f0-9]{10}$/.test(id) ? getMedia(db, id) : null;
-  if (!m) throw new HttpError(404, 'No such image or video in the Library');
+  if (!m) throw new HttpError(404, 'No such image, video or sound in the Library');
   return m;
 }
 
@@ -139,6 +156,9 @@ export interface NewMedia {
   width?: number;
   height?: number;
   duration?: number;
+  /** A sound's shape, and the words sung or spoken in it. */
+  peaks?: number[];
+  lyrics?: string;
   prompt?: string;
   model?: string;
   sessionKey?: string;
@@ -150,19 +170,19 @@ export interface NewMedia {
 export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
   initMedia(db);
   const count = (db.prepare('select count(*) as n from media').get() as { n: number }).n;
-  if (count >= MAX_ITEMS) throw new HttpError(400, `The Library keeps at most ${MAX_ITEMS} images and videos: delete some first`);
+  if (count >= MAX_ITEMS) throw new HttpError(400, `The Library keeps at most ${MAX_ITEMS} images, videos and sounds: delete some first`);
   await fs.promises.mkdir(MEDIA_DIR, { recursive: true, mode: 0o700 });
   const id = crypto.randomBytes(5).toString('hex');
   const name = `${id}.${n.ext}`;
   await fs.promises.copyFile(n.from, path.join(MEDIA_DIR, name), fs.constants.COPYFILE_EXCL);
   const now = Date.now();
   db.prepare(
-    `insert into media (id, kind, title, description, file, mime, bytes, width, height, duration, prompt, model, session_key, source, caption, space, created_at, updated_at)
-     values (@id, @kind, @title, @description, @file, @mime, @bytes, @width, @height, @duration, @prompt, @model, @session, @source, 'pending', @space, @now, @now)`,
+    `insert into media (id, kind, title, description, file, mime, bytes, width, height, duration, peaks, lyrics, prompt, model, session_key, source, caption, space, created_at, updated_at)
+     values (@id, @kind, @title, @description, @file, @mime, @bytes, @width, @height, @duration, @peaks, @lyrics, @prompt, @model, @session, @source, 'pending', @space, @now, @now)`,
   ).run({
     id,
     kind: n.kind,
-    title: cleanText(n.title, 120) || (n.kind === 'video' ? 'Video' : 'Image'),
+    title: cleanText(n.title, 120) || (n.kind === 'video' ? 'Video' : n.kind === 'audio' ? 'Audio' : 'Image'),
     description: cleanText(n.description, 2000),
     file: name,
     mime: n.mime,
@@ -170,6 +190,8 @@ export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
     width: n.width ?? null,
     height: n.height ?? null,
     duration: n.duration ?? null,
+    peaks: n.peaks?.length ? JSON.stringify(n.peaks) : null,
+    lyrics: n.lyrics ? String(n.lyrics).replace(/\r\n?/g, '\n').trim().slice(0, 8000) || null : null,
     prompt: n.prompt ? cleanText(n.prompt, 4000) : null,
     model: n.model ? cleanText(n.model, 120) : null,
     session: n.sessionKey ?? null,

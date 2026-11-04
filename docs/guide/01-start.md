@@ -126,7 +126,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
 - **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
 - **Projects**: your projects, by name and description. Opening one opens the project.
-- **Apps**, **Scheduled tasks**, **Assistants**, **Skills**, **Pages**, **Images and videos** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
+- **Apps**, **Scheduled tasks**, **Assistants**, **Skills**, **Pages**, **Images, videos and audio** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
 - **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
 
 ### Choose where it looks

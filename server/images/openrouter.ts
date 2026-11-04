@@ -7,8 +7,16 @@ import path from 'node:path';
 import type { ImageModel } from '../../shared/images.ts';
 import type { MediaParam } from '../../shared/media.ts';
 
-/** The app's choice, first one OpenRouter still lists. */
-export const PREFERRED = ['google/gemini-3.1-flash-image', 'google/gemini-2.5-flash-image', 'google/gemini-3.1-flash-image-preview', 'openai/gpt-image-1-mini', 'black-forest-labs/flux.2-pro'];
+/** The app's choice, first one OpenRouter still lists: ByteDance's Seedream 5.0, then Google's, OpenAI's and FLUX's. */
+export const PREFERRED = [
+  'bytedance-seed/seedream-5-0-pro',
+  'bytedance-seed/seedream-5-0-flash',
+  'google/gemini-3.1-flash-image',
+  'google/gemini-2.5-flash-image',
+  'google/gemini-3.1-flash-image-preview',
+  'openai/gpt-image-1-mini',
+  'black-forest-labs/flux.2-pro',
+];
 
 export const ASPECTS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9'];
 export const SIZES = ['1K', '2K', '4K'];
@@ -236,8 +244,8 @@ export function dimensions(b: Buffer): { w: number; h: number } | null {
 
 const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/avif': 'avif' };
 
-/** A file name from words: "Red panda, in space!" → "red-panda-in-space". */
-export function slug(words: string): string {
+/** A file name from words: "Red panda, in space!" → "red-panda-in-space" (`fallback` when no word is left). */
+export function slug(words: string, fallback = 'image'): string {
   const s = words
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
@@ -245,7 +253,7 @@ export function slug(words: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   const cut = s.length > 48 ? s.slice(0, 48).replace(/-[^-]*$/, '') : s;
-  return cut || 'image';
+  return cut || fallback;
 }
 
 export interface Saved {

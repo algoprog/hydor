@@ -4,7 +4,7 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, AppWindow, ArrowRight, Blocks, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, AppWindow, ArrowRight, AudioLines, Blocks, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
@@ -29,7 +29,7 @@ import { openAsk } from '../guide/ask';
 import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
 
-export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Projects' | 'Apps' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Plugins' | 'Connections' | 'Pages' | 'Images and videos' | 'Themes' | 'Files';
+export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Projects' | 'Apps' | 'Scheduled tasks' | 'Assistants' | 'Skills' | 'Plugins' | 'Connections' | 'Pages' | 'Images, videos and audio' | 'Themes' | 'Files';
 
 export interface Entry extends Findable {
   id: string;
@@ -64,6 +64,7 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:library': <LibraryBig size={15} />,
   'go:media': <Images size={15} />,
   'go:videos': <Play size={15} />,
+  'go:audio': <AudioLines size={15} />,
   'go:published': <Globe size={15} />,
   'go:preview': <MonitorSmartphone size={15} />,
   'go:usage': <Gauge size={15} />,
@@ -204,14 +205,14 @@ export async function liveEntries(): Promise<Entry[]> {
   for (const m of media?.items ?? [])
     out.push({
       id: `media:${m.id}`,
-      group: 'Images and videos',
-      icon: m.kind === 'video' ? <Play size={15} /> : <ImageIcon size={15} />,
+      group: 'Images, videos and audio',
+      icon: m.kind === 'video' ? <Play size={15} /> : m.kind === 'audio' ? <AudioLines size={15} /> : <ImageIcon size={15} />,
       title: m.title,
-      keywords: `${m.kind === 'video' ? 'video clip' : 'image picture'} library`,
+      keywords: `${m.kind === 'video' ? 'video clip' : m.kind === 'audio' ? 'audio sound music song voice recording' : 'image picture'} library`,
       text: [m.description, m.prompt].filter(Boolean).join(' '),
       where: 'Library › Media',
       body: m.description,
-      opens: m.kind === 'video' ? 'Opens the video' : 'Opens the image',
+      opens: m.kind === 'video' ? 'Opens the video' : m.kind === 'audio' ? 'Opens the sound' : 'Opens the image',
       run: () => go(`/media/${encodeURIComponent(m.id)}`),
     });
   for (const c of conns?.connections ?? [])

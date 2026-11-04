@@ -1,6 +1,6 @@
 # Documents, images, videos and voice
 
-Agents in Hydor read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures and short videos, or change yours, with image and video models, and you can keep what they make in your Library. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
+Agents in Hydor read PDFs, Word, Excel, PowerPoint and other documents, make new ones for you, and hand them over as cards you open or download; they can also make pictures and short videos (or change yours), songs, voice-overs and sounds, with image, video and audio models, and you can keep what they make in your Library. And you can speak instead of typing, have replies read aloud, or talk to the app hands-free while you walk.
 
 ![An agent that read a report and made a one-page Word summary and a spreadsheet with a chart](images/documents-voice.webp)
 
@@ -139,36 +139,49 @@ If LibreOffice can't lay a file out, the viewer says so and its text is still un
 
 ## Let agents make images
 
-Ask any agent for a picture ("make a logo for my bakery", "turn this photo into a watercolour") and it makes it with an image model through OpenRouter, saves it in the session's folder and shows it with its reply. Set it up in **[Settings → Capabilities → Images and video](/settings?s=images)** (on a phone: Settings, then **Images and video**).
+Ask any agent for a picture ("make a logo for my bakery", "turn this photo into a watercolour") and it makes it with an image model through OpenRouter, saves it in the session's folder and shows it with its reply. Set it up in **[Settings → Capabilities → Images, video and audio](/settings?s=images)** (on a phone: Settings, then **Images, video and audio**).
 
 - **[Making images](/settings?s=images&find=Making%20images)**: the switch **Let agents make images** gives every agent the tool for it. It is on unless you turn it off; off, agents are not offered the tool.
-- **The OpenRouter key**: image and video models are reached through OpenRouter, and each image or video is paid for with your OpenRouter key. Without one, this section says so, with **Get one at openrouter.ai** and **Add the key**, which opens [Settings → Agents → Models → OpenRouter](/settings?s=models&find=OpenRouter) where the key goes (see [Agents, accounts and models](/guide/agents-models)).
-- **[Image model](/settings?s=images&find=Image%20model)**: the model that makes the images, shown with its maker, about what one image costs (for a picture of about a megapixel), the month OpenRouter listed it and its id, with tags: **New** (listed in the last 30 days), **Edits** (it takes pictures to change or follow) and **Text too** (it writes text with its images). Until you pick one, it is the app's choice ("The app’s choice, until you pick one"): the first of a short list of Google Gemini, OpenAI and FLUX image models that OpenRouter still offers. To pick one:
+- **The OpenRouter key**: image, video and audio models are reached through OpenRouter, and each image, video or sound is paid for with your OpenRouter key. Without one, this section says so, with **Get one at openrouter.ai** and **Add the key**, which opens [Settings → Agents → Models → OpenRouter](/settings?s=models&find=OpenRouter) where the key goes (see [Agents, accounts and models](/guide/agents-models)).
+- **[Image model](/settings?s=images&find=Image%20model)**: the model that makes the images, shown with its maker, about what one image costs (for a picture of about a megapixel), the month OpenRouter listed it and its id, with tags: **New** (listed in the last 30 days), **Edits** (it takes pictures to change or follow) and **Text too** (it writes text with its images). Until you pick one, it is the app's choice ("The app’s choice, until you pick one"): the first of a short list that OpenRouter still offers: ByteDance's Seedream 5.0 Pro and Flash, then Google Gemini, OpenAI and FLUX image models. To pick one:
   1. Click **Change**: a list of OpenRouter's image models opens.
-  2. Search it by name ("flux", "gemini", "recraft"), and sort it **Newest** or **Cheapest**.
+  2. Search it by name ("seedream", "flux", "gemini"), and sort it **Newest** or **Cheapest**.
   3. Click a row to use that model. **Let the app choose instead** goes back to the app's choice.
 
 The lists come from OpenRouter and need no key; when they can't be reached, the list says so.
 
 ## Let agents make videos
 
-Agents can make short videos too ("ten seconds of waves at dusk", "make this photo of my dog run through a field"), with a video model through OpenRouter, in the same section, **[Settings → Capabilities → Images and video](/settings?s=images)**:
+Agents can make short videos too ("ten seconds of waves at dusk", "make this photo of my dog run through a field"), with a video model through OpenRouter, in the same section, **[Settings → Capabilities → Images, video and audio](/settings?s=images)**:
 
 - **[Making videos](/settings?s=images&find=Making%20videos)**: the switch **Let agents make videos** gives every agent the tool for it. It is on unless you turn it off.
-- **[Video model](/settings?s=images&find=Video%20model)**: the model that makes them, shown with its maker, what a second of video costs (from its lowest resolution without sound to its highest with sound, as "$0.03 to $0.08 a second"), the lengths it makes ("4 to 8 s"), its highest resolution ("up to 1080p") and the month OpenRouter listed it, with tags: **Sound** (it makes sound with the picture), **From a picture** (it can start from a picture you give) and **Edits videos** (it changes a video you give it instead of making one from words). Until you pick one, it is the app's choice: the first of a short list of cheap, quick models with sound (Google Veo 3.1 Lite first) that OpenRouter still offers. **Change** opens the list to search ("veo", "kling", "seedance") and sort **Newest** or **Cheapest**.
+- **[Video model](/settings?s=images&find=Video%20model)**: the model that makes them, shown with its maker, what a second of video costs (from its lowest resolution without sound to its highest with sound, as "$0.03 to $0.08 a second"), the lengths it makes ("4 to 8 s"), its highest resolution ("up to 1080p") and the month OpenRouter listed it, with tags: **Sound** (it makes sound with the picture), **From a picture** (it can start from a picture you give) and **Edits videos** (it changes a video you give it instead of making one from words). Until you pick one, it is the app's choice: the first of a short list of models with sound that OpenRouter still offers: ByteDance's Seedance 2.5, then cheaper, quicker ones such as Google Veo 3.1 Lite. **Change** opens the list to search ("seedance", "veo", "kling") and sort **Newest** or **Cheapest**.
 
 Videos cost far more than pictures: from a few cents to dollars a second, and a video of 8 seconds with sound from a top model can cost several dollars. Each one is paid for with your OpenRouter key, and you see its price on a form before anything is made.
 
+## Let agents make audio
+
+Agents can make sound too: songs and jingles ("a 30-second jingle for my podcast"), voice-overs and narration in a voice you describe ("read this welcome in a warm, slow voice") or in a voice copied from a recording you have, and sound effects and ambience ("rain on a tin roof"). Set it up in the same section, **[Settings → Capabilities → Images, video and audio](/settings?s=images)**:
+
+- **[Making audio](/settings?s=images&find=Making%20audio)**: the switch **Let agents make audio** gives every agent the tool for it. It is on unless you turn it off.
+- **[Music model](/settings?s=images&find=Music%20model)**: the model that makes songs and music, shown with its maker, its price ("$0.08 a song"), the longest it makes ("up to 3:00") and the month OpenRouter listed it, with the tag **Music**. Until you pick one, it is the app's choice: Google's Lyria 3 Pro, which makes whole songs of up to about 3 minutes, with singing or without; else Lyria 3 Clip, which makes 30-second clips.
+- **[Voice and sound model](/settings?s=images&find=Voice%20and%20sound%20model)**: the model that speaks and makes other sounds, shown with its price ("$0.0025 a second", "$0.08 per 1,000 characters", "about $0.014 a minute"), the longest it makes and how many voices it has, with tags: **Sounds too** (it makes sound effects and ambience as well as voices, from a description), **Copies voices** (it speaks in a voice copied from short recordings you give it), **Conversations** (it voices several speakers, each in their own voice) and **Directed** (it takes directions for the delivery: tone, pace, emotion). Until you pick one, it is the app's choice: ByteDance's Seed Audio 1.0, which does all of these from a description, up to 2 minutes at a time; else Google's Gemini 3.8 Flash TTS, else ElevenLabs v3.
+
+**Change** opens each model's list, to search ("lyria"; "seed", "elevenlabs", "gemini") and sort **Newest** or **Cheapest** (voices by about what a minute of speech costs); **Let the app choose instead** goes back to the app's choice. When the voice model you picked only reads words aloud, a sound effect or a copied voice is made with the app's choice that can, and the form says so.
+
+Voice models are mostly sold by the character read, Seed Audio by the second of sound it makes, Lyria by the song. Each is paid for with your OpenRouter key, and you see its price on a form before anything is made.
+
 ## Check the settings before anything is made
 
-Before an agent makes a picture or a video, a short form shows in the conversation with the settings that model takes and what the result costs, filled in with what you asked for and the app's defaults:
+Before an agent makes a picture, a video or a sound, a short form shows in the conversation with the settings that model takes and what the result costs, filled in with what you asked for and the app's defaults:
 
 - for a picture: **Shape** (square, wide, tall…, as many as the model takes), **Resolution** (1K, 2K, 4K…), **Quality**, **How many pictures** (for models that make several at once) and **Transparent background** (for a logo or an icon);
-- for a video: **Video length** (the lengths the model makes, or **Length, in seconds**), **Shape**, **Resolution** and **Sound**.
+- for a video: **Video length** (the lengths the model makes, or **Length, in seconds**), **Shape**, **Resolution** and **Sound**;
+- for a sound: for a song, **Instrumental, no singing** and, with a model that makes long songs, **Length, in seconds** (leave it empty for the song to take as long as it needs); for a sound effect, its **Length, in seconds** (Seed Audio is paid by the second); for speech, the **Voice** (for a model with voices of its own); and the **File** (**MP3, smaller** or **WAV, uncompressed**), where the model makes both.
 
-Above the fields are the model's name, its price ("about $0.08 an image", "$0.03 to $0.08 a second, by resolution and sound"; for a video, what it comes to with the settings shown) and what the agent will ask for, in its own words. Change what you like and click **Make it**; **Not now** closes the form, and nothing is made or spent. The form shows only the settings the model offers.
+Above the fields are the model's name, its price ("about $0.08 an image", "$0.03 to $0.08 a second, by resolution and sound", "$0.08 a song", "$0.0025 a second of sound"; for a video or a sound, what it comes to with the settings shown) and what the agent will ask for, in its own words. Change what you like and click **Make it**; **Not now** closes the form, and nothing is made or spent. The form shows only the settings the model offers.
 
-The form comes once per model in a session: later pictures and videos in that session use the settings you picked, unless you ask for others ("now a tall one"). Say "show me the settings again" for the form, or "go ahead, choose for me" for the agent to make it without one. Scheduled tasks and apps' runs make theirs without a form, with the app's defaults, since nobody is there to answer.
+The form comes once per model in a session: later pictures, videos and sounds in that session use the settings you picked (for a sound, its voice and its file), unless you ask for others ("now a tall one"). Say "show me the settings again" for the form, or "go ahead, choose for me" for the agent to make it without one. Scheduled tasks and apps' runs make theirs without a form, with the app's defaults, since nobody is there to answer.
 
 ## Ask for a picture, or have one changed
 
@@ -182,7 +195,7 @@ Pictures are saved in an **images** folder inside the session's folder, named af
 In the conversation:
 
 - While the model works, a placeholder in the shape asked for says "Making an image" with the time so far, and the description under it.
-- Then the pictures show with the reply, with the description and the model's name under them, and **Save to Library** (see [Keep a picture or a video](#keep-a-picture-or-a-video)). Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a project**, **Copy path**) appear when you point at it (on a phone they are always there); with several pictures, **Save to Library** is there too.
+- Then the pictures show with the reply, with the description and the model's name under them, and **Save to Library** (see [Keep what an agent made](#keep-what-an-agent-made)). Click one to see it large: click again for full size, the arrows (or arrow keys) step through several, **Open in a new tab** opens it alone, and Escape closes. Over each picture, **Show in the files**, **Download** and **More** (⋯: **Start a session with it**, **Add to a project**, **Copy path**) appear when you point at it (on a phone they are always there); with several pictures, **Save to Library** is there too.
 - Without an OpenRouter key you see "Images need an OpenRouter key", with **Add an OpenRouter key**. When the model makes nothing, you see "No image this time" with its reason.
 
 ## Ask for a video
@@ -203,9 +216,29 @@ In the conversation:
 - Then the video shows with the reply, ready to play (full screen too, from its controls), with the description and the model's name under it, and **Save to Library**. Over it, **Show in the files**, **Download** and **More** (⋯) appear when you point at it.
 - "Still being made" means the agent stopped waiting before the video was ready: it shows once the agent checks again (ask it to, if it does not). "No video this time" gives the reason: you closed the form, or the model refused (its words say why).
 
-## Keep a picture or a video
+## Ask for music, a voice or a sound
 
-**Save to Library**, under a picture or a video an agent made, keeps a copy of it in your [Library](/guide/library#images-and-videos-in-the-library), where a model writes a title and a description for it, and where it stays after the session's folder is cleaned up. The button then reads **In your Library** and opens it there.
+Tell the agent what you want to hear:
+
+- **Music**: the genre and mood, the instruments, the tempo, the voice that sings and how it goes ("a 2-minute upbeat synth-pop song about Monday mornings, with a woman singing and a catchy chorus"). Give your own lyrics, or let the model write them; ask for an instrumental when you want no singing. Lyria 3 Clip always makes 30 seconds; Lyria 3 Pro makes up to about 3 minutes, as long as you ask. A song takes a minute or two.
+- **A voice-over**: the words to say, exactly, and how they should sound ("read this in a calm, deep voice, slowly"). With a model that has voices of its own, you pick one on the form; Seed Audio makes the voice you describe. A conversation between several speakers works too ("a short podcast intro with two hosts"), with models that voice them.
+- **A voice copied from a recording**: give the agent 1 to 3 recordings of the voice, files on this computer (WAV, MP3, M4A, OGG or FLAC, up to 30 MB each; the first 30 seconds of each are used), for a model that **Copies voices** (Seed Audio). Use only a voice you may use: your own, or one whose owner agreed. With ffmpeg on the computer any of those files works; without it, WAV and MP3 only.
+- **A sound effect or ambience**: what it is, what happens and when ("heavy rain on a tin roof, thunder rolling in at the end, no voices"), and how long.
+- **Another model** for one sound, when you name it ("read it with ElevenLabs v3"), without changing Settings.
+
+Sounds are saved in an **audio** folder inside the session's folder, named after what they are, as MP3 (or WAV, when you ask for it).
+
+In the conversation:
+
+- While the model works, a card says "Making music", "Making a voice-over" or "Making a sound", with the time so far.
+- Then the sound shows with the reply, in a player: the round button plays and pauses it (one sound plays at a time), its shape is the bar to move along (click or drag it), then the time and the speed (**1×**, **1.25×**, **1.5×**, **2×** or **0.75×**). While the player has focus, Space or K plays and pauses, and ← → move 5 seconds. Its title comes from the file's name, with **Show in the files**, **Download** and **More** (⋯) beside it. Under it are the words it was made from, the model's name and **Save to Library** (see [Keep what an agent made](#keep-what-an-agent-made)); a song's **Lyrics** open under them.
+- Without an OpenRouter key you see "Audio needs an OpenRouter key", with **Add an OpenRouter key**. "No sound this time" gives the reason: you closed the form, or the model refused (its words say why).
+
+The agent cannot hear what it made: it knows the sound by what it asked for. If it does not sound right, say what to change, and it makes another.
+
+## Keep what an agent made
+
+**Save to Library**, under a picture, a video or a sound an agent made, keeps a copy of it in your [Library](/guide/library#images-and-videos-in-the-library), where a model writes a title and a description for it (for a sound, from the words it was made from, since no model can hear it), and where it stays after the session's folder is cleaned up. The button then reads **In your Library** and opens it there.
 
 ## Dictate a message
 
@@ -333,3 +366,6 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Which video models make sound, and what does a second cost with each?"
 - "Make agents use Kling for videos."
 - "Stop agents from making videos."
+- "Which music model do agents use, and what does a song cost?"
+- "Use ElevenLabs v3 for voice-overs, with the voice George."
+- "Stop agents from making audio."

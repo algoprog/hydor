@@ -23,14 +23,14 @@ for the service and the Mac app):
 | `HYDOR_EMBED_DEVICE` | the GPU with the most free memory, else `cpu` | Where memory's search by meaning runs (`cpu`, `cuda:1`…); Settings → Memory can also keep it on the CPU |
 | `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
 | `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
-| `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills with |
+| `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills and sounds' lengths and shapes with, and voice samples are read with |
 | `HYDOR_UPDATE_FEED` | the newest GitHub release's `hydor-mac.json` | Where the Mac app looks for new versions |
 
 ## What it stores
 
 In `DATA_DIR`: the password hash (`auth.json`), the session index and search database (`hydor.db`; `naget-agent.db` or `web-agent.db` in older installs),
 the agents' programs the app installed (`clients/`), logs of running agents (`runs/`), attachments waiting to be sent (`uploads/`), files deleted in the file
-browser (`trash/`), the Library's images and videos with their stills and frames (`media/`), notebook kernels and the
+browser (`trash/`), the Library's images, videos and sounds with their stills and frames (`media/`), notebook kernels and the
 terminal server, and, once search by meaning is turned on in
 Settings → Memory, its private Python environment (`memory/venv`). Its model goes to Hugging Face's cache
 (`~/.cache/huggingface`, or `memory/hf` in Docker). Conversations themselves stay where the agents

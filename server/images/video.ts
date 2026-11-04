@@ -8,8 +8,8 @@ import path from 'node:path';
 import type { VideoModel } from '../../shared/media.ts';
 import { HEADERS, slug, type Reference } from './openrouter.ts';
 
-/** The app's choice, first one OpenRouter still lists: cheap, quick, with sound. */
-export const PREFERRED_VIDEO = ['google/veo-3.1-lite', 'google/veo-3.1-fast', 'bytedance/seedance-2.0-fast', 'kwaivgi/kling-v3.0-std', 'alibaba/wan-2.7', 'google/veo-3.1'];
+/** The app's choice, first one OpenRouter still lists: ByteDance's Seedance 2.5, then cheap, quick ones, all with sound. */
+export const PREFERRED_VIDEO = ['bytedance/seedance-2.5', 'google/veo-3.1-lite', 'google/veo-3.1-fast', 'bytedance/seedance-2.0-fast', 'kwaivgi/kling-v3.0-std', 'alibaba/wan-2.7', 'google/veo-3.1'];
 
 const FRAMES = new Set(['first_frame', 'last_frame']);
 
@@ -240,7 +240,7 @@ export async function downloadVideos(base: string, key: string, job: VideoJob, d
     if (!data.length) continue;
     if (data.length > 500 * 1024 * 1024) throw new Error('The video is over 500 MB');
     const ext = EXT[type] ?? 'mp4';
-    const stem = slug(name) || 'video';
+    const stem = slug(name, 'video');
     for (let n = 1; n < 1000; n++) {
       const file = path.join(dir, `${urls.length > 1 ? `${stem}-${i + 1}` : stem}${n > 1 ? `-${n}` : ''}.${ext}`);
       try {
