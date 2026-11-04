@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="style.css" />
   <script>document.documentElement.classList.add('js')</script>
   <script src="main.js" defer></script>
+  <script src="docs/search.js" defer></script>
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -102,9 +103,10 @@
         <a href="#features">Features</a>
         <a href="#mobile">Mobile</a>
         <a href="#privacy">Privacy</a>
-        <a href="https://github.com/algoprog/hydor/tree/main/docs/guide">Docs</a>
+        <a href="/docs/">Docs</a>
       </nav>
       <div class="nav-end">
+        <button class="nav-search" type="button" data-search-open aria-label="Search the docs"><svg class="ic"><use href="#i-search" /></svg><span>Search</span><kbd>Ctrl K</kbd></button>
         <a class="nav-gh" href="https://github.com/algoprog/hydor" aria-label="Hydor on GitHub">
           <svg class="ic"><use href="#i-github" /></svg><span class="nav-gh-label">GitHub</span>
         </a>
@@ -120,7 +122,7 @@
       <a href="#mobile">Mobile</a>
       <a href="#privacy">Privacy</a>
       <a href="#download">Download</a>
-      <a href="https://github.com/algoprog/hydor/tree/main/docs/guide">Docs</a>
+      <a href="/docs/">Docs</a>
       <a href="https://github.com/algoprog/hydor">GitHub</a>
     </div>
   </header>
@@ -157,7 +159,7 @@
             <path transform="translate(458 0)" d="M5 100V5H34A25 20 0 0 1 34 50H5M30 50L66 106" stroke="currentColor" />
           </g>
         </svg>
-        <p class="tagline reveal"><span lang="grc">ὕδωρ</span>, “water” in ancient Greek: it takes the shape of whatever holds it.</p>
+        <p class="tagline reveal"><span lang="grc">ὕδωρ</span>, “water” in ancient Greek: it takes the shape of whatever holds it</p>
         <h1 class="reveal" style="--d: 90ms">Give your agents <span class="water-text">a home</span></h1>
         <p class="lede reveal" style="--d: 170ms">
           Hydor runs Claude Code, Codex or any model on your machine, with the plans and APIs you already pay for. A
@@ -538,7 +540,7 @@
           </details>
           <details>
             <summary>Can I use it from my phone?<svg class="ic"><use href="#i-chev" /></svg></summary>
-            <div class="faq-a"><p>Yes. Open it in your phone's browser and add it to the home screen: it works like an app, with notifications. To reach it away from home, put HTTPS in front of it; <a href="https://github.com/algoprog/hydor/blob/main/docs/remote-access.md">the docs show a few easy ways</a>.</p></div>
+            <div class="faq-a"><p>Yes. Open it in your phone's browser and add it to the home screen: it works like an app, with notifications. To reach it away from home, put HTTPS in front of it; <a href="/docs/remote-access">the docs show a few easy ways</a>.</p></div>
           </details>
           <details>
             <summary>Which agents and models does it work with?<svg class="ic"><use href="#i-chev" /></svg></summary>
@@ -562,7 +564,7 @@
         <header class="section-head reveal">
           <p class="eyebrow">Download</p>
           <h2>Get Hydor</h2>
-          <p>Install it once on a computer, then open it from any device. A short tour sets up the rest.</p>
+          <p>Install it once on a computer, then open it from any device.<br />A short tour sets up the rest.</p>
         </header>
         <div class="dl">
           <article class="dl-card dl-mac reveal" id="get-mac">
@@ -623,8 +625,8 @@ docker logs hydor | grep setup</code></pre>
         </div>
         <p class="dl-version reveal">
           Latest release: <a href="https://github.com/algoprog/hydor/releases/latest">Hydor %VERSION%</a> ·
-          <a href="https://github.com/algoprog/hydor/blob/main/CHANGELOG.md">Release notes</a> ·
-          <a href="https://github.com/algoprog/hydor/blob/main/docs/install.md">Install guide</a>
+          <a href="/docs/release-notes">Release notes</a> ·
+          <a href="/docs/install">Install guide</a>
         </p>
       </div>
       <div class="waves" aria-hidden="true">
@@ -646,15 +648,15 @@ docker logs hydor | grep setup</code></pre>
           <h4>Hydor</h4>
           <a href="#features">Features</a>
           <a href="#download">Download</a>
-          <a href="https://github.com/algoprog/hydor/blob/main/CHANGELOG.md">Release notes</a>
-          <a href="https://github.com/algoprog/hydor/blob/main/docs/features.md">Everything it does</a>
+          <a href="/docs/release-notes">Release notes</a>
+          <a href="/docs/features">Everything it does</a>
         </div>
         <div>
           <h4>Docs</h4>
-          <a href="https://github.com/algoprog/hydor/tree/main/docs/guide">User guide</a>
-          <a href="https://github.com/algoprog/hydor/blob/main/docs/install.md">Installation</a>
-          <a href="https://github.com/algoprog/hydor/blob/main/docs/remote-access.md">Remote access</a>
-          <a href="https://github.com/algoprog/hydor/blob/main/docs/how-it-works.md">How it works</a>
+          <a href="/docs/">User guide</a>
+          <a href="/docs/install">Installation</a>
+          <a href="/docs/remote-access">Remote access</a>
+          <a href="/docs/how-it-works">How it works</a>
         </div>
         <div>
           <h4>Project</h4>
