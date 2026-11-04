@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.22.1 · 4 November 2026
+
+The Game finder keeps to what you ask for.
+
+- **Only games still to come**: asked for games coming soon, the Game finder picks only those (fewer rather than
+  one already out), each with when it comes out on its card, and sums them up without notes on missing details.
+
 ## 0.22.0 · 4 November 2026
 
 Sources you can see at a glance, apps that run when they fit, and pictures and trailers in their answers.
