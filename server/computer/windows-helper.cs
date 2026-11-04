@@ -37,6 +37,9 @@ public static class HydorComputer
     [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT point);
     [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr window);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr window, IntPtr dc);
+    [DllImport("gdi32.dll", SetLastError = true)] static extern bool BitBlt(IntPtr dest, int x, int y, int w, int h, IntPtr source, int sx, int sy, uint rop);
     [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(POINT point, uint flags);
     [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
@@ -51,6 +54,8 @@ public static class HydorComputer
     const uint MOVE = 0x0001, LEFTDOWN = 0x0002, LEFTUP = 0x0004, RIGHTDOWN = 0x0008, RIGHTUP = 0x0010;
     const uint MIDDLEDOWN = 0x0020, MIDDLEUP = 0x0040, WHEEL = 0x0800, HWHEEL = 0x1000;
     const uint EXTENDEDKEY = 0x0001, KEYUP = 0x0002, UNICODE = 0x0004;
+    // The screen copied as it is, layered windows (menus, tooltips) too; .NET's CopyFromScreen refuses the two together.
+    const uint SRCCOPY = 0x00CC0020, CAPTUREBLT = 0x40000000;
     // Mouse buttons by the steps' numbers: left, right, middle.
     static readonly uint[] DOWN = { LEFTDOWN, RIGHTDOWN, MIDDLEDOWN };
     static readonly uint[] UP = { LEFTUP, RIGHTUP, MIDDLEUP };
@@ -311,15 +316,21 @@ public static class HydorComputer
         byte[] jpeg;
         using (Bitmap full = new Bitmap(w, h, PixelFormat.Format24bppRgb))
         {
-            try
+            // CAPTUREBLT takes in layered windows too (menus, tooltips); windows that keep out of captures stay out.
+            using (Graphics g = Graphics.FromImage(full))
             {
-                // CaptureBlt takes in layered windows too (menus, tooltips); windows that keep out of captures stay out.
-                using (Graphics g = Graphics.FromImage(full))
-                    g.CopyFromScreen(r.Left, r.Top, 0, 0, new Size(w, h), CopyPixelOperation.SourceCopy | CopyPixelOperation.CaptureBlt);
-            }
-            catch (Exception e)
-            {
-                throw new Exception("could not see the screen (is it locked, or showing a Windows security prompt?): " + e.Message);
+                IntPtr dest = g.GetHdc();
+                IntPtr screen = GetDC(IntPtr.Zero);
+                try
+                {
+                    if (screen == IntPtr.Zero || !BitBlt(dest, 0, 0, w, h, screen, r.Left, r.Top, SRCCOPY | CAPTUREBLT))
+                        throw new Exception("could not see the screen (is it locked, or showing a Windows security prompt?)");
+                }
+                finally
+                {
+                    if (screen != IntPtr.Zero) ReleaseDC(IntPtr.Zero, screen);
+                    g.ReleaseHdc(dest);
+                }
             }
             using (Bitmap small = new Bitmap(tw, th, PixelFormat.Format24bppRgb))
             {

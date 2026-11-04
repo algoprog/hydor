@@ -4,7 +4,8 @@
 //   macOS    screencapture, with the glow hidden meanwhile (macOS 15.4 and later capture even windows that ask not)
 //   Windows  the built helper (HYDOR_COMPUTER_HELPER), with the glow left as it is: Windows keeps it out by itself
 //   Linux    the app's own capture, on an X display with a compositor (else the app shows no glow at all)
-// It also says whether a capture without hiding it shows the glow (macOS, Linux), which is what the person sees.
+// It also checks the person sees it: on Linux a capture without hiding it shows it; on a Mac, where captures may leave
+// it out by themselves, macOS's own list of the windows on screen has it, over the whole display, above the others.
 //   npx electron scripts/glow-test.cjs     (in desktop/)
 'use strict';
 const { app, BrowserWindow, desktopCapturer, nativeImage, screen } = require('electron');
@@ -116,6 +117,23 @@ app.whenReady().then(async () => {
     return;
   }
   for (const [name, spot] of Object.entries(spots)) say(near(at(agent, spot), COLOUR), `the agent’s screenshot shows no glow at the ${name}`, fmt(at(agent, spot)));
+  if (MAC) {
+    // macOS's own list of the windows on screen: this app's, with their level and where they are (in points).
+    const script = `ObjC.import('CoreGraphics');
+      var all = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(1, 0)));
+      JSON.stringify(all.filter(function (w) { return w.kCGWindowOwnerPID === ${process.pid}; }).map(function (w) {
+        return { layer: w.kCGWindowLayer, bounds: w.kCGWindowBounds, alpha: w.kCGWindowAlpha };
+      }));`;
+    let mine = [];
+    try {
+      mine = JSON.parse(execFileSync('/usr/bin/osascript', ['-l', 'JavaScript', '-e', script], { encoding: 'utf8' }));
+    } catch (e) {
+      console.log(`      could not read macOS's list of windows: ${String(e && e.message).split('\n')[0]}`);
+    }
+    const b = d.bounds;
+    const over = mine.find((w) => w.bounds && w.bounds.X === b.x && w.bounds.Y === b.y && w.bounds.Width === b.width && w.bounds.Height === b.height && w.layer >= 1000);
+    say(!!over, 'the person sees the glow: on screen over the whole display, above the other windows', JSON.stringify(mine));
+  }
   if (!WIN) {
     await wait(800);
     const seen = await screenAsIs();
