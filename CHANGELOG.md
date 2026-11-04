@@ -3,6 +3,35 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.27.0 · 4 November 2026
+
+Hydor for Windows and Linux: desktop apps beside the Mac one, that bring everything they need and keep themselves up
+to date.
+
+- **The Windows app**: an installer for your account (no administrator needed) that puts Hydor in the Start menu and
+  opens it in a window of its own. It stays in the notification area of the taskbar when you close the window, opens
+  in the background when you sign in to Windows, and updates itself as the Mac app does: a minute's notice, then the
+  new version's installer runs without its window and opens the app again. Agents run their commands in Git for
+  Windows' bash, as Claude Code does there; terminals open it too. Install Git for Windows beside it.
+- **The Linux app**: a `.deb` for Ubuntu and Debian and an AppImage for every other system, for x64 and ARM. It brings
+  its own Node.js and tmux, stays in the system tray, opens when you log in, and updates itself: an AppImage replaces
+  its own file (and goes back to the version before if the new one does not start); the `.deb` installs a new version
+  once you give your password.
+- **Agents carry on through updates everywhere**: on Windows and from an AppImage, each version runs from a copy of
+  itself in your local data folder, so the agents that outlive the app never hold its files.
+- **The server runs on Windows**: agents' runners talk over named pipes that answer only the app, programs installed
+  with npm start without a shell in between, stopping a command stops everything it started, Windows paths
+  (`C:\Users\…`) work in the Files page, the sidebar's folders, Git and the folder picker, and the safety checks on
+  agents' commands read Windows and Git Bash paths too.
+- The README offers each system its download: Mac (Apple silicon or Intel), Windows, and Linux (`.deb` or AppImage,
+  x64 or ARM). Settings → General words updates and starting at login for the system you are on.
+- Projects in the sidebar that began outside Hydor, in Claude Code or Codex (VS Code, a terminal, their desktop apps),
+  show the mark of the agent they came from. Point at one, or open its ⋯, to see which apps and which added account
+  its sessions came from. A session's Info now says "Hydor" for the sessions Hydor started.
+- Not in the Windows and Linux apps yet: computer use (it stays in the Mac app). On Windows also the agent sandbox,
+  **Run code** steps in apps, local voice transcription and the System page's figures, and terminals end when the app
+  quits (Windows has no tmux).
+
 ## 0.26.0 · 4 November 2026
 
 Explore, a magazine made for you; sessions that name themselves; and memory notes that no longer fill the page.
