@@ -12,6 +12,17 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-Apple_silicon-111?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Apple silicon)" /></a>
+  <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-Intel-111?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Intel)" /></a>
+  <a href="https://hub.docker.com/r/algoprog/hydor"><img src="https://img.shields.io/badge/Docker-algoprog%2Fhydor-1D63ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker image algoprog/hydor" /></a>
+</p>
+<p align="center">
+  <a href="https://github.com/algoprog/hydor/releases/latest"><img src="https://img.shields.io/github/v/release/algoprog/hydor?label=latest&color=0a7ea4" alt="Latest release" /></a>
+  <a href="https://hub.docker.com/r/algoprog/hydor"><img src="https://img.shields.io/docker/pulls/algoprog/hydor?color=0a7ea4" alt="Docker pulls" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/algoprog/hydor?color=0a7ea4" alt="License" /></a>
+</p>
+
+<p align="center">
   <a href="docs/media/hydor-intro.mp4"><img src="docs/media/hydor-intro.webp" width="720" alt="A 110-second tour of Hydor, drawn in its water style: pick any agent and any model, even one on your own computer, start it in a folder, follow its steps, approve a command and see the diff; ask the Researcher for an e-bike: it searches and reads the web, hands you its browser to sign in, and answers with its sources, a spreadsheet and a memory note; carry on from a phone and turn a follow-up into a scheduled task; run the Trip planner app and see its own view, with pictures and a map; make a picture, a clip and a song; open slides in the Library; then sessions across agents and machines, one search for everything, and the terminal, files, Git, models, projects, skills, plugins, connected apps and usage around them" /></a>
 </p>
 
@@ -51,9 +62,10 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 
 ## Quick start
 
-On a Mac (macOS 12 or newer, Apple silicon or Intel): download the Mac app from the
-[latest release](https://github.com/algoprog/hydor/releases/latest) (`…-arm64-mac.dmg` or `…-x64-mac.dmg`) and drag
-it to Applications. It brings everything it needs and keeps itself up to date. See [the Mac app](docs/install.md#the-mac-app).
+On a Mac (macOS 12 or newer): download the Mac app for
+[Apple silicon](https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg) or
+[Intel](https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg) (or pick from the
+[latest release](https://github.com/algoprog/hydor/releases/latest)) and drag it to Applications. It brings everything it needs and keeps itself up to date. See [the Mac app](docs/install.md#the-mac-app).
 
 With Docker, on Linux, macOS or Windows (Intel/AMD and ARM):
 
@@ -62,6 +74,19 @@ docker run -d --name hydor --restart unless-stopped -p 127.0.0.1:8790:8790 \
   -v hydor-home:/home/node -v "$PWD/workspace:/workspace" algoprog/hydor
 docker logs hydor | grep setup   # your one-time setup link
 ```
+
+Or run it on a cloud service, straight from the [Docker image](https://hub.docker.com/r/algoprog/hydor), billed to
+your account there:
+
+<p>
+  <a href="https://render.com/deploy?repo=https://github.com/algoprog/hydor"><img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" height="32" /></a>
+  <a href="https://cloud.digitalocean.com/apps/new?repo=https://github.com/algoprog/hydor/tree/main"><img src="https://www.deploytodo.com/do-btn-blue.svg" alt="Deploy to DigitalOcean" height="32" /></a>
+  <a href="https://app.koyeb.com/deploy?name=hydor&type=docker&image=docker.io/algoprog/hydor:latest&ports=8790;http;/&instance_type=small"><img src="https://www.koyeb.com/static/images/deploy/button.svg" alt="Deploy to Koyeb" height="32" /></a>
+</p>
+
+Render keeps your settings and sessions on a disk (a paid plan); on DigitalOcean App Platform and Koyeb they start
+afresh when the app is redeployed. Then open the address the service gives you with `/setup?token=…` from its logs.
+See [On a cloud service](docs/install.md#on-a-cloud-service).
 
 Or on Linux, as a service of your user (needs Node.js 22.12+, git and tmux):
 

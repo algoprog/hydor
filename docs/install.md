@@ -98,6 +98,23 @@ Inside the container, the container itself is the boundary around the agents. Co
 start there (containers block the Linux namespaces it needs), so the app makes *Full access* the default for
 Codex and says why in the mode menu. Claude Code's permission prompts work as usual.
 
+## On a cloud service
+
+The README's buttons run the public Docker image (`algoprog/hydor`) on a hosting service, billed to your account
+there. Each makes one web service on port 8790, checked at `/api/health`:
+
+- **Render** (`render.yaml`): a Starter service with a 10 GB disk at `/home/node`, so your settings, sessions and
+  agents' sign-ins stay through restarts and updates.
+- **DigitalOcean App Platform** (`.do/deploy.template.yaml`): a 1 vCPU / 2 GB app. App Platform has no lasting disk:
+  everything starts afresh when the app is redeployed. For a lasting copy, run the image on a Droplet as in
+  [With Docker](#with-docker).
+- **Koyeb**: the image as it is, on a small instance; without a volume it also starts afresh when redeployed.
+
+When it is up, find the line `No password set yet. Open http://…/setup?token=…` in the service's logs, open
+`/setup?token=…` at the address the service gives you, and choose a password. The service's address is served
+over HTTPS, so phones can use it at once. The app updates when the service pulls `algoprog/hydor:latest` again
+(a redeploy).
+
 ## Without Docker
 
 ```bash
