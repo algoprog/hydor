@@ -31,7 +31,7 @@ import { Elapsed } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
-import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
+import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isChatgptProjectFolder, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
@@ -57,10 +57,18 @@ function pruneActive(active: Set<string>) {
 /** What the home folder is called where a session's folder is named (translated, unlike folders' own names). */
 export const HOME_FOLDER = 'Home folder';
 
+/** What a folder the Codex app made for a ChatGPT project is called when Codex does not say the project's name. */
+export const CHATGPT_PROJECT = 'ChatGPT project';
+
 /** The folder a session works in, as a short name ("Home folder" for the home folder). */
 export function folderName(cwd: string | undefined, home?: string): string {
   if (!cwd) return '';
-  if (home && cwd.replace(/\/+$/, '') === home.replace(/\/+$/, '')) return HOME_FOLDER;
+  const dir = cwd.replace(/\/+$/, '');
+  if (home && dir === home.replace(/\/+$/, '')) return HOME_FOLDER;
+  // A Codex project's folder goes by the project's name; a ChatGPT project's folder the Codex app made is named only by an id.
+  const named = useApp.getState().boot?.folderNames?.[dir];
+  if (named) return named;
+  if (isChatgptProjectFolder(dir)) return CHATGPT_PROJECT;
   return basename(cwd) || '/';
 }
 
@@ -334,7 +342,7 @@ const RowBody = memo(function RowBody({
             <ActivityText s={s} className="min-w-0" />
           ) : (
             <>
-              <span className="min-w-0 truncate" translate={where === HOME_FOLDER ? undefined : 'no'}>
+              <span className="min-w-0 truncate" translate={where === HOME_FOLDER || where === CHATGPT_PROJECT ? undefined : 'no'}>
                 {where || '—'}
               </span>
               <span className="shrink-0" aria-hidden>
@@ -582,6 +590,7 @@ export function SessionList({ query }: { query: string }) {
   const defaultCwd = useApp((s) => s.boot?.defaultCwd);
   const autoFolders = useApp((s) => s.boot?.autoFolders);
   const unpicked = useMemo(() => unpickedFolders(home, defaultCwd, autoFolders), [home, defaultCwd, autoFolders]);
+  const folderNames = useApp((s) => s.boot?.folderNames);
   const [, redraw] = useState(0);
   const [groupTime, setGroupTime] = useState(Date.now);
   // The order you dragged the spaces' and folders' groups into, the same on every device.
@@ -590,7 +599,7 @@ export function SessionList({ query }: { query: string }) {
   const groups = useMemo(() => {
     const listed = order.map((k) => byKey[k]).filter((s): s is SessionSummary => !!s && !s.archived && shown(s) && !nest.under.has(s.key));
     // The list showing one space: its sessions go by day.
-    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places });
+    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places, names: folderNames });
     const snz = out.find((g) => g.kind === 'snoozed');
     if (snz) snz.items.sort((a, b) => (a.snoozedUntil ?? 0) - (b.snoozedUntil ?? 0));
     const act = out.find((g) => g.kind === 'active');
@@ -600,7 +609,7 @@ export function SessionList({ query }: { query: string }) {
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
     for (const g of out) g.keys = g.items.map((s) => s.key);
     return out;
-  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime]);
+  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames]);
 
   // Move sessions out of Active even when no new session events arrive.
   useEffect(() => {

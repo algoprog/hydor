@@ -67,6 +67,7 @@ import { appWords } from './language/index.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
+import { codexFolderNames } from './codex-projects.ts';
 
 ensureDirs();
 ensureProbeDir();
@@ -246,6 +247,8 @@ app.get('/api/bootstrap', async () => ({
   defaultCwd: config.defaultCwd,
   // Folders no one picked: the sidebar groups sessions by the folders people pick, never by these.
   autoFolders: [...new Set([...madeRoots(), DEFAULT_TASK_ROOT, config.dataDir, os.tmpdir(), '/tmp'].map((r) => r.replace(/\/+$/, '')))],
+  // Names for folders Codex keeps projects in (its ChatGPT projects' folders are named only by an id).
+  folderNames: codexFolderNames(),
   prefs: { claude: sessions.defaults('claude'), codex: sessions.defaults('codex') },
   start: startSettings(db),
   indexing: indexer.progress,

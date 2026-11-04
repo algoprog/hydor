@@ -32,7 +32,7 @@ Under the search field is every session, in groups:
 - **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
 - **Snoozed**: at the bottom, until their time comes.
 
-Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and a session started in a project in the project's group, whatever its folder.
+Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and a session started in a project in the project's group, whatever its folder. A folder of a Codex project shows under the project's name. The folders the Codex app makes for your ChatGPT projects are named only by an id, so unless Codex knows the project's name they get no group either, and their sessions show **ChatGPT project** as their folder. Two folders of the same name show as many of the folders above them as it takes to tell them apart ("client/app", "server/app").
 
 Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. The pen at the end of a heading (on a computer, when you point at the heading) starts a new session in that folder or project.
 

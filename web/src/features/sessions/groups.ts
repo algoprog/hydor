@@ -52,8 +52,34 @@ export function unpickedFolders(home?: string, defaultCwd?: string, auto?: strin
   const exact = new Set(['/', home, defaultCwd].filter((d): d is string => !!d).map(trim));
   return (dir) => {
     const d = trim(dir);
-    return exact.has(d) || roots.some((r) => d === r || d.startsWith(r + '/'));
+    return exact.has(d) || roots.some((r) => d === r || d.startsWith(r + '/')) || isChatgptProjectFolder(d);
   };
+}
+
+/** A folder the Codex app made for one of your ChatGPT projects (~/.codex/.chatgpt-projects/g-p-…): named only by an id. */
+export const isChatgptProjectFolder = (dir: string) => basename(dirname(trim(dir))) === '.chatgpt-projects';
+
+/**
+ * Labels for folders' groups: a folder's own name (`names` gives some another, such as a Codex project's), and two
+ * folders of the same name told apart by as many of the folders they are in as it takes ("client/app", "server/app").
+ */
+export function folderLabels(dirs: string[], names: Record<string, string> = {}): Map<string, string> {
+  const parts = (d: string) => d.split('/').filter(Boolean);
+  const label = (d: string, depth: number) => {
+    if (names[d]) return names[d];
+    const p = parts(d);
+    // A folder at the top shows whole once it needs telling apart ("/app").
+    return depth > 1 && depth >= p.length ? `/${p.join('/')}` : p.slice(-depth).join('/') || d;
+  };
+  const out = new Map(dirs.map((d) => [d, label(d, 1)]));
+  for (let depth = 2; depth <= 8; depth++) {
+    const seen = new Map<string, number>();
+    for (const l of out.values()) seen.set(l, (seen.get(l) ?? 0) + 1);
+    const clash = dirs.filter((d) => !names[d] && seen.get(out.get(d)!)! > 1);
+    if (!clash.length) break;
+    for (const d of clash) out.set(d, label(d, depth));
+  }
+  return out;
 }
 
 /** The folder a session counts for: its worktree's main checkout, else its own. */
@@ -75,13 +101,13 @@ export const isPlaceKind = (kind: GroupKind) => kind === 'space' || kind === 'fo
  */
 export function groupSessions(
   list: SessionSummary[],
-  o: { now: Date; byFolder: boolean; spaces: SpaceView[] | null; unpicked: (dir: string) => boolean; places?: readonly string[] },
+  o: { now: Date; byFolder: boolean; spaces: SpaceView[] | null; unpicked: (dir: string) => boolean; places?: readonly string[]; names?: Record<string, string> },
 ): SessionGroup[] {
   const spaces = new Map((o.spaces ?? []).map((sp) => [sp.id, sp]));
   const spaceOf = (s: SessionSummary) => (typeof s.extra?.space === 'string' ? spaces.get(s.extra.space) : undefined);
   const folderOf = (s: SessionSummary) => {
     const dir = workFolder(s);
-    return dir && !o.unpicked(dir) ? dir : undefined;
+    return dir && (o.names?.[dir] || !o.unpicked(dir)) ? dir : undefined;
   };
   // How many listed sessions work in each folder, whichever group they show in now: a folder's group stays while
   // one of its two sessions is active or pinned.
@@ -114,11 +140,9 @@ export function groupSessions(
     }
   }
   const groups = [...out.values()];
-  // Two folders of the same name are told apart by the folder each is in ("client/app", "server/app").
   const folders = groups.filter((g) => g.kind === 'folder');
-  const named = new Map<string, number>();
-  for (const g of folders) named.set(g.label, (named.get(g.label) ?? 0) + 1);
-  for (const g of folders) if (named.get(g.label)! > 1) g.label = `${basename(dirname(g.path!)).replace(/^\/$/, '')}/${g.label}`;
+  const labels = folderLabels(folders.map((g) => g.path!), o.names);
+  for (const g of folders) g.label = labels.get(g.path!) ?? g.label;
   const placed = new Map((o.places ?? []).map((id, i) => [id, i]));
   const at = (g: SessionGroup) => (isPlaceKind(g.kind) ? (placed.get(g.id) ?? -1) : 0);
   return groups.sort((a, b) => RANK[a.kind] - RANK[b.kind] || at(a) - at(b));
