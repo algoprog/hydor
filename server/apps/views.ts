@@ -22,7 +22,20 @@ export const CARD_CSS = String.raw`
 .card > h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--n-muted); }
 `;
 
+/** A picture at the top of a card, cut to fit. */
+export const PIC_CSS = String.raw`
+.pic { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: calc(var(--n-radius) - 4px); background: var(--n-soft); }
+.pic.tall { aspect-ratio: 2 / 3; }
+`;
+
 // ---- Trip planner ----------------------------------------------------------------------------------------------------
+
+/** A day's picture, its main sight named over the foot of it (when it is not the day's area). */
+const DAY_PICTURE_CSS = String.raw`
+.ph { position: relative; margin: 0 0 10px; }
+.ph img { display: block; width: 100%; object-fit: cover; border-radius: calc(var(--n-radius) - 4px); background: var(--n-soft); }
+.ph figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 12px 8px; border-radius: 0 0 calc(var(--n-radius) - 4px) calc(var(--n-radius) - 4px); background: linear-gradient(transparent, rgb(0 0 0 / .62)); color: #fff; font-size: 13px; font-weight: 600; }
+`;
 
 const TRIP: AppUi = {
   pages: [
@@ -141,10 +154,11 @@ ${STATS_CSS}
 `,
     },
     'day-card': {
-      description: 'A day on the timeline: morning, afternoon and evening, each to tick off, with its map and the day on a page of its own',
+      description: 'A day on the timeline: its main sight’s picture, morning, afternoon and evening, each to tick off, with its map and the day on a page of its own',
       html: String.raw`<article class="day{{#@last}} last{{/@last}}">
   <div class="rail"><span class="dot">{{day}}</span></div>
   <div class="body">
+    {{#picture}}<figure class="ph"><img src="{{picture}}" alt="" loading="lazy">{{#sight}}{{^sight|is:$area}}<figcaption>{{sight}}</figcaption>{{/sight}}{{/sight}}</figure>{{/picture}}
     <header>
       <div><b>{{date|weekday}}</b> <span class="date">{{date|longdate}}</span></div>
       {{#area}}<span class="area">{{area}}</span>{{/area}}
@@ -168,6 +182,8 @@ ${STATS_CSS}
 .last .rail::before { display: none; }
 .dot { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--n-accent); color: var(--n-accent-fg); font-weight: 700; }
 .body { min-width: 0; padding: 12px 14px 10px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
+${DAY_PICTURE_CSS}
+.ph img { aspect-ratio: 21 / 9; max-height: 230px; }
 header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; margin-bottom: 8px; }
 .date { color: var(--n-muted); font-size: 13.5px; }
 .area { padding: 2px 10px; border-radius: 999px; background: var(--n-accent-soft); color: var(--n-accent); font-size: 12.5px; font-weight: 600; }
@@ -187,8 +203,9 @@ footer { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; padding-top
 `,
     },
     'day-detail': {
-      description: 'One day on a page of its own: its three parts to tick off, its map, a copy of it, and research on its area',
+      description: 'One day on a page of its own: its main sight’s picture, its three parts to tick off, its map, a copy of it, and research on its area',
       html: String.raw`<div class="detail">
+  {{#picture}}<figure class="ph"><img src="{{picture}}" alt="">{{#sight}}{{^sight|is:$area}}<figcaption>{{sight}}</figcaption>{{/sight}}{{/sight}}</figure>{{/picture}}
   <p class="kicker">Day {{day}} of {{result.days|count}} · {{date|weekday}}, {{date|longdate}}</p>
   <h2>{{area|or:A free day}}</h2>
   <div class="parts">
@@ -212,6 +229,8 @@ footer { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; padding-top
   </div>
 </div>`,
       css: String.raw`
+${DAY_PICTURE_CSS}
+.ph { margin-bottom: 16px; } .ph img { aspect-ratio: 2.4 / 1; max-height: 340px; } .ph figcaption { font-size: 14px; }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 h2 { margin: 4px 0 16px !important; font-size: 26px !important; letter-spacing: -.015em; }
 .parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
@@ -429,15 +448,18 @@ const COMPARE: AppUi = {
   ],
   elements: {
     winner: {
-      description: 'The pick, its price and what it is best for, and why',
+      description: 'The pick with its picture, its price and what it is best for, and why',
       html: String.raw`<section class="win">
+  {{#result.pick}}{{#result.comparison|where:product=$result.pick|first}}{{#picture}}<img class="ph" src="{{picture}}" alt="">{{/picture}}{{/result.comparison}}{{/result.pick}}
   <p class="kicker">🏆 The pick</p>
   {{#result.pick}}<h1>{{result.pick}}</h1><p class="lead">{{result.recommendation}}</p>{{/result.pick}}{{^result.pick}}<h1>{{result.recommendation}}</h1>{{/result.pick}}
   {{#result.pick}}{{#result.comparison|where:product=$result.pick|first}}<div class="facts">{{#price}}<span class="price">{{price}}</span>{{/price}}{{#best_for}}<span class="for">Best for {{best_for}}</span>{{/best_for}}{{#link}}<a class="n-btn n-primary" href="{{link}}" target="_blank" rel="noopener noreferrer">See it ↗</a>{{/link}}</div>{{/result.comparison}}{{/result.pick}}
   <div class="why">{{result.why|markdown}}</div>
 </section>`,
       css: String.raw`
-.win { padding: 22px 24px; border: 1px solid color-mix(in srgb, var(--n-accent) 40%, var(--n-line)); border-radius: calc(var(--n-radius) + 4px); background: linear-gradient(135deg, var(--n-accent-soft), transparent 70%), var(--n-card); }
+.win { display: flow-root; padding: 22px 24px; border: 1px solid color-mix(in srgb, var(--n-accent) 40%, var(--n-line)); border-radius: calc(var(--n-radius) + 4px); background: linear-gradient(135deg, var(--n-accent-soft), transparent 70%), var(--n-card); }
+.ph { float: right; width: min(34%, 220px); aspect-ratio: 1; margin: 0 0 12px 20px; object-fit: contain; border-radius: var(--n-radius); background: var(--n-card); }
+@media (max-width: 520px) { .ph { width: 38%; margin-left: 14px; } }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 h1 { margin: 6px 0 12px !important; font-size: 26px !important; letter-spacing: -.015em; }
 .lead { margin: -6px 0 14px; font-size: 16px; line-height: 1.5; }
@@ -450,21 +472,25 @@ h1 { margin: 6px 0 12px !important; font-size: 26px !important; letter-spacing: 
 `,
     },
     contender: {
-      description: 'Another product it weighed, in a few words',
+      description: 'Another product it weighed, with its picture, in a few words',
       html: String.raw`<button type="button" class="c" data-event="open_product">
-  <b>{{product}}</b>
+  {{#picture}}<img class="th" src="{{picture}}" alt="" loading="lazy">{{/picture}}
+  <span class="t"><b>{{product}}</b>
   <span class="price">{{price}}</span>
-  {{#best_for}}<span class="for">Best for {{best_for}}</span>{{/best_for}}
+  {{#best_for}}<span class="for">Best for {{best_for}}</span>{{/best_for}}</span>
 </button>`,
       css: String.raw`
-.c { display: flex; flex-direction: column; gap: 4px; width: 100%; height: 100%; padding: 13px 15px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); color: inherit; font: inherit; text-align: left; }
+.c { display: flex; gap: 12px; align-items: flex-start; width: 100%; height: 100%; padding: 13px 15px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); color: inherit; font: inherit; text-align: left; }
 .c:hover { border-color: var(--n-accent); }
+.th { flex: none; width: 60px; height: 60px; object-fit: contain; border-radius: 8px; background: var(--n-soft); }
+.t { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 b { font-size: 15px; } .price { font-size: 14px; } .for { color: var(--n-muted); font-size: 13px; }
 `,
     },
     product: {
-      description: 'A product: price, strengths and weaknesses, what it is best for; the pick stands out',
+      description: 'A product: its picture, price, strengths and weaknesses, what it is best for; the pick stands out',
       html: String.raw`<article class="p{{#product|is:$result.pick}} pick{{/product}}">
+  {{#picture}}<img class="pic" src="{{picture}}" alt="" loading="lazy">{{/picture}}
   {{#product|is:$result.pick}}<span class="badge">🏆 The pick</span>{{/product}}
   <h3>{{product}}</h3>
   <p class="price">{{price|or:No price found}}{{#score}} · <span class="score">{{score}}/100</span>{{/score}}</p>
@@ -473,9 +499,12 @@ b { font-size: 15px; } .price { font-size: 14px; } .for { color: var(--n-muted);
   {{#best_for}}<p class="for">Best for {{best_for}}</p>{{/best_for}}
   <div class="act"><button type="button" class="n-btn" data-event="open_product">More</button>{{#link}}<a class="n-btn" href="{{link}}" target="_blank" rel="noopener noreferrer">See it ↗</a>{{/link}}</div>
 </article>`,
-      css: String.raw`
+      css:
+        PIC_CSS +
+        String.raw`
 & { height: 100%; }
 .p { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; padding: 16px 16px 14px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
+.pic { aspect-ratio: 4 / 3; margin-bottom: 12px; object-fit: contain; }
 .pick { border-color: var(--n-accent); box-shadow: 0 0 0 3px var(--n-accent-soft); }
 .badge { align-self: flex-start; margin-bottom: 8px; padding: 2px 10px; border-radius: 999px; background: var(--n-accent); color: var(--n-accent-fg); font-size: 12px; font-weight: 700; }
 h3 { margin: 0; font-size: 16.5px; }
@@ -490,11 +519,13 @@ li { position: relative; padding-left: 20px; margin: 4px 0; }
 `,
     },
     'product-detail': {
-      description: 'One product on a page of its own, with research on how it holds up',
+      description: 'One product on a page of its own, with its picture and research on how it holds up',
       html: String.raw`<div class="d">
-  <p class="kicker">{{#product|is:$result.pick}}🏆 The pick{{/product}}{{^product|is:$result.pick}}Also considered{{/product}}</p>
-  <h2>{{product}}</h2>
-  <p class="price">{{price|or:No price found}}{{#best_for}} · best for {{best_for}}{{/best_for}}</p>
+  <div class="top"><div>
+    <p class="kicker">{{#product|is:$result.pick}}🏆 The pick{{/product}}{{^product|is:$result.pick}}Also considered{{/product}}</p>
+    <h2>{{product}}</h2>
+    <p class="price">{{price|or:No price found}}{{#best_for}} · best for {{best_for}}{{/best_for}}</p>
+  </div>{{#picture}}<img class="ph" src="{{picture}}" alt="">{{/picture}}</div>
   <div class="two">
     <section><h3>Strengths</h3><ul class="pros">{{#strengths|split}}<li>{{.}}</li>{{/strengths}}</ul></section>
     <section><h3>Weaknesses</h3><ul class="cons">{{#weaknesses|split}}<li>{{.}}</li>{{/weaknesses}}</ul></section>
@@ -505,6 +536,9 @@ li { position: relative; padding-left: 20px; margin: 4px 0; }
   </div>
 </div>`,
       css: String.raw`
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; } .top > div { min-width: 0; }
+.ph { flex: none; width: 150px; height: 150px; margin-bottom: 14px; object-fit: contain; border-radius: var(--n-radius); background: var(--n-soft); }
+@media (max-width: 520px) { .ph { width: 96px; height: 96px; } }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 h2 { margin: 4px 0 4px !important; font-size: 26px !important; }
 .price { margin: 0 0 16px; color: var(--n-muted); }
@@ -944,8 +978,9 @@ const NEWS: AppUi = {
       css: CHIPS_CSS,
     },
     story: {
-      description: 'A story: its topic and day, what happened and why it matters, its source, to mark read or research',
+      description: 'A story: its picture, its topic and day, what happened and why it matters, its source, to mark read or research',
       html: String.raw`<article class="s{{#state.read.@key}} read{{/state.read.@key}}">
+  {{#picture}}<img class="pic" src="{{picture}}" alt="" loading="lazy">{{/picture}}
   <div class="top"><span class="topic">{{topic}}</span>{{#date}}<span class="when">{{date|shortdate}}</span>{{/date}}</div>
   <h3><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{title}}</a></h3>
   <p class="sum">{{summary}}</p>
@@ -956,9 +991,12 @@ const NEWS: AppUi = {
     <button type="button" class="b" data-event="research">Research</button>
   </div>
 </article>`,
-      css: String.raw`
+      css:
+        PIC_CSS +
+        String.raw`
 & { height: 100%; }
 .s { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; padding: 14px 16px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
+.pic { margin-bottom: 10px; }
 .read { opacity: .62; }
 .top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12.5px; }
 .topic { padding: 1px 9px; border-radius: 999px; background: var(--n-accent-soft); color: var(--n-accent); font-weight: 600; }

@@ -241,7 +241,9 @@ test('the frame’s sources: the view’s kit and the engine run as the text sen
 /** An answer in the shape of its fields, every field there. */
 function answerOf(answer: AnswerField[]): Record<string, unknown> {
   const cell = (type: string, n: number): unknown => (type === 'number' ? n : type === 'yesno' ? true : type === 'date' ? `2026-11-2${n}` : type === 'url' ? `https://example.com/${n}` : `text ${n}`);
-  return Object.fromEntries(answer.map((f) => [f.id, f.type === 'table' ? [1, 2].map((n) => Object.fromEntries((f.columns ?? []).map((c) => [c.id, cell(c.type, n)]))) : f.type === 'list' ? ['one', 'two'] : cell(f.type, 1)]));
+  return Object.fromEntries(
+    answer.map((f) => [f.id, f.type === 'table' ? [1, 2].map((n) => Object.fromEntries((f.columns ?? []).map((c) => [c.id, cell(c.type, n)]))) : f.type === 'list' ? ['one', 'two'] : f.type === 'media' ? [{ src: 'https://example.com/1.jpg', kind: 'image' }] : cell(f.type, 1)]),
+  );
 }
 
 test('ready-made apps: each of the twenty-six has a view of pages and elements of its own that checks out, uses only what its answer and form give, and has events', () => {

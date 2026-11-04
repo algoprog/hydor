@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { ChevronRight, CircleAlert, CircleStop, Reply } from 'lucide-react';
 import type { ChildReply } from '@shared/children';
 import type { UserItem } from '@shared/types';
-import { Markdown } from '../../components/Markdown';
+import { ReplyMarkdown } from '../../components/Markdown';
 import { cx } from '../../components/ui';
 import { clockTime } from '../../lib/format';
 import { openSession } from '../../lib/nav';
@@ -59,7 +59,7 @@ export function ChildReplyRow({ item, reply }: { item: UserItem; reply: ChildRep
         <div className="mt-1 mb-2 ml-[15px] border-l border-accent/30 pl-4">
           {reply.summaryOf ? <div className="mb-1.5 text-[12px] text-fg-3">A summary of a long reply</div> : null}
           {reply.why && reply.text && <div className="mb-1.5 text-[12.5px] text-fg-3">{reply.why}</div>}
-          {reply.text ? <Markdown text={reply.text} breaks className="!text-[13.5px] !leading-relaxed !text-fg-2" /> : <div className="text-[13px] text-fg-3">{reply.why ?? 'It wrote no reply.'}</div>}
+          {reply.text ? <ReplyMarkdown text={reply.text} breaks className="!text-[13.5px] !leading-relaxed !text-fg-2" /> : <div className="text-[13px] text-fg-3">{reply.why ?? 'It wrote no reply.'}</div>}
           <button type="button" onClick={() => openSession(reply.key)} className="mt-2 inline-flex items-center gap-0.5 text-[12.5px] font-medium text-accent hover:underline">
             {reply.summaryOf ? 'Read the whole reply' : 'Open its session'}
             <ChevronRight size={13} />

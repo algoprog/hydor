@@ -21,7 +21,8 @@ import { opensTurn } from '../opinion/turns.ts';
 import { checkDaily } from './api.ts';
 import { builtinsForAgents } from './builtins.ts';
 import { startRun, waitFor } from './runs.ts';
-import { FIND_K, FIND_MAX, findApps } from './search.ts';
+import { byWords, FIND_K, FIND_MAX, findApps } from './search.ts';
+import { words } from '../memory/store.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
 import { missingSecrets } from './secrets.ts';
 
@@ -53,15 +54,20 @@ function findApp(list: Usable[], want: string): Usable | null {
 const typeWord = (f: AppField) => (f.type === 'choice' ? (f.options ?? []).join(' | ') : f.type === 'yesno' ? 'yes/no' : f.type === 'long' ? 'long text' : f.type === 'file' ? 'a file’s path' : f.type);
 const clipLine = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : s);
 
-/** One app in a line, for the tool and the start-up note: how to name it, what it does, and what its form asks. */
-function appLine(u: Usable, asks: boolean): string {
-  const head = `${u.recipe.name}${u.own ? '' : ' (ready-made)'}${u.recipe.description ? ` — ${clipLine(u.recipe.description, 150)}` : ''}`;
+/** One app, for the tools and the notes: how to name it, what it does, and what its form asks. */
+function appText(u: Usable, asks: boolean): string {
+  const head = `"${u.ref}": ${u.recipe.name}${u.own ? '' : ' (ready-made)'}${u.recipe.description ? ` — ${clipLine(u.recipe.description, 150)}` : ''}`;
   const form = asks && u.recipe.fields.length ? ` Asks ${u.recipe.fields.map((f) => `${f.id}${f.required && !f.default ? '' : '?'}: ${typeWord(f)}`).join(', ')}.` : '';
-  return `- "${u.ref}": ${head}${form && !/[.!?…]$/.test(head) ? '.' : ''}${form}`;
+  return `${head}${form && !/[.!?…]$/.test(head) ? '.' : ''}${form}`;
 }
 
-/** Up to this many apps, the start-up note names them all; past it, the ones run most lately, and find_apps finds the rest. */
+/** One app in a line of a list. */
+const appLine = (u: Usable, asks: boolean) => `- ${appText(u, asks)}`;
+
+/** Up to this many apps, the start-up note names them all with what each does; past it, the ones run most lately. */
 const NAMED = 10;
+/** Up to this many, the others are named too (by name alone); past it, find_apps finds them. */
+const LISTED = 40;
 
 /** The apps by when they last ran (the user's own first among those never run). */
 function byUse(db: DB, list: Usable[]): Usable[] {
@@ -79,12 +85,48 @@ export function useNote(db: DB): string | null {
   const head =
     "The user's apps (the Apps page) do jobs for them: small tools that look things up, work them out and show the answer in a view of their own (a forecast, a trip plan, a comparison, a quiz…). When the user asks for something an app does, run it with use_app instead of doing that work yourself: it asks them for what is missing on the app's own card and shows its answer in the conversation as the app shows it. Prefer their own apps to the ready-made ones that do the same.";
   if (list.length <= NAMED) return [head, ...list.map((u) => appLine(u, false))].join('\n');
-  return [
-    `${head} There are ${list.length}: when a request might be one of their jobs, call find_apps with a few words on what the user wants to get the best fits (with their forms), then pick one. Those they run most:`,
-    ...byUse(db, list)
-      .slice(0, 6)
-      .map((u) => appLine(u, false)),
-  ].join('\n');
+  const used = byUse(db, list);
+  const top = used.slice(0, 6).map((u) => appLine(u, false));
+  // Not too many: the others by name too, so a request one of them does is not missed for want of a search.
+  if (list.length <= LISTED)
+    return [
+      `${head} Before you look something up, pick, plan or compare for them yourself, see whether one of their ${list.length} apps does it; find_apps gives each one's form. Those they run most:`,
+      ...top,
+      `The others: ${used
+        .slice(6)
+        .map((u) => `"${u.ref}" (${u.recipe.name})`)
+        .join(', ')}.`,
+    ].join('\n');
+  return [`${head} There are ${list.length}: when a request might be one of their jobs, call find_apps with a few words on what the user wants to get the best fits (with their forms), then pick one. Those they run most:`, ...top].join('\n');
+}
+
+// ---- the app a message asks for -----------------------------------------------------------------------------------
+
+/** A message of fewer words than this ("thanks", "go on") gets no word on an app. */
+const HINT_WORDS = 3;
+/** How surely its words must point at one app: a score this high (BM25), and this many times the next one's. */
+const HINT_SCORE = 5;
+const HINT_LEAD = 1.8;
+
+/**
+ * The one app a message clearly asks for, by its words: the agent hears of it with the message, so a job an app does
+ * is not done by hand for want of a search (a session on "best upcoming games for switch 2" answered it itself).
+ * Only a clear lead counts: words alone take "weather this week" for the Weekly news digest, a close second.
+ */
+export function appForMessage(db: DB, text: string): Usable | null {
+  const t = text.trim();
+  if (!t || t.startsWith('/') || words(t).length < HINT_WORDS) return null;
+  const list = usableApps(db);
+  if (!list.length) return null;
+  const [a, b] = byWords(list, t.slice(0, 2000));
+  return a && a.score >= HINT_SCORE && (!b || a.score >= HINT_LEAD * b.score) ? a.u : null;
+}
+
+/** What the agent hears ahead of a message that one of the user's apps clearly does. */
+export function appHint(db: DB, text: string): string | null {
+  const u = appForMessage(db, text);
+  if (!u) return null;
+  return `This message looks like a job for one of the user's apps: ${appText(u, true)} If it does what they ask, run it with use_app (the answers the message gives go in; the user fills in the rest on its card) instead of doing the work yourself; if it does not, carry on.`;
 }
 
 // ---- the answers the agent gives ------------------------------------------------------------------------------

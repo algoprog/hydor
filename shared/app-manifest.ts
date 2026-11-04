@@ -397,7 +397,7 @@ export function appInfo(id: string, r: Pick<AppRecipe, 'name' | 'fields' | 'answ
 }
 
 /** Tools a step may call on its own, outside a session: they answer without a conversation to answer in. */
-export const STEP_TOOLS = ['web_search', 'read_page', 'http_request', 'read_document', 'generate_image', 'knowledge_search', 'knowledge_read', 'recall', 'notify_user'];
+export const STEP_TOOLS = ['web_search', 'read_page', 'find_media', 'http_request', 'read_document', 'generate_image', 'knowledge_search', 'knowledge_read', 'recall', 'notify_user'];
 
 /**
  * Values every step can use beside the form's answers and the steps' values: the moment, in the user's time

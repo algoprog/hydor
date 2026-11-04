@@ -532,9 +532,9 @@ test('switching a session’s assistant: its settings, connections, model and mo
   state.status = 'working';
   await beforeSend(key);
   assert.deepEqual(calls.recycled, []);
-  const note = messageNotes(key);
+  const note = await messageNotes(key);
   assert.match(note, /^The user switched this session's assistant from Researcher to Mailer\. From here on, work as below[\s\S]*# Assistant: Mailer\n[\s\S]*Answer the mail\./);
-  assert.equal(messageNotes(key), '');
+  assert.equal(await messageNotes(key), '');
   // Idle, the agent still has Researcher's instructions: it starts afresh before the next message.
   state.status = 'idle';
   await beforeSend(key);
@@ -559,7 +559,7 @@ test('switching a session’s assistant: its settings, connections, model and mo
   await beforeSend(key);
   assert.deepEqual(calls.recycled, [key]);
   await started('run-s3');
-  assert.equal(messageNotes(key), 'The user switched this session\'s assistant from Mailer to Writer. Its instructions ("# Assistant: Writer") are now in yours: work that way from here on.');
+  assert.equal(await messageNotes(key), 'The user switched this session\'s assistant from Mailer to Writer. Its instructions ("# Assistant: Writer") are now in yours: work that way from here on.');
 
   // Away and back before a message: nothing to say, nothing to start afresh.
   await put('tutor');
@@ -567,7 +567,7 @@ test('switching a session’s assistant: its settings, connections, model and mo
   calls.recycled.length = 0;
   await beforeSend(key);
   assert.deepEqual(calls.recycled, []);
-  assert.equal(messageNotes(key), '');
+  assert.equal(await messageNotes(key), '');
 
   // Custom reads its instructions before each turn: never started afresh, and the switch alone.
   const custom = 'acp:switch-2';
@@ -577,7 +577,7 @@ test('switching a session’s assistant: its settings, connections, model and mo
   await put('planner', custom);
   await beforeSend(custom);
   assert.deepEqual(calls.recycled, []);
-  assert.match(messageNotes(custom), /^The user switched this session's assistant from General to Planner\. Its instructions/);
+  assert.match(await messageNotes(custom), /^The user switched this session's assistant from General to Planner\. Its instructions/);
 
   // No such assistant, no such session.
   assert.equal((await put('nobody')).statusCode, 404);

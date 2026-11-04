@@ -8,7 +8,7 @@ import { isActive } from '@shared/apps';
 import { enc, post } from '../../lib/api';
 import { clockTime } from '../../lib/format';
 import { toastError } from '../../lib/store';
-import { Markdown } from '../../components/Markdown';
+import { ReplyMarkdown } from '../../components/Markdown';
 import { cx, Throbber } from '../../components/ui';
 import type { RunDetail } from './api';
 
@@ -47,7 +47,7 @@ function Answer({ a, working, progress, results }: { a: RunAsk; working: boolean
           </div>
         )
       ) : a.reply ? (
-        <Markdown text={a.reply} className="text-[14px]" />
+        <ReplyMarkdown text={a.reply} className="text-[14px]" />
       ) : (
         !a.updated && <div className="text-[13px] text-fg-3">No reply</div>
       )}

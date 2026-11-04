@@ -1,10 +1,11 @@
-// Web search for every agent: web_search and read_page on each session's own MCP server, Naget Search
-// by default with other providers behind it (providers.ts), Settings → Search, and a note under each
-// turn's reply listing the searches it ran and the pages it read.
+// Web search for every agent: web_search, read_page and find_media on each session's own MCP server, Naget
+// Search by default with other providers behind it (providers.ts), and Settings → Search. The pages a reply
+// cites show as links in it and as cards under it (shared/citations.ts, in the pages).
 import type { SearchTestResult } from '../../shared/search.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet } from '../db.ts';
 import type { Feature } from '../features/types.ts';
+import { iconRoutes } from '../web/icons.ts';
 import { SearchService, type SettingsPatch } from './service.ts';
 import { INSTRUCTIONS, searchTools } from './tools.ts';
 
@@ -22,6 +23,8 @@ export const search: Feature = {
         throw new HttpError(400, (e as Error).message);
       }
     });
+    // The icons of the sites a reply cites.
+    iconRoutes(d.app);
     d.app.post('/api/search/test', async (req): Promise<SearchTestResult> => {
       const b = (req.body ?? {}) as { id?: string; key?: string; url?: string };
       return s.test(String(b.id ?? ''), { key: typeof b.key === 'string' ? b.key : undefined, url: typeof b.url === 'string' ? b.url : undefined });
@@ -29,6 +32,5 @@ export const search: Feature = {
   },
   tools: () => (svc ? searchTools(svc) : []),
   spawn: () => ({ instructions: [INSTRUCTIONS] }),
-  turnEnd: (t, d) => svc?.turnEnded(t, d),
   start: () => svc?.start(),
 };

@@ -5,13 +5,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { describe, it } from 'node:test';
 import Database from 'better-sqlite3';
-import { formatPage, formatSearch, parsePage, parseSearch, type SourcesData } from '../../../shared/search.ts';
+import { citedReply, citeNumbers, shortSite, spokenReply, CITE_RUN } from '../../../shared/citations.ts';
+import { formatPage, formatSearch, parsePage, parseSearch } from '../../../shared/search.ts';
 import type { Deps, RunCtx } from '../../features/types.ts';
-import { notesOf } from '../../notes.ts';
-import { BlockedAddress, type FetchedPage } from '../../web/fetch.ts';
+import { BlockedAddress, htmlMarkdown, type FetchedPage } from '../../web/fetch.ts';
 import { ArgError, filtersText, pageArgs, searchArgs } from '../args.ts';
 import { brave } from '../brave.ts';
 import { duckduckgo, parseDuckDuckGo } from '../duckduckgo.ts';
+import { articleMatch, asksOf, coverage, findMedia, nameWords, ownBadge, showsIt, youtubeId, type MediaDeps } from '../media.ts';
 import { fetchTaxonomy, naget, nagetRequest, readCredits } from '../naget.ts';
 import { nearest, parts, readPage, type ReadDeps } from '../page.ts';
 import { fallbackNote, NoProvider, Searcher, type Configured } from '../run.ts';
@@ -546,9 +547,6 @@ describe('the search service and its tools', () => {
     await web.run({ query: 'another search' }, run());
     assert.equal(calls.filter((c) => c.url.startsWith('https://naget.com/')).length, 1);
     assert.equal(svc.view().providers[0].lastError?.kind, 'auth');
-    const sources = svc.take('claude:s1', Date.now());
-    assert.equal(sources?.searches.length, 2);
-    assert.equal(sources?.searches[0].top[0].url, 'https://patents.google.com/patent/US8481204B2/en');
   });
 
   it('reads a page for a question by its words without a key, and leaves Naget Search to search', async () => {
@@ -644,61 +642,151 @@ describe('the search service and its tools', () => {
     assert.ok(sx.calls[0].url.startsWith('https://searx.example.org/search?'), sx.calls[0].url);
     assert.match((await s2.test('searxng', { url: 'ftp://x' })).error!, /not a web address/);
   });
+});
 
-  it('notes the sources of a turn under its last search', async () => {
-    const db = new Database(':memory:');
-    db.exec('create table session_notes (id text primary key, key text not null, kind text not null, at integer not null, anchor text, data text not null)');
-    const items = [
-      { id: 'u1', kind: 'user', text: 'find papers' },
-      { id: 'toolu_1', kind: 'tool', tool: { name: 'mcp__hydor__web_search' } },
-      { id: 'toolu_2', kind: 'tool', tool: { name: 'mcp__hydor__read_page' } },
-      { id: 'a1', kind: 'assistant', text: 'Here they are.' },
-    ];
-    const d = { db, sessions: { timeline: async () => ({ page: () => ({ items }) }) } } as unknown as Deps;
-    const svc = new SearchService({ kv: memory(), fetch: fake(() => json(500, {})).f });
-    svc.record('claude:s1', { search: { query: 'q', provider: 'Naget Search', count: 20, top: [] } });
-    svc.record('claude:s1', { page: { url: 'https://a.example/', title: 'A' } });
-    svc.record('claude:s1', { page: { url: 'https://a.example/', title: 'A again' } });
-    await svc.turnEnded({ key: 'claude:s1', agent: 'claude', status: 'idle', startedAt: 0, endedAt: Date.now(), external: false }, d);
-    const [note] = notesOf(db, 'claude:s1');
-    assert.equal(note.kind, 'sources');
-    assert.equal(note.anchor, 'toolu_2');
-    assert.deepEqual(note.data as SourcesData, { searches: [{ query: 'q', provider: 'Naget Search', count: 20, top: [] }], pages: [{ url: 'https://a.example/', title: 'A' }] });
-    // A turn without searches adds nothing.
-    await svc.turnEnded({ key: 'claude:s1', agent: 'claude', status: 'idle', startedAt: 0, endedAt: Date.now(), external: false }, d);
-    assert.equal(notesOf(db, 'claude:s1').length, 1);
+describe('find_media', () => {
+  const wiki = (pages: { title: string; index: number; description?: string; thumb?: string }[]) =>
+    json(200, { query: { pages: pages.map((p) => ({ title: p.title, index: p.index, description: p.description ?? '', fullurl: `https://en.wikipedia.org/wiki/${p.title.replace(/ /g, '_')}`, ...(p.thumb ? { thumbnail: { source: `${p.thumb}?utm_source=en.wikipedia.org` } } : {}) })) } });
+  const page = (url: string, image?: string): FetchedPage => ({ url, status: 200, contentType: 'text/html', text: 'x', ...(image ? { image } : {}) });
+
+  it('names: words without accents, case, joiners or a part in brackets; an article is the thing’s own when its title is its name', () => {
+    assert.deepEqual(nameWords('Pokémon Winds and Waves'), ['pokemon', 'winds', 'waves']);
+    assert.deepEqual(nameWords('Hades (video game)'), ['hades']);
+    assert.equal(coverage(nameWords('Metroid Ravenous'), 'Metroid Ravenous - Official Trailer - YouTube'), 1);
+    assert.equal(articleMatch(nameWords('Hades II'), 'Hades II', '2025 video game', ['video', 'game']), 3);
+    // Another part of a series is not it; a club's full name is, when its description says it is that kind of thing.
+    assert.equal(articleMatch(nameWords('Hades'), 'Hades II', '2025 video game', ['video', 'game']), 0);
+    assert.equal(articleMatch(nameWords('Arsenal'), 'Arsenal F.C.', 'Association football club in England', ['football', 'club']), 2);
+    assert.equal(articleMatch(nameWords('Arsenal'), 'Arsenal F.C.', 'Association football club in England', ['restaurant']), 0);
+    assert.equal(articleMatch(nameWords('Monster Hunter'), 'List of Monster Hunter media', '', []), 0);
+    // A namesake told apart in brackets is the thing's own only when the brackets say it is that kind of thing.
+    assert.equal(articleMatch(nameWords('Iceland'), 'Iceland (supermarket)', 'British supermarket chain', ['country']), 0);
+    assert.equal(articleMatch(nameWords('Iceland'), 'Iceland', 'Island country in the Atlantic Ocean', ['country']), 3);
+    assert.equal(articleMatch(nameWords('Hades'), 'Hades (video game)', '2020 video game', ['video', 'game']), 3);
+    assert.equal(articleMatch(nameWords('Hades'), 'Hades (video game)', '2020 video game', []), 2);
+    // A place's flag or a map of where it is does not show it; a club's crest does.
+    assert.equal(showsIt('https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Flag_of_Iceland.svg/640px-Flag_of_Iceland.svg.png', 'country'), false);
+    assert.equal(showsIt('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/2011_Dimos_Mykonou.png/640px-2011_Dimos_Mykonou.png', 'island'), false);
+    assert.equal(showsIt('https://upload.wikimedia.org/wikipedia/commons/9/9a/Belem_Tower_Lisbon.jpg', 'landmark'), true);
+    assert.equal(showsIt('https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Arsenal_FC.svg/960px-Arsenal_FC.svg.png', 'football club'), true);
+    // A site's one picture for every page is not the thing's.
+    assert.equal(ownBadge('/img/worldometers-fb.jpg', 'https://www.worldometers.info/world-population/iceland-population/'), true);
+    assert.equal(ownBadge('/_userdata/img/ogp.png', 'https://www.japan.go.jp/'), true);
+    assert.equal(ownBadge('/wp-content/uploads/2026/04/belem-tower-lisbon-tagus-river.jpg', 'https://www.lisbontourism.org/belem-tower/'), false);
+    assert.equal(youtubeId('https://www.youtube.com/watch?v=EtIZCfCoajE&t=3'), 'EtIZCfCoajE');
+    assert.equal(youtubeId('https://youtu.be/EtIZCfCoajE'), 'EtIZCfCoajE');
+    assert.equal(youtubeId('https://www.youtube.com/shorts/EtIZCfCoajE'), 'EtIZCfCoajE');
+    assert.equal(youtubeId('https://www.youtube.com/@nintendo'), null);
   });
 
-  it('counts what the agent searched and read with its own web tools, in order', async () => {
-    const db = new Database(':memory:');
-    db.exec('create table session_notes (id text primary key, key text not null, kind text not null, at integer not null, anchor text, data text not null)');
-    const web = (id: string, ts: number, tool: Record<string, unknown>) => ({ id, ts, kind: 'tool', tool: { category: 'web', status: 'ok', ...tool } });
-    const items = [
-      web('old', 1, { name: 'WebFetch', title: 'https://earlier.example/' }),
-      { id: 'u1', kind: 'user', text: 'tech news' },
-      web('t1', 10, { name: 'WebSearch', title: 'intel stock', output: 'Intel shares slump\n  https://news.example/intel\nSecond\n  https://b.example/x' }),
-      web('t3', 30, { name: 'WebFetch', title: 'https://www.cnbc.com/2026/10/31/binance.html', subtitle: '200 OK', input: { url: 'https://www.cnbc.com/2026/10/31/binance.html', prompt: 'Key facts\nand more' } }),
-      web('t4', 40, { name: 'WebFetch', title: 'https://down.example/', status: 'error' }),
-      { id: 'q1', kind: 'user', text: 'and chips', meta: 'queued' },
-      web('t5', 50, { name: 'web_search', title: 'nvidia' }),
-      { id: 'a1', kind: 'assistant', text: 'Here they are.' },
-    ];
-    const d = { db, sessions: { timeline: async () => ({ page: () => ({ items }) }) } } as unknown as Deps;
+  it('a picture from the thing’s own Wikipedia article, else a page that names it (never a site’s badge, nor one picture for two things); a video whose title names it', async () => {
+    const searched: { text: string; sites?: string[] }[] = [];
+    const d: MediaDeps = {
+      fetch: (async (u: string) => {
+        const q = decodeURIComponent(/gsrsearch=([^&]+)/.exec(String(u))![1]);
+        if (q.startsWith('Hades II')) return wiki([{ title: 'Hades (video game)', index: 1, description: '2020 video game', thumb: 'https://upload.wikimedia.org/h1.jpg' }, { title: 'Hades II', index: 2, description: '2025 video game', thumb: 'https://upload.wikimedia.org/h2.jpg' }]);
+        // Its own article has no picture: none from another article stands in.
+        if (q.startsWith('Winds and Waves')) return wiki([{ title: 'Winds and Waves', index: 1, description: 'Upcoming video game' }, { title: 'Pokémon', index: 2, thumb: 'https://upload.wikimedia.org/p.jpg' }]);
+        return wiki([]);
+      }) as unknown as typeof fetch,
+      async search(text, o) {
+        searched.push({ text, sites: o.sites });
+        if (o.sites?.includes('youtube.com'))
+          return text.startsWith('Hades II')
+            ? [
+                { title: 'Some other game - Trailer', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa', snippet: '' },
+                { title: 'Hades II - Launch Trailer - YouTube', url: 'https://www.youtube.com/watch?v=bbbbbbbbbbb', snippet: '' },
+              ]
+            : [];
+        if (text.startsWith('Winds and Waves')) return [{ title: 'Winds and Waves – official site', url: 'https://ww.example/', snippet: '' }];
+        if (text.startsWith('Odd One')) return [{ title: 'Odd One', url: 'https://shop.example/odd', snippet: '' }];
+        if (text.startsWith('Other One')) return [{ title: 'Other One', url: 'https://shop.example/other', snippet: '' }];
+        return [];
+      },
+      async fetchPage(url) {
+        if (url === 'https://ww.example/') return page(url, 'https://ww.example/meta/winds-and-waves-key-art.jpg');
+        if (url === 'https://own.example/') return page(url, 'https://own.example/images/logo.png');
+        // The shop's one picture for every page is its own, not the thing's.
+        return page(url, 'https://shop.example/hero.jpg');
+      },
+    };
+    const found = await findMedia([{ name: 'Hades II' }, { name: 'Winds and Waves' }, { name: 'Own Page', page: 'https://own.example/' }, { name: 'Odd One' }, { name: 'Other One' }], { kind: 'video game', videos: 'trailer' }, d);
+    assert.deepEqual(found[0], { item: 'Hades II', picture: 'https://upload.wikimedia.org/h2.jpg', picture_page: 'https://en.wikipedia.org/wiki/Hades_II', video: 'https://www.youtube.com/watch?v=bbbbbbbbbbb', video_title: 'Hades II - Launch Trailer' });
+    assert.equal(found[1].picture, 'https://ww.example/meta/winds-and-waves-key-art.jpg');
+    assert.equal(found[1].video, null);
+    assert.equal(found[2].picture, null, 'a logo is not a picture of the thing');
+    assert.equal(found[3].picture, null, 'the same picture for two things is the site’s');
+    assert.equal(found[4].picture, null);
+    assert.ok(searched.some((x) => x.text === 'Hades II trailer' && x.sites?.includes('youtube.com')));
+  });
+
+  it('the tool: names, or rows with the columns that name them and hold their pages, in the order given', async () => {
+    assert.deepEqual(asksOf({ items: ['A', 'B'] }), [{ name: 'A' }, { name: 'B' }]);
+    assert.deepEqual(asksOf({ items: [{ title: 'A', link: 'https://a.example/' }, { name: 'B' }, {}] }), [{ name: 'A', page: 'https://a.example/' }, { name: 'B' }, { name: '' }]);
+    assert.deepEqual(asksOf({ items: [{ dish: 'Pad thai', url: 'not a page' }], name: 'dish' }), [{ name: 'Pad thai' }]);
+    assert.deepEqual(asksOf({ items: '["A","B"]' }), [{ name: 'A' }, { name: 'B' }]);
+    assert.match(String(asksOf({ items: 3 })), /give a list/);
     const svc = new SearchService({ kv: memory(), fetch: fake(() => json(500, {})).f });
-    svc.record('claude:s1', { page: { url: 'https://techcrunch.com/', title: 'TechCrunch' } });
-    await svc.turnEnded({ key: 'claude:s1', agent: 'claude', status: 'idle', startedAt: 0, endedAt: Date.now(), external: false }, d);
-    const [note] = notesOf(db, 'claude:s1');
-    assert.equal(note.anchor, 't5');
-    const data = note.data as SourcesData;
-    assert.deepEqual(data.searches, [
-      { query: 'intel stock', provider: 'Claude Code', count: 2, top: [{ title: 'Intel shares slump', url: 'https://news.example/intel' }, { title: 'Second', url: 'https://b.example/x' }] },
-      { query: 'nvidia', provider: 'Codex', count: 0, top: [] },
-    ]);
-    // In the order they were read (the app's read_page came last here), without the failed one or one from the turn before.
-    assert.deepEqual(data.pages, [{ url: 'https://www.cnbc.com/2026/10/31/binance.html', question: 'Key facts' }, { url: 'https://techcrunch.com/', title: 'TechCrunch' }]);
-    // A session running elsewhere is not read for them alone.
-    const d2 = { db, sessions: { timeline: async () => assert.fail('not read') } } as unknown as Deps;
-    await svc.turnEnded({ key: 'claude:s2', agent: 'claude', status: 'idle', startedAt: 0, endedAt: Date.now(), external: true }, d2);
-    assert.equal(notesOf(db, 'claude:s2').length, 0);
+    const tool = searchTools(svc).find((t) => t.name === 'find_media')!;
+    assert.ok(tool, 'every agent gets it');
+    assert.match(JSON.stringify(await tool.run({ items: [{}] }, run())), /isError/);
+  });
+});
+
+describe('the sources a reply cites', () => {
+  const reply = [
+    'The biggest is Ocarina of Time [1][12], then Metroid [10].',
+    '',
+    '```',
+    'Sources: [7] in code stays',
+    '```',
+    '',
+    '---',
+    '',
+    'Sources:',
+    '1. [IGN – Upcoming games](https://www.ign.com/a)',
+    '10. [The Escapist](https://www.escapistmagazine.com/b) — the Direct',
+    '   what it covers, indented',
+    '12. GameTechReport: https://gametechreport.com/c.',
+    '',
+    'Want a shorter list?',
+  ].join('\n');
+
+  it('takes the list out by the numbers the agent wrote (the text cites [10] as the tenth, whatever line it is on), and leaves what follows', () => {
+    const r = citedReply(reply);
+    assert.deepEqual(
+      r.sources.map((s) => [s.n, s.title, s.url]),
+      [
+        [1, 'IGN – Upcoming games', 'https://www.ign.com/a'],
+        [10, 'The Escapist', 'https://www.escapistmagazine.com/b'],
+        [12, 'GameTechReport', 'https://gametechreport.com/c'],
+      ],
+    );
+    assert.ok(r.body.endsWith('```\n\nWant a shorter list?'), r.body);
+    assert.ok(!r.body.includes('---'));
+    assert.ok(r.body.includes('Sources: [7] in code stays'), 'code is left as it is');
+    assert.deepEqual([...r.body.matchAll(CITE_RUN)].map((m) => citeNumbers(m[0])).slice(0, 2), [[1, 12], [10]]);
+    assert.deepEqual(citeNumbers('[3–5][7]'), [3, 4, 5, 7]);
+    assert.equal(spokenReply(reply).split('\n')[0], 'The biggest is Ocarina of Time, then Metroid.');
+  });
+
+  it('reads the other ways agents write them, and leaves a reply without them as it is', () => {
+    assert.deepEqual(citedReply('Hi\n\n**Sources**\n- [Polygon](https://www.polygon.com/a)\n- https://en.wikipedia.org/wiki/X').sources.map((s) => s.n), [1, 2]);
+    assert.deepEqual(citedReply('Hi\n\nSources: [IGN](https://ign.com/a), [BBC](https://www.bbc.co.uk/n)').sources.map((s) => s.title), ['IGN', 'BBC']);
+    assert.deepEqual(citedReply('See [3](https://nytimes.com/a).').sources, [{ n: 3, title: '', url: 'https://nytimes.com/a' }]);
+    const defs = citedReply('Text [1]\n\n[1]: https://arxiv.org/abs/1 "A paper"');
+    assert.deepEqual([defs.body, defs.sources], ['Text [1]', [{ n: 1, title: 'A paper', url: 'https://arxiv.org/abs/1' }]]);
+    assert.deepEqual(citedReply('Sources: none, I answered from memory.'), { body: 'Sources: none, I answered from memory.', sources: [] });
+    // While it is still coming, the start of a source is held back.
+    assert.deepEqual(citedReply('Answer [1].\n\nSources:\n1. [A](https://a.com/x)\n2. [B', { streaming: true }), { body: 'Answer [1].', sources: [{ n: 1, title: 'A', url: 'https://a.com/x' }] });
+    assert.equal(shortSite('https://en.wikipedia.org/wiki/X'), 'wikipedia');
+    assert.equal(shortSite('https://www.bbc.co.uk/news'), 'bbc');
+    assert.equal(shortSite('https://windswaves.pokemon.com/en-us/'), 'pokemon');
+  });
+
+  it('a page’s own picture comes with it, its address made whole', () => {
+    const p = htmlMarkdown('<html><head><title>T</title><meta property="og:image" content="/img/share.jpg?w=1&amp;h=2"></head><body><p>Hello there, this is the page.</p></body></html>', 'https://site.example/a/b');
+    assert.equal(p.image, 'https://site.example/img/share.jpg?w=1&h=2');
+    assert.equal(htmlMarkdown('<html><head><meta name="twitter:image" content="data:image/png;base64,AAAA"></head><body>x</body></html>', 'https://s.example/').image, undefined);
   });
 });

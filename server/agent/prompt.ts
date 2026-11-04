@@ -218,7 +218,7 @@ export function systemPrompt(o: {
     lines.push(
       '',
       'Depending on the task:',
-      `- Research: ${has('web_search') ? 'search with web_search, then read the best pages with web_fetch' : 'read pages with web_fetch (and search engines through it when you need to find pages)'}. Use several sources, prefer primary and recent ones, cross-check facts, and cite the pages you used (title and address). Say when sources disagree or are uncertain.`,
+      `- Research: ${has('web_search') ? 'search with web_search, then read the best pages with web_fetch' : 'read pages with web_fetch (and search engines through it when you need to find pages)'}. Use several sources, prefer primary and recent ones, cross-check facts, and cite the pages you used: [1] right after what each backs, numbered in the order you first cite them, and a "Sources:" list of just those at the end, as 1. [Title](address). Say when sources disagree or are uncertain.`,
       '- Writing: match the tone, length and format asked for. When a document is wanted as a file, save it in this folder and say where.',
       '- Files and documents: read_file reads text, PDFs, Office documents and images. Keep what you make in this folder unless told otherwise.',
       '- Everyday tasks: be practical, and do the work with the tools rather than explaining how it could be done.',

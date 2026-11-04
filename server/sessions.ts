@@ -201,9 +201,9 @@ function withFiles(text: string, files: string[]): string {
  * What the capabilities have for the agent with this message (the user changed a page), ahead of it in a
  * <system-reminder>, which the conversation does not show. A command ("/goal …") goes as it is.
  */
-function withNotes(key: string, text: string): string {
+async function withNotes(key: string, text: string, said = text): Promise<string> {
   if (text.trimStart().startsWith('/')) return text;
-  const notes = messageNotes(key);
+  const notes = await messageNotes(key, said);
   return notes ? `<system-reminder>\n${notes}\n</system-reminder>\n\n${text}` : text;
 }
 
@@ -958,7 +958,9 @@ export class SessionManager extends EventEmitter {
     if (prompt || images.length) {
       await beforeSend(l.key);
       await this.snapshot(l.key);
-      await l.adapter.sendMessage(prompt, this.saveImages(images));
+      // What the capabilities have to say of the request (an app that does it); not of a conversation handed over.
+      const said = splitHandoff(o.prompt ?? '') ? '' : (o.prompt?.trim() ?? '');
+      await l.adapter.sendMessage(said ? await withNotes(l.key, prompt, said) : prompt, this.saveImages(images));
     }
     this.queueSummary(l.key);
     return l.key;
@@ -1598,7 +1600,7 @@ export class SessionManager extends EventEmitter {
     });
     if (!this.lives.has(key)) await this.start(key);
     await this.snapshot(key);
-    await this.live(key).adapter.sendMessage(withNotes(key, withFiles(m.text, m.files)), images);
+    await this.live(key).adapter.sendMessage(await withNotes(key, withFiles(m.text, m.files), m.text), images);
     this.touchApp(key);
   }
 
@@ -1728,7 +1730,7 @@ export class SessionManager extends EventEmitter {
     this.userStopped.delete(key);
     l.adapter.limitStopped = false;
     this.emit('resumeCancelled', key);
-    await l.adapter.sendMessage(withNotes(key, withFiles(text, this.saveFiles(files))), this.saveImages(images));
+    await l.adapter.sendMessage(await withNotes(key, withFiles(text, this.saveFiles(files)), text), this.saveImages(images));
     this.touchApp(key);
   }
 

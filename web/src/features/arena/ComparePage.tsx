@@ -6,7 +6,7 @@ import { ArrowUpRight, Check, Swords } from 'lucide-react';
 import type { ArenaMatch, ArenaEntry } from '@shared/arena';
 import type { TimelineItem } from '@shared/types';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Markdown } from '../../components/Markdown';
+import { ReplyMarkdown } from '../../components/Markdown';
 import { Badge, Button, cx, Throbber } from '../../components/ui';
 import { activityOf, isBusy } from '../../lib/activity';
 import { api, enc, post } from '../../lib/api';
@@ -49,7 +49,7 @@ function Column({ e, m, onKeep }: { e: ArenaEntry; m: ArenaMatch; onKeep: () => 
         {kept ? <Badge tone="ok">Kept</Badge> : m.winner ? <Badge>Archived</Badge> : busy ? <span className="text-[11.5px] text-fg-3">working…</span> : null}
       </header>
       <div className="min-h-[160px] flex-1 overflow-y-auto px-3 py-2 md:max-h-[calc(100dvh-230px)]">
-        {reply ? <Markdown text={reply} /> : <div className="flex h-24 items-center justify-center text-fg-3">{busy || !items ? <Throbber size={20} /> : 'No answer yet'}</div>}
+        {reply ? <ReplyMarkdown text={reply} /> : <div className="flex h-24 items-center justify-center text-fg-3">{busy || !items ? <Throbber size={20} /> : 'No answer yet'}</div>}
       </div>
       <footer className="flex items-center gap-2 border-t border-line px-3 py-2">
         {!m.winner && (

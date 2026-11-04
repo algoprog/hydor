@@ -2,8 +2,8 @@
 
 How agents search the web, and how to add a search provider in one file. [Back to the README](../README.md).
 
-Every agent the app runs (Claude Code, Codex, Custom and ACP agents) gets two tools on its session's own
-MCP server: `web_search` and `read_page`. A search goes to the providers in Settings → Search, in their
+Every agent the app runs (Claude Code, Codex, Custom and ACP agents) gets three tools on its session's own
+MCP server: `web_search`, `read_page` and `find_media`. A search goes to the providers in Settings → Search, in their
 order: the first one that is on answers, and when it can't (no key, a limit reached, out of reach, a bot
 check), the next one does. One that failed rests until it may be asked again, so every search doesn't
 wait on it. The answer tells the agent which provider answered, and which filters it could not keep to.
@@ -18,7 +18,19 @@ wait on it. The answer tells the agent which provider answered, and which filter
 `read_page` reads a page through the app's safe fetch (public addresses only), in parts when it is
 long. Given a question, it returns only the parts of the page that answer it: through Naget Search's
 context filter while Naget Search is on and has a key (unlike its searches, the filter takes no requests
-without one), else the paragraphs that share the most words with the question.
+without one), else the paragraphs that share the most words with the question. A page's own picture (its
+`og:image`) comes at the end of its first part.
+
+`find_media` finds a picture, and a video when asked, for each of a list of things (or the rows of a table): the
+lead picture of the thing's own Wikipedia article when its title is the thing's name, else the `og:image` of its own
+page or of the first pages a search finds whose titles name it (never a site's logo, nor one picture for two things),
+and the first YouTube video a search of youtube.com finds whose title names it. Apps use it as a step, so their
+answers show pictures and trailers; the server keeps a copy of each picture when a run ends.
+
+Agents are asked to cite pages as `[1]` after what each backs and to end a reply with a `Sources:` list of just
+those pages (`1. [Title](address)`). The pages (`shared/citations.ts`) take the list out of the text by the numbers
+the agent wrote, show each `[n]` as a chip with the site's icon (`GET /api/site-icon/:host`, fetched once from the
+site and kept) and the list as cards under the reply.
 
 ## Adding a provider
 

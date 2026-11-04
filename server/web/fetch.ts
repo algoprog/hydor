@@ -14,6 +14,10 @@ export interface FetchedPage {
   title?: string;
   /** What the page says about itself (its meta description). */
   description?: string;
+  /** The picture it shows when shared (og:image), as a whole address. */
+  image?: string;
+  /** Its site's icon, as the page names it (<link rel="icon">), as a whole address. */
+  icon?: string;
   /** Readable text: Markdown for HTML, other text types as they are (JSON indented). */
   text: string;
   /** The raw body, for types the caller reads itself (a PDF, an image, an Office file). */
@@ -457,16 +461,20 @@ function tidy(md: string): string {
   return out.join('\n').trim();
 }
 
-/** A page's main content as Markdown, with its title and description. */
-export function htmlMarkdown(html: string, url?: string): { markdown: string; title?: string; description?: string } {
+/** A page's main content as Markdown, with its title, its description and the picture it shows when shared. */
+export function htmlMarkdown(html: string, url?: string): { markdown: string; title?: string; description?: string; image?: string; icon?: string } {
   const root = parseHtml(html);
-  const meta = (name: string) => find(root, (e) => e.tag === 'meta' && (e.attrs.name ?? e.attrs.property ?? '').toLowerCase() === name)[0]?.attrs.content?.trim();
+  const meta = (name: string) => find(root, (e) => e.tag === 'meta' && [e.attrs.property, e.attrs.name].some((n) => n?.toLowerCase() === name))[0]?.attrs.content?.trim();
   const title = (find(root, (e) => e.tag === 'title')[0] ? inline(textOf(find(root, (e) => e.tag === 'title')[0])).trim() : '') || meta('og:title') || undefined;
   const description = meta('description') || meta('og:description') || undefined;
   let base: URL | null = null;
   try {
     base = url ? new URL(find(root, (e) => e.tag === 'base')[0]?.attrs.href ?? url, url) : null;
   } catch {}
+  const image = pictureOf(meta('og:image') || meta('og:image:secure_url') || meta('og:image:url') || meta('twitter:image') || meta('twitter:image:src') || find(root, (e) => e.tag === 'link' && /(^|\s)image_src(\s|$)/i.test(e.attrs.rel ?? ''))[0]?.attrs.href, base);
+  // Its icon: the touch icon (a clear picture), else the icon it names; not a mask (a shape to colour in).
+  const links = find(root, (e) => e.tag === 'link' && !!e.attrs.href && /(^|\s)(icon|apple-touch-icon(-precomposed)?)(\s|$)/i.test(e.attrs.rel ?? '') && !/mask-icon/i.test(e.attrs.rel ?? ''));
+  const icon = pictureOf((links.find((e) => /apple-touch-icon/i.test(e.attrs.rel ?? '')) ?? links.find((e) => /png|svg/i.test(`${e.attrs.type ?? ''} ${e.attrs.href}`)) ?? links[0])?.attrs.href, base);
   const body = find(root, (e) => e.tag === 'body')[0] ?? root;
   strip(body, textLen(body));
   const main = mainOf(body);
@@ -474,7 +482,19 @@ export function htmlMarkdown(html: string, url?: string): { markdown: string; ti
   // A title the content does not open with goes on top.
   const h1 = /^# (.+)$/m.exec(markdown)?.[1];
   if (title && !h1 && !markdown.startsWith(title)) markdown = `# ${title}\n\n${markdown}`;
-  return { markdown, title, description };
+  return { markdown, title, description, ...(image ? { image } : {}), ...(icon ? { icon } : {}) };
+}
+
+/** A picture's address as a page gives it (relative, entity-encoded, protocol-relative), made whole: http(s) only. */
+function pictureOf(raw: string | undefined, base: URL | null): string | undefined {
+  const v = decodeEntities(raw?.trim() ?? '');
+  if (!v || v.startsWith('data:')) return undefined;
+  try {
+    const u = base ? new URL(v, base) : new URL(v);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** A page's readable text: no scripts or styles, block elements on their own lines. */
@@ -563,6 +583,6 @@ export async function fetchPage(input: string, o: { signal?: AbortSignal; maxByt
       continue;
     }
     const page = htmlMarkdown(raw, url.toString());
-    return { ...base, title: page.title, description: page.description, text: page.markdown };
+    return { ...base, title: page.title, description: page.description, ...(page.image ? { image: page.image } : {}), ...(page.icon ? { icon: page.icon } : {}), text: page.markdown };
   }
 }

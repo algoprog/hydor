@@ -79,7 +79,8 @@ import {
 } from './store.ts';
 import { templateById } from './templates.ts';
 import { agentsMay, builtinsOf, isInstalled, setAgents, setInstalled } from './builtins.ts';
-import { findAppsTool, tellAsker, useAppTool, useNote } from './use.ts';
+import { appHint, findAppsTool, tellAsker, useAppTool, useNote } from './use.ts';
+import { sessionExtra } from '../sessionExtra.ts';
 import { setModelsHere } from './models.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
 import { saveAppSecrets, secretsOf } from './secrets.ts';
@@ -1165,6 +1166,13 @@ export const apps: Feature = {
   },
   // Templates the user changed in their editor, for the agents that built them, with the next message.
   beforeMessage: (key, d) => takeAppEdits(d.db, key),
+  // A message one of the user's apps clearly does: the agent hears which, with it. Not in an app's own run, nor in
+  // sessions another agent or the app started for a part of its work (a child, a research, an arena match).
+  aboutMessage(text, key, d) {
+    const x = sessionExtra(d.db, key);
+    if (markOf(x) || x.parent || x.research || typeof x.arena === 'string' || x.swarm) return null;
+    return appHint(d.db, text);
+  },
   start(d) {
     startRuns(d);
     startBatches(d.db, (id) => getApp(d.db, id)?.slug);

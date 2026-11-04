@@ -37,6 +37,8 @@ export interface ReadResult {
 interface Readable {
   url: string;
   title?: string;
+  /** The picture it shows when shared. */
+  image?: string;
   text: string;
   /** How it was read, when not as a web page ("PDF, 12 pages"). */
   kind?: string;
@@ -131,7 +133,7 @@ async function load(url: string, d: ReadDeps): Promise<{ page: Readable } | { fa
     page = { url: p.url, text: doc.text, kind: `PDF${doc.parts ? `, ${doc.parts} pages` : ''}${doc.note ? ` (${doc.note})` : ''}` };
   } else if (!p.text.trim()) {
     return { fail: { text: p.body?.length ? `${p.url} is a ${p.contentType || 'binary'} file, not a page with text.` : `${p.url} has no text.`, isError: true } };
-  } else page = { url: p.url, title: p.title, text: p.text };
+  } else page = { url: p.url, title: p.title, ...(p.image ? { image: p.image } : {}), text: p.text };
   cache.set(url, { at: Date.now(), page });
   if (cache.size > 30) cache.delete(cache.keys().next().value!);
   return { page };
@@ -146,7 +148,10 @@ export async function readPage(a: PageArgs, d: ReadDeps): Promise<ReadResult> {
   const all = parts(page.text);
   if (a.page > all.length) return { text: `${page.url} has ${all.length} part${all.length === 1 ? '' : 's'}; there is no part ${a.page}.`, isError: true };
   const detail = [page.kind, all.length > 1 ? `part ${a.page} of ${all.length}` : ''].filter(Boolean).join(', ');
-  const footer = a.page < all.length ? `More: read_page with page ${a.page + 1} (of ${all.length}) for the next part, or with a question for just the parts that answer it.` : undefined;
+  const more = a.page < all.length ? `More: read_page with page ${a.page + 1} (of ${all.length}) for the next part, or with a question for just the parts that answer it.` : '';
+  // Its picture, for an answer or a page that shows what it is about.
+  const picture = a.page === 1 && page.image ? `Its picture (what it shows when shared): ${page.image}` : '';
+  const footer = [picture, more].filter(Boolean).join('\n') || undefined;
   return { text: formatPage({ title: page.title, url: page.url, detail: detail || undefined, body: all[a.page - 1], footer }), source: { url: page.url, title: page.title } };
 }
 

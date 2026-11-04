@@ -125,6 +125,18 @@ Give each fact as one short sentence, as the page states it: numbers, units, dat
   },
 ];
 
+/** The Trip planner's days, each with its main sight's picture. */
+const TRIP_DAYS: AnswerField['columns'] = [
+  { id: 'day', label: 'Day', type: 'number' },
+  { id: 'date', label: 'Date', type: 'date' },
+  { id: 'area', label: 'Area', type: 'text' },
+  { id: 'sight', label: 'Main sight', type: 'text' },
+  { id: 'morning', label: 'Morning', type: 'text' },
+  { id: 'afternoon', label: 'Afternoon', type: 'text' },
+  { id: 'evening', label: 'Evening', type: 'text' },
+  { id: 'picture', label: 'Picture', type: 'image' },
+];
+
 /** The Trip planner's days on its map. */
 const TRIP_STOPS: AnswerField['columns'] = [
   { id: 'day', label: 'Day', type: 'number' },
@@ -132,6 +144,18 @@ const TRIP_STOPS: AnswerField['columns'] = [
   { id: 'area', label: 'Area', type: 'text' },
   { id: 'lat', label: 'Latitude', type: 'number' },
   { id: 'lng', label: 'Longitude', type: 'number' },
+];
+
+/** The Weekly news digest's stories, each with its picture. */
+const STORY_COLS: AnswerField['columns'] = [
+  { id: 'topic', label: 'Topic', type: 'text' },
+  { id: 'title', label: 'Story', type: 'text' },
+  { id: 'summary', label: 'What happened', type: 'text' },
+  { id: 'why', label: 'Why it matters', type: 'text' },
+  { id: 'date', label: 'Date', type: 'date' },
+  { id: 'source', label: 'Source', type: 'text' },
+  { id: 'url', label: 'Link', type: 'url' },
+  { id: 'picture', label: 'Picture', type: 'image' },
 ];
 
 const T: Draft[] = [
@@ -813,6 +837,7 @@ How to plan:
 - Say what should be booked ahead, and how far ahead.
 - Estimate the costs in the local currency as numbers (a low and a high for each item); the total is added up after.
 - Give each day's area its latitude and longitude (its centre, as a map gives them), for the trip's map.
+- Name each day's main sight by its own name (or its area, on a day without one), for the day's picture.
 Hand in one row of the itinerary per day, in order.`,
           outputs: [
             { id: 'overview', label: 'Overview', type: 'markdown', required: true, description: 'The trip in a few sentences: the idea of the plan, where to stay, the weather to expect' },
@@ -824,6 +849,7 @@ Hand in one row of the itinerary per day, in order.`,
               columns: [
                 { id: 'day', label: 'Day', type: 'number' },
                 { id: 'area', label: 'Area', type: 'text' },
+                { id: 'sight', label: 'Main sight', type: 'text', description: 'By its own name, for the day’s picture' },
                 { id: 'morning', label: 'Morning', type: 'text' },
                 { id: 'afternoon', label: 'Afternoon', type: 'text' },
                 { id: 'evening', label: 'Evening', type: 'text' },
@@ -845,21 +871,36 @@ Hand in one row of the itinerary per day, in order.`,
             { id: 'tips', label: 'Tips', type: 'list', description: 'Getting in from the airport or station, transport passes, money, safety, and what to pack for the weather' },
           ],
         },
+        { id: 'media', title: 'Find a picture for each day', do: 'tool', tool: 'find_media', with: { items: '{{plan.itinerary}}', name: 'sight', kind: 'in {{destination}}' }, failed: 'skip' },
         {
           id: 'assemble',
           title: 'Put the plan together',
           do: 'code',
           language: 'javascript',
-          with: { dates: '{{calendar.dates}}', itinerary: '{{plan.itinerary}}', costs: '{{plan.costs}}', currency: '{{plan.currency}}', home: '{{plan.home}}', rate: '{{plan.rate}}' },
+          with: { dates: '{{calendar.dates}}', itinerary: '{{plan.itinerary}}', media: '{{media.data}}', costs: '{{plan.costs}}', currency: '{{plan.currency}}', home: '{{plan.home}}', rate: '{{plan.rate}}' },
           code:
             LIST +
-            String.raw`// The day-by-day table on the trip's own dates, and the budget with its total added up (in the travelers' own
-// currency too, when the plan gives a rate).
+            String.raw`// The day-by-day table on the trip's own dates, each day with its main sight's picture, and the budget with its total
+// added up (in the travelers' own currency too, when the plan gives a rate).
 const dates = rows(input.dates);
-const plan = rows(input.itinerary);
+// The pictures came in the order of the itinerary's rows, as it was handed in.
+const all = list(input.itinerary);
+const plan = rows(all);
+const media = list(input.media && input.media.items);
+// A day's picture when it is a photo: a drawing (a map of where it is, a flag, a crest) is left out.
+const pictureOf = (r) => {
+  const m = media[all.indexOf(r)];
+  const src = m && typeof m === 'object' ? String(m.picture || '') : '';
+  let file = '';
+  try {
+    file = decodeURIComponent(new URL(src).pathname.split('/').pop());
+  } catch (e) {}
+  const drawn = /\.svg\b|(^|[_\-\s(])(map|maps|locator|location|flag|coat_of_arms|emblem|seal|dimos)([_\-\s.)]|$)/i.test(file);
+  return file && !drawn && /^https?:\/\/\S+$/.test(src) ? src : null;
+};
 const days = dates.map((d, i) => {
   const r = plan.find((x) => Number(x.day) === Number(d.day)) || plan[i] || {};
-  return { day: d.day, date: d.date, area: r.area || '', morning: r.morning || '', afternoon: r.afternoon || '', evening: r.evening || '' };
+  return { day: d.day, date: d.date, area: r.area || '', sight: r.sight || '', morning: r.morning || '', afternoon: r.afternoon || '', evening: r.evening || '', picture: pictureOf(r) };
 });
 const num = (v) => {
   const n = Number(String(v === null || v === undefined ? '' : v).replace(/[^\d.\-]/g, ''));
@@ -896,19 +937,7 @@ const mid = (k) => at.map((s) => s[k]).sort((a, b) => a - b)[Math.floor(at.lengt
 const far = (s) => Math.hypot((s.lat - mid('lat')) * 111, (s.lng - mid('lng')) * 111 * Math.cos((s.lat * Math.PI) / 180)) > 400;
 return { days, budget, stops: at.filter((s) => !far(s)) };`,
           outputs: [
-            {
-              id: 'days',
-              label: 'Day by day',
-              type: 'table',
-              columns: [
-                { id: 'day', label: 'Day', type: 'number' },
-                { id: 'date', label: 'Date', type: 'date' },
-                { id: 'area', label: 'Area', type: 'text' },
-                { id: 'morning', label: 'Morning', type: 'text' },
-                { id: 'afternoon', label: 'Afternoon', type: 'text' },
-                { id: 'evening', label: 'Evening', type: 'text' },
-              ],
-            },
+            { id: 'days', label: 'Day by day', type: 'table', columns: TRIP_DAYS },
             { id: 'budget', label: 'Budget', type: 'table', columns: [{ id: 'item', label: 'Item', type: 'text' }, { id: 'estimate', label: 'Estimate', type: 'text' }] },
             { id: 'stops', label: 'On the map', type: 'table', columns: TRIP_STOPS },
           ],
@@ -919,20 +948,7 @@ return { days, budget, stops: at.filter((s) => !far(s)) };`,
     },
     answer: [
       { id: 'overview', label: 'Overview', type: 'markdown', required: true, description: 'The trip in a few sentences: the idea of the plan, where to stay, the weather to expect' },
-      {
-        id: 'days',
-        label: 'Day by day',
-        type: 'table',
-        required: true,
-        columns: [
-          { id: 'day', label: 'Day', type: 'number' },
-          { id: 'date', label: 'Date', type: 'date' },
-          { id: 'area', label: 'Area', type: 'text' },
-          { id: 'morning', label: 'Morning', type: 'text' },
-          { id: 'afternoon', label: 'Afternoon', type: 'text' },
-          { id: 'evening', label: 'Evening', type: 'text' },
-        ],
-      },
+      { id: 'days', label: 'Day by day', type: 'table', required: true, columns: TRIP_DAYS },
       { id: 'book_ahead', label: 'Book ahead', type: 'list', description: 'What to book, and how far ahead' },
       {
         id: 'budget',
@@ -947,7 +963,7 @@ return { days, budget, stops: at.filter((s) => !far(s)) };`,
       { id: 'stops', label: 'On the map', type: 'table', description: 'Each day’s area, with where it is', columns: TRIP_STOPS },
     ],
     examples: [
-      { id: 'lisbon-in-spring', name: 'Lisbon in spring', inputs: { destination: 'Lisbon', start: '2027-04-12', days: 4, travelers: 'Two adults', interests: 'Food markets, viewpoints, tiles' }, checks: ['{{answer.days}} is not empty', '{{answer.budget}} is not empty'] },
+      { id: 'lisbon-in-spring', name: 'Lisbon in spring', inputs: { destination: 'Lisbon', start: '2027-04-12', days: 4, travelers: 'Two adults', interests: 'Food markets, viewpoints, tiles' }, checks: ['{{answer.days}} is not empty', '{{answer.budget}} is not empty', '{{media.data.pictures}} > 0'] },
       { id: 'a-family-trip', name: 'A relaxed family trip', inputs: { destination: 'Copenhagen', start: '2027-07-05', days: 3, travelers: 'Two adults and a six-year-old', pace: 'Relaxed' }, checks: ['{{calendar.count}} = 3'] },
     ],
   },
@@ -979,10 +995,11 @@ What matters to them: {{needs}}
 {{#budget}}Budget: {{budget}}
 {{/budget}}{{#region}}Buying in: {{region}}
 {{/region}}
-Say whether they named the products to compare, or described a need instead. List the products they named, each as exactly as they can be told apart (brand and model). Turn what matters to them into three to six criteria, each weighted from 1 (nice to have) to 5 (a must), with what a good score looks like. If they described a need, write a web search query to find the strongest current options for it; today is {{today}}, so put the year in it.`,
+Say whether they named the products to compare, or described a need instead. List the products they named, each as exactly as they can be told apart (brand and model), and say what kind of product they are in a word or two (headphones, a dishwasher), for their pictures. Turn what matters to them into three to six criteria, each weighted from 1 (nice to have) to 5 (a must), with what a good score looks like. If they described a need, write a web search query to find the strongest current options for it; today is {{today}}, so put the year in it.`,
           outputs: [
             { id: 'named', label: 'Products named', type: 'yesno', required: true },
             { id: 'products', label: 'Products', type: 'list' },
+            { id: 'kind', label: 'What they are', type: 'text', description: 'The kind of product, in a word or two' },
             {
               id: 'criteria',
               label: 'Criteria',
@@ -1140,19 +1157,22 @@ Prices{{#region}} in {{region}}{{/region}}:
             },
           ],
         },
+        { id: 'media', title: 'Find their pictures', do: 'tool', tool: 'find_media', with: { items: '{{each.items}}', name: 'product', page: 'link', kind: '{{understand.kind}}' }, failed: 'skip' },
         {
           id: 'score',
           title: 'Weigh them up',
           do: 'code',
           language: 'javascript',
-          with: { criteria: '{{understand.criteria}}', facts: '{{each.items}}', products: '{{shortlist.items}}' },
+          with: { criteria: '{{understand.criteria}}', facts: '{{each.items}}', products: '{{shortlist.items}}', media: '{{media.data}}' },
           code:
             LIST +
             String.raw`// Each product's score against what matters (out of 100, by the criteria's weights), the pick and a runner-up for
-// another priority (cheaper, when one nearly as good is), and the table to compare them by, best first.
+// another priority (cheaper, when one nearly as good is), and the table to compare them by, best first, each with its
+// picture.
 const criteria = rows(input.criteria).filter((c) => c.criterion);
 const facts = list(input.facts);
 const names = list(input.products);
+const media = list(input.media && input.media.items);
 const priceOf = (t) => {
   const m = /\d[\d.,]*/.exec(String(t || ''));
   if (!m) return null;
@@ -1178,7 +1198,7 @@ const all = names.map((name, i) => {
     most += weight(c) * 5;
     return v;
   });
-  return { product: String(f.product || name), total: most ? Math.round((1000 * got) / most) / 10 : 0, cells, price: priceOf(f.price), f };
+  return { product: String(f.product || name), total: most ? Math.round((1000 * got) / most) / 10 : 0, cells, price: priceOf(f.price), f, m: media[i] && typeof media[i] === 'object' ? media[i] : {} };
 });
 const ranked = all.slice().sort((a, b) => b.total - a.total || (a.price || Infinity) - (b.price || Infinity));
 const top = ranked[0];
@@ -1203,6 +1223,7 @@ const comparison = ranked.map((r) => ({
   weaknesses: [r.f.weaknesses, r.f.problems ? 'Known problems: ' + r.f.problems : ''].filter(Boolean).join(' '),
   best_for: r.f.best_for || '',
   link: link(r.f.link),
+  picture: link(r.m.picture),
 }));
 return {
   matrix,
@@ -1230,6 +1251,7 @@ return {
                 { id: 'weaknesses', label: 'Weaknesses', type: 'text' },
                 { id: 'best_for', label: 'Best for', type: 'text' },
                 { id: 'link', label: 'Link', type: 'url' },
+                { id: 'picture', label: 'Picture', type: 'image' },
               ],
             },
           ],
@@ -1280,12 +1302,13 @@ What was found about each:
           { id: 'weaknesses', label: 'Weaknesses', type: 'text' },
           { id: 'best_for', label: 'Best for', type: 'text' },
           { id: 'link', label: 'Link', type: 'url' },
+          { id: 'picture', label: 'Picture', type: 'image' },
         ],
       },
       { id: 'watch_out', label: 'Watch out for', type: 'list' },
     ],
     examples: [
-      { id: 'named-products', name: 'Two named headphones', inputs: { products: 'Sony WH-1000XM5\nBose QuietComfort Ultra', needs: 'Noise cancelling on flights, comfort, battery', budget: '$400' }, checks: ['{{answer.comparison}} is not empty', '{{answer.pick}} is not empty'] },
+      { id: 'named-products', name: 'Two named headphones', inputs: { products: 'Sony WH-1000XM5\nBose QuietComfort Ultra', needs: 'Noise cancelling on flights, comfort, battery', budget: '$400' }, checks: ['{{answer.comparison}} is not empty', '{{answer.pick}} is not empty', '{{media.data.pictures}} > 0'] },
       { id: 'a-need', name: 'A need, not products', inputs: { products: 'A quiet dishwasher under €900', needs: 'Quiet, reliable, fits 60 cm', region: 'Germany' }, checks: ['{{understand.named}} = no', '{{answer.comparison}} is not empty'] },
     ],
   },
@@ -2572,7 +2595,9 @@ const stories = topics.flatMap((t) => chosen.filter((s) => s.topic === t)).map((
 const quiet = topics.filter((t) => !stories.some((s) => s.topic === t));
 const NONE = 'No real news this week';
 const none = quiet.map((topic) => ({ topic, title: NONE, summary: '', why: '', date: null, source: '', url: null }));
-return { stories: stories.concat(none), count: stories.length, quiet };`,
+// The real stories, by their headlines and pages, for their pictures (in the same order, before the quiet topics).
+const look = stories.map((s) => ({ name: s.title, page: s.url }));
+return { stories: stories.concat(none), count: stories.length, quiet, look };`,
           outputs: [
             {
               id: 'stories',
@@ -2590,7 +2615,26 @@ return { stories: stories.concat(none), count: stories.length, quiet };`,
             },
             { id: 'count', label: 'How many', type: 'number' },
             { id: 'quiet', label: 'Quiet topics', type: 'list' },
+            { id: 'look', label: 'Their pictures to find', type: 'table', columns: [{ id: 'name', label: 'Story', type: 'text' }, { id: 'page', label: 'Its page', type: 'url' }] },
           ],
+          failed: 'agent',
+        },
+        { id: 'media', title: 'Find their pictures', do: 'tool', tool: 'find_media', if: '{{select.look}} is not empty', with: { items: '{{select.look}}', name: 'name', page: 'page', kind: 'news' }, failed: 'skip' },
+        {
+          id: 'pictures',
+          title: 'Put each picture with its story',
+          do: 'code',
+          language: 'javascript',
+          with: { stories: '{{select.stories}}', media: '{{media.data}}' },
+          code:
+            LIST +
+            String.raw`// Each story with the picture its own page shows (or a page with the same story, when its own has none), where one
+// was found.
+const media = list(input.media && input.media.items);
+const link = (v) => (/^https?:\/\/\S+$/.test(String(v || '').trim()) ? String(v).trim() : null);
+const stories = rows(input.stories).map((s, i) => ({ ...s, picture: link(media[i] && typeof media[i] === 'object' ? media[i].picture : null) }));
+return { stories };`,
+          outputs: [{ id: 'stories', label: 'Stories', type: 'table', columns: STORY_COLS }],
           failed: 'agent',
         },
         {
@@ -2607,29 +2651,15 @@ return { stories: stories.concat(none), count: stories.length, quiet };`,
           ],
         },
       ],
-      outputs: { headline: '{{write.headline}}', stories: '{{select.stories}}', digest: '{{write.digest}}' },
+      outputs: { headline: '{{write.headline}}', stories: '{{pictures.stories}}', digest: '{{write.digest}}' },
     },
     answer: [
       { id: 'headline', label: 'The week in a sentence', type: 'text', required: true },
-      {
-        id: 'stories',
-        label: 'Stories',
-        type: 'table',
-        required: true,
-        columns: [
-          { id: 'topic', label: 'Topic', type: 'text' },
-          { id: 'title', label: 'Story', type: 'text' },
-          { id: 'summary', label: 'What happened', type: 'text' },
-          { id: 'why', label: 'Why it matters', type: 'text' },
-          { id: 'date', label: 'Date', type: 'date' },
-          { id: 'source', label: 'Source', type: 'text' },
-          { id: 'url', label: 'Link', type: 'url' },
-        ],
-      },
+      { id: 'stories', label: 'Stories', type: 'table', required: true, columns: STORY_COLS },
       { id: 'digest', label: 'Digest', type: 'markdown', required: true, description: 'The whole digest, ready to read' },
     ],
     examples: [
-      { id: 'batteries-and-ai-rules', name: 'Batteries and AI rules', inputs: { topics: 'battery technology\nEU AI rules', length: 'Brief' }, checks: ['{{answer.stories}} is not empty', '{{answer.digest}} is not empty'] },
+      { id: 'batteries-and-ai-rules', name: 'Batteries and AI rules', inputs: { topics: 'battery technology\nEU AI rules', length: 'Brief' }, checks: ['{{answer.stories}} is not empty', '{{answer.digest}} is not empty', '{{media.data.pictures}} > 0'] },
     ],
   },
   {

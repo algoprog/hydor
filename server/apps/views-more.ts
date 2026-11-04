@@ -4,7 +4,7 @@
 // copy, run the app again with one answer changed, or start another ready-made app on part of the answer. Their
 // words are translated as the app's are (uiTexts).
 import type { AppUi } from '../../shared/app-ui.ts';
-import { CHIPS_CSS, HERO_CSS, STATS_CSS } from './views.ts';
+import { CHIPS_CSS, HERO_CSS, PIC_CSS as PIC, STATS_CSS } from './views.ts';
 
 // ---- what several share -----------------------------------------------------------------------------------------
 
@@ -35,10 +35,10 @@ const ROW = String.raw`
 @media (max-width: 520px) { .r { grid-template-columns: auto 1fr; } .r > :last-child { grid-column: 2; justify-self: start; } }
 `;
 
-/** A picture at the top of a card, cut to fit. */
-const PIC = String.raw`
-.pic { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: calc(var(--n-radius) - 4px); background: var(--n-soft); }
-.pic.tall { aspect-ratio: 2 / 3; }
+/** A mark on a card's picture when it has a video to play (a trailer): the picture goes in .shot, the mark is .play. */
+const PLAY = String.raw`
+.shot { position: relative; display: block; }
+.play { position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; background: rgb(0 0 0 / 0.62); color: #fff; font-size: 12px; font-style: normal; padding-left: 2px; box-sizing: border-box; }
 `;
 
 /** Results as letters in coloured circles (W, D, L). */
@@ -165,8 +165,8 @@ h2 { margin: 4px 0 14px !important; font-size: 24px !important; }
     'wx-wear': {
       description: 'What to wear or take, and what to watch out for',
       html: String.raw`<div class="w">
-  {{#result.wear}}<h3>Wear or take</h3><ul class="wear">{{#result.wear}}<li>{{.}}</li>{{/result.wear}}</ul>{{/result.wear}}
-  {{#result.alerts}}<h3>Watch out for</h3><ul class="alerts">{{#result.alerts}}<li>{{.}}</li>{{/result.alerts}}</ul>{{/result.alerts}}
+  {{#result.wear|count}}<h3>Wear or take</h3><ul class="wear">{{#result.wear}}<li>{{.}}</li>{{/result.wear}}</ul>{{/result.wear}}
+  {{#result.alerts|count}}<h3>Watch out for</h3><ul class="alerts">{{#result.alerts}}<li>{{.}}</li>{{/result.alerts}}</ul>{{/result.alerts}}
   <div class="n-row"><button type="button" class="n-btn" data-event="copy">Copy the forecast</button><button type="button" class="n-btn" data-event="best_time">Best months to go</button></div>
 </div>`,
       css: String.raw`
@@ -217,8 +217,9 @@ const BEST_TIME: AppUi = {
   ],
   elements: {
     'bt-hero': {
-      description: 'The place, what it is for, the best months and the summary; another kind of trip in a list',
+      description: 'The place with its picture across the top, what it is for, the best months and the summary; another kind of trip in a list',
       html: String.raw`<header class="hero">
+  {{#result.picture|first}}<img class="ph" src="{{src}}" alt="{{result.place}}">{{/result.picture}}
   <p class="kicker">Best time to go · weather of {{result.years}}</p>
   <h1>{{result.place}}</h1>
   <label class="for">Best for
@@ -230,13 +231,15 @@ const BEST_TIME: AppUi = {
       <option value="Escaping the heat"{{#inputs.for_what|is:Escaping the heat}} selected{{/inputs.for_what}}>Escaping the heat</option>
     </select>
   </label>
-  {{#result.best}}<div class="best">{{#result.best}}<span>{{month}}</span>{{/result.best}}</div>{{/result.best}}
+  {{#result.best|count}}<div class="best">{{#result.best}}<span>{{month}}</span>{{/result.best}}</div>{{/result.best}}
   <div class="sum">{{result.summary|markdown}}</div>
   <button type="button" class="n-btn" data-event="forecast">The forecast for the days ahead</button>
 </header>`,
       css:
         HERO_CSS +
         String.raw`
+.hero { overflow: hidden; }
+.ph { display: block; width: calc(100% + 44px); max-width: none; height: clamp(150px, 26vw, 260px); margin: -20px -22px 16px; object-fit: cover; background: var(--n-soft); }
 .for { display: inline-flex; align-items: center; gap: 8px; margin: 6px 0 10px; color: var(--n-muted); font-size: 13.5px; }
 select { padding: 5px 8px; border: 1px solid var(--n-line); border-radius: 9px; background: var(--n-card); color: var(--n-fg); font: inherit; font-size: 14px; }
 .best { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -261,7 +264,7 @@ select { padding: 5px 8px; border: 1px solid var(--n-line); border-radius: 9px; 
     },
     'bt-tips': {
       description: 'The months to avoid, and tips for a visit',
-      html: String.raw`<div class="t">{{#result.avoid}}<h3>Months to avoid</h3><ul>{{#result.avoid}}<li>{{.}}</li>{{/result.avoid}}</ul>{{/result.avoid}}{{#result.tips}}<h3>Tips</h3><ul>{{#result.tips}}<li>{{.}}</li>{{/result.tips}}</ul>{{/result.tips}}</div>`,
+      html: String.raw`<div class="t">{{#result.avoid|count}}<h3>Months to avoid</h3><ul>{{#result.avoid}}<li>{{.}}</li>{{/result.avoid}}</ul>{{/result.avoid}}{{#result.tips|count}}<h3>Tips</h3><ul>{{#result.tips}}<li>{{.}}</li>{{/result.tips}}</ul>{{/result.tips}}</div>`,
       css: String.raw`
 .t { padding: 14px 16px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
 h3 { margin: 0 0 6px; font-size: 13px; color: var(--n-muted); } ul { margin: 0 0 12px; padding-left: 20px; font-size: 14.5px; line-height: 1.5; }
@@ -441,8 +444,8 @@ const MATCH: AppUi = {
     'mp-news': {
       description: 'Each side’s team news, to copy, with the team’s tracker one click away',
       html: String.raw`<div class="two">
-  <section><h3>{{result.team}}</h3>{{#result.team_news}}<ul>{{#result.team_news}}<li>{{.}}</li>{{/result.team_news}}</ul>{{/result.team_news}}{{^result.team_news}}<p class="muted">No news found</p>{{/result.team_news}}</section>
-  <section><h3>{{result.opponent}}</h3>{{#result.opponent_news}}<ul>{{#result.opponent_news}}<li>{{.}}</li>{{/result.opponent_news}}</ul>{{/result.opponent_news}}{{^result.opponent_news}}<p class="muted">No news found</p>{{/result.opponent_news}}</section>
+  <section><h3>{{result.team}}</h3>{{#result.team_news|count}}<ul>{{#result.team_news}}<li>{{.}}</li>{{/result.team_news}}</ul>{{/result.team_news}}{{^result.team_news}}<p class="muted">No news found</p>{{/result.team_news}}</section>
+  <section><h3>{{result.opponent}}</h3>{{#result.opponent_news|count}}<ul>{{#result.opponent_news}}<li>{{.}}</li>{{/result.opponent_news}}</ul>{{/result.opponent_news}}{{^result.opponent_news}}<p class="muted">No news found</p>{{/result.opponent_news}}</section>
 </div>
 <div class="n-row acts"><button type="button" class="n-btn" data-event="copy">Copy the preview</button><button type="button" class="n-btn" data-event="track">Follow {{result.team}}</button></div>`,
       css: String.raw`
@@ -682,14 +685,15 @@ const GIFTS: AppUi = {
       css: CHIPS_CSS,
     },
     'gf-card': {
-      description: 'An idea: why it suits them, its price, one to buy, a star to keep it',
+      description: 'An idea: its picture, why it suits them, its price, one to buy, a star to keep it',
       html: String.raw`<div class="c{{^fits}} over{{/fits}}">
+  {{#picture}}<img class="pic" src="{{picture}}" alt="" loading="lazy">{{/picture}}
   <span class="tag">{{kind}}</span><h3>{{idea}}</h3><p>{{why}}</p>
   <p class="muted">{{#low}}{{result.currency}}{{low|number}}–{{high|number}}{{/low}}{{^fits}} · over the budget{{/fits}}</p>
   {{#example}}<p class="ex">{{example}}{{#price}} · <b>{{result.currency}}{{price|number}}</b>{{/price}}{{#shop}} · {{shop}}{{/shop}}</p>{{/example}}
   <div class="foot">{{#link}}<a class="b" href="{{link}}" target="_blank" rel="noopener noreferrer">See it ↗</a>{{/link}}<button type="button" class="b{{#state.star.@key}} on{{/state.star.@key}}" data-event="star">{{#state.star.@key}}★ Kept{{/state.star.@key}}{{^state.star.@key}}☆ Keep{{/state.star.@key}}</button><button type="button" class="b" data-event="more">More like this</button></div>
 </div>`,
-      css: CARD + String.raw`.over { opacity: .75; } .ex { padding: 8px 10px; border-radius: 9px; background: var(--n-soft); font-size: 13.5px !important; }`,
+      css: CARD + PIC + String.raw`.over { opacity: .75; } .ex { padding: 8px 10px; border-radius: 9px; background: var(--n-soft); font-size: 13.5px !important; }`,
     },
   },
   events: {
@@ -704,7 +708,7 @@ const GIFTS: AppUi = {
 const WATCH: AppUi = {
   pages: [
     { id: 'tonight', title: 'Tonight', blocks: [{ element: 'wt-hero' }, { element: 'wt-card', data: 'result.picks', each: true, layout: 'grid', empty: 'Nothing found' }] },
-    { id: 'pick', title: 'Pick', tab: false, blocks: [{ element: 'wt-detail', data: 'page.item' }] },
+    { id: 'pick', title: 'Pick', tab: false, blocks: [{ element: 'wt-detail', data: 'page.item' }, { element: 'video', data: 'page.item.video' }] },
     {
       id: 'all',
       title: 'Side by side',
@@ -722,18 +726,18 @@ const WATCH: AppUi = {
       css: HERO_CSS + String.raw`.hero h1 { font-size: 21px !important; }`,
     },
     'wt-card': {
-      description: 'A film or show: its picture, where it streams, how long, why it fits',
+      description: 'A film or show: its picture (with a mark when it has a trailer), where it streams, how long, why it fits',
       html: String.raw`<button type="button" class="c" data-event="open">
-  {{#picture}}<img class="pic" src="{{picture}}" alt="" loading="lazy">{{/picture}}
+  {{#picture}}<span class="shot"><img class="pic" src="{{picture}}" alt="" loading="lazy">{{#video}}<i class="play" aria-label="Trailer">▶</i>{{/video}}</span>{{/picture}}
   <span class="tag">{{kind}}{{#year}} · {{year}}{{/year}}</span><h3>{{title}}</h3>
   <p class="muted">{{genre}}{{#minutes}} · {{minutes}} min{{/minutes}}{{#rating}} · ★ {{rating}}{{/rating}}</p>
   <p>{{why}}</p>
   {{#where}}<p class="where{{#on_yours}} yours{{/on_yours}}">▶ {{where}}</p>{{/where}}
 </button>`,
-      css: CARD + PIC + String.raw`.where { font-size: 13px !important; color: var(--n-muted); } .yours { color: var(--n-ok) !important; font-weight: 600; }`,
+      css: CARD + PIC + PLAY + String.raw`.where { font-size: 13px !important; color: var(--n-muted); } .yours { color: var(--n-ok) !important; font-weight: 600; }`,
     },
     'wt-detail': {
-      description: 'One pick on a page of its own, with a link to more and a way to rule it out',
+      description: 'One pick on a page of its own, with a link to more and a way to rule it out (its trailer plays below)',
       html: String.raw`<div class="dt">{{#picture}}<img class="pic tall" src="{{picture}}" alt="">{{/picture}}<div>
   <p class="kicker">{{kind}}{{#year}} · {{year}}{{/year}} · {{genre}}</p><h2>{{title}}</h2>
   <p>{{why}}</p>{{#where}}<p><b>Where to watch:</b> {{where}}</p>{{/where}}
@@ -760,7 +764,7 @@ h2 { margin: 4px 0 10px !important; font-size: 24px !important; } p { margin: 0 
 const GAMES: AppUi = {
   pages: [
     { id: 'games', title: 'Games', blocks: [{ element: 'gm-hero' }, { element: 'gm-card', data: 'result.games', each: true, layout: 'grid', empty: 'No games found' }] },
-    { id: 'game', title: 'Game', tab: false, blocks: [{ element: 'gm-detail', data: 'page.item' }] },
+    { id: 'game', title: 'Game', tab: false, blocks: [{ element: 'gm-detail', data: 'page.item' }, { element: 'video', data: 'page.item.video' }] },
     {
       id: 'prices',
       title: 'Prices',
@@ -770,29 +774,34 @@ const GAMES: AppUi = {
         { element: 'table', data: 'result.games', with: { columns: ['title', 'price', 'lowest', 'store'] } },
       ],
     },
-    { id: 'time', title: 'Time to finish', blocks: [{ title: 'Hours for the main part', element: 'plot', data: 'result.games', with: { kind: 'hbar', x: 'title', y: 'hours', height: 280 } }] },
+    { id: 'time', title: 'Time to finish', if: 'result.games|sum:hours', blocks: [{ title: 'Hours for the main part', element: 'plot', data: 'result.games', with: { kind: 'hbar', x: 'title', y: 'hours', height: 280 } }] },
   ],
   elements: {
     'gm-hero': {
       description: 'What you like, and the picks in a line',
-      html: String.raw`<header class="hero"><p class="kicker">Game finder · {{inputs.platform}}{{^inputs.budget|is:Any price}} · {{inputs.budget}}{{/inputs.budget}}</p><h1>{{result.summary}}</h1><p class="sub">{{inputs.likes|short:140}}</p></header>`,
+      html: String.raw`<header class="hero"><p class="kicker">Game finder · {{inputs.platform}}{{^inputs.when|is:Out now}} · {{inputs.when}}{{/inputs.when}}{{^inputs.budget|is:Any price}} · {{inputs.budget}}{{/inputs.budget}}</p><h1>{{result.summary}}</h1>{{#inputs.likes}}<p class="sub">{{inputs.likes|short:140}}</p>{{/inputs.likes}}</header>`,
       css: HERO_CSS + String.raw`.hero h1 { font-size: 21px !important; }`,
     },
     'gm-card': {
-      description: 'A game: its picture, why it fits, how long it takes and its price',
+      description: 'A game: its picture (with a mark when it has a trailer), when it comes out or why it fits, how long it takes and its price',
       html: String.raw`<button type="button" class="c" data-event="open">
-  {{#picture}}<img class="pic" src="{{picture}}" alt="" loading="lazy">{{/picture}}
-  <span class="tag">{{genre}}</span><h3>{{title}}{{#year}} <small>{{year}}</small>{{/year}}</h3>
+  {{#picture}}<span class="shot"><img class="pic" src="{{picture}}" alt="" loading="lazy">{{#video}}<i class="play" aria-label="Trailer">▶</i>{{/video}}</span>{{/picture}}
+  <span class="tags"><span class="tag">{{genre}}</span>{{#coming}}<span class="tag soon">{{#out}}Coming {{out}}{{/out}}{{^out}}Coming soon{{/out}}</span>{{/coming}}</span><h3>{{title}}{{#year}} <small>{{year}}</small>{{/year}}</h3>
   <p>{{why}}</p>
   <p class="muted">{{platforms}}{{#hours}} · about {{hours}} h{{/hours}}</p>
   <p class="price">{{#free}}<b>Free to play</b>{{/free}}{{^free}}{{#price}}<b>&#36;{{price}}</b> at {{store}}{{#lowest}} · lowest ever &#36;{{lowest}}{{/lowest}}{{/price}}{{/free}}</p>
 </button>`,
-      css: CARD + PIC + String.raw`small { color: var(--n-muted); font-weight: 400; } .price { font-size: 13.5px !important; } .price b { color: var(--n-ok); }`,
+      css:
+        CARD +
+        PIC +
+        PLAY +
+        String.raw`small { color: var(--n-muted); font-weight: 400; } .price { font-size: 13.5px !important; } .price:empty { display: none; } .price b { color: var(--n-ok); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; } .tag.soon { background: none; box-shadow: inset 0 0 0 1px var(--n-accent); }`,
     },
     'gm-detail': {
-      description: 'A game on a page of its own, with its deal and a search for more like it',
+      description: 'A game on a page of its own, with when it comes out, its deal and a search for more like it (its trailer plays below)',
       html: String.raw`<div class="dt">{{#picture}}<img class="pic" src="{{picture}}" alt="">{{/picture}}
-  <p class="kicker">{{genre}}{{#year}} · {{year}}{{/year}}</p><h2>{{title}}</h2><p>{{why}}</p>
+  <p class="kicker">{{genre}}{{#year}} · {{year}}{{/year}}{{#coming}}{{#out}} · coming {{out}}{{/out}}{{^out}} · coming soon{{/out}}{{/coming}}</p><h2>{{title}}</h2><p>{{why}}</p>
   <p class="muted">Plays on {{platforms}}{{#hours}} · about {{hours}} hours{{/hours}}</p>
   <div class="n-row">{{#deal}}<a class="n-btn n-primary" href="{{deal}}" target="_blank" rel="noopener noreferrer">&#36;{{price}} at {{store}} ↗</a>{{/deal}}<button type="button" class="n-btn" data-event="more">More like this</button></div>
 </div>`,
@@ -968,10 +977,10 @@ const WHATS_ON: AppUi = {
       css: HERO_CSS + STATS_CSS + String.raw`.copy { margin-top: 14px; }`,
     },
     'wo-day': {
-      description: 'A day: its weather, and what is on',
+      description: 'A day: its weather, and what is on, each with its picture',
       html: String.raw`<section class="day">
   <header><b>{{date|weekday}}</b><span class="muted">{{date|longdate}}</span>{{#high}}<span class="wx">{{icon}} {{high}}° / {{low}}°{{#chance}} · 💧 {{chance}}%{{/chance}}</span>{{/high}}</header>
-  {{#result.events|where:date=$date}}<div class="ev"><span class="t">{{time|or:All day}}</span><p><b>{{name}}</b><small>{{venue}}{{#price}} · {{price}}{{/price}}</small>{{#why}}<small>{{why}}</small>{{/why}}</p>{{#url}}<a class="go" href="{{url}}" target="_blank" rel="noopener noreferrer">↗</a>{{/url}}</div>{{/result.events}}
+  {{#result.events|where:date=$date}}<div class="ev"><span class="t">{{time|or:All day}}</span><p><b>{{name}}</b><small>{{venue}}{{#price}} · {{price}}{{/price}}</small>{{#why}}<small>{{why}}</small>{{/why}}</p><span class="end">{{#picture}}<img class="th" src="{{picture}}" alt="" loading="lazy">{{/picture}}{{#url}}<a class="go" href="{{url}}" target="_blank" rel="noopener noreferrer">↗</a>{{/url}}</span></div>{{/result.events}}
   {{^result.events|where:date=$date}}<p class="muted none">Nothing found for this day</p>{{/result.events}}
 </section>`,
       css: String.raw`
@@ -980,13 +989,17 @@ header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; m
 .muted { color: var(--n-muted); font-size: 13px; } .wx { margin-left: auto; font-size: 13.5px; }
 .ev { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--n-line); }
 .t { color: var(--n-accent); font-size: 13px; font-weight: 600; } p { margin: 0; font-size: 14.5px; } small { display: block; color: var(--n-muted); font-size: 12.5px; }
+.end { display: flex; align-items: flex-start; gap: 10px; }
+.th { display: block; width: 76px; height: 54px; object-fit: cover; border-radius: 8px; background: var(--n-soft); }
+@media (max-width: 520px) { .ev { grid-template-columns: 52px 1fr auto; } .th { width: 56px; height: 42px; } }
 .go { color: var(--n-accent); text-decoration: none; } .none { margin: 6px 0 0; }
 `,
     },
     'wo-row': {
-      description: 'A thing to do in a line, to mark as going',
-      html: String.raw`<div class="r"><div class="when"><b>{{date|day}}</b>{{date|month}}</div><p>{{name}}<small>{{kind}} · {{time|or:All day}} · {{venue}}{{#price}} · {{price}}{{/price}}</small></p><button type="button" class="b{{#state.going.@key}} on{{/state.going.@key}}" data-event="going">{{#state.going.@key}}✓ Going{{/state.going.@key}}{{^state.going.@key}}Going?{{/state.going.@key}}</button></div>`,
-      css: ROW + String.raw`.on { border-color: var(--n-ok); color: var(--n-ok); }`,
+      description: 'A thing to do in a line, with its picture, to mark as going',
+      html: String.raw`<div class="r"><div class="when"><b>{{date|day}}</b>{{date|month}}</div><p>{{#picture}}<img class="th" src="{{picture}}" alt="" loading="lazy">{{/picture}}{{name}}<small>{{kind}} · {{time|or:All day}} · {{venue}}{{#price}} · {{price}}{{/price}}</small></p><button type="button" class="b{{#state.going.@key}} on{{/state.going.@key}}" data-event="going">{{#state.going.@key}}✓ Going{{/state.going.@key}}{{^state.going.@key}}Going?{{/state.going.@key}}</button></div>`,
+      css: ROW + String.raw`.on { border-color: var(--n-ok); color: var(--n-ok); }
+.th { float: right; width: 64px; height: 44px; margin: 0 0 0 10px; object-fit: cover; border-radius: 7px; background: var(--n-soft); }`,
     },
     'wo-kinds': {
       description: 'The kinds of thing to do, to show one kind',

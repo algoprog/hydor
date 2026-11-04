@@ -42,7 +42,7 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model with vLLM on your
   GPU (split across several when one is too small) or your Mac's Apple silicon, with models suggested for what it has
 - Get help with anything, not just code: assistants for research, writing and planning (switch between them
-  mid-session), web search (Naget Search by default) and a browser you can watch and take over (in the Mac app, your Mac itself
+  mid-session), web search (Naget Search by default, the pages a reply cites shown as links in it and cards under it) and a browser you can watch and take over (in the Mac app, your Mac itself
   too: its screen, mouse and keyboard, once you allow it), documents in and
   out, small tools and pages you keep (watch them being written and change them yourself, in a visual editor that
   works on phones too, or in their code), slides to edit and present as in PowerPoint or Google Slides, documents,
@@ -54,7 +54,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   recipes and a week's meals, gifts, what to watch, games and a quiz to play, what's on, savings, your data as
   charts, a topic as a timeline, a place on a map) or your own: one agent, or steps with data, a
   memory and a screen of their own, their answers in views made for them (pages, elements, buttons that act,
-  maps, 2D and 3D plots, pictures, videos and widgets of their own), the keys they need asked for once and kept
+  maps, 2D and 3D plots, pictures, videos and widgets of their own, with the pictures and trailers of what they
+  find, from games and films to products and places), the keys they need asked for once and kept
   in the vault, shared as one file with their own pictures and videos (ready-made ones too); ask for what one
   does in any session and the agent finds the right one among many (by words and by meaning) and runs it there,
   asking you for what is missing on the app's own card
