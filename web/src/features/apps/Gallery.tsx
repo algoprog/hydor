@@ -212,19 +212,26 @@ function YourApp({ a, ready }: { a: CardApp; ready?: boolean }) {
 /** Cards side by side; on a phone, the rows of one list (shorter, so more of them show). */
 const GRID = 'grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 max-sm:divide-y max-sm:divide-line max-sm:overflow-hidden max-sm:rounded-2xl max-sm:border max-sm:border-line';
 
-/** Your own app, made here: a tile at the end of yours that opens the builder (which also takes a description or a file). */
-function NewTile() {
+/** Your own app, made here: it opens the builder (which also takes a description or a file). After your apps, a card
+ *  with an app card's face (a plus on an accent tile, the name, a line); with none yet, one row across the page. */
+function NewTile({ row }: { row?: boolean }) {
   return (
     <button
       type="button"
       onClick={() => go('/apps/new')}
-      className="flex min-h-[128px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line-2 p-4 text-center text-fg-3 transition-colors hover:border-accent/60 hover:bg-accent-soft hover:text-accent max-sm:hidden"
+      className={cx(
+        'group flex w-full gap-3 rounded-2xl border border-line text-left transition-colors hover:border-line-2 hover:bg-bg-1',
+        row ? 'items-center px-4 py-3 sm:gap-4 sm:px-5 sm:py-4' : 'min-h-[128px] items-start p-4 max-sm:hidden',
+      )}
     >
-      <span className="grid h-10 w-10 place-items-center rounded-full bg-bg-2">
-        <Plus size={18} />
+      <span aria-hidden className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[13px] bg-accent/15 text-accent ring-1 ring-accent/20 ring-inset">
+        <Plus size={21} strokeWidth={1.9} />
       </span>
-      <span className="text-[14px] font-medium">Make an app</span>
-      <span className="text-[12.5px] leading-snug">Describe it to an agent, start from scratch, or install a file</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold tracking-tight">Make an app</span>
+        <span className="mt-0.5 block text-[13px] leading-snug text-pretty text-fg-3">Describe it to an agent, start from scratch, or install a file</span>
+      </span>
+      {row && <ChevronRight size={16} className="shrink-0 text-fg-3 transition-colors group-hover:text-accent" />}
     </button>
   );
 }
@@ -493,13 +500,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                     {!words && cat === 'All' && <NewTile />}
                   </div>
                 ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <NewTile />
-                    <button type="button" onClick={() => go('/apps/new')} className="flex items-center gap-3 rounded-2xl border border-dashed border-line-2 px-4 py-3 text-left text-fg-2 sm:hidden">
-                      <Plus size={18} className="shrink-0 text-accent" />
-                      <span className="text-[14px] font-medium">Make an app</span>
-                    </button>
-                  </div>
+                  <NewTile row />
                 )}
               </Part>
             )}
