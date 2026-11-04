@@ -10737,5 +10737,10 @@
 "Your voice-over":"Η εκφώνησή σας",
 "{0} does not take pictures to work from. Describe the change in words, or the user can pick a model that edits pictures in Settings → Images, video and audio.":"Το {0} δεν δέχεται εικόνες ως βάση. Περιγράψτε την αλλαγή με λόγια, ή ο χρήστης μπορεί να επιλέξει ένα μοντέλο που επεξεργάζεται εικόνες στις Ρυθμίσεις → Εικόνες, βίντεο και ήχος.",
 "OpenRouter has no image model {0}. The user can see the ones there are in Settings → Images, video and audio.":"Το OpenRouter δεν έχει μοντέλο εικόνων {0}. Ο χρήστης μπορεί να δει όσα υπάρχουν στις Ρυθμίσεις → Εικόνες, βίντεο και ήχος.",
-"OpenRouter has no video model {0}. The user can see the ones there are in Settings → Images, video and audio.":"Το OpenRouter δεν έχει μοντέλο βίντεο {0}. Ο χρήστης μπορεί να δει όσα υπάρχουν στις Ρυθμίσεις → Εικόνες, βίντεο και ήχος."
+"OpenRouter has no video model {0}. The user can see the ones there are in Settings → Images, video and audio.":"Το OpenRouter δεν έχει μοντέλο βίντεο {0}. Ο χρήστης μπορεί να δει όσα υπάρχουν στις Ρυθμίσεις → Εικόνες, βίντεο και ήχος.",
+"about ${0} a minute of speech":"περίπου ${0} ανά λεπτό ομιλίας",
+"Search: flux, gemini, recraft…":"Αναζήτηση: flux, gemini, recraft…",
+"Search: veo, kling, seedance…":"Αναζήτηση: veo, kling, seedance…",
+"Search: lyria…":"Αναζήτηση: lyria…",
+"Search: seed, elevenlabs, gemini…":"Αναζήτηση: seed, elevenlabs, gemini…"
 }

@@ -10728,5 +10728,10 @@
 "Your voice-over":"你的配音",
 "{0} does not take pictures to work from. Describe the change in words, or the user can pick a model that edits pictures in Settings → Images, video and audio.":"{0} 不接受用作参考的图片。请用文字描述要做的修改；或者由用户在“设置 → 图片、视频和音频”中选择一个能编辑图片的模型。",
 "OpenRouter has no image model {0}. The user can see the ones there are in Settings → Images, video and audio.":"OpenRouter 没有图像模型 {0}。用户可以在“设置 → 图片、视频和音频”中查看现有的模型。",
-"OpenRouter has no video model {0}. The user can see the ones there are in Settings → Images, video and audio.":"OpenRouter 没有视频模型 {0}。用户可以在“设置 → 图片、视频和音频”中查看现有的模型。"
+"OpenRouter has no video model {0}. The user can see the ones there are in Settings → Images, video and audio.":"OpenRouter 没有视频模型 {0}。用户可以在“设置 → 图片、视频和音频”中查看现有的模型。",
+"about ${0} a minute of speech":"每分钟语音约 ${0}",
+"Search: flux, gemini, recraft…":"搜索：flux、gemini、recraft…",
+"Search: veo, kling, seedance…":"搜索：veo、kling、seedance…",
+"Search: lyria…":"搜索：lyria…",
+"Search: seed, elevenlabs, gemini…":"搜索：seed、elevenlabs、gemini…"
 }

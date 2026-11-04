@@ -196,7 +196,7 @@ function AudioRow({ m, selected, onPick }: { m: AudioModel; selected?: boolean; 
 /** A model list to search and sort, in a dialog: image, video, music or voice models. */
 function ModelDialog<T extends { id: string }>({ open, onClose, title, endpoint, hint, using, onPick, row }: { open: boolean; onClose: () => void; title: string; endpoint: string; hint: string; using: string; onPick: (id: string) => void; row: (m: T, selected: boolean, pick: () => void) => ReactNode }) {
   const [q, setQ] = useState('');
-  const [sort, setSort] = useState<'new' | 'price'>('new');
+  const [sort, setSort] = useState<'picks' | 'new' | 'price'>('picks');
   const [list, setList] = useState<T[] | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -236,6 +236,7 @@ function ModelDialog<T extends { id: string }>({ open, onClose, title, endpoint,
           value={sort}
           onChange={setSort}
           options={[
+            { value: 'picks', label: 'Suggested' },
             { value: 'new', label: 'Newest' },
             { value: 'price', label: 'Cheapest' },
           ]}
@@ -500,7 +501,7 @@ export function ImagesSettings() {
         onClose={() => setDialog(null)}
         title="Image model"
         endpoint="/api/images/models"
-        hint="Search image models: flux, gemini, recraft…"
+        hint="Search: flux, gemini, recraft…"
         using={img.using}
         onPick={(id) => void saveImg({ model: id })}
         row={(m, selected, pick) => <ImageRow key={m.id} m={m} selected={selected} onPick={pick} />}
@@ -510,7 +511,7 @@ export function ImagesSettings() {
         onClose={() => setDialog(null)}
         title="Video model"
         endpoint="/api/videos/models"
-        hint="Search video models: veo, kling, seedance…"
+        hint="Search: veo, kling, seedance…"
         using={vid.using}
         onPick={(id) => void saveVid({ model: id })}
         row={(m, selected, pick) => <VideoRow key={m.id} m={m} selected={selected} onPick={pick} />}
@@ -520,7 +521,7 @@ export function ImagesSettings() {
         onClose={() => setDialog(null)}
         title="Music model"
         endpoint="/api/audio/models?kind=music"
-        hint="Search music models: lyria…"
+        hint="Search: lyria…"
         using={aud.usingMusic}
         onPick={(id) => void saveAud({ music: id })}
         row={(m, selected, pick) => <AudioRow key={m.id} m={m} selected={selected} onPick={pick} />}
@@ -530,7 +531,7 @@ export function ImagesSettings() {
         onClose={() => setDialog(null)}
         title="Voice and sound model"
         endpoint="/api/audio/models?kind=speech"
-        hint="Search voice models: seed, elevenlabs, gemini…"
+        hint="Search: seed, elevenlabs, gemini…"
         using={aud.usingSpeech}
         onPick={(id) => void saveAud({ speech: id })}
         row={(m, selected, pick) => <AudioRow key={m.id} m={m} selected={selected} onPick={pick} />}
