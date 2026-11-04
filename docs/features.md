@@ -33,7 +33,10 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   start a new session there, and dragged by their headings into the order you like, the same on every device;
   a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's
   for it, on every device, shown under sessions and in the folder menus too; Codex projects' folders, such as the
-  ones it makes for ChatGPT projects, show by the project's name); then the rest by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
+  ones it makes for ChatGPT projects, show by the project's name). A folder none of whose sessions were started in
+  Hydor (they came from Claude Code or Codex in VS Code, a terminal or their desktop apps) carries the mark of the
+  agent they came from after its name, and its tooltip and ⋯ say which apps, and which added account; then the rest
+  by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
   (until later), settles (done for now), archives or deletes the session, on phones too.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
   OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).

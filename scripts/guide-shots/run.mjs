@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Browser, sleep } from './cdp.mjs';
-import { CATALOG, EMAIL, makeData, makeFiles, makeSessions, overrides, seedApi } from './demo.mjs';
+import { CATALOG, EMAIL, makeData, makeFiles, makeImported, makeSessions, overrides, seedApi } from './demo.mjs';
 import { SHOTS as GUIDE_SHOTS } from './shots.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -151,18 +151,24 @@ async function main() {
   stubs();
   const folders = makeFiles(home, now);
   const sessions = makeSessions(home, path.join(home, '.claude/projects'), now, folders);
+  const imported = makeImported(home, path.join(home, '.codex'), path.join(home, '.claude/projects'), now);
   makeData(path.join(home, '.hydor'));
   const cookie = await startServer();
   const api = apiFor(cookie);
   await seedApi(api, home, now, sessions);
-  // Sessions the API touched (a space, a pin) take the time of their last message again.
+  // Alex's sessions were started in Hydor (the app's own are, and so they show); those the API touched (a space, a
+  // pin) take the time of their last message again. The imported ones stay as they came.
   const Database = createRequire(path.join(REPO, 'package.json'))('better-sqlite3');
   const db = new Database(path.join(home, '.hydor', 'hydor.db'));
   db.pragma('busy_timeout = 5000');
-  for (const x of Object.values(sessions)) db.prepare('update app_sessions set created_at = ?, updated_at = ? where key = ?').run(x.at - 60_000, x.at, x.key);
+  const own = db.prepare(
+    `insert into app_sessions (key, agent, created_by_app, created_at, updated_at) values (?, 'claude', 1, ?, ?)
+     on conflict(key) do update set created_by_app = 1, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+  );
+  for (const x of Object.values(sessions)) own.run(x.key, x.at - 60_000, x.at);
   db.close();
   // The sessions once the app has read their transcripts.
-  const keys = Object.values(sessions).map((s) => s.key);
+  const keys = [...Object.values(sessions), ...Object.values(imported)].map((s) => s.key);
   for (let i = 0; i < 60; i++) {
     const list = await api('GET', '/api/sessions?limit=300');
     const have = new Set((list.sessions ?? list).map((s) => s.key));

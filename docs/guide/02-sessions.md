@@ -250,7 +250,7 @@ Press Ctrl+F (⌘F) in a session. **Find in this session** looks through your me
 
 - **Changes**: every file the session changed, the most changed first, with lines added and removed. Click a file for each edit's diff; **Open** opens the file.
 - **Commands**: every shell command the agent ran, newest first, with **All**, **Failed** and **Background** filters. Click one for its output.
-- **Info**: the agent, status, folder, branch, model and effort, how much of the context is used, when it started and was last active, its activity (prompts, turns, tool calls, commands), tokens (in, cached, out), the API cost (what the same work would cost at API prices), output speed, and where it was started (VS Code, a terminal, this app…). Below: its background tasks (open one for its output, or **Stop** it), and **Continue in a terminal**: the command that resumes the session in a terminal, and the session id, each with a copy button (Claude Code and Codex).
+- **Info**: the agent, status, folder, branch, model and effort, how much of the context is used, when it started and was last active, its activity (prompts, turns, tool calls, commands), tokens (in, cached, out), the API cost (what the same work would cost at API prices), output speed, and where it was started (Hydor, VS Code, a terminal, Claude's desktop app…). Below: its background tasks (open one for its output, or **Stop** it), and **Continue in a terminal**: the command that resumes the session in a terminal, and the session id, each with a copy button (Claude Code and Codex).
 
 ## Read the meters: context, cache and speed
 

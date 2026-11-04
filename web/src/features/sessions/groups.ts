@@ -4,11 +4,13 @@
 // sessions are in its group from the first; a folder needs two sessions for one, and a session in a worktree counts
 // for its main checkout. Folders no one picked get no group, so their sessions go by day: the home folder and the default one, and
 // what is under the app's own places (task folders, apps' runs, worktrees, the temporary folder: the server's
-// autoFolders). With grouping off, or while the list shows one space, the rest all go by day.
+// autoFolders). With grouping off, or while the list shows one space, the rest all go by day. A folder none of whose
+// sessions Hydor started (they came from VS Code, a terminal, Claude's or Codex's own app) says where they came from.
 import { isChatgptProjectFolder } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
 import { basename, dayGroup, dirname } from '../../lib/format';
+import { folderSources, type FolderSource } from '../../lib/origin';
 
 export type GroupKind = 'active' | 'pinned' | 'space' | 'folder' | 'day' | 'snoozed';
 
@@ -23,6 +25,8 @@ export interface SessionGroup {
   /** A folder group's folder. */
   path?: string;
   space?: SpaceView;
+  /** A folder group none of whose sessions was started here: where they came from (Claude Code, Codex; the apps). */
+  from?: FolderSource[];
 }
 
 /** Sessions a folder needs for a group of its own. */
@@ -108,13 +112,16 @@ export function groupSessions(
     const dir = workFolder(s);
     return dir && (o.names?.[dir] || !o.unpicked(dir)) ? dir : undefined;
   };
-  // How many listed sessions work in each folder, whichever group they show in now: a folder's group stays while
-  // one of its two sessions is active or pinned.
-  const inFolder = new Map<string, number>();
+  // The listed sessions that work in each folder, whichever group they show in now: a folder's group stays while
+  // one of its two sessions is active or pinned, and is marked as from elsewhere only while none of them was started here.
+  const inFolder = new Map<string, SessionSummary[]>();
   if (o.byFolder) {
     for (const s of list) {
       const dir = spaceOf(s) ? undefined : folderOf(s);
-      if (dir) inFolder.set(dir, (inFolder.get(dir) ?? 0) + 1);
+      if (!dir) continue;
+      const l = inFolder.get(dir);
+      if (l) l.push(s);
+      else inFolder.set(dir, [s]);
     }
   }
   const out = new Map<string, SessionGroup>();
@@ -132,7 +139,7 @@ export function groupSessions(
     else if (s.resumeAt != null || hasBackgroundWork(s) || lastActivityAt(s) > t - ACTIVE_MS) put(s, 'active', 'active', 'Active');
     else if (s.pinned) put(s, 'pinned', 'pinned', 'Pinned');
     else if (space) put(s, `space:${space.id}`, 'space', space.name, { space });
-    else if (dir && (inFolder.get(dir) ?? 0) >= FOLDER_MIN) put(s, `dir:${dir}`, 'folder', basename(dir) || dir, { path: dir });
+    else if (dir && (inFolder.get(dir)?.length ?? 0) >= FOLDER_MIN) put(s, `dir:${dir}`, 'folder', basename(dir) || dir, { path: dir });
     else {
       const day = dayGroup(s.updatedAt, o.now);
       put(s, `day:${day}`, 'day', day);
@@ -141,7 +148,10 @@ export function groupSessions(
   const groups = [...out.values()];
   const folders = groups.filter((g) => g.kind === 'folder');
   const labels = folderLabels(folders.map((g) => g.path!), o.names);
-  for (const g of folders) g.label = labels.get(g.path!) ?? g.label;
+  for (const g of folders) {
+    g.label = labels.get(g.path!) ?? g.label;
+    g.from = folderSources(inFolder.get(g.path!) ?? g.items);
+  }
   const placed = new Map((o.places ?? []).map((id, i) => [id, i]));
   const at = (g: SessionGroup) => (isPlaceKind(g.kind) ? (placed.get(g.id) ?? -1) : 0);
   return groups.sort((a, b) => RANK[a.kind] - RANK[b.kind] || at(a) - at(b));

@@ -10957,5 +10957,8 @@
 "This project’s own":"Του ίδιου του έργου",
 "Which skill? Give its name as the skills list shows it.":"Ποια δεξιότητα; Δώστε το όνομά της όπως το δείχνει η λίστα δεξιοτήτων.",
 "agent: claude or codex, or none for a skill of the library or the project":"agent: claude ή codex, ή τίποτα για μια δεξιότητα της βιβλιοθήκης ή του έργου",
-"on: true or false, or null for what Settings → Skills says":"on: true ή false, ή null για ό,τι λένε οι Ρυθμίσεις → Δεξιότητες"
+"on: true or false, or null for what Settings → Skills says":"on: true ή false, ή null για ό,τι λένε οι Ρυθμίσεις → Δεξιότητες",
+"Another app":"Άλλη εφαρμογή",
+"From {0}: {1}":"Από {0}: {1}",
+"Started outside Hydor":"Ξεκίνησαν εκτός Hydor"
 }

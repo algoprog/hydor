@@ -10948,5 +10948,8 @@
 "This project’s own":"这个项目自己的",
 "Which skill? Give its name as the skills list shows it.":"哪个技能？请给出技能列表中显示的名称。",
 "agent: claude or codex, or none for a skill of the library or the project":"agent：claude 或 codex；技能库或项目的技能则不填",
-"on: true or false, or null for what Settings → Skills says":"on：true 或 false；用 null 表示按设置 → 技能"
+"on: true or false, or null for what Settings → Skills says":"on：true 或 false；用 null 表示按设置 → 技能",
+"Another app":"另一个应用",
+"From {0}: {1}":"来自 {0}：{1}",
+"Started outside Hydor":"在 Hydor 之外启动"
 }

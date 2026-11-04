@@ -18,16 +18,17 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { SearchHit, SessionSummary } from '@shared/types';
+import type { AgentAccount, SearchHit, SessionSummary } from '@shared/types';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { basename, markRuns, tildify, timeAgo } from '../../lib/format';
 import { filePath, go, openSession } from '../../lib/nav';
 import { activityOf, inBackground, isBusy, isWorking } from '../../lib/activity';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { folderName, givenName, namedFolders, renameFolder, translatable, useFolderNames } from '../../lib/folderNames';
+import type { FolderSource } from '../../lib/origin';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat } from '../../components/DiffView';
-import { Button, cx, Dialog, IconButton, Throbber, MenuItem, MenuSep, Popover, useConfirm, useMediaQuery } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, Throbber, MenuItem, MenuLabel, MenuSep, Popover, useConfirm, useMediaQuery } from '../../components/ui';
 import { Elapsed } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
@@ -581,9 +582,23 @@ function PlaceRename({ g, onDone }: { g: SessionGroup; onDone: () => void }) {
   );
 }
 
+/** The agent a folder's sessions came from, and the account they are in when it is one added in Settings → Accounts: "Claude Code (Work)". */
+function sourceName(f: FolderSource, accounts?: AgentAccount[]) {
+  const account = f.account ? accounts?.find((a) => a.id === f.account)?.name : undefined;
+  return account ? `${agentName(f.agent)} (${account})` : agentName(f.agent);
+}
+
+/** Where a folder's sessions came from, for its tooltips: one line for each agent ("From Codex: VS Code, Terminal"). */
+function sourceLines(from: FolderSource[], accounts?: AgentAccount[]) {
+  const lines = from.map((f) => (f.apps.length ? `From ${sourceName(f, accounts)}: ${f.apps.join(', ')}` : sourceName(f, accounts)));
+  return ['Started outside Hydor', ...lines].join('\n');
+}
+
 /**
  * A space's or a folder's heading: it folds the group away, and drags it to another place among them; its pen starts
- * a new session there, and its ⋯ (or a right-click, or a double-click on the name) renames it.
+ * a new session there, and its ⋯ (or a right-click, or a double-click on the name) renames it. A folder whose sessions
+ * were all started outside Hydor shows the marks of the agents they came from after its name, and its tooltip and ⋯
+ * say where they were started.
  */
 function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGroup; folded: boolean; home?: string; onFold?: () => void; handle?: PlaceHandle; lifted?: boolean }) {
   const unread = folded && g.items.some(unreadOf);
@@ -592,6 +607,8 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
   const more = useRef<HTMLButtonElement>(null);
   // A folder you named: its own name can come back.
   const mine = useFolderNames((x) => (g.path ? x.mine[g.path] : undefined));
+  const accounts = useApp((x) => x.boot?.accounts);
+  const from = g.from && sourceLines(g.from, accounts);
   const shown = (
     <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
   );
@@ -605,7 +622,7 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
           ref={handle?.ref}
           {...handle?.attrs}
           aria-expanded={!folded}
-          title={g.space ? `The ${g.space.name} project: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : tildify(g.path, home)}
+          title={g.space ? `The ${g.space.name} project: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : from ? `${tildify(g.path, home)}\n${from}` : tildify(g.path, home)}
           onClick={(e) => {
             // On a phone a tap on a button in the list closes the drawer (it opened a session); this one stays.
             e.stopPropagation();
@@ -631,6 +648,13 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
             <span className="min-w-0 truncate" translate={translatable(g.label) ? undefined : 'no'}>
               {g.label}
             </span>
+            {g.from && (
+              <span className="flex shrink-0 items-center gap-0.5" title={from}>
+                {[...new Set(g.from.map((f) => f.agent))].map((a) => (
+                  <AgentIcon key={a} agent={a} size={12} />
+                ))}
+              </span>
+            )}
             {folded && <span className="tnum shrink-0 text-[11.5px] font-normal text-fg-3">{g.items.length}</span>}
             {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
             <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
@@ -658,6 +682,25 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
             <SquarePen size={13} />
           </IconButton>
           <Popover anchor={more} open={menu} onClose={() => setMenu(false)} width={210} align="end">
+            {g.from && (
+              <>
+                <MenuLabel>Started outside Hydor</MenuLabel>
+                {g.from.map((f) => (
+                  <div key={`${f.agent}:${f.account ?? ''}`} className="flex gap-2.5 px-2.5 pb-1.5 text-[12.5px] leading-[17px]">
+                    <span className="flex h-[17px] w-4 shrink-0 items-center justify-center">
+                      <AgentIcon agent={f.agent} size={13} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-fg-2" translate="no">
+                        {sourceName(f, accounts)}
+                      </span>
+                      {f.apps.length > 0 && <span className="block text-fg-3">{f.apps.join(' · ')}</span>}
+                    </span>
+                  </div>
+                ))}
+                <MenuSep />
+              </>
+            )}
             <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), setRenaming(true))}>
               Rename
             </MenuItem>
