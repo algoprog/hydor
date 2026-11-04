@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Hydor · Every AI agent, at home on your computer</title>
+  <meta name="description" content="Hydor runs Claude Code, Codex or any model on your own computer, with the plans you already pay for. Follow every step, approve what matters, and pick it up on your phone. Free and open source." />
+  <link rel="canonical" href="https://hydor.app/" />
+  <meta name="author" content="Chris Samarinas" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="icon" href="favicon.ico" sizes="48x48" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Hydor" />
+  <meta property="og:url" content="https://hydor.app/" />
+  <meta property="og:title" content="Hydor · Every AI agent, at home on your computer" />
+  <meta property="og:description" content="Run Claude Code, Codex or any model on your own computer, with the plans you already pay for, and use them from any device. Free and open source." />
+  <meta property="og:image" content="https://hydor.app/img/og.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Hydor: every AI agent, at home on your computer" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="style.css" />
+  <script>document.documentElement.classList.add('js')</script>
+  <script src="main.js" defer></script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Hydor",
+      "description": "A self-hosted home for AI agents: run Claude Code, Codex or any model on your own computer and use them from any device.",
+      "url": "https://hydor.app/",
+      "downloadUrl": "https://github.com/algoprog/hydor/releases/latest",
+      "softwareVersion": "%VERSION%",
+      "operatingSystem": "macOS, Linux, Windows (Docker)",
+      "applicationCategory": "ProductivityApplication",
+      "license": "https://opensource.org/licenses/MIT",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "Chris Samarinas", "url": "https://algoprog.com" }
+    }
+  </script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11.5m0 0-4.5-4.5M12 15l4.5-4.5M4 16.5v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8.5 5.8v12.4a.8.8 0 0 0 1.2.7l10-6.2a.8.8 0 0 0 0-1.4l-10-6.2a.8.8 0 0 0-1.2.7z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-github" viewBox="0 0 16 16"><path fill="currentColor" stroke="none" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="m7.5 9.5 2.5 2.5-2.5 2.5M12.5 15h4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.2 19 6v5.2c0 4.4-3 8.2-7 9.6-4-1.4-7-5.2-7-9.6V6z"/><path d="M12 8.2v4.2m0 3v.3"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.8"/><path d="M3.2 12h17.6M12 3.2c2.4 2.5 3.6 5.4 3.6 8.8s-1.2 6.3-3.6 8.8c-2.4-2.5-3.6-5.4-3.6-8.8S9.6 5.7 12 3.2z"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M3 5.8c2.6-1 5.6-.9 9 1 3.4-1.9 6.4-2 9-1v13c-2.6-1-5.6-.9-9 1-3.4-1.9-6.4-2-9-1z"/><path d="M12 6.8v13"/></symbol>
+    <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M9 12.5h7M9 16.5h7M12.5 10.5v8"/></symbol>
+    <symbol id="i-apps" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.8"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4.2 4.2 0 0 0 5.4 5.4l-8.6 8.6a2.3 2.3 0 0 1-3.3-3.3l8.6-8.6A4.2 4.2 0 0 1 14.7 6.3z" transform="translate(-1.5 -1.5)"/></symbol>
+    <symbol id="i-plane" viewBox="0 0 24 24"><path d="M21 3.5 3 10.6l7 2.8 2.8 7z"/><path d="M10 13.4 21 3.5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+    <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.8"/><path d="M2 19.5h20"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3 20.5 7.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7.2 18.5h10.3a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.1a4.75 4.75 0 0 0 .6 9.4z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5v-3a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M7 15h3"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="m8.5 7.5-5 4.5 5 4.5M15.5 7.5l5 4.5-5 4.5M13.5 5l-3 14"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.8"/><path d="M12 7.2V12l3.2 2"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.9 8.6 19 10.5l-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5h12l2.5 8.5V19h-17z"/><path d="M3.5 13.5H9a3 3 0 0 0 6 0h5.5"/></symbol>
+    <symbol id="i-servers" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="7" rx="1.8"/><rect x="3.5" y="13" width="17" height="7" rx="1.8"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-omega" viewBox="0 0 100 100"><path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke-width="10"/></symbol>
+  </svg>
+
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" data-nav>
+    <div class="nav-in">
+      <a class="brand" href="#top" aria-label="Hydor, back to the top">
+        <svg class="wordmark" viewBox="-4 -1 530 102" fill="none" stroke-width="10" aria-hidden="true">
+          <defs>
+            <clipPath id="wm1-clip"><rect x="-10" y="0" width="542" height="100" /></clipPath>
+            <mask id="wm1-mask" maskUnits="userSpaceOnUse" x="-10" y="-10" width="116" height="120">
+              <path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke="#fff" stroke-width="10" />
+            </mask>
+            <linearGradient id="wm1-sea" gradientUnits="userSpaceOnUse" x1="0" y1="-4" x2="0" y2="96">
+              <stop offset="0" stop-color="#5eead4" /><stop offset=".55" stop-color="#38bdf8" /><stop offset="1" stop-color="#60a5fa" />
+            </linearGradient>
+          </defs>
+          <g clip-path="url(#wm1-clip)">
+            <path d="M5 0V100M61 0V100M5 50H61" stroke="currentColor" />
+            <path transform="translate(104 0)" d="M-1 -6L35 52L71 -6M35 52V100" stroke="currentColor" />
+            <path transform="translate(212 0)" d="M5 0V100M5 5H30A39 45 0 0 1 30 95H5" stroke="currentColor" />
+            <g transform="translate(324 0)">
+              <path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke="#38bdf8" opacity=".3" />
+              <g mask="url(#wm1-mask)">
+                <g class="wm-fill"><g class="wm-ebb"><g class="wm-bob"><g class="wm-swell">
+                  <path d="M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 V130 H-72 Z" fill="url(#wm1-sea)" stroke="none" />
+                  <path d="M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0" stroke="#fff" stroke-width="5" opacity=".85" />
+                </g></g></g></g>
+              </g>
+            </g>
+            <path transform="translate(458 0)" d="M5 100V5H34A25 20 0 0 1 34 50H5M30 50L66 106" stroke="currentColor" />
+          </g>
+        </svg>
+      </a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#see">See it work</a>
+        <a href="#features">Features</a>
+        <a href="#phone">On your phone</a>
+        <a href="#yours">Privacy</a>
+        <a href="https://github.com/algoprog/hydor/tree/main/docs/guide">Docs</a>
+      </nav>
+      <div class="nav-end">
+        <a class="nav-gh" href="https://github.com/algoprog/hydor" aria-label="Hydor on GitHub">
+          <svg class="ic"><use href="#i-github" /></svg><span class="nav-gh-label">GitHub</span>
+        </a>
+        <a class="btn btn-primary btn-sm" href="#download">Download</a>
+        <button class="nav-menu" type="button" aria-expanded="false" aria-controls="nav-sheet" aria-label="Menu" data-menu>
+          <svg class="ic"><use href="#i-menu" /></svg>
+        </button>
+      </div>
+    </div>
+    <div class="nav-sheet" id="nav-sheet" hidden>
+      <a href="#see">See it work</a>
+      <a href="#features">Features</a>
+      <a href="#phone">On your phone</a>
+      <a href="#yours">Privacy</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/algoprog/hydor/tree/main/docs/guide">Docs</a>
+      <a href="https://github.com/algoprog/hydor">GitHub</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="hero" id="top">
+      <canvas class="water" aria-hidden="true" data-water></canvas>
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="wrap hero-copy">
+        <a class="pill reveal" href="https://github.com/algoprog/hydor/releases/latest">
+          <span class="pill-tag">New in %VERSION%</span>
+          <span class="pill-text">%WHATS_NEW%</span>
+          <svg class="ic"><use href="#i-arrow" /></svg>
+        </a>
+        <h1 class="reveal" style="--d: 80ms">Every AI agent,<br /><span class="water-text">at home on your computer.</span></h1>
+        <p class="lede reveal" style="--d: 160ms">
+          Hydor runs Claude Code, Codex or any model on your own machine, with the plans you already pay for. Ask for
+          research, a document, a trip plan or a bug fix, follow every step, approve what matters, and pick it up on
+          your phone.
+        </p>
+        <div class="hero-ctas reveal" style="--d: 240ms">
+          <a class="btn btn-primary btn-lg" href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg" data-get>
+            <svg class="ic"><use href="#i-download" /></svg><span data-get-label>Download for Mac</span>
+          </a>
+          <button class="btn btn-ghost btn-lg" type="button" data-tour>
+            <span class="play-dot"><svg class="ic"><use href="#i-play" /></svg></span>Watch the tour<span class="btn-note">2 min</span>
+          </button>
+        </div>
+        <p class="fine reveal" style="--d: 320ms" data-get-note>
+          Free and open source · macOS 12 or newer, Apple silicon ·
+          <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg">Intel Mac</a> ·
+          <a href="#download">Docker and Linux</a>
+        </p>
+      </div>
+
+      <div class="stage">
+        <div class="stage-tilt" data-tilt>
+          <figure class="window">
+            <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Hydor</span></div>
+            <img src="img/app-start.webp" width="1600" height="1000" fetchpriority="high"
+              alt="Hydor's start page: the sidebar lists sessions that need you, pinned ones and projects, and the message box asks what to work on, with the agent, model, folder and assistant to pick under it." />
+          </figure>
+          <div class="float float-a" aria-hidden="true"><span class="dot dot-amber"></span><b>Needs you</b><span>Run the whole test suite?</span></div>
+          <div class="float float-b" aria-hidden="true"><svg class="ic"><use href="#i-check" /></svg><span>Answer with <b>5 sources</b></span></div>
+          <div class="float float-c" aria-hidden="true"><span class="add">+2</span><span class="del">−3</span><span class="mono">src/checkout/total.ts</span></div>
+          <figure class="phone phone-hero" aria-hidden="true">
+            <img src="img/app-phone.webp" width="780" height="1688" alt="" />
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- Agents and models -->
+    <section class="agents" aria-labelledby="agents-title">
+      <p class="agents-title" id="agents-title">Works with the agents and models you already use</p>
+      <div class="marquee">
+        <div class="marquee-track">
+          <ul class="marquee-set">
+            <li><i style="--c: #f0a07f"></i>Claude Code</li>
+            <li><i style="--c: #b9a9ff"></i>Codex</li>
+            <li><i style="--c: #8ab4f8"></i>Gemini CLI</li>
+            <li><i style="--c: #6fd39a"></i>OpenCode</li>
+            <li><i style="--c: #a78bfa"></i>Qwen Code</li>
+            <li><i style="--c: #f2b468"></i>Goose</li>
+            <li><i style="--c: #5eead4"></i>Kimi CLI</li>
+            <li><i style="--c: #f28b8b"></i>Auggie</li>
+            <li><i style="--c: #93c5fd"></i>OpenRouter</li>
+            <li><i style="--c: #e9edf5"></i>Ollama</li>
+            <li><i style="--c: #38bdf8"></i>vLLM</li>
+            <li><i style="--c: #fcd34d"></i>Hugging Face</li>
+          </ul>
+          <ul class="marquee-set" aria-hidden="true">
+            <li><i style="--c: #f0a07f"></i>Claude Code</li>
+            <li><i style="--c: #b9a9ff"></i>Codex</li>
+            <li><i style="--c: #8ab4f8"></i>Gemini CLI</li>
+            <li><i style="--c: #6fd39a"></i>OpenCode</li>
+            <li><i style="--c: #a78bfa"></i>Qwen Code</li>
+            <li><i style="--c: #f2b468"></i>Goose</li>
+            <li><i style="--c: #5eead4"></i>Kimi CLI</li>
+            <li><i style="--c: #f28b8b"></i>Auggie</li>
+            <li><i style="--c: #93c5fd"></i>OpenRouter</li>
+            <li><i style="--c: #e9edf5"></i>Ollama</li>
+            <li><i style="--c: #38bdf8"></i>vLLM</li>
+            <li><i style="--c: #fcd34d"></i>Hugging Face</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live demo -->
+    <section class="section" id="see">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow">See it work</p>
+          <h2>Ask in plain words.<br /><span class="water-text">Watch it get done.</span></h2>
+          <p>Every step shows as it happens, in words you can follow. Commands and edits wait for your OK, and every change comes with its diff.</p>
+        </header>
+
+        <div class="demo reveal" data-demo>
+          <div class="demo-tabs" role="tablist" aria-label="Examples">
+            <button class="demo-tab" role="tab" type="button" id="tab-bug" aria-selected="true" aria-controls="demo-panel" data-scenario="bug">
+              <svg class="ic"><use href="#i-wrench" /></svg>Fix a bug<span class="demo-tab-bar"></span>
+            </button>
+            <button class="demo-tab" role="tab" type="button" id="tab-research" aria-selected="false" aria-controls="demo-panel" data-scenario="research" tabindex="-1">
+              <svg class="ic"><use href="#i-search" /></svg>Research a purchase<span class="demo-tab-bar"></span>
+            </button>
+            <button class="demo-tab" role="tab" type="button" id="tab-trip" aria-selected="false" aria-controls="demo-panel" data-scenario="trip" tabindex="-1">
+              <svg class="ic"><use href="#i-plane" /></svg>Plan a trip<span class="demo-tab-bar"></span>
+            </button>
+          </div>
+          <div class="demo-window" id="demo-panel" role="tabpanel" aria-labelledby="tab-bug">
+            <div class="demo-head">
+              <div class="demo-title">
+                <span class="spark" aria-hidden="true"></span>
+                <span data-demo-title>Fix the checkout tests</span>
+              </div>
+              <div class="demo-meta">
+                <span class="status" data-demo-status data-state="ready">Ready</span>
+                <span class="demo-path" data-demo-meta>~/code/shop-api · main · Opus 5.5</span>
+              </div>
+            </div>
+            <div class="demo-body" data-demo-body aria-live="off"></div>
+            <div class="demo-input">
+              <div class="demo-typed" data-demo-typed><span class="ph">Describe a task, ask a question, or paste an error…</span></div>
+              <div class="demo-input-row">
+                <span class="demo-chip" data-demo-assistant>Coder · Opus 5.5 · High</span>
+                <span class="demo-send" aria-hidden="true"><svg class="ic"><use href="#i-arrow" /></svg></span>
+              </div>
+            </div>
+          </div>
+          <p class="demo-caption">An example, played out. In Hydor it is your own agent, in your own folder.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow">Everything in one place</p>
+          <h2>One home for all your agents</h2>
+          <p>Whichever agent does the work, it gets the same tools, skills and connections, and you get one place to follow it all, on any device.</p>
+        </header>
+
+        <div class="bento">
+          <article class="card card-agents reveal" data-spot>
+            <div class="card-copy">
+              <h3>Any agent, any model</h3>
+              <p>Claude Code and Codex with the plans you pay for, Gemini CLI and other ACP agents, or Hydor's own agent with any model: OpenRouter, Ollama, or open-weight models on your own graphics card or Mac. Sign in several plans, and a session moves on when one hits its limit.</p>
+            </div>
+            <div class="picker" aria-hidden="true" data-picker>
+              <div class="picker-row"><i class="pk pk-claude"></i><div><b>Claude Code</b><span>Anthropic · Claude plan or API key</span></div><svg class="ic tick"><use href="#i-check" /></svg></div>
+              <div class="picker-row"><i class="pk pk-codex"></i><div><b>Codex</b><span>OpenAI · ChatGPT plan or API key</span></div><svg class="ic tick"><use href="#i-check" /></svg></div>
+              <div class="picker-row"><svg class="pk pk-omega" viewBox="-6 -6 112 112"><use href="#i-omega" /></svg><div><b>Custom</b><span>Any model: OpenRouter, Ollama, vLLM</span></div><svg class="ic tick"><use href="#i-check" /></svg></div>
+              <div class="picker-row"><i class="pk pk-gemini"></i><div><b>Gemini CLI</b><span>ACP agent</span></div><svg class="ic tick"><use href="#i-check" /></svg></div>
+            </div>
+          </article>
+
+          <article class="card card-steer reveal" style="--d: 80ms" data-spot>
+            <div class="card-copy">
+              <h3>You stay in charge</h3>
+              <p>Approve commands and edits from a card, see each change as a diff, add a note while the agent works, or stop it.</p>
+            </div>
+            <div class="st-note" aria-hidden="true">
+              <span class="st-tag">Your note</span><span class="st-text">Also check the refund flow: it uses total() too.</span><span class="st-q">joins the turn</span>
+            </div>
+            <div class="mini-approve" aria-hidden="true">
+              <div class="ma-head"><svg class="ic"><use href="#i-shield" /></svg>Edit a file<span>waiting 4 s</span></div>
+              <div class="ma-diff">
+                <div class="ln del"><b>−</b>return subtotal - discount;</div>
+                <div class="ln add"><b>+</b>return round(net * (1 + TAX));</div>
+              </div>
+              <div class="ma-btns"><span class="b-allow">Allow</span><span class="b-always">Always allow edits</span><span class="b-deny">Deny…</span></div>
+            </div>
+          </article>
+
+          <article class="card card-shot card-browser reveal" data-spot>
+            <div class="card-copy">
+              <h3>Help with anything, not just code</h3>
+              <p>A Researcher, Writer, Tutor, Planner and Analyst ready to start. Agents search the web and cite their sources, and use a browser you can watch and take over to sign in or pay.</p>
+            </div>
+            <div class="shot"><img src="img/browser.webp" width="1200" height="740" loading="lazy" alt="An agent at work in its browser on an e-bike shop's page, with a Take over button for you to step in." /></div>
+          </article>
+
+          <article class="card card-shot card-apps reveal" style="--d: 80ms" data-spot>
+            <div class="card-copy">
+              <h3>Apps that show the answer</h3>
+              <p>Small tools for one job, a trip plan, a product comparison, the weather or a quiz, whose answers open in views of their own, with maps, charts and pictures. Use the ready-made ones, or describe your own.</p>
+            </div>
+            <div class="shot"><img src="img/trip-app.webp" width="1200" height="576" loading="lazy" alt="The Trip planner app's answer in a chat: a map of Lisbon with each day's area in order, from Alfama to Sintra." /></div>
+          </article>
+
+          <article class="card card-shot card-library reveal" data-spot>
+            <div class="card-copy">
+              <h3>Keep what it makes</h3>
+              <p>Pages, slides, documents, spreadsheets and LaTeX, edited right in the app and exported to PDF, Word, PowerPoint or Excel. Pictures, videos, music and voice-overs too. All of it waits in your Library, by project.</p>
+            </div>
+            <div class="shot"><img src="img/library-slides.webp" width="1200" height="646" loading="lazy" alt="Slides for a four-day Lisbon trip open in the Library's editor, with an illustrated tram on the first slide." /></div>
+          </article>
+
+          <article class="card card-memory reveal" style="--d: 80ms" data-spot>
+            <div class="card-copy">
+              <h3>It remembers you</h3>
+              <p>A profile of you and notes on your projects, found by their words and by what they mean, on your own computer. Each session starts with what bears on your request.</p>
+            </div>
+            <div class="mem" aria-hidden="true" data-mem>
+              <div class="mem-q"><svg class="ic"><use href="#i-search" /></svg><span data-mem-q></span><i class="caret"></i></div>
+              <ul class="mem-notes">
+                <li data-k="food"><span class="tag">You</span>Vegetarian, loves Portuguese food</li>
+                <li data-k="work"><span class="tag">Shop website</span>Payments go through Stripe</li>
+                <li data-k="style"><span class="tag">You</span>Likes short answers with a clear pick</li>
+                <li data-k="trip"><span class="tag">Lisbon trip</span>Prefers walking to taxis</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card card-auto reveal" data-spot>
+            <div class="card-copy">
+              <h3>Work that runs by itself</h3>
+              <p>Scheduled tasks, watchers and webhooks, and goals an agent keeps working on until they hold.</p>
+            </div>
+            <ul class="tasks" aria-hidden="true">
+              <li><svg class="ic"><use href="#i-clock" /></svg><div><b>Weekly news digest</b><span>Mondays at 8:00</span></div><em class="ok">Done</em></li>
+              <li><svg class="ic"><use href="#i-globe" /></svg><div><b>Watch the e-bike's price</b><span>Tells you when it drops</span></div><em class="run"><i></i>Watching</em></li>
+              <li><svg class="ic"><use href="#i-spark" /></svg><div><b>Goal: every test passes</b><span>Keeps going until it holds</span></div><em class="run"><i></i>Turn 3</em></li>
+            </ul>
+          </article>
+
+          <article class="card card-replies reveal" style="--d: 80ms" data-spot>
+            <div class="card-copy">
+              <h3>Replies made to read</h3>
+              <p>Maths drawn as in a textbook, diagrams in the app's colours, and charts and small tools that run right inside a reply.</p>
+            </div>
+            <div class="replies" aria-hidden="true">
+              <div class="formula">
+                <math display="block">
+                  <mi>x</mi><mo>=</mo>
+                  <mfrac>
+                    <mrow><mo>−</mo><mi>b</mi><mo>±</mo><msqrt><msup><mi>b</mi><mn>2</mn></msup><mo>−</mo><mn>4</mn><mi>a</mi><mi>c</mi></msqrt></mrow>
+                    <mrow><mn>2</mn><mi>a</mi></mrow>
+                  </mfrac>
+                </math>
+              </div>
+              <div class="bars"><i style="--h: 38%"></i><i style="--h: 62%"></i><i style="--h: 48%"></i><i style="--h: 80%"></i><i style="--h: 70%"></i><i style="--h: 94%"></i></div>
+              <div class="flow"><span>Question</span><i></i><span>Search</span><i></i><span>Read</span><i></i><span class="end">Answer</span></div>
+            </div>
+          </article>
+
+          <article class="card card-shot card-around reveal" data-spot>
+            <div class="card-copy">
+              <h3>And everything around them</h3>
+              <p>A terminal, files, Git with one Sync button, models for your own hardware, projects, skills, plugins, connected apps, usage and limits, and one search box (Ctrl+K) for all of it.</p>
+            </div>
+            <div class="shot"><img src="img/around.webp" width="1700" height="882" loading="lazy" alt="Cards for the terminal, files, Git, models, projects, skills, plugins, connected apps, and usage and limits." /></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it goes -->
+    <section class="section story-section" id="how">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow">How it goes</p>
+          <h2>From a question to <span class="water-text">work that's done</span></h2>
+        </header>
+        <div class="story" data-story>
+          <ol class="story-steps">
+            <li class="story-step" data-step="0">
+              <span class="story-num">01</span>
+              <h3>Say what you need</h3>
+              <p>Pick an agent, a model and a folder, or let Hydor make a folder for the task. Type it, attach files, or just talk.</p>
+              <img class="story-inline" src="img/app-start.webp" width="1600" height="1000" loading="lazy" alt="" />
+            </li>
+            <li class="story-step" data-step="1">
+              <span class="story-num">02</span>
+              <h3>Follow every step</h3>
+              <p>Commands fold into small boxes with plain names, each a click away from its output. Commands and edits wait for your Allow, or go ahead on their own if you let them.</p>
+              <img class="story-inline" src="img/app-session.webp" width="1600" height="1536" loading="lazy" alt="" />
+            </li>
+            <li class="story-step" data-step="2">
+              <span class="story-num">03</span>
+              <h3>Get answers you can check</h3>
+              <p>Agents search and read the web for you, and each reply shows the pages it cites. Comparisons and reports come as files to open or download.</p>
+              <img class="story-inline" src="img/app-research.webp" width="1600" height="1600" loading="lazy" alt="" />
+            </li>
+            <li class="story-step" data-step="3">
+              <span class="story-num">04</span>
+              <h3>Make it a routine</h3>
+              <p>Turn a follow-up into a scheduled task, and Hydor runs it for you, every morning or every Monday, and tells you what it found.</p>
+              <img class="story-inline" src="img/app-tasks.webp" width="1600" height="869" loading="lazy" alt="" />
+            </li>
+            <li class="story-step" data-step="4">
+              <span class="story-num">05</span>
+              <h3>Keep it together</h3>
+              <p>Projects hold a job's sessions, files, documents, memory and guidelines in one place, like Projects in ChatGPT or Claude, but on your own computer.</p>
+              <img class="story-inline" src="img/app-projects.webp" width="1600" height="1280" loading="lazy" alt="" />
+            </li>
+          </ol>
+          <div class="story-stage" aria-hidden="true">
+            <div class="window story-window">
+              <div class="window-bar"><i></i><i></i><i></i><span>Hydor</span></div>
+              <div class="story-shots">
+                <img class="on" src="img/app-start.webp" width="1600" height="1000" loading="lazy" alt="" />
+                <img src="img/app-session.webp" width="1600" height="1536" loading="lazy" alt="" />
+                <img src="img/app-research.webp" width="1600" height="1600" loading="lazy" alt="" />
+                <img src="img/app-tasks.webp" width="1600" height="869" loading="lazy" alt="" />
+                <img src="img/app-projects.webp" width="1600" height="1280" loading="lazy" alt="" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Phone -->
+    <section class="section phone-section" id="phone">
+      <div class="wrap phone-grid">
+        <div class="phone-copy">
+          <header class="section-head left reveal">
+            <p class="eyebrow">On your phone</p>
+            <h2>Leave your desk.<br /><span class="water-text">Your agents keep going.</span></h2>
+            <p>Sessions keep running when you close the tab. Add Hydor to your phone's home screen, get a notification when an agent finishes or needs you, and answer right from it.</p>
+          </header>
+          <ul class="ticks reveal" style="--d: 100ms">
+            <li><svg class="ic"><use href="#i-bell" /></svg><div><b>Approve from the notification</b><span>A plain yes or no has Approve and Deny right on it.</span></div></li>
+            <li><svg class="ic"><use href="#i-inbox" /></svg><div><b>One inbox</b><span>Everything waiting on you, across sessions, tasks and machines.</span></div></li>
+            <li><svg class="ic"><use href="#i-mic" /></svg><div><b>Hands-free</b><span>Talk to it and hear its answers, by voice.</span></div></li>
+            <li><svg class="ic"><use href="#i-servers" /></svg><div><b>Several machines, one place</b><span>Add your other computers and switch between them.</span></div></li>
+          </ul>
+        </div>
+        <div class="phone-demo reveal" style="--d: 120ms" aria-hidden="true">
+          <div class="phone phone-big" data-phone>
+            <div class="phone-screen">
+              <div class="lock">
+                <div class="lock-date" data-lock-date>Wednesday 4 November</div>
+                <div class="lock-time">9:41</div>
+                <div class="notes">
+                  <div class="note note-1"><div class="note-in"><div class="note-card">
+                    <div class="note-top"><svg class="note-icon" viewBox="-6 -6 112 112"><use href="#i-omega" /></svg>Hydor<span>now</span></div>
+                    <b>Fix the checkout tests</b>
+                    <p>Needs you: run the whole test suite (npm test)?</p>
+                    <div class="note-btns"><span class="nb-yes">Approve</span><span class="nb-no">Deny</span></div>
+                    <div class="note-done"><svg class="ic"><use href="#i-check" /></svg>Approved · running the tests</div>
+                  </div></div></div>
+                  <div class="note note-2"><div class="note-in"><div class="note-card">
+                    <div class="note-top"><svg class="note-icon" viewBox="-6 -6 112 112"><use href="#i-omega" /></svg>Hydor<span>2 min ago</span></div>
+                    <b>Find the best e-bike under $2,000</b>
+                    <p>Finished · The Velora Ridge E5 fits best: its 85 Nm mid-drive climbs your hills…</p>
+                  </div></div></div>
+                </div>
+              </div>
+              <img class="phone-app" src="img/app-phone.webp" width="780" height="1688" loading="lazy" alt="" />
+              <div class="phone-island"></div>
+            </div>
+          </div>
+          <div class="phone-ripple"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Yours -->
+    <section class="section" id="yours">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow">Yours</p>
+          <h2>Your computer, your plans, your data</h2>
+          <p>Hydor is not a service you sign up for. It is an app that runs where you choose, with the AI you choose.</p>
+        </header>
+        <div class="yours">
+          <article class="y-card reveal" data-spot>
+            <span class="y-icon"><svg class="ic"><use href="#i-home" /></svg></span>
+            <h3>Runs where you are</h3>
+            <p>On your Mac, a Linux box at home or a server you rent. Your sessions, files and memory stay there.</p>
+          </article>
+          <article class="y-card reveal" style="--d: 70ms" data-spot>
+            <span class="y-icon"><svg class="ic"><use href="#i-card" /></svg></span>
+            <h3>Uses what you pay for</h3>
+            <p>The Claude and ChatGPT plans you already have, pay as you go through OpenRouter, or free models on your own computer.</p>
+          </article>
+          <article class="y-card reveal" style="--d: 140ms" data-spot>
+            <span class="y-icon"><svg class="ic"><use href="#i-lock" /></svg></span>
+            <h3>Keys agents never see</h3>
+            <p>Passwords and keys live in an encrypted vault. Agents use them by name, only on the sites you allow.</p>
+          </article>
+          <article class="y-card reveal" style="--d: 210ms" data-spot>
+            <span class="y-icon"><svg class="ic"><use href="#i-code" /></svg></span>
+            <h3>Open source</h3>
+            <p>MIT licensed: read every line and change what you like. In English, Chinese or Greek.</p>
+          </article>
+        </div>
+        <dl class="stats reveal">
+          <div><dt>Built-in skills</dt><dd><span data-count="60">60</span>+</dd></div>
+          <div><dt>Ready assistants</dt><dd><span data-count="8">8</span></dd></div>
+          <div><dt>Ways to install</dt><dd><span data-count="4">4</span></dd></div>
+          <div><dt>Cost of the app</dt><dd>$<span data-count="0">0</span></dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- Download -->
+    <section class="section download-section" id="download">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow">Download</p>
+          <h2>Get Hydor</h2>
+          <p>Install it once on a computer, then open it from any device. A short tour sets up what you want to use, made for people new to AI.</p>
+        </header>
+        <div class="dl">
+          <article class="dl-card dl-mac reveal" id="get-mac" data-spot>
+            <span class="y-icon"><svg class="ic"><use href="#i-laptop" /></svg></span>
+            <h3>Mac</h3>
+            <p>The easiest way: everything Hydor needs in one app, in a window of its own and in the menu bar. It keeps itself up to date.</p>
+            <div class="dmg" aria-hidden="true">
+              <figure class="dmg-app"><img src="favicon.svg" width="76" height="76" alt="" /><figcaption>Hydor</figcaption></figure>
+              <svg class="dmg-arrow" viewBox="0 0 48 20"><path d="M2 10h42m-8-7 8 7-8 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <figure><span class="dmg-folder"><svg class="ic"><use href="#i-apps" /></svg></span><figcaption>Applications</figcaption></figure>
+            </div>
+            <ul class="dl-list">
+              <li><svg class="ic"><use href="#i-check" /></svg>In the menu bar when its window is closed, and opens at login</li>
+              <li><svg class="ic"><use href="#i-check" /></svg>Notifications from your Mac itself</li>
+              <li><svg class="ic"><use href="#i-check" /></svg>Updates itself, and goes back if a new version does not start</li>
+              <li><svg class="ic"><use href="#i-check" /></svg>Computer use, once you turn it on: agents can work in your Mac's apps</li>
+            </ul>
+            <div class="dl-btns">
+              <a class="btn btn-primary" href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg" data-mac="arm"><svg class="ic"><use href="#i-download" /></svg>Apple silicon</a>
+              <a class="btn btn-ghost" href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg" data-mac="x64"><svg class="ic"><use href="#i-download" /></svg>Intel</a>
+            </div>
+            <p class="dl-fine">macOS 12 or newer · Not sure? Apple menu → About This Mac: "Apple M…" means Apple silicon.</p>
+          </article>
+          <article class="dl-card reveal" style="--d: 70ms" id="get-docker" data-spot>
+            <span class="y-icon"><svg class="ic"><use href="#i-box" /></svg></span>
+            <h3>Docker</h3>
+            <p>On Linux, macOS or Windows, Intel/AMD and ARM. Then open the setup link from its log.</p>
+            <div class="code" data-copy-wrap>
+              <div class="code-bar"><span>Terminal</span><button class="copy" type="button" data-copy aria-label="Copy the Docker commands"><svg class="ic"><use href="#i-copy" /></svg><span>Copy</span></button></div>
+              <pre><code>docker run -d --name hydor --restart unless-stopped \
+  -p 127.0.0.1:8790:8790 -v hydor-home:/home/node \
+  -v "$PWD/workspace:/workspace" algoprog/hydor
+docker logs hydor | grep setup</code></pre>
+            </div>
+          </article>
+          <article class="dl-card reveal" style="--d: 140ms" id="get-linux" data-spot>
+            <span class="y-icon"><svg class="ic"><use href="#i-terminal" /></svg></span>
+            <h3>Linux</h3>
+            <p>As a service of your user. Needs Node.js 22.12 or newer, git and tmux.</p>
+            <div class="code" data-copy-wrap>
+              <div class="code-bar"><span>Terminal</span><button class="copy" type="button" data-copy aria-label="Copy the Linux commands"><svg class="ic"><use href="#i-copy" /></svg><span>Copy</span></button></div>
+              <pre><code>git clone https://github.com/algoprog/hydor &amp;&amp; cd hydor
+./install.sh</code></pre>
+            </div>
+          </article>
+          <article class="dl-card dl-cloud reveal" style="--d: 210ms" id="get-cloud" data-spot>
+            <span class="y-icon"><svg class="ic"><use href="#i-cloud" /></svg></span>
+            <div class="dl-cloud-copy">
+              <h3>In the cloud</h3>
+              <p>Run it on a cloud service from the Docker image, billed to your account there.</p>
+            </div>
+            <div class="dl-btns">
+              <a class="btn btn-ghost" href="https://render.com/deploy?repo=https://github.com/algoprog/hydor">Deploy to Render</a>
+              <a class="btn btn-ghost" href="https://cloud.digitalocean.com/apps/new?repo=https://github.com/algoprog/hydor/tree/main">DigitalOcean</a>
+              <a class="btn btn-ghost" href="https://app.koyeb.com/deploy?name=hydor&amp;type=docker&amp;image=docker.io/algoprog/hydor:latest&amp;ports=8790;http;/&amp;instance_type=small">Koyeb</a>
+            </div>
+          </article>
+        </div>
+        <p class="dl-version reveal">
+          Latest release: <a href="https://github.com/algoprog/hydor/releases/latest">%VERSION%</a>, %RELEASE_DATE% ·
+          <a href="https://github.com/algoprog/hydor/blob/main/CHANGELOG.md">Release notes</a> ·
+          <a href="https://github.com/algoprog/hydor/blob/main/docs/install.md">Install guide</a> ·
+          <a href="https://github.com/algoprog/hydor/blob/main/docs/remote-access.md">Use it from your phone</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section faq-section" id="faq">
+      <div class="wrap faq-wrap">
+        <header class="section-head left reveal">
+          <p class="eyebrow">Questions</p>
+          <h2>Good to know</h2>
+          <p>Something else? <a href="https://github.com/algoprog/hydor/issues">Ask on GitHub</a>.</p>
+        </header>
+        <div class="faq reveal" style="--d: 80ms">
+          <details>
+            <summary>Is Hydor free?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>Yes. Hydor is free and open source, under the MIT license. The AI it uses is your own: a Claude or ChatGPT plan you already pay for, models you pay for as you go through OpenRouter, or free models that run on your own computer.</p></div>
+          </details>
+          <details>
+            <summary>Do I need to know how to code?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>No. A short tour, made for people new to AI, sets up what you want to use. Then ask in plain words: assistants help with research, writing, planning, learning and everyday jobs. If you do code, you also get a terminal, files, Git and every change as a diff.</p></div>
+          </details>
+          <details>
+            <summary>Where do my conversations and files live?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>On the computer that runs Hydor. Your sessions, files, memory and keys are kept there, not in a Hydor cloud. Agents reach the AI services and websites you choose from there.</p></div>
+          </details>
+          <details>
+            <summary>Can I use it from my phone?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>Yes. Open it in your phone's browser and add it to the home screen: it works like an app, with notifications. To reach it away from home, put HTTPS in front of it; <a href="https://github.com/algoprog/hydor/blob/main/docs/remote-access.md">the docs show a few easy ways</a>.</p></div>
+          </details>
+          <details>
+            <summary>Which agents and models does it work with?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>Claude Code, Codex, Gemini CLI and other agents that speak the Agent Client Protocol, such as OpenCode, Qwen Code, Goose, Kimi CLI and Auggie. Hydor's own agent, Custom, gives any model the same tools: through OpenRouter, Ollama, or vLLM on your own graphics card.</p></div>
+          </details>
+          <details>
+            <summary>Does it run on Windows?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>Yes, with Docker. There is also a Mac app, an installer for Linux, and one-click deploys to cloud services.</p></div>
+          </details>
+          <details>
+            <summary>Is it made by Anthropic or OpenAI?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>No. Hydor is an independent project, not affiliated with or endorsed by Anthropic or OpenAI. It runs their official command-line tools, signed in with your own account.</p></div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- Closing -->
+    <section class="closing" aria-labelledby="closing-title">
+      <div class="wrap closing-in">
+        <svg class="wordmark wordmark-big" viewBox="-4 -1 530 102" fill="none" stroke-width="10" role="img" aria-label="Hydor" data-fill-on-view>
+          <defs>
+            <clipPath id="wm2-clip"><rect x="-10" y="0" width="542" height="100" /></clipPath>
+            <mask id="wm2-mask" maskUnits="userSpaceOnUse" x="-10" y="-10" width="116" height="120">
+              <path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke="#fff" stroke-width="10" />
+            </mask>
+            <linearGradient id="wm2-sea" gradientUnits="userSpaceOnUse" x1="0" y1="-4" x2="0" y2="96">
+              <stop offset="0" stop-color="#5eead4" /><stop offset=".55" stop-color="#38bdf8" /><stop offset="1" stop-color="#60a5fa" />
+            </linearGradient>
+          </defs>
+          <g clip-path="url(#wm2-clip)">
+            <path d="M5 0V100M61 0V100M5 50H61" stroke="currentColor" />
+            <path transform="translate(104 0)" d="M-1 -6L35 52L71 -6M35 52V100" stroke="currentColor" />
+            <path transform="translate(212 0)" d="M5 0V100M5 5H30A39 45 0 0 1 30 95H5" stroke="currentColor" />
+            <g transform="translate(324 0)">
+              <path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke="#38bdf8" opacity=".3" />
+              <g mask="url(#wm2-mask)">
+                <g class="wm-fill"><g class="wm-ebb"><g class="wm-bob"><g class="wm-swell">
+                  <path d="M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 V130 H-72 Z" fill="url(#wm2-sea)" stroke="none" />
+                  <path d="M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0" stroke="#fff" stroke-width="5" opacity=".85" />
+                </g></g></g></g>
+              </g>
+            </g>
+            <path transform="translate(458 0)" d="M5 100V5H34A25 20 0 0 1 34 50H5M30 50L66 106" stroke="currentColor" />
+          </g>
+        </svg>
+        <p class="closing-greek reveal"><span lang="grc">ὕδωρ</span>, "water" in ancient Greek: it takes the shape of whatever holds it.</p>
+        <h2 class="closing-title reveal" id="closing-title">Give your agents a home.</h2>
+        <div class="hero-ctas reveal">
+          <a class="btn btn-primary btn-lg" href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg" data-get>
+            <svg class="ic"><use href="#i-download" /></svg><span data-get-label>Download for Mac</span>
+          </a>
+          <a class="btn btn-ghost btn-lg" href="#download">Other ways to install</a>
+        </div>
+      </div>
+      <div class="waves" aria-hidden="true">
+        <svg class="wave wave-1" viewBox="0 0 1440 120" preserveAspectRatio="none"><path d="M0 60 Q 180 20 360 60 T 720 60 T 1080 60 T 1440 60 V120 H0Z" /></svg>
+        <svg class="wave wave-2" viewBox="0 0 1440 120" preserveAspectRatio="none"><path d="M0 70 Q 180 42 360 70 T 720 70 T 1080 70 T 1440 70 V120 H0Z" /></svg>
+        <svg class="wave wave-3" viewBox="0 0 1440 120" preserveAspectRatio="none"><path d="M0 82 Q 180 64 360 82 T 720 82 T 1080 82 T 1440 82 V120 H0Z" /></svg>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-in">
+      <div class="footer-brand">
+        <svg class="footer-omega" viewBox="-6 -6 112 112" aria-hidden="true"><use href="#i-omega" /></svg>
+        <p>A home for AI agents, on your own computer. Made by <a href="https://algoprog.com">Chris Samarinas</a>.</p>
+      </div>
+      <nav class="footer-cols" aria-label="Footer">
+        <div>
+          <h4>Hydor</h4>
+          <a href="#features">Features</a>
+          <a href="#download">Download</a>
+          <a href="https://github.com/algoprog/hydor/blob/main/CHANGELOG.md">Release notes</a>
+          <a href="https://github.com/algoprog/hydor/blob/main/docs/features.md">Everything it does</a>
+        </div>
+        <div>
+          <h4>Docs</h4>
+          <a href="https://github.com/algoprog/hydor/tree/main/docs/guide">User guide</a>
+          <a href="https://github.com/algoprog/hydor/blob/main/docs/install.md">Installation</a>
+          <a href="https://github.com/algoprog/hydor/blob/main/docs/remote-access.md">Remote access</a>
+          <a href="https://github.com/algoprog/hydor/blob/main/docs/how-it-works.md">How it works</a>
+        </div>
+        <div>
+          <h4>Project</h4>
+          <a href="https://github.com/algoprog/hydor">GitHub</a>
+          <a href="https://github.com/algoprog/hydor/issues">Issues</a>
+          <a href="https://hub.docker.com/r/algoprog/hydor">Docker Hub</a>
+          <a href="https://github.com/algoprog/hydor/blob/main/LICENSE">MIT License</a>
+        </div>
+      </nav>
+    </div>
+    <div class="wrap footer-base">
+      <p>Made by <a href="https://algoprog.com">Chris Samarinas</a>. Hydor is an independent project, not affiliated with or endorsed by Anthropic or OpenAI.</p>
+      <p>No cookies or trackers on this site.</p>
+    </div>
+  </footer>
+
+  <dialog class="tour" data-tour-dialog aria-label="A two-minute tour of Hydor">
+    <button class="tour-close" type="button" aria-label="Close" data-tour-close><svg class="ic"><use href="#i-x" /></svg></button>
+    <video controls playsinline preload="none" poster="img/tour-poster.webp" data-tour-video>
+      <source src="media/hydor-tour.mp4" type="video/mp4" />
+    </video>
+  </dialog>
+</body>
+</html>
