@@ -1,5 +1,5 @@
-// "Save to Library" on a picture or video an agent made: the file is copied into the Library (in the space you pick,
-// when there are spaces), where a model writes its title and description. Once kept, it says so and opens it there.
+// "Save to Library" on a picture, video or sound an agent made: the file is copied into the Library (in the space you
+// pick, when there are spaces), where a model writes its title and description. Once kept, it says so and opens it there.
 import { useEffect, useState } from 'react';
 import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import type { MediaItem } from '@shared/media';
@@ -14,6 +14,8 @@ export interface KeepWhat {
   path: string;
   prompt?: string;
   model?: string;
+  /** A song's lyrics, a hint for its title and description (the model cannot hear it). */
+  lyrics?: string;
   sessionKey?: string;
 }
 
@@ -25,7 +27,7 @@ function useKeep(w: KeepWhat) {
   const keepIn = async (space: string | null) => {
     setBusy(true);
     try {
-      const r = await post<{ item: MediaItem; existed: boolean }>('/api/media', { path: w.path, prompt: w.prompt, model: w.model, sessionKey: w.sessionKey, space });
+      const r = await post<{ item: MediaItem; existed: boolean }>('/api/media', { path: w.path, prompt: w.prompt, model: w.model, lyrics: w.lyrics, sessionKey: w.sessionKey, space });
       useMedia.getState().put(r.item);
       if (!r.existed) toast('Saved to your Library; a title and a description are being written for it', 'ok');
     } catch (e) {
@@ -43,7 +45,7 @@ function useKeep(w: KeepWhat) {
   return { kept, busy, keep, menu: menu.menu };
 }
 
-/** The button under a picture or video: Save to Library, or Saved, which opens it there. */
+/** The button under a picture, video or sound: Save to Library, or Saved, which opens it there. */
 export function KeepButton(w: KeepWhat & { className?: string }) {
   const { kept, busy, keep, menu } = useKeep(w);
   return (

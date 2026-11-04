@@ -1,4 +1,4 @@
-// Image generation through OpenRouter: the settings (Settings → Images and video) and the models to pick from.
+// Image generation through OpenRouter: the settings (Settings → Images, video and audio) and the models to pick from.
 import type { MediaParam } from './media.ts';
 
 /** An OpenRouter model that makes images. */

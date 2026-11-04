@@ -109,7 +109,7 @@ async function eachAccount(agent: 'claude' | 'codex', ask: (env: Env) => Promise
 
 const CLAUDE_FLAGS = ['--setting-sources', '', '--strict-mcp-config', '--no-session-persistence', '--disable-slash-commands', '--output-format', 'json'];
 
-async function askClaude(q: OneShot): Promise<string> {
+export async function askClaude(q: OneShot): Promise<string> {
   // --tools takes a list, so another flag must follow it; the prompt goes last.
   const args = ['-p', '--model', q.model ?? 'haiku', '--tools', '', ...CLAUDE_FLAGS, '--system-prompt', q.system, q.prompt];
   return eachAccount('claude', async (env) => claudeAnswer(await run(config.claudeBin, args, { timeout: q.timeoutMs ?? 90_000, env, signal: q.signal })), q.signal);

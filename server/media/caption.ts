@@ -1,6 +1,7 @@
-// The title and description of each image and video kept in the Library, written by a model that sees images:
-// a picture is shown to it (a smaller copy), a video as ten of its frames on one picture (frames.ts), with what
-// it was made from as a hint. Settings → Images and video picks the model and where it runs: the app's choice
+// The title and description of each image, video and sound kept in the Library, written by a model that sees
+// images: a picture is shown to it (a smaller copy), a video as ten of its frames on one picture (frames.ts), with
+// what it was made from as a hint; a sound, which it cannot hear, is described from what it was made from (its
+// prompt, its words, its model) alone. Settings → Images, video and audio picks the model and where it runs: the app's choice
 // (a cheap vision model through OpenRouter when a key is set, else Claude Haiku through Claude Code), any
 // vision model in OpenRouter's catalog, Claude through the Claude Code sign-in, or one of the models added in
 // Settings → Models (Ollama, vLLM, an endpoint). Without one, the title and description come from the prompt.
@@ -19,7 +20,7 @@ import { HEADERS } from '../images/openrouter.ts';
 import { userLang } from '../language/index.ts';
 import { loadConfig } from '../models/config.ts';
 import { catalog, OPENROUTER_URL, search } from '../models/openrouter.ts';
-import { askClaudeAbout } from '../oneshot.ts';
+import { askClaude, askClaudeAbout } from '../oneshot.ts';
 import { frameGrid, still } from './frames.ts';
 import { filesOf } from './store.ts';
 
@@ -93,6 +94,8 @@ interface Writer {
   label: string;
   /** The model's answer about the picture at `file`. */
   ask(system: string, prompt: string, file: string, signal: AbortSignal): Promise<string>;
+  /** Its answer from words alone (a sound's title, from what it was made from). */
+  askText(system: string, prompt: string, signal: AbortSignal): Promise<string>;
 }
 
 const claudeOk = () => {
@@ -124,6 +127,21 @@ function viaChat(m: AgentModel, provider: Writer['provider'], d: Pick<Deps, 'mod
       });
       return r.text;
     },
+    async askText(system, prompt, signal) {
+      let model = m;
+      if (model.start) model = await d.models.ensure(model.id);
+      const r = await chat(model, {
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: prompt },
+        ],
+        signal,
+        onText: () => {},
+        onReasoning: () => {},
+        maxTokens: 600,
+      });
+      return r.text;
+    },
   };
 }
 
@@ -137,7 +155,13 @@ export async function captionWriter(db: DB, d: Pick<Deps, 'models'>): Promise<Wr
   const key = loadConfig().openrouter.apiKey;
   const claude = (model: string): Writer => {
     const o = CLAUDE.find((x) => x.id === model) ?? CLAUDE[0];
-    return { provider: 'claude', model: o.id, label: `${o.label}, ${WHERE.claude}`, ask: (system, prompt, file) => askClaudeAbout({ system, prompt: `${prompt}\n\nThe picture: ${file}`, model: o.id as 'haiku', files: [file] }) };
+    return {
+      provider: 'claude',
+      model: o.id,
+      label: `${o.label}, ${WHERE.claude}`,
+      ask: (system, prompt, file) => askClaudeAbout({ system, prompt: `${prompt}\n\nThe picture: ${file}`, model: o.id as 'haiku', files: [file] }),
+      askText: (system, prompt, signal) => askClaude({ system, prompt, model: o.id as 'haiku', signal }),
+    };
   };
   const openrouter = async (model: string): Promise<Writer | { why: string }> => {
     if (!key) return { why: 'No OpenRouter key is set (Settings → Models → OpenRouter).' };
@@ -152,7 +176,7 @@ export async function captionWriter(db: DB, d: Pick<Deps, 'models'>): Promise<Wr
     case 'auto':
       if (key) return openrouter('');
       if (claudeOk()) return claude('haiku');
-      return { why: 'No model that sees images: add an OpenRouter key, or pick one in Settings → Images and video.' };
+      return { why: 'No model that sees images: add an OpenRouter key, or pick one in Settings → Images, video and audio.' };
     case 'openrouter':
       return openrouter(c.model);
     case 'claude':
@@ -183,7 +207,7 @@ export function titleFrom(m: Pick<MediaItem, 'prompt' | 'kind'> & { name?: strin
     return cut.charAt(0).toUpperCase() + cut.slice(1);
   }
   const base = (m.name ?? '').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
-  return base ? base.charAt(0).toUpperCase() + base.slice(1) : m.kind === 'video' ? 'Video' : 'Image';
+  return base ? base.charAt(0).toUpperCase() + base.slice(1) : m.kind === 'video' ? 'Video' : m.kind === 'audio' ? 'Audio' : 'Image';
 }
 
 /** The first JSON object in a model's answer, with its title and description cleaned up. */
@@ -217,6 +241,35 @@ const SYSTEM = [
   'Answer with JSON only: {"title": "…", "description": "…"}.',
 ].join(' ');
 
+const AUDIO_SYSTEM = [
+  'You write the title and description of a sound someone keeps in their media library: a song or a piece of music, speech, or sound effects and ambience, made by an AI model.',
+  'You cannot hear it, so write from what it was made from (the words it was asked for, its lyrics or script, the model, its length): say what it is, without judging how it sounds.',
+  'The title: at most 8 words, no quotes and no full stop at the end. The description: 1 to 3 plain sentences, at most 60 words, without starting "This audio", "This song" or "This recording".',
+  'Answer with JSON only: {"title": "…", "description": "…"}.',
+].join(' ');
+
+/** A sound's title and description, from what it was made from (no model hears it). */
+async function writeAudioCaption(db: DB, w: Writer, m: MediaItem, fallback: { title: string; description: string }): Promise<{ title: string; description: string; by?: string; error?: string }> {
+  const lang = userLang(db);
+  const prompt = [
+    `Write the title and description of this ${m.duration ? `${Math.round(m.duration)}-second ` : ''}sound.`,
+    m.model ? `It was made with the model ${m.model}.` : '',
+    m.prompt ? `It was made from these words: "${m.prompt.replace(/\s+/g, ' ').slice(0, 1500)}"` : '',
+    m.lyrics ? `Its words, sung or spoken: "${m.lyrics.slice(0, 1500)}"` : '',
+    !m.prompt && !m.lyrics && m.source ? `Its file is called "${path.basename(m.source)}".` : '',
+    lang !== 'en' ? `Write them in ${LANGS.find((l) => l.id === lang)?.english ?? 'English'}.` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  try {
+    const c = readCaption(await w.askText(AUDIO_SYSTEM, prompt, AbortSignal.timeout(120_000)));
+    if (!c) return { ...fallback, by: w.label, error: `${w.label} did not answer with a title and a description.` };
+    return { ...c, by: w.label };
+  } catch (e) {
+    return { ...fallback, by: w.label, error: String((e as Error).message ?? e).slice(0, 300) };
+  }
+}
+
 /** The picture the model sees: a video's frames, or a smaller copy of an image (made in `tmp`). */
 async function pictureOf(m: MediaItem, tmp: string): Promise<string | null> {
   const f = filesOf(m);
@@ -235,6 +288,7 @@ export async function writeCaption(db: DB, d: Pick<Deps, 'models'>, m: MediaItem
   const fallback = { title: titleFrom({ ...m, name: m.source ? path.basename(m.source) : undefined }), description: (m.prompt ?? '').replace(/\s+/g, ' ').trim().slice(0, 600) };
   const w = await captionWriter(db, d).catch((e) => ({ why: String((e as Error).message ?? e) }));
   if ('why' in w) return { ...fallback, error: w.why };
+  if (m.kind === 'audio') return writeAudioCaption(db, w, m, fallback);
   const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hydor-caption-'));
   try {
     const pic = await pictureOf(m, tmp);
