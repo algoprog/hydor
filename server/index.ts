@@ -46,7 +46,7 @@ import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink 
 import { checkUpdates, installUpdateNow, laterUpdate, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { accountEnv, accountPool, addAccount, addedAccounts, autoSwitchOn, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
-import { devServerShot, listDevServers, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
+import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
@@ -1491,6 +1491,10 @@ app.register(async (scope) => {
             send(c, { t: 'kernel', id, e: { op: 'gone' } });
           }
         }
+      } else if (m.t !== 'ping' && typeof m.key === 'string' && m.key.startsWith('preview:')) {
+        // A dev server's page streaming to Preview: its frames and state only, no session behind it.
+        if (m.t === 'sub') c.subs.add(m.key);
+        else if (m.t === 'unsub') c.subs.delete(m.key);
       } else if (m.t === 'sub' && m.key === SYSTEM_CHANNEL && !c.subs.has(m.key)) {
         c.subs.add(m.key);
         system.watch(1);
@@ -1509,7 +1513,7 @@ app.register(async (scope) => {
     ws.on('close', () => {
       for (const k of c.subs) {
         if (k === SYSTEM_CHANNEL) system.watch(-1);
-        else if (!k.startsWith('kernel:')) sessions.subscribe(k, -1);
+        else if (!k.startsWith('kernel:') && !k.startsWith('preview:')) sessions.subscribe(k, -1);
       }
       clients.delete(c);
     });
@@ -1584,17 +1588,30 @@ app.post('/api/preview/link', async (req) => {
   if (!PREVIEW_PORT) throw new HttpError(400, 'Previews are off (PREVIEW_PORT=0)');
   return { token: previewToken(port) };
 });
-/** A dev server's page as a picture (PNG), for browsers that can't reach the preview port, and to save or hand to an agent. */
+/** Where the browser can't reach the preview port: the page opens in the app's own browser here and streams to Preview, which the user drives. */
+app.post('/api/preview/live', async (req) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const port = Number(b.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new HttpError(400, 'Pick a port');
+  if (port === config.port) throw new HttpError(400, 'That is Hydor itself');
+  const device = b.device === 'phone' || b.device === 'tablet' ? b.device : 'desktop';
+  const at = typeof b.path === 'string' ? b.path.slice(0, 2000) : undefined;
+  return livePreview(port, { path: at, device, w: b.w, h: b.h, scale: b.scale }).catch((e) => {
+    throw e instanceof HttpError ? e : new HttpError(502, `Could not open port ${port} here: ${(e as Error).message}`);
+  });
+});
+/** A dev server's page as a picture (PNG): Preview's pictures, and one to save or hand to an agent (live: as its live preview shows it now). */
 const shotArgs = (q: Record<string, unknown>) => {
   const port = Number(q.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new HttpError(400, 'Pick a port');
   const at = typeof q.path === 'string' && q.path.startsWith('/') ? q.path.slice(0, 2000) : '/';
   const device = q.device === 'phone' || q.device === 'tablet' ? q.device : 'desktop';
-  return { port, at, device } as const;
+  const live = q.live === true || q.live === '1' || q.live === 'true';
+  return { port, at, device, live } as const;
 };
 app.get('/api/preview/shot', async (req, reply) => {
   const a = shotArgs(req.query as Record<string, unknown>);
-  const png = await devServerShot(a.port, a.at, a.device).catch((e) => {
+  const png = await devServerShot(a.port, a.at, a.device, a.live).catch((e) => {
     throw new HttpError(502, `No picture of port ${a.port}: ${(e as Error).message}`);
   });
   return reply.header('Cache-Control', 'no-store').type('image/png').send(png);
@@ -1602,7 +1619,7 @@ app.get('/api/preview/shot', async (req, reply) => {
 /** The same picture kept as a file, for a new session to start with (its path). */
 app.post('/api/preview/shot', async (req) => {
   const a = shotArgs((req.body ?? {}) as Record<string, unknown>);
-  const png = await devServerShot(a.port, a.at, a.device).catch((e) => {
+  const png = await devServerShot(a.port, a.at, a.device, a.live).catch((e) => {
     throw new HttpError(502, `No picture of port ${a.port}: ${(e as Error).message}`);
   });
   const dir = path.join(config.dataDir, 'shots', 'preview');

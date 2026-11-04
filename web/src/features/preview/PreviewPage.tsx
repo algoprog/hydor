@@ -1,20 +1,26 @@
 // Preview: the web apps running on this machine (a dev server: Vite, Next, a Python server…), each with its
 // page's title and project, to look at inside the app at a computer's, tablet's or phone's size, with an
 // address bar, back, forward and reload. Where this browser can't reach the preview port (the app behind a
-// tunnel with one hostname), the app shows pictures of the screen taken here instead. A screen can open in a
-// tab of its own, be saved as a picture, or go to an agent with a question.
+// tunnel with one hostname), the page runs in the app's own browser on this computer instead and streams
+// here, live: clicks, keys, scrolling and touch go to it. It shows as pictures on request. A screen can open
+// in a tab of its own, be saved as a picture, or go to an agent with a question.
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import { ArrowLeft, ArrowRight, Camera, ChevronDown, ChevronRight, Ellipsis, ExternalLink, Globe, Image as ImageIcon, MessageSquarePlus, Monitor, MonitorSmartphone, RotateCw, Server, Smartphone, Tablet } from 'lucide-react';
+import type { BrowserView } from '@shared/browser';
 import { api, post } from '../../lib/api';
 import { tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { startSessionWith } from '../../lib/startFiles';
+import { live as socket } from '../../lib/ws';
 import { tr } from '../../i18n/runtime';
 import { toastError, useApp } from '../../lib/store';
 import { Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Throbber, useIsMobile } from '../../components/ui';
 import { SystemHeader } from '../system/SystemHeader';
 import { RefreshIcon } from '../../components/RefreshIcon';
+import { DialogCard, KeyRow } from '../browser/Dock';
+import { LiveView, type LiveViewApi } from '../browser/LiveView';
+import { browserCall, listenBrowser, useBrowser } from '../browser/store';
 
 interface DevServer {
   port: number;
@@ -41,11 +47,22 @@ const DEVICES: { value: Device; label: string; icon: ReactNode }[] = [
   { value: 'phone', label: 'Phone', icon: <Smartphone size={14} /> },
 ];
 
+type Reach = 'checking' | 'yes' | 'no';
+
 const nameOf = (s: DevServer) => s.project ?? s.title ?? s.program;
 const pathOf = (href: string) => {
   try {
     const u = new URL(href);
     return u.pathname + u.search + u.hash;
+  } catch {
+    return '/';
+  }
+};
+/** Where the streamed page is: its path on the dev server, or the whole address on another site. */
+const shownAt = (href: string, port: number) => {
+  try {
+    const u = new URL(href);
+    return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname) && Number(u.port) === port ? u.pathname + u.search + u.hash : u.href;
   } catch {
     return '/';
   }
@@ -80,8 +97,8 @@ function ServerRow({ s, active, onOpen }: { s: DevServer; active: boolean; onOpe
   );
 }
 
-/** The frame (or the picture) at a device's width, scaled down to fit. */
-function Stage({ device, children }: { device: Device; children: ReactNode }) {
+/** The frame (or the picture) at a device's width, scaled down to fit. `onFit` hears the page's size in CSS pixels. */
+function Stage({ device, children, onFit }: { device: Device; children: ReactNode; onFit?: (fit: { w: number; h: number }) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {
@@ -92,13 +109,18 @@ function Stage({ device, children }: { device: Device; children: ReactNode }) {
     return () => ro.disconnect();
   }, []);
   const want = WIDTH[device];
+  const scale = want && size.w ? Math.min(1, (size.w - 32) / want) : 1;
+  const fitW = want || size.w;
+  const fitH = Math.round(want ? (size.h - 32) / scale : size.h);
+  useEffect(() => {
+    if (size.w > 0 && size.h > 0) onFit?.({ w: fitW, h: fitH });
+  }, [fitW, fitH, size.w, size.h, onFit]);
   if (!want)
     return (
       <div ref={box} className="relative h-full w-full bg-white dark:bg-[#151412]">
         {children}
       </div>
     );
-  const scale = size.w ? Math.min(1, (size.w - 32) / want) : 1;
   return (
     <div ref={box} className="relative h-full w-full overflow-hidden bg-bg-2">
       {size.w > 0 && (
@@ -113,8 +135,84 @@ function Stage({ device, children }: { device: Device; children: ReactNode }) {
   );
 }
 
-/** One web app: live inside the app when the preview port is reachable, else as pictures taken here. */
-function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | null; reach: 'checking' | 'yes' | 'no'; onBack?: () => void }) {
+/** Device pixels per CSS pixel for the streamed page: sharp on this screen, its frames at most 1600 pixels wide. */
+const scaleFor = (w: number) => Math.max(1, Math.min(2, window.devicePixelRatio || 1, 1600 / Math.max(1, w)));
+
+/**
+ * The page in the app's own browser on this computer, streaming: opened while `on`, laid out at `fit` (as
+ * Preview shows it), where it was left when Preview comes back to it.
+ */
+function useStream(port: number, on: boolean, device: Device, fit: { w: number; h: number } | null) {
+  const [key, setKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [n, setN] = useState(0);
+  const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
+  useEffect(() => {
+    const on = () => setVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
+  const view = useBrowser((x) => (key ? x.views[key] : undefined));
+  const open = !!view?.open;
+  const url = view?.tabs.find((t) => t.active)?.url;
+  // A path to go to once; and where the page was, to open there again once its browser has closed (unwatched for a while).
+  const goTo = useRef<string | undefined>(undefined);
+  const last = useRef('/');
+  if (open && url && /^https?:/.test(url)) last.current = shownAt(url, port);
+  const closed = !!key && !!view && !open;
+  useEffect(() => listenBrowser(), []);
+  useEffect(() => (key ? socket.sub(key) : undefined), [key]);
+  useEffect(() => {
+    // Closed after a while with nobody looking: it opens again once someone looks (not from a tab in the background).
+    if (!on || !fit || (closed && !visible)) return;
+    if (closed && goTo.current === undefined && last.current.startsWith('/')) goTo.current = last.current;
+    let alive = true;
+    const t = window.setTimeout(
+      () => {
+        const at = goTo.current;
+        goTo.current = undefined;
+        post<{ key: string; view: BrowserView }>('/api/preview/live', { port, device, w: fit.w, h: fit.h, scale: scaleFor(fit.w), ...(at !== undefined ? { path: at } : {}) })
+          .then((r) => {
+            useBrowser.setState((st) => ({ views: { ...st.views, [r.key]: r.view } }));
+            if (!alive) return;
+            setKey(r.key);
+            setError(null);
+          })
+          .catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
+      },
+      // At once the first time; a resize settles first.
+      key && !closed ? 250 : 0,
+    );
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, port, device, fit?.w, fit?.h, n, closed, closed && visible]);
+  return {
+    key: open ? key : null,
+    view: open ? view : undefined,
+    url: open ? url : undefined,
+    error,
+    /** Goes to a path on the dev server. */
+    go: (at: string) => {
+      goTo.current = at;
+      setN((x) => x + 1);
+    },
+    /** Back, forward or reload; with no page yet, tries to open it again. */
+    nav: (to: 'back' | 'forward' | 'reload') => {
+      if (key && open) void browserCall(key, '/nav', { do: to });
+      else setN((x) => x + 1);
+    },
+  };
+}
+
+/**
+ * One web app: the page itself in a frame when this browser reaches the preview port; else streamed from
+ * the app's own browser on this computer, which the user drives; or, on request, as pictures taken here.
+ */
+function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | null; reach: Reach; onBack?: () => void }) {
+  const mobile = useIsMobile();
   const [device, setDevice] = useState<Device>(() => (localStorage.getItem('wa.preview.device') as Device) || 'desktop');
   const [path, setPath] = useState('/');
   const [field, setField] = useState('/');
@@ -125,10 +223,22 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
   const [shotState, setShotState] = useState<'loading' | 'ok' | 'failed'>('loading');
   const [menu, setMenu] = useState(false);
   const [asking, setAsking] = useState(false);
+  const [fit, setFit] = useState<{ w: number; h: number } | null>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
-  const live = reach === 'yes' && !!origin && !picture;
+  const pageRef = useRef<LiveViewApi>(null);
+  const mode: 'checking' | 'frame' | 'stream' | 'picture' = picture ? 'picture' : reach === 'checking' ? 'checking' : reach === 'yes' && origin ? 'frame' : 'stream';
+  const live = mode === 'frame';
+  const stream = useStream(s.port, mode === 'stream', device, fit);
   useEffect(() => localStorage.setItem('wa.preview.device', device), [device]);
+
+  // The address bar follows the streamed page.
+  useEffect(() => {
+    if (mode !== 'stream' || !stream.url || !/^https?:/.test(stream.url)) return;
+    const p = shownAt(stream.url, s.port);
+    setPath(p);
+    setField(p);
+  }, [mode, stream.url, s.port]);
 
   // A fresh entry link each time the server or the way to look at it changes.
   useEffect(() => {
@@ -164,13 +274,17 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
 
   const goTo = (e?: FormEvent) => {
     e?.preventDefault();
+    // The streamed page went to another site: its address goes as typed.
+    if (mode === 'stream' && stream.key && /^https?:\/\//i.test(field.trim())) return void browserCall(stream.key, '/navigate', { url: field.trim() });
     const p = field.trim().startsWith('/') ? field.trim() : `/${field.trim()}`;
     setPath(p);
     setField(p);
     if (live && origin) setSrc(`${origin}${p}`);
+    else if (mode === 'stream') stream.go(p);
     else setShotN((n) => n + 1);
   };
   const nav = (to: 'back' | 'forward' | 'reload') => {
+    if (mode === 'stream') return stream.nav(to);
     if (!live) return setShotN((n) => n + 1);
     const w = frame.current?.contentWindow;
     if (w && origin) w.postMessage({ type: 'naget-preview-go', go: to }, new URL(origin).origin);
@@ -179,6 +293,8 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
   };
   const shotUrl = `/api/preview/shot?port=${s.port}&path=${encodeURIComponent(path)}&device=${device}&n=${shotN}`;
   useEffect(() => setShotState('loading'), [shotUrl]);
+  // Saved or handed to an agent: the streamed page as it is now; else a picture taken afresh.
+  const nowLive = mode === 'stream' && !!stream.key;
 
   const openTab = async () => {
     setMenu(false);
@@ -197,7 +313,7 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
   const savePicture = async () => {
     setMenu(false);
     try {
-      const r = await fetch(shotUrl, { credentials: 'same-origin' });
+      const r = await fetch(nowLive ? `${shotUrl}&live=1` : shotUrl, { credentials: 'same-origin' });
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error ?? 'No picture');
       const url = URL.createObjectURL(await r.blob());
       const a = document.createElement('a');
@@ -213,8 +329,8 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
     setMenu(false);
     setAsking(true);
     try {
-      const r = await post<{ path: string; size: number }>('/api/preview/shot', { port: s.port, path, device });
-      const where = `localhost:${s.port}${path}`;
+      const r = await post<{ path: string; size: number }>('/api/preview/shot', { port: s.port, path, device, live: nowLive });
+      const where = path.startsWith('/') ? `localhost:${s.port}${path}` : path;
       startSessionWith([{ path: r.path, size: r.size }], `/?prompt=${encodeURIComponent(`${tr(`About this screen of ${nameOf(s)} (${where}):`)} `)}${s.cwd ? `&cwd=${encodeURIComponent(s.cwd)}` : ''}`);
     } catch (e) {
       toastError(e);
@@ -231,13 +347,13 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
             <ArrowLeft size={18} />
           </IconButton>
         )}
-        <IconButton label="Back" size="sm" disabled={!live} onClick={() => nav('back')} className="max-sm:hidden">
+        <IconButton label="Back" size="sm" disabled={mode !== 'frame' && mode !== 'stream'} onClick={() => nav('back')} className="max-sm:hidden">
           <ArrowLeft size={15} />
         </IconButton>
-        <IconButton label="Forward" size="sm" disabled={!live} onClick={() => nav('forward')} className="max-sm:hidden">
+        <IconButton label="Forward" size="sm" disabled={mode !== 'frame' && mode !== 'stream'} onClick={() => nav('forward')} className="max-sm:hidden">
           <ArrowRight size={15} />
         </IconButton>
-        <IconButton label={live ? 'Reload' : 'Take a new picture'} size="sm" onClick={() => nav('reload')}>
+        <IconButton label={mode === 'picture' ? 'Take a new picture' : 'Reload'} size="sm" onClick={() => nav('reload')}>
           <RotateCw size={15} />
         </IconButton>
         <form onSubmit={goTo} className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-bg-1 px-2.5 focus-within:border-accent/60">
@@ -260,7 +376,7 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
           <MenuItem icon={<Camera size={14} />} onClick={savePicture}>
             Save a picture of it
           </MenuItem>
-          {reach === 'yes' && origin && (
+          {reach !== 'checking' && (
             <>
               <MenuSep />
               <MenuItem icon={picture ? <Globe size={14} /> : <ImageIcon size={14} />} onClick={() => (setMenu(false), setPicture((p) => !p))}>
@@ -270,9 +386,8 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
           )}
         </Popover>
       </div>
-      {!live && reach === 'no' && <FarAway />}
       <div className="relative min-h-0 flex-1">
-        <Stage device={device}>
+        <Stage device={device} onFit={setFit}>
           {live ? (
             src ? (
               <iframe ref={frame} key={`${s.port}`} src={src} title={title ?? nameOf(s)} className="block h-full w-full border-0 bg-white dark:bg-[#151412]" allow="clipboard-read; clipboard-write; fullscreen" />
@@ -281,6 +396,28 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
                 <Throbber size={26} />
               </div>
             )
+          ) : mode === 'stream' ? (
+            stream.key && stream.view ? (
+              <>
+                <LiveView ref={pageRef} k={stream.key} view={stream.view} driving plain className="h-full w-full" />
+                {stream.view.dialog && <DialogCard k={stream.key} view={stream.view} />}
+              </>
+            ) : stream.error ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-[13px] text-fg-3">
+                <p translate="no">{stream.error}</p>
+                <Button size="sm" variant="secondary" onClick={() => stream.nav('reload')}>
+                  Try again
+                </Button>
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center text-fg-3">
+                <Throbber size={26} />
+              </div>
+            )
+          ) : mode === 'checking' ? (
+            <div className="flex h-full items-center justify-center text-fg-3">
+              <Throbber size={26} />
+            </div>
           ) : (
             <div className="h-full overflow-y-auto">
               <img
@@ -301,26 +438,7 @@ function Viewer({ s, origin, reach, onBack }: { s: DevServer; origin: string | n
           )}
         </Stage>
       </div>
-    </div>
-  );
-}
-
-/** Why pictures show instead of the page itself, and how to see it live. */
-function FarAway() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="shrink-0 border-b border-line bg-bg-1 px-3 py-2 text-[12.5px] leading-relaxed">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-1.5 text-left text-fg-2">
-        <ImageIcon size={14} className="shrink-0 text-fg-3" />
-        <span className="min-w-0 flex-1">You see pictures of the page taken on this computer: this browser can’t reach the preview port.</span>
-        {open ? <ChevronDown size={14} className="shrink-0 text-fg-3" /> : <ChevronRight size={14} className="shrink-0 text-fg-3" />}
-      </button>
-      {open && (
-        <p className="mt-1.5 pl-5 text-fg-3">
-          To use it live here: on the same network, or over a VPN such as Tailscale, open the app at this computer’s own address. Behind a tunnel or a proxy, give the preview port a hostname of its own
-          (for example preview.example.com → localhost:8791) and start the app with PREVIEW_ORIGIN set to it.
-        </p>
-      )}
+      {mode === 'stream' && mobile && stream.key && <KeyRow live={pageRef} />}
     </div>
   );
 }
@@ -329,7 +447,7 @@ export function PreviewPage() {
   const search = useSearch();
   const mobile = useIsMobile();
   const [info, setInfo] = useState<Info | null>(null);
-  const [reach, setReach] = useState<'checking' | 'yes' | 'no'>('checking');
+  const [reach, setReach] = useState<Reach>('checking');
   const [other, setOther] = useState('');
   const [others, setOthers] = useState(false);
   const selected = Number(new URLSearchParams(search).get('port')) || null;
@@ -344,13 +462,32 @@ export function PreviewPage() {
     const t = setInterval(load, 5000);
     return () => clearInterval(t);
   }, []);
+  // Whether this browser reaches the preview port: as it did last time at once, checked again meanwhile. An
+  // address it can't reach may never answer (a tunnel's), so the check gives up after three seconds.
+  const loaded = !!info;
   useEffect(() => {
-    if (!origin) return;
-    setReach('checking');
-    fetch(`${origin}/__ac/ping`, { mode: 'cors', cache: 'no-store' })
-      .then((r) => setReach(r.ok ? 'yes' : 'no'))
-      .catch(() => setReach('no'));
-  }, [origin]);
+    if (!loaded) return;
+    if (!origin) {
+      setReach('no');
+      return;
+    }
+    const k = `wa.preview.reach:${origin}`;
+    const known = localStorage.getItem(k);
+    setReach(known === 'yes' || known === 'no' ? known : 'checking');
+    let alive = true;
+    fetch(`${origin}/__ac/ping`, { mode: 'cors', cache: 'no-store', signal: AbortSignal.timeout(3000) })
+      .then(
+        (r): Reach => (r.ok ? 'yes' : 'no'),
+        (): Reach => 'no',
+      )
+      .then((v) => {
+        localStorage.setItem(k, v);
+        if (alive) setReach(v);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [origin, loaded]);
 
   const pick = (port: number | null) => go(port ? `/preview?port=${port}` : '/preview', !mobile);
   const webs = info?.servers.filter((s) => s.web) ?? [];

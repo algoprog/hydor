@@ -428,8 +428,9 @@ programs shows each program's version and what is out, with Check now, Update no
   rename, publish and delete (saying which commits would be lost), and stashes to look inside, apply and drop.
 - Preview: the web apps running on this computer (dev servers, told apart from APIs and databases, with their
   project, page title and framework), shown inside the app at a computer's, tablet's or phone's width with an
-  address bar, back and forward; as pictures taken on this computer where the browser can't reach the preview
-  port (behind a tunnel); and a screen goes to a new session as a picture, with a question.
+  address bar, back and forward. Where the browser can't reach the preview port (behind a tunnel), the page
+  runs in a browser on this computer and streams to Preview live, to click, type, scroll and tap in (with a
+  key row on phones); or as still pictures. A screen goes to a new session as a picture, with a question.
 - Terminal: real shells that survive reloads and server restarts, with suggestions as you type (from your
   history, branches, scripts and folders, or written from a plain description) and an extra row of keys on
   phones.

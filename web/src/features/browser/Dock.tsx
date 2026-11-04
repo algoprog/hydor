@@ -1,6 +1,6 @@
 // Above a session's message box while its browser is open: what the agent is doing there, a live
 // view to watch (full screen on a phone), taking over to log in or pass a check, and handing back.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, ChevronDown, ChevronUp, CreditCard, Ellipsis, FileDown, Globe, Hand, Keyboard, Maximize2, Minimize2, RotateCw, Server, X } from 'lucide-react';
 import type { BrowserAsk, BrowserView } from '@shared/browser';
@@ -84,7 +84,7 @@ export function AskLine({ k, ask, phone, onTake }: { k: string; ask: BrowserAsk;
 }
 
 /** A JavaScript dialog the page opened, over the live view: only the user answers it. */
-function DialogCard({ k, view }: { k: string; view: BrowserView }) {
+export function DialogCard({ k, view }: { k: string; view: BrowserView }) {
   const d = view.dialog!;
   const [text, setText] = useState(d.defaultPrompt ?? '');
   const [busy, setBusy] = useState(false);
@@ -198,6 +198,22 @@ const KEYS: { label: ReactNode; key: string }[] = [
   { label: '↑', key: 'ArrowUp' },
   { label: '↓', key: 'ArrowDown' },
 ];
+
+/** Under a live view a phone drives: its own keyboard (**Type**), and the keys phones lack. */
+export function KeyRow({ live }: { live: RefObject<LiveViewApi | null> }) {
+  return (
+    <div className="flex shrink-0 gap-1 overflow-x-auto border-t border-line bg-bg-1 px-1.5 py-1.5 pb-[max(6px,var(--safe-bottom))] [&::-webkit-scrollbar]:hidden">
+      <button onClick={() => live.current?.keyboard()} aria-label="Keyboard" className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 text-[12.5px] font-medium text-accent-fg">
+        <Keyboard size={15} /> Type
+      </button>
+      {KEYS.map((x) => (
+        <button key={x.key} onClick={() => live.current?.press(x.key)} className="h-9 min-w-9 shrink-0 rounded-md bg-bg-3 px-2.5 font-mono text-[12.5px] text-fg">
+          {x.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** The browser's menu: its tabs, the profile it uses, sites, files it saved, closing it. */
 function BrowserMenu({ s, view, close }: { s: SessionSummary; view: BrowserView; close: () => void }) {
@@ -419,18 +435,7 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
                 </>
               )}
             </FitBox>
-            {driving && mobile && (
-              <div className="flex shrink-0 gap-1 overflow-x-auto border-t border-line bg-bg-1 px-1.5 py-1.5 pb-[max(6px,var(--safe-bottom))] [&::-webkit-scrollbar]:hidden">
-                <button onClick={() => live.current?.keyboard()} aria-label="Keyboard" className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 text-[12.5px] font-medium text-accent-fg">
-                  <Keyboard size={15} /> Type
-                </button>
-                {KEYS.map((x) => (
-                  <button key={x.key} onClick={() => live.current?.press(x.key)} className="h-9 min-w-9 shrink-0 rounded-md bg-bg-3 px-2.5 font-mono text-[12.5px] text-fg">
-                    {x.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            {driving && mobile && <KeyRow live={live} />}
           </div>,
           document.body,
         )}

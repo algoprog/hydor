@@ -430,8 +430,17 @@ function globalPolicy(): Policy {
 
 // ---- each session's browser ----------------------------------------------------------------------
 
-/** A browser of the user's own outside any session: logging a profile in from Settings. */
+/** A browser of the user's own outside any session: logging a profile in from Settings… */
 export const profileKey = (id: string) => `browser-profile:${id}`;
+/** …or a dev server's page streaming to Preview, where the browser can't reach the preview port (server/preview.ts). */
+export const previewKey = (port: number) => `preview:${port}`;
+/** Neither has an agent to tell, cards in a conversation, or a session's options. */
+export const outsideSessions = (key: string) => key.startsWith('browser-profile:') || key.startsWith('preview:');
+/** A preview's page reaches its own dev server, by each name of this machine, and nothing else here. */
+const previewLocal = (key: string): string[] => {
+  const port = key.startsWith('preview:') ? Number(key.slice('preview:'.length)) : 0;
+  return Number.isInteger(port) && port > 0 ? ['localhost', '127.0.0.1', '::1'].map((h) => `${h}:${port}`) : [];
+};
 
 const browsers = new Map<string, SessionBrowser>();
 /** Element numbers go on counting for the life of the server, so a number never means two things. */
@@ -475,17 +484,21 @@ export class SessionBrowser implements TabOwner {
   ) {}
 
   get ownBrowser() {
-    return this.key.startsWith('browser-profile:');
+    return outsideSessions(this.key);
   }
 
-  viewportFor(): { w: number; h: number } {
+  /** The size Preview shows its page at: new tabs open at it too. */
+  fit: { w: number; h: number; mobile: boolean; scale: number } | null = null;
+
+  viewportFor(): { w: number; h: number; mobile?: boolean; scale?: number } {
+    if (this.fit) return this.fit;
     return this.active ? { w: this.active.viewport.w, h: this.active.viewport.h } : DESKTOP;
   }
 
   policy(): Policy {
     const s = browserSettings(d().db);
     const o = this.ownBrowser ? {} : sessionOptions(d().db, this.key);
-    return { blockPrivate: s.blockPrivate, allow: [...s.allow, ...(o.allow ?? [])], block: [...s.block, ...(o.block ?? [])], local: o.local ?? [] };
+    return { blockPrivate: s.blockPrivate, allow: [...s.allow, ...(o.allow ?? [])], block: [...s.block, ...(o.block ?? [])], local: [...(o.local ?? []), ...previewLocal(this.key)] };
   }
 
   /** Its proxy refused a connection (a WebSocket, or a name that now leads inward): noted on the tab in front. */
@@ -643,6 +656,20 @@ export class SessionBrowser implements TabOwner {
         { maxWidth: this.cast.w, maxHeight: this.cast.h },
       )
       .catch(() => {});
+  }
+
+  /** Preview's page, laid out at the size it shows it (a computer's, a tablet's or a phone's), the user driving. */
+  async layOut(fit: { w: number; h: number; mobile: boolean; scale: number }) {
+    this.lastUse = Date.now();
+    this.driver = 'user';
+    this.fit = fit;
+    const t = await this.tab();
+    const v = t.viewport;
+    if (v.w !== fit.w || v.h !== fit.h || v.mobile !== fit.mobile || v.scale !== fit.scale) {
+      await t.setViewport(fit.w, fit.h, fit.mobile, fit.scale);
+      if (this.cast && Date.now() < this.watchUntil) await this.startCast();
+    }
+    this.changed();
   }
 
   /** The user takes the wheel (or hands it back). On a phone the page is laid out for its screen meanwhile. */
@@ -851,7 +878,8 @@ export function viewOf(key: string): BrowserView {
 export function sweepIdle() {
   const now = Date.now();
   for (const b of openBrowsers()) {
-    const limit = b.asks.length || b.driver === 'user' ? ASK_IDLE_MS : IDLE_MS;
+    // A preview has nothing to wait for: it closes like any browser nobody looks at.
+    const limit = b.key.startsWith('preview:') ? IDLE_MS : b.asks.length || b.driver === 'user' ? ASK_IDLE_MS : IDLE_MS;
     if (now - Math.max(b.lastUse, b.watchUntil) > limit) void b.close('idle');
   }
 }
@@ -860,7 +888,7 @@ export function sweepIdle() {
 
 /** A message to the session's agent: now when it is free, else after the running turn. */
 async function tellAgent(key: string, text: string) {
-  if (key.startsWith('browser-profile:')) return;
+  if (outsideSessions(key)) return;
   try {
     await d().sessions.deliverOrQueue(key, text);
   } catch (e) {
