@@ -232,9 +232,7 @@ export function Tips() {
         aria-hidden
         className={cx('tip-ring pointer-events-none fixed z-[45] rounded-[12px]', hidden && 'opacity-0')}
         style={{ left: box.left - PAD, top: box.top - PAD, width: box.width + PAD * 2, height: box.height + PAD * 2 }}
-      >
-        <span key={shown.id} className="tour-ping" />
-      </div>
+      />
       <div
         ref={setCard}
         key={shown.id}

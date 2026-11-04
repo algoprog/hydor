@@ -16,7 +16,7 @@ import { Button, cx, Throbber } from '../../components/ui';
 import { dollars, shortGpu, size, tokens, useModels } from '../settings/ModelsSettings';
 
 /** Rows of a list on one quiet panel. */
-const panel = 'tour-list';
+const panel = 'overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-line divide-y divide-line';
 
 function Wait({ label }: { label: string }) {
   return (
@@ -46,7 +46,7 @@ function Toggle({ on, onClick, name, words = ['Add', 'Added'] }: { on: boolean; 
       aria-pressed={on}
       aria-label={on ? `${words[1]}: ${name}` : `${words[0]} ${name}`}
       className={cx(
-        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] transition-colors',
+        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] transition-colors',
         on ? 'text-fg-2 hover:bg-bg-2' : 'text-fg-2 ring-1 ring-line-2 ring-inset hover:bg-bg-2 hover:text-fg',
       )}
     >
@@ -95,7 +95,7 @@ function OrKey() {
           'Paste it here.',
         ].map((t, i) => (
           <li key={i} className="flex gap-3">
-            <span className="tnum w-4 shrink-0 text-fg-3">{i + 1}</span>
+            <span className="tour-num">{i + 1}</span>
             <span className="min-w-0 pt-px">{t}</span>
           </li>
         ))}
@@ -105,7 +105,7 @@ function OrKey() {
           e.preventDefault();
           if (key.trim() && !busy) void connect();
         }}
-        className="flex items-center gap-2 rounded-xl bg-panel p-1.5 pl-4 ring-1 ring-line transition-[box-shadow] ring-inset focus-within:ring-2 focus-within:ring-accent/40"
+        className="flex items-center gap-2 rounded-xl bg-panel/80 p-1.5 pl-4 ring-1 ring-line transition-[box-shadow] focus-within:ring-2 focus-within:ring-accent/45"
       >
         <KeyRound size={17} className="shrink-0 text-fg-3" />
         <input
@@ -212,15 +212,7 @@ function OrPicks({ st }: { st: ModelsState }) {
         </button>
       </div>
       <div>
-        <Label
-          aside={
-            missing.length > 1 && (
-              <button type="button" onClick={() => void addAll()} className="text-[13px] text-fg-3 transition-colors hover:text-fg">
-                {`Add all ${missing.length}`}
-              </button>
-            )
-          }
-        >
+        <Label aside={missing.length > 1 && <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={() => void addAll()}>{`Add all ${missing.length}`}</Button>}>
           For your agent: pick one or more
         </Label>
         {!text ? (
@@ -230,11 +222,11 @@ function OrPicks({ st }: { st: ModelsState }) {
             {text.map((m) => {
               const org = m.org ?? (m.detail ?? m.id).replace(/^openrouter\//, '').split('/')[0];
               return (
-                <div key={m.id} className="tour-row">
+                <div key={m.id} className="flex items-center gap-3.5 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span className="text-[14.5px] font-medium text-fg">{m.label}</span>
-                      <span className="text-[13px] text-fg-3">{m.note}</span>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="text-[14px] font-medium text-fg">{m.label}</span>
+                      <span className="tour-note">{m.note}</span>
                     </div>
                     <div className="tnum mt-0.5 truncate text-[12.5px] text-fg-3" title="Prices are per million tokens (a token is about ¾ of a word): in is what it reads, out is what it writes">
                       {[org, m.price ? `${dollars(m.price.input)} in, ${dollars(m.price.output)} out` : '', m.contextLength ? `reads ${tokens(m.contextLength)} at once` : ''].filter(Boolean).join(' · ')}
@@ -253,7 +245,7 @@ function OrPicks({ st }: { st: ModelsState }) {
             <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12.5px] text-fg-3">
               <span className="mr-1">Also yours:</span>
               {others.map((m) => (
-                <span key={m.id} className="inline-flex h-7 items-center gap-1 rounded-lg pr-1 pl-2.5 text-fg-2 ring-1 ring-line ring-inset">
+                <span key={m.id} className="inline-flex h-7 items-center gap-1 rounded-full bg-bg-2 pr-1 pl-2.5 text-fg-2 ring-1 ring-line">
                   <span translate="no">{m.label}</span>
                   <button type="button" aria-label={`Take ${m.label} out`} title="Take it out of the pickers" onClick={() => save({ unpin: m.id })} className="rounded-full p-0.5 text-fg-3 hover:bg-fg/[0.08] hover:text-fg">
                     <X size={12} />
@@ -273,12 +265,12 @@ function OrPicks({ st }: { st: ModelsState }) {
             const i = media.info[p.id];
             const label = i?.label ?? nameOf(p.id);
             return (
-              <div key={p.id} className="tour-row">
-                <span className="flex w-5 shrink-0 justify-center text-fg-3">{ROLE_ICON[role]}</span>
+              <div key={p.id} className="flex items-center gap-3.5 px-4 py-3">
+                <span className="tour-media-icon">{ROLE_ICON[role]}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="text-[14.5px] font-medium text-fg">{label}</span>
-                    <span className="text-[13px] text-fg-3">{p.note}</span>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="text-[14px] font-medium text-fg">{label}</span>
+                    <span className="tour-note">{p.note}</span>
                   </div>
                   {i?.price && <div className="tnum mt-0.5 text-[12.5px] text-fg-3">{i.price}</div>}
                 </div>
@@ -290,7 +282,7 @@ function OrPicks({ st }: { st: ModelsState }) {
         <p className="mt-2.5 text-[12.5px] text-fg-3">Any agent makes them when you ask (“a logo for my bakery”, “a calm piano tune”), and shows you the price before it starts.</p>
       </div>
       <div>
-        <button type="button" onClick={() => setSearching((x) => !x)} aria-expanded={searching} className="inline-flex items-center gap-1.5 text-[13.5px] text-fg-3 transition-colors hover:text-fg">
+        <button type="button" onClick={() => setSearching((x) => !x)} aria-expanded={searching} className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-fg-2 transition-colors hover:text-fg">
           <Search size={14} /> Search all of OpenRouter’s models
           <ChevronDown size={14} className={cx('transition-transform', searching && 'rotate-180')} />
         </button>
@@ -334,7 +326,7 @@ function OrSearch({ pinned, onToggle }: { pinned: Set<string>; onToggle: (id: st
           spellCheck={false}
           autoComplete="off"
           aria-label="Search OpenRouter's models"
-          className="h-10 w-full rounded-lg bg-panel pr-10 pl-10 text-[14.5px] text-fg ring-1 ring-line outline-none ring-inset placeholder:text-fg-3 focus:ring-2 focus:ring-accent/40"
+          className="h-11 w-full rounded-xl bg-panel/80 pr-10 pl-10 text-[14.5px] text-fg ring-1 ring-line outline-none placeholder:text-fg-3 focus:ring-2 focus:ring-accent/45"
         />
         {busy && <Throbber className="absolute top-1/2 right-3.5 -translate-y-1/2 text-fg-3" />}
       </div>
@@ -342,7 +334,7 @@ function OrSearch({ pinned, onToggle }: { pinned: Set<string>; onToggle: (id: st
         <div className={cx(panel, 'mt-3')}>
           {hits.length ? (
             hits.map((m) => (
-              <div key={m.id} className="tour-row py-2.5">
+              <div key={m.id} className="flex items-center gap-3.5 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-medium text-fg">{m.label}</div>
                   <div className="tnum truncate text-[12.5px] text-fg-3">{[m.org, m.price ? `${dollars(m.price.input)} in, ${dollars(m.price.output)} out` : ''].filter(Boolean).join(' · ')}</div>
@@ -407,11 +399,11 @@ function Local({ st }: { st: ModelsState }) {
   const not = picks?.filter((p) => !p.runs) ?? [];
   const unready = runs.some((p) => !p.ready);
   return (
-    <div className="space-y-8">
-      <div className="flex items-start gap-3 text-[14px]">
-        <Cpu size={16} className="mt-0.5 shrink-0 text-fg-3" />
+    <div className="space-y-7">
+      <div className="flex items-center gap-4 rounded-2xl bg-panel/70 p-4 ring-1 ring-line">
+        <Cpu size={20} className="shrink-0 text-fg-3" />
         <div className="min-w-0">
-          <div className="font-medium text-fg">{pc.title}</div>
+          <div className="text-[15.5px] leading-tight font-semibold text-fg">{pc.title}</div>
           <div className="mt-0.5 text-[13px] text-fg-3">{pc.sub}</div>
         </div>
       </div>
@@ -429,9 +421,9 @@ function Local({ st }: { st: ModelsState }) {
           <p className="text-[14px] leading-relaxed text-fg-2">This computer is a little small for AI models. Pay as you go gives you the best ones without needing a strong computer, and you can add it any time.</p>
         )}
         {unready && (
-          <p className="mt-3 text-[13px] leading-relaxed text-fg-3">
+          <p className="mt-3 text-[12.5px] leading-relaxed text-fg-3">
             They download now; to run them, this computer needs one more free program.{' '}
-            <button type="button" className="text-fg-2 underline decoration-line-2 underline-offset-2 hover:text-fg" onClick={() => go('/settings?s=models')}>
+            <button type="button" className="font-medium text-accent hover:underline" onClick={() => go('/settings?s=models')}>
               Settings → Models
             </button>{' '}
             sets it up, whenever you like.
@@ -440,16 +432,16 @@ function Local({ st }: { st: ModelsState }) {
       </div>
       {not.length > 0 && (
         <div>
-          <button type="button" onClick={() => setMore((x) => !x)} aria-expanded={more} className="inline-flex items-center gap-1.5 text-[13px] text-fg-3 transition-colors hover:text-fg">
+          <button type="button" onClick={() => setMore((x) => !x)} aria-expanded={more} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-fg-3 transition-colors hover:text-fg">
             {not.length === 1 ? '1 more needs a bigger computer' : `${not.length} more need a bigger computer`}
             <ChevronDown size={14} className={cx('transition-transform', more && 'rotate-180')} />
           </button>
           {more && (
-            <div className={cx(panel, 'mt-3')}>
+            <div className={cx(panel, 'mt-3 opacity-80')}>
               {not.map((p) => (
-                <div key={p.repo} className="tour-row">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[14.5px] font-medium text-fg-2">{p.name}</div>
+                <div key={p.repo} className="px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-medium text-fg">{p.name}</div>
                     <div className="mt-0.5 text-[12.5px] text-fg-3">{[p.maker, `needs ${p.needs ? p.needs[0].toLowerCase() + p.needs.slice(1) : 'more than this computer has'}`].join(' · ')}</div>
                   </div>
                 </div>
@@ -458,9 +450,9 @@ function Local({ st }: { st: ModelsState }) {
           )}
         </div>
       )}
-      <p className="text-[13px] text-fg-3">
+      <p className="text-[12.5px] text-fg-3">
         Hundreds more, and how each runs, are in{' '}
-        <button type="button" className="text-fg-2 underline decoration-line-2 underline-offset-2 hover:text-fg" onClick={() => go('/settings?s=models')}>
+        <button type="button" className="font-medium text-accent hover:underline" onClick={() => go('/settings?s=models')}>
           Settings → Models
         </button>
         .
@@ -488,37 +480,34 @@ function Pick({ p, st }: { p: LocalPickView; st: ModelsState }) {
     }
   };
   return (
-    <div className="px-4 py-4">
-      <div className="flex items-start gap-4">
+    <div className="px-4 py-3.5">
+      <div className="flex items-start gap-3.5">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-[15px] font-medium text-fg">{p.name}</span>
-            <span className="text-[13px] text-fg-3">
-              {p.maker}
-              {p.best && (
-                <>
-                  {' · '}
-                  <span className="text-accent">Best for this computer</span>
-                </>
-              )}
-            </span>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-[14.5px] font-medium text-fg">{p.name}</span>
+            {p.best && <span className="tour-note tour-note-best">Best for this computer</span>}
           </div>
-          <div className="mt-1 text-[13.5px] leading-snug text-fg-2">{p.blurb}</div>
-          <div className="tnum mt-1.5 text-[12.5px] text-fg-3">
-            {[p.fit.verdict === 'good' ? (speed ? `Runs well: about ${speed} words a second` : 'Runs well here') : 'Runs here, slowly', `${size(p.sizeBytes)} download`, p.vision ? 'reads pictures' : ''].filter(Boolean).join(' · ')}
+          <div className="mt-0.5 text-[13px] leading-snug text-fg-2">{p.blurb}</div>
+          <div className="tnum mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12.5px] text-fg-3">
+            <span className={cx('inline-flex items-center gap-1.5 font-medium', p.fit.verdict === 'good' ? 'text-ok' : 'text-warn')}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+              {p.fit.verdict === 'good' ? (speed ? `Runs well: about ${speed} words a second` : 'Runs well here') : 'Runs here, slowly'}
+            </span>
+            <span>{size(p.sizeBytes)} download</span>
+            {p.vision && <span>reads pictures</span>}
           </div>
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 pt-0.5">
           {p.have ? (
             <span className="inline-flex h-8 items-center gap-1.5 px-1 text-[13px] text-fg-2">
               <Check size={14} className="text-ok" /> Installed
             </span>
           ) : d ? (
-            <Button size="sm" variant="ghost" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
+            <Button size="sm" variant="ghost" className="rounded-full" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
               Cancel
             </Button>
           ) : (
-            <Button size="sm" variant="secondary" icon={<Download size={13} />} disabled={busy || !p.install} onClick={() => void install()}>
+            <Button size="sm" variant="secondary" className="rounded-full" icon={<Download size={13} />} disabled={busy || !p.install} onClick={() => void install()}>
               Install
             </Button>
           )}
@@ -526,8 +515,8 @@ function Pick({ p, st }: { p: LocalPickView; st: ModelsState }) {
       </div>
       {d && (
         <div className="mt-3 flex items-center gap-3">
-          <div className="h-0.5 flex-1 overflow-hidden rounded-full bg-line">
-            <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct || 2}%` }} />
+          <div className="tour-pipe h-1.5 flex-1 overflow-hidden rounded-full bg-fg/10">
+            <div className="tour-pipe-water h-full rounded-full" style={{ width: `${pct || 3}%` }} />
           </div>
           <span className="tnum shrink-0 text-[12px] text-fg-3">{d.totalBytes ? `${Math.floor(pct)}%` : size(d.doneBytes)}</span>
         </div>

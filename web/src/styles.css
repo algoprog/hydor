@@ -603,13 +603,59 @@ html {
 }
 
 /* ---- the welcome tour -------------------------------------------------------------------------- */
-/* Quiet and plain (Tour.tsx): the app's own surfaces and its one accent, fine lines, generous space. What it says
-   shows at once; the little that moves does so once and briefly: the Ω on the welcome page filling with water, the
-   progress, the light gliding to the next part of the app. Nothing glows, loops or is blurred (blurring the window
-   again each frame made the tour stutter in the Mac app). */
+/* Hydor is the Greek ὕδωρ, water, and the tour is drawn in it (Tour.tsx, scenes.tsx), quietly: its pages stand over a
+   still sea that rises a little with each step; the steps are droplets, full once passed; the welcome's film plays
+   once; the map's water is drawn, not flowing; the Ω fills once. Icons are plain lines; things picked are edged in
+   sea-blue (actions keep the gold accent); nothing glows, loops or splashes, and nothing is blurred (blurring the
+   window again each frame made the tour stutter in the Mac app). What it says shows at once. */
+
+/* The sea under the pages and the sign-in screens. --level (0 to 1) raises it as the tour goes on. */
+.tour-sea {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  --level: 0;
+}
+.tour-sea-glow {
+  position: absolute;
+  inset: -25%;
+  background:
+    radial-gradient(42% 36% at 22% 18%, color-mix(in srgb, var(--water-2) 9%, transparent), transparent 72%),
+    radial-gradient(50% 30% at 50% 100%, color-mix(in srgb, var(--water-3) 9%, transparent), transparent 75%);
+}
+.tour-sea-waves {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 30vh;
+  min-height: 190px;
+  transform: translateY(calc((1 - var(--level)) * 10vh));
+  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tour-wave-1 {
+  opacity: 0.08;
+}
+.tour-wave-2 {
+  opacity: 0.1;
+  transform: translateX(-140px);
+}
+.tour-wave-3 {
+  opacity: 0.13;
+  transform: translateX(-60px);
+}
+.dark .tour-wave-1 {
+  opacity: 0.1;
+}
+.dark .tour-wave-2 {
+  opacity: 0.13;
+}
+.dark .tour-wave-3 {
+  opacity: 0.17;
+}
 
 /* The setup pages fill the screen: the first comes in over the app (a new install's straight after the password
-   screen, which looks the same), and the last goes as the app comes in. */
+   screen, which stands over the same sea), and the last goes as the app comes in. */
 .tour-page {
   animation: overlay-in 200ms ease-out backwards;
 }
@@ -617,7 +663,7 @@ html {
   animation: none;
 }
 .tour-page.tour-page-out {
-  animation: tour-page-out 280ms ease-in forwards;
+  animation: tour-page-out 300ms ease-in forwards;
 }
 @keyframes tour-page-out {
   to {
@@ -626,81 +672,312 @@ html {
 }
 /* The words scroll above the buttons, fading out at their edge rather than running under them. */
 .tour-scroll {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
 }
-
-/* The welcome page's mark: water rises in its Ω once, and stays. */
-.tour-fill {
-  animation: tour-fill 1600ms 200ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
-}
-@keyframes tour-fill {
-  from {
-    transform: translateY(420px);
+@media (max-width: 1023px) {
+  .tour-scene .tour-map {
+    max-width: 250px;
   }
-  to {
-    transform: translateY(84px);
+  .tour-scene .tour-film {
+    max-width: 320px;
   }
 }
+@media (max-width: 640px) {
+  .tour-scene .tour-map {
+    max-width: 210px;
+  }
+  .tour-map-label {
+    display: none;
+  }
+  .tour-scene .tour-node {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+  }
+  .tour-scene .tour-map-center {
+    scale: 0.62;
+  }
+  .tour-scene .tour-film {
+    font-size: 12px;
+  }
+}
 
-/* Where the tour stands: a fine line of short segments, those passed and the one now in the accent. */
-.tour-steps {
-  display: flex;
-  gap: 4px;
+/* Where the tour stands: droplets, full once passed and now, empty to come. */
+.tour-drop {
+  overflow: visible;
 }
-.tour-steps > span {
-  height: 2px;
-  width: 14px;
-  border-radius: 1px;
-  background: var(--line-2);
-  transition: background-color 300ms ease;
+.tour-drop-shell {
+  fill: color-mix(in srgb, var(--bg) 55%, transparent);
+  stroke: color-mix(in srgb, var(--fg) 38%, transparent);
+  stroke-width: 1.2;
 }
-.tour-steps > span[data-on] {
-  background: var(--accent);
+.tour-drop-full .tour-drop-shell,
+.tour-drop-now .tour-drop-shell {
+  stroke: color-mix(in srgb, var(--water-2) 70%, transparent);
+}
+.tour-drop-water {
+  fill: color-mix(in srgb, var(--water-2) 75%, var(--water-3));
+}
+.tour-drop-now .tour-drop-water {
+  fill: var(--water-2);
 }
 
-/* Choices and lists: rows on one panel with hairlines between them, as Settings has them. */
-.tour-list {
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--panel);
-  box-shadow: inset 0 0 0 1px var(--line);
+/* The mark: the deep blue tile, and water at its level in the Ω, rising to it once. */
+.tour-mark-level {
+  transition: transform 1300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.tour-list > * + * {
-  border-top: 1px solid var(--line);
+
+/* The welcome's film, once: the request is typed, the agent's steps come one by one, the result arrives, and it all
+   stays. With reduced motion it shows only the end. */
+.tour-film {
+  --film: 5.4s;
 }
-.tour-row {
+.tour-film-ask {
+  animation: film-ask var(--film) ease-out both;
+}
+.tour-film-type {
+  display: inline-block;
+  animation: film-type var(--film) steps(36, end) both;
+}
+.tour-film-work {
+  animation: film-work var(--film) ease-out both;
+}
+.tour-film-step {
+  animation: film-step-1 var(--film) ease-out both;
+}
+.tour-film-step:nth-child(2) {
+  animation-name: film-step-2;
+}
+.tour-film-step:nth-child(3) {
+  animation-name: film-step-3;
+}
+.tour-film-busy {
+  animation: film-busy var(--film) linear both;
+}
+.tour-film-done {
+  animation: film-done var(--film) ease-out both;
+}
+@keyframes film-ask {
+  0% {
+    opacity: 0;
+  }
+  4%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes film-type {
+  0%,
+  4% {
+    clip-path: inset(0 100% 0 0);
+  }
+  26%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes film-work {
+  0%,
+  27% {
+    opacity: 0;
+  }
+  33%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes film-step-1 {
+  0%,
+  36% {
+    opacity: 0;
+  }
+  41%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes film-step-2 {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  55%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes film-step-3 {
+  0%,
+  64% {
+    opacity: 0;
+  }
+  69%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes film-busy {
+  0%,
+  31% {
+    opacity: 0;
+  }
+  34%,
+  76% {
+    opacity: 1;
+  }
+  80%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes film-done {
+  0%,
+  78% {
+    opacity: 0;
+  }
+  86%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* The map of what does the work: fine pipes to the Ω, a line of water along those picked, and the nodes edged. */
+.tour-map-pipe {
+  stroke: var(--line-2);
+  stroke-width: 0.45;
+  stroke-dasharray: 0.9 1.5;
+}
+.tour-map-flow {
+  stroke: var(--water-2);
+  stroke-width: 0.7;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.tour-node {
+  position: relative;
   display: flex;
-  width: 100%;
+  width: 54px;
+  height: 54px;
   align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--line);
+  color: var(--fg-3);
+  transition:
+    box-shadow 300ms ease,
+    color 300ms ease;
+}
+.tour-node > span:last-child {
+  opacity: 0.55;
+  filter: grayscale(1);
+  transition:
+    opacity 300ms ease,
+    filter 300ms ease;
+}
+.tour-node-on {
+  color: var(--fg);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--water-2) 80%, transparent);
+}
+.tour-node-on > span:last-child {
+  opacity: 1;
+  filter: none;
+}
+.tour-node-focus {
+  box-shadow: 0 0 0 2px var(--water-2);
+}
+.tour-node-small {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+}
+
+/* What can be picked: edged in sea-blue once picked. Icons are plain lines, with no tiles. */
+.tour-tile {
+  display: flex;
+  align-items: flex-start;
   gap: 14px;
+  border-radius: 16px;
   padding: 14px 16px;
   text-align: left;
-  transition: background-color 150ms ease;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  box-shadow: 0 0 0 1px var(--line);
+  transition:
+    box-shadow 180ms ease,
+    background-color 180ms ease;
 }
-button.tour-row:hover {
-  background: var(--bg-1);
+.tour-tile:hover {
+  box-shadow: 0 0 0 1px var(--line-2);
 }
-.tour-row[aria-pressed='true'] {
-  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+.tour-tile-on,
+.tour-tile-on:hover {
+  background: color-mix(in srgb, var(--water-2) 6%, var(--panel));
+  box-shadow: 0 0 0 1.5px var(--water-2);
 }
-.tour-check {
+.tour-tile-icon {
+  display: flex;
+  width: 20px;
+  flex: none;
+  justify-content: center;
+  padding-top: 1px;
+  color: var(--fg-2);
+}
+.tour-tile-check {
   display: flex;
   width: 18px;
   height: 18px;
   flex: none;
+  margin-top: 1px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   box-shadow: inset 0 0 0 1.5px var(--line-2);
-  color: var(--accent-fg);
-  transition:
-    background-color 150ms ease,
-    box-shadow 150ms ease;
+  color: #fff;
+  transition: background-color 180ms ease;
 }
-[aria-pressed='true'] > .tour-check {
-  background: var(--accent);
+.tour-tile-on .tour-tile-check {
   box-shadow: none;
+  background: var(--water-2);
+}
+.tour-point-icon,
+.tour-card-icon,
+.tour-media-icon {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  color: var(--fg-2);
+}
+.tour-point-icon {
+  width: 22px;
+  padding-top: 2px;
+}
+.tour-card-icon {
+  width: 18px;
+  color: var(--fg-3);
+}
+.tour-media-icon {
+  width: 20px;
+  color: var(--fg-3);
+}
+.tour-num {
+  width: 16px;
+  flex: none;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.tour-note {
+  color: var(--water-ink);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.tour-note-best {
+  color: var(--accent);
+}
+/* A download, as water filling a fine pipe. */
+.tour-pipe-water {
+  background: linear-gradient(90deg, var(--water-1), var(--water-2));
+  transition: width 500ms ease;
 }
 /* Words to try, put in the message box. */
 .tour-try {
@@ -719,19 +996,19 @@ button.tour-row:hover {
   color: var(--fg);
 }
 
-/* In the app: the page dims (no blur) around a fine ring, which glides from part to part. */
+/* In the app: the page dims (no blur) around a ring of water, which glides from part to part. */
 .tour-scrim {
-  --scrim: 0.5;
+  --scrim: 0.52;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  animation: overlay-in 320ms ease-out;
-  transition: opacity 300ms ease;
+  animation: overlay-in 360ms ease-out;
+  transition: opacity 320ms ease;
 }
 .tour-ring {
-  transition: opacity 200ms ease;
+  transition: opacity 220ms ease;
   box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--fg) 80%, transparent),
-    0 0 0 6px color-mix(in srgb, var(--fg) 7%, transparent);
+    0 0 0 2px var(--water-2),
+    0 0 0 6px color-mix(in srgb, var(--water-2) 16%, transparent);
 }
 .tour-card {
   box-shadow: var(--shadow-lg);
@@ -744,7 +1021,7 @@ button.tour-row:hover {
 }
 .tour-card.tour-card-out,
 .auth-card.tour-card-out {
-  animation: tour-card-out 240ms ease-in forwards;
+  animation: tour-card-out 260ms ease-in forwards;
 }
 @keyframes tour-card-out {
   to {
@@ -760,12 +1037,12 @@ button.tour-row:hover {
   from {
     box-shadow:
       0 8px 30px rgba(0, 0, 0, 0.1),
-      0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+      0 0 0 0 color-mix(in srgb, var(--water-2) 50%, transparent);
   }
   to {
     box-shadow:
       0 8px 30px rgba(0, 0, 0, 0.1),
-      0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent);
+      0 0 0 14px color-mix(in srgb, var(--water-2) 0%, transparent);
   }
 }
 /* The tour builds the app up. It opens on an empty app (what was on screen goes once the first page covers it), and
@@ -844,8 +1121,17 @@ button.tour-row:hover {
     translate: 0 6px;
   }
 }
-/* Tips after the tour: a still accent ring around the part a tip is about, with one ripple as it lands; the page
-   around stays as it is (no dimming), so you can go on working. */
+@media (prefers-reduced-motion: reduce) {
+  .tour-film,
+  .tour-film * {
+    animation: none !important;
+  }
+  .tour-film-busy {
+    display: none;
+  }
+}
+/* Tips after the tour: a still accent ring around the part a tip is about; the page around stays as it is (no
+   dimming), so you can go on working. */
 .tip-ring {
   box-shadow:
     0 0 0 2px var(--accent),
@@ -861,9 +1147,9 @@ button.tour-row:hover {
     transform: translateY(4px) scale(0.98);
   }
 }
-/* The password and sign-in screens: the card rises in once the mark has drawn. */
+/* The password and sign-in screens: the card fades in under the logo. */
 .auth-card {
-  animation: tour-card-in 700ms 380ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: tour-card-in 400ms 200ms ease-out backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
