@@ -101,7 +101,7 @@ export async function inspect(input: string, o: { token?: string; machine: Machi
   const arch: string | undefined = cfg.architectures?.[0] ?? info.config?.architectures?.[0];
   const ctxMax = Number(info.gguf?.context_length ?? cfg.text_config?.max_position_embeddings ?? cfg.max_position_embeddings ?? 0) || undefined;
   const ctx = Math.min(ctxMax ?? LOCAL_CONTEXT, LOCAL_CONTEXT);
-  const perToken = cachePerToken(cfg);
+  const perToken = cachePerToken(cfg, ctx);
   const { quants: qs, projector } = quants(files);
   const vision = !!projector || /image-text|vision/i.test(info.pipeline_tag ?? '') || !!cfg.vision_config;
   const params = Number(info.safetensors?.total ?? info.gguf?.total ?? 0) || undefined;
@@ -136,7 +136,7 @@ export async function inspect(input: string, o: { token?: string; machine: Machi
     const weights = want.filter((f) => f.path.endsWith('.safetensors')).reduce((a, f) => a + f.size, 0);
     out.vllm = {
       supported: o.vllmArchs ? (arch ? o.vllmArchs.has(arch) : false) : null,
-      fit: fit(o.machine, { weightBytes: weights, cacheBytes: perToken * ctx, downloadBytes: out.downloadBytes, params, cpuOk: false, split: true }),
+      fit: fit(o.machine, { weightBytes: weights, cacheBytes: perToken * ctx, downloadBytes: out.downloadBytes, params, cpuOk: false, split: true, eight: !!params && !cfg.quantization_config && weights / params > 1.5 }),
     };
     if (o.vllmArchs && arch && !o.vllmArchs.has(arch)) out.vllm.reason = `This vLLM does not run ${arch} yet.`;
     // The same model as GGUF runs with Ollama, often sooner than vLLM supports a new architecture.
@@ -231,7 +231,7 @@ export async function search(o: HfQuery, x: { token?: string; machine: MachineIn
     const q4 = m.params * Q4_BYTES;
     return {
       ...rest,
-      fit: fit(x.machine, { weightBytes, cacheBytes: weightBytes * 0.1, downloadBytes: weightBytes, params: m.params, cpuOk: m.kind === 'gguf', split: m.kind === 'safetensors' }),
+      fit: fit(x.machine, { weightBytes, cacheBytes: weightBytes * 0.1, downloadBytes: weightBytes, params: m.params, cpuOk: m.kind === 'gguf', split: m.kind === 'safetensors', eight: m.kind === 'safetensors' && weightBytes / m.params > 1.5 }),
       fitGguf: m.kind === 'safetensors' ? fit(x.machine, { weightBytes: q4, cacheBytes: q4 * 0.1, downloadBytes: q4, params: m.params, cpuOk: true }) : undefined,
     };
   });

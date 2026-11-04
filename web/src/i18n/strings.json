@@ -9296,6 +9296,7 @@
 "viewed":"web/src/features/review/ReviewPage.tsx",
 "Viewed":"web/src/features/review/ReviewPage.tsx",
 "vLLM {0} does not run {1} yet":"server/models/manager.ts",
+"vLLM at 8-bit":"web/src/features/settings/ModelsSettings.tsx",
 "vLLM did not start {0}: {1}":"server/models/manager.ts",
 "vLLM is not installed here (it runs these weights).":"web/src/features/settings/ModelsSettings.tsx",
 "vLLM is not installed here (pip install vllm), or set its command in Settings → Models":"server/models/manager.ts",

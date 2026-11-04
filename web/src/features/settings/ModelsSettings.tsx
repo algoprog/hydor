@@ -400,7 +400,7 @@ function AddFromHf({ st }: { st: ModelsState }) {
 
 /** How a suggested model would run here, in a few words: where, and with what. */
 function runsWith(p: LocalPickView): string {
-  const how = p.install && 'ollama' in p.install ? 'Ollama' : 'vLLM';
+  const how = p.install && 'ollama' in p.install ? 'Ollama' : p.fit.fp8 ? 'vLLM at 8-bit' : 'vLLM';
   if (p.fit.gpus?.length) return `${how}, split across ${p.fit.gpus.length} GPUs`;
   if (p.fit.where === 'gpu' && p.fit.gpu != null) return `${how}, on GPU ${p.fit.gpu}`;
   if (p.fit.where === 'gpu') return `${how}, on Apple silicon`;

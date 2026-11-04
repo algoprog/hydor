@@ -10578,5 +10578,6 @@
 "No questions: it runs at once, without asking anything.":"没有问题：它会直接运行，什么都不问。",
 "None yet. Add one here, or keep a finished test run as one.":"还没有。在这里添加一个，或把一次完成的试运行保存为示例。",
 "Not in the task yet":"还没用在任务里",
-"Parts of the app":"应用的各部分"
+"Parts of the app":"应用的各部分",
+"vLLM at 8-bit":"vLLM 8-bit"
 }

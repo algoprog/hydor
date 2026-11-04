@@ -10587,5 +10587,6 @@
 "No questions: it runs at once, without asking anything.":"Χωρίς ερωτήσεις: εκτελείται αμέσως, χωρίς να ρωτήσει τίποτα.",
 "None yet. Add one here, or keep a finished test run as one.":"Κανένα ακόμα. Προσθέστε ένα εδώ ή κρατήστε μια ολοκληρωμένη δοκιμαστική εκτέλεση ως παράδειγμα.",
 "Not in the task yet":"Δεν υπάρχει ακόμα στην εργασία",
-"Parts of the app":"Τα μέρη της εφαρμογής"
+"Parts of the app":"Τα μέρη της εφαρμογής",
+"vLLM at 8-bit":"vLLM σε 8-bit"
 }

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import type { LocalModel, MachineInfo, ModelDownload } from '../../shared/types.ts';
 import { LOCAL_PICKS, OPENROUTER_PICKS } from '../../shared/model-picks.ts';
-import { fit, gpuPlan } from './machine.ts';
+import { cachePerToken, fit, fp8Card, gpuPlan } from './machine.ts';
 import { localPicks, routeOf } from './picks.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -39,6 +39,34 @@ test('a model goes on the GPU with the most room, or split across the fewest GPU
   assert.equal(gpuPlan(desktop, 200 * GiB, { split: true }), null, 'more than all four hold');
   assert.equal(gpuPlan(desktop, 30 * GiB, { split: true, only: 1 }), null, 'one card asked for: no splitting');
   assert.equal(gpuPlan(mac, 1 * GiB), null, 'no NVIDIA cards on a Mac');
+});
+
+test('the context cache: attention layers alone, a sliding window’s worth for sliding ones, global heads of their own', () => {
+  const plain = { num_hidden_layers: 32, num_attention_heads: 32, num_key_value_heads: 8, head_dim: 128 };
+  assert.equal(cachePerToken(plain), 32 * 2 * 8 * 128 * 2);
+  const hybrid = { ...plain, num_hidden_layers: 24, layer_types: [...Array(13).fill('conv'), ...Array(6).fill('full_attention'), ...Array(5).fill('sliding_attention')], sliding_window: 256 };
+  assert.equal(cachePerToken(hybrid, 32768), Math.round(6 * 4096 + 5 * 4096 * (256 / 32768)), 'convolution layers keep nothing; sliding ones their window');
+  const gemma = REPOS['google/gemma-4-12B-it'].config!;
+  const perToken = cachePerToken(gemma, 32768);
+  assert.ok(perToken * 32768 < 1.2 * GB && perToken * 32768 > 0.6 * GB, `about a gigabyte at 32K, not ${((perToken * 32768) / GB).toFixed(1)} GB`);
+  assert.equal(cachePerToken({ ...plain, layers_block_type: ['attention', 'mamba', 'mamba', 'attention'] }), 2 * 2 * 8 * 128 * 2, 'state-space layers keep nothing');
+});
+
+test('a 16-bit model too big for a card goes on one at 8-bit before it is split, on cards that can', () => {
+  const eight = gpuPlan(desktop, 30 * GiB, { split: true, need8: 16 * GiB });
+  assert.deepEqual(eight?.gpus.map((g) => g.index), [1]);
+  assert.equal(eight?.fp8, true);
+  assert.equal(gpuPlan(desktop, 20 * GiB, { need8: 11 * GiB })?.fp8, undefined, 'it fits as it is: no 8-bit');
+  const split8 = gpuPlan(desktop, 60 * GiB, { split: true, need8: 33 * GiB });
+  assert.deepEqual(split8?.gpus.map((g) => g.index), [1, 2], 'too big at 8-bit for one card, and as it is for four: two at 8-bit');
+  assert.equal(split8?.fp8, true);
+  const old = box([card(0, 'Tesla T4', 16)]);
+  assert.equal(gpuPlan(old, 20 * GiB, { need8: 11 * GiB }), null, 'a T4 does not take FP8');
+  assert.ok(fp8Card('NVIDIA GeForce RTX 3090') && fp8Card('NVIDIA H100 80GB HBM3') && !fp8Card('NVIDIA GeForce RTX 2080 Ti') && !fp8Card('Tesla V100-SXM2-32GB'));
+  const f = fit(desktop, { weightBytes: 24 * GB, cacheBytes: 2 * GB, downloadBytes: 24 * GB, cpuOk: false, split: true, eight: true });
+  assert.equal(f.fp8, true);
+  assert.equal(f.gpus, undefined, 'one card');
+  assert.match(f.notes[0], /8-bit \(FP8\)/);
 });
 
 test('how a model runs: one card, several, a Mac’s graphics, the CPU, or not at all', () => {
@@ -81,9 +109,18 @@ test('where each suggested model would run: vLLM on NVIDIA cards and Macs, Ollam
 const REPOS: Record<string, { files: [string, number][]; config?: Record<string, unknown> }> = {
   'LiquidAI/LFM3-VL-2B': { files: [['config.json', 3000], ['model.safetensors', 3.84 * GB], ['tokenizer.json', 4e6], ['modeling_lfm3.py', 40000]], config: { architectures: ['Lfm3VlForConditionalGeneration'], num_hidden_layers: 16, num_attention_heads: 32, num_key_value_heads: 8, hidden_size: 2048 } },
   'LiquidAI/LFM3-VL-2B-GGUF': { files: [['LFM3-VL-2B-Q4_K_M.gguf', 1.1 * GB], ['LFM3-VL-2B-Q8_0.gguf', 1.85 * GB], ['mmproj-LFM3-VL-2B-Q8_0.gguf', 0.2 * GB]] },
-  'google/gemma-4-12B-it': { files: [['config.json', 3000], ['model.safetensors', 23.92 * GB]], config: { architectures: ['Gemma4UnifiedForConditionalGeneration'], text_config: { num_hidden_layers: 48, num_attention_heads: 16, num_key_value_heads: 8, head_dim: 256 } } },
+  'google/gemma-4-12B-it': {
+    files: [['config.json', 3000], ['model.safetensors', 23.92 * GB]],
+    config: {
+      architectures: ['Gemma4UnifiedForConditionalGeneration'],
+      text_config: { num_hidden_layers: 48, num_attention_heads: 16, num_key_value_heads: 8, head_dim: 256, sliding_window: 1024, num_global_key_value_heads: 1, global_head_dim: 512, layer_types: Array.from({ length: 48 }, (_, i) => (i % 6 === 5 ? 'full_attention' : 'sliding_attention')) },
+    },
+  },
   'google/gemma-4-12B-it-qat-q4_0-gguf': { files: [['gemma-4-12b-it-qat-q4_0.gguf', 6.98 * GB], ['mmproj-gemma-4-12b-it-qat-q4_0.gguf', 0.18 * GB]] },
-  'RecursiveSI/flint-int4': { files: [['config.json', 3000], ...Array.from({ length: 5 }, (_, i): [string, number] => [`model-0000${i}.safetensors`, 4.52 * GB])], config: { architectures: ['FlintForCausalLM'], num_hidden_layers: 49, num_attention_heads: 32, num_key_value_heads: 4, head_dim: 128 } },
+  'RecursiveSI/flint-int4': {
+    files: [['config.json', 3000], ...Array.from({ length: 5 }, (_, i): [string, number] => [`model-0000${i}.safetensors`, 4.52 * GB])],
+    config: { architectures: ['FlintForCausalLM'], num_hidden_layers: 49, num_attention_heads: 32, num_key_value_heads: 4, head_dim: 128, sliding_window: 513, layer_types: Array.from({ length: 49 }, (_, i) => (i % 7 < 2 ? 'full_attention' : 'sliding_attention')) },
+  },
   'zai-org/GLM-5.3-Flash': { files: [['config.json', 3000], ...Array.from({ length: 62 }, (_, i): [string, number] => [`model-${i}.safetensors`, 5.3 * GB])], config: { architectures: ['Glm5NextForConditionalGeneration'], num_hidden_layers: 78, num_attention_heads: 64, num_key_value_heads: 8, head_dim: 128 } },
 };
 const realFetch = globalThis.fetch;
@@ -99,12 +136,15 @@ globalThis.fetch = (async (input: string | URL | Request) => {
 const ready = { vllm: { archs: new Set(['Lfm3VlForConditionalGeneration', 'Gemma4UnifiedForConditionalGeneration', 'FlintForCausalLM', 'Glm5NextForConditionalGeneration']) }, ollama: true };
 const shown = (list: Awaited<ReturnType<typeof localPicks>>) => list.filter((p) => p.runs).map((p) => `${p.name}${p.best ? '*' : ''}`);
 
-test('a desktop with four 24 GB cards: the small model, and Gemma split across two cards, which is the one to start with', async () => {
+test('a desktop with four 24 GB cards: the small model, and Gemma at 8-bit on one card, which is the one to start with', async () => {
   const list = await localPicks({ machine: desktop, runtimes: ready, local: [], downloads: [] });
   assert.deepEqual(shown(list), ['LFM3-VL 2B', 'Gemma 4 12B*']);
   const gemma = list.find((p) => p.name === 'Gemma 4 12B')!;
   assert.deepEqual(gemma.install, { repo: 'google/gemma-4-12B-it' });
-  assert.equal(gemma.fit.gpus?.length, 2);
+  assert.equal(gemma.fit.fp8, true);
+  assert.equal(gemma.fit.gpus, undefined);
+  const lfm = list.find((p) => p.name === 'LFM3-VL 2B')!;
+  assert.equal(lfm.fit.fp8, undefined, 'small enough as it is');
   assert.ok(gemma.sizeBytes > 23 * GB);
   assert.equal(gemma.ready, true);
   assert.equal(list.find((p) => p.name === 'Flint')!.needs, 'A Mac with Apple silicon');
@@ -134,6 +174,7 @@ test('a server with eight H200s runs GLM-5.3 Flash split across them; what is he
   assert.deepEqual(shown(list), ['LFM3-VL 2B', 'Gemma 4 12B', 'GLM-5.3 Flash*']);
   const glm = list.find((p) => p.name === 'GLM-5.3 Flash')!;
   assert.ok((glm.fit.gpus?.length ?? 0) >= 4, 'split across several cards');
+  assert.equal(glm.fit.fp8, undefined, 'its weights are 8-bit already');
   assert.equal(glm.coming, 'vllm:zai-org/GLM-5.3-Flash');
   assert.equal(list[0].have, 'vllm/LiquidAI/LFM3-VL-2B');
 });

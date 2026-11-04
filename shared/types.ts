@@ -1362,6 +1362,8 @@ export interface ModelFit {
   gpu?: number;
   /** Split across these NVIDIA cards (vLLM's tensor parallelism), when one alone has too little memory. */
   gpus?: number[];
+  /** Stored at 8-bit as vLLM loads it (FP8), a 16-bit model that does not fit as it is. */
+  fp8?: boolean;
   needBytes: number;
   tokensPerSec?: number;
   downloadBytes: number;
