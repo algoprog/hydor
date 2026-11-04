@@ -36,7 +36,7 @@
       "url": "https://hydor.app/",
       "downloadUrl": "https://github.com/algoprog/hydor/releases/latest",
       "softwareVersion": "%VERSION%",
-      "operatingSystem": "macOS, Linux, Windows (Docker)",
+      "operatingSystem": "macOS, Windows, Linux",
       "applicationCategory": "ProductivityApplication",
       "license": "https://opensource.org/licenses/MIT",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -61,6 +61,8 @@
     <symbol id="i-plane" viewBox="0 0 24 24"><path d="M21 3.5 3 10.6l7 2.8 2.8 7z"/><path d="M10 13.4 21 3.5"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
     <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.8"/><path d="M2 19.5h20"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16v4"/></symbol>
+    <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9h18M6.5 6.8h.01M9 6.8h.01"/></symbol>
     <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3 20.5 7.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7.2 18.5h10.3a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.1a4.75 4.75 0 0 0 .6 9.4z"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
@@ -176,7 +178,7 @@
         <p class="fine reveal" style="--d: 330ms" data-get-note>
           Free and open source · macOS 12 or newer, Apple silicon ·
           <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg">Intel Mac</a> ·
-          <a href="#download">Docker and Linux</a>
+          <a href="#download">Windows and Linux</a>
         </p>
       </div>
 
@@ -496,7 +498,7 @@
           <article class="y-card reveal">
             <span class="y-icon"><svg class="ic"><use href="#i-home" /></svg></span>
             <h3>Runs where you are</h3>
-            <p>On your Mac, a Linux box at home or a server you rent. Your sessions, files and memory stay there.</p>
+            <p>On your Mac or PC, a Linux box at home or a server you rent. Your sessions, files and memory stay there.</p>
           </article>
           <article class="y-card reveal" style="--d: 70ms">
             <span class="y-icon"><svg class="ic"><use href="#i-card" /></svg></span>
@@ -548,7 +550,7 @@
           </details>
           <details>
             <summary>Does it run on Windows?<svg class="ic"><use href="#i-chev" /></svg></summary>
-            <div class="faq-a"><p>Yes, with Docker. There is also a Mac app, an installer for Linux, and one-click deploys to cloud services.</p></div>
+            <div class="faq-a"><p>Yes. The Windows app installs for your account and keeps itself up to date, like the apps for Mac and Linux. Agents run their commands in <a href="https://git-scm.com/download/win">Git for Windows</a>, as Claude Code does there, so install that too. Docker works as well.</p></div>
           </details>
           <details>
             <summary>Is it made by Anthropic or OpenAI?<svg class="ic"><use href="#i-chev" /></svg></summary>
@@ -570,7 +572,7 @@
           <article class="dl-card dl-mac reveal" id="get-mac">
             <span class="y-icon"><svg class="ic"><use href="#i-laptop" /></svg></span>
             <h3>Mac</h3>
-            <p>The easiest way: everything Hydor needs in one app, in its own window and in the menu bar. It keeps itself up to date.</p>
+            <p>Everything Hydor needs in one app, in its own window and in the menu bar. It keeps itself up to date.</p>
             <div class="dmg" aria-hidden="true">
               <figure class="dmg-app"><img src="favicon.svg" width="76" height="76" alt="" /><figcaption>Hydor</figcaption></figure>
               <svg class="dmg-arrow" viewBox="0 0 48 20"><path d="M2 10h42m-8-7 8 7-8 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -588,10 +590,35 @@
             </div>
             <p class="dl-fine">macOS 12 or newer. Not sure which? Apple menu → About This Mac: “Apple M…” means Apple silicon.</p>
           </article>
-          <article class="dl-card reveal" style="--d: 70ms" id="get-docker">
+          <article class="dl-card dl-app reveal" style="--d: 70ms" id="get-windows">
+            <span class="y-icon"><svg class="ic"><use href="#i-monitor" /></svg></span>
+            <h3>Windows</h3>
+            <p>An installer for your account, no administrator needed: Hydor in the Start menu and in its own window. It keeps itself up to date.</p>
+            <ul class="dl-list">
+              <li><svg class="ic"><use href="#i-check" /></svg>In the notification area when closed, and opens at sign-in</li>
+              <li><svg class="ic"><use href="#i-check" /></svg>Commands run in Git for Windows, as with Claude Code</li>
+            </ul>
+            <div class="dl-btns">
+              <a class="btn btn-primary" href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-win.exe" data-win><svg class="ic"><use href="#i-download" /></svg>Download for Windows</a>
+              <a class="btn btn-ghost" href="https://git-scm.com/download/win">Git for Windows</a>
+            </div>
+            <p class="dl-fine">Windows 10 or 11, x64. The installer is not signed yet: if Windows asks, choose More info, then Run anyway.</p>
+          </article>
+          <article class="dl-card dl-app reveal" style="--d: 140ms" id="get-linux">
+            <span class="y-icon"><svg class="ic"><use href="#i-window" /></svg></span>
+            <h3>Linux</h3>
+            <p>For Ubuntu and Debian (.deb) or any other system (AppImage), with its own Node.js and tmux, in the system tray. It keeps itself up to date.</p>
+            <div class="dl-btns">
+              <a class="btn btn-primary" href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-linux.deb" data-linux="deb"><svg class="ic"><use href="#i-download" /></svg>.deb</a>
+              <a class="btn btn-ghost" href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-linux.AppImage" data-linux="appimage"><svg class="ic"><use href="#i-download" /></svg>AppImage</a>
+            </div>
+            <p class="dl-fine" data-linux-note>x64. For ARM: <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-linux.deb">.deb</a> · <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-linux.AppImage">AppImage</a>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.</p>
+          </article>
+          <p class="dl-sep reveal">Or on a server</p>
+          <article class="dl-card reveal" id="get-docker">
             <span class="y-icon"><svg class="ic"><use href="#i-box" /></svg></span>
             <h3>Docker</h3>
-            <p>On Linux, macOS or Windows, Intel/AMD and ARM. Then open the setup link from its log.</p>
+            <p>On a server, or anywhere Docker runs: Intel/AMD and ARM. Then open the setup link from its log.</p>
             <div class="code" data-copy-wrap>
               <div class="code-bar"><span>Terminal</span><button class="copy" type="button" data-copy aria-label="Copy the Docker commands"><svg class="ic"><use href="#i-copy" /></svg><span>Copy</span></button></div>
               <pre><code>docker run -d --name hydor --restart unless-stopped \
@@ -600,12 +627,12 @@
 docker logs hydor | grep setup</code></pre>
             </div>
           </article>
-          <article class="dl-card reveal" style="--d: 140ms" id="get-linux">
+          <article class="dl-card reveal" style="--d: 70ms" id="get-server">
             <span class="y-icon"><svg class="ic"><use href="#i-terminal" /></svg></span>
-            <h3>Linux</h3>
-            <p>As a service of your user. Needs Node.js 22.12 or newer, git and tmux.</p>
+            <h3>Linux server</h3>
+            <p>As a service of your user, on a machine without a screen. Needs Node.js 22.12 or newer, git and tmux.</p>
             <div class="code" data-copy-wrap>
-              <div class="code-bar"><span>Terminal</span><button class="copy" type="button" data-copy aria-label="Copy the Linux commands"><svg class="ic"><use href="#i-copy" /></svg><span>Copy</span></button></div>
+              <div class="code-bar"><span>Terminal</span><button class="copy" type="button" data-copy aria-label="Copy the Linux server commands"><svg class="ic"><use href="#i-copy" /></svg><span>Copy</span></button></div>
               <pre><code>git clone https://github.com/algoprog/hydor &amp;&amp; cd hydor
 ./install.sh</code></pre>
             </div>

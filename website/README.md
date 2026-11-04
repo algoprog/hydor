@@ -27,8 +27,9 @@ JavaScript with no framework, dark like the app's own dark theme, and nothing th
 node website/build.mjs --serve 4321   # then open http://localhost:4321
 ```
 
-The page offers the download that suits the visitor: the Mac app for their Mac's chip, Docker on Windows, the
-installer on Linux. Reduced motion in the system's settings turns its animations off.
+The page offers the download that suits the visitor: the Mac app for their Mac's chip, the Windows installer, and on
+Linux the .deb (where the browser names Ubuntu or Debian) or else the AppImage, for their processor; Docker, the Linux
+server's installer and the cloud services follow. Reduced motion in the system's settings turns its animations off.
 
 ## Publish it
 
