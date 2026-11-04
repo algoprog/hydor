@@ -1,11 +1,12 @@
-// The Library's images and videos: what the user keeps of what agents made (or any picture or video on this
-// computer), each copied in with a title and a description a model writes for it (caption.ts): from the picture
-// itself, or from ten of a video's frames on one picture (frames.ts). The Library page shows them beside the
+// The Library's images, videos and audio: what the user keeps of what agents made (or any picture, video or sound
+// on this computer), each copied in with a title and a description a model writes for it (caption.ts): from the
+// picture itself, from ten of a video's frames on one picture (frames.ts), or for a sound, which the model cannot
+// hear, from what it was made from (its prompt, its words, its model). The Library page shows them beside the
 // pages; agents reach them through the API (app_api), and work from their files (an item's file).
 //
 // Routes, signed in:
 //   GET  /api/media                      every item, newest first
-//   POST /api/media                      keeps a file: { path, prompt?, model?, sessionKey?, space? }
+//   POST /api/media                      keeps a file: { path, prompt?, model?, lyrics?, sessionKey?, space? }
 //   GET/PATCH/DELETE /api/media/:id      one item; PATCH { title?, description?, space? }
 //   POST /api/media/:id/caption          writes its title and description again
 //   GET  /api/media/:id/file             the file (?download=1 to save it), in parts for a video player
@@ -23,7 +24,7 @@ import type { Deps, Feature } from '../features/types.ts';
 import { byteRange, resolvePath } from '../files.ts';
 import { dimensions, slug } from '../images/openrouter.ts';
 import { captionModels, captionSettings, setCaptionChoice, titleFrom, writeCaption } from './caption.ts';
-import { frameGrid, hasFfmpeg, probe, still } from './frames.ts';
+import { frameGrid, hasFfmpeg, probe, still, waveform } from './frames.ts';
 import { addMedia, deleteMedia, editMedia, filesOf, initMedia, listMedia, mustMedia, savedFrom, setCaption, setMediaSpace } from './store.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 
@@ -38,6 +39,14 @@ const TYPES: Record<string, { kind: MediaKind; mime: string }> = {
   m4v: { kind: 'video', mime: 'video/mp4' },
   webm: { kind: 'video', mime: 'video/webm' },
   mov: { kind: 'video', mime: 'video/quicktime' },
+  mp3: { kind: 'audio', mime: 'audio/mpeg' },
+  wav: { kind: 'audio', mime: 'audio/wav' },
+  m4a: { kind: 'audio', mime: 'audio/mp4' },
+  aac: { kind: 'audio', mime: 'audio/aac' },
+  ogg: { kind: 'audio', mime: 'audio/ogg' },
+  oga: { kind: 'audio', mime: 'audio/ogg' },
+  opus: { kind: 'audio', mime: 'audio/ogg' },
+  flac: { kind: 'audio', mime: 'audio/flac' },
 };
 
 const MAX_BYTES = 1024 * 1024 * 1024;
@@ -81,14 +90,14 @@ function caption(d: Deps, id: string) {
 
 // ---- keeping a file ------------------------------------------------------------------------------------------
 
-export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; model?: unknown; sessionKey?: unknown; space?: unknown }): Promise<{ item: MediaItem; existed: boolean }> {
-  if (typeof b.path !== 'string' || !b.path.trim()) throw new HttpError(400, 'path: the image or video to keep');
+export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; model?: unknown; lyrics?: unknown; sessionKey?: unknown; space?: unknown }): Promise<{ item: MediaItem; existed: boolean }> {
+  if (typeof b.path !== 'string' || !b.path.trim()) throw new HttpError(400, 'path: the image, video or sound to keep');
   const file = resolvePath(b.path);
   const st = await fs.promises.stat(file).catch(() => null);
   if (!st?.isFile()) throw new HttpError(404, `No such file: ${file}`);
   const ext = path.extname(file).slice(1).toLowerCase();
   const type = TYPES[ext];
-  if (!type) throw new HttpError(400, 'The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF) and videos (MP4, WebM, MOV)');
+  if (!type) throw new HttpError(400, 'The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF), videos (MP4, WebM, MOV) and sounds (MP3, WAV, M4A, AAC, OGG, OPUS, FLAC)');
   if (st.size > MAX_BYTES) throw new HttpError(413, 'The file is over 1 GB');
   const had = savedFrom(d.db, file, st.size);
   if (had) return { item: had, existed: true };
@@ -96,10 +105,14 @@ export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; m
   // The space picked, or (not asked) the session's.
   const space = spaceChoice(d.db, b.space, sessionSpace(d.db, str(b.sessionKey, 200)));
   const prompt = str(b.prompt, 4000);
-  let size: { width?: number; height?: number; duration?: number } = {};
+  let size: { width?: number; height?: number; duration?: number; peaks?: number[] } = {};
   if (type.kind === 'video') {
     const p = await probe(file);
     size = { width: p?.width, height: p?.height, duration: p?.duration };
+  } else if (type.kind === 'audio') {
+    // Its length, and its shape to draw it by.
+    const [p, peaks] = await Promise.all([probe(file), waveform(file)]);
+    size = { duration: p?.duration, ...(peaks ? { peaks } : {}) };
   } else {
     const head = Buffer.alloc(64 * 1024);
     const fd = await fs.promises.open(file, 'r');
@@ -115,25 +128,27 @@ export async function keepFile(d: Deps, b: { path?: unknown; prompt?: unknown; m
       size = { width: p?.width, height: p?.height };
     }
   }
+  const lyrics = typeof b.lyrics === 'string' && b.lyrics.trim() ? b.lyrics.trim().slice(0, 8000) : undefined;
   const item = await addMedia(d.db, {
     kind: type.kind,
     from: file,
-    ext: ext === 'jpeg' ? 'jpg' : ext === 'm4v' ? 'mp4' : ext,
+    ext: ext === 'jpeg' ? 'jpg' : ext === 'm4v' ? 'mp4' : ext === 'oga' ? 'ogg' : ext,
     mime: type.mime,
     bytes: st.size,
     title: titleFrom({ kind: type.kind, prompt, name: path.basename(file) }),
     ...size,
     prompt,
+    lyrics,
     model: str(b.model, 120),
     sessionKey: str(b.sessionKey, 200),
     space,
   });
-  // A still to show it by: a tenth of the way into a video; a smaller copy of a large picture.
+  // A still to show it by: a tenth of the way into a video; a smaller copy of a large picture (a sound has none).
   const f = filesOf(item);
   if (type.kind === 'video') {
     await still(f.file, f.still, { at: item.duration ? Math.min(item.duration * 0.1, 2) : undefined, width: 720 });
     void frameGrid(f.file, f.frames, { duration: item.duration, width: item.width, height: item.height });
-  } else if (st.size > 400 * 1024 || (item.width ?? 0) > 1200) await still(f.file, f.still, { width: 720 });
+  } else if (type.kind === 'image' && (st.size > 400 * 1024 || (item.width ?? 0) > 1200)) await still(f.file, f.still, { width: 720 });
   tell(d, { what: 'media', item });
   caption(d, item.id);
   return { item, existed: false };
@@ -216,7 +231,7 @@ export const media: Feature = {
       const f = filesOf(m);
       if (fs.existsSync(f.still)) return send(req, reply, f.still, 'image/jpeg');
       if (m.kind === 'image') return send(req, reply, m.file, m.mime);
-      throw new HttpError(404, 'No still of this video');
+      throw new HttpError(404, m.kind === 'audio' ? 'A sound has no still' : 'No still of this video');
     });
     app.get('/api/media/:id/frames', async (req, reply) => {
       const m = mustMedia(db, (req.params as { id: string }).id);

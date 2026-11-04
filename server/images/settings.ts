@@ -1,10 +1,11 @@
-// The settings an image or video model takes (its shape, resolution, length, sound…), as the form the user fills
-// in before anything is made: only the ones the model offers, as short choices, filled in with what the agent
-// gave, what the user picked earlier in the session, or the app's defaults; and what the result would cost.
+// The settings an image, video or audio model takes (its shape, resolution, length, sound, voice…), as the form the
+// user fills in before anything is made: only the ones the model offers, as short choices, filled in with what the
+// agent gave, what the user picked earlier in the session, or the app's defaults; and what the result would cost.
 // Its words are the app's own, in the user's language (`tr`, the app's dictionaries: npm run i18n:extract reads
 // them from this file); the answers come back as the labels shown, which formContent maps to their values.
 import type { ImageModel } from '../../shared/images.ts';
-import type { MediaParam, VideoModel } from '../../shared/media.ts';
+import type { AudioModel, MediaParam, VideoModel } from '../../shared/media.ts';
+import { defaultVoice, lengthWords, voiceLabel } from './audio.ts';
 import { height, perSecondFor } from './video.ts';
 
 type Json = Record<string, any>;
@@ -25,6 +26,17 @@ export interface VideoChoice {
   audio?: boolean;
 }
 
+export interface AudioChoice {
+  format?: 'mp3' | 'wav';
+  voice?: string;
+  instrumental?: boolean;
+  /** About how long, in seconds: a song that can be long, a sound. */
+  seconds?: number;
+}
+
+/** What generate_audio makes: music, words said aloud, or other sound. */
+export type AudioKind = 'music' | 'speech' | 'sound';
+
 /** Each shape's label, whole, for the dictionaries. */
 const SHAPES: Record<string, string> = {
   '1:1': 'Square (1:1)',
@@ -43,7 +55,16 @@ const SHAPES: Record<string, string> = {
 const COMMON = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9', '9:21'];
 
 /** The form's title and button. */
-export const FORM = { image: 'Your picture', imageChanged: 'Your picture, changed', video: 'Your video', videoChanged: 'Your video, changed', submit: 'Make it' };
+export const FORM = {
+  image: 'Your picture',
+  imageChanged: 'Your picture, changed',
+  video: 'Your video',
+  videoChanged: 'Your video, changed',
+  music: 'Your music',
+  speech: 'Your voice-over',
+  sound: 'Your sound',
+  submit: 'Make it',
+};
 
 type Tr = (s: string) => string;
 const same: Tr = (s) => s;
@@ -194,6 +215,70 @@ export function videoMismatch(m: VideoModel | undefined, v: VideoChoice): string
   return null;
 }
 
+// ---- audio -------------------------------------------------------------------------------------------------
+
+/** What the model makes unless asked otherwise: MP3 where it can, its first voice of the language, with singing. */
+export function audioDefaults(m: AudioModel | undefined, kind: AudioKind): AudioChoice {
+  return {
+    format: !m || m.formats.includes('mp3') ? 'mp3' : m.formats[0],
+    ...(kind === 'speech' && m?.voices?.length && !m.prompted ? { voice: defaultVoice(m.voices) } : {}),
+    ...(kind === 'music' ? { instrumental: false } : {}),
+    ...(kind === 'sound' && m?.prompted ? { seconds: 10 } : {}),
+  };
+}
+
+/** Each voice's label, the same one twice made plain by its id. */
+function voiceLabels(voices: string[]): Map<string, string> {
+  const seen = new Map<string, number>();
+  for (const v of voices) seen.set(voiceLabel(v), (seen.get(voiceLabel(v)) ?? 0) + 1);
+  return new Map(voices.map((v) => [v, (seen.get(voiceLabel(v)) ?? 0) > 1 ? v : voiceLabel(v)]));
+}
+
+/**
+ * The form's fields for audio: for music, singing or not and (a model that makes long songs) about how long; for a
+ * sound, how long; for speech, the voice (`voices`: false when the voice comes from samples, turns or a description);
+ * the file, where the model makes more than one kind.
+ */
+export function audioForm(m: AudioModel | undefined, kind: AudioKind, v: AudioChoice, tr: Tr = same, o: { voices?: boolean } = {}): Json {
+  const props: Json = {};
+  if (!m) return props;
+  if (kind === 'music') {
+    props.instrumental = { title: tr('Instrumental, no singing'), type: 'boolean', default: v.instrumental === true };
+    if ((m.maxSeconds ?? 0) > 30)
+      props.seconds = { title: tr('Length, in seconds'), type: 'integer', minimum: 10, maximum: m.maxSeconds, ...(v.seconds ? { default: v.seconds } : {}), description: tr('Leave it empty for the song to take as long as it needs.') };
+  }
+  if (kind === 'sound' && m.prompted)
+    props.seconds = { title: tr('Length, in seconds'), type: 'integer', minimum: 1, maximum: m.maxSeconds ?? 120, default: v.seconds ?? 10, ...(m.perSecond ? { description: tr('It is paid by the second.') } : {}) };
+  if (kind === 'speech' && o.voices !== false && (m.voices?.length ?? 0) > 1) {
+    const labels = voiceLabels(m.voices!);
+    props.voice = choices(tr('Voice'), m.voices!, (x: string) => labels.get(x) ?? x, v.voice);
+  }
+  if (m.formats.length > 1) props.format = choices(tr('File'), m.formats, (f: string) => tr(f === 'mp3' ? 'MP3, smaller' : 'WAV, uncompressed'), v.format);
+  return props;
+}
+
+/** The form's answers as settings; a length emptied on it is left to the model. */
+export function audioAnswers(c: Record<string, unknown>, v: AudioChoice, fields: Json = {}): AudioChoice {
+  const out: AudioChoice = {
+    ...v,
+    ...(c.format === 'mp3' || c.format === 'wav' ? { format: c.format } : {}),
+    ...(typeof c.voice === 'string' ? { voice: c.voice } : {}),
+    ...(typeof c.instrumental === 'boolean' ? { instrumental: c.instrumental } : {}),
+    ...(typeof c.seconds === 'number' ? { seconds: Math.round(c.seconds) } : {}),
+  };
+  if ('seconds' in fields && typeof c.seconds !== 'number') delete out.seconds;
+  return out;
+}
+
+/** A setting the agent gave that the model does not take: what to say instead of making it. */
+export function audioMismatch(m: AudioModel | undefined, v: AudioChoice): string | null {
+  if (!m) return null;
+  if (v.voice && m.voices?.length && !m.prompted && !m.voices.includes(v.voice))
+    return `${m.label} has no voice “${v.voice}”: give one of ${m.voices.slice(0, 40).join(', ')}${m.voices.length > 40 ? ', …' : ''}, or leave voice out.`;
+  if (v.seconds && m.maxSeconds && v.seconds > m.maxSeconds) return `${m.label} makes at most ${lengthWords(m.maxSeconds)} at once: give a shorter duration, or make it in parts.`;
+  return null;
+}
+
 // ---- what it costs -----------------------------------------------------------------------------------------
 
 export const money = (n: number) => (n >= 0.095 ? `$${n.toFixed(2)}` : `$${Number(n.toPrecision(2))}`);
@@ -227,12 +312,30 @@ export function priceLine(kind: 'image' | 'video', m: ImageModel | VideoModel | 
   return `${range}${then}`;
 }
 
-/** Settings the session picked before, by kind and model: asked once, used again. */
-const picked = new Map<string, { at: number; v: ImageChoice | VideoChoice }>();
+/** The line above an audio form: the model, and what it costs (a song, a second, a thousand characters, a minute of speech), in the user's language. */
+export function audioPriceLine(m: AudioModel | undefined, id: string, tr: Tr = same, cost?: number): string {
+  const name = m ? `**${m.label}**${m.org ? ` (${m.org})` : ''}` : `**${id}**`;
+  const then = cost && !m?.perSong ? ` ${tr(`With the settings below, about ${money(cost)}.`)}` : '';
+  if (!m) return tr(`${name}, through OpenRouter.`);
+  if (m.free) return tr(`${name}, through OpenRouter: free.`);
+  if (m.perSong) return m.maxSeconds && m.maxSeconds <= 30 ? tr(`${name}, through OpenRouter: ${money(m.perSong)} a clip of ${m.maxSeconds} seconds.`) : tr(`${name}, through OpenRouter: ${money(m.perSong)} a song.`);
+  if (m.perSecond) return `${tr(`${name}, through OpenRouter: ${money(m.perSecond)} a second of sound.`)}${then}`;
+  if (m.perChar) return `${tr(`${name}, through OpenRouter: ${money(m.perChar * 1000)} for 1,000 characters.`)}${then}`;
+  if (m.perMinute) return `${tr(`${name}, through OpenRouter: about ${money(m.perMinute)} a minute of speech.`)}${then}`;
+  return `${tr(`${name}, through OpenRouter.`)}${then}`;
+}
 
-export const pickedKey = (session: string, kind: 'image' | 'video', model: string) => `${session}\n${kind}\n${model}`;
-export const pickedFor = <T extends ImageChoice | VideoChoice>(k: string): T | undefined => picked.get(k)?.v as T | undefined;
-export function rememberPicked(k: string, v: ImageChoice | VideoChoice) {
+/** The line on an audio form when the model picked cannot make what is asked: the one that makes it instead. */
+export const insteadLine = (picked: string, used: string, tr: Tr = same) => tr(`${picked} cannot make this, so it is made with ${used}.`);
+
+type Choice = ImageChoice | VideoChoice | AudioChoice;
+
+/** Settings the session picked before, by kind and model: asked once, used again. */
+const picked = new Map<string, { at: number; v: Choice }>();
+
+export const pickedKey = (session: string, kind: 'image' | 'video' | 'audio', model: string) => `${session}\n${kind}\n${model}`;
+export const pickedFor = <T extends Choice>(k: string): T | undefined => picked.get(k)?.v as T | undefined;
+export function rememberPicked(k: string, v: Choice) {
   picked.set(k, { at: Date.now(), v });
   // A day is long enough for one session's work.
   if (picked.size > 500) for (const [key, x] of picked) if (Date.now() - x.at > 86_400_000) picked.delete(key);

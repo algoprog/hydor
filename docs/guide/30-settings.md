@@ -208,15 +208,18 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Working at once, per session**](/settings?s=children&find=Working%20at%20once%2C%20per%20session): How many child sessions one session runs at once.
 - [**Swarm size**](/settings?s=children&find=Swarm%20size): How many agents of a swarm work at once.
 
-### Images and video
+### Images, video and audio
 
-[Settings → Images and video](/settings?s=images): pictures and videos agents make for you through OpenRouter, and who writes their captions in the Library. More in [Documents, images, videos and voice](/guide/documents-voice).
+[Settings → Images, video and audio](/settings?s=images): pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions in the Library. More in [Documents, images, videos and voice](/guide/documents-voice).
 
 - [**Making images**](/settings?s=images&find=Making%20images): Let agents make images.
 - [**Image model**](/settings?s=images&find=Image%20model): The model that makes them.
 - [**Making videos**](/settings?s=images&find=Making%20videos): Let agents make videos.
 - [**Video model**](/settings?s=images&find=Video%20model): The model that makes videos.
-- [**Captions in the Library**](/settings?s=images&find=Captions%20in%20the%20Library): The model that writes the titles and descriptions of the images and videos you keep.
+- [**Making audio**](/settings?s=images&find=Making%20audio): Let agents make audio.
+- [**Music model**](/settings?s=images&find=Music%20model): The model that makes music.
+- [**Voice and sound model**](/settings?s=images&find=Voice%20and%20sound%20model): The model that makes voices and sounds.
+- [**Captions in the Library**](/settings?s=images&find=Captions%20in%20the%20Library): The model that writes the titles and descriptions of the images, videos and audio you keep.
 
 ### Voice
 

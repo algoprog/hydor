@@ -208,15 +208,18 @@
 - [**每个会话同时工作的数量**](/settings?s=children&find=Working%20at%20once%2C%20per%20session)：一个会话同时运行的子会话数量。
 - [**集群规模**](/settings?s=children&find=Swarm%20size)：一个集群中同时工作的智能体数量。
 
-### 图片和视频
+### 图片、视频和音频
 
-[设置 → 图片和视频](/settings?s=images)：智能体通过 OpenRouter 为你生成的图片和视频，以及资料库中它们的标题和说明由谁撰写。详见[文档、图片、视频和语音](/guide/documents-voice)。
+[设置 → 图片、视频和音频](/settings?s=images)：智能体通过 OpenRouter 为你生成的图片、视频、音乐和语音，以及资料库中它们的标题和说明由谁撰写。详见[文档、图片、视频和语音](/guide/documents-voice)。
 
 - [**图片生成**](/settings?s=images&find=Making%20images)：允许智能体生成图片。
 - [**图像模型**](/settings?s=images&find=Image%20model)：生成它们的模型。
 - [**视频生成**](/settings?s=images&find=Making%20videos)：允许智能体生成视频。
 - [**视频模型**](/settings?s=images&find=Video%20model)：生成视频的模型。
-- [**资料库中的标题和说明**](/settings?s=images&find=Captions%20in%20the%20Library)：为你保存的图片和视频撰写标题和说明的模型。
+- [**音频生成**](/settings?s=images&find=Making%20audio)：允许智能体生成音频。
+- [**音乐模型**](/settings?s=images&find=Music%20model)：生成音乐的模型。
+- [**语音和声音模型**](/settings?s=images&find=Voice%20and%20sound%20model)：生成语音和声音的模型。
+- [**资料库中的标题和说明**](/settings?s=images&find=Captions%20in%20the%20Library)：为你保存的图片、视频和音频撰写标题和说明的模型。
 
 ### 语音
 

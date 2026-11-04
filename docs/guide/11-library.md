@@ -1,6 +1,6 @@
 # Library: pages, images, videos and sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets and LaTeX documents you edit as in PowerPoint, Word, Excel or Overleaf. What you keep goes in your Library, sorted by project, with the pictures and videos you saved, each with a title and a description written for it. This topic covers watching a page as it is written, changing it, keeping it (with its versions, its data and an address for your phone), keeping images and videos, making your own pages, exporting files, asking an agent to change what you have open, and publishing at a link.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets and LaTeX documents you edit as in PowerPoint, Word, Excel or Overleaf. What you keep goes in your Library, sorted by project, with the pictures, videos and sounds you saved, each with a title and a description. This topic covers watching a page as it is written, changing it, keeping it (with its versions, its data and an address for your phone), keeping images, videos and sounds, making your own pages, exporting files, asking an agent to change what you have open, and publishing at a link.
 
 ![The Library: everything kept, each project's things together, with its places beside them](images/library.webp)
 
@@ -168,7 +168,7 @@ With nothing kept yet, the Library says "Your Library is empty", with **New page
 Everything in the Library belongs to one project, or to none (see [Projects and knowledge](/guide/spaces)):
 
 - What an agent saves (a page, slides, a document, a spreadsheet, a LaTeX document) goes in its session's project, when the session is in one.
-- What you keep yourself (**Keep** on a page, **Save to Library** under a picture or a video) asks where it goes when you have projects, with the session's own project first; with no projects, it is kept at once.
+- What you keep yourself (**Keep** on a page, **Save to Library** under a picture, a video or a sound) asks where it goes when you have projects, with the session's own project first; with no projects, it is kept at once.
 - **New**, at the top right of the Library, makes it in the project you are looking at; pick another under **In a project** (see [Make a page](#make-a-page)).
 - To move something, open its **More** (⋯) → **Move to a project**, on its card or on its own page, and pick a project or **No project**. "Moved to Thesis" confirms it. Moving it changes nothing else: its versions, its data and its addresses stay.
 
@@ -176,35 +176,36 @@ A project's own page shows what it holds in the Library too, on its **Overview**
 
 ## Images and videos in the Library
 
-Pictures and videos agents make for you stay in the session's folder (see [Ask for a picture, or have one changed](/guide/documents-voice#ask-for-a-picture-or-have-one-changed) and [Ask for a video](/guide/documents-voice#ask-for-a-video)). To keep one, click **Save to Library** under it in the conversation (with projects, pick the one it goes in): a copy goes into your Library, where it stays after the session's folder is cleaned up, and a model writes its title and description (see [Titles and descriptions](#titles-and-descriptions)). The button then reads **In your Library** and opens it there.
+Pictures, videos and sounds agents make for you stay in the session's folder (see [Ask for a picture, or have one changed](/guide/documents-voice#ask-for-a-picture-or-have-one-changed), [Ask for a video](/guide/documents-voice#ask-for-a-video) and [Ask for music, a voice or a sound](/guide/documents-voice#ask-for-music-a-voice-or-a-sound)). To keep one, click **Save to Library** under it in the conversation (with projects, pick the one it goes in): a copy goes into your Library, where it stays after the session's folder is cleaned up, and a model writes its title and description (see [Titles and descriptions](#titles-and-descriptions)). The button then reads **In your Library** and opens it there.
 
-They show among the Library's other things; **Pictures** and **Videos** above the cards show each kind alone ([Show the videos](/library?kind=video)). Each is a card with a still of it and its title (while it is being written, "Writing its title…"); a video's card shows its length on the still. Click a card to open it (see [Open an image or a video](#open-an-image-or-a-video)). Its **More** (⋯) has **Start a session with it**, **Move to a project**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
+They show among the Library's other things; **Pictures**, **Videos** and **Audio** above the cards show each kind alone ([Show the videos](/library?kind=video), [the audio](/library?kind=audio)). Each is a card with a still of it and its title (while it is being written, "Writing its title…"); a video's card shows its length on the still, and a sound's card shows its shape, with a round button to play it right there and its length beside it. Click a card to open it (see [Open an image, a video or a sound](#open-an-image-a-video-or-a-sound)). Its **More** (⋯) has **Start a session with it**, **Move to a project**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
 
-The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF) and videos (MP4, WebM, MOV), up to 1 GB each and 5,000 in all, in the app's data folder. Agents can work from what you kept: ask "use the boat picture from my Library for a birthday card", and the agent finds it there.
+The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF), videos (MP4, WebM, MOV) and sounds (MP3, WAV, M4A, AAC, OGG, OPUS, FLAC), up to 1 GB each and 5,000 in all, in the app's data folder. Agents can work from what you kept: ask "use the boat picture from my Library for a birthday card", and the agent finds it there.
 
 ## Titles and descriptions
 
-Each image or video you keep gets a title and a description written by a model that sees images: it looks at the picture, or at ten frames of the video spread from its start to its end, put together on one picture, with the words it was made from as a hint. They are written in the app's language.
+Each image or video you keep gets a title and a description written by a model that sees images: it looks at the picture, or at ten frames of the video spread from its start to its end, put together on one picture, with the words it was made from as a hint. A sound it cannot hear: its title and description are written from what it was made from (its words, its lyrics or script, the model that made it), and nothing of the sound itself is sent to the model. They are written in the app's language.
 
-Pick the model in **[Settings → Capabilities → Images and video → Captions in the Library](/settings?s=images&find=Captions%20in%20the%20Library)**:
+Pick the model in **[Settings → Capabilities → Images, video and audio → Captions in the Library](/settings?s=images&find=Captions%20in%20the%20Library)**:
 
 - **Where it runs**: **Automatic** (a cheap model through OpenRouter when you have an OpenRouter key, Google's Gemini Flash Lite first; else Claude Haiku through your Claude Code sign-in), **OpenRouter** (any model in its catalog that sees images: **Pick a model** opens the list to search), **Claude** (**Claude Haiku**, **Claude Sonnet** or **Claude Opus**, through your Claude Code sign-in), **Ollama** or **vLLM** (a model on this computer that sees images, from [Settings → Models](/settings?s=models)), or **Your endpoints** (an OpenAI-compatible endpoint's model; whether it sees images is not known, so it says "may not see images").
 - **Model**: for Claude, Ollama, vLLM and your endpoints, the model to use.
 - Under them, "Written by" and the model in use, or why no model can write them now.
 
-Writing them costs a fraction of a cent through OpenRouter, and nothing on a model on this computer. A video's frames need ffmpeg on the computer the app runs on; without it, the section says so, and videos get their title and description from the words they were made from, and show without a still.
+Writing them costs a fraction of a cent through OpenRouter, and nothing on a model on this computer. A video's frames need ffmpeg on the computer the app runs on; without it, the section says so, and videos get their title and description from the words they were made from, and show without a still. ffmpeg also gives a sound its length and its shape; without it, a sound's card shows an icon instead.
 
-When no model could write them, they come from the words the image or video was made from (or its file's name), and its page says so, with **Try again** and **Pick the model**. You can also write your own: **Edit the title and description** on its page. What you write stays, until you choose **Write them again**.
+When no model could write them, they come from the words the image, video or sound was made from (or its file's name), and its page says so, with **Try again** and **Pick the model**. You can also write your own: **Edit the title and description** on its page. What you write stays, until you choose **Write them again**.
 
-## Open an image or a video
+## Open an image, a video or a sound
 
-An image or a video opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures**, or **The Library’s videos**), its title with "An image" or "A video" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Download** and **More** (⋯): **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from), **Move to a project** (the project it is in shows beside it) and **Delete**.
+An image, a video or a sound opens at its own place in the Library. The bar at the top has the back arrow (**The Library’s pictures**, **The Library’s videos** or **The Library’s audio**), its title with "An image", "A video" or "Audio" and its length under it, **Start a session with it** (the start page opens with it in the message box, so the new session gets it with your first message: write what you want done with it, such as "make a poster from this", and send), **Download** and **More** (⋯): **Edit the title and description**, **Write them again**, **Open its session** (the conversation it was saved from), **Move to a project** (the project it is in shows beside it) and **Delete**.
 
-Below, the picture (click it for full size) or the video, to play, and beside it (under it on a phone):
+Below, the picture (click it for full size), or the video or the sound, to play (a sound in a large player, its shape to move along, with the time and the speed), and beside it (under it on a phone):
 
 - its title and description, with the pencil to change them, and the model that wrote them;
-- **Made with** (the model that made it), **From the words** (what it was made from), its **Size**, its **Length** (a video), its **File** size and when it was **Kept**;
-- for a video, **The frames its description was written from**: the ten frames the model saw (click for full size).
+- **Made with** (the model that made it), **From the words** (what it was made from), its **Size**, its **Length** (a video, a sound), its **File** size and when it was **Kept**;
+- for a video, **The frames its description was written from**: the ten frames the model saw (click for full size);
+- for a sound, **Sung or spoken**: a song's lyrics, or the words read aloud.
 
 ## Make a page
 
@@ -492,3 +493,4 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Which images did I keep in my Library this month? List their titles."
 - "Rename the boat video in my Library to 'Lake test', and write its description again."
 - "Make a birthday card with the tram picture from my Library."
+- "Which sounds did I keep in my Library? List their titles and lengths."

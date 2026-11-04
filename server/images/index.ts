@@ -1,20 +1,22 @@
-// Images and videos through OpenRouter, shown in the conversation.
+// Images, videos and audio through OpenRouter, shown in the conversation.
 //
-// generate_image and generate_video (on each session's own MCP server, while each is on in Settings → Images and
-// video) make them with the model picked there, the app's choice, or one the agent names, using the OpenRouter
-// key from Settings → Models. Before they make anything they show the user a form with the settings the model
-// takes (shape, resolution, quality, length, sound…) and what it costs (settings.ts), unless the agent gave
-// them all, the user answered it earlier in the session, or nobody is there to answer (a scheduled task, an
-// app's run). What they make is saved in the session's folder (images/, videos/) and shown with the reply,
-// where the user can keep it in the Library (server/media).
+// generate_image, generate_video and generate_audio (on each session's own MCP server, while each is on in
+// Settings → Images, video and audio) make them with the model picked there, the app's choice, or one the agent
+// names, using the OpenRouter key from Settings → Models. Before they make anything they show the user a form
+// with the settings the model takes (shape, resolution, quality, length, sound, voice…) and what it costs
+// (settings.ts), unless the agent gave them all, the user answered it earlier in the session, or nobody is there
+// to answer (a scheduled task, an app's run). What they make is saved in the session's folder (images/, videos/,
+// audio/) and shown with the reply, where the user can keep it in the Library (server/media).
 //   GET/PUT /api/images/settings   on or off, and the model (ImagesState)
 //   GET     /api/images/models     OpenRouter's image models, by name, newest or cheapest first
 //   GET/PUT /api/videos/settings   on or off, and the model (VideosState)
 //   GET     /api/videos/models     OpenRouter's video models, by name, newest or cheapest first
+//   GET/PUT /api/audio/settings    on or off, the music model and the voice and sound model (AudioState)
+//   GET     /api/audio/models      OpenRouter's models that make music or speak, by name, newest or cheapest first
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ImageModel, ImagesState } from '../../shared/images.ts';
-import type { VideoModel, VideosState } from '../../shared/media.ts';
+import type { AudioModel, AudioState, VideoModel, VideosState } from '../../shared/media.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
 import { inSession } from '../documents/index.ts';
@@ -24,9 +26,35 @@ import { loadConfig } from '../models/config.ts';
 import { OPENROUTER_URL } from '../models/openrouter.ts';
 import { appWords } from '../language/index.ts';
 import { sessionExtra } from '../sessionExtra.ts';
+import {
+  audioCost,
+  audioModels,
+  cleanLyrics,
+  describedInput,
+  generateChatAudio,
+  generateSpeech,
+  musicPrompt,
+  placeholderProblem,
+  PREFERRED_MUSIC,
+  PREFERRED_SPEECH,
+  readAloud,
+  readSamples,
+  saveAudio,
+  wavSeconds,
+  withDetails,
+  type AudioWish,
+  type MadeAudio,
+  type Turn,
+} from './audio.ts';
 import { generate, imageModels, PREFERRED, readReferences, saveImages, type Reference } from './openrouter.ts';
 import {
+  audioAnswers,
+  audioDefaults,
+  audioForm,
+  audioMismatch,
+  audioPriceLine,
   FORM,
+  insteadLine,
   imageAnswers,
   imageDefaults,
   imageFits,
@@ -42,6 +70,8 @@ import {
   videoDefaults,
   videoForm,
   videoMismatch,
+  type AudioChoice,
+  type AudioKind,
   type ImageChoice,
   type VideoChoice,
 } from './settings.ts';
@@ -126,7 +156,7 @@ function imageTool(db: DB): RunTool {
     // It writes files and asks a service outside, at a cost.
     annotations: { readOnlyHint: false, openWorldHint: true },
     description: [
-      'Make an image from a description, or change pictures the user has, with an image model through OpenRouter (the one picked in Settings → Images and video, or the one model names).',
+      'Make an image from a description, or change pictures the user has, with an image model through OpenRouter (the one picked in Settings → Images, video and audio, or the one model names).',
       'Before it makes anything, the user sees a short form in the conversation with the settings that model takes (shape, resolution, quality, how many) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (later images use the same settings unless you give others; ask: true shows it again).',
       'Set ask: false only when the user said to choose for them or to go ahead without asking.',
@@ -160,8 +190,8 @@ function imageTool(db: DB): RunTool {
       const refs = await readReferences((Array.isArray(a.images) ? a.images : []).map((p: unknown) => inSession(ctx.cwd, String(p))).slice(0, 8));
       const s = settings(db);
       const { id, info } = await using(s, asked);
-      if (asked && !info && (await models().catch(() => [])).length) throw new Error(`OpenRouter has no image model ${asked}. The user can see the ones there are in Settings → Images and video.`);
-      if (refs.length && info && !info.edits) throw new Error(`${info.label} does not take pictures to work from. Describe the change in words, or the user can pick a model that edits pictures in Settings → Images and video.`);
+      if (asked && !info && (await models().catch(() => [])).length) throw new Error(`OpenRouter has no image model ${asked}. The user can see the ones there are in Settings → Images, video and audio.`);
+      if (refs.length && info && !info.edits) throw new Error(`${info.label} does not take pictures to work from. Describe the change in words, or the user can pick a model that edits pictures in Settings → Images, video and audio.`);
       if (info?.maxRefs && refs.length > info.maxRefs) throw new Error(`${info.label} takes at most ${info.maxRefs} pictures to work from.`);
       const given: ImageChoice = {
         ...(str(a.aspect_ratio) ? { aspect: str(a.aspect_ratio) } : {}),
@@ -270,7 +300,7 @@ function videoTool(db: DB): RunTool {
     name: 'generate_video',
     annotations: { readOnlyHint: false, openWorldHint: true },
     description: [
-      'Make a short video from a description, and if wanted from pictures to start or end on (first_frame, last_frame) or to follow (references), with a video model through OpenRouter (the one picked in Settings → Images and video, or the one model names).',
+      'Make a short video from a description, and if wanted from pictures to start or end on (first_frame, last_frame) or to follow (references), with a video model through OpenRouter (the one picked in Settings → Images, video and audio, or the one model names).',
       'Videos cost far more than images (cents to dollars a second) and take a minute to several to make.',
       'Before it makes anything, the user sees a short form in the conversation with the settings that model takes (length, shape, resolution, sound) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (ask: true shows it again). Set ask: false only when the user said to choose for them or to go ahead without asking.',
@@ -318,7 +348,7 @@ function videoTool(db: DB): RunTool {
       if (asked && !MODEL_ID.test(asked)) throw new Error('model: an OpenRouter id, like google/veo-3.1.');
       const s = settings(db, 'videos');
       const { id, info } = await usingVideo(s, asked);
-      if (asked && !info && (await vmodels().catch(() => [])).length) throw new Error(`OpenRouter has no video model ${asked}. The user can see the ones there are in Settings → Images and video.`);
+      if (asked && !info && (await vmodels().catch(() => [])).length) throw new Error(`OpenRouter has no video model ${asked}. The user can see the ones there are in Settings → Images, video and audio.`);
       const first = await oneImage(ctx.cwd, a.first_frame);
       const last = await oneImage(ctx.cwd, a.last_frame);
       const refs = await readReferences((Array.isArray(a.references) ? a.references : []).map((p: unknown) => inSession(ctx.cwd, String(p))).slice(0, 4));
@@ -383,6 +413,297 @@ function videoTool(db: DB): RunTool {
   };
 }
 
+// ---- generate_audio ------------------------------------------------------------------------------------
+
+interface AudioSettings {
+  enabled: boolean;
+  /** The music model picked, and the voice and sound model; '' for the app's choice. */
+  music: string;
+  speech: string;
+}
+
+function audioSettings(db: DB): AudioSettings {
+  try {
+    const s = JSON.parse(kvGet(db, 'audio') ?? '{}');
+    return { enabled: s.enabled !== false, music: typeof s.music === 'string' ? s.music : '', speech: typeof s.speech === 'string' ? s.speech : '' };
+  } catch {
+    return { enabled: true, music: '', speech: '' };
+  }
+}
+
+const amodels = () => audioModels(OPENROUTER_URL);
+
+/** The model for music, or for voices and sounds: the one asked for, the one picked, or the first of the app's choices OpenRouter still lists. */
+async function usingAudio(s: AudioSettings, role: 'music' | 'speech', asked?: string): Promise<{ id: string; info?: AudioModel }> {
+  const list = await amodels().catch(() => [] as AudioModel[]);
+  const pref = role === 'music' ? PREFERRED_MUSIC : PREFERRED_SPEECH;
+  const id = asked || (role === 'music' ? s.music : s.speech) || pref.find((p) => list.some((m) => m.id === p)) || pref[0];
+  return { id, info: list.find((m) => m.id === id) };
+}
+
+async function audioState(db: DB): Promise<AudioState> {
+  const s = audioSettings(db);
+  const [music, speech] = await Promise.all([usingAudio(s, 'music'), usingAudio(s, 'speech')]);
+  // Whether the voice model copies voices, from its endpoints.
+  if (speech.info?.via === 'speech') await withDetails(OPENROUTER_URL, [speech.info]).catch(() => {});
+  return { enabled: s.enabled, music: s.music, speech: s.speech, usingMusic: music.id, usingSpeech: speech.id, musicInfo: music.info, speechInfo: speech.info, keySet: !!loadConfig().openrouter.apiKey };
+}
+
+const AUDIO_KINDS: AudioKind[] = ['music', 'speech', 'sound'];
+
+/** Why a model cannot make what is asked: music, sounds (a model that takes a description), copied voices, conversations. */
+function cannot(m: AudioModel, kind: AudioKind, o: { samples: number; turns: boolean }): string | null {
+  if (kind === 'music' && m.kind !== 'music' && !m.prompted) return `${m.label} does not make music`;
+  if (kind === 'speech' && m.kind === 'music') return `${m.label} makes music, not speech`;
+  if (kind === 'sound' && !m.prompted) return `${m.label} only reads words aloud`;
+  if (o.samples && m.cloning === false) return `${m.label} does not speak in a voice from samples`;
+  if (o.samples > 1 && m.cloning && (m.maxSamples ?? 1) < o.samples) return `${m.label} takes one voice sample at a time`;
+  if (o.turns && !m.multiSpeaker && !m.prompted) return `${m.label} voices one speaker at a time`;
+  return null;
+}
+
+/** A conversation's turns as the agent gave them: each with its words, and a voice and a manner if given. */
+function readTurns(v: unknown): Turn[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) throw new Error('turns: a list of { text, voice?, instructions? }.');
+  if (v.length > 40) throw new Error('turns: at most 40 in one go.');
+  return v.map((t, i) => {
+    const text = typeof t === 'string' ? t.trim() : String(t?.text ?? '').trim();
+    if (!text) throw new Error(`turns[${i}]: its words go in text.`);
+    return { text, ...(str(t?.voice) ? { voice: str(t.voice) } : {}), ...(str(t?.instructions) ? { instructions: str(t.instructions) } : {}) };
+  });
+}
+
+/** How long one call may take, the form included (under Codex's ten minutes for a tool call). */
+const AUDIO_WAIT_MS = 560_000;
+/** How long the model may take: a whole song with Lyria 3 Pro takes a minute or two; speech and sounds less. */
+const MUSIC_MS = 300_000;
+const SPEECH_MS = 240_000;
+
+const AUDIO_WORD: Record<AudioKind, string> = { music: 'music', speech: 'speech', sound: 'sound' };
+
+function audioTool(db: DB): RunTool {
+  return {
+    name: 'generate_audio',
+    // It writes a file and asks a service outside, at a cost.
+    annotations: { readOnlyHint: false, openWorldHint: true },
+    description: [
+      'Make sound through OpenRouter: music (songs with vocals or instrumentals, jingles, loops, background music), speech (narration, voice-overs, announcements, dialogue, in a described voice or one copied from 1–3 short recordings the user has), or sound effects and ambience.',
+      'kind picks the model: music uses the music model picked in Settings → Images, video and audio (the app’s choice is Google’s Lyria: Lyria 3 Pro makes songs of up to about 3 minutes, Lyria 3 Clip 30-second clips), speech and sound the voice and sound model (the app’s choice is ByteDance’s Seed Audio, up to 2 minutes), or model names another.',
+      'Before it makes anything, the user sees a short form in the conversation with the model, the settings it takes (singing or not, length, voice, file) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
+      'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (ask: true shows it again). Set ask: false only when the user said to choose for them or to go ahead without asking.',
+      'music: in prompt, the genre, mood, instruments, tempo (BPM), key, the singer’s voice and the structure (timestamps like "[0:00 - 0:15] Intro: soft piano" place things); the lyrics in lyrics, with [Verse] and [Chorus] tags, or instrumental: true; without either the model writes its own lyrics. Write the prompt in the language the song should be sung in.',
+      'speech: the exact words in prompt (or a conversation in turns), and how they are said in instructions: the voice, age, accent, tone, pace and emotion. Seed Audio reads prompt as a description, so there you may also write the whole scene with the spoken lines in quotes (‘A calm, deep male narrator: "Welcome to the museum." Soft rain in the background.’). voice: one of the model’s own voices by id, where it has them (a wrong one gets you the list). voice_samples: recordings of the voice to speak in (only a voice the user may use); with several, write who says what with @Audio1, @Audio2, @Audio3.',
+      'sound: describe the sound and what happens when ("Heavy rain on a tin roof, thunder rolling in at the end, no voices"), and its duration.',
+      'It is saved in the session’s folder (audio/) and the user hears it with your reply, in a player where they can download it and keep it in their Library: do not repeat it or its path. You cannot hear it: speak of it as what you asked for.',
+    ].join(' '),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: AUDIO_KINDS, description: 'music: a song or a piece of music; speech: words said aloud; sound: sound effects or ambience.' },
+        prompt: {
+          type: 'string',
+          description: 'music: the piece described; speech: the exact words to say (or, for Seed Audio, a whole description with the spoken lines in quotes); sound: the sound described.',
+        },
+        lyrics: { type: 'string', description: 'The words of the song, with [Verse], [Chorus]… tags (music).' },
+        instrumental: { type: 'boolean', description: 'Music without singing.' },
+        duration: { type: 'integer', minimum: 1, maximum: 300, description: 'About how long, in seconds, if the user said: a song (Lyria 3 Pro: up to about 180; Lyria 3 Clip always makes 30) or a sound (Seed Audio: up to 120). Speech is as long as its words.' },
+        instructions: { type: 'string', description: 'How the words are said (speech): the voice, age, accent, tone, pace and emotion ("a warm, elderly British man, slowly, with a smile").' },
+        voice: { type: 'string', description: 'One of the voice model’s own voices, by id ("george", "Kore"), where it has them.' },
+        turns: {
+          type: 'array',
+          maxItems: 40,
+          items: {
+            type: 'object',
+            properties: {
+              text: { type: 'string', description: 'What this speaker says.' },
+              voice: { type: 'string', description: 'Their voice: one of the model’s voices, or for Seed Audio a description ("A young woman") or @Audio1.' },
+              instructions: { type: 'string', description: 'How they say it.' },
+            },
+            required: ['text'],
+          },
+          description: 'A conversation, a turn each (speech), for models that voice several speakers (Gemini TTS, Fish Audio, Seed Audio).',
+        },
+        voice_samples: { type: 'array', items: { type: 'string' }, maxItems: 3, description: 'Paths of 1–3 recordings of a voice to speak in (WAV, MP3, M4A, OGG or FLAC, up to 30 MB; the first 30 seconds of each count), for models that copy voices (Seed Audio).' },
+        format: { type: 'string', enum: ['mp3', 'wav'], description: 'The file, if the user said: mp3 (smaller) or wav (uncompressed).' },
+        model: { type: 'string', description: 'OpenRouter’s id of another audio model, only when the user asks for it ("elevenlabs/eleven-v3", "google/lyria-3-clip-preview").' },
+        name: { type: 'string', description: 'A short file name, without extension (default: from the prompt).' },
+        ask: { type: 'boolean', description: 'true: show the settings form even if answered before; false: make it without the form.' },
+      },
+      required: ['kind'],
+    },
+    async run(a, ctx) {
+      const until = Date.now() + AUDIO_WAIT_MS;
+      const key = loadConfig().openrouter.apiKey;
+      if (!key) return { isError: true, text: NO_KEY('Audio') };
+      const kind = AUDIO_KINDS.find((k) => k === a.kind);
+      if (!kind) throw new Error('kind: music, speech or sound.');
+      const prompt = String(a.prompt ?? '').trim();
+      const turns = readTurns(a.turns);
+      if (turns.length && kind !== 'speech') throw new Error('turns are for speech: a conversation to voice.');
+      if (!prompt && !turns.length) throw new Error(kind === 'speech' ? 'Give the words to say in prompt, or a conversation in turns.' : `Describe the ${kind} in prompt.`);
+      const asked = str(a.model);
+      if (asked && !MODEL_ID.test(asked)) throw new Error('model: an OpenRouter id, like elevenlabs/eleven-v3.');
+      const samplePaths: string[] = (Array.isArray(a.voice_samples) ? a.voice_samples : []).map((p: unknown) => inSession(ctx.cwd, String(p)));
+      if (samplePaths.length && kind !== 'speech') throw new Error('voice_samples are for speech: the voice to say the words in.');
+      if (samplePaths.length > 3) throw new Error('Give at most 3 voice samples.');
+      const s = audioSettings(db);
+      const role = kind === 'music' ? 'music' : 'speech';
+      let { id, info } = await usingAudio(s, role, asked);
+      const list = await amodels().catch(() => [] as AudioModel[]);
+      if (asked && !info && list.length) throw new Error(`OpenRouter has no audio model ${asked}. The user can see the ones there are in Settings → Images, video and audio.`);
+      const need = { samples: samplePaths.length, turns: turns.length > 0 };
+      if (info?.via === 'speech' && need.samples) await withDetails(OPENROUTER_URL, [info]).catch(() => {});
+      let why = info ? cannot(info, kind, need) : null;
+      // What the model picked cannot do, another of the app's choices may: sounds, copied voices, conversations.
+      let instead: string | undefined;
+      if (why && !asked && info) {
+        const pool = [...(kind === 'music' ? PREFERRED_MUSIC : []), ...PREFERRED_SPEECH].map((p) => list.find((m) => m.id === p)).filter((m): m is AudioModel => !!m);
+        if (need.samples) await withDetails(OPENROUTER_URL, pool.filter((m) => m.via === 'speech')).catch(() => {});
+        const alt = pool.find((m) => !cannot(m, kind, need));
+        if (alt) {
+          instead = info.label;
+          id = alt.id;
+          info = alt;
+          why = null;
+        }
+      }
+      if (why) return { isError: true, text: `${why}: ${asked ? 'leave model out, or name one that can' : 'name one that can in model, or the user can pick one in Settings → Images, video and audio'}.` };
+      const samples = await readSamples(samplePaths);
+      const prompted = !!info?.prompted;
+      // A voice by its id, in whatever case it was written; for a model that takes a description, the words describe it.
+      const voiceAsked = str(a.voice);
+      const voiceId = voiceAsked ? info?.voices?.find((x) => x.toLowerCase() === voiceAsked.toLowerCase()) : undefined;
+      // A voice the model does not list (Fish Audio takes any of its own) goes as given, for it to say whether it has it.
+      const voiceOk = !!voiceAsked && !prompted;
+      const lyrics = str(a.lyrics);
+      const instrumental = bool(a.instrumental);
+      const given: AudioChoice = {
+        ...(a.format === 'mp3' || a.format === 'wav' ? { format: a.format } : {}),
+        ...(voiceOk && !samples.length && !turns.length ? { voice: voiceId ?? voiceAsked } : {}),
+        ...(instrumental !== undefined ? { instrumental } : lyrics ? { instrumental: false } : {}),
+        ...(int(a.duration) ? { seconds: Math.max(1, int(a.duration)!) } : {}),
+      };
+      const memo = pickedKey(ctx.key, 'audio', id);
+      const before = pickedFor<AudioChoice>(memo);
+      let v: AudioChoice = { ...audioDefaults(info, kind), ...(before?.format ? { format: before.format } : {}), ...(before?.voice ? { voice: before.voice } : {}), ...given };
+      // A length goes into what the model is asked only when the agent gave one or the user confirmed one on the form.
+      let timed = given.seconds !== undefined;
+      const instructions = [prompted && voiceAsked ? voiceAsked : '', str(a.instructions) ?? ''].filter(Boolean).join(', ') || undefined;
+      /** What to make; `priced`: for the form's price, with the length it shows. */
+      const wish = (c: AudioChoice, priced = false): AudioWish => ({
+        kind,
+        prompt,
+        ...(lyrics ? { lyrics } : {}),
+        instrumental: c.instrumental,
+        instructions,
+        ...(turns.length ? { turns } : {}),
+        ...(c.seconds && (timed || priced) ? { seconds: c.seconds } : {}),
+        samples: samples.length,
+      });
+      const tr = appWords(db);
+      const fields = audioForm(info, kind, v, tr, { voices: !samples.length && !prompted });
+      const left = Object.keys(fields).some((f) => !(f in given));
+      const ask = askOf(a);
+      if ((ask === true || (ask === undefined && left && !before)) && Object.keys(fields).length && attended(ctx)) {
+        const what = prompt || turns.map((t) => t.text).join(' ');
+        const r = await fillForm(ctx, {
+          title: tr(FORM[kind]),
+          message: [
+            audioPriceLine(info, id, tr, audioCost(info, wish(v, true))),
+            ...(instead && info ? [insteadLine(instead, info.label, tr)] : []),
+            `> ${what.replace(/\s+/g, ' ').slice(0, 400)}`,
+          ].join('\n\n'),
+          schema: { properties: fields },
+          submit: tr(FORM.submit),
+          waitMs: Math.max(60_000, until - Date.now() - (kind === 'music' ? MUSIC_MS : SPEECH_MS)),
+        });
+        if (!r.ok && r.why === 'declined') return CLOSED(AUDIO_WORD[kind]);
+        if (!r.ok && r.why === 'timeout') return { isError: true, text: NO_ANSWER(AUDIO_WORD[kind]) };
+        if (!r.ok && r.why === 'withdrawn') return { isError: true, text: WITHDRAWN(AUDIO_WORD[kind]) };
+        if (r.ok) {
+          v = audioAnswers(r.content, v, fields);
+          if ('seconds' in fields) timed = typeof r.content.seconds === 'number';
+          rememberPicked(memo, { format: v.format, ...(v.voice ? { voice: v.voice } : {}) });
+        }
+      } else {
+        const wrong = audioMismatch(info, given);
+        if (wrong) return { isError: true, text: wrong };
+      }
+      if (info && v.format && !info.formats.includes(v.format)) v.format = info.formats[0];
+      const w = wish(v);
+      const via = info?.via ?? (role === 'music' ? 'chat' : 'speech');
+      // What the model is sent.
+      let input: string | Turn[] = prompt;
+      if (via === 'speech') {
+        if (prompted) {
+          input = describedInput(w);
+          const bad = placeholderProblem(input, samples.length);
+          if (bad) return { isError: true, text: bad };
+          if (input.length > 3000) return { isError: true, text: `${info?.label ?? id} takes at most 3,000 characters at once (this is ${input.length}): make it in parts.` };
+        } else if (kind === 'music') input = musicPrompt(w);
+        else if (turns.length) {
+          const voices = info?.voices ?? [];
+          const off = turns.find((t) => t.voice && voices.length && !voices.some((x) => x.toLowerCase() === t.voice!.toLowerCase()));
+          if (off) return { isError: true, text: `${info?.label ?? id} has no voice “${off.voice}”: give each turn one of ${voices.slice(0, 40).join(', ')}.` };
+          input = turns.map((t) => ({ text: t.text, ...(t.voice ? { voice: voices.find((x) => x.toLowerCase() === t.voice!.toLowerCase()) ?? t.voice } : {}), ...(t.instructions ? { instructions: t.instructions } : {}) }));
+        } else input = prompt.replace(/@Audio\d+\s*/g, '').trim();
+      }
+      const limit = kind === 'music' ? MUSIC_MS : SPEECH_MS;
+      const timeout = AbortSignal.timeout(limit);
+      const signal = ctx.signal ? AbortSignal.any([ctx.signal, timeout]) : timeout;
+      let made: MadeAudio;
+      try {
+        made =
+          via === 'speech'
+            ? await generateSpeech({
+                base: OPENROUTER_URL,
+                key,
+                model: id,
+                input,
+                ...(!prompted && !samples.length && v.voice ? { voice: v.voice } : {}),
+                ...(!prompted && info?.instructions && w.instructions ? { instructions: w.instructions } : {}),
+                format: v.format === 'wav' ? 'pcm' : 'mp3',
+                samples,
+                signal,
+              })
+            : await generateChatAudio({
+                base: OPENROUTER_URL,
+                key,
+                model: id,
+                ...(info?.kind === 'speech' ? { prompt: prompt || turns.map((t) => t.text).join('\n'), system: readAloud(w.instructions), voice: v.voice } : { prompt: musicPrompt(w) }),
+                format: v.format ?? 'mp3',
+                signal,
+              });
+      } catch (e) {
+        if (timeout.aborted) return { isError: true, text: `${id} took over ${Math.round(limit / 60_000)} minutes, so it was stopped: nothing was saved. Try again, or ask for something shorter.` };
+        if (ctx.signal?.aborted) return { isError: true, text: `Stopped before the ${AUDIO_WORD[kind]} was made.` };
+        return { isError: true, text: `The ${AUDIO_WORD[kind]} was not made: ${String((e as Error).message ?? e)}` };
+      }
+      const saved = await saveAudio(made, path.join(ctx.cwd, 'audio'), str(a.name) ?? (prompt || turns[0]?.text || kind));
+      const p = await probe(saved.path).catch(() => null);
+      const secs = p?.duration ?? wavSeconds(made.data);
+      const cost = made.cost ?? audioCost(info, w, secs);
+      const words = made.words && kind === 'music' ? cleanLyrics(made.words) : undefined;
+      const what = kind === 'music' ? (v.instrumental ? 'a piece of music' : 'a song') : kind === 'sound' ? 'a sound' : turns.length ? 'a conversation' : 'a voice-over';
+      const how = [
+        kind === 'speech' && v.voice && !prompted && !samples.length && !turns.length ? `voice ${v.voice}` : '',
+        samples.length ? `in the voice of ${samples.map((x) => x.name).join(', ')}` : '',
+        kind === 'music' && v.instrumental ? 'instrumental' : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
+      return [
+        `Made ${what} with ${id}${cost === undefined ? '' : cost ? ` (${made.cost ? '' : 'about '}${money(cost)})` : ' (free)'}${how ? `, ${how}` : ''}:`,
+        `${saved.path} (${[secs ? `${Math.round(secs * 10) / 10} s` : '', size(saved.bytes)].filter(Boolean).join(', ')})`,
+        ...(instead && info ? [`${instead} cannot make this, so ${info.label} made it.`] : []),
+        'The user hears it with your reply, in a player where they can download it and keep it in their Library: don’t repeat it or its path. You cannot listen to it: speak of it as what you asked for.',
+        ...(words ? [/^[[{]/.test(words) ? `Notes from the model:\n${words.slice(0, 2000)}` : `Lyrics:\n${words.slice(0, 2000)}`] : []),
+      ].join('\n');
+    },
+  };
+}
+
 // ---- the routes ---------------------------------------------------------------------------------------------
 
 const searchWords = (q: unknown) =>
@@ -428,6 +749,33 @@ export const images: Feature = {
       list.sort(q.sort === 'price' ? (x, y) => (x.perSecond ?? Infinity) - (y.perSecond ?? Infinity) || newer(x, y) : newer);
       return { models: list.slice(0, 100) };
     });
+    app.get('/api/audio/settings', async () => audioState(db));
+    app.put('/api/audio/settings', async (req) => {
+      const b = (req.body ?? {}) as { enabled?: unknown; music?: unknown; speech?: unknown };
+      const s = audioSettings(db);
+      if (typeof b.enabled === 'boolean') s.enabled = b.enabled;
+      if (typeof b.music === 'string' && (b.music === '' || MODEL_ID.test(b.music))) s.music = b.music;
+      if (typeof b.speech === 'string' && (b.speech === '' || MODEL_ID.test(b.speech))) s.speech = b.speech;
+      kvSet(db, 'audio', JSON.stringify(s));
+      return audioState(db);
+    });
+    app.get('/api/audio/models', async (req) => {
+      const q = req.query as Record<string, string>;
+      const kind = q.kind === 'music' || q.kind === 'speech' ? q.kind : undefined;
+      const words = searchWords(q.q);
+      const list = (await amodels()).filter((m) => (!kind || m.kind === kind) && words.every((w) => `${m.id} ${m.label} ${m.org ?? ''}`.toLowerCase().includes(w)));
+      // Which voice models copy voices, from their endpoints (asked once, kept for hours).
+      await withDetails(OPENROUTER_URL, list).catch(() => {});
+      const newer = (x: AudioModel, y: AudioModel) => (y.created ?? 0) - (x.created ?? 0);
+      // Cheapest: a song for music; a minute of speech for voices, however each is sold.
+      const price = (m: AudioModel) => (m.free ? 0 : (m.perSong ?? m.perMinute ?? Infinity));
+      list.sort(q.sort === 'price' ? (x, y) => price(x) - price(y) || newer(x, y) : newer);
+      return { models: list.slice(0, 100) };
+    });
   },
-  tools: ({ deps }) => [...(settings(deps.db).enabled ? [imageTool(deps.db)] : []), ...(settings(deps.db, 'videos').enabled ? [videoTool(deps.db)] : [])],
+  tools: ({ deps }) => [
+    ...(settings(deps.db).enabled ? [imageTool(deps.db)] : []),
+    ...(settings(deps.db, 'videos').enabled ? [videoTool(deps.db)] : []),
+    ...(audioSettings(deps.db).enabled ? [audioTool(deps.db)] : []),
+  ],
 };

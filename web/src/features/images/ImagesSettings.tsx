@@ -1,12 +1,12 @@
-// Settings → Images and video: whether agents can make images and videos, and with which of OpenRouter's models
-// (each model's list opens in a dialog, to search and sort), and the model that writes the titles and
-// descriptions of what you keep in the Library: where it runs (the app's choice, OpenRouter, Claude, a model
-// of your own) and which. Making them uses the OpenRouter key from Settings → Models; without one, this says
-// where to add it.
+// Settings → Images, video and audio: whether agents can make images, videos and audio, and with which of
+// OpenRouter's models (an image model, a video model, a music model and a voice and sound model; each list opens in
+// a dialog, to search and sort), and the model that writes the titles and descriptions of what you keep in the
+// Library: where it runs (the app's choice, OpenRouter, Claude, a model of your own) and which. Making them uses
+// the OpenRouter key from Settings → Models; without one, this says where to add it.
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { AudioLines, Check, ExternalLink, Film, ImagePlay, KeyRound, PenLine, Search, Sparkles, TriangleAlert, Type, X } from 'lucide-react';
+import { AudioLines, Check, Copy, ExternalLink, Film, ImagePlay, KeyRound, MessagesSquare, Mic, Music, PenLine, Search, Sparkles, TriangleAlert, Type, X } from 'lucide-react';
 import type { ImageModel, ImagesState } from '@shared/images';
-import { clipLength, type CaptionModelOption, type CaptionProvider, type MediaSettings, type VideoModel, type VideosState } from '@shared/media';
+import { clipLength, type AudioModel, type AudioState, type CaptionModelOption, type CaptionProvider, type MediaSettings, type VideoModel, type VideosState } from '@shared/media';
 import { api, put } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
@@ -18,6 +18,23 @@ const usd = (n: number) => (n >= 0.095 ? n.toFixed(2) : String(Number(n.toPrecis
 export const aboutPrice = (n?: number) => (n == null ? undefined : `about $${usd(n)} an image`);
 const perSecond = (m: VideoModel) => (m.perSecond == null ? undefined : m.perSecondMax && m.perSecondMax > m.perSecond * 1.05 ? `$${usd(m.perSecond)} to $${usd(m.perSecondMax)} a second` : `$${usd(m.perSecond)} a second`);
 const lengths = (d: number[]) => (!d.length ? undefined : d.length === 1 ? clipLength(d[0]) : `${d[0]} to ${clipLength(d[d.length - 1])}`);
+/** Dollars to two figures: sounds are sold by small amounts ("$0.0025 a second"). */
+const usd2 = (n: number) => (n >= 0.095 ? n.toFixed(2) : String(Number(n.toPrecision(2))));
+/** What a sound model costs, the way it is sold: a song, a second, a thousand characters, about a minute of speech. */
+const audioPrice = (m: AudioModel) =>
+  m.free
+    ? 'Free'
+    : m.perSong
+      ? m.maxSeconds && m.maxSeconds <= 30
+        ? `$${usd2(m.perSong)} a clip`
+        : `$${usd2(m.perSong)} a song`
+      : m.perSecond
+        ? `$${usd2(m.perSecond)} a second`
+        : m.perChar
+          ? `$${usd2(m.perChar * 1000)} per 1,000 characters`
+          : m.perMinute
+            ? `about $${usd2(m.perMinute)} a minute`
+            : undefined;
 
 function Mark({ name }: { name: string }) {
   let h = 0;
@@ -133,7 +150,50 @@ function VideoRow({ m, selected, onPick }: { m: VideoModel; selected?: boolean; 
   );
 }
 
-/** A model list to search and sort, in a dialog: image or video models. */
+function AudioRow({ m, selected, onPick }: { m: AudioModel; selected?: boolean; onPick?: () => void }) {
+  return (
+    <Row
+      id={m.id}
+      label={m.label}
+      org={m.org}
+      created={m.created}
+      selected={selected}
+      onPick={onPick}
+      facts={[audioPrice(m), m.maxSeconds ? `up to ${clipLength(m.maxSeconds)}` : undefined, m.voices?.length ? (m.voices.length === 1 ? '1 voice' : `${m.voices.length} voices`) : undefined]}
+      tags={
+        <>
+          {m.kind === 'music' && (
+            <Tag icon={<Music size={11} />} title="Makes songs and music">
+              Music
+            </Tag>
+          )}
+          {m.prompted && (
+            <Tag icon={<AudioLines size={11} />} title="Makes sound effects and ambience as well as voices, from a description">
+              <span className="max-sm:hidden">Sounds too</span>
+            </Tag>
+          )}
+          {m.cloning && (
+            <Tag icon={<Copy size={11} />} title="Speaks in a voice copied from short recordings you give it">
+              <span className="max-sm:hidden">Copies voices</span>
+            </Tag>
+          )}
+          {m.multiSpeaker && (
+            <Tag icon={<MessagesSquare size={11} />} title="Voices a conversation, each speaker in their own voice">
+              <span className="max-sm:hidden">Conversations</span>
+            </Tag>
+          )}
+          {m.kind === 'speech' && !m.prompted && m.instructions && (
+            <Tag icon={<Mic size={11} />} title="Takes directions for the delivery: tone, pace, emotion">
+              <span className="max-sm:hidden">Directed</span>
+            </Tag>
+          )}
+        </>
+      }
+    />
+  );
+}
+
+/** A model list to search and sort, in a dialog: image, video, music or voice models. */
 function ModelDialog<T extends { id: string }>({ open, onClose, title, endpoint, hint, using, onPick, row }: { open: boolean; onClose: () => void; title: string; endpoint: string; hint: string; using: string; onPick: (id: string) => void; row: (m: T, selected: boolean, pick: () => void) => ReactNode }) {
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<'new' | 'price'>('new');
@@ -145,7 +205,7 @@ function ModelDialog<T extends { id: string }>({ open, onClose, title, endpoint,
     setBusy(true);
     const t = setTimeout(
       () =>
-        api<{ models: T[] }>(`${endpoint}?${new URLSearchParams({ q: q.trim(), sort })}`)
+        api<{ models: T[] }>(`${endpoint}${endpoint.includes('?') ? '&' : '?'}${new URLSearchParams({ q: q.trim(), sort })}`)
           .then((r) => alive && setList(r.models), (e) => alive && (setList([]), toastError(e)))
           .finally(() => alive && setBusy(false)),
       q ? 220 : 0,
@@ -364,17 +424,20 @@ function Captions({ st, onSave }: { st: MediaSettings; onSave: (provider: Captio
 export function ImagesSettings() {
   const [img, setImg] = useState<ImagesState | null>(null);
   const [vid, setVid] = useState<VideosState | null>(null);
+  const [aud, setAud] = useState<AudioState | null>(null);
   const [med, setMed] = useState<MediaSettings | null>(null);
-  const [dialog, setDialog] = useState<'image' | 'video' | null>(null);
+  const [dialog, setDialog] = useState<'image' | 'video' | 'music' | 'speech' | null>(null);
   useEffect(() => {
     api<ImagesState>('/api/images/settings').then(setImg, toastError);
     api<VideosState>('/api/videos/settings').then(setVid, toastError);
+    api<AudioState>('/api/audio/settings').then(setAud, toastError);
     api<MediaSettings>('/api/media/settings').then(setMed, toastError);
   }, []);
   const saveImg = (body: Partial<Pick<ImagesState, 'enabled' | 'model'>>) => put<ImagesState>('/api/images/settings', body).then(setImg, toastError);
   const saveVid = (body: Partial<Pick<VideosState, 'enabled' | 'model'>>) => put<VideosState>('/api/videos/settings', body).then(setVid, toastError);
+  const saveAud = (body: Partial<Pick<AudioState, 'enabled' | 'music' | 'speech'>>) => put<AudioState>('/api/audio/settings', body).then(setAud, toastError);
   const saveCaptions = (provider: CaptionProvider, model: string) => put<MediaSettings>('/api/media/settings', { captions: { provider, model } }).then(setMed, toastError);
-  if (!img || !vid || !med)
+  if (!img || !vid || !aud || !med)
     return (
       <div className="flex justify-center py-10 text-fg-3">
         <Throbber size={28} />
@@ -385,13 +448,14 @@ export function ImagesSettings() {
   return (
     <div className="space-y-4">
       <p className="text-[13px] leading-relaxed text-fg-3">
-        Ask any agent for a picture or a short video (“a logo for my bakery”, “ten seconds of waves at dusk”) and it makes it with a model through OpenRouter, once you have checked its settings and price on a short form. Keep what you like in your Library.
+        Ask any agent for a picture, a short video, a song or a voice-over (“a logo for my bakery”, “ten seconds of waves at dusk”, “a jingle for my podcast”) and it makes it with a model through OpenRouter, once you have
+        checked its settings and price on a short form. Keep what you like in your Library.
       </p>
       {!img.keySet && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2.5">
           <KeyRound size={16} className="shrink-0 text-warn" />
           <div className="min-w-[12rem] flex-1 text-[12.5px] leading-snug text-fg-2">
-            Image and video models are reached through OpenRouter, and no key is set yet.{' '}
+            Image, video and audio models are reached through OpenRouter, and no key is set yet.{' '}
             <a className="inline-flex items-center gap-0.5 text-accent hover:underline" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
               Get one at openrouter.ai <ExternalLink size={11} />
             </a>
@@ -411,7 +475,24 @@ export function ImagesSettings() {
           {vidModel ? <VideoRow m={vidModel} /> : <div className="px-3 py-2.5 font-mono text-[12.5px] text-fg-2">{vid.using}</div>}
         </ModelLine>
       </Section>
-      <Section title="Captions in the Library" sub="Each picture or video you keep gets a title and a description, written by a model that sees images. It sees a video as ten of its frames on one picture.">
+      <Section
+        title="Making audio"
+        sub="Agents get a tool for it: songs and jingles, voice-overs in a described voice or one copied from a recording, sound effects and ambience. Each is paid for with your OpenRouter key, its price shown first."
+        actions={<Switch on={aud.enabled} onChange={(on) => void saveAud({ enabled: on })} label="Let agents make audio" />}
+      >
+        <div className="space-y-4">
+          <ModelLine label="Music model" picked={!!aud.music} onChange={() => setDialog('music')} onAuto={() => void saveAud({ music: '' })}>
+            {aud.musicInfo ? <AudioRow m={aud.musicInfo} /> : <div className="px-3 py-2.5 font-mono text-[12.5px] text-fg-2">{aud.usingMusic}</div>}
+          </ModelLine>
+          <ModelLine label="Voice and sound model" picked={!!aud.speech} onChange={() => setDialog('speech')} onAuto={() => void saveAud({ speech: '' })}>
+            {aud.speechInfo ? <AudioRow m={aud.speechInfo} /> : <div className="px-3 py-2.5 font-mono text-[12.5px] text-fg-2">{aud.usingSpeech}</div>}
+          </ModelLine>
+        </div>
+      </Section>
+      <Section
+        title="Captions in the Library"
+        sub="Each picture or video you keep gets a title and a description, written by a model that sees images. It sees a video as ten of its frames on one picture; a sound, which it cannot hear, it describes from what it was made from."
+      >
         <Captions st={med} onSave={(p, m) => void saveCaptions(p, m)} />
       </Section>
       <ModelDialog<ImageModel>
@@ -433,6 +514,26 @@ export function ImagesSettings() {
         using={vid.using}
         onPick={(id) => void saveVid({ model: id })}
         row={(m, selected, pick) => <VideoRow key={m.id} m={m} selected={selected} onPick={pick} />}
+      />
+      <ModelDialog<AudioModel>
+        open={dialog === 'music'}
+        onClose={() => setDialog(null)}
+        title="Music model"
+        endpoint="/api/audio/models?kind=music"
+        hint="Search music models: lyria…"
+        using={aud.usingMusic}
+        onPick={(id) => void saveAud({ music: id })}
+        row={(m, selected, pick) => <AudioRow key={m.id} m={m} selected={selected} onPick={pick} />}
+      />
+      <ModelDialog<AudioModel>
+        open={dialog === 'speech'}
+        onClose={() => setDialog(null)}
+        title="Voice and sound model"
+        endpoint="/api/audio/models?kind=speech"
+        hint="Search voice models: seed, elevenlabs, gemini…"
+        using={aud.usingSpeech}
+        onPick={(id) => void saveAud({ speech: id })}
+        row={(m, selected, pick) => <AudioRow key={m.id} m={m} selected={selected} onPick={pick} />}
       />
     </div>
   );
