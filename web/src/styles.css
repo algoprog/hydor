@@ -468,12 +468,48 @@ html {
 .spin-once {
   animation: spin-once 650ms cubic-bezier(0.3, 0.7, 0.3, 1);
 }
-/* The logo's Ω lifts a little under the pointer, like a wave. */
+/* The logo's tide (Wordmark with tide, in the sidebar): the Ω holds still while, under the pointer, it empties to a
+   faint outline and bright water rises in it, a wave along its crest that keeps flowing and bobbing while the pointer
+   stays; then the water drains and the letter is whole again. .logo-tide is the water's height in the letter's units
+   (112 is below it, 24 nearly full); .logo-swell moves the wave by one length (36), .logo-bob lifts and lowers it,
+   both only while the pointer is there. */
 .logo-omega {
-  transition: translate 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: opacity 500ms ease 220ms;
 }
-.group:hover .logo-omega {
-  translate: 0 -8px;
+.wordmark-tide:hover .logo-omega {
+  opacity: 0.3;
+  transition: opacity 240ms ease;
+}
+.logo-tide {
+  transform: translateY(112px);
+  transition: transform 760ms cubic-bezier(0.55, 0, 0.75, 0.25);
+}
+.wordmark-tide:hover .logo-tide {
+  transform: translateY(24px);
+  transition: transform 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.logo-swell {
+  animation: logo-swell 1.5s linear infinite paused;
+}
+.logo-bob {
+  animation: logo-bob 2.6s ease-in-out infinite paused;
+}
+.wordmark-tide:hover :is(.logo-swell, .logo-bob) {
+  animation-play-state: running;
+}
+.logo-crest {
+  stroke: #fff;
+  opacity: 0.85;
+}
+@keyframes logo-bob {
+  50% {
+    transform: translateY(6px);
+  }
+}
+@keyframes logo-swell {
+  to {
+    transform: translateX(-36px);
+  }
 }
 /* Something just arrived or got done: a small pop, a check that draws itself, a line through. */
 @keyframes pop-in {

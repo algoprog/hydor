@@ -28,7 +28,7 @@ Under the search field is every session, in groups:
 
 - **Active**: all sessions with activity in the last five minutes, here or in VS Code or a terminal, including ones that have finished. After five minutes without activity they return to their usual group, even if their agent is still open. Sessions stopped by a usage limit stay here while scheduled to resume automatically; cancelling that resume restores the five-minute rule. Sessions whose background agents, commands or monitors are still running stay here too, however quiet, until those end. They keep their places while listed; drag one to move it.
 - **Pinned**: the sessions you pinned, in the order you drag them into. Drag a session from the groups below onto it to pin it.
-- **Projects**: a group for each of your projects, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
+- **Projects**: a group for each of your projects, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first, until you put them in an order of your own: drag a group by its heading to another place among them (on a phone, hold the heading a moment first). That order is the same on every device, and a group you never moved (a project made since) comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
 - **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
 - **Snoozed**: at the bottom, until their time comes.
 
@@ -241,4 +241,5 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "Next time I open the start page, have it set to Claude Code with the Researcher assistant."
 - "Make my search box look only in my sessions and pages."
 - "Put Settings and Search first among the tools at the bottom of my sidebar."
+- "Put my Thesis project first among the groups in my sidebar."
 - "What is in my inbox?"

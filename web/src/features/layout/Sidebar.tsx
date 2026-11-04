@@ -91,8 +91,6 @@ interface Tool {
   go: () => void;
   extra?: ReactNode;
   tour?: string;
-  /** How its icon answers the pointer (styles.css, "small motion"). */
-  anim?: string;
 }
 
 /** What a tool being dragged gets: its place among the others, and the handlers that pick it up. */
@@ -125,7 +123,7 @@ function NavItem({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; floa
         drag?.lifted && 'opacity-40',
       )}
     >
-      <span className={cx('ico shrink-0', t.anim ?? 'ico-lift', t.match ? 'text-fg' : 'text-fg-3')}>{t.icon}</span>
+      <span className={cx('shrink-0', t.match ? 'text-fg' : 'text-fg-3')}>{t.icon}</span>
       <span className="max-w-full truncate px-1 leading-none">{t.label}</span>
       {t.extra}
     </button>
@@ -177,16 +175,15 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
 
   const tools: Tool[] = [
     ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path) }))),
-    { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint />, anim: 'ico-grow' },
+    { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint /> },
     // This computer: its files, Git, terminals, previews and monitor, each a tab of System.
-    { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), anim: 'ico-turn', tour: 'nav-system' },
+    { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), tour: 'nav-system' },
     {
       id: 'settings',
       label: 'Settings',
       icon: <Settings size={17} />,
       match: loc === '/settings',
       go: () => nav('/settings'),
-      anim: 'ico-turn',
       tour: 'nav-settings',
       extra: updates ? <span className="absolute top-2.5 left-[calc(50%+7px)] h-1.5 w-1.5 rounded-full bg-accent" title="A newer version is out (Settings → General)" /> : undefined,
     },
@@ -228,8 +225,8 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
       className={cx('flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)]', mobile ? 'select-none [-webkit-touch-callout:none] [&_input]:select-text' : 'border-r border-line')}
     >
       <div data-tour="sidebar-top" className="flex h-14 shrink-0 items-center gap-2.5 px-4">
-        <span className="group flex min-w-0 flex-1 items-center text-fg">
-          <Wordmark height={16} />
+        <span className="flex min-w-0 flex-1 items-center text-fg">
+          <Wordmark height={16} tide />
         </span>
         {!connected && (
           <span title="Reconnecting…" className="text-warn">
@@ -252,11 +249,9 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         <MachineSwitcher onGo={mobile ? close : undefined} />
         <button
           onClick={() => nav('/')}
-          className="group flex h-9 w-full items-center gap-2.5 rounded-[10px] bg-bg-2 px-3 text-[13.5px] font-medium text-fg ring-1 ring-line-2 transition-colors ring-inset hover:bg-bg-3"
+          className="flex h-9 w-full items-center gap-2.5 rounded-[10px] bg-bg-2 px-3 text-[13.5px] font-medium text-fg ring-1 ring-line-2 transition-colors ring-inset hover:bg-bg-3"
         >
-          <span className="ico ico-tilt">
-            <SquarePen size={16} />
-          </span>
+          <SquarePen size={16} className="shrink-0" />
           New session
         </button>
         <div data-tip="search" className="relative">

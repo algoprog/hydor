@@ -26,7 +26,8 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   after a usage limit stay in Active until that scheduled resume is cleared, and so do sessions whose background
   agents, commands or monitors are still running, until those end. Pinned comes next, then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable, a line per session, with a pen to
-  start a new session there; then the rest by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
+  start a new session there, and dragged by their headings into the order you like, the same on every device;
+  then the rest by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
   (until later), settles (done for now), archives or deletes the session, on phones too.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
   OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).

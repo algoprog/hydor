@@ -1,5 +1,6 @@
-// Script tests for the order of the sidebar's tools: the tools named first, the rest after them in their usual
-// order; a name it does not know refused; the usual order kept as none; the routes, and the news to open pages.
+// Script tests for the sidebar's orders: the tools named first, the rest after them in their usual order; a name it
+// does not know refused; the usual order kept as none; the projects' and folders' groups as dragged; the routes, and
+// the news to open pages.
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/sidebar/sidebar-test.ts
 //   DATA_DIR=/tmp/hydor-test-sidebar node dist/dev/sidebar-test.js
@@ -7,11 +8,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { SIDEBAR_TOOLS, toolOrder, usualOrder } from '../../shared/sidebar.ts';
+import { MAX_PLACES, placeOrder, SIDEBAR_TOOLS, toolOrder, usualOrder } from '../../shared/sidebar.ts';
 import type { ServerEvent } from '../../shared/types.ts';
 import { kvGet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
-import { setSidebarTools, sidebar, sidebarTools } from './index.ts';
+import { setSidebarPlaces, setSidebarTools, sidebar, sidebarPlaces, sidebarTools } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -74,13 +75,34 @@ test('the routes: GET reads it, PUT keeps it and tells every open page', async (
   };
   const sent: ServerEvent[] = [];
   sidebar.routes!({ app, db, broadcast: (e: ServerEvent) => sent.push(e) } as unknown as Deps);
+  setSidebarPlaces(db, []);
   const order = ['search', 'help', ...usual.filter((t) => t !== 'search' && t !== 'help')];
-  assert.deepEqual(await handlers.get('PUT /api/sidebar')!({ body: { tools: ['search', 'help'] } }), { tools: order });
-  assert.deepEqual(sent, [{ t: 'feature', id: 'sidebar', data: { tools: order } }]);
-  assert.deepEqual(await handlers.get('GET /api/sidebar')!({}), { tools: order });
+  assert.deepEqual(await handlers.get('PUT /api/sidebar')!({ body: { tools: ['search', 'help'] } }), { tools: order, places: [] });
+  assert.deepEqual(sent, [{ t: 'feature', id: 'sidebar', data: { tools: order, places: [] } }]);
+  assert.deepEqual(await handlers.get('GET /api/sidebar')!({}), { tools: order, places: [] });
+  // The groups' order alone: the tools stay as they were.
+  const places = ['dir:/home/alex/blog', 'space:sp1'];
+  assert.deepEqual(await handlers.get('PUT /api/sidebar')!({ body: { places } }), { tools: order, places });
+  assert.deepEqual(sent[1], { t: 'feature', id: 'sidebar', data: { tools: order, places } });
+  assert.deepEqual(await handlers.get('GET /api/sidebar')!({}), { tools: order, places });
   await assert.rejects(() => handlers.get('PUT /api/sidebar')!({ body: { tools: ['inbox'] } }), /inbox/);
-  await assert.rejects(() => handlers.get('PUT /api/sidebar')!({}), /first to last/);
-  assert.equal(sent.length, 1, 'a refused change tells nobody');
+  await assert.rejects(() => handlers.get('PUT /api/sidebar')!({ body: { places: ['day:Today'] } }), /day:Today/);
+  await assert.rejects(() => handlers.get('PUT /api/sidebar')!({}), /tools, places or both/);
+  assert.equal(sent.length, 2, 'a refused change tells nobody');
+});
+
+test('the projects’ and folders’ groups: as dragged, repeats and other names refused or passed over, kept for every device', () => {
+  assert.deepEqual(sidebarPlaces(db), ['dir:/home/alex/blog', 'space:sp1'], 'as the routes left it');
+  assert.deepEqual(setSidebarPlaces(db, ['space:sp2', 'dir:/srv/shop', 'space:sp2']), ['space:sp2', 'dir:/srv/shop']);
+  assert.deepEqual(sidebarPlaces(db), ['space:sp2', 'dir:/srv/shop']);
+  assert.throws(() => setSidebarPlaces(db, ['space:sp2', 'pinned']), (e: Error & { status?: number }) => e.status === 400 && /pinned/.test(e.message));
+  assert.throws(() => setSidebarPlaces(db, 'space:sp2'), /first to last/);
+  assert.throws(() => setSidebarPlaces(db, ['dir:relative/path']), /relative/);
+  assert.deepEqual(sidebarPlaces(db), ['space:sp2', 'dir:/srv/shop'], 'a refused order changes nothing');
+  assert.equal(placeOrder(Array.from({ length: MAX_PLACES + 20 }, (_, i) => `space:s${i}`)).length, MAX_PLACES);
+  db.prepare("insert or replace into kv (k, v) values ('sidebar.places', 'not json')").run();
+  assert.deepEqual(sidebarPlaces(db), []);
+  assert.deepEqual(setSidebarPlaces(db, []), []);
 });
 
 for (const [name, fn] of tests) {

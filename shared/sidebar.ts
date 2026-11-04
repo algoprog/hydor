@@ -1,6 +1,7 @@
 // The tools at the bottom of the sidebar (Library, Spaces, Apps, System…) and the order you drag them into, which
 // the server keeps for every device (server/sidebar). An order names the tools first to last; any it leaves out
-// (one a newer version brings) follow, in their usual order.
+// (one a newer version brings) follow, in their usual order. The groups of projects and folders among the sessions
+// keep the order you drag them into too: groups it leaves out (a project made since) come first, newest first.
 
 /**
  * Every tool, in its usual order: the Library, Spaces, Apps and Usage, then System, Settings, Search and Help, four
@@ -24,3 +25,14 @@ export function toolOrder(v: unknown): SidebarTool[] {
 
 /** The order is the usual one. */
 export const usualOrder = (tools: readonly string[]) => tools.join() === SIDEBAR_TOOLS.join();
+
+/** At most this many project and folder groups keep a place (the first ones). */
+export const MAX_PLACES = 400;
+
+/** A project's group ("space:<its id>") or a folder's ("dir:<the folder>"). */
+export const isPlaceId = (v: unknown): v is string => typeof v === 'string' && v.length <= 1100 && (/^space:[\w-]{1,80}$/.test(v) || /^dir:\/[^\0\n]*$/.test(v));
+
+/** The groups of projects and folders in the order to show, first to last: names that are not one skipped, and repeats. */
+export function placeOrder(v: unknown): string[] {
+  return [...new Set(Array.isArray(v) ? v.filter(isPlaceId) : [])].slice(0, MAX_PLACES);
+}

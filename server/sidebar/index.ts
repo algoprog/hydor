@@ -1,11 +1,13 @@
-// The order of the tools at the bottom of the sidebar, as you drag them (shared/sidebar.ts): kept here, so every
-// device shows the same order, and open pages change at once. Another machine's pages show this server's.
-import { RETIRED_TOOLS, SIDEBAR_TOOLS, isSidebarTool, toolOrder, usualOrder, type SidebarTool } from '../../shared/sidebar.ts';
+// The sidebar's orders, as you drag them (shared/sidebar.ts): the tools at its bottom, and the groups of your projects
+// and folders among the sessions. Kept here, so every device shows the same order, and open pages change at once.
+// Another machine's pages show this server's.
+import { RETIRED_TOOLS, SIDEBAR_TOOLS, isSidebarTool, placeOrder, toolOrder, usualOrder, type SidebarTool } from '../../shared/sidebar.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Feature } from '../features/types.ts';
 
 const KEY = 'sidebar.tools';
+const PLACES = 'sidebar.places';
 
 /** Every tool, first to last. */
 export function sidebarTools(db: DB): SidebarTool[] {
@@ -28,14 +30,36 @@ export function setSidebarTools(db: DB, v: unknown): SidebarTool[] {
   return tools;
 }
 
+/** The groups of projects and folders, first to last, as dragged: "space:<id>" and "dir:<folder>". */
+export function sidebarPlaces(db: DB): string[] {
+  try {
+    return placeOrder(JSON.parse(kvGet(db, PLACES) ?? '[]'));
+  } catch {
+    return [];
+  }
+}
+
+/** Keeps the order of the projects' and folders' groups; anything else in the list is refused. */
+export function setSidebarPlaces(db: DB, v: unknown): string[] {
+  if (!Array.isArray(v)) throw new HttpError(400, 'places: the groups first to last, as "space:<project id>" or "dir:<folder>" ([] for their usual order, newest first)');
+  const bad = v.filter((x) => placeOrder([x]).length === 0);
+  if (bad.length) throw new HttpError(400, `Not a project or folder group: ${bad.slice(0, 3).map((x) => JSON.stringify(x)).join(', ')}. Give "space:<project id>" or "dir:<folder>"`);
+  const places = placeOrder(v);
+  kvSet(db, PLACES, JSON.stringify(places));
+  return places;
+}
+
 export const sidebar: Feature = {
   id: 'sidebar',
   routes(d) {
-    d.app.get('/api/sidebar', async () => ({ tools: sidebarTools(d.db) }));
+    d.app.get('/api/sidebar', async () => ({ tools: sidebarTools(d.db), places: sidebarPlaces(d.db) }));
     d.app.put('/api/sidebar', async (req) => {
-      const tools = setSidebarTools(d.db, (req.body as { tools?: unknown } | undefined)?.tools);
-      d.broadcast({ t: 'feature', id: 'sidebar', data: { tools } });
-      return { tools };
+      const b = (req.body ?? {}) as { tools?: unknown; places?: unknown };
+      if (b.tools === undefined && b.places === undefined) throw new HttpError(400, 'Give tools, places or both');
+      const tools = b.tools === undefined ? sidebarTools(d.db) : setSidebarTools(d.db, b.tools);
+      const places = b.places === undefined ? sidebarPlaces(d.db) : setSidebarPlaces(d.db, b.places);
+      d.broadcast({ t: 'feature', id: 'sidebar', data: { tools, places } });
+      return { tools, places };
     });
   },
 };

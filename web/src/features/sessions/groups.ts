@@ -1,7 +1,8 @@
 // The sidebar's groups of sessions: Active, Pinned, a group for each space and for each folder you work in, then the
-// rest by day (Today, Yesterday, This week, months, years), and Snoozed at the bottom. A space's sessions are in its
-// group from the first; a folder needs two sessions for one, and a session in a worktree counts for its main
-// checkout. Folders no one picked get no group, so their sessions go by day: the home folder and the default one, and
+// rest by day (Today, Yesterday, This week, months, years), and Snoozed at the bottom. Spaces' and folders' groups
+// come by their newest session, or in the order you dragged them into (any you never moved first). A space's
+// sessions are in its group from the first; a folder needs two sessions for one, and a session in a worktree counts
+// for its main checkout. Folders no one picked get no group, so their sessions go by day: the home folder and the default one, and
 // what is under the app's own places (task folders, apps' runs, worktrees, the temporary folder: the server's
 // autoFolders). With grouping off, or while the list shows one space, the rest all go by day.
 import type { SpaceView } from '@shared/spaces';
@@ -63,11 +64,19 @@ export function workFolder(s: SessionSummary): string | undefined {
 
 const RANK: Record<GroupKind, number> = { active: 0, pinned: 1, space: 2, folder: 2, day: 3, snoozed: 4 };
 
+/** A space's or a folder's group, which goes under Projects and keeps the place you drag it to. */
+export const isPlaceKind = (kind: GroupKind) => kind === 'space' || kind === 'folder';
+
 /**
- * The groups, in order, for sessions listed newest first. Spaces and folders come by their newest session; each
- * keeps its sessions newest first, as days do. Active, Pinned and Snoozed are left in that order for the list to sort.
+ * The groups, in order, for sessions listed newest first. Spaces and folders come by their newest session, unless
+ * `places` (their ids, as dragged: "space:<id>", "dir:<folder>") gives them a place: those come after the ones it
+ * does not name, in its order. Each keeps its sessions newest first, as days do. Active, Pinned and Snoozed are left
+ * in that order for the list to sort.
  */
-export function groupSessions(list: SessionSummary[], o: { now: Date; byFolder: boolean; spaces: SpaceView[] | null; unpicked: (dir: string) => boolean }): SessionGroup[] {
+export function groupSessions(
+  list: SessionSummary[],
+  o: { now: Date; byFolder: boolean; spaces: SpaceView[] | null; unpicked: (dir: string) => boolean; places?: readonly string[] },
+): SessionGroup[] {
   const spaces = new Map((o.spaces ?? []).map((sp) => [sp.id, sp]));
   const spaceOf = (s: SessionSummary) => (typeof s.extra?.space === 'string' ? spaces.get(s.extra.space) : undefined);
   const folderOf = (s: SessionSummary) => {
@@ -110,5 +119,7 @@ export function groupSessions(list: SessionSummary[], o: { now: Date; byFolder: 
   const named = new Map<string, number>();
   for (const g of folders) named.set(g.label, (named.get(g.label) ?? 0) + 1);
   for (const g of folders) if (named.get(g.label)! > 1) g.label = `${basename(dirname(g.path!)).replace(/^\/$/, '')}/${g.label}`;
-  return groups.sort((a, b) => RANK[a.kind] - RANK[b.kind]);
+  const placed = new Map((o.places ?? []).map((id, i) => [id, i]));
+  const at = (g: SessionGroup) => (isPlaceKind(g.kind) ? (placed.get(g.id) ?? -1) : 0);
+  return groups.sort((a, b) => RANK[a.kind] - RANK[b.kind] || at(a) - at(b));
 }
