@@ -2,6 +2,7 @@
 // the server keeps for every device (server/sidebar). An order names the tools first to last; any it leaves out
 // (one a newer version brings) follow, in their usual order. The groups of projects and folders among the sessions
 // keep the order you drag them into too: groups it leaves out (a project made since) come first, newest first.
+import type { Agent } from './types.ts';
 
 /**
  * Every tool, in its usual order: the Library, Spaces, Apps and Usage, then System, Settings, Search and Help, four
@@ -55,3 +56,16 @@ export function folderNameMap(v: unknown): Record<string, string> {
 
 /** A folder the Codex app made for one of your ChatGPT projects (~/.codex/.chatgpt-projects/g-p-…): named only by an id. */
 export const isChatgptProjectFolder = (dir: string) => /\/\.chatgpt-projects\/[^/]+\/*$/.test(dir);
+
+/**
+ * Where the sessions of a folder whose work began outside Hydor came from (bootstrap's folderOrigins): one agent's,
+ * in one account, to an entry, the most sessions first.
+ */
+export interface FolderOrigin {
+  agent: Agent;
+  /** The account added in Settings → Accounts whose history they are in; none for the agent's own sign-in. */
+  account?: string;
+  /** The apps they were started in, as the agent wrote them down (Claude Code's entrypoint, Codex's source: "claude-vscode", "cli"…), the most sessions first. */
+  sources: string[];
+  sessions: number;
+}

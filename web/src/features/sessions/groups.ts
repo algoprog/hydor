@@ -4,13 +4,14 @@
 // sessions are in its group from the first; a folder needs two sessions for one, and a session in a worktree counts
 // for its main checkout. Folders no one picked get no group, so their sessions go by day: the home folder and the default one, and
 // what is under the app's own places (task folders, apps' runs, worktrees, the temporary folder: the server's
-// autoFolders). With grouping off, or while the list shows one space, the rest all go by day. A folder none of whose
-// sessions Hydor started (they came from VS Code, a terminal, Claude's or Codex's own app) says where they came from.
-import { isChatgptProjectFolder } from '@shared/sidebar';
+// autoFolders). With grouping off, or while the list shows one space, the rest all go by day. A folder whose work began
+// outside Hydor (its first session came from VS Code, a terminal, Claude's or Codex's own app) says where its sessions
+// came from.
+import { isChatgptProjectFolder, type FolderOrigin } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
 import { basename, dayGroup, dirname } from '../../lib/format';
-import { folderSources, type FolderSource } from '../../lib/origin';
+import { folderSources, fromOrigins, type FolderSource } from '../../lib/origin';
 
 export type GroupKind = 'active' | 'pinned' | 'space' | 'folder' | 'day' | 'snoozed';
 
@@ -25,7 +26,7 @@ export interface SessionGroup {
   /** A folder group's folder. */
   path?: string;
   space?: SpaceView;
-  /** A folder group none of whose sessions was started here: where they came from (Claude Code, Codex; the apps). */
+  /** A folder group whose first session was started outside Hydor: where its sessions came from (Claude Code, Codex; the apps). */
   from?: FolderSource[];
 }
 
@@ -104,7 +105,16 @@ export const isPlaceKind = (kind: GroupKind) => kind === 'space' || kind === 'fo
  */
 export function groupSessions(
   list: SessionSummary[],
-  o: { now: Date; byFolder: boolean; spaces: SpaceView[] | null; unpicked: (dir: string) => boolean; places?: readonly string[]; names?: Record<string, string> },
+  o: {
+    now: Date;
+    byFolder: boolean;
+    spaces: SpaceView[] | null;
+    unpicked: (dir: string) => boolean;
+    places?: readonly string[];
+    names?: Record<string, string>;
+    /** Where each folder's work began, as the server knows it (bootstrap's folderOrigins); a folder it leaves out goes by the sessions listed. */
+    origins?: Record<string, FolderOrigin[]>;
+  },
 ): SessionGroup[] {
   const spaces = new Map((o.spaces ?? []).map((sp) => [sp.id, sp]));
   const spaceOf = (s: SessionSummary) => (typeof s.extra?.space === 'string' ? spaces.get(s.extra.space) : undefined);
@@ -113,7 +123,7 @@ export function groupSessions(
     return dir && (o.names?.[dir] || !o.unpicked(dir)) ? dir : undefined;
   };
   // The listed sessions that work in each folder, whichever group they show in now: a folder's group stays while
-  // one of its two sessions is active or pinned, and is marked as from elsewhere only while none of them was started here.
+  // one of its two sessions is active or pinned, and the first of them says where its work began when the server did not.
   const inFolder = new Map<string, SessionSummary[]>();
   if (o.byFolder) {
     for (const s of list) {
@@ -150,7 +160,8 @@ export function groupSessions(
   const labels = folderLabels(folders.map((g) => g.path!), o.names);
   for (const g of folders) {
     g.label = labels.get(g.path!) ?? g.label;
-    g.from = folderSources(inFolder.get(g.path!) ?? g.items);
+    const known = o.origins?.[g.path!];
+    g.from = known ? fromOrigins(known) : folderSources(inFolder.get(g.path!) ?? g.items);
   }
   const placed = new Map((o.places ?? []).map((id, i) => [id, i]));
   const at = (g: SessionGroup) => (isPlaceKind(g.kind) ? (placed.get(g.id) ?? -1) : 0);

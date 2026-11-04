@@ -1,6 +1,6 @@
 // Script tests for the sidebar's orders: the tools named first, the rest after them in their usual order; a name it
 // does not know refused; the usual order kept as none; the projects' and folders' groups as dragged; the routes, and
-// the news to open pages.
+// the news to open pages. And where each folder's work began (origins.ts).
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/sidebar/sidebar-test.ts
 //   DATA_DIR=/tmp/hydor-test-sidebar node dist/dev/sidebar-test.js
@@ -13,6 +13,7 @@ import type { ServerEvent } from '../../shared/types.ts';
 import { kvGet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { setSidebarPlaces, setSidebarTools, sidebar, sidebarPlaces, sidebarTools } from './index.ts';
+import { folderOrigins } from './origins.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -112,6 +113,46 @@ test('the projects’ and folders’ groups: as dragged, repeats and other names
   db.prepare("insert or replace into kv (k, v) values ('sidebar.places', 'not json')").run();
   assert.deepEqual(sidebarPlaces(db), []);
   assert.deepEqual(setSidebarPlaces(db, []), []);
+});
+
+test('where each folder began: Hydor, or outside it, with the agents, accounts and apps its sessions came from', () => {
+  let n = 0;
+  /** A session the indexer read from an agent's history, `at` hours ago; `here` when Hydor started it. */
+  const ses = (cwd: string, at: number, o: { agent?: string; source?: string; here?: boolean; hidden?: boolean; worktree?: string; account?: string } = {}) => {
+    const key = `${o.agent ?? 'claude'}:o${++n}`;
+    db.prepare(`insert into sessions (key, agent, id, path, cwd, source, created_at, updated_at, hidden) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      key, o.agent ?? 'claude', `o${n}`, `/x/${n}.jsonl`, cwd, o.source ?? null, 1000 - at, 1000 - at, o.hidden ? 1 : 0,
+    );
+    if (o.here || o.worktree || o.account)
+      db.prepare(`insert into app_sessions (key, agent, cwd, created_by_app, worktree, account, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        key, o.agent ?? 'claude', cwd, o.here ? 1 : 0, o.worktree ? JSON.stringify({ path: cwd, branch: 'b', base: 'main', repo: o.worktree }) : null, o.account ?? null, 1000 - at, 1000 - at,
+      );
+  };
+  // Begun in Codex (VS Code, then a terminal), then worked on from Hydor and from Claude Code under an added account.
+  ses('/home/a/shop', 90, { agent: 'codex', source: 'vscode' });
+  ses('/home/a/shop/', 80, { agent: 'codex', source: 'cli' });
+  ses('/home/a/shop', 70, { agent: 'codex', source: 'vscode' });
+  ses('/home/a/shop', 60, { here: true, source: 'sdk-cli' });
+  ses('/home/a/shop', 50, { source: 'claude-vscode', account: 'acc1' });
+  // A sub-agent's thread or an empty session (hidden) is not one of the folder's.
+  ses('/home/a/shop', 95, { here: true, hidden: true });
+  // Begun in Hydor, in a worktree of the checkout; later from a terminal.
+  ses('/home/a/.hydor/worktrees/blog-x', 40, { here: true, worktree: '/home/a/blog' });
+  ses('/home/a/blog', 30, { source: 'cli' });
+  // One session alone: no group, so not said.
+  ses('/home/a/notes', 20, { source: 'cli' });
+  // Started in Hydor and not indexed yet: only the app's own row.
+  db.prepare(`insert into app_sessions (key, agent, cwd, created_by_app, created_at, updated_at) values ('claude:fresh', 'claude', '/home/a/notes', 1, 990, 990)`).run();
+  const o = folderOrigins(db);
+  assert.deepEqual(o['/home/a/shop'], [
+    { agent: 'codex', account: undefined, sources: ['vscode', 'cli'], sessions: 3 },
+    { agent: 'claude', account: 'acc1', sources: ['claude-vscode'], sessions: 1 },
+  ]);
+  assert.deepEqual(o['/home/a/blog'], []);
+  // The fresh one makes two: it began outside (an hour before it).
+  assert.deepEqual(o['/home/a/notes'], [{ agent: 'claude', account: undefined, sources: ['cli'], sessions: 1 }]);
+  assert.equal('/home/a/.hydor/worktrees/blog-x' in o, false);
+  db.exec(`delete from sessions where key like '%:o%'; delete from app_sessions where key like '%:o%' or key = 'claude:fresh'`);
 });
 
 for (const [name, fn] of tests) {

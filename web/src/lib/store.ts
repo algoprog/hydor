@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AppTheme } from '@shared/themes';
+import type { FolderOrigin } from '@shared/sidebar';
 import type {
   AcpAgentDef,
   Agent,
@@ -107,6 +108,8 @@ export interface Bootstrap {
   autoFolders?: string[];
   /** Names for folders that have one besides their own (a Codex project's, such as a ChatGPT project's folder); missing on older servers. */
   folderNames?: Record<string, string>;
+  /** Folders two or more sessions worked in: where the sessions of those whose work began outside Hydor came from (empty for the rest); missing on older servers. */
+  folderOrigins?: Record<string, FolderOrigin[]>;
   prefs: Record<string, SessionPrefs>;
   /** What the start page had picked last; missing on servers before it was kept. */
   start?: StartSettings;
