@@ -41,7 +41,7 @@ the real app's).
   memory notes, scheduled tasks at times well away from now, pages, the Library's images and videos, apps, learned
   skills). The pictures and clips are in `media/`: made once through OpenRouter, kept small. What only a running agent or a real account has
   is answered to the page instead (`overrides`): two sessions waiting on a card, Claude Code's model list, the
-  plans' usage, the inbox and Settings → Models.
+  plans' usage, the inbox, and Settings → Models with the models it suggests.
 - `shots.mjs` lists the shots: the page, what to open on it (a menu, a folded group of steps) and the part to
   keep. Desktop shots are 1280×800 CSS pixels (taller where a page needs it) at twice the resolution, cut to
   that part and at most 1600 pixels wide; `devices` is a 390×844 phone at 780 pixels wide.

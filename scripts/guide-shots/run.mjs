@@ -198,12 +198,14 @@ async function main() {
   }
 }
 
-/** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox, Settings → Models. */
+/** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox, Settings → Models
+ * and the models it suggests. */
 async function route(p, api, fake) {
-  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|usage|inbox|catalog\/claude|models(\?|$))/, async (req) => {
+  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|usage|inbox|catalog\/claude|models(\?|$)|models\/picks)/, async (req) => {
     if (req.method !== 'GET') return null;
     const u = new URL(req.url);
     if (u.pathname === '/api/models') return { json: fake.models(await api('GET', u.pathname)) };
+    if (u.pathname === '/api/models/picks') return { json: { picks: fake.picks } };
     if (u.pathname === '/api/catalog/claude') return { json: { ...(await api('GET', u.pathname)), models: CATALOG.claude } };
     if (u.pathname === '/api/usage') return { json: { ...fake.usage, accounts: {} } };
     if (u.pathname === '/api/inbox') return { json: { items: fake.inbox } };

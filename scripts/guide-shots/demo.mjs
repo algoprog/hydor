@@ -667,7 +667,41 @@ export function overrides(s, now) {
     machine: { gpus: [{ index: 0, name: 'NVIDIA GeForce RTX 4090', totalBytes: 25_769_803_776, freeBytes: 6_400_000_000 }], ramBytes: 68_719_476_736, ramFreeBytes: 41_000_000_000, diskFreeBytes: 412_000_000_000, cpus: 16 },
     storage: { usedBytes: 25_700_000_000, freeBytes: 412_000_000_000 },
   });
-  return { live, usage, inbox, models };
+  /** The models suggested for that desktop (GET /api/models/picks): two run on its card, two need more. */
+  const fit = (more) => ({ verdict: 'good', where: 'gpu', gpu: 0, notes: [], ...more });
+  const none = { verdict: 'no', where: 'none', needBytes: 0, downloadBytes: 0, notes: [] };
+  const picks = [
+    {
+      repo: 'LiquidAI/LFM3-VL-2B',
+      name: 'LFM3-VL 2B',
+      maker: 'Liquid AI',
+      blurb: 'Small and quick, and it reads pictures. Runs on almost any computer.',
+      vision: true,
+      params: 1.9,
+      install: { repo: 'LiquidAI/LFM3-VL-2B' },
+      fit: fit({ needBytes: 5_300_000_000, tokensPerSec: 145, downloadBytes: 3_860_000_000 }),
+      runs: true,
+      sizeBytes: 3_860_000_000,
+      ready: true,
+    },
+    {
+      repo: 'google/gemma-4-12B-it',
+      name: 'Gemma 4 12B',
+      maker: 'Google',
+      blurb: 'A capable all-rounder that reads pictures, for a computer with a good graphics card.',
+      vision: true,
+      params: 12,
+      install: { repo: 'google/gemma-4-12B-it' },
+      fit: fit({ fp8: true, needBytes: 14_700_000_000, tokensPerSec: 46, downloadBytes: 23_960_000_000 }),
+      runs: true,
+      best: true,
+      sizeBytes: 23_960_000_000,
+      ready: true,
+    },
+    { repo: 'RecursiveSI/flint-int4', name: 'Flint', maker: 'Recursive', blurb: 'Made for coding agents, and quick for its size, on a Mac with Apple silicon and 32 GB or more.', params: 39.8, active: 2.5, mac: true, fit: none, runs: false, sizeBytes: 22_600_000_000, needs: 'A Mac with Apple silicon', ready: false },
+    { repo: 'zai-org/GLM-5.3-Flash', name: 'GLM-5.3 Flash', maker: 'Z.ai', blurb: 'Among the strongest open models, for a server with several large graphics cards.', vision: true, params: 321, install: { repo: 'zai-org/GLM-5.3-Flash' }, fit: none, runs: false, sizeBytes: 328_400_000_000, needs: 'About 368 GB of graphics memory', ready: true },
+  ];
+  return { live, usage, inbox, models, picks };
 }
 
 /** The models Claude Code offers, as its own program lists them (the stand-in program lists none). */
