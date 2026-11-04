@@ -90,6 +90,14 @@ emulation) when a tag `v<version>` is pushed, beside the Mac app's release, and 
 `algoprog/hydor:latest` to Docker Hub, signed in with the repository secret `DOCKERHUB_TOKEN`. Running it by hand
 (Actions → Docker image) builds both without pushing. To build one here: `docker build -t hydor .`
 
+## The website
+
+[hydor.app](https://hydor.app) is the one-page website in `website/`: plain HTML, CSS and JavaScript, dark like the
+app's dark theme, with screenshots of the app and frames of its tour film. `node website/build.mjs --serve 4321`
+builds it into `dist/website` and shows it at http://localhost:4321; `--deploy` publishes it on Cloudflare Pages
+(project `hydor`) with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set. The page names the latest release,
+so publish it again after one. [website/README.md](../website/README.md) has the rest.
+
 ## Keeping the docs current
 
 What users can see and do is described in several places, which change with the feature in the same commit:

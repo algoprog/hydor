@@ -11,6 +11,8 @@
   Run <b>Claude Code</b>, <b>Codex</b> or <b>any model</b> on your own computer, and use them from any device.
 </p>
 
+<p align="center"><a href="https://hydor.app"><b>hydor.app</b></a></p>
+
 <p align="center">
   <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-Apple_silicon-111?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Apple silicon)" /></a>
   <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-Intel-111?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Intel)" /></a>
