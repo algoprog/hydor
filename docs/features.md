@@ -490,11 +490,12 @@ programs shows each program's version and what is out, with Check now, Update no
   typed it lists what those places hold. `Ctrl+F` finds within a conversation.
 - A short welcome tour, made for people new to AI and drawn in water (Hydor is the Greek for it), calmly: a short
   film of a request being done, then what should do the work (Claude or ChatGPT with the plan you pay for, pay as you
-  go through OpenRouter, free models on this computer, other agents), each set up on pages over a still sea that
-  rises a little as you go, droplets for the steps and plain line icons: sign-ins, the suggested OpenRouter models,
-  or a model suggested for this computer installed with one click. Then it shows you around as the app builds itself
-  up, a ring of water lighting each part as it is explained, with first tasks to put in the message box. Help shows
-  it again.
+  go through OpenRouter, free models on this computer, other agents), each set up on a page that fits the screen,
+  its picture and words always in the same place: sign-ins, the suggested OpenRouter models and those for pictures,
+  music, voices and videos, or a model suggested for this computer installed with one click. Beside each page,
+  streams flow from what you picked into a pool around the Ω; small dots show the steps, over a sea whose waves
+  drift gently. Then it shows you around as the app builds itself up, a ring of water lighting each part as it is
+  explained, with first tasks to put in the message box. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
   inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Library,
   Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
