@@ -1,6 +1,6 @@
 ---
 name: presentations
-description: Use when the user wants a PowerPoint file (.pptx) made or changed from code (a pitch deck, talk, lesson, report or summary to show in PowerPoint, Keynote or Google Slides), or wants an existing .pptx, .ppt or .odp read, summarised or edited. For new slides to edit and present in the app, make a deck with save_slides instead.
+description: Use when the user wants a PowerPoint file (.pptx) made or changed (a pitch deck, talk, lesson or report for PowerPoint, Keynote or Google Slides), or a .pptx, .ppt or .odp read or edited. For slides to present in the app, use save_slides.
 category: documents
 ---
 
@@ -60,14 +60,29 @@ d.save("launch-plan.pptx")
 3. **Look at it**: `<this folder>/scripts/render-pages launch-plan.pptx` and open the PNGs with your
    tool for viewing images. Check for text running out of its box, crowded slides, pictures too small,
    and slides that say the same thing; fix and run again. Without LibreOffice, read it back with
-   `read_document` and keep each slide short.
+   `read_document` and keep each slide short. Either way, look in the text for leftovers such as
+   TODO, lorem ipsum or `[Your name]`.
 4. **Hand it over** with `present_files` and a short caption; in your reply, a sentence or two on
    what the deck covers.
 
 ## Changing one
 
 `Presentation("theirs.pptx")` keeps the user's theme and layouts: add slides with their layouts
-(`prs.slide_layouts`), change text in `shape.text_frame`, and save under a new name. To build a new
-deck on their template: `Deck(template="their-template.pptx")`. `.ppt` and `.odp`: convert first with
-`soffice --headless --convert-to pptx file.ppt`. A PDF of the slides: `soffice --headless
---convert-to pdf deck.pptx`.
+(`prs.slide_layouts`), change text in `shape.text_frame`, and save under a new name. Placeholders
+you leave empty show "Click to add text" in PowerPoint's editing view (not in the rendered
+pictures, so look for them in the code): remove them.
+
+```python
+for ph in list(slide.placeholders):
+    if ph.has_text_frame and not ph.text_frame.text.strip():
+        ph._element.getparent().remove(ph._element)
+```
+
+To build a new deck on their template: `Deck(template="their-template.pptx")`. `.ppt` and `.odp`:
+convert first with `soffice --headless --convert-to pptx file.ppt`. A PDF of the slides:
+`soffice --headless --convert-to pdf deck.pptx`.
+
+"Package not found" for a file that is there: `head -c 4 file.pptx | od -An -tx1` shows `50 4b 03 04`
+for a normal one (so this one is damaged: ask for it again), `d0 cf 11 e0` for one locked with a
+password or an old .ppt under a new name (try converting it with soffice; if that fails, ask for a
+copy saved without the password), and nothing for an empty file.

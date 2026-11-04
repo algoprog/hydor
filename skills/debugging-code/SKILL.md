@@ -23,7 +23,9 @@ stack trace, a debugger, targeted logging and the version history. This skill is
 - Flaky: run it in a loop until it fails, `for i in $(seq 50); do <command> || break; done`, then alone and
   with its neighbours. Order dependence means shared state: globals, database rows, files, time, ports.
 - Fails only elsewhere (CI, production): list what differs (versions, config, data, environment, OS,
-  CPU architecture, time zone) and reproduce that difference locally.
+  CPU architecture, time zone) and reproduce that difference locally. Compare the database schema too:
+  test fixtures often build a simpler one, without the NOT NULL, unique and foreign key rules of the real
+  one (`PRAGMA table_info(orders)` in SQLite, `\d orders` in psql, on both, side by side).
 
 ## 2. Read the error properly
 
@@ -37,8 +39,17 @@ stack trace, a debugger, targeted logging and the version history. This skill is
 - Get more detail when the trace is short or unreadable: `node --stack-trace-limit=50`,
   `node --enable-source-maps` for TypeScript or bundled code, `python -X faulthandler` for segfaults,
   `py-spy dump --pid <pid>` for a hang, `RUST_BACKTRACE=1`, `GOTRACEBACK=all`.
-- Search the exact message in the code (`git grep -n "message text"`) to see where it is raised, and in
-  the library's issue tracker when the error comes from a dependency.
+- A long log with many errors is usually a few bugs repeated. Count each kind once before reading
+  (numbers and ids become placeholders), then start with the most common:
+
+  ```bash
+  grep -E 'ERROR|Error|Exception' app.log | sed -E 's/[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}/<id>/g; s/0x[0-9a-fA-F]+/<hex>/g; s/[0-9]+/N/g' | sort | uniq -c | sort -rn | head
+  ```
+
+- Search the exact message in the code (`git grep -n "message text"`) to see where it is raised. When it
+  comes from a dependency, search the web for it in quotes with the library's name and version
+  (`web_search`), and its issue tracker. Read the whole thread: the fix that worked is often near the
+  end, and may hold only for some versions.
 
 ## 3. Narrow it down
 
@@ -47,6 +58,7 @@ Pick the cheapest tool that answers the question you have now:
 | Question | Tool |
 | --- | --- |
 | Which change broke it? | `git bisect` |
+| When did this line change, and why? | `git log -S "quantity" -p -- src/` (commits that added or removed the text), `git blame -L 40,60 src/cart.py` |
 | What are the values at this line? | A breakpoint, or one targeted log line |
 | Which part of the input triggers it? | Halve the input until the failure goes away |
 | Which layer is wrong? | Check the data at each boundary: request in, query, result, response out |
@@ -87,7 +99,9 @@ Most bugs are a wrong belief about one of these. Check each with a print or an a
   `.next/`, `__pycache__`), the wrong config file or environment variable, data not as you think it is.
 - **The code that actually runs:** the server restarted? the container rebuilt? the module you edited is
   the one imported (`python -c "import pkg; print(pkg.__file__)"`, `node -p "require.resolve('pkg')"`)?
-  the dependency version you expect (`npm ls pkg`, `pip show pkg`)?
+  the dependency version you expect (`npm ls pkg`, `pip show pkg`)? A linked local copy instead of the
+  released package (`pip show` lists an "Editable project location", `npm ls` shows `-> ./path`) is often
+  the bug itself; if you did not put it there, ask before switching it back.
 - **Time and concurrency:** a promise not awaited or not returned, two requests racing, a callback firing
   twice, a timeout or a retry hiding the first error.
 - **Edges:** off by one, an empty list, the first or last item, a value exactly at a limit.
@@ -103,6 +117,10 @@ Most bugs are a wrong belief about one of these. Check each with a print or an a
   one"), not "test bug 123". See the test-first skill.
 - Run the whole suite, not only the one test. Remove every temporary log line, `breakpoint()`,
   `debugger;`, `.only` and skip: `git diff` shows them.
+- If it failed in a scheduled job, a service or a container, run the exact command that runs it there
+  (same user, interpreter, working folder and environment) and read its exit code and log: a passing unit
+  test does not prove that path. For a job, compare what it produced with what it took in (rows read and
+  written, files in and out): "finished" with half the output is still broken.
 - Report the cause, the fix and the check that proves it (see evidence-before-done).
 
 ## Pitfalls
@@ -114,3 +132,6 @@ Most bugs are a wrong belief about one of these. Check each with a print or an a
 - An interactive debugger in a shell that cannot take input.
 - Widening a `catch` or adding a retry so the symptom goes away.
 - Leaving debug output, skipped tests or `.only` in the diff.
+- Reading a long log line by line, so one repeated error looks like many.
+- Fixing a library by editing its installed copy (`node_modules`, `site-packages`): the next install
+  undoes it. Upgrade, pin or work around it in the project, and say so.

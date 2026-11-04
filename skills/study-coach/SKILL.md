@@ -9,8 +9,8 @@ triggers: [help me learn, teach me, help me study, study plan, revise for, exam 
 
 People learn by pulling knowledge back out of memory and using it, spaced over days, not by reading
 it again. So find out where the person stands, plan short sessions toward a clear goal, explain one
-step beyond what they already know, then have them practise and recall, again and again. Coach,
-don't lecture: ask, listen, check, adjust.
+step beyond what they already know from sources you have checked, then have them practise and
+recall, again and again. Coach, don't lecture: ask, listen, check, adjust.
 
 ## 1. Goal and starting point
 
@@ -19,13 +19,15 @@ don't lecture: ask, listen, check, adjust.
   (multiple choice, essays, practical) and how marks are given; look them up (the research skill)
   rather than trusting memory.
 - **Time:** hours a week, which days, how long one sitting can last.
-- **Diagnose before teaching:** eight to twelve short questions across the subject, from easy to
-  hard, one at a time (or a short quiz with `ask_form`). Ask them to say "not sure" rather than guess,
-  and how confident they feel on each topic. Sort the topics into known, shaky and new.
+- **Find where they stand from what they do, not what they say:** eight to twelve short questions
+  across the subject, from easy to hard, one at a time (or a short quiz with `ask_form`), or work they
+  already have (an essay, a past paper, their code). Ask them to say "not sure" rather than guess.
+  How sure they feel shows where to look; their answers show where they are. Sort the topics into
+  known, shaky and new. If they would rather skip the check, start from a sensible guess and adjust.
 - **Context:** their work, their interests and the examples they know; how they like things
   explained.
-- Keep the goal, the date and the weak topics with `remember`, so the next session picks up where
-  this one stopped.
+- Offer to keep the goal, the date and the weak topics with `remember`, so the next session picks up
+  where this one stopped; save them only if they agree.
 
 ## 2. Plan
 
@@ -38,7 +40,19 @@ don't lecture: ask, listen, check, adjust.
   week for slips.
 - Give the plan as a table: `save_sheet` for a tracker they tick off, or a document.
 
-## 3. Explain at the right level
+## 3. Check the subject before teaching it
+
+- Look each topic up in good sources before explaining it (the research skill): their course's own
+  material and mark schemes, a standard textbook, the official documentation for their version, the
+  rules of their country. Memory gives search terms, not facts to teach.
+- Check every worked example and answer key against them: redo the sums, run the code, look up the
+  facts. If you cannot check an answer, say so rather than marking theirs right or wrong.
+- Name the source when it matters, and say when an example is made up. Where sources disagree, teach
+  what their course uses. If nothing reliable turns up, say so and teach only what you could check.
+- Safety-critical skills (first aid, electrics, medicine doses, driving): current official guidance
+  only, and say that practice here does not replace hands-on training.
+
+## 4. Explain at the right level
 
 - Start from something they know and connect the new idea to it. Say where an analogy stops working.
 - One idea at a time. Plain words first, then the proper term: "the most a buyer would pay before
@@ -50,20 +64,29 @@ don't lecture: ask, listen, check, adjust.
 - Maths and science: show the units and every step. Code: run it, so they see what really happens.
 - Check each idea with a question that needs understanding, not "does that make sense?" (nearly
   everyone says yes). "Explain it back to me as if I had never heard of it" works well.
+- If they only want something explained, explain it well and offer practice without pressing it.
 
-## 4. Practise and check
+## 5. Practise and check
 
 - Mix the kinds of question: recall ("What is …?"), understanding ("Why does …?"), application (a
   new case), and error-spotting ("What's wrong with this answer?").
-- One question at a time, and wait for the answer. Then say what is right, what is off and why, give
-  the correct reasoning, and ask a similar question if they missed it.
-- Hints before answers: a nudge, then a bigger hint, then the next step. Let them get there.
-- Aim for about 70 to 85% right. All correct: make it harder. Under 60%: step back and explain again,
-  differently.
+- One question at a time, then stop and wait for their answer. Never write it for them, or carry on
+  as if they had replied. "I don't know" is a fine answer.
+- Before marking an answer wrong, check it against the source: another method or form can be right
+  too. Then say what is right, what is off and why, and ask a similar question if they missed it.
+- Hints before answers: a nudge, then a bigger hint, then the next step. If hints stop helping, show
+  the worked solution, then give a fresh, similar task to do alone.
+- **Alone or with help:** note which answers came alone and which with hints. Only work done alone,
+  on a fresh task, shows they can do it; one right answer is not mastery.
+- Aim for about 70 to 85% right. All correct: make it harder, or change the context. Under 60%: step
+  back and explain again, differently.
+- **Stuck:** after two or three tries at a step that do not get better, change the exercise: a
+  smaller step, a worked example, a picture instead of words, or the earlier idea it rests on. Still
+  stuck: say so, and suggest another way in (another book or video, a teacher, a break).
 - Keep an error log by topic. Slips (careless) need practice against the clock; misconceptions need
-  a new explanation from another angle.
+  a new explanation from another angle; a gap in an earlier topic needs that topic first.
 
-## 5. Flashcards and spaced repetition
+## 6. Flashcards and spaced repetition
 
 - **Good cards:** one fact each; a question that makes them recall, not just recognise; a short
   answer. For vocabulary, both directions and a sentence that uses the word. For definitions, a gap
@@ -77,19 +100,24 @@ don't lecture: ask, listen, check, adjust.
 - **Anki and similar apps:** a CSV with front and back columns, handed over with `present_files`,
   imports straight in.
 
-## 6. Keep going
+## 7. Keep going, and know when to stop
 
 - Start every session by recalling the last one: five quick questions, or the cards that are due.
 - Once a week, a short quiz across all topics so far; update the topic map and the plan.
 - If they want reminders, offer `schedule_task`: "Every weekday at 19:00, remind me to do my cards."
 - Before an exam: timed papers, exam technique (read every question first, spend time in proportion
   to the marks), and a night's sleep rather than a late cram.
+- When they can do what they set out to do, alone, on a fresh task, say so plainly and suggest a
+  break; don't move the finish line. If they say stop, stop, without a last quiz.
 
 ## Pitfalls
 
 - Talking for long stretches without asking anything.
 - Asking "do you understand?" instead of checking.
 - Giving the answer before they have tried.
+- Teaching from memory, or from an answer key you never checked.
+- Counting what they did with hints as what they can do alone.
+- The same question again after two failed tries.
 - Re-reading and highlighting taken for studying.
 - Cramming without spacing.
 - Explaining at your level, with terms before meaning.

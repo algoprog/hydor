@@ -1,7 +1,8 @@
 # Architecture overview template
 
 Copy this, fill in what you found, and delete sections that do not apply. Mark each claim **(ran)** when
-you saw it work, or **(read)** when it comes from docs or code you did not run.
+you saw it work, **(read)** when it comes from docs or code you did not run, or **(guess)** when you
+inferred it from names and structure.
 
 ````markdown
 # <Project name>: how it fits together
@@ -44,6 +45,17 @@ flowchart LR
 One request, end to end: <e.g. "POST /api/orders: routes/orders.ts validates, services/orders.ts prices
 and saves in one transaction, jobs/receipt.ts sends the email">.
 
+## Outside services and data
+
+| Service | Used for | Configured by | What it is sent |
+| --- | --- | --- | --- |
+| PostgreSQL | all app data | `DATABASE_URL` | everything (read) |
+| Stripe | payments | `STRIPE_SECRET_KEY` | order totals, customer email (read) |
+| Resend | email | `RESEND_API_KEY` | addresses, receipt text (guess) |
+
+Where the real copy of each kind of data lives, and the copies made from it: <e.g. "orders: the
+`orders` table; copied into the search index by `jobs/reindex.ts` and into the nightly CSV export">.
+
 ## Where to make common changes
 
 - A new API route: `server/routes/<area>.ts`, registered in `server/routes/index.ts`; test in
@@ -74,6 +86,7 @@ and saves in one transaction, jobs/receipt.ts sends the email">.
   `(("label"))` circle for an external actor.
 - Quote labels that contain slashes, parentheses or spaces, as above.
 - Keep it to the 5 to 12 parts that matter; a diagram of every file explains nothing.
+- `subgraph Server` ... `end` groups parts by where they run (browser, server, outside services).
 - For a sequence of calls in one request, a sequence diagram is clearer:
 
 ```mermaid

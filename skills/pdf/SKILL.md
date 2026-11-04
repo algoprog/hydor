@@ -75,8 +75,26 @@ scripts/office-python scripts/pdf_tools.py fill form.pdf values.json filled.pdf
 scripts/office-python scripts/pdf_tools.py stamp report.pdf DRAFT draft.pdf
 ```
 
+## A PDF that will not open
+
+`pdfinfo file.pdf` says what is wrong.
+
+- **Locked:** `scripts/office-python scripts/pdf_tools.py unlock file.pdf PASSWORD open.pdf`; without
+  the password, ask the person who sent it.
+- **Damaged** (it opens in some viewers only, or tools report a broken xref or trailer):
+  `pdftocairo -pdf broken.pdf repaired.pdf` (poppler, which render-pages also needs) redraws the pages it
+  can still read into a clean file. Text stays text, but links, form fields and bookmarks are lost
+  and fonts that were not embedded are replaced by look-alikes: keep the original, and say so.
+- **Cut short** (an interrupted download or attachment: no `%%EOF` at the end, see
+  `tail -c 32 file.pdf`): it cannot be mended; get it again.
+
 ## Every time
 
 1. Look at the result: `scripts/render-pages file.pdf` and open the PNGs with your tool for viewing
-   images. Check margins, that tables fit, and that nothing is cut off; fix and run again.
-2. Hand it over with `present_files` and a short caption; in your reply, a sentence on what it is.
+   images. Check margins, that tables fit, and that nothing is cut off; fix and run again. Read the
+   text back too (`pdftotext file.pdf - | head -60`) for leftovers such as TODO, lorem ipsum or
+   `[Your name]`.
+2. For a print shop or an archive (PDF/A), every font must be embedded: `pdffonts file.pdf` shows
+   `yes` under `emb` for each. reportlab's built-in Helvetica, Times and Courier never are, so
+   register a TrueType font (above) and use it throughout.
+3. Hand it over with `present_files` and a short caption; in your reply, a sentence on what it is.

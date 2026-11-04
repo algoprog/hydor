@@ -51,6 +51,9 @@ Length limits, what shows before "more", picture sizes and each platform's habit
 - Use the person's own photos when there are any; real beats generated for people, places and
   products. To make one, `generate_image` (see the image-prompts skill), in the platform's shape.
 - Text on a picture: a few large words, readable on a phone.
+- An infographic or a carousel that explains with facts follows the infographics skill; a YouTube
+  thumbnail and its title, the youtube-thumbnails skill; the person's colours, fonts and voice, their
+  brand kit (the brand-kit skill).
 - **Alt text** for every picture: what it shows and why it is there, in a sentence or two. Captions
   on videos, since many people watch without sound.
 

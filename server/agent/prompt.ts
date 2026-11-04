@@ -49,32 +49,42 @@ function frontmatter(src: string): Record<string, string> {
   return out;
 }
 
+/** At most this many of the project's and the user's own skills, so a big collection of them cannot crowd the library out. */
+const MAX_OWN_SKILLS = 40;
+/** At most this many skills in all: each costs a line of the prompt. */
+const MAX_SKILLS = 120;
+
 /** Skills of the project and of the user (Claude Code's and Codex's folders included), then the app's library (HYDOR_SKILL_DIRS). */
 export function findSkills(cwd: string): Skill[] {
   const home = os.homedir();
-  const dirs = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
-  dirs.push(...(process.env.HYDOR_SKILL_DIRS ?? '').split(path.delimiter).filter(Boolean));
+  const own = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
+  const library = (process.env.HYDOR_SKILL_DIRS ?? '').split(path.delimiter).filter(Boolean);
   const seen = new Set<string>();
   const out: Skill[] = [];
-  for (const d of dirs) {
-    let list: string[];
-    try {
-      list = fs.readdirSync(d);
-    } catch {
-      continue;
-    }
-    for (const n of list) {
-      const file = path.join(d, n, 'SKILL.md');
+  const take = (dirs: string[], max: number) => {
+    for (const d of dirs) {
+      let list: string[];
       try {
-        const fm = frontmatter(fs.readFileSync(file, 'utf8').slice(0, 4000));
-        const name = fm.name || n;
-        if (seen.has(name)) continue;
-        seen.add(name);
-        out.push({ name, description: (fm.description ?? '').slice(0, 240), file });
-      } catch {}
+        list = fs.readdirSync(d);
+      } catch {
+        continue;
+      }
+      for (const n of list) {
+        if (out.length >= max) return;
+        const file = path.join(d, n, 'SKILL.md');
+        try {
+          const fm = frontmatter(fs.readFileSync(file, 'utf8').slice(0, 4000));
+          const name = fm.name || n;
+          if (seen.has(name)) continue;
+          seen.add(name);
+          out.push({ name, description: (fm.description ?? '').slice(0, 240), file });
+        } catch {}
+      }
     }
-  }
-  return out.slice(0, 80);
+  };
+  take(own, MAX_OWN_SKILLS);
+  take(library, MAX_SKILLS);
+  return out;
 }
 
 /** The project's instructions: AGENTS.md (or CLAUDE.md) in the folder and its parents, up to the repository's top. */

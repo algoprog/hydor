@@ -3,6 +3,34 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.24.0 · 4 November 2026
+
+Twelve new skills for agents, a new Ebooks plugin, a deeper Audio and video plugin, and sharper built-in skills.
+
+- **New skills**: agents now know how to check whether an ad, a post or a message is true, misleading or a scam
+  (**spin-check**), get a website found in search engines and AI answers (**seo**), help with stories, novels,
+  poems and getting published (**creative-writing**), get you ready for a job interview with mock interviews
+  (**job-interviews**), prepare and run meetings (**meetings**), test and price a business of your own
+  (**solo-business**), make infographics, YouTube thumbnails and a brand kit (**infographics**,
+  **youtube-thumbnails**, **brand-kit**), look after a server over SSH without locking you out (**servers**) and
+  make websites everyone can use (**web-accessibility**). Ask "what can you do for me?" and **everyday-help** finds,
+  in a short conversation, where the app could help in your days, then sets up one small thing if you say yes.
+- **Ebooks**, a new plugin (**Settings → Plugins**): read an EPUB, make one with a cover and a table of contents
+  from a manuscript, and check or repair it before it goes to Kindle, Apple Books or Kobo.
+- **Audio and video** evens out a podcast's loudness, shortens long pauses, cuts a recording from a list of the
+  parts to keep and makes vertical clips for social media.
+- **Sharper built-in skills**: code review looks for weakened tests and for AI-written code; github covers
+  contributing to other people's projects; data-analysis has a guide to cleaning data and a before-and-after check;
+  study-coach checks the facts before it teaches; local-models knows llama.cpp's new default port; and debugging,
+  security, performance, testing, SQL, research, papers, fine-tuning, model evaluation, financial models (unit
+  economics, burn and runway), project plans, release notes, diagrams, Docker and the document skills gained the
+  checks and pitfalls they were missing.
+- **Meeting recordings** keep what was proposed apart from what was agreed, and never make up owners, dates or
+  agreement.
+- **Custom always sees the built-in skills**: however many skills of your own you have, at most 40 of them take
+  places in its list, so the library's are never crowded out. "Fact-check" now brings in spin-check.
+- Many of these skills are adapted from Magnus Hedemark's agent-skills collection, under the MIT License.
+
 ## 0.23.1 · 4 November 2026
 
 The dark themes trade colours, and both are pure black behind your sessions.

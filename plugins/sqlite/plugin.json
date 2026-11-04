@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "sqlite",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Tools to look inside SQLite databases, query them safely, change them in one go, and move data in and out of CSV files.",
   "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
   "license": "MIT",

@@ -87,17 +87,42 @@ Bars week by week can be drawn with formulas, one column per week. The full layo
 milestones, a line for today, and tasks ticked off and kept with `hydor.storage`; it opens on a
 phone at its own address.
 
-## 7. Keep it up to date
+## 7. Check the plan before sharing it
+
+- Every "Done when" item and every in-scope item is reached by a milestone and its tasks, and no
+  task serves something out of scope.
+- Every task has one owner, an estimate and its dependencies; each long wait starts early enough
+  to end before the task that needs it.
+- The end, with the buffer, falls before the deadline; costs stay within the budget; nobody is
+  booked on two things at once (look down each owner's weeks).
+- Each decision still open has an owner and a date to decide by, and the tasks it holds up are
+  marked Waiting.
+- In a sheet, read it back (`get_page`): no error values, the critical path marked, and every End,
+  and every Start after the first tasks, a formula rather than a typed date, so one slip moves
+  everything after it.
+
+## 8. Keep it up to date
 
 - Agree a rhythm: weekly, or at each milestone. Each update: the status and dates of open tasks, the
   critical path checked again, the risks reviewed, new tasks added.
-- Report in three lines: on track, at risk or late; what was done since last time; what is next and
-  what is needed from whom. Say when the end date moves, and why.
+- Report in three lines: on track, at risk, late, or unknown (no fresh news is unknown, not on
+  track); what was done since last time; what is next and what is needed from whom. Say when the
+  end date moves, and why, as soon as you know it, not at the next update.
 - When someone adds to the scope, say what it costs in time or money and ask which limit gives.
+  Offer the choices: add it and move the date or budget, swap it for something of the same size,
+  do it later, or not at all.
+- **When it slips:** find what is really holding it up (one person, a supplier, a decision not
+  made, work being redone). Then choose, guided by what gives first (step 1): simplify or cut
+  scope, re-order around the blocker, run more in parallel, deliver in stages, move the date.
+  People added late cost time before they save it (someone has to show them the work); overtime
+  helps for a week or two, not as the plan. Give the new forecast at once, next to the baseline.
 - Keep the agreed dates as a baseline: copy them once, as plain dates, into a Baseline end column,
   so slips show against them. (The sheet's earlier versions are kept too, but only the latest 40.)
 - Offer a scheduled task (`schedule_task`) that reads the plan each Monday and sums up what is late
   and what is due, or asks the owners for their updates.
+- **Closing:** check with whoever decides that it is done as agreed (the "Done when" list); give
+  every leftover item an owner and a date, or drop it openly; hand over what others will now run
+  or look after; note three lessons for next time.
 
 ## Pitfalls
 

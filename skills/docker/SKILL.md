@@ -13,10 +13,12 @@ secrets. Good debugging starts from the exit code, the logs and a shell inside t
 
 ## 1. Before you start
 
-- `docker version` and `docker compose version` (Compose v2 is `docker compose`, with a space).
+- `docker version` and `docker compose version` (Compose v2 and later is `docker compose`, with a space).
 - Read what is there: the Dockerfile, the compose file, `.dockerignore`, and `.env` (its names, not its
   values: do not print secrets into the conversation).
 - Containers and volumes can hold the user's data: ask before removing or recreating what you did not make.
+- On a server, the machine around the containers (its firewall, disk, updates, backups) is the servers
+  skill's work.
 
 ## 2. Write a good Dockerfile
 
@@ -107,7 +109,13 @@ secrets:
 - Services reach each other by service name (`db:5432`). Inside a container, `localhost` is that
   container itself.
 - `depends_on` with `condition: service_healthy` waits for the health check; without it, only the start
-  order is set.
+  order is set. A job that must finish first (a migration): `condition: service_completed_successfully`.
+  `docker compose up -d --wait` returns once services are healthy and such jobs are done.
+- `${DB_PASSWORD:?DB_PASSWORD must be set}` stops Compose when a value is missing, instead of starting
+  with a blank one; `$$` passes a `$` through to the container's shell.
+- On a server, `ports:` opens a port to the internet whatever ufw or firewalld say: publish only what
+  must be public, bind the rest to the machine (`"127.0.0.1:5432:5432"`), and rotate the logs, which
+  are otherwise kept forever.
 - Image data paths change between versions: `postgres:18` keeps its data under `/var/lib/postgresql`,
   17 and earlier under `/var/lib/postgresql/data`. Check the image's documentation when you change versions.
 - Commands: `docker compose up -d --build`, `docker compose ps`, `docker compose logs -f --tail=100 web`,
@@ -116,6 +124,8 @@ secrets:
 - `docker compose down` removes the containers and network and keeps volumes. `docker compose down -v`
   also deletes the named volumes, the database with them: ask first.
 - The top-level `version:` key is obsolete; Compose ignores it.
+- Variables and `.env` files, profiles, several compose files, networks, running on a server, CI and
+  watch mode: `references/compose.md`.
 
 ## 5. Debug a container
 
@@ -163,3 +173,4 @@ secrets:
 - `latest` tags that change under you.
 - `docker compose down -v` or a volume prune deleting a database.
 - Shell-form `CMD`: the app never sees the stop signal and is killed after the timeout.
+- A database published as `"5432:5432"` on a server: open to the internet, whatever the firewall says.

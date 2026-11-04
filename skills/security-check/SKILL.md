@@ -27,11 +27,13 @@ each finding with evidence rather than listing theoretical worries.
 
 - In the files: `gitleaks dir -v .` when installed; otherwise search by hand
   (`git grep -n -i -E "api[_-]?key|secret|token|passw"`). Look in config, CI files, Dockerfiles, notebooks,
-  test fixtures, and front-end code (anything shipped to the browser is public).
+  test fixtures, and front-end code (anything shipped to the browser is public). Look at what the app logs
+  too: request logging that records `Authorization` headers, cookies or whole bodies writes secrets down.
 - In the history: `gitleaks git -v .` or `trufflehog git file://. --results=verified,unknown`. A secret
   deleted in a later commit is still in the history.
-- A secret found: treat it as leaked. Have it rotated first (revoked and replaced at the provider), then
-  removed from the code and history (see git-rescue). Report where it is, never its value.
+- A secret found: treat it as leaked. Have it rotated first (revoked and replaced at the provider), check
+  the provider's logs for use while it was exposed, then remove it from the code and history (see
+  git-rescue). Report where it is, never its value.
 - Code reads secrets from the environment or a secret store; `.env` is in `.gitignore`; `.env.example`
   holds placeholders.
 - In this app, when a check needs a credential, ask with `request_secret` and use it through
@@ -63,7 +65,11 @@ unless `p.startsWith(root + path.sep)`. Python: `p = (base / name).resolve()` th
 - List every route, endpoint and job that touches data, and who may call each. Look for ones with no
   auth check: read the router, not only the files that changed.
 - Object-level checks: `/api/invoices/123` must confirm invoice 123 belongs to the caller. This is the
-  most common serious bug. Test it: as user A, request user B's ids.
+  most common serious bug. Test it: as user A, request user B's ids. Bulk, export, search and download
+  routes, background jobs and an AI feature's tools need the same check; that is where it goes missing.
+- Who the caller is, and their organisation or tenant, comes from the verified session or token, never
+  from an id the client sends in the body, the query or a header.
+- A check that fails with an error (a timeout, an exception) must refuse the request, not let it through.
 - Admin actions are checked on the server, not just hidden in the interface.
 - Passwords hashed with argon2id, bcrypt or scrypt (never plain SHA or MD5); sign-in rate-limited; the
   session id renewed at sign-in; sign-out ends the session on the server.
@@ -97,9 +103,14 @@ unless `p.startsWith(root + path.sep)`. Python: `p = (base / name).resolve()` th
 | Container images | `trivy image <image>` or `osv-scanner scan image <image>` |
 
 - Triage, do not just bump: is the vulnerable code reachable, is it a development-only dependency, is
-  there a fixed version? Upgrade the smallest step that fixes it, then run the tests.
-- Lock files committed; CI actions pinned to versions or commit hashes; no install scripts piped from the
-  network into a shell.
+  there a fixed version? Upgrade the smallest step that fixes it, then run the tests. A vulnerability on
+  CISA's Known Exploited Vulnerabilities list (KEV) is being used in attacks now: fix it first, whatever
+  its score.
+- Lock files committed; third-party CI actions pinned to a full commit hash (a version tag can be moved);
+  no install scripts piped from the network into a shell.
+- Packages run their install scripts with your rights. For an unfamiliar one, check the name is spelled
+  right (`requrests` is not `requests`), it has real history and users, and what its scripts do
+  (`npm query ':attr(scripts, [postinstall])'` lists the installed packages that have one).
 - A tool not installed: say which checks you could not run. Use one-off runners (`npx`, `pipx run`, a
   container) rather than installing system-wide.
 
@@ -116,6 +127,8 @@ and response, or the code path from input to sink), and the fix.
 | Low | Missing hardening headers, a vulnerable dependency on an unreachable path |
 
 - Fix critical and high first, each with a test that proves it (the attacker's request now fails).
+- One instance usually has siblings: search for the same pattern everywhere and fix the whole family,
+  ideally through one safe helper (one query builder, one path check), not only the line you found.
 - Lead the report with critical and high; then list what you checked and what you did not, so silence is
   not read as "secure".
 - Leave secret values and working exploits for third-party systems out of the report.

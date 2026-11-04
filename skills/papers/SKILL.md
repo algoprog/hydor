@@ -14,6 +14,10 @@ it exactly. Request examples for every service are in `references/scholarly-apis
 
 ## 1. Find candidates
 
+- **A systematic review**, or any answer that claims to cover a field: before screening, write down
+  what counts and what does not (years, languages, study designs, populations, outcomes); keep each
+  query with where and when it ran; count what was found, excluded (with the reason) and kept. A
+  PRISMA flow diagram reports exactly that, and it lets someone repeat the review.
 - `web_search` with `categories: ["academic"]` (every scholarly index), `["arxiv"]` or
   `["pubmed"]`, `k` up to 100, `from` and `to` for years, `file_types: ["pdf"]` for full texts.
   Use the field's own terms and several phrasings; the title of one key paper finds its
@@ -29,7 +33,7 @@ it exactly. Request examples for every service are in `references/scholarly-apis
   - **PubMed** and **Europe PMC** for medicine and life sciences; **Crossref** for any DOI.
 - Snowball from two or three key papers: backwards through their references, forwards through the
   papers citing them. Sort citing papers by date for the latest work, by citations for the
-  influential work.
+  influential work. Stop when new papers only cite ones you have and add no new findings.
 - Look for newer versions of what you found: the published version of a preprint (results can
   change), corrections, and retractions (the publisher's page; Retraction Watch's database).
 
@@ -95,6 +99,7 @@ observational study", "consistent across three randomised trials and a meta-anal
 - Summarising methods or results from the abstract alone.
 - Treating a preprint, or a single study, as settled.
 - Relative effects without absolute ones: "doubles the risk" may mean 1 in 10,000 becoming 2.
+- Stronger words than the paper's: "associated with" becoming "causes", "in mice" becoming "in people".
 - Missing the latest work: always look at who cited the key papers in the last two years.
 - Invented or half-remembered references.
 - Many fast requests to the APIs: they throttle, then block.

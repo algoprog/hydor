@@ -189,6 +189,22 @@ await test("Custom's skills list: the project's own first, then the library (bun
   assert.ok(vis.find((s) => s.name === 'research')?.file.startsWith(viewSkills()));
 });
 
+await test("Custom's skills list: a big collection of your own leaves room for the library", () => {
+  const proj = path.join(root, 'crowded');
+  for (let i = 0; i < 70; i++) write(path.join(proj, '.agents', 'skills', `mine-${i}`, 'SKILL.md'), `---\nname: mine-${i}\ndescription: Use when doing job ${i}.\n---\n\n# Mine ${i}\n`);
+  const before = process.env.HYDOR_SKILL_DIRS;
+  process.env.HYDOR_SKILL_DIRS = viewSkills();
+  try {
+    const list = findSkills(proj);
+    assert.ok(list.filter((s) => s.name.startsWith('mine-')).length > 0, 'some of yours');
+    assert.ok(list.filter((s) => !s.file.startsWith(viewSkills())).length <= 40, 'at most 40 of yours');
+    for (const n of fs.readdirSync(BUNDLED).filter((n) => fs.existsSync(path.join(BUNDLED, n, 'SKILL.md')))) assert.ok(list.some((s) => s.name === n), `${n} from the library`);
+  } finally {
+    if (before === undefined) delete process.env.HYDOR_SKILL_DIRS;
+    else process.env.HYDOR_SKILL_DIRS = before;
+  }
+});
+
 await test('what each agent is given: a plugin folder, an extra skills folder, an environment variable, a list to read from', async () => {
   const base = { cwd: root, runId: 'r', resume: false, extra: {} };
   // Stand-ins for Claude Code: an older one without --plugin-dir gets nothing (it would not start).
@@ -240,7 +256,7 @@ await test('whole words only; stems with *; at most two skills, the best first',
   assert.ok(!triggerPattern('patents')!.test('the patentsy thing'));
   assert.ok(triggerPattern('renovat*')!.test('Renovation costs'));
   assert.ok(!triggerPattern('debug*')!.test('a nodebug flag'));
-  const m = matchTriggers('Research and fact-check the claims, then draft a report on it, and verify the numbers', bundledTriggers);
+  const m = matchTriggers('Research and find sources for the claims, then draft a report on it, and verify the numbers', bundledTriggers);
   assert.equal(m.length, 2);
   assert.equal(m[0].name, 'research');
 });

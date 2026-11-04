@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "ebooks",
+  "version": "1.0.0",
+  "description": "Ebooks for every agent: read an EPUB's details, contents and text, make a valid EPUB from Markdown or HTML chapters with a cover and a table of contents, and check or repair one before it goes to Kindle, Apple Books or Kobo.",
+  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "license": "MIT",
+  "keywords": ["epub", "ebooks", "kindle", "apple books", "self-publishing", "markdown"],
+  "extensions": {
+    "com.naget.agent": {
+      "title": "Ebooks",
+      "category": "documents",
+      "icon": "book",
+      "requires": {
+        "python": ">=3.10",
+        "pip": ["lxml>=5.2,<7", "Markdown>=3.6,<4", "beautifulsoup4>=4.12,<5"],
+        "commands": [
+          { "name": "epubcheck", "hint": "The official EPUB checker, which stores use (it needs Java). On a Mac: brew install epubcheck. On Ubuntu or Debian: sudo apt install epubcheck. Elsewhere: download it from github.com/w3c/epubcheck/releases.", "optional": true },
+          { "name": "pandoc", "hint": "Turns Word files into ebooks. On a Mac: brew install pandoc. On Ubuntu or Debian: sudo apt install pandoc. On Windows: winget install pandoc.", "optional": true }
+        ]
+      }
+    }
+  }
+}

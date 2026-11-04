@@ -50,9 +50,20 @@ automatically a blocking one.
 - SQL parameterised; no shell strings built from input; file paths kept under a base folder; outgoing
   URLs from users checked against an allowlist.
 - Output escaped for its context (HTML, attributes, URLs, JSON in HTML).
-- Every new route, job and query checks who may do it, including access to each object by id.
+- Every new route, job and query checks who may do it, including access to each object by id. A test
+  shows that a user who may not do it is refused: a test of the allowed path proves nothing about the
+  boundary.
 - No secrets in code, tests, logs or error messages; new secrets read from the environment or a store.
-- New dependencies: needed, maintained, licence acceptable, no known vulnerabilities.
+
+## Dependencies and generated files
+
+- New dependencies: needed (not a big package for a small job), maintained, licence acceptable, no known
+  vulnerabilities.
+- Read the lockfile diff, not only the manifest: how many packages came along, any install scripts
+  (`preinstall`, `postinstall`), names one letter off a well-known package.
+- A major version bump: its changelog read for breaking changes.
+- Generated files: what generates them is in the diff, and they match it (regenerate and compare when
+  that is cheap). Vendored code: where it came from, and which version.
 
 ## Tests
 
@@ -60,6 +71,7 @@ automatically a blocking one.
 - Edge cases and error paths covered, not only the happy path.
 - Tests assert outcomes, are independent of each other, and do not sleep or depend on real time.
 - No `.only`, `.skip` or commented-out tests left behind; flaky tests not introduced.
+- No test deleted, assertion loosened or snapshot re-recorded without a stated reason.
 
 ## Performance
 
@@ -83,6 +95,16 @@ automatically a blocking one.
 - Metrics or health checks updated when behaviour changes.
 - Config and environment variables documented, with safe defaults.
 - User-visible changes reflected in the docs, help text, translations and changelog.
+
+## Written by an AI
+
+- Every function, method, option, environment variable and config key it uses exists in the installed
+  version.
+- Tests written from the request. A test written by reading the code agrees with the code even when both
+  are wrong.
+- No dependency added unasked; no pattern copied from an old version of a library.
+- Comments, commit messages and the description claim only what the code does.
+- No changes nobody asked for.
 
 ## Front end specifics
 

@@ -47,6 +47,8 @@ page. The choice stays theirs: you lay it out and say what you would do.
 
 - Gather the facts for each option: prices, terms, reviews, data, the person's own numbers. Use the
   research skill for anything to look up, and cite it. Mark estimates as estimates, with a range.
+- Keep each number with what it counts and when: "3 of 40 customers asked for it, in March", not
+  "customers want it". When the count is missing, say so rather than writing a percentage.
 - Score each option 1 to 5 on each criterion and work out the weighted total (weight × score, summed,
   divided by 100). A table works in the conversation; with `save_sheet` the person can change the
   weights and watch the totals move (`=SUMPRODUCT($B$2:$B$6,C2:C6)/100`).
@@ -74,6 +76,9 @@ page. The choice stays theirs: you lay it out and say what you would do.
 - The first steps, the date to decide by, and for a reversible choice a date to review how it went.
 - When it is genuinely close, say so and offer a tie-breaker: the more reversible option, a small
   test, or "which would you be relieved to hear had been chosen?"
+- When the evidence is thin, recommend a small test rather than a confident yes: what is tried,
+  for how long, who runs it, and the result that means go on or stop. Not an open-ended "find out
+  more".
 - For medical, legal, tax or large money decisions, the brief frames the questions to take to a
   professional; it does not stand in for one.
 
@@ -87,6 +92,8 @@ One page, recommendation at the top. The template and a filled-in example are in
 - `show_html` for a side-by-side view: the page kit's `table.n-compare` (with `.n-best` on the
   winning column) and `.n-proscons` suit it.
 - `save_sheet` for a scoring table they will adjust themselves.
+- Once it is decided, add a line at the top (what was chosen, by whom, when, and any disagreement),
+  so the brief becomes the record to come back to at the review.
 
 ## Pitfalls
 
@@ -97,3 +104,4 @@ One page, recommendation at the top. The template and a filled-in example are in
 - Sunk costs treated as a reason.
 - A recommendation without the conditions that would change it.
 - Steering toward your preference instead of the person's goal.
+- Leaving out the evidence that points the other way, or making a weak case sound certain.

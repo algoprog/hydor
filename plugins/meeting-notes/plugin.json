@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "meeting-notes",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "From a meeting recording to notes people use: a transcript made on this computer, then a summary, decisions, action items with owners and dates, open questions and a follow-up email, each with the time it was said.",
   "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
   "license": "MIT",

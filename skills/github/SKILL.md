@@ -70,9 +70,14 @@ required approvals. Use the repository's usual method: `gh pr merge 123 --squash
 
 ## 3. Issues
 
-- Search before creating: `gh issue list --search "invoice duplicate" --state all`.
+- Search before creating, pull requests too: `gh issue list --search "invoice duplicate" --state all`,
+  `gh pr list --search "invoice duplicate" --state all`.
 - `gh issue create --title "..." --body-file issue.md --label bug`: what happened, what was expected,
-  steps to reproduce, versions and environment, logs or screenshots.
+  steps to reproduce, versions and environment, logs or screenshots. A feature request: the problem
+  and who has it first, then the idea and the alternatives. A label that does not exist makes the
+  command fail: `gh label list` first.
+- A security hole is never a public issue: follow the project's `SECURITY.md`, or report it privately
+  (the repository's Security tab → Report a vulnerability, where the project has it turned on).
 - `gh issue view 45 --comments`, `gh issue comment 45 -b "..."`,
   `gh issue close 45 --reason "not planned" -c "Why, in one line"`.
 
@@ -83,6 +88,12 @@ required approvals. Use the repository's usual method: `gh pr merge 123 --squash
   go after the tag. `--verify-tag` when the tag should already exist.
 - Release notes for the people who use it: breaking changes first, then new features and fixes,
   in plain words; thank contributors.
+- Before tagging: pull the merged main, check that the version in the package file (`package.json`,
+  `pyproject.toml`) matches the tag, and see what the release workflow listens for (`on: push: tags`
+  or `release: published`). Often the tag, not the merge, is what publishes.
+- A published version is permanent: people and registries may already have it (npm refuses the same
+  version twice). A broken release gets a new patch version; never move or re-push a tag others may
+  have fetched.
 
 ## 5. Actions
 
@@ -100,7 +111,32 @@ required approvals. Use the repository's usual method: `gh pr merge 123 --squash
 - `gh api` reaches any endpoint `gh` has no command for:
   `gh api repos/{owner}/{repo}/pulls/123/comments --paginate`.
 
-## 7. Rules for shared repositories
+## 7. Contributing to someone else's project
+
+Maintainers are often volunteers: a contribution is welcome when it is easy to take in.
+
+- Read the rules first: `CONTRIBUTING.md` (also in `.github/` or `docs/`), the code of conduct, the
+  templates, and any policy on AI-assisted work (some projects refuse it, some ask for a note: follow
+  it and tell the user; where there is none, suggest a short note in the description that an AI
+  assistant helped). Note what they require: signed-off commits (`git commit -s`, for a DCO), a CLA, a
+  commit message format, how to run the tests and linters.
+- Search issues and pull requests, open and closed (section 3): the fix may exist, be under way, or
+  have been declined already.
+- Welcome work: issues labelled "good first issue" or "help wanted", or a bug with clear steps. Avoid
+  ones waiting for information, marked won't fix or upstream, or with an open pull request.
+- Anything beyond a small fix (a feature, a new dependency, a refactor, a few hundred lines): open an
+  issue first with the problem and the plan, and wait for a maintainer's yes.
+- The fork route: `gh repo fork owner/name --clone`, a branch from the upstream default branch (not
+  always `main`: `gh repo view owner/name --json defaultBranchRef -q .defaultBranchRef.name`), push to
+  the fork, then `gh pr create --repo owner/name --base <default> --head <you>:<branch>`. If the
+  organisation blocks that, give the user the page to open the pull request themselves:
+  `https://github.com/owner/name/compare/<default>...<you>:<branch>`.
+- One change per pull request; a second fix found on the way gets its own branch and pull request. Run
+  their tests and linters first; update the docs and changelog where the project keeps them.
+- Afterwards: fix CI failures quickly and answer every review comment. No response? One polite ping
+  after a week or two. Closed without merging: ask why once if it is unclear, then accept it.
+
+## 8. Rules for shared repositories
 
 - Never push to someone else's branch, and never force-push a shared branch (main, release
   branches, a pull request others work on). On your own branch, if history must change, use
@@ -121,3 +157,5 @@ required approvals. Use the repository's usual method: `gh pr merge 123 --squash
 - A huge pull request mixing a refactor, a feature and formatting.
 - A description that lists files instead of saying what changed and why.
 - A token with far more access than the task needs.
+- Backticks or `$` inside a double-quoted `--title`, `-b` or `--body`: the shell runs them. Use single
+  quotes or `--body-file`.

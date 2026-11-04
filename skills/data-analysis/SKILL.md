@@ -41,7 +41,7 @@ the data; the analysis itself is often a few lines.
 | --- | --- | --- |
 | Counts | rows against what the source says (the export said 12,408 orders?) | find what was cut off or doubled |
 | Totals | a sum against a figure known to be right (a bank statement's balance, the shop's report) | find the difference before going on |
-| Gaps | empty cells per column; missing days or months | leave out, fill, or flag, and say which |
+| Gaps | empty cells per column; stand-ins for empty (0, -1, 999, "N/A", 1900-01-01); missing days or months | leave out, fill, or flag, and say which |
 | Duplicates | identical rows; the same ID twice (overlapping exports) | keep one, after checking they really are the same |
 | Types | numbers as text ("1,234", "€12", "12-"), dates in mixed formats (is 03/04 March or April?) | convert, and count what would not convert |
 | Units and scales | cents and euros, thousands and units, 0.12 and 12% side by side | one unit per column |
@@ -49,7 +49,14 @@ the data; the analysis itself is often a few lines.
 | Labels | "UK", "U.K.", "United Kingdom"; trailing spaces; capitals | map to one label |
 
 Keep the original file unchanged. Clean into a new file or table, and log each step: what, how many
-rows, why. The log goes into the caveats.
+rows, why. The log goes into the caveats. Rows you cannot fix safely go to a set-aside file with the
+reason, never silently away.
+
+For more than a quick fix (stand-ins for empty, names spelled several ways, dates or amounts in
+several formats, rows you are unsure of), follow `references/cleaning.md`. Then check that rows,
+keys and totals are accounted for with this skill's `scripts/compare_data.py`, as
+`python3 <this folder>/scripts/compare_data.py raw.csv clean.csv --key id --sum amount`; it lists
+what to check.
 
 ## 4. Analyse
 
@@ -67,8 +74,13 @@ rows, why. The log goes into the caveats.
 - **Small numbers:** 3 to 6 is "+100%": always give the counts with the percentages.
 - **Percent and percentage points:** a rate going from 10% to 12% is up 2 points, or 20%.
 - **Hidden groups:** split the total by the main groups; a total can rise while every group falls.
-- **Cause:** data that was only observed shows what goes together, not what causes what. Say
-  "linked with", not "leads to".
+- **Chance:** small groups and short periods move about on their own. Set a change against the usual
+  ups and downs, and give a range rather than one number; quick checks in `references/pandas-recipes.md`.
+- **Many looks:** split the data twenty ways and one split will look remarkable by chance. Say how
+  many you tried; a pattern found by searching is a lead to check, not a finding.
+- **Cause:** data that was only observed shows what goes together, not what causes what. Something
+  else may drive both (bigger shops advertise more and sell more): compare like with like (shops of a
+  similar size) before saying more, and say "linked with", not "leads to".
 
 ## 5. Sanity-check the results
 
@@ -104,5 +116,6 @@ and the script with `present_files` when the person may want to redo or extend i
 - Rows dropped silently; averages of averages; currencies or units mixed.
 - A period picked because it tells the best story.
 - Percentages of tiny groups presented as trends.
+- A change within the usual ups and downs reported as news.
 - Correlation reported as cause.
 - Misleading charts: cut axes, 3D, two y-axes.

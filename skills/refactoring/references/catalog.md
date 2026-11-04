@@ -15,7 +15,8 @@ When: a block inside a long function does one thing you can name.
 5. Look for other copies of the same block and replace them too, one at a time.
 
 Watch for: early `return`, `break` or `continue` inside the block; `this` or closures in JavaScript;
-exceptions that were caught by a surrounding `try`.
+exceptions that were caught by a surrounding `try`; a harmless name over a side effect (a `getTotal` that
+also saves), which misleads every reader.
 
 ## Inline function or variable
 
@@ -43,7 +44,8 @@ When: it uses another module's data or helpers more than its own, or its folder 
 3. Remove the re-export once nothing imports the old path.
 
 Watch for: circular imports created by the move; module side effects at import time; build or bundler
-configs that list paths.
+configs that list paths. Keep visibility as it was: do not make something public just so the move
+compiles.
 
 ## Split a large module
 

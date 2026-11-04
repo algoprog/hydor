@@ -124,7 +124,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['skills', 'Make my own version', 'change edit built-in skill override customise customize', 'Change a built-in skill: your version takes its place', 'Change a built-in skill'],
   // Agents › Plugins
   ['plugins', 'Your plugins', 'plugins installed added on off every agent', 'The plugins you added, on or off for every agent'],
-  ['plugins', 'Come with the app', 'built-in plugins add sqlite speech to text transcribe ocr python data audio video library docs meeting recordings', 'Plugins that come with the app, ready to add', 'Built-in plugins'],
+  ['plugins', 'Come with the app', 'built-in plugins add sqlite speech to text transcribe ocr python data audio video ebooks epub library docs meeting recordings', 'Plugins that come with the app, ready to add', 'Built-in plugins'],
   ['plugins', 'Make a plugin', 'create build new plugin package share editor own', 'Bundle skills, tools, instructions and files of your own as a plugin'],
   ['plugins', 'From a link', 'add plugin github git repository url install', 'Add a plugin from GitHub or another Git address', 'Add a plugin from a link'],
   ['plugins', 'From a .zip file', 'add plugin zip file import upload', 'Add a plugin someone packed into a .zip', 'Add a plugin from a file'],

@@ -2,7 +2,7 @@
 name: frontend-polish
 description: Use when a web interface works but looks or feels unfinished, or when asked to improve its layout, spacing, typography, colours, states, phone layout or accessibility. Not for testing whole user flows; see web-app-qa.
 category: coding
-triggers: [polish the ui, ui look*, polish the page, improve the ui, make it responsive, responsive design, looks bad on mobile, design system, color contrast, colour contrast, wcag, a11y]
+triggers: [polish the ui, ui look*, polish the page, improve the ui, make it responsive, responsive design, looks bad on mobile, design system, color contrast, colour contrast]
 ---
 
 # Frontend polish
@@ -92,6 +92,9 @@ screenshots, not by reading CSS.
 - Form errors are tied to their field (`aria-describedby`) and announced (`role="alert"`).
 - Automated checks find only part of the problems: run Lighthouse (DevTools, or `npx lighthouse <url>
   --only-categories=accessibility --view`) or axe, then Tab through the page yourself.
+- These are the basics for polish. For a full accessibility review or audit (screen reader testing,
+  WCAG criteria, dialogs and widgets, a report that claims only what was checked), follow the
+  web-accessibility skill.
 
 ## 9. Motion, sparingly
 

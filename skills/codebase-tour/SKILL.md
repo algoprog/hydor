@@ -22,7 +22,7 @@ work it out again.
 
 Quickly, in this order:
 
-- `README*`, `CONTRIBUTING*`, `docs/`, architecture notes and decision records (`docs/adr/`).
+- `README*`, `CONTRIBUTING*`, `ARCHITECTURE.md` or `DESIGN.md`, `docs/`, decision records (`docs/adr/`).
 - Notes for agents and editors: `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.github/copilot-instructions.md`.
   They often hold the rules that matter most (tests to run, files to update together).
 - Manifests: `package.json` (scripts, `main`, `bin`, `workspaces`), `pyproject.toml`, `go.mod`,
@@ -43,13 +43,18 @@ git ls-files | grep -Eo '\.[A-Za-z0-9]+$' | sort | uniq -c | sort -rn | head  # 
 git log --oneline -15                                                         # what is happening lately
 git log --format= --name-only --since=6.months | grep . | sort | uniq -c | sort -rn | head -20  # hot spots
 git shortlog -sn --no-merges HEAD | head                                      # who works on it
+git ls-files -z -- '*.py' '*.ts' '*.go' | xargs -0 wc -l | sort -rn | head -15  # the largest source files
 ```
+
+- A repository not on disk yet: `git clone --filter=blob:none <url>` brings the history these commands
+  need and fetches file contents only as they are read; `--depth=1` is quicker but has no history.
 
 - Sort the top-level folders into app code, tests, scripts, config, docs, and generated or vendored code.
   Skip generated and vendored code (`dist/`, `build/`, `vendor/`, `node_modules/`, generated clients).
 - A monorepo: find the workspace list (`workspaces` in `package.json`, `pnpm-workspace.yaml`, `go.work`,
   `[workspace]` in `Cargo.toml`) and treat each package as a small tour of its own.
-- Hot spots (files changed most often) are where the important and fragile code usually is.
+- Hot spots (files changed most often) are where the important and fragile code usually is. The largest
+  files are often the core, or the most tangled; a file that is both is where changes are hardest.
 
 ## 4. Build, run and test it
 
@@ -74,6 +79,10 @@ Pick one real flow (a request, a command, a background job) and trace it:
   each module on the path: they show intended use.
 - Confirm the path by running it: a temporary log line or breakpoint that you see hit (remove it after).
 - For a task, find the most similar existing feature and follow its shape.
+- What changes along with a file:
+  `git show --format= --name-only $(git log --format=%H -30 -- src/orders.ts) | grep . | sort | uniq -c | sort -rn | head`
+  counts the files touched in the same commits as its last 30 changes (its tests, types, docs,
+  translations). A change to it will probably need the same.
 
 ## 6. Note the conventions
 
@@ -100,8 +109,13 @@ flowchart LR
 ```
 
 - Where to make common changes ("a new API route: ...; a new page: ...").
+- The outside services it needs (database, queue, payment, email, AI APIs, file storage), found in
+  `.env.example`, the config and the dependencies, and what is sent to each.
+- For the main kinds of data, where the real copy lives and which copies are made from it (caches,
+  search indexes, exports): a change to the data has to reach each.
 - Conventions, gotchas and open questions.
-- Mark what you checked by running it and what you only read.
+- Mark what you checked by running it, what you only read, and what you guessed from names and
+  structure; a guess that matters goes under open questions.
 
 Give it in the reply, or save it where the user wants it. Do not add files to the repository unasked.
 

@@ -66,6 +66,8 @@ run every line.
 ## Things to check after every action
 
 - The visible result is right, and still right after a reload.
+- It happened once (no second order, email or charge), and nothing else changed (other records, another
+  user's data).
 - No errors in the console; no failed requests in the Network panel.
 - The address, page title and Back button make sense.
 - Focus lands somewhere sensible (on the new content, the error, or the dialog).

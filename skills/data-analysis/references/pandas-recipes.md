@@ -116,6 +116,48 @@ print(merged["_merge"].value_counts())   # left_only: orders with no known custo
 `validate` stops the join when the keys are not what you think (a customer listed twice would
 otherwise double those orders silently).
 
+## Is a difference more than chance?
+
+Small groups and short periods move about on their own. Check a change, or a gap between groups,
+against chance before reporting it, and leave out a month that is not over yet.
+
+```python
+import math
+import numpy as np
+
+# How much does it usually move? The last change against the usual month-to-month swing
+monthly = df.set_index("date")["amount"].resample("MS").sum()
+changes = monthly.pct_change().dropna()
+print(f"last month {changes.iloc[-1]:+.1%}; a usual month moves ±{changes.abs().median():.1%}")
+
+# Two percentages: 12% of 400 customers against 9% of 350
+p1, n1, p2, n2 = 0.12, 400, 0.09, 350
+margin = 2 * math.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+print(f"{(p1 - p2) * 100:+.1f} points, give or take {margin * 100:.1f}")   # +3.0, give or take 4.5: could be chance
+
+# Two groups' averages: how often does shuffling the labels make a gap this big?
+a = df.loc[df["shop"] == "North", "amount"].dropna().to_numpy()
+b = df.loc[df["shop"] == "South", "amount"].dropna().to_numpy()
+gap = a.mean() - b.mean()
+rng = np.random.default_rng(1)
+both = np.concatenate([a, b])
+shuffled = np.empty(10_000)
+for i in range(len(shuffled)):
+    rng.shuffle(both)
+    shuffled[i] = both[:len(a)].mean() - both[len(a):].mean()
+print(f"gap {gap:,.2f}: chance alone makes one this big {np.mean(np.abs(shuffled) >= abs(gap)):.1%} of the time")
+
+# A range for the gap: resample each group many times
+gaps = [rng.choice(a, len(a)).mean() - rng.choice(b, len(b)).mean() for _ in range(10_000)]
+low, high = np.percentile(gaps, [2.5, 97.5])
+print(f"gap {gap:,.2f}, likely between {low:,.2f} and {high:,.2f}")
+```
+
+Chance making a gap this big less than 5% of the time, and a range that leaves out 0, point to a real
+difference (not to its cause). A range that includes 0 means the data cannot say which group is
+higher: report "no clear difference", not "no difference". For skewed amounts use `np.median` in
+place of `.mean()`. The give-or-take for percentages needs about ten of each answer in each group.
+
 ## Check
 
 ```python

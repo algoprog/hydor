@@ -17,7 +17,8 @@ can follow, what should happen, what did happen, and the evidence.
   version you test, so each bug can be tied to it.
 - Production: no real purchases, no messages to real customers, no changes to real data unless the user
   says so. Prefer test accounts, test payment cards and a staging copy.
-- What matters most: a new feature, a release, a specific worry. Spend most of the time there.
+- What matters most: a new feature, a release, a specific worry, and places that broke before (closed
+  bug reports, recent fixes), since bugs cluster. Spend most of the time there.
 - Sign-ins: ask with `request_secret` rather than in the chat, and type them with `browser_act` using
   `"secret": "NAME"`, so passwords never pass through the conversation.
 
@@ -39,6 +40,12 @@ the outline of the report.
 - Watch for silent failures: errors in the console, requests failing with 4xx or 5xx, data saved wrongly
   but shown rightly (reload to check). In DevTools: the Console, and the Network panel filtered to
   failed requests. A flow that "works" while throwing errors is a bug.
+- A success message proves only that the message appeared. Check the effect itself: reload, look from
+  another session or account (or through the API), check it happened exactly once (one order, one
+  email, one charge), and that nothing else changed (another user's data, other records).
+- When nothing says what should happen, judge against the previous version, the same kind of feature
+  elsewhere in the app, what its help or marketing promises, comparable apps, and standards (WCAG for
+  accessibility). Say which one you used when you report.
 
 ## 4. Push on the edges
 
@@ -84,6 +91,16 @@ test('checkout with a coupon', async ({ page }) => {
 - Slow API: `await page.route('**/api/**', async (route) => { await new Promise((r) => setTimeout(r,
   3000)); await route.continue(); })`. Offline: `await page.context().setOffline(true)`. Phone size:
   `test.use({ viewport: { width: 390, height: 844 } })`.
+- Wait with the assertions that retry by themselves (`await expect(locator).toBeVisible()`,
+  `toHaveText`, `toHaveURL`), never with fixed pauses (`page.waitForTimeout`).
+- A flaky test: run it alone several times (`npx playwright test <file> --repeat-each=5 --workers=1`)
+  and read the trace. Usually a locator matched nothing yet, matched two things, or caught an element
+  being redrawn: fix the locator, not the timing. A failing test is a finding until shown otherwise;
+  never change its expected result, or skip it, to get a green run.
+- Accept new screenshots or snapshots (`--update-snapshots`) only after looking at what changed.
+- An accessibility scan: `npm i -D @axe-core/playwright`, then in a test
+  `const { violations } = await new AxeBuilder({ page }).analyze();` (`AxeBuilder` is that package's
+  default export). Report the `critical` and `serious` ones as bugs.
 
 ## 6. Report each bug so it can be fixed
 
@@ -92,7 +109,8 @@ One bug per report, using `references/bug-report.md`:
 - **Title:** what is wrong, and where. "Coupon applied twice when Apply is double-clicked."
 - **Environment:** address, build or commit, browser, screen size, account used.
 - **Steps:** numbered, from a known starting point, as few as reproduce it.
-- **Expected** and **actual**, one line each.
+- **Expected** and **actual**, one line each. Write what you saw, not a guess at the cause ("Save returns
+  500", not "the backend is broken"); a suspected cause goes under Notes, marked as a guess.
 - **Evidence:** a screenshot (`browser_read` with `kind: "screenshot"`, or `ui_screenshot` with
   `phase: "check"`), the console error text, the failing request (method, address, status, response).
 - **Severity:**
@@ -117,6 +135,7 @@ unless the user wants them kept (see clean-up).
 - Testing only the happy path you were shown.
 - "It doesn't work" with no steps, or several bugs in one report.
 - Missing silent failures: console errors, failed requests, data that is wrong after a reload.
+- Trusting a success message without checking that the change really happened, and only once.
 - Real purchases, real emails or real customer data touched while testing production.
 - Calling the app ready without saying what was not tested.
 - Passwords or tokens written into scripts, screenshots or reports.
