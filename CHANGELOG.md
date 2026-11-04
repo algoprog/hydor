@@ -3,6 +3,22 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.24.3 · 4 November 2026
+
+Preview shows a dev server live when you reach the app through a tunnel: click, type and scroll in it, instead of
+looking at pictures.
+
+- **Live behind a tunnel**: where your browser can't reach the preview port (the app behind a tunnel or a proxy with
+  one hostname), Preview opens the page in a browser on this computer and streams it to you live, at the size you
+  picked, instead of still pictures. Click, type, scroll and paste in it as in any page; back, forward, reload and
+  the address bar work, and hot reload shows there too.
+- **On a phone**, tap and drag in the page; **Type** under it brings up the keyboard, beside Tab, Enter, Esc and the
+  arrows.
+- **Save a picture of it** and **Ask an agent about this screen** take the page as it is on your screen, after your
+  clicks and typing.
+- The page reaches only the dev server you are looking at, not the other servers on this computer, and closes after
+  15 minutes with nobody looking. **Show it as a picture** in **More** still shows still pictures.
+
 ## 0.24.2 · 4 November 2026
 
 A neater Make an app card on the Apps page.
