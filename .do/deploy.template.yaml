@@ -1,0 +1,17 @@
+# DigitalOcean App Platform: the "Deploy to DigitalOcean" button in the README makes this app from the public
+# Docker image (algoprog/hydor). App Platform has no lasting disk, so settings and sessions start afresh when the
+# app is redeployed; for a lasting copy use a Droplet with Docker (docs/install.md#with-docker).
+spec:
+  name: hydor
+  services:
+    - name: hydor
+      image:
+        registry_type: DOCKER_HUB
+        registry: algoprog
+        repository: hydor
+        tag: latest
+      http_port: 8790
+      instance_count: 1
+      instance_size_slug: apps-s-1vcpu-2gb
+      health_check:
+        http_path: /api/health

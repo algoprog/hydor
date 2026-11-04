@@ -80,6 +80,12 @@ jobs:
           merge-multiple: true
       - name: The update feed
         run: node mac/scripts/feed.mjs "${GITHUB_REF_NAME#v}" out > out/hydor-mac.json && cat out/hydor-mac.json
+      # The disk images again under names without the version, so the README's buttons can link to
+      # releases/latest/download/Hydor-arm64-mac.dmg and always get the newest.
+      - name: Download links that stay the same
+        run: |
+          for arch in arm64 x64; do cp out/Hydor-*-$arch-mac.dmg out/Hydor-$arch-mac.dmg; done
+          ls -l out
       - name: Release notes from CHANGELOG.md
         run: awk '/^## /{n++} n==1 && !/^## /' CHANGELOG.md > notes.md && cat notes.md
       - name: Publish

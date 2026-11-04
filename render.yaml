@@ -1,0 +1,18 @@
+# Render Blueprint: the "Deploy to Render" button in the README makes this service from the public Docker image
+# (algoprog/hydor). Its disk keeps the home folder (/home/node: settings, sessions, agents' sign-ins), which needs a
+# paid plan. Open the address Render gives it, add /setup?token=… from the service's logs, and choose a password.
+services:
+  - type: web
+    name: hydor
+    runtime: image
+    image:
+      url: docker.io/algoprog/hydor:latest
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: '8790'
+    disk:
+      name: hydor-home
+      mountPath: /home/node
+      sizeGB: 10
