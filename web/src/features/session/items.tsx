@@ -38,7 +38,8 @@ import { basename, clockTime, compact, duration, stripAnsi, tildify } from '../.
 import { langFromPath } from '../../lib/highlight';
 import { openFile, openSession } from '../../lib/nav';
 import { toastError, useApp, useLive, useSessions } from '../../lib/store';
-import { CodeBlock, CopyButton, Markdown, useSmoothText } from '../../components/Markdown';
+import { CodeBlock, CopyButton, Markdown, ReplyMarkdown, useSmoothText } from '../../components/Markdown';
+import { spokenReply } from '@shared/citations';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Button, cx, useConfirm } from '../../components/ui';
@@ -988,13 +989,16 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
   );
 }
 
-/** A reply; `note` for the agent's in-between notes inside a turn's work (they read the same: they are what people read). */
+/**
+ * A reply; `note` for the agent's in-between notes inside a turn's work (they read the same: they are what people read).
+ * The sources it cites show as chips in its text and as one line under it, not as a list at its end.
+ */
 export const AssistantBlock = memo(function AssistantBlock({ item, note }: { item: Extract<TimelineItem, { kind: 'assistant' }>; note?: boolean }) {
   const { text, revealing } = useSmoothText(item.text, !!item.streaming);
   const { fork } = useContext(SessionCtx);
   return (
     <div data-seq={item.seq} data-text={item.id} data-quote className="tl-item group relative">
-      <Markdown text={text} streaming={revealing} breaks className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
+      <ReplyMarkdown text={text} streaming={revealing} breaks className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
       {!item.streaming && (
         <div className="absolute -top-1 -right-1 flex opacity-0 transition-opacity group-hover:opacity-100">
           {fork && item.entry && !note && (
@@ -1008,7 +1012,7 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note }: { ite
               <GitFork size={13} />
             </button>
           )}
-          <ReadAloudButton id={item.id} text={item.text} />
+          <ReadAloudButton id={item.id} text={spokenReply(item.text)} />
           <CopyButton text={item.text} label="Copy message" />
         </div>
       )}

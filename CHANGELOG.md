@@ -3,6 +3,28 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.22.0 · 4 November 2026
+
+Sources you can see at a glance, apps that run when they fit, and pictures and trailers in their answers.
+
+- **Sources where the reply cites them**: where an agent cites a page, a small chip with the site's icon and name
+  sits in the text. Point at it on a computer, or tap it on a phone, to see the page; click to open it.
+- **One Sources line under the reply**: it shows the first sites' icons and how many pages the reply cites, and
+  opens to a card for each page. Only the pages the reply cites, not every search the agent ran, and the list at
+  the end of the reply no longer repeats in the text, with each number pointing at the right page.
+- **Your apps, when they fit**: ask for something one of your apps does ("best upcoming games for Switch 2") and
+  the agent runs it instead of answering itself. Every session now knows all your apps by name (up to 40).
+- **Games coming soon**: the Game finder finds games still to come, with when each comes out, as well as those out
+  now, and knows the Nintendo Switch 2.
+- **Pictures and trailers in apps**: the Game finder shows each game's cover and trailer on any platform, What to
+  watch each pick's trailer, and pictures come with Compare products, Gift ideas, the Weekly news digest, What's on,
+  each day of the Trip planner and Best time to go. Pictures from the web are kept with the run, so they last.
+- **Pictures for anything**: agents and app steps can find a picture, and a video, of each thing in a list: from its
+  Wikipedia article, the pages about it, or YouTube.
+- A table in an app can now have up to 16 columns.
+- **Fixed**: Weather outlook, Match preview and Best time to go no longer repeat a heading and its list once for each
+  thing in it.
+
 ## 0.21.1 · 4 November 2026
 
 A quieter welcome tour, and bigger models on one graphics card.

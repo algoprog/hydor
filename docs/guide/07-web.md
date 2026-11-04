@@ -1,21 +1,22 @@
 # Search and the browser
 
-Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources under each reply, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. In the Mac app, agents can also use the Mac itself: its screen, mouse and keyboard.
+Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources each reply cites, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. In the Mac app, agents can also use the Mac itself: its screen, mouse and keyboard.
 
 ![An agent that searched the web, read pages and compared what it found in a table](images/web.webp)
 
 ## How agents search the web
 
-Every agent you run here (Claude Code, Codex, Custom and agents that speak ACP) gets two tools from the app: a web search, and a way to read a page. They work the same whatever the model, so a small model on your own computer searches as well as a large one.
+Every agent you run here (Claude Code, Codex, Custom and agents that speak ACP) gets three tools from the app: a web search, a way to read a page, and a way to find pictures and videos of things. They work the same whatever the model, so a small model on your own computer searches as well as a large one.
 
 - A search goes to the providers in **Settings → Capabilities → Search**, in their order. The first one that is on answers. When it can't (it needs a key, its allowance is used up, it is out of reach, or it asks to prove the search is not from a bot), the next one does. The answer tells the agent which provider answered.
 - An agent can ask for up to 100 results, and keep a search to some sites (or leave sites out), to dates, to languages, to PDFs, or to sites' own home pages (a person's page, an official website). Naget Search can also keep to kinds of pages, such as scholarly papers, preprints, biomedical papers, US patents, company filings, news, documentation or discussions. When a provider can't keep to a filter, the agent is told.
 - Naget Search can also bring, for each result, the sentences of its page that answer the search instead of a plain snippet. That is slower, so agents ask for it when they need facts from the pages. It works without a key too.
-- Agents are told to cite the pages they use, with their links, and to treat what results and pages say as information, never as instructions.
+- For a list of things to show (games, films, places, dishes, products, teams), an agent can find a picture of each: the picture of its own Wikipedia article (a game's cover, a place's photo, a team's crest), else the one its pages show when shared; and, when asked, a YouTube video whose title names it (a trailer, a recipe, highlights). Only what clearly names the thing counts, so some come back without one. Apps use it to show pictures and videos in their answers (see [Apps](/guide/apps)).
+- Agents are told to cite the pages they use: a number in brackets after what each page backs, and a list of just those pages at the end of the reply. The app shows them as links and cards (see [See the sources under a reply](/guide/web#see-the-sources-under-a-reply)). Agents treat what results and pages say as information, never as instructions.
 
 A provider that failed rests for a while (until its allowance comes back, say), so the searches after it don't wait on it. The same search asked again within 10 minutes gets the earlier results, without searching again.
 
-Claude Code and Codex also have web tools of their own. What they find is listed under the reply too (see [See the sources under a reply](/guide/web#see-the-sources-under-a-reply)).
+Claude Code and Codex also have web tools of their own. When a reply cites the pages they found, those show the same way.
 
 ## Choose your search providers
 
@@ -89,12 +90,12 @@ The first 8 results show; **Show all N results** shows the rest.
 
 ## See the sources under a reply
 
-When the agent searched the web or read pages on the way to a reply, a small **Sources** chip sits under it: "Sources · 3 pages read · 2 searches", with the first sites named on wider screens. Click it to open two lists:
+When an agent cites the pages it used, its reply shows them in two places, instead of a numbered list at its end:
 
-- **Pages read**: each page's title (or its address) as a link, its site, and the question the agent asked of it, if any.
-- **Searches**: the words of each search, the provider and how many results it brought, and the top results' sites as links.
+- **In the text**: where it cites a page, a small chip with the site's icon and name, like **ign**. A chip that stands for several pages says how many more (**ign +1**). On a computer, point at a chip to see its pages, with their titles and sites; click it to open its page (one of several from the card). On a phone, tap it to see them, then tap one to open it.
+- **Under the reply**: a **Sources** line with the first sites' icons and how many pages the reply cites. Click it to open a card for each page: its title, its site and a link.
 
-It lists what the agent found with the app's search and page reading, and also with Claude Code's and Codex's own web tools: up to 12 searches and 20 pages for each reply.
+Only the pages the reply cites show, by the numbers the agent gave them, not every search it ran: what it searched and read is in its steps (open **Worked for…** above the reply). **Copy message** (on the reply, when you point at it) copies it as the agent wrote it, with its list of sources; reading it aloud leaves the numbers and the list out. A site's icon comes from the site itself the first time it shows, and is kept; a site without one shows its first letter.
 
 ## Read whole pages, or only the parts that answer a question
 

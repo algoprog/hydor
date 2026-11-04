@@ -58,8 +58,12 @@ agents that speak ACP and take MCP servers.
   permissions, spending caps, files and commands stay yours.
 - **The web**: search with Naget Search (its own index of the web, papers, patents and filings; free daily
   searches without a key) or SearXNG, Brave Search and DuckDuckGo, by category, site or date, up to 100 results;
-  read whole pages, or only the parts that answer a question. Each search shows its results, and each reply its
-  sources. [Search providers](search-providers.md).
+  read whole pages, or only the parts that answer a question; find a picture and a video of each of a list of things
+  (find_media: a Wikipedia article's lead picture, else what the pages about it show when shared, and a YouTube
+  video whose title names it). Each search shows its results, and each reply the sources it cites: a chip with the
+  site's icon and name where it cites a page (a card of its pages on hover or tap) and a Sources line under it that
+  opens to a card for each page, only those cited, by the numbers the agent gave them, its list of sources no longer
+  repeated in the text. [Search providers](search-providers.md).
 - **A browser**: agents open sites, click, type and read pages, in a Chromium of their own. You watch it live
   above the message box and take over to log in, solve a check or pay, on a computer or a phone; with a sign-in
   saved in the vault, the agent signs in itself, typing the password without seeing it, on that site only. Sites
@@ -152,8 +156,10 @@ agents that speak ACP and take MCP servers.
   kind, and lists the runs to pick up again, your own apps, the ready-made ones under their kinds (each card saying
   whether it has its own view and works in chats) and the ready-made apps you uninstalled, to install again. They run
   from the Apps page, the API, MCP, a public page, or once for each row of a CSV. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
-  that says in plain words what it asks, gives and does. However many apps there are, a session is told only of
-  the few run most, and agents find the right one with find_apps: a few words on what the user wants, searched by
+  that says in plain words what it asks, gives and does. A session is told of the few apps run most with what they
+  do and of the others by name (up to 40 in all), and a message one app clearly does tells the agent which, with its
+  form (a clear lead by words, so "best upcoming games for switch 2" runs the Game finder); past 40, agents find the
+  right one with find_apps: a few words on what the user wants, searched by
   words (BM25 over names, kinds, descriptions and form questions, plurals and word starts matching) and by meaning
   (the search box's vectors), fused by rank, the user's own and those run lately lifted, the best twenty with
   their forms. An app that needs a model through OpenRouter asks for OpenRouter's key with its other keys (kept
@@ -169,10 +175,13 @@ agents that speak ACP and take MCP servers.
   as charts, maps and cards: a weather outlook and the best time to go somewhere (Open-Meteo), a team tracker and
   match previews (TheSportsDB and the web), recipes from what is in your fridge and a week of dinners with one
   shopping list by aisle (TheMealDB), gift ideas, what to watch tonight and where it streams (TVmaze), a game finder
-  with PC prices and their lowest ever (CheapShark), a quiz on any topic to play on its page, a book finder (Open
+  for games out now or coming soon (Nintendo Switch 2 too), each with its picture and trailer, and PC prices with
+  their lowest ever (CheapShark), a quiz on any topic to play on its page, a book finder (Open
   Library), what's on in a city by day and on a map, a savings plan, your own spreadsheet or numbers as charts, a
-  topic as a timeline (Wikipedia) and a place explored on a map in walking order (Wikipedia and OpenStreetMap). Each
-  hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
+  topic as a timeline (Wikipedia) and a place explored on a map in walking order (Wikipedia and OpenStreetMap). Many
+  show pictures and videos of what they find, through find_media: each game's cover and trailer, each film's or show's
+  trailer, each product, gift idea, news story and event, a picture for each day of a trip, a photo of the place to
+  go. Each hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
   off, a page for each day, a map of the days, a list to book and a budget chart; Compare products' pick, and the products side by side with their scores on a chart;
   the news digest's stories by topic), with buttons that run it again with a change (a slower pace, one more day,
   a more formal letter, new questions about the same document) or start another app on part of it (research a

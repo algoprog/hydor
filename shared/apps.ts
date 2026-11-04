@@ -69,8 +69,8 @@ export interface PublicSettings {
   web: boolean;
 }
 
-/** What a public run with the web may use: web search and page reading, which reach public addresses only. */
-export const PUBLIC_WEB_TOOLS = ['web_search', 'read_page'];
+/** What a public run with the web may use: web search, page reading and finding pictures and videos, which reach public addresses only. */
+export const PUBLIC_WEB_TOOLS = ['web_search', 'read_page', 'find_media'];
 
 /** What a run follows: the task, its form and answer, and who does it with what. */
 export interface AppRecipe {
@@ -768,7 +768,7 @@ export function cleanAnswer(raw: unknown): AnswerField[] {
     const cTaken: string[] = [];
     const columns =
       type === 'table'
-        ? (Array.isArray(x.columns) ? x.columns : []).slice(0, 12).flatMap((c: any): AnswerColumn[] => {
+        ? (Array.isArray(x.columns) ? x.columns : []).slice(0, 16).flatMap((c: any): AnswerColumn[] => {
             const cl = str(c?.label, 60) || str(c?.id, 60);
             if (!cl) return [];
             const cid = fieldId(str(c.id, 40) || cl, cTaken);

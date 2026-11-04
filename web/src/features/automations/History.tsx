@@ -8,7 +8,7 @@ import { api, enc, post, put } from '../../lib/api';
 import { duration, money } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
-import { Markdown } from '../../components/Markdown';
+import { ReplyMarkdown } from '../../components/Markdown';
 import { Button, cx, IconButton, inputCls, Throbber } from '../../components/ui';
 import { localTime, OutcomeBadge, TriggerIcon } from './parts';
 
@@ -34,7 +34,11 @@ function RunRow({ r, onRerun }: { r: TaskRun; onRerun: () => void }) {
             {r.summary ?? r.error}
           </button>
         )}
-        {open && r.reply && <Markdown text={r.reply} breaks className="mt-1.5 rounded-lg border border-line px-3 py-2 !text-[13px]" />}
+        {open && r.reply && (
+          <div className="mt-1.5 rounded-lg border border-line px-3 py-2">
+            <ReplyMarkdown text={r.reply} breaks className="!text-[13px]" />
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 items-center">
         {r.appRun ? (

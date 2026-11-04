@@ -140,6 +140,11 @@ export interface Feature {
    * the message in a <system-reminder>, which the conversation does not show. Asked once per message.
    */
   beforeMessage?(key: string, d: Deps): string | null | undefined;
+  /**
+   * What the agent should hear about the user's message itself (one of their apps does what it asks), ahead of it
+   * with beforeMessage's notes. Asked once per message, the first one of a session too.
+   */
+  aboutMessage?(text: string, key: string, d: Deps): string | null | undefined | Promise<string | null | undefined>;
   /** Once, when the server is up. */
   start?(d: Deps): void;
 }

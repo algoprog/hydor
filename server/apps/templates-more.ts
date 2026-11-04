@@ -323,6 +323,7 @@ const GIFT_COLS = [
   { id: 'shop', label: 'Shop', type: 'text' as const },
   { id: 'link', label: 'Link', type: 'url' as const },
   { id: 'fits', label: 'Within the budget', type: 'yesno' as const },
+  { id: 'picture', label: 'Picture', type: 'image' as const },
 ];
 const WATCH_COLS = [
   { id: 'title', label: 'Title', type: 'text' as const },
@@ -335,11 +336,14 @@ const WATCH_COLS = [
   { id: 'on_yours', label: 'On your services', type: 'yesno' as const },
   { id: 'why', label: 'Why', type: 'text' as const },
   { id: 'picture', label: 'Picture', type: 'image' as const },
+  { id: 'video', label: 'Trailer', type: 'url' as const },
   { id: 'link', label: 'More about it', type: 'url' as const },
 ];
 const GAME_COLS = [
   { id: 'title', label: 'Game', type: 'text' as const },
   { id: 'year', label: 'Year', type: 'number' as const },
+  { id: 'out', label: 'Comes out', type: 'text' as const },
+  { id: 'coming', label: 'Coming soon', type: 'yesno' as const },
   { id: 'genre', label: 'Genre', type: 'text' as const },
   { id: 'platforms', label: 'Plays on', type: 'text' as const },
   { id: 'hours', label: 'Hours to finish', type: 'number' as const },
@@ -350,6 +354,7 @@ const GAME_COLS = [
   { id: 'store', label: 'Store', type: 'text' as const },
   { id: 'deal', label: 'Deal', type: 'url' as const },
   { id: 'picture', label: 'Picture', type: 'image' as const },
+  { id: 'video', label: 'Trailer', type: 'url' as const },
 ];
 const QUESTION_COLS = [
   { id: 'n', label: 'Number', type: 'number' as const },
@@ -372,6 +377,7 @@ const EVENT_COLS = [
   { id: 'url', label: 'Link', type: 'url' as const },
   { id: 'lat', label: 'Latitude', type: 'number' as const },
   { id: 'lng', label: 'Longitude', type: 'number' as const },
+  { id: 'picture', label: 'Picture', type: 'image' as const },
 ];
 const SAVING_COLS = [
   { id: 'month', label: 'Month', type: 'text' as const },
@@ -667,7 +673,8 @@ return {
           code:
             BODY +
             PLACE +
-            String.raw`// The place, and the address of its weather day by day over the last five whole years.
+            String.raw`// The place, and the address of its weather day by day over the last five whole years; and, for its picture, its name
+// as it is known without its country ("Paris, Texas", "Kyoto") and what it is (a country, or a place in one).
 const p = await placeOf(input.found, input.place, ctx);
 if (!p) throw new Error('No place called “' + input.place + '” was found: check its spelling, or add its country');
 const year = Number(String(input.today || '').slice(0, 4)) || new Date().getFullYear();
@@ -675,15 +682,40 @@ const url =
   'https://archive-api.open-meteo.com/v1/archive?latitude=' + p.lat + '&longitude=' + p.lng + (p.coast ? '&elevation=0' : '') + '&timezone=auto' +
   '&start_date=' + (year - 5) + '-01-01&end_date=' + (year - 1) + '-12-31' +
   '&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration,snowfall_sum';
-return { label: p.label, lat: p.lat, lng: p.lng, at: p.lat + ',' + p.lng, url, years: (year - 5) + '–' + (year - 1) };`,
+const name = p.country && p.label.endsWith(', ' + p.country) ? p.label.slice(0, -(p.country.length + 2)) : p.label;
+const kind = p.country && name === p.country ? 'country' : p.country ? 'in ' + p.country : '';
+return { label: p.label, name, kind, lat: p.lat, lng: p.lng, at: p.lat + ',' + p.lng, url, years: (year - 5) + '–' + (year - 1) };`,
           outputs: [
             { id: 'label', label: 'Place', type: 'text' },
+            { id: 'name', label: 'Its name', type: 'text' },
+            { id: 'kind', label: 'What it is', type: 'text', description: 'A country, or a place in one' },
             { id: 'lat', label: 'Latitude', type: 'number' },
             { id: 'lng', label: 'Longitude', type: 'number' },
             { id: 'at', label: 'Where on a map', type: 'text' },
             { id: 'url', label: 'Its weather', type: 'url' },
             { id: 'years', label: 'Years', type: 'text' },
           ],
+          failed: 'agent',
+        },
+        { id: 'media', title: 'Find its picture', do: 'tool', tool: 'find_media', with: { items: ['{{spot.name}}'], kind: '{{spot.kind}}' }, failed: 'skip' },
+        {
+          id: 'photo',
+          title: 'Keep it if it is a photo',
+          do: 'code',
+          language: 'javascript',
+          with: { media: '{{media.data}}' },
+          code:
+            LIST +
+            String.raw`// The place's picture when it is a photo of it: a drawing (a map of where it is, its flag, a crest) is left out.
+const m = list(input.media && input.media.items)[0];
+const src = m && typeof m === 'object' ? String(m.picture || '') : '';
+let file = '';
+try {
+  file = decodeURIComponent(new URL(src).pathname.split('/').pop());
+} catch (e) {}
+const drawn = /\.svg\b|(^|[_\-\s(])(map|maps|locator|location|flag|coat_of_arms|emblem|seal|dimos)([_\-\s.)]|$)/i.test(file);
+return { picture: file && !drawn && /^https?:\/\/\S+$/.test(src) ? src : null };`,
+          outputs: [{ id: 'picture', label: 'Picture', type: 'url' }],
           failed: 'agent',
         },
         { id: 'history', title: 'Get five years of weather', do: 'tool', tool: 'http_request', with: { url: '{{spot.url}}', max_chars: 200000 }, failed: 'agent' },
@@ -791,7 +823,7 @@ return { months, best: ranked.slice(0, 3).map((x) => x.month), worst: ranked.sli
           ],
         },
       ],
-      outputs: { place: '{{spot.label}}', years: '{{spot.years}}', summary: '{{advise.summary}}', months: '{{months.months}}', best: '{{advise.best}}', avoid: '{{advise.avoid}}', tips: '{{advise.tips}}', unit: '{{months.unit}}', rain_unit: '{{months.rain_unit}}' },
+      outputs: { place: '{{spot.label}}', years: '{{spot.years}}', summary: '{{advise.summary}}', months: '{{months.months}}', best: '{{advise.best}}', avoid: '{{advise.avoid}}', tips: '{{advise.tips}}', unit: '{{months.unit}}', rain_unit: '{{months.rain_unit}}', picture: '{{photo.picture}}' },
     },
     answer: [
       { id: 'place', label: 'Place', type: 'text', required: true },
@@ -819,9 +851,10 @@ return { months, best: ranked.slice(0, 3).map((x) => x.month), worst: ranked.sli
       { id: 'tips', label: 'Tips', type: 'list' },
       { id: 'unit', label: 'Temperature unit', type: 'text' },
       { id: 'rain_unit', label: 'Rain unit', type: 'text' },
+      { id: 'picture', label: 'Picture', type: 'media', description: 'A picture of the place' },
     ],
     examples: [
-      { id: 'crete-for-the-beach', name: 'Crete for the beach', inputs: { place: 'Crete', for_what: 'Beach and sun' }, checks: ['{{answer.months}} is not empty', '{{answer.best}} is not empty'] },
+      { id: 'crete-for-the-beach', name: 'Crete for the beach', inputs: { place: 'Crete', for_what: 'Beach and sun' }, checks: ['{{answer.months}} is not empty', '{{answer.best}} is not empty', '{{answer.picture}} is not empty'] },
       { id: 'somewhere-to-ski', name: 'Somewhere to ski', inputs: { place: 'Zermatt, Switzerland', for_what: 'Snow and skiing' }, checks: ['{{months.best}} does not contain Jul'] },
     ],
   },
@@ -1879,24 +1912,46 @@ return { text };`,
           outputs: [{ id: 'picks', label: 'Picks', type: 'table', columns: [{ id: 'n', label: 'Idea', type: 'number' }, { id: 'example', label: 'One to buy', type: 'text' }, { id: 'price', label: 'Price', type: 'number' }, { id: 'shop', label: 'Shop', type: 'text' }, { id: 'link', label: 'Address', type: 'text' }] }],
         },
         {
+          id: 'shown',
+          title: 'Choose what to picture',
+          do: 'code',
+          language: 'javascript',
+          with: { ideas: '{{ideas.ideas}}', picks: '{{prices.picks}}' },
+          code:
+            LIST +
+            String.raw`// What each idea's picture shows: the one to buy, with its own page, when there is one; else the idea.
+const picks = rows(input.picks);
+const link = (v) => (/^https?:\/\/\S+$/.test(String(v || '').trim()) ? String(v).trim() : null);
+const items = rows(input.ideas).map((x, i) => {
+  const p = picks.find((q) => Number(q.n) === i + 1) || {};
+  return { name: String(p.example || '').trim() || String(x.idea || '').trim(), page: link(p.link) };
+});
+return { items };`,
+          outputs: [{ id: 'items', label: 'Pictures to find', type: 'table', columns: [{ id: 'name', label: 'Of', type: 'text' }, { id: 'page', label: 'Its page', type: 'url' }] }],
+          failed: 'agent',
+        },
+        { id: 'media', title: 'Find their pictures', do: 'tool', tool: 'find_media', with: { items: '{{shown.items}}', name: 'name', page: 'page', kind: 'gift' }, failed: 'skip' },
+        {
           id: 'merge',
           title: 'Weigh them against the budget',
           do: 'code',
           language: 'javascript',
-          with: { ideas: '{{ideas.ideas}}', picks: '{{prices.picks}}', budget: '{{budget}}', approach: '{{ideas.approach}}' },
+          with: { ideas: '{{ideas.ideas}}', picks: '{{prices.picks}}', media: '{{media.data}}', budget: '{{budget}}', approach: '{{ideas.approach}}' },
           code:
             LIST +
-            String.raw`// Each idea with one to buy, and whether it fits the budget (the first number in it): those that do first.
+            String.raw`// Each idea with one to buy and its picture, and whether it fits the budget (the first number in it): those that do first.
 const budget = num((/\d[\d.,]*/.exec(String(input.budget || '')) || [''])[0].replace(/,(?=\d{3}\b)/g, ''));
 const picks = rows(input.picks);
+const media = list(input.media && input.media.items);
 const link = (v) => (/^https?:\/\/\S+$/.test(String(v || '').trim()) ? String(v).trim() : null);
 const ideas = rows(input.ideas).map((x, i) => {
   const p = picks.find((q) => Number(q.n) === i + 1) || {};
+  const m = media[i] && typeof media[i] === 'object' ? media[i] : {};
   const low = num(x.low);
   const high = num(x.high);
   const price = num(p.price);
   const cost = price !== null ? price : low;
-  return { idea: String(x.idea || ''), kind: String(x.kind || ''), why: String(x.why || ''), low, high, example: String(p.example || ''), price, shop: String(p.shop || ''), link: link(p.link), fits: budget === null || cost === null ? true : cost <= budget * 1.05, at: i };
+  return { idea: String(x.idea || ''), kind: String(x.kind || ''), why: String(x.why || ''), low, high, example: String(p.example || ''), price, shop: String(p.shop || ''), link: link(p.link), fits: budget === null || cost === null ? true : cost <= budget * 1.05, picture: link(m.picture), at: i };
 });
 ideas.sort((a, b) => Number(b.fits) - Number(a.fits) || a.at - b.at);
 const fit = ideas.filter((x) => x.fits).length;
@@ -1918,7 +1973,7 @@ return { ideas: ideas.map(({ at, ...x }) => x), budget, summary: String(input.ap
       { id: 'currency', label: 'Currency', type: 'text' },
     ],
     examples: [
-      { id: 'a-gardener', name: 'A gardener who has everything', inputs: { who: 'My dad, 65, loves gardening and jazz, has everything', occasion: 'Birthday', budget: '€60' }, checks: ['{{answer.ideas}} is not empty', '{{answer.budget}} = 60'] },
+      { id: 'a-gardener', name: 'A gardener who has everything', inputs: { who: 'My dad, 65, loves gardening and jazz, has everything', occasion: 'Birthday', budget: '€60' }, checks: ['{{answer.ideas}} is not empty', '{{answer.budget}} = 60', '{{media.data.pictures}} > 0'] },
       { id: 'a-teenager', name: 'A teenager into games', inputs: { who: 'My niece, 15, into video games and drawing', budget: '$40', region: 'the US' }, checks: ['{{answer.ideas}} is not empty'] },
     ],
   },
@@ -1929,7 +1984,7 @@ return { ideas: ideas.map(({ at, ...x }) => x), budget, summary: String(input.ap
     icon: 'clapperboard',
     color: 'violet',
     category: 'Fun',
-    description: 'Films and shows picked for your mood tonight, with where each streams in your country, its rating, a picture and why it fits.',
+    description: 'Films and shows picked for your mood tonight, with where each streams in your country, its rating, its picture and trailer, and why it fits.',
     fields: [
       { id: 'mood', label: 'In the mood for', type: 'text', required: true, placeholder: 'e.g. Something funny and light, or a gripping thriller' },
       { id: 'kind', label: 'Film or show', type: 'choice', options: ['Either', 'A film', 'A show'], default: 'Either' },
@@ -1960,8 +2015,10 @@ return { ideas: ideas.map(({ at, ...x }) => x), budget, summary: String(input.ap
           with: { picks: '{{pick.picks}}', country: '{{country}}' },
           code:
             LIST +
-            String.raw`// For each pick: where to find more about it (TVmaze for a show, Wikipedia for a film) and the search for where it streams.
-const items = rows(input.picks).slice(0, 6).map((p) => {
+            String.raw`// For each pick: where to find more about it (TVmaze for a show, Wikipedia for a film) and the search for where it streams;
+// and its title with its year in brackets, which finds its own trailer and not another's of the same name.
+const picks = rows(input.picks).slice(0, 6);
+const items = picks.map((p) => {
   const show = /show|series/i.test(String(p.kind || ''));
   const title = String(p.title || '').trim();
   const info = show
@@ -1969,10 +2026,20 @@ const items = rows(input.picks).slice(0, 6).map((p) => {
     : 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrlimit=1&prop=pageimages|description|info&inprop=url&piprop=thumbnail&pithumbsize=400&gsrsearch=' + encodeURIComponent(title + ' ' + (p.year || '') + ' film');
   return { title, show, info, query: title + ' ' + (p.year || '') + ' where to watch streaming ' + String(input.country || '') };
 });
-return { items };`,
-          outputs: [{ id: 'items', label: 'Look-ups', type: 'table', columns: [{ id: 'title', label: 'Title', type: 'text' }, { id: 'show', label: 'A show', type: 'yesno' }, { id: 'info', label: 'Where to find more', type: 'url' }, { id: 'query', label: 'Search', type: 'text' }] }],
+const names = picks.map((p) => {
+  const title = String(p.title || '').trim();
+  return title && num(p.year) ? title + ' (' + num(p.year) + ')' : title;
+});
+const shows = items.filter((x) => x.show).length;
+return { items, names, kind: shows && shows === items.length ? 'TV series' : shows ? 'film or TV series' : 'film' };`,
+          outputs: [
+            { id: 'items', label: 'Look-ups', type: 'table', columns: [{ id: 'title', label: 'Title', type: 'text' }, { id: 'show', label: 'A show', type: 'yesno' }, { id: 'info', label: 'Where to find more', type: 'url' }, { id: 'query', label: 'Search', type: 'text' }] },
+            { id: 'names', label: 'Titles and years', type: 'list' },
+            { id: 'kind', label: 'What they are', type: 'text' },
+          ],
           failed: 'agent',
         },
+        { id: 'media', title: 'Find their trailers', do: 'tool', tool: 'find_media', with: { items: '{{urls.names}}', kind: '{{urls.kind}}', pictures: false, videos: 'official trailer' }, failed: 'skip' },
         {
           id: 'look',
           title: 'Look each one up',
@@ -2038,20 +2105,22 @@ return {
           title: 'Put the picks together',
           do: 'code',
           language: 'javascript',
-          with: { picks: '{{pick.picks}}', look: '{{look.items}}', where: '{{streams.where}}', services: '{{services}}' },
+          with: { picks: '{{pick.picks}}', look: '{{look.items}}', where: '{{streams.where}}', media: '{{media.data}}', services: '{{services}}' },
           code:
             LIST +
-            String.raw`// Each pick with its picture, rating, where it streams and whether that is one of your services: those that are first.
+            String.raw`// Each pick with its picture, trailer, rating, where it streams and whether that is one of your services: those that are first.
 const low = (s) => String(s || '').toLowerCase().trim();
 const look = rows(input.look);
 const where = rows(input.where);
+const media = list(input.media && input.media.items);
 const picks = rows(input.picks)
   .slice(0, 6)
   .map((p, i) => {
     const l = look.find((x) => low(x.title) === low(p.title)) || look[i] || {};
     const w = where.find((x) => low(x.title) === low(p.title)) || {};
+    const m = media[i] && typeof media[i] === 'object' ? media[i] : {};
     const on = w.on_yours === true || /^(yes|true)$/i.test(String(w.on_yours));
-    return { title: String(p.title || ''), year: num(p.year), kind: /show|series/i.test(String(p.kind)) ? 'Show' : 'Film', genre: String(p.genre || ''), minutes: num(p.minutes), rating: num(l.rating), where: String(w.where || l.channel || ''), on_yours: input.services ? on : null, why: String(p.why || ''), picture: l.picture || null, link: l.link || null, at: i };
+    return { title: String(p.title || ''), year: num(p.year), kind: /show|series/i.test(String(p.kind)) ? 'Show' : 'Film', genre: String(p.genre || ''), minutes: num(p.minutes), rating: num(l.rating), where: String(w.where || l.channel || ''), on_yours: input.services ? on : null, why: String(p.why || ''), picture: l.picture || null, video: m.video || null, link: l.link || null, at: i };
   })
   .sort((a, b) => Number(!!b.on_yours) - Number(!!a.on_yours) || a.at - b.at)
   .map(({ at, ...p }) => p);
@@ -2067,7 +2136,7 @@ return { picks };`,
       { id: 'picks', label: 'Picks', type: 'table', required: true, columns: WATCH_COLS },
     ],
     examples: [
-      { id: 'light-and-funny', name: 'Light and funny', inputs: { mood: 'Something funny and light', services: 'Netflix, Prime Video', country: 'United Kingdom' }, checks: ['{{answer.picks}} is not empty', '{{answer.tonight}} is not empty'] },
+      { id: 'light-and-funny', name: 'Light and funny', inputs: { mood: 'Something funny and light', services: 'Netflix, Prime Video', country: 'United Kingdom' }, checks: ['{{answer.picks}} is not empty', '{{answer.tonight}} is not empty', '{{media.data.videos}} > 0'] },
       { id: 'a-gripping-show', name: 'A gripping show', inputs: { mood: 'A gripping mystery', kind: 'A show', seen: 'Severance, True Detective' }, checks: ['{{answer.picks}} does not contain Severance'] },
     ],
   },
@@ -2077,31 +2146,74 @@ return { picks };`,
     icon: 'gamepad',
     color: 'red',
     category: 'Fun',
-    description: 'Games picked for what you like and where you play, with why each fits and how long it takes, and for PC its best price today and its lowest ever.',
+    description: 'Games for what you like and where you play, out now or coming soon: each with its picture, its trailer and why it fits, and for PC its best price.',
     fields: [
-      { id: 'likes', label: 'What you like', type: 'long', required: true, placeholder: 'e.g. Cozy co-op games like Stardew Valley, or tense strategy' },
-      { id: 'platform', label: 'Where you play', type: 'choice', options: ['Any', 'PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Phone or tablet'], default: 'Any' },
+      { id: 'likes', label: 'What you like', type: 'long', placeholder: 'e.g. Cozy co-op games like Stardew Valley, or tense strategy. Empty: the best of them' },
+      { id: 'platform', label: 'Where you play', type: 'choice', options: ['Any', 'PC', 'PlayStation', 'Xbox', 'Nintendo Switch 2', 'Nintendo Switch', 'Phone or tablet'], default: 'Any' },
+      { id: 'when', label: 'Out now or coming', type: 'choice', options: ['Out now', 'Coming soon', 'Both'], default: 'Out now' },
       { id: 'budget', label: 'Budget', type: 'choice', options: ['Any price', 'Free to play', 'Under 20'], default: 'Any price' },
     ],
     prompt: '',
     flow: {
       steps: [
-        { id: 'scan', title: 'Search for games like these', do: 'tool', tool: 'web_search', with: { query: 'best games like {{likes}} {{platform}}', k: 10 }, failed: 'skip' },
+        {
+          id: 'ask',
+          title: 'Word the searches',
+          do: 'code',
+          language: 'javascript',
+          with: { likes: '{{likes}}', platform: '{{platform}}', today: '{{today}}' },
+          code: String.raw`// What to search for: the games out now like these, and those announced and still to come, on that platform.
+const on = input.platform && input.platform !== 'Any' ? input.platform + ' ' : '';
+const likes = String(input.likes || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+const year = Number(String(input.today || '').slice(0, 4)) || new Date().getFullYear();
+return {
+  now: (likes ? 'best ' + on + 'games like ' + likes : 'best ' + on + 'games to play right now').trim(),
+  coming: ('upcoming ' + on + 'games ' + (likes ? likes + ' ' : '') + 'release dates ' + year + ' ' + (year + 1)).trim(),
+};`,
+          outputs: [
+            { id: 'now', label: 'Out now', type: 'text' },
+            { id: 'coming', label: 'Coming soon', type: 'text' },
+          ],
+          failed: 'agent',
+        },
+        { id: 'scan', title: 'Search for games out now', do: 'tool', tool: 'web_search', if: '{{when}} = Out now or {{when}} = Both', with: { query: '{{ask.now}}', k: 10 }, failed: 'skip' },
+        { id: 'coming', title: 'Search for games coming soon', do: 'tool', tool: 'web_search', if: '{{when}} = Coming soon or {{when}} = Both', with: { query: '{{ask.coming}}', k: 12, snippets: 'filtered' }, failed: 'skip' },
         {
           id: 'pick',
           title: 'Pick the games',
           do: 'model',
-          instructions: `Pick eight games for someone who likes: {{likes}}. Where they play: {{platform}}. Budget: {{budget}}. Only games out now, on that platform; good ones, not only the famous ones. Today is {{today}}.
+          instructions: `Pick eight games for someone who likes: {{likes}}{{^likes}}anything (they did not say: pick the best and most talked-about){{/likes}}. Where they play: {{platform}}. Budget: {{budget}}. Today is {{today}}.
+
+Which games: {{when}}. Out now: only games already out on that platform. Coming soon: only games announced for it and not out yet (none that is only a rumour), the soonest first. Both: four of each, those out now first. Good ones, not only the famous ones.
 
 {{scan.text}}
 
-- games: each its title, year, genre, the platforms it is on, about how many hours its main part takes, why it fits in a sentence, and whether it is free to play.
+{{coming.text}}
+
+- games: each its title as its makers write it, the year it came or comes out, for one not out yet when it comes (its date, or the month or season the sources give: "12 Feb 2027", "Spring 2027"; empty for one out now), whether it is still to come, its genre, the platforms it is on, about how many hours its main part takes (empty when not known), why it fits in a sentence, and whether it is free to play.
 - summary: the picks in a sentence.`,
           outputs: [
-            { id: 'games', label: 'Games', type: 'table', required: true, columns: [{ id: 'title', label: 'Game', type: 'text' }, { id: 'year', label: 'Year', type: 'number' }, { id: 'genre', label: 'Genre', type: 'text' }, { id: 'platforms', label: 'Plays on', type: 'text' }, { id: 'hours', label: 'Hours', type: 'number' }, { id: 'why', label: 'Why', type: 'text' }, { id: 'free', label: 'Free to play', type: 'yesno' }] },
+            {
+              id: 'games',
+              label: 'Games',
+              type: 'table',
+              required: true,
+              columns: [
+                { id: 'title', label: 'Game', type: 'text' },
+                { id: 'year', label: 'Year', type: 'number' },
+                { id: 'out', label: 'Comes out', type: 'text' },
+                { id: 'coming', label: 'Coming soon', type: 'yesno' },
+                { id: 'genre', label: 'Genre', type: 'text' },
+                { id: 'platforms', label: 'Plays on', type: 'text' },
+                { id: 'hours', label: 'Hours', type: 'number' },
+                { id: 'why', label: 'Why', type: 'text' },
+                { id: 'free', label: 'Free to play', type: 'yesno' },
+              ],
+            },
             { id: 'summary', label: 'In short', type: 'text', required: true },
           ],
         },
+        { id: 'media', title: 'Find their pictures and trailers', do: 'tool', tool: 'find_media', with: { items: '{{pick.games}}', name: 'title', kind: 'video game', videos: 'trailer' }, failed: 'skip' },
         {
           id: 'deals',
           title: 'Check PC prices',
@@ -2116,10 +2228,11 @@ return { picks };`,
               title: 'Check its price',
               do: 'code',
               language: 'javascript',
-              with: { title: '{{game.title}}' },
+              with: { title: '{{game.title}}', coming: '{{game.coming}}' },
               code:
                 BODY +
-                String.raw`// The game at CheapShark (PC stores): its best price now, the store, and the lowest it has ever been.
+                String.raw`// The game at CheapShark (PC stores): its best price now, the store, and the lowest it has ever been. One still to come has none.
+if (input.coming === true || /^(yes|true)$/i.test(String(input.coming))) return { title: input.title, found: false };
 const STORES = { 1: 'Steam', 2: 'GamersGate', 3: 'GreenManGaming', 7: 'GOG', 11: 'Humble Store', 13: 'Ubisoft Store', 15: 'Fanatical', 21: 'WinGameStore', 23: 'GameBillet', 25: 'Epic Games Store', 27: 'Gamesplanet', 28: 'Gamesload', 30: 'IndieGala', 35: 'DreamGame' };
 const headers = { 'User-Agent': '${UA}' };
 const plain = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -2156,17 +2269,23 @@ return {
           title: 'Put the list together',
           do: 'code',
           language: 'javascript',
-          with: { games: '{{pick.games}}', deals: '{{deals.items}}', budget: '{{budget}}' },
+          with: { games: '{{pick.games}}', deals: '{{deals.items}}', media: '{{media.data}}', budget: '{{budget}}' },
           code:
             LIST +
-            String.raw`// Each game with its price where one was found; with a budget, those within it first.
+            String.raw`// Each game with its picture and trailer, and its price where one was found; with a budget, those within it first.
 const deals = list(input.deals);
+const media = list(input.media && input.media.items);
 const yes = (v) => v === true || /^(yes|true)$/i.test(String(v));
 const games = rows(input.games).map((g, i) => {
   const d = deals[i] && deals[i].found ? deals[i] : {};
-  return { title: String(g.title || ''), year: num(g.year), genre: String(g.genre || ''), platforms: String(g.platforms || ''), hours: num(g.hours), why: String(g.why || ''), free: yes(g.free), price: num(d.price), lowest: num(d.lowest), store: String(d.store || ''), deal: d.deal || null, picture: d.picture || null, at: i };
+  const m = media[i] && typeof media[i] === 'object' ? media[i] : {};
+  const coming = yes(g.coming);
+  return {
+    title: String(g.title || ''), year: num(g.year), out: coming ? String(g.out || '') : '', coming, genre: String(g.genre || ''), platforms: String(g.platforms || ''), hours: num(g.hours), why: String(g.why || ''), free: yes(g.free),
+    price: num(d.price), lowest: num(d.lowest), store: String(d.store || ''), deal: d.deal || null, picture: m.picture || d.picture || null, video: m.video || null, at: i,
+  };
 });
-const within = (g) => (input.budget === 'Free to play' ? g.free : input.budget === 'Under 20' ? g.free || (g.price !== null && g.price < 20) : true);
+const within = (g) => (input.budget === 'Free to play' ? g.free : input.budget === 'Under 20' ? g.free || g.coming || (g.price !== null && g.price < 20) : true);
 games.sort((a, b) => Number(within(b)) - Number(within(a)) || a.at - b.at);
 return { games: games.map(({ at, ...g }) => g) };`,
           outputs: [{ id: 'games', label: 'Games', type: 'table', columns: GAME_COLS }],
@@ -2182,6 +2301,7 @@ return { games: games.map(({ at, ...g }) => g) };`,
     examples: [
       { id: 'cozy-co-op', name: 'Cozy co-op on PC', inputs: { likes: 'Cozy co-op games like Stardew Valley', platform: 'PC' }, checks: ['{{answer.games}} is not empty'] },
       { id: 'switch-for-kids', name: 'Switch games for kids', inputs: { likes: 'Fun games for an 8-year-old, no violence', platform: 'Nintendo Switch' }, checks: ['{{answer.games}} is not empty', '{{deals.count}} is empty'] },
+      { id: 'coming-to-switch-2', name: 'Coming to Switch 2', inputs: { platform: 'Nintendo Switch 2', when: 'Coming soon' }, checks: ['{{answer.games}} is not empty', '{{scan.text}} is empty'] },
     ],
   },
   {
@@ -2498,6 +2618,7 @@ Search results:
             { id: 'summary', label: 'In short', type: 'text', required: true },
           ],
         },
+        { id: 'media', title: 'Find their pictures', do: 'tool', tool: 'find_media', with: { items: '{{events.events}}', name: 'name', page: 'url', kind: 'event in {{spot.name}}' }, failed: 'skip' },
         {
           id: 'where',
           title: 'Plan the map',
@@ -2518,14 +2639,15 @@ return { items };`,
           title: 'Lay out the days',
           do: 'code',
           language: 'javascript',
-          with: { events: '{{events.events}}', found: '{{locate.items}}', weather: '{{weather}}', from: '{{dates.from}}', to: '{{dates.to}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}' },
+          with: { events: '{{events.events}}', found: '{{locate.items}}', media: '{{media.data}}', weather: '{{weather}}', from: '{{dates.from}}', to: '{{dates.to}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}' },
           code:
             LIST +
             BODY +
             SKY +
-            String.raw`// The events on those days in order, each on the map when its venue was found near the city (within 30 km); and each
-// day with its weather.
+            String.raw`// The events on those days in order, each with its picture, and on the map when its venue was found near the city
+// (within 30 km); and each day with its weather.
 const found = list(input.found);
+const media = list(input.media && input.media.items);
 const day = (v) => (/^\d{4}-\d{2}-\d{2}/.exec(String(v || '')) || [''])[0];
 const near = (a, b) => Math.hypot((a - Number(input.lat)) * 111, (b - Number(input.lng)) * 111 * Math.cos((Number(input.lat) * Math.PI) / 180)) < 30;
 const link = (v) => (/^https?:\/\/\S+$/.test(String(v || '').trim()) ? String(v).trim() : null);
@@ -2534,7 +2656,8 @@ const events = rows(input.events)
   .map((e, i) => {
     const f = (((bodyOf(found[i]) || {}).features || [])[0] || {}).geometry;
     const c = f && Array.isArray(f.coordinates) && near(f.coordinates[1], f.coordinates[0]) ? f.coordinates : null;
-    return { name: String(e.name || ''), date: day(e.date) || input.from, time: String(e.time || ''), venue: String(e.venue || ''), kind: String(e.kind || 'Other'), price: String(e.price || ''), why: String(e.why || ''), url: link(e.url), lat: c ? c[1] : null, lng: c ? c[0] : null };
+    const m = media[i] && typeof media[i] === 'object' ? media[i] : {};
+    return { name: String(e.name || ''), date: day(e.date) || input.from, time: String(e.time || ''), venue: String(e.venue || ''), kind: String(e.kind || 'Other'), price: String(e.price || ''), why: String(e.why || ''), url: link(e.url), lat: c ? c[1] : null, lng: c ? c[0] : null, picture: link(m.picture) };
   })
   .filter((e) => e.name && e.date >= input.from && e.date <= input.to)
   .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));

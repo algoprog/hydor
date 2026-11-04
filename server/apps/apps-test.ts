@@ -28,7 +28,7 @@ import { publicRunOf, publicRunPrompt } from './publicRun.ts';
 import { runInstructions, saveResult, startRun, startRuns } from './runs.ts';
 import * as store from './store.ts';
 import { TEMPLATES } from './templates.ts';
-import { intake, usableApps, useNote } from './use.ts';
+import { appForMessage, appHint, intake, usableApps, useNote } from './use.ts';
 import { byWords, dropAppIndex, findApps, stem } from './search.ts';
 import { addModels, modelStates, needModels, setModelsHere } from './models.ts';
 import { missingSecrets, needSecrets, saveAppSecrets, secretsOf } from './secrets.ts';
@@ -273,7 +273,7 @@ test('ready-made apps: each recipe, flow, view and set of examples cleans up wit
       for (const c of e.checks ?? []) assert.ok(!('error' in readRule(c)), `${t.id}, example ${e.id}: its check “${c}” reads`);
       assert.ok((e.checks ?? []).length, `${t.id}, example ${e.id}: has a check`);
     }
-    for (const f of t.answer) assert.ok((f.columns ?? []).length <= 12, `${t.id}: ${f.id} has at most twelve columns`);
+    for (const f of t.answer) assert.ok((f.columns ?? []).length <= 16, `${t.id}: ${f.id} has at most sixteen columns`);
   }
   assert.ok(kinds.size <= 12, `at most twelve kinds of app, not ${[...kinds].join(', ')}`);
 });
@@ -951,6 +951,31 @@ test('find_apps: the best fits for a few words (by words while search by meaning
   assert.match(JSON.stringify(await findTool('claude:finder').run({ query: ' ' }, sessionCtx('claude:finder'))), /isError/);
   for (const a of [weather, chef]) store.deleteApp(db, a.id);
   dropAppIndex();
+});
+
+test('a message one app clearly does: the agent hears which, with its form; a close call, a command or a word or two gets nothing; every app is named while there are not too many', async () => {
+  dropAppIndex();
+  // Among the ready-made ones (other tests leave apps of their own behind).
+  const own = usableApps(db).filter((u) => u.own);
+  for (const u of own) store.deleteApp(db, u.app);
+  dropAppIndex();
+  assert.equal(appForMessage(db, 'best upcoming games for switch 2')?.app, 'tpl:game-finder');
+  assert.equal(appForMessage(db, 'plan a 4 day trip to Lisbon')?.app, 'tpl:trip-planner');
+  assert.equal(appForMessage(db, 'write a cover letter for this job')?.app, 'tpl:cover-letter');
+  // Words alone would take these for another app (the Weekly news digest, Gift ideas): too close to call, so nothing.
+  assert.equal(appForMessage(db, "what's the weather in Athens this week"), null);
+  assert.equal(appForMessage(db, 'recipe ideas with chicken and rice'), null);
+  assert.equal(appForMessage(db, 'fix the bug in server/index.ts'), null);
+  assert.equal(appForMessage(db, 'thanks!'), null);
+  assert.equal(appForMessage(db, '/goal best upcoming games for switch 2'), null);
+  const hint = appHint(db, 'best upcoming games for switch 2')!;
+  assert.match(hint, /^This message looks like a job for one of the user's apps: "game-finder": Game finder \(ready-made\) — /);
+  assert.match(hint, /Asks likes\?: long text, platform\?: Any \| PC/);
+  assert.match(hint, /run it with use_app/);
+  // The start-up note: the few run most with what they do, then the others by name.
+  const note = useNote(db)!;
+  assert.match(note, /see whether one of their \d+ apps does it/);
+  assert.match(note, /The others: .*"game-finder" \(Game finder\)|"game-finder": Game finder/);
 });
 
 test('use_app: what the request lacks is asked on the app’s own card (optional ones may stay empty); it runs with a card in the conversation and the call gives its answer', async () => {

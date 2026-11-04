@@ -30,6 +30,7 @@ import { checkDaily } from './api.ts';
 import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
+import { takeInAnswer } from './media.ts';
 import { getApp, getRun, getStep, listSteps, removeSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
 
 /** Public runs' throwaway folders (as for one-step public runs). */
@@ -975,6 +976,19 @@ function replyOf(ended: Exec['ended']): string | undefined {
   return (pick(['agent', 'app'], 'reply') ?? pick(['model'], 'text'))?.slice(0, 60_000);
 }
 
+/**
+ * The pictures an answer shows, kept here as an agent's handed-in answer has them kept (media.ts): a copy of each one
+ * on the web, so it shows wherever the answer does and lasts. A public run's stay links (its visitors' runs fetch
+ * nothing here); what cannot be kept stays as it was.
+ */
+async function kept(x: Exec, recipe: AppRecipe, value: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    return (await takeInAnswer(db(), recipe.answer, value, { cwd: x.folder, local: !x.pub })).value;
+  } catch {
+    return value;
+  }
+}
+
 async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'stopped', error?: string) {
   execs.delete(x.run.id);
   const recipe: AppRecipe = x.run.recipe;
@@ -986,7 +1000,7 @@ async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'st
     // Its outputs say where answer fields come from; the rest come by name, from the last step that gave one.
     const raw = { ...byName(recipe.answer, x.ended), ...Object.fromEntries(Object.entries(x.flow.outputs ?? {}).map(([k, v]) => [k, valueOf(v, scope)])) };
     const c = checkAnswer(recipe.answer, raw);
-    if (c.ok) result = c.value;
+    if (c.ok) result = await kept(x, recipe, c.value);
     else {
       status = 'failed';
       error = `The steps ended without what the app gives back: ${c.errors.join('; ')}`;

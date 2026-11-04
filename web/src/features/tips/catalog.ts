@@ -35,7 +35,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   sources: {
     title: 'Where the answer came from',
-    body: 'Sources lists the pages the agent read and the searches it ran for this reply, with links.',
+    body: 'Sources lists the pages this reply cites. The small site names in its text link to them too.',
   },
   'files-made': {
     title: 'Files the agent made',

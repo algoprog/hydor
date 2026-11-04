@@ -1,7 +1,6 @@
 // Web search, as the server and the pages share it: the providers as Settings shows them, Naget
-// Search's allowance, the sources a turn used, and the text web_search and read_page answer with. The
-// server writes that text for the model; the pages read it back to draw the results, so the agent's own
-// transcript stays the one record of a search.
+// Search's allowance, and the text web_search and read_page answer with. The server writes that text for the
+// model; the pages read it back to draw the results, so the agent's own transcript stays the one record of a search.
 
 export const SEARCH_TOOL = 'web_search';
 export const READ_TOOL = 'read_page';
@@ -68,12 +67,6 @@ export interface SearchTestResult {
   count?: number;
   sample?: { title: string; url: string }[];
   error?: string;
-}
-
-/** The sources one turn used, kept as a note on the conversation (kind "sources"). */
-export interface SourcesData {
-  searches: { query: string; provider: string; count: number; top: { title: string; url: string }[] }[];
-  pages: { url: string; title?: string; question?: string }[];
 }
 
 /** News the server sends the pages (feature id "search"). */

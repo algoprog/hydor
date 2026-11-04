@@ -164,7 +164,7 @@ export async function beforeSend(key: string) {
 }
 
 /** What the capabilities have for the agent with this message, as one block ('' for nothing). */
-export function messageNotes(key: string): string {
+export async function messageNotes(key: string, text = ''): Promise<string> {
   if (!deps) return '';
   const parts: string[] = [];
   for (const f of list) {
@@ -173,6 +173,13 @@ export function messageNotes(key: string): string {
       if (t?.trim()) parts.push(t.trim());
     } catch (e) {
       warn(f, 'beforeMessage', e);
+    }
+    if (!f.aboutMessage || !text.trim()) continue;
+    try {
+      const t = await f.aboutMessage(text, key, deps);
+      if (t?.trim()) parts.push(t.trim());
+    } catch (e) {
+      warn(f, 'aboutMessage', e);
     }
   }
   return parts.join('\n\n');

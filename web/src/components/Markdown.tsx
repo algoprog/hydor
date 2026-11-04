@@ -5,6 +5,8 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { Check, Copy } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
+import { CITE_RUN, citedReply, citeNumbers, type Cited } from '@shared/citations';
+import { CiteChip, SourcesRow } from './Citations';
 import { cx } from './ui';
 import { goApp, openFile } from '../lib/nav';
 import { joinPath } from '../lib/format';
@@ -254,6 +256,31 @@ const components: Components = {
 
 const katexOpts = { throwOnError: false, strict: 'ignore' as const, output: 'html' as const };
 
+/** A citing number's chip (remarkCites), and a link whose words are only a number ("[3](https://…)") as one too. */
+function citeComponents(cites: Map<number, Cited>, link: Components['a']): Components {
+  const Link = link!;
+  return {
+    sup({ node, children, ...props }: any) {
+      const nums = String(props['data-cite'] ?? '')
+        .split(',')
+        .map(Number)
+        .filter((n) => cites.has(n));
+      if (!nums.length) return <sup {...props}>{children}</sup>;
+      return <CiteChip sources={nums.map((n) => cites.get(n)!)} />;
+    },
+    a(props: any) {
+      const words = hastText(props.node).trim();
+      const n = /^\[?(\d{1,3})\]?$/.exec(words)?.[1];
+      const href = String(props.href ?? '');
+      if (n && /^https?:\/\//i.test(href)) {
+        const known = cites.get(Number(n));
+        return <CiteChip sources={[known && known.url === href ? known : { n: Number(n), title: '', url: href }]} />;
+      }
+      return <Link {...props} />;
+    },
+  };
+}
+
 /**
  * While text streams, each word becomes its own span: React keeps the spans it already
  * rendered, so only words that just arrived mount and fade in (see .sw in styles.css).
@@ -305,6 +332,40 @@ function remarkLineBreaks() {
   return (tree: any) => visit(tree);
 }
 
+/**
+ * A reply's citing numbers ("[1][12]", "[3, 4]") as one chip each, for the numbers its sources have (shared/citations.ts);
+ * not inside code, links or maths. The chip is a <sup data-cite="1,12"> that `sup` below draws.
+ */
+function remarkCites(o: { known: Set<number> }) {
+  const SKIP = new Set(['link', 'linkReference', 'inlineCode', 'code', 'definition', 'math', 'inlineMath', 'html']);
+  const visit = (node: any) => {
+    if (!node.children || SKIP.has(node.type)) return;
+    const out: any[] = [];
+    for (const child of node.children) {
+      if (child.type !== 'text' || !child.value.includes('[')) {
+        visit(child);
+        out.push(child);
+        continue;
+      }
+      const v: string = child.value;
+      let at = 0;
+      for (const m of v.matchAll(CITE_RUN)) {
+        const nums = citeNumbers(m[0]).filter((n) => o.known.has(n));
+        if (!nums.length) continue;
+        // The space before it goes: the chip keeps its own.
+        const before = v.slice(at, m.index).replace(/[ \t]+$/, '');
+        if (before) out.push({ type: 'text', value: before });
+        out.push({ type: 'cite', data: { hName: 'sup', hProperties: { dataCite: nums.join(',') }, hChildren: [{ type: 'text', value: m[0] }] } });
+        at = m.index! + m[0].length;
+      }
+      if (!at) out.push(child);
+      else if (at < v.length) out.push({ type: 'text', value: v.slice(at) });
+    }
+    node.children = out;
+  };
+  return (tree: any) => visit(tree);
+}
+
 const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: true }]] as any;
 const remarkBreaks = [...remarkPlugins, remarkLineBreaks] as any;
 const rehypePlugins = [[rehypeKatex, katexOpts]] as any;
@@ -328,6 +389,7 @@ export const Markdown = memo(function Markdown({
   breaks,
   app,
   headingIds,
+  cites,
 }: {
   text: string;
   className?: string;
@@ -342,42 +404,65 @@ export const Markdown = memo(function Markdown({
   app?: boolean;
   /** The ids its headings take, in order (a translated guide topic: the English ones). */
   headingIds?: string[];
+  /** A reply's sources by the numbers it cites them by: each citing number shows as a chip that links to its page. */
+  cites?: Map<number, Cited>;
 }) {
   const src = useMemo(() => normalizeMath(text, !notebook), [text, notebook]);
-  const comps = useMemo<Components>(
-    () =>
-      resolveImage
-        ? {
-            ...components,
-            a: makeLink(baseDir, app),
-            img({ src: from, alt, width, height, align }: any) {
-              const url = resolveImage(String(from ?? ''));
-              // `align="left|right"` (old HTML that READMEs still use) floats the image beside the text.
-              const float = align === 'left' || align === 'right' ? { float: align, margin: align === 'right' ? '0 0 8px 16px' : '0 16px 8px 0' } : undefined;
-              if (url) return <img src={url} alt={alt ?? ''} width={width} height={height} style={float as React.CSSProperties | undefined} />;
-              return (
-                <a href={String(from ?? '')} target="_blank" rel="noopener noreferrer">
-                  {alt || 'image'} ↗
-                </a>
-              );
-            },
-          }
-        : { ...components, a: makeLink(baseDir, app) },
-    [resolveImage, baseDir, app],
-  );
+  const comps = useMemo<Components>(() => {
+    const base: Components = {
+      ...components,
+      a: makeLink(baseDir, app),
+      ...(cites ? citeComponents(cites, makeLink(baseDir, app)) : {}),
+    };
+    return resolveImage
+      ? {
+          ...base,
+          img({ src: from, alt, width, height, align }: any) {
+            const url = resolveImage(String(from ?? ''));
+            // `align="left|right"` (old HTML that READMEs still use) floats the image beside the text.
+            const float = align === 'left' || align === 'right' ? { float: align, margin: align === 'right' ? '0 0 8px 16px' : '0 16px 8px 0' } : undefined;
+            if (url) return <img src={url} alt={alt ?? ''} width={width} height={height} style={float as React.CSSProperties | undefined} />;
+            return (
+              <a href={String(from ?? '')} target="_blank" rel="noopener noreferrer">
+                {alt || 'image'} ↗
+              </a>
+            );
+          },
+        }
+      : base;
+  }, [resolveImage, baseDir, app, cites]);
+  const remark = useMemo(() => {
+    const list = breaks ? remarkBreaks : remarkPlugins;
+    return cites?.size ? [...list, [remarkCites, { known: new Set(cites.keys()) }]] : list;
+  }, [breaks, cites]);
   const rehype = useMemo(
     () => [...(rehypeExtra ?? []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir || app ? [[rehypeHeadingIds, { ids: headingIds }]] : [])],
     [rehypeExtra, streaming, baseDir, app, headingIds],
   );
   return (
     <div className={cx('md', className)}>
-      <ReactMarkdown remarkPlugins={breaks ? remarkBreaks : remarkPlugins} rehypePlugins={rehype} components={comps}>
+      <ReactMarkdown remarkPlugins={remark} rehypePlugins={rehype} components={comps}>
         {src}
       </ReactMarkdown>
       {children}
     </div>
   );
 });
+
+/**
+ * An agent's reply: the sources it cites as chips in its text and one Sources line under it, instead of the list it
+ * ends with (shared/citations.ts). While it is still coming (`streaming`), the line waits for its end.
+ */
+export function ReplyMarkdown({ text, streaming, ...rest }: Omit<Parameters<typeof Markdown>[0], 'cites'>) {
+  const cited = useMemo(() => citedReply(text, { streaming }), [text, streaming]);
+  const cites = useMemo(() => (cited.sources.length ? new Map(cited.sources.map((s) => [s.n, s])) : undefined), [cited]);
+  return (
+    <>
+      <Markdown text={cited.body} cites={cites} streaming={streaming} {...rest} />
+      {!streaming && cited.sources.length > 0 && <SourcesRow sources={cited.sources} />}
+    </>
+  );
+}
 
 /**
  * Text that arrives in bursts, revealed at an even pace a few words at a time, so it reads
