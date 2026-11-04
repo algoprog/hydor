@@ -15,9 +15,9 @@ import Fastify from 'fastify';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { images } from '../images/index.ts';
-import { paramsOf } from '../images/openrouter.ts';
-import { imageForm, videoCost, videoDefaults, videoForm, videoMismatch } from '../images/settings.ts';
-import { perSecondFor, skusOf, timing, videoModel } from '../images/video.ts';
+import { paramsOf, PREFERRED } from '../images/openrouter.ts';
+import { imageDefaults, imageForm, videoCost, videoDefaults, videoForm, videoMismatch } from '../images/settings.ts';
+import { perSecondFor, PREFERRED_VIDEO, skusOf, timing, videoModel } from '../images/video.ts';
 import { loadConfig, saveConfig } from '../models/config.ts';
 import { readCaption, titleFrom } from './caption.ts';
 import { frameGrid, hasFfmpeg, probe } from './frames.ts';
@@ -218,6 +218,37 @@ const until = async (cond: () => boolean, ms = 8000) => {
   ok(!('count' in im), 'no count where the model makes one');
   const rc = imageForm({ id: 'r', label: 'R', textOut: false, edits: false, params: paramsOf(IMAGE_API[1].supported_parameters) }, {});
   ok(rc.count.maximum === 4 && rc.transparent.type === 'boolean' && rc.aspect.oneOf.some((x: any) => x.const === 'auto'), 'how many, a transparent background, auto shape');
+
+  // The app's first choices, ByteDance's Seedream 5.0 and Seedance 2.5, as OpenRouter lists them: read like any other.
+  ok(PREFERRED.slice(0, 2).join() === 'bytedance-seed/seedream-5-0-pro,bytedance-seed/seedream-5-0-flash' && PREFERRED_VIDEO[0] === 'bytedance/seedance-2.5', 'the app’s first choices');
+  const sp = paramsOf({
+    resolution: { type: 'enum', values: ['1K', '2K'] },
+    aspect_ratio: { type: 'enum', values: ['1:1', '1:2', '2:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '9:19.5', '19.5:9', '9:20', '20:9', '9:21', '21:9', 'auto'] },
+    n: { type: 'range', min: 1, max: 1 },
+    input_references: { type: 'range', min: 0, max: 14 },
+    seed: { type: 'boolean' },
+  });
+  const seedream = { id: 'bytedance-seed/seedream-5-0-pro', label: 'Seedream 5.0 Pro', textOut: false, edits: true, maxRefs: 14, params: sp.filter((p) => p.id !== 'input_references') };
+  const sd = imageDefaults(seedream);
+  const sf = imageForm(seedream, sd);
+  ok(sd.aspect === '1:1' && sd.size === '1K' && sd.count === undefined && sf.size.oneOf.length === 2 && !('count' in sf) && !('transparent' in sf), `Seedream 5.0: 1K or 2K, one at a time: ${JSON.stringify(sd)}`);
+  ok(sf.aspect.oneOf.some((x: any) => x.const === 'auto') && !sf.aspect.oneOf.some((x: any) => x.const === '9:19.5'), 'its shapes, the odd ones left off the form');
+  const dance = videoModel({
+    id: 'bytedance/seedance-2.5',
+    name: 'ByteDance: Seedance 2.5',
+    created: 1786141253,
+    supported_resolutions: ['480p', '720p'],
+    supported_aspect_ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9'],
+    supported_durations: Array.from({ length: 27 }, (_, i) => i + 4),
+    supported_frame_images: ['first_frame', 'last_frame'],
+    generate_audio: true,
+    seed: true,
+    pricing_skus: { video_tokens: '0.0000107', video_tokens_without_audio: '0.0000107', video_tokens_with_video_input: '0.0000064' },
+  });
+  ok(dance.durations[0] === 4 && dance.durations[dance.durations.length - 1] === 30 && dance.resolutions.join() === '480p,720p' && dance.audio && dance.frames.join() === 'first_frame,last_frame' && !dance.videoIn, 'Seedance 2.5: 4 to 30 seconds, 480p or 720p, sound, first and last frames');
+  ok(Math.abs((perSecondFor(dance, '720p', true) ?? 0) - 0.0000107 * ((1280 * 720 * 24) / 1024)) < 1e-9 && dance.perSecond! < dance.perSecondMax!, `its price a second, by the video token: ${perSecondFor(dance, '720p', true)}`);
+  const df = videoForm(dance, videoDefaults(dance));
+  ok(df.duration.type === 'integer' && df.duration.minimum === 4 && df.duration.maximum === 30 && videoDefaults(dance).duration === 5 && df.audio.type === 'boolean', 'its form: a length from 4 to 30 seconds, and sound');
 }
 
 // ---- generate_image ------------------------------------------------------------------------------------
