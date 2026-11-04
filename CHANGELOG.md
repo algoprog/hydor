@@ -3,6 +3,25 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.28.0 · 4 November 2026
+
+Computer use on Windows and Linux too, a glow around the screen while an agent is at it, and Esc to stop it.
+
+- **A glow while an agent uses your computer**: the edges of every display light up in the app's water colours,
+  and a note at the bottom says an agent is using your Mac (your PC, your computer) and that Esc stops it. Clicks go
+  through it and it never takes the keyboard. It is for you only: the agent's screenshots never show it.
+- **Esc stops the agent**: press Esc in any app while an agent uses the computer (⌘⇧Esc still works on a Mac).
+  When the agent presses Escape itself, to close a dialog say, that does not stop it.
+- **Computer use on Windows**: agents see the PC's screen and use its mouse and keyboard in any app, type in any
+  language, and open apps by their names in the Start menu. There is nothing to allow in Windows: turn it on in
+  Settings → Computer use.
+- **Computer use on Linux**, on an X11 (Xorg) desktop: the same, with apps opened by the names your applications
+  menu shows, and text in any script whatever the keyboard layout. A Wayland desktop lets no app see or use the
+  others, so there Settings says so, and how to log in to an X11 session instead.
+- Settings → Computer use is the same in every desktop app: **Let agents use this computer**, macOS's permissions on
+  a Mac, and on Linux what is in the way, if anything. The card each session shows asks about your Mac, your PC or
+  your computer.
+
 ## 0.27.0 · 4 November 2026
 
 Hydor for Windows and Linux: desktop apps beside the Mac one, that bring everything they need and keep themselves up
