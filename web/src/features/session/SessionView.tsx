@@ -25,6 +25,7 @@ import { FindBar } from './FindBar';
 import { FeatureDock, sessionPaneOf, useSessionSide, type SessionPane } from '../registry';
 import { useSessionShow, type SessionShow } from './show';
 import { LOCALE } from '../../i18n/locale';
+import { startedIn } from '../../lib/origin';
 
 function StatusPill({ s }: { s: SessionSummary }) {
   const a = activityOf(s);
@@ -392,18 +393,6 @@ function CommandsList({ s, version }: { s: SessionSummary; version: number }) {
   );
 }
 
-const SOURCES: Record<string, string> = {
-  'claude-vscode': 'VS Code',
-  vscode: 'VS Code',
-  cli: 'Terminal',
-  'sdk-cli': 'This app or another SDK client',
-  'sdk-ts': 'An SDK client',
-  'sdk-py': 'An SDK client',
-  exec: 'codex exec',
-  subagent: 'A sub-agent',
-  'claude-desktop': 'Claude desktop',
-};
-
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 py-2 text-[13px]">
@@ -462,7 +451,7 @@ function InfoPanel({ s }: { s: SessionSummary }) {
             </span>
           </InfoRow>
         ) : null}
-        {s.source && <InfoRow label="Started from">{SOURCES[s.source] ?? s.source}</InfoRow>}
+        {startedIn(s) && <InfoRow label="Started from">{startedIn(s)}</InfoRow>}
       </dl>
       {tasks.length > 0 && (
         <div className="mt-4">

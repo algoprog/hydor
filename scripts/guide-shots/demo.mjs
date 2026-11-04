@@ -390,6 +390,47 @@ export function makeSessions(home, projects, now, { shop, blog }) {
   return out;
 }
 
+/**
+ * Sessions Alex had before Hydor, which it lists too: the shop's phone app, worked on with Codex in VS Code and once
+ * with Claude Code in a terminal. Their folder's group is marked with where they came from. (Alex's other sessions
+ * count as started in Hydor: run.mjs says so in the app's data.)
+ */
+export function makeImported(home, codexHome, projects, now) {
+  const cwd = path.join(home, 'code/shop-app');
+  write(path.join(cwd, 'README.md'), "# Shop app\n\nThe shop's phone app: products, cart and orders.\n");
+  const out = {};
+  const codex = [
+    ['badge', 20 * HOUR, 'The cart badge shows the wrong count after removing an item. Fix it.', 'Fixed: the badge now counts what is left in the cart after a removal, and a test covers it.', 'Fix the cart badge count'],
+    ['push', 2 * DAY, 'Send a push notification when an order ships.', 'Done: shipped orders send a notification with the tracking link; you can turn them off in the app\'s settings.', 'Notify when an order ships'],
+  ];
+  for (const [name, ago, ask, answer, title] of codex) {
+    const id = uuid();
+    const t0 = now - ago;
+    const at = (ms) => new Date(t0 + ms).toISOString();
+    const lines = [
+      { timestamp: at(0), type: 'session_meta', payload: { id, timestamp: at(0), cwd, originator: 'codex_vscode', cli_version: '0.161.0', source: 'vscode', model_provider: 'openai' } },
+      { timestamp: at(500), type: 'event_msg', payload: { type: 'task_started', turn_id: `${id}-1` } },
+      { timestamp: at(600), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: ask }] } },
+      { timestamp: at(45_000), type: 'response_item', payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: answer }] } },
+      { timestamp: at(45_100), type: 'event_msg', payload: { type: 'task_complete', turn_id: `${id}-1`, duration_ms: 44_500 } },
+      { timestamp: at(45_200), type: 'event_msg', payload: { type: 'thread_name_updated', thread_name: title } },
+    ];
+    const d = new Date(t0);
+    const day = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+    write(path.join(codexHome, 'sessions', day, `rollout-${at(0).slice(0, 19).replace(/:/g, '-')}-${id}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    out[name] = { key: `codex:${id}`, cwd, at: t0 + 45_200 };
+  }
+  // Claude Code in a terminal ("cli"): its transcript says where it was started.
+  const t = new Transcript({ cwd, at: now - 3 * DAY });
+  const entry = t.entry.bind(t);
+  t.entry = (type, extra) => entry(type, { entrypoint: 'cli', ...extra });
+  t.user('Why does the app crash on startup on older Android phones?');
+  t.wait(30_000).say(['It used an API from Android 12; older phones now take another path, so it starts on Android 9 and up.'], { out: 500 });
+  t.title('Crash on older Android phones').save(projects);
+  out.android = { key: t.key, cwd, at: t.t };
+  return out;
+}
+
 // ---- through the app's own API -------------------------------------------------------------------------
 
 const PAGE = (title, body) =>

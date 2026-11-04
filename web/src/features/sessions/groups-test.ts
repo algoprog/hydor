@@ -229,6 +229,42 @@ test('ChatGPT projects\' folders (named by an id) get no group, unless Codex nam
   assert.equal(gs.filter((g) => g.kind === 'day').flatMap((g) => g.items).length, 2, 'the unnamed ChatGPT project\'s sessions go by day');
 });
 
+test('a folder none of whose sessions Hydor started says where they came from, by agent and account; one it started in does not', () => {
+  n = 0;
+  const gs = group([
+    // Codex in VS Code and a terminal, and Claude Code in its desktop app under an added account.
+    ses(`${HOME}/code/shop`, 1 * H, { agent: 'codex', source: 'vscode' }),
+    ses(`${HOME}/code/shop`, 2 * H, { agent: 'codex', source: 'cli' }),
+    ses(`${HOME}/code/shop`, 3 * H, { agent: 'codex', source: 'vscode' }),
+    ses(`${HOME}/code/shop`, 4 * H, { source: 'claude-desktop', account: 'work' }),
+    // A sub-agent's thread counts for its parent.
+    ses(`${HOME}/code/shop`, 5 * H, { agent: 'codex', source: 'subagent' }),
+    // One session started here: the folder is Hydor's too.
+    ses(`${HOME}/code/blog`, 6 * H, { source: 'cli' }),
+    ses(`${HOME}/code/blog`, 7 * H, { source: 'sdk-cli', createdByApp: true }),
+    // Started here, and active now, so outside the folder's group: it still counts.
+    ses(`${HOME}/code/notes`, 1000, { createdByApp: true }),
+    ses(`${HOME}/code/notes`, 8 * H, { source: 'claude-vscode' }),
+    ses(`${HOME}/code/notes`, 9 * H, { source: 'claude-vscode' }),
+    // An agent that did not say where it was started.
+    ses(`${HOME}/code/old`, 10 * H),
+    ses(`${HOME}/code/old`, 11 * H),
+  ]);
+  const at = (dir: string) => gs.find((g) => g.path === `${HOME}/code/${dir}`)!;
+  assert.deepEqual(at('shop').from, [
+    { agent: 'codex', account: undefined, sessions: 3, apps: ['VS Code', 'Terminal'] },
+    { agent: 'claude', account: 'work', sessions: 1, apps: ['Claude desktop'] },
+  ]);
+  assert.equal(at('blog').from, undefined);
+  assert.equal(at('notes').from, undefined);
+  assert.deepEqual(at('old').from, [{ agent: 'claude', account: undefined, sessions: 2, apps: [] }]);
+  // A space is Hydor's own.
+  n = 0;
+  const sp = group([ses(`${HOME}/code/x`, H, { extra: { space: 's1' } }), ses(`${HOME}/code/x`, 2 * H, { extra: { space: 's1' } })], { spaces: [space('s1', 'Shop')] });
+  assert.equal(sp[0].kind, 'space');
+  assert.equal(sp[0].from, undefined);
+});
+
 test('with grouping off, everything but active, pinned and snoozed goes by day, as before', () => {
   n = 0;
   const gs = group([ses(`${HOME}/code/shop`, H), ses(`${HOME}/code/shop`, 2 * H, { extra: { space: 'sp1' } })], { byFolder: false, spaces: [space('sp1', 'Thesis')] });
