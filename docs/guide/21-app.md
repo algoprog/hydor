@@ -18,8 +18,8 @@ The mode is kept in this browser, so your phone and your computer can differ. Th
 
 Under the switch, the themes show as small pictures of the app in their colours, in two rows: **Dark** and **Light**. Four come with the app:
 
-- **Hydor Dark**: warm near-black with a gold accent. The dark theme at first.
-- **Midnight**: a cool blue-black with a periwinkle accent.
+- **Hydor Dark**: pure black behind your sessions, cool blue-black panels and a periwinkle accent. The dark theme at first.
+- **Midnight**: pure black behind your sessions, warm near-black panels and a gold accent.
 - **Hydor Light**: warm off-white with a deep gold accent. The light theme at first.
 - **Sage**: a cool green-grey paper with a deep teal accent.
 

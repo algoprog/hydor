@@ -3,8 +3,8 @@
   "short_name": "Hydor",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#121110",
-  "theme_color": "#121110",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "/icon-192.png?v=4",

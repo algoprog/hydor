@@ -1380,7 +1380,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const PAGE_CSS = [
   'html,body{margin:0;padding:0}',
   'body{background:var(--n-bg,#f6f5f1);color:var(--n-fg,#1b1915);font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}',
-  'html[data-n-theme=dark] body{background:#121110;color:#f2eee7}',
+  'html[data-n-theme=dark] body{background:#000000;color:#e9edf5}',
   '.nt-top{padding:6px 12px 0}',
   '.nt-top summary{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer;color:var(--n-muted,#77736b);font-size:12px;padding:4px 0;user-select:none}',
   '.nt-top summary::-webkit-details-marker{display:none}',
