@@ -123,6 +123,8 @@ It is kept by the app, so it works with no browser open.
 - **In the Mac app**: it opens in the background when you log in to the Mac, with its icon in the menu bar and its window closed. It is on from the first time you open it from the Applications folder.
 - **Started some other way**: turning it on sets it up as a service of your user. Where that isn't possible (no systemd for your user), the line says so.
 
+While the app loads, in a browser or while the Mac app starts, its logo shows with water rising in the Ω, and the app appears as soon as it is ready.
+
 ## Keep the app up to date
 
 A copy installed from git (the installer's, or Docker's) looks for a newer version a few minutes after it starts and then once a day; the Mac app looks a minute after it opens and then every 4 hours. **About**, at the bottom of [Settings → App → General](/settings?s=general&find=Check%20now), shows the version you run and how things stand:

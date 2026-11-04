@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { Router } from 'wouter';
 import type { AppTheme } from '@shared/themes';
 import { api, onUnauthorized } from './lib/api';
+import { endBoot } from './lib/boot';
 import { machineBase, machineId } from './lib/machine';
 import { currentLang } from './i18n';
 import { useMachines } from './lib/machines';
@@ -31,6 +32,11 @@ export function App() {
     mq.addEventListener('change', applyTheme);
     return () => mq.removeEventListener('change', applyTheme);
   }, [theme, darkTheme, lightTheme, custom]);
+
+  // The logo shown while the page loads stays until it is known what to show: the app, or a sign-in.
+  useLayoutEffect(() => {
+    if (auth !== 'unknown') endBoot();
+  }, [auth]);
 
   useEffect(() => {
     api<{ setup: boolean; authenticated: boolean }>('/api/auth/state')

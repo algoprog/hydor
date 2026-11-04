@@ -484,6 +484,32 @@ const page = (body) =>
   a{color:AccentColor;margin:0 8px}</style><main>${body}</main>`);
 const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 
+// While the server starts: the logo, HYDΩR, water rising in its Ω and moving gently until the app is there, in the
+// app's colours, dark or light as the Mac is. The page the server sends opens on the same logo (web/index.html #boot),
+// its Ω already full, so the one follows the other without a jump.
+const OMEGA_D = 'M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92';
+const SEA_D = 'M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0';
+const bootPage = () =>
+  'data:text/html;charset=utf-8,' +
+  encodeURIComponent(`<!doctype html><meta charset="utf-8"><title>Hydor</title><style>
+  :root{color-scheme:light dark;--bg:#f6f5f1;--fg:#1b1915;--w1:#14b8a6;--w2:#0ea5e9;--w3:#2563eb;--ink:#0284c7}
+  @media (prefers-color-scheme:dark){:root{--bg:#000;--fg:#e9edf5;--w1:#5eead4;--w2:#38bdf8;--w3:#60a5fa;--ink:#38bdf8}}
+  html,body{height:100%;margin:0}body{display:grid;place-items:center;background:var(--bg);color:var(--fg)}
+  svg{display:block;width:min(232px,56vw);height:auto;overflow:visible}
+  .fill{transform:translateY(112px);animation:fill 1.6s cubic-bezier(.22,1,.36,1) .1s forwards}
+  .ebb{animation:ebb 3.2s ease-in-out 1.7s infinite}.bob{animation:bob 2.6s ease-in-out infinite}.swell{animation:swell 1.5s linear infinite}
+  @keyframes fill{to{transform:translateY(8px)}}@keyframes ebb{50%{transform:translateY(12px)}}
+  @keyframes bob{50%{transform:translateY(4px)}}@keyframes swell{to{transform:translateX(-36px)}}
+  @media (prefers-reduced-motion:reduce){.fill{transform:translateY(8px);animation:none}.ebb,.bob,.swell{animation:none}}
+  </style><svg viewBox="-4 -1 530 102" width="232" height="45" fill="none" stroke-width="10" role="img" aria-label="Hydor is starting"><defs>
+  <clipPath id="c"><rect x="-10" y="0" width="542" height="100"/></clipPath>
+  <mask id="m" maskUnits="userSpaceOnUse" x="-10" y="-10" width="116" height="120"><path d="${OMEGA_D}" stroke="#fff" stroke-width="10"/></mask>
+  <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="-4" x2="0" y2="96"><stop offset="0" style="stop-color:var(--w1)"/><stop offset=".55" style="stop-color:var(--w2)"/><stop offset="1" style="stop-color:var(--w3)"/></linearGradient>
+  </defs><g clip-path="url(#c)"><path d="M5 0V100M61 0V100M5 50H61" stroke="currentColor"/><path transform="translate(104 0)" d="M-1 -6L35 52L71 -6M35 52V100" stroke="currentColor"/>
+  <path transform="translate(212 0)" d="M5 0V100M5 5H30A39 45 0 0 1 30 95H5" stroke="currentColor"/><g transform="translate(324 0)"><path d="${OMEGA_D}" style="stroke:var(--ink)" opacity=".3"/>
+  <g mask="url(#m)"><g class="fill"><g class="ebb"><g class="bob"><g class="swell"><path d="${SEA_D} V130 H-72 Z" fill="url(#g)" stroke="none"/><path d="${SEA_D}" stroke="#fff" stroke-width="5" opacity=".85"/></g></g></g></g></g></g>
+  <path transform="translate(458 0)" d="M5 100V5H34A25 20 0 0 1 34 50H5M30 50L66 106" stroke="currentColor"/></g></svg>`);
+
 function openWindow(at) {
   if (!win) {
     const bounds = readJson(path.join(DATA, 'window.json')) || {};
@@ -495,7 +521,8 @@ function openWindow(at) {
       minHeight: 480,
       show: false,
       title: 'Hydor',
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#161616' : '#ffffff',
+      // The app's page colour (Hydor Dark, Hydor Light), so nothing flashes before the starting page paints.
+      backgroundColor: nativeTheme.shouldUseDarkColors ? '#000000' : '#f6f5f1',
       webPreferences: { contextIsolation: true, sandbox: true, spellcheck: true, backgroundThrottling: false },
     });
     win.webContents.setUserAgent(`${win.webContents.getUserAgent()} HydorMac/${app.getVersion()}`);
@@ -527,7 +554,7 @@ function openWindow(at) {
     });
   }
   if (at !== undefined && serverUrl) void win.loadURL(serverUrl + at);
-  else if (!serverUrl && !win.webContents.getURL()) void win.loadURL(page('<h2>Starting Hydor…</h2><p>This takes a few seconds.</p>'));
+  else if (!serverUrl && !win.webContents.getURL()) void win.loadURL(bootPage());
   app.dock?.show();
   if (win.isMinimized()) win.restore();
   win.show();
@@ -552,7 +579,7 @@ function showProblem() {
 function action(what) {
   if (what === 'retry') {
     failures = 0;
-    void win?.loadURL(page('<h2>Starting Hydor…</h2>'));
+    void win?.loadURL(bootPage());
     startServer();
   } else if (what === 'log') shell.showItemInFolder(LOG);
 }
