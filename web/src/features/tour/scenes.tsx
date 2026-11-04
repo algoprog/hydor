@@ -131,7 +131,7 @@ export function WelcomeFilm() {
       <div className="tour-film-ask ml-auto w-fit max-w-[88%] rounded-2xl rounded-br-md bg-white/90 px-3.5 py-2.5 text-[13px] leading-snug text-[#10233a] shadow-lg dark:bg-white/[0.94]">
         <span className="tour-film-type">Sum up the report in my Downloads folder</span>
       </div>
-      <div className="tour-film-work mt-4 rounded-2xl border border-white/15 bg-[#0b1a2c]/75 p-3.5 text-[12.5px] text-white/90 shadow-xl">
+      <div className="tour-film-work mt-4 rounded-2xl border border-white/15 bg-[linear-gradient(160deg,#10263c,#0b1a2c)] p-3.5 text-[12.5px] text-white/90 shadow-xl">
         <div className="mb-2.5 flex items-center gap-2 text-[12px] font-medium text-white">
           <TideMark size={20} ripples={false} />
           <span>Your agent</span>

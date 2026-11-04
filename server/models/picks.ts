@@ -113,6 +113,8 @@ export async function localPicks(o: { machine: MachineInfo; token?: string; runt
             cpuOk: route === 'ollama',
             split: route === 'vllm',
             metal: route === 'vllm',
+            // 16-bit weights (about two bytes a parameter) may be stored at 8-bit as vLLM loads them.
+            eight: route === 'vllm' && m.gpus.length > 0 && weights / (p.params * 1e9) > 1.5,
             ...(p.active ? { active: (weights * p.active) / p.params } : {}),
           })
         : null;

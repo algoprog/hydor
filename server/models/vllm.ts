@@ -1,6 +1,7 @@
 // vLLM (docs.vllm.ai) serving models downloaded from Hugging Face: one server per model, on its own
-// port and the GPU with room for it, or split across 2, 4 or 8 GPUs (tensor parallelism) when no one GPU has
-// room. Servers run detached and outlive restarts of the app; vllm.json says what runs where.
+// port and the GPU with room for it; a 16-bit model too big for it stored at 8-bit as it loads (FP8); or split
+// across 2, 4 or 8 GPUs (tensor parallelism) when no one GPU has room. Servers run detached and outlive restarts of
+// the app; vllm.json says what runs where.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -147,10 +148,14 @@ export async function startServer(
   const max = Number(cfg.text_config?.max_position_embeddings ?? cfg.max_position_embeddings ?? 0) || LOCAL_CONTEXT;
   const maxLen = Math.min(o.maxLen ?? LOCAL_CONTEXT, max);
   // Weights, the context cache for a full-length conversation with some to spare, and vLLM's own share.
-  const need = o.weightsBytes * 1.1 + cachePerToken(cfg) * maxLen * 1.25 + 1.5 * GiB;
+  const cache = cachePerToken(cfg, maxLen) * maxLen * 1.25 + 1.5 * GiB;
+  const need = o.weightsBytes * 1.1 + cache;
+  // A 16-bit checkpoint (no quantization of its own) may be stored at 8-bit as it loads, when it does not fit as it is.
+  const quantized = !!(cfg.quantization_config ?? cfg.text_config?.quantization_config);
+  const need8 = quantized ? undefined : o.weightsBytes * 0.55 + cache;
   if (o.machine.apple) return startOnMac(v, { ...o, cfg, need, maxLen });
   if (!o.machine.gpus.length) throw new HttpError(400, 'vLLM needs an NVIDIA GPU or a Mac with Apple silicon, and neither is here');
-  const plan = gpuPlan(o.machine, need, { split: true, only: o.gpu });
+  const plan = gpuPlan(o.machine, need, { split: true, only: o.gpu, need8 });
   if (!plan) {
     const most = [...o.machine.gpus].sort((a, b) => b.freeBytes - a.freeBytes)[0];
     throw new HttpError(
@@ -187,6 +192,7 @@ export async function startServer(
     '--max-num-seqs',
     '8',
     ...(tp > 1 ? ['--tensor-parallel-size', String(tp)] : []),
+    ...(plan.fp8 ? ['--quantization', 'fp8'] : []),
     ...(parser ? ['--enable-auto-tool-choice', '--tool-call-parser', parser] : []),
     ...(o.customCode ? ['--trust-remote-code'] : []),
   ];

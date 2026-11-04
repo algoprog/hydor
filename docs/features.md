@@ -327,8 +327,9 @@ Its models come from Settings → Models:
   refusals; GPT-6.1 Sol, better; Claude Opus 5.5, best overall) or search its catalog (each model's maker, context,
   longest reply, price, release date, and whether it reasons, sees images or calls tools; filter and sort).
 - **Ollama**: the models of an Ollama server, with GGUF weights pulled straight from Hugging Face.
-- **vLLM**: Hugging Face models downloaded here and served on a GPU, split across 2, 4 or 8 GPUs when one has too
-  little memory, or on a Mac's Apple silicon (vllm-metal), started when a session first uses them.
+- **vLLM**: Hugging Face models downloaded here and served on a GPU (a 16-bit model too big for it at 8-bit, FP8),
+  split across 2, 4 or 8 GPUs when one has too little memory, or on a Mac's Apple silicon (vllm-metal), started
+  when a session first uses them.
 - **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, another provider).
 
 Before any search, the models suggested for this computer show by what it can run, each with how it would run here
