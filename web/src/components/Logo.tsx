@@ -38,8 +38,18 @@ export function WaterGradient({ id, bright }: { id: string; bright?: boolean }) 
   );
 }
 
-/** The full logo, HYDΩR: `height` px tall (its capitals' height), the letters in the text's colour, the Ω in the sea's. */
-export function Wordmark({ height = 16, className }: { height?: number; className?: string }) {
+/** The wordmark Ω's water (its own units, cap height 100): a surface along y = 0 with one wave every 36, and the
+ * water below it, wide enough to flow by one wave and still fill the letter; and that surface alone, its crest. */
+const TIDE_WAVE = 'M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 V130 H-72 Z';
+const TIDE_CREST = 'M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0';
+
+/**
+ * The full logo, HYDΩR: `height` px tall (its capitals' height), the letters in the text's colour, the Ω in the sea's.
+ * With `tide`, the pointer over it fills the Ω with the sea: the letter empties to a faint outline and bright water
+ * rises in it, its crest a wave that keeps flowing and bobbing while the pointer stays, then drains away and the
+ * letter is whole again (styles.css, "the logo's tide"). The letter itself never moves.
+ */
+export function Wordmark({ height = 16, className, tide }: { height?: number; className?: string; tide?: boolean }) {
   const id = useId();
   return (
     <svg
@@ -48,7 +58,7 @@ export function Wordmark({ height = 16, className }: { height?: number; classNam
       height={height}
       fill="none"
       strokeWidth={WORD_STROKE}
-      className={className ? `shrink-0 ${className}` : 'shrink-0'}
+      className={['shrink-0', tide && 'wordmark-tide', className].filter(Boolean).join(' ')}
       role="img"
       aria-label="Hydor"
     >
@@ -56,12 +66,38 @@ export function Wordmark({ height = 16, className }: { height?: number; classNam
         <clipPath id={id}>
           <rect x="-10" y="0" width={WORD_WIDTH + 20} height="100" />
         </clipPath>
+        {tide && (
+          <>
+            <mask id={`${id}m`} maskUnits="userSpaceOnUse" x="-10" y="-10" width="116" height="120">
+              <path d={WORD_OMEGA.d} stroke="#fff" strokeWidth={WORD_STROKE} />
+            </mask>
+            <linearGradient id={`${id}g`} gradientUnits="userSpaceOnUse" x1="0" y1="-4" x2="0" y2="96">
+              <stop offset="0" style={{ stopColor: 'var(--water-1)' }} />
+              <stop offset="0.55" style={{ stopColor: 'var(--water-2)' }} />
+              <stop offset="1" style={{ stopColor: 'var(--water-3)' }} />
+            </linearGradient>
+          </>
+        )}
       </defs>
       <g clipPath={`url(#${id})`}>
         {LETTERS.map((l) => (
           <path key={l.x} transform={`translate(${l.x} 0)`} d={l.d} stroke="currentColor" />
         ))}
-        <path className="logo-omega" transform={`translate(${WORD_OMEGA.x} 0)`} d={WORD_OMEGA.d} style={{ stroke: 'var(--water-ink)' }} />
+        <g transform={`translate(${WORD_OMEGA.x} 0)`}>
+          <path className="logo-omega" d={WORD_OMEGA.d} style={{ stroke: 'var(--water-ink)' }} />
+          {tide && (
+            <g mask={`url(#${id}m)`} aria-hidden>
+              <g className="logo-tide">
+                <g className="logo-bob">
+                  <g className="logo-swell">
+                    <path d={TIDE_WAVE} fill={`url(#${id}g)`} stroke="none" />
+                    <path className="logo-crest" d={TIDE_CREST} strokeWidth={5} />
+                  </g>
+                </g>
+              </g>
+            </g>
+          )}
+        </g>
       </g>
     </svg>
   );

@@ -1,30 +1,41 @@
-// The order of the sidebar's tools, as you drag them: kept by the server for every device (server/sidebar), and
-// in this browser too, so the sidebar opens in it at once. A change made on another device, or by an agent,
-// arrives as the server's news. Another machine's pages show this server's order, as they do its themes.
+// The sidebar's orders, as you drag them: its tools, and the groups of your projects and folders among the sessions.
+// Kept by the server for every device (server/sidebar), and in this browser too, so the sidebar opens in it at once.
+// A change made on another device, or by an agent, arrives as the server's news. Another machine's pages show this
+// server's order, as they do its themes.
 import { create } from 'zustand';
-import { toolOrder, type SidebarTool } from '@shared/sidebar';
+import { placeOrder, toolOrder, type SidebarTool } from '@shared/sidebar';
 import { api, put } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { toastError } from '../../lib/store';
 import { ownLive } from '../../lib/ws';
 
 const KEY = 'wa.sidebar.tools';
+const PLACES_KEY = 'wa.sidebar.places';
 
-function saved(): SidebarTool[] {
+function saved<T>(key: string, read: (v: unknown) => T): T {
   try {
-    return toolOrder(JSON.parse(localStorage.getItem(KEY) ?? '[]'));
+    return read(JSON.parse(localStorage.getItem(key) ?? '[]'));
   } catch {
-    return toolOrder([]);
+    return read([]);
   }
 }
 
-export const useToolOrder = create<{ tools: SidebarTool[] }>(() => ({ tools: saved() }));
+/** The tools first to last, and the projects' and folders' groups as dragged ("space:<id>", "dir:<folder>"). */
+export const useToolOrder = create<{ tools: SidebarTool[]; places: string[] }>(() => ({ tools: saved(KEY, toolOrder), places: saved(PLACES_KEY, placeOrder) }));
 
 function keep(tools: SidebarTool[]) {
   if (tools.join() === useToolOrder.getState().tools.join()) return;
   useToolOrder.setState({ tools });
   try {
     localStorage.setItem(KEY, JSON.stringify(tools));
+  } catch {}
+}
+
+function keepPlaces(places: string[]) {
+  if (places.join('\n') === useToolOrder.getState().places.join('\n')) return;
+  useToolOrder.setState({ places });
+  try {
+    localStorage.setItem(PLACES_KEY, JSON.stringify(places));
   } catch {}
 }
 
@@ -45,9 +56,22 @@ export function setToolOrder(tools: readonly string[]) {
     .finally(() => sending--);
 }
 
+/** Shows the projects' and folders' groups in this order (first to last), here at once and on every device a moment later. */
+export function setPlaceOrder(places: readonly string[]) {
+  keepPlaces(placeOrder(places));
+  changes++;
+  sending++;
+  queue = queue
+    .then(() => put('/api/sidebar', { places: useToolOrder.getState().places }))
+    .catch(toastError)
+    .finally(() => sending--);
+}
+
 function heard(v: unknown) {
-  const tools = (v as { tools?: unknown } | undefined)?.tools;
-  if (!sending && Array.isArray(tools)) keep(toolOrder(tools));
+  if (sending) return;
+  const { tools, places } = (v ?? {}) as { tools?: unknown; places?: unknown };
+  if (Array.isArray(tools)) keep(toolOrder(tools));
+  if (Array.isArray(places)) keepPlaces(placeOrder(places));
 }
 
 let listening = false;
@@ -60,7 +84,7 @@ export function loadToolOrder() {
     else onFeatureEvent('sidebar', (e) => heard(e.data));
   }
   const at = changes;
-  api<{ tools: SidebarTool[] }>('/api/sidebar')
+  api<{ tools: SidebarTool[]; places?: string[] }>('/api/sidebar')
     .then((r) => at === changes && heard(r))
     .catch(() => {});
 }

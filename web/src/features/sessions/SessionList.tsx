@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoute } from 'wouter';
 import { AlarmClock, Archive, CheckCheck, ChevronRight, Ellipsis, Folder, Pencil, Pin, PinOff, SquarePen, Target, Trash2 } from 'lucide-react';
@@ -14,6 +14,7 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type Modifier,
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -30,12 +31,13 @@ import { Elapsed } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
-import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
+import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
 import { ChildNest, nestChildren } from '../children/Nest';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
+import { setPlaceOrder, useToolOrder } from '../layout/toolOrder';
 
 /**
  * Active sessions keep their places: newest to become active on top, then fixed. Working,
@@ -96,9 +98,19 @@ export function StatusDot({ s, className }: { s: SessionSummary; className?: str
 
 /** Rows of these groups keep the order you drag them into; the others go newest first. */
 const orderable = (kind: GroupKind) => kind === 'active' || kind === 'pinned';
-/** A space's or a folder's group: under Projects, with a heading that folds it. */
-const isPlace = (g: SessionGroup) => g.kind === 'space' || g.kind === 'folder';
+/** A space's or a folder's group: under Projects, with a heading that folds it, and dragged by that heading. */
+const isPlace = (g: SessionGroup) => isPlaceKind(g.kind);
 const PIN_ZONE = 'zone:pin';
+/** A space's or a folder's group being dragged: its id after this. */
+const PLACE = 'place:';
+/** Where the group picked up was as the pointer took it, before the groups folded to their headings. */
+let pickedAt: { left: number; top: number } | null = null;
+/** The copy that follows the pointer stays under it, though the list closes up as a group is picked up (the groups
+ * fold to their headings, which moves it): it is placed by where the group is now, and moved by the pointer since. */
+const stayUnderPointer: Modifier = ({ transform, active, activeNodeRect }) =>
+  pickedAt && activeNodeRect && String(active?.id).startsWith(PLACE)
+    ? { ...transform, x: transform.x + pickedAt.left - activeNodeRect.left, y: transform.y + pickedAt.top - activeNodeRect.top }
+    : transform;
 /** A drop ends with a click on the row under the pointer; that click is ignored. */
 let lastDragEnd = 0;
 
@@ -471,21 +483,31 @@ const unreadOf = (s: SessionSummary) => !!s.doneAt && s.doneAt > (s.seenAt ?? 0)
 /** Space and folder groups showing all their sessions, kept while the list redraws. */
 const shownWhole = new Set<string>();
 
-/** A space's or a folder's heading: it folds the group away; its pen starts a new session there. */
-function PlaceHead({ g, folded, home, onFold }: { g: SessionGroup; folded: boolean; home?: string; onFold: () => void }) {
+/** What picks a space's or a folder's group up: its heading. */
+interface PlaceHandle {
+  ref: (el: HTMLElement | null) => void;
+  attrs: HTMLAttributes<HTMLButtonElement>;
+}
+
+/** A space's or a folder's heading: it folds the group away, and drags it to another place among them; its pen starts a new session there. */
+function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGroup; folded: boolean; home?: string; onFold?: () => void; handle?: PlaceHandle; lifted?: boolean }) {
   const unread = folded && g.items.some(unreadOf);
   return (
-    <div data-tip="groups" className="group/head sticky top-0 z-[1] flex items-center gap-0.5 bg-sidebar py-0.5">
+    <div data-tip="groups" className={cx('group/head flex items-center gap-0.5 py-0.5', lifted ? 'rounded-lg bg-bg-2 shadow-lg ring-1 ring-line-2' : 'sticky top-0 z-[1] bg-sidebar')}>
       <button
         type="button"
+        ref={handle?.ref}
+        {...handle?.attrs}
         aria-expanded={!folded}
         title={g.space ? `The ${g.space.name} project: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : tildify(g.path, home)}
         onClick={(e) => {
           // On a phone a tap on a button in the list closes the drawer (it opened a session); this one stays.
           e.stopPropagation();
-          onFold();
+          // A drop ends with a click on the heading under the pointer.
+          if (Date.now() - lastDragEnd < 300) return;
+          onFold?.();
         }}
-        className="flex h-7 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg max-md:h-8"
+        className="flex h-7 min-w-0 flex-1 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium text-fg-2 transition-colors select-none [-webkit-touch-callout:none] hover:bg-bg-2 hover:text-fg max-md:h-8"
       >
         <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
         <span className="flex min-w-0 items-center gap-1.5">
@@ -497,15 +519,27 @@ function PlaceHead({ g, folded, home, onFold }: { g: SessionGroup; folded: boole
           <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
         </span>
       </button>
-      <IconButton
-        size="sm"
-        label={`New session in ${g.label}`}
-        onClick={() => (g.space ? startInSpace(g.space) : newSessionIn(g.path!))}
-        // On hover with a mouse; always on touch screens.
-        className="opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100"
-      >
-        <SquarePen size={13} />
-      </IconButton>
+      {!lifted && (
+        <IconButton
+          size="sm"
+          label={`New session in ${g.label}`}
+          onClick={() => (g.space ? startInSpace(g.space) : newSessionIn(g.path!))}
+          // On hover with a mouse; always on touch screens.
+          className="opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100"
+        >
+          <SquarePen size={13} />
+        </IconButton>
+      )}
+    </div>
+  );
+}
+
+/** A space's or a folder's group, which its heading drags to another place among the others. */
+function SortablePlace({ id, className, children }: { id: string; className?: string; children: (handle: PlaceHandle) => ReactNode }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: PLACE + id });
+  return (
+    <div ref={setNodeRef} data-place={id} style={{ transform: CSS.Translate.toString(transform), transition }} className={cx(className, isDragging && 'opacity-40')}>
+      {children({ ref: setActivatorNodeRef, attrs: { ...attributes, ...(listeners as HTMLAttributes<HTMLButtonElement>) } })}
     </div>
   );
 }
@@ -532,6 +566,8 @@ export function SessionList({ query }: { query: string }) {
   /** Opened by a row's ⋯ (it lines up with the button's end), or by a right-click on the row (under its start). */
   const [menuByButton, setMenuByButton] = useState(false);
   const [dragKey, setDragKey] = useState<string | null>(null);
+  // A space's or a folder's group being dragged (its id): meanwhile they all show as their headings alone.
+  const [dragPlace, setDragPlace] = useState<string | null>(null);
   const [overGroup, setOverGroup] = useState<string | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const sensors = useSensors(useSensor(MouseSensor, MOUSE_DRAG), useSensor(AreaTouchSensor, TOUCH_DRAG));
@@ -548,11 +584,13 @@ export function SessionList({ query }: { query: string }) {
   const unpicked = useMemo(() => unpickedFolders(home, defaultCwd, autoFolders), [home, defaultCwd, autoFolders]);
   const [, redraw] = useState(0);
   const [groupTime, setGroupTime] = useState(Date.now);
+  // The order you dragged the spaces' and folders' groups into, the same on every device.
+  const places = useToolOrder((s) => s.places);
 
   const groups = useMemo(() => {
     const listed = order.map((k) => byKey[k]).filter((s): s is SessionSummary => !!s && !s.archived && shown(s) && !nest.under.has(s.key));
     // The list showing one space: its sessions go by day.
-    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked });
+    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places });
     const snz = out.find((g) => g.kind === 'snoozed');
     if (snz) snz.items.sort((a, b) => (a.snoozedUntil ?? 0) - (b.snoozedUntil ?? 0));
     const act = out.find((g) => g.kind === 'active');
@@ -562,7 +600,7 @@ export function SessionList({ query }: { query: string }) {
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
     for (const g of out) g.keys = g.items.map((s) => s.key);
     return out;
-  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, groupTime]);
+  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime]);
 
   // Move sessions out of Active even when no new session events arrive.
   useEffect(() => {
@@ -590,8 +628,10 @@ export function SessionList({ query }: { query: string }) {
     useUI.getState().set({ groupFolds: { ...Object.fromEntries(Object.entries(rest).slice(-199)), [g.id]: !shut } });
   };
 
-  // Active or Pinned: the nearest row of the same group. A dated row: only a Pinned row or the pin zone right under the pointer.
+  // A space's or a folder's group: the nearest of those groups. Active or Pinned: the nearest row of the same group.
+  // A dated row: only a Pinned row or the pin zone right under the pointer.
   const collision: CollisionDetection = (args) => {
+    if (String(args.active.id).startsWith(PLACE)) return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => String(c.id).startsWith(PLACE)) });
     const from = groupOf.get(String(args.active.id));
     if (from === 'dated') return pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id === PIN_ZONE || groupOf.get(String(c.id)) === 'pinned') });
     return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => groupOf.get(String(c.id)) === from) });
@@ -607,11 +647,26 @@ export function SessionList({ query }: { query: string }) {
 
   const setFlag = (s: SessionSummary, f: { pinned?: boolean; archived?: boolean }) => setFlags(s, f);
 
+  /** A space's or a folder's group dropped among the others: the groups shown in their new order, then any the list leaves out now. */
+  const dropPlace = (from: string, to: string) => {
+    const ids = groups.filter(isPlace).map((g) => g.id);
+    const a = ids.indexOf(from);
+    const b = ids.indexOf(to);
+    if (a < 0 || b < 0 || a === b) return;
+    const moved = arrayMove(ids, a, b);
+    setPlaceOrder([...moved, ...places.filter((id) => !moved.includes(id))]);
+  };
+
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     lastDragEnd = Date.now();
     setDragKey(null);
+    setDragPlace(null);
     setOverGroup(null);
     if (!over) return;
+    if (String(active.id).startsWith(PLACE)) {
+      if (String(over.id).startsWith(PLACE)) dropPlace(String(active.id).slice(PLACE.length), String(over.id).slice(PLACE.length));
+      return;
+    }
     const key = String(active.id);
     const from = groupOf.get(key);
     const to = over.id === PIN_ZONE ? 'pinned' : groupOf.get(String(over.id));
@@ -681,123 +736,168 @@ export function SessionList({ query }: { query: string }) {
   if (!groups.length) return <div className="px-4 py-10 text-center text-[13px] text-fg-3">No sessions yet.</div>;
 
   const dragging = dragKey ? byKey[dragKey] : null;
+  const draggingPlace = dragPlace ? groups.find((g) => g.id === dragPlace) : undefined;
   const datedDrag = !!dragKey && groupOf.get(dragKey) === 'dated';
   // No Pinned group yet: dragging a dated session shows where to drop it to pin it.
   const zoneAt = datedDrag && !groups.some((g) => g.kind === 'pinned') ? (groups[0]?.kind === 'active' ? 1 : 0) : -1;
   // What each group shows: a space's or a folder's newest few (all once asked, none while folded), and the session open.
+  // While one of those groups is dragged, they all show as their headings alone.
   const now = Date.now();
-  const shut = new Set(groups.filter((g) => isPlace(g) && isFolded(g, folds, now)).map((g) => g.id));
+  const shut = new Set(groups.filter((g) => isPlace(g) && (!!dragPlace || isFolded(g, folds, now))).map((g) => g.id));
   const shownRows = groups.map((g) => {
     if (!isPlace(g)) return g.items;
+    if (dragPlace) return [];
     const rows = shut.has(g.id) ? [] : shownWhole.has(g.id) ? g.items : g.items.slice(0, GROUP_ROWS);
     const open = activeKey ? g.items.find((s) => s.key === activeKey) : undefined;
     return open && !rows.includes(open) ? [...rows, open] : rows;
   });
+  // Each group's frame and contents; the spaces' and folders' groups (one run of them, under Projects) drag among
+  // themselves by their headings.
+  const items = groups.map((g, i) => {
+    const sortable = orderable(g.kind);
+    const place = isPlace(g);
+    const visible = shownRows[i];
+    const before = shownRows.slice(0, i).reduce((n, x) => n + x.length, 0);
+    const rows = visible.map((s, k) => {
+      const p: RowProps = {
+        s,
+        active: s.key === activeKey,
+        home,
+        renaming: renaming === s.key,
+        onRename,
+        onMenu,
+        onMore,
+        menuOpen: menu?.key === s.key,
+        touch: coarse,
+        eager: before + k < 30,
+        place,
+        inPinned: g.kind === 'pinned',
+      };
+      const row = sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
+      const kids = nest.byParent.get(s.key);
+      if (!kids) return row;
+      return (
+        <Fragment key={s.key}>
+          {row}
+          <ChildNest
+            parent={s.key}
+            kids={kids}
+            activeKey={activeKey}
+            row={(c, active) => <RowBody s={c} active={active} home={home} onMore={onMore} menuOpen={menu?.key === c.key} touch={coarse} place={place} />}
+          />
+        </Fragment>
+      );
+    });
+    const shutNow = place && shut.has(g.id);
+    // Rows left out, or all of them shown since asked: a line to show them, or fewer again.
+    const more = g.items.length - visible.length;
+    const whole = shownWhole.has(g.id);
+    // Folded spaces and folders close up into a list of them.
+    const prev = groups[i - 1];
+    const afterPlace = !!prev && isPlace(prev);
+    const frame = cx(
+      'px-2 transition-colors',
+      i > 0 && (!place ? 'mt-2' : afterPlace && !shut.has(prev.id) && 'mt-1.5'),
+      !shutNow && 'pb-1',
+      datedDrag && g.kind === 'pinned' && overGroup === 'pinned' && 'rounded-xl bg-accent/[0.06]',
+    );
+    const body = (handle?: PlaceHandle) => (
+      <>
+        {place ? (
+          <PlaceHead g={g} folded={shutNow} home={home} onFold={() => fold(g)} handle={handle} />
+        ) : (
+          <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
+        )}
+        {sortable ? (
+          <SortableContext items={g.keys} strategy={verticalListSortingStrategy}>
+            {rows}
+          </SortableContext>
+        ) : (
+          rows
+        )}
+        {place && !shutNow && (whole ? g.items.length > GROUP_ROWS : more > 0) && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!shownWhole.delete(g.id)) shownWhole.add(g.id);
+              redraw((n) => n + 1);
+            }}
+            className="flex h-7 w-full items-center rounded-lg pl-[35px] text-left text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2 max-md:h-8"
+          >
+            {whole ? 'Show fewer' : `Show ${more} more`}
+          </button>
+        )}
+      </>
+    );
+    return { g, i, frame, body };
+  });
+  type Item = (typeof items)[number];
+  const listed: ({ kind: 'one'; item: Item } | { kind: 'places'; first: number; items: Item[] })[] = [];
+  for (const it of items) {
+    const last = listed[listed.length - 1];
+    if (!isPlace(it.g)) listed.push({ kind: 'one', item: it });
+    else if (last?.kind === 'places') last.items.push(it);
+    else listed.push({ kind: 'places', first: it.i, items: [it] });
+  }
+
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={collision}
       onDragStart={({ active }) => {
-        setDragKey(String(active.id));
+        const id = String(active.id);
+        if (id.startsWith(PLACE)) {
+          const el = [...document.querySelectorAll<HTMLElement>('[data-place]')].find((x) => x.dataset.place === id.slice(PLACE.length));
+          const r = el?.getBoundingClientRect();
+          pickedAt = r ? { left: r.left, top: r.top } : null;
+          setDragPlace(id.slice(PLACE.length));
+        } else setDragKey(id);
         setMenu(null);
       }}
       onDragOver={({ over }) => setOverGroup(!over ? null : over.id === PIN_ZONE ? 'pinned' : (groupOf.get(String(over.id)) ?? null))}
       onDragEnd={onDragEnd}
       onDragCancel={() => {
         setDragKey(null);
+        setDragPlace(null);
         setOverGroup(null);
       }}
-      accessibility={{ screenReaderInstructions: { draggable: 'Drag to move this session. Active and Pinned keep the order you set; drop a session on Pinned to pin it.' } }}
+      accessibility={{
+        screenReaderInstructions: {
+          draggable: 'Drag to move this session. Active and Pinned keep the order you set; drop a session on Pinned to pin it. Drag a project or folder by its name to move its group.',
+        },
+      }}
     >
-      {/* Touches that land on the list may pick a row up (lib/dragTouch). */}
+      {/* Touches that land on the list may pick a row (or a group's heading) up (lib/dragTouch). */}
       <div ref={touchDragArea}>
-        {groups.map((g, i) => {
-          const sortable = orderable(g.kind);
-          const place = isPlace(g);
-          const visible = shownRows[i];
-          const before = shownRows.slice(0, i).reduce((n, x) => n + x.length, 0);
-          const rows = visible.map((s, k) => {
-            const p: RowProps = {
-              s,
-              active: s.key === activeKey,
-              home,
-              renaming: renaming === s.key,
-              onRename,
-              onMenu,
-              onMore,
-              menuOpen: menu?.key === s.key,
-              touch: coarse,
-              eager: before + k < 30,
-              place,
-              inPinned: g.kind === 'pinned',
-            };
-            const row = sortable ? <SortableRow key={s.key} {...p} /> : <DraggableRow key={s.key} {...p} />;
-            const kids = nest.byParent.get(s.key);
-            if (!kids) return row;
-            return (
-              <Fragment key={s.key}>
-                {row}
-                <ChildNest
-                  parent={s.key}
-                  kids={kids}
-                  activeKey={activeKey}
-                  row={(c, active) => <RowBody s={c} active={active} home={home} onMore={onMore} menuOpen={menu?.key === c.key} touch={coarse} place={place} />}
-                />
-              </Fragment>
-            );
-          });
-          const shutNow = place && shut.has(g.id);
-          // Rows left out, or all of them shown since asked: a line to show them, or fewer again.
-          const more = g.items.length - visible.length;
-          const whole = shownWhole.has(g.id);
-          // The spaces' and folders' groups go under one heading, Projects; folded ones close up into a list of them.
-          const prev = groups[i - 1];
-          const afterPlace = !!prev && isPlace(prev);
-          return (
-            <Fragment key={g.id}>
-              {i === zoneAt && <PinZone hot={overGroup === 'pinned'} />}
-              <div
-                className={cx(
-                  'px-2 transition-colors',
-                  i > 0 && (!place || !afterPlace ? 'mt-2' : !shut.has(prev.id) && 'mt-1.5'),
-                  !shutNow && 'pb-1',
-                  datedDrag && g.kind === 'pinned' && overGroup === 'pinned' && 'rounded-xl bg-accent/[0.06]',
-                )}
-              >
-                {place && !afterPlace && <div className="px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">Projects</div>}
-                {place ? (
-                  <PlaceHead g={g} folded={shutNow} home={home} onFold={() => fold(g)} />
-                ) : (
-                  <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
-                )}
-                {sortable ? (
-                  <SortableContext items={g.keys} strategy={verticalListSortingStrategy}>
-                    {rows}
-                  </SortableContext>
-                ) : (
-                  rows
-                )}
-                {place && !shutNow && (whole ? g.items.length > GROUP_ROWS : more > 0) && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!shownWhole.delete(g.id)) shownWhole.add(g.id);
-                      redraw((n) => n + 1);
-                    }}
-                    className="flex h-7 w-full items-center rounded-lg pl-[35px] text-left text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2 max-md:h-8"
-                  >
-                    {whole ? 'Show fewer' : `Show ${more} more`}
-                  </button>
-                )}
-              </div>
+        {listed.map((part) =>
+          part.kind === 'places' ? (
+            <Fragment key={`places:${part.first}`}>
+              <div className={cx('px-[18px] pt-1.5 pb-1 text-[12px] font-medium text-fg-3', part.first > 0 && 'mt-2')}>Projects</div>
+              <SortableContext items={part.items.map((x) => PLACE + x.g.id)} strategy={verticalListSortingStrategy}>
+                {part.items.map((x) => (
+                  <SortablePlace key={x.g.id} id={x.g.id} className={x.frame}>
+                    {(handle) => x.body(handle)}
+                  </SortablePlace>
+                ))}
+              </SortableContext>
             </Fragment>
-          );
-        })}
+          ) : (
+            <Fragment key={part.item.g.id}>
+              {part.item.i === zoneAt && <PinZone hot={overGroup === 'pinned'} />}
+              <div className={part.item.frame}>{part.item.body()}</div>
+            </Fragment>
+          ),
+        )}
         {zoneAt === groups.length && <PinZone hot={overGroup === 'pinned'} />}
       </div>
       {confirmNode}
-      {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : null}</DragOverlay>, document.body)}
+      {createPortal(
+        <DragOverlay dropAnimation={null} modifiers={[stayUnderPointer]}>
+          {dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : draggingPlace ? <PlaceHead g={draggingPlace} folded home={home} lifted /> : null}
+        </DragOverlay>,
+        document.body,
+      )}
       <Popover anchor={menuAnchor} open={!!menu} onClose={() => (setMenu(null), setSnoozing(false))} width={snoozing ? 240 : 190} align={menuByButton ? 'end' : 'start'}>
         {menu && snoozing && <SnoozeItems s={menu} onDone={() => (setMenu(null), setSnoozing(false))} />}
         {menu && !snoozing && (

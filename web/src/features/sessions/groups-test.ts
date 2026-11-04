@@ -185,6 +185,27 @@ test('the order: active, pinned, spaces and folders by their newest session, the
   );
 });
 
+test('spaces and folders you dragged keep their places, after the ones you never moved, which go by their newest session', () => {
+  n = 0;
+  const list = [
+    ses(`${HOME}/code/new`, 1 * H),
+    ses(`${HOME}/code/new`, 2 * H),
+    ses(`${HOME}/code/old`, 50 * H),
+    ses(`${HOME}/code/old`, 60 * H),
+    ses(`${HOME}/somewhere`, 3 * H, { extra: { space: 'sp1' } }),
+    ses(`${HOME}/code/fresh`, 0.5 * H),
+    ses(`${HOME}/code/fresh`, 0.6 * H),
+  ];
+  const sorted = [...list].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const at = (places?: string[]) =>
+    groupSessions(sorted, { now, byFolder: true, spaces: [space('sp1', 'Thesis')], unpicked, places })
+      .filter((g) => g.kind === 'space' || g.kind === 'folder')
+      .map((g) => g.label);
+  assert.deepEqual(at(), ['fresh', 'new', 'Thesis', 'old'], 'by their newest session');
+  assert.deepEqual(at([`dir:${HOME}/code/old`, 'space:sp1', `dir:${HOME}/code/new`]), ['fresh', 'old', 'Thesis', 'new'], 'the one never moved first, then as dragged');
+  assert.deepEqual(at([`dir:${HOME}/gone`, `dir:${HOME}/code/fresh`, 'space:sp1', `dir:${HOME}/code/old`, `dir:${HOME}/code/new`]), ['fresh', 'Thesis', 'old', 'new'], 'a group no longer there is passed over');
+});
+
 test('two folders of the same name show the folder each is in', () => {
   n = 0;
   const gs = group([ses(`${HOME}/client/app`, H), ses(`${HOME}/client/app`, 2 * H), ses(`${HOME}/server/app`, 3 * H), ses(`${HOME}/server/app`, 4 * H), ses('/app', 5 * H), ses('/app', 6 * H)]);
