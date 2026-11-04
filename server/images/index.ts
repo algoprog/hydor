@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ImageModel, ImagesState } from '../../shared/images.ts';
 import type { AudioModel, AudioState, VideoModel, VideosState } from '../../shared/media.ts';
+import { OPENROUTER_PICKS, type OpenRouterRole } from '../../shared/model-picks.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
 import { inSession } from '../documents/index.ts';
@@ -433,6 +434,14 @@ function audioSettings(db: DB): AudioSettings {
 
 const amodels = () => audioModels(OPENROUTER_URL);
 
+/** A model list's order with the app's suggestions for these roles first, as listed (shared/model-picks.ts), then the
+ * newest. */
+function suggestedFirst<T extends { id: string; created?: number }>(...roles: OpenRouterRole[]): (x: T, y: T) => number {
+  const ids = OPENROUTER_PICKS.filter((p) => roles.includes(p.role)).map((p) => p.id);
+  const rank = (m: T) => (ids.includes(m.id) ? ids.indexOf(m.id) : ids.length);
+  return (x, y) => rank(x) - rank(y) || (y.created ?? 0) - (x.created ?? 0);
+}
+
 /** The model for music, or for voices and sounds: the one asked for, the one picked, or the first of the app's choices OpenRouter still lists. */
 async function usingAudio(s: AudioSettings, role: 'music' | 'speech', asked?: string): Promise<{ id: string; info?: AudioModel }> {
   const list = await amodels().catch(() => [] as AudioModel[]);
@@ -729,7 +738,7 @@ export const images: Feature = {
       const words = searchWords(q.q);
       const list = (await models()).filter((m) => words.every((w) => `${m.id} ${m.label} ${m.org ?? ''}`.toLowerCase().includes(w)));
       const newer = (x: ImageModel, y: ImageModel) => (y.created ?? 0) - (x.created ?? 0);
-      list.sort(q.sort === 'price' ? (x, y) => (x.perImage ?? Infinity) - (y.perImage ?? Infinity) || newer(x, y) : newer);
+      list.sort(q.sort === 'price' ? (x, y) => (x.perImage ?? Infinity) - (y.perImage ?? Infinity) || newer(x, y) : q.sort === 'picks' ? suggestedFirst<ImageModel>('image') : newer);
       return { models: list.slice(0, 100) };
     });
     app.get('/api/videos/settings', async () => videoState(db));
@@ -746,7 +755,7 @@ export const images: Feature = {
       const words = searchWords(q.q);
       const list = (await vmodels()).filter((m) => words.every((w) => `${m.id} ${m.label} ${m.org ?? ''}`.toLowerCase().includes(w)));
       const newer = (x: VideoModel, y: VideoModel) => (y.created ?? 0) - (x.created ?? 0);
-      list.sort(q.sort === 'price' ? (x, y) => (x.perSecond ?? Infinity) - (y.perSecond ?? Infinity) || newer(x, y) : newer);
+      list.sort(q.sort === 'price' ? (x, y) => (x.perSecond ?? Infinity) - (y.perSecond ?? Infinity) || newer(x, y) : q.sort === 'picks' ? suggestedFirst<VideoModel>('video') : newer);
       return { models: list.slice(0, 100) };
     });
     app.get('/api/audio/settings', async () => audioState(db));
@@ -761,7 +770,7 @@ export const images: Feature = {
     });
     app.get('/api/audio/models', async (req) => {
       const q = req.query as Record<string, string>;
-      const kind = q.kind === 'music' || q.kind === 'speech' ? q.kind : undefined;
+      const kind: 'music' | 'speech' | undefined = q.kind === 'music' || q.kind === 'speech' ? q.kind : undefined;
       const words = searchWords(q.q);
       const list = (await amodels()).filter((m) => (!kind || m.kind === kind) && words.every((w) => `${m.id} ${m.label} ${m.org ?? ''}`.toLowerCase().includes(w)));
       // Which voice models copy voices, from their endpoints (asked once, kept for hours).
@@ -769,7 +778,7 @@ export const images: Feature = {
       const newer = (x: AudioModel, y: AudioModel) => (y.created ?? 0) - (x.created ?? 0);
       // Cheapest: a song for music; a minute of speech for voices, however each is sold.
       const price = (m: AudioModel) => (m.free ? 0 : (m.perSong ?? m.perMinute ?? Infinity));
-      list.sort(q.sort === 'price' ? (x, y) => price(x) - price(y) || newer(x, y) : newer);
+      list.sort(q.sort === 'price' ? (x, y) => price(x) - price(y) || newer(x, y) : q.sort === 'picks' ? suggestedFirst<AudioModel>(...(kind ? [kind] : (['music', 'speech'] as const))) : newer);
       return { models: list.slice(0, 100) };
     });
   },

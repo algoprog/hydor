@@ -7,7 +7,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Check, ChevronDown, Clapperboard, Cpu, Download, Image as ImageIcon, KeyRound, Mic, Music, Plus, Search, X } from 'lucide-react';
 import type { ModelsState, OpenRouterModel } from '@shared/types';
 import type { ImageModel, ImagesState } from '@shared/images';
-import type { VideoModel, VideosState } from '@shared/media';
+import type { AudioModel, VideoModel, VideosState } from '@shared/media';
 import { OPENROUTER_PICKS, type LocalPickView, type OpenRouterRole } from '@shared/model-picks';
 import { api, post, put } from '../../lib/api';
 import { go } from '../../lib/nav';
@@ -129,6 +129,10 @@ function OrKey() {
 /** What a model that makes things costs, in words: an image, a song, a second. */
 const usd = (n: number) => (n >= 0.095 ? n.toFixed(2) : String(Number(n.toPrecision(1))));
 
+/** A sound model's price as it is sold: a song, a second, or about a minute of speech. */
+const audioPrice = (m: AudioModel) =>
+  m.free ? 'Free' : m.perSong ? `$${usd(m.perSong)} a song` : m.perSecond ? `$${usd(m.perSecond)} a second` : m.perMinute ? `about $${usd(m.perMinute)} a minute of speech` : undefined;
+
 interface MediaInfo {
   label: string;
   price?: string;
@@ -151,8 +155,8 @@ function useMedia() {
     api<{ models: ImageModel[] }>('/api/images/models?q=seedream').then((r) => add(r.models.map((m) => ({ id: m.id, label: m.label, price: m.perImage ? `about $${usd(m.perImage)} a picture` : undefined }))), () => {});
     api<{ models: VideoModel[] }>('/api/videos/models?q=seedance').then((r) => add(r.models.map((m) => ({ id: m.id, label: m.label, price: m.perSecond ? `$${usd(m.perSecond)} a second` : undefined }))), () => {});
     for (const kind of ['music', 'speech'])
-      api<{ models: { id: string; label: string; perSong?: number; perSecond?: number }[] }>(`/api/audio/models?kind=${kind}`).then(
-        (r) => add(r.models.map((m) => ({ id: m.id, label: m.label, price: m.perSong ? `$${usd(m.perSong)} a song` : m.perSecond ? `$${usd(m.perSecond)} a second` : undefined }))),
+      api<{ models: AudioModel[] }>(`/api/audio/models?kind=${kind}`).then(
+        (r) => add(r.models.map((m) => ({ id: m.id, label: m.label, price: audioPrice(m) }))),
         () => {},
       );
     return () => {
