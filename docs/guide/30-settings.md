@@ -182,9 +182,9 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Computer use
 
-[Settings → Computer use](/settings?s=computer): agents see your Mac’s screen and use its mouse and keyboard, in the Mac app. More in [Search and the browser](/guide/web).
+[Settings → Computer use](/settings?s=computer): agents see your screen and use the mouse and keyboard, in the desktop app. More in [Search and the browser](/guide/web).
 
-- [**Let agents use this Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac): Agents see the screen and use the mouse and keyboard, in any app; each session asks you first.
+- [**Let agents use this computer**](/settings?s=computer&find=Let%20agents%20use%20this%20computer): Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first.
 - [**Accessibility**](/settings?s=computer&find=Accessibility): macOS’s permission for Hydor to use the mouse and keyboard.
 - [**Screen Recording**](/settings?s=computer&find=Screen%20Recording): macOS’s permission for Hydor to see the screen.
 

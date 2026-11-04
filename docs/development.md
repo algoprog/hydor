@@ -70,16 +70,41 @@ terminals are shells in ConPTY that the server keeps, with what they printed, si
 are junctions. `server/platform-test.ts` checks all of it on the system it runs on, and the desktop workflow runs it on
 each.
 
-Computer use (`server/computer/`, the Mac app only) works through that channel too. The tools run macOS's own programs
-as children of the server, so macOS checks the app's permissions: `screencapture` for the main display, `sips` to scale
-it to 1280 pixels and make a JPEG, `open -a` for apps, and `osascript -l JavaScript` with one driver script
-(`driver.ts`) that posts CGEvents through the ObjC bridge: clicks with their click count, drags, scroll wheels, key
-combinations by their US-keyboard codes, and text as Unicode on key events (a pasted fallback puts the clipboard back).
-`plan.ts` checks actions and maps the screenshot's pixels to points (Retina, scaled resolutions); `access.ts` keeps the
-setting, the per-session card, Stop and the one session at the Mac. The server asks the app for macOS's permissions
-(`ask` `permissions`, and `request` to show macOS's prompt and its System Settings pane), tells it while an agent
-acts (`computer`: the menu bar's title and Stop, with ⌘⇧Esc registered meanwhile) and hears `computer-stop`.
-`server/computer/computer-test.ts` runs everything but macOS itself, the driver with stand-ins for the bridge.
+Computer use (`server/computer/`, in the desktop apps) works through that channel too. `plan.ts` checks the agent's
+actions and turns them into one list of driver steps for every system, with each system's keys (macOS's key codes,
+Windows' virtual-key codes, X11's keysyms) and the screenshot's pixels mapped to the screen (points on a Mac, pixels
+elsewhere); `access.ts` keeps the setting, the per-session card, Stop and the one session at the computer; each system
+has its machine (`machine.ts`):
+
+- **macOS** (`mac.ts`) runs macOS's own programs as children of the server, so macOS checks the app's permissions:
+  `screencapture` for the main display, `sips` to scale it to 1280 pixels and make a JPEG, `open -a` for apps, and
+  `osascript -l JavaScript` with one driver script (`driver.ts`) that posts CGEvents through the ObjC bridge: clicks
+  with their click count, drags, scroll wheels, key combinations by their US-keyboard codes, and text as Unicode on
+  key events (a pasted fallback puts the clipboard back). The server asks the app for macOS's permissions (`ask`
+  `permissions`, and `request` to show macOS's prompt and its System Settings pane).
+- **Windows** (`windows.ts`) keeps one helper running (`helper.ts`: a request and an answer per line of JSON),
+  `windows-helper.cs`: SendInput for the mouse and keyboard (text as Unicode), a per-monitor DPI-aware copy of the
+  screen scaled to a JPEG, and apps from the Start menu (`shell:AppsFolder`). `desktop/scripts/stage.sh` builds it into
+  `bin/hydor-computer.exe` with the C# compiler Windows has (.NET Framework's `csc`, so C# 5); without that,
+  PowerShell compiles the same file as it starts.
+- **Linux** (`linux.ts`) needs an X11 desktop (a Wayland one is told apart and said so): `x11-helper.py`, Python's own
+  ctypes with libX11 and libXtst, moves the pointer, clicks and types through XTest (a character the layout lacks
+  borrows a spare key for a moment), the app takes the screenshot (Electron's `desktopCapturer`), and apps open by
+  their `.desktop` entries (`gio launch`, `gtk-launch`, or the Exec line).
+
+While an agent acts, the server tells the app (`computer`, with the words of its note and whether to glow: not on a
+Linux desktop without a compositor), and the app (`desktop/glow.cjs`) lines every display's edges with a glow in
+see-through, click-through windows above everything, with a note at the bottom; registers Esc (and ⌘⇧Esc on a Mac)
+meanwhile, and sends `computer-stop` when one is pressed, or Stop is chosen in its menu. The agent's screenshots never
+show the glow: Windows (10 2004 and later) keeps windows that ask out of every capture (`setContentProtection`);
+macOS 15.4 and later put them in all the same, so the server asks the app to hide it (`ask` `glow`) while
+`screencapture` runs and tells it to come back (`glow`); on Linux the app takes the screenshot itself (`ask`
+`screenshot`), hiding it meanwhile. Around the agent's own Escape the server asks the app to let go of Esc (`ask`
+`esc`) and gives it back (`esc`), so the agent does not stop itself. `server/computer/computer-test.ts` runs
+everything but the systems themselves (the Mac's driver with stand-ins for the bridge); `x11-test.ts` drives the X11
+helper against a test window on an X display, `windows-test.ts` the Windows helper against Notepad, and
+`desktop/scripts/glow-test.cjs` shows the glow and checks the agent's screenshot leaves it out: the desktop workflow
+runs them on each system.
 
 Releases are built by `.github/workflows/desktop.yml` on GitHub's own computers when a tag `v<version>` (the version in
 `package.json`) is pushed: the Mac app for Apple silicon and Intel, the Windows installer for x64, and the Linux

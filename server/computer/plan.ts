@@ -1,11 +1,13 @@
-// What computer use does, worked out before anything touches the Mac: the agent's actions checked and turned into
-// the small steps the Mac's driver posts (driver.ts), points on the screen from the screenshot's pixels, keys by
-// their macOS key codes, what each action did in words, and the sizes of pictures. Nothing here runs a program, so
-// the tests run it on any computer.
+// What computer use does, worked out before anything touches the computer: the agent's actions checked and turned
+// into the small steps each system's driver takes (driver.ts on a Mac, windows.ts, linux.ts), points on the screen
+// from the screenshot's pixels, keys by each system's own codes (macOS's key codes, Windows' virtual-key codes, X11's
+// keysyms), what each action did in words, and the sizes of pictures. Nothing here runs a program, so the tests run it
+// on any computer.
 //
 // Coordinates: the agent sees the main display scaled down to MAX_SIDE pixels on its longer side, and names pixels of
 // that picture. macOS posts events in points (a Retina display has two pixels to a point, and a scaled resolution
-// other ratios), so a pixel maps to a point by the display's size in points over the picture's size in pixels.
+// other ratios); Windows and X11 in the screen's own pixels. A pixel of the picture maps to the screen by the
+// display's size there over the picture's size in pixels.
 
 /** The longer side of a screenshot, in pixels: what models read well (the screen is scaled down to it, never up). */
 export const MAX_SIDE = 1280;
@@ -25,7 +27,8 @@ export interface Geometry {
   /** The picture's size in pixels. */
   width: number;
   height: number;
-  /** The main display in points, in macOS's global coordinates (its top left is 0,0). */
+  /** The main display where the driver posts events: in points on a Mac, in pixels elsewhere, in the system's global
+   * coordinates (the main display's top left is 0,0). */
   x: number;
   y: number;
   w: number;
@@ -40,7 +43,7 @@ export function fitSize(w: number, h: number, max = MAX_SIDE): { width: number; 
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** A pixel of the screenshot on the screen, in points (inside the display). */
+/** A pixel of the screenshot on the screen, as the driver places it (inside the display). */
 export function toScreen(p: Point, g: Geometry): { x: number; y: number } {
   const x = g.x + (p[0] * g.w) / g.width;
   const y = g.y + (p[1] * g.h) / g.height;
@@ -55,42 +58,145 @@ export function toPicture(pt: { x: number; y: number }, g: Geometry): Point | nu
 
 // ---- keys ---------------------------------------------------------------------------------------------------
 
-/** The modifier keys' flags (CGEventFlags) and key codes. */
-export const FLAGS = { cmd: 0x100000, shift: 0x20000, alt: 0x80000, ctrl: 0x40000, fn: 0x800000 } as const;
-type Mod = keyof typeof FLAGS;
-const MOD_CODE: Record<Mod, number> = { cmd: 55, shift: 56, alt: 58, ctrl: 59, fn: 63 };
-/** The order a person presses them in. */
-const MOD_ORDER: Mod[] = ['ctrl', 'alt', 'shift', 'cmd', 'fn'];
+/** Which computer: the desktop app's system. */
+export type System = 'mac' | 'windows' | 'linux';
 
-/** Names for the modifiers: macOS's, Linux's and Windows' (agents trained elsewhere say super or meta), and symbols. */
-const MOD_NAMES: Record<string, Mod> = {
-  cmd: 'cmd', command: 'cmd', super: 'cmd', meta: 'cmd', win: 'cmd', windows: 'cmd', '⌘': 'cmd',
+/** The modifier keys' flags on a Mac (CGEventFlags). */
+export const FLAGS = { cmd: 0x100000, shift: 0x20000, alt: 0x80000, ctrl: 0x40000, fn: 0x800000 } as const;
+/** The modifiers a combination can hold: cmd on a Mac; super, the Windows (or Super) key, on Windows and Linux. */
+type Mod = 'cmd' | 'shift' | 'alt' | 'ctrl' | 'fn' | 'super';
+
+/** One system's keys as its driver presses them: macOS's virtual key codes, Windows' virtual-key codes, X11's keysyms. */
+export interface Keymap {
+  system: System;
+  /** The modifiers this system has: each one's key, and its flag (CGEventFlags on a Mac; a bit of its own elsewhere). */
+  mods: Partial<Record<Mod, { code: number; flag: number }>>;
+  /** The names agents give modifiers (macOS's, Linux's and Windows', and symbols), as the modifier they mean here. */
+  modNames: Record<string, Mod>;
+  /** The order a person presses them in. */
+  order: Mod[];
+  /** Keys that type no character (the same on every keyboard layout). */
+  named: Record<string, number>;
+  /** Characters by their key on a US keyboard: for shortcuts like cmd+c. */
+  chars: Record<string, number>;
+  /** The escape key: Esc stops the agent, so the app lets go of it while the agent itself presses it. */
+  escape: number;
+  /** The modifiers, and the keys with names, in words for what is wrong. */
+  modWords: string;
+  holdWords: string;
+  keyWords: string;
+}
+
+const range = (from: number, n: number, name: (i: number) => string) => Object.fromEntries(Array.from({ length: n }, (_, i) => [name(i), from + i]));
+
+/** The Mac: macOS's virtual key codes, and CGEventFlags. Agents trained elsewhere say super, meta or win for cmd. */
+export const MAC_KEYS: Keymap = {
+  system: 'mac',
+  mods: {
+    cmd: { code: 55, flag: FLAGS.cmd },
+    shift: { code: 56, flag: FLAGS.shift },
+    alt: { code: 58, flag: FLAGS.alt },
+    ctrl: { code: 59, flag: FLAGS.ctrl },
+    fn: { code: 63, flag: FLAGS.fn },
+  },
+  modNames: {
+    cmd: 'cmd', command: 'cmd', super: 'cmd', meta: 'cmd', win: 'cmd', windows: 'cmd', '⌘': 'cmd',
+    shift: 'shift', '⇧': 'shift',
+    alt: 'alt', option: 'alt', opt: 'alt', '⌥': 'alt',
+    ctrl: 'ctrl', control: 'ctrl', '⌃': 'ctrl',
+    fn: 'fn', function: 'fn',
+  },
+  order: ['ctrl', 'alt', 'shift', 'cmd', 'fn'],
+  named: {
+    return: 36, enter: 36, kpenter: 76, tab: 48, space: 49, spacebar: 49,
+    // The Mac's delete key erases before the cursor; forward delete after it.
+    delete: 51, backspace: 51, forwarddelete: 117, del: 117,
+    escape: 53, esc: 53,
+    left: 123, right: 124, down: 125, up: 126, arrowleft: 123, arrowright: 124, arrowdown: 125, arrowup: 126,
+    home: 115, end: 119, pageup: 116, prior: 116, pagedown: 121, next: 121, help: 114, insert: 114,
+    f1: 122, f2: 120, f3: 99, f4: 118, f5: 96, f6: 97, f7: 98, f8: 100, f9: 101, f10: 109, f11: 103, f12: 111,
+    f13: 105, f14: 107, f15: 113, f16: 106, f17: 64, f18: 79, f19: 80, f20: 90,
+    capslock: 57, volumeup: 72, volumedown: 73, mute: 74,
+  },
+  // ANSI key codes.
+  chars: {
+    a: 0, s: 1, d: 2, f: 3, h: 4, g: 5, z: 6, x: 7, c: 8, v: 9, b: 11, q: 12, w: 13, e: 14, r: 15, y: 16, t: 17,
+    '1': 18, '2': 19, '3': 20, '4': 21, '6': 22, '5': 23, '=': 24, '9': 25, '7': 26, '-': 27, '8': 28, '0': 29,
+    ']': 30, o: 31, u: 32, '[': 33, i: 34, p: 35, l: 37, j: 38, "'": 39, k: 40, ';': 41, '\\': 42, ',': 43, '/': 44,
+    n: 45, m: 46, '.': 47, '`': 50, ' ': 49,
+  },
+  escape: 53,
+  modWords: 'cmd, shift, alt (option), ctrl or fn',
+  holdWords: 'shift, cmd, alt (option) or ctrl',
+  keyWords: 'return, tab, escape, delete, forward_delete, space, up, down, left, right, home, end, page_up, page_down, f1–f20',
+};
+
+/** Windows and Linux name their modifiers alike; a Mac's cmd is ctrl there, and super (win, meta) the Windows key. */
+const PC_MOD_NAMES: Record<string, Mod> = {
+  ctrl: 'ctrl', control: 'ctrl', '⌃': 'ctrl', cmd: 'ctrl', command: 'ctrl', '⌘': 'ctrl',
   shift: 'shift', '⇧': 'shift',
   alt: 'alt', option: 'alt', opt: 'alt', '⌥': 'alt',
-  ctrl: 'ctrl', control: 'ctrl', '⌃': 'ctrl',
-  fn: 'fn', function: 'fn',
+  super: 'super', win: 'super', windows: 'super', meta: 'super', start: 'super',
+};
+const PC_ORDER: Mod[] = ['ctrl', 'alt', 'shift', 'super'];
+const PC_KEY_WORDS = 'return, tab, escape, backspace, delete, space, up, down, left, right, home, end, page_up, page_down, insert, f1–f24';
+
+/** Windows: virtual-key codes (letters and digits are their capitals' codes; punctuation the US keyboard's VK_OEM keys). */
+export const WINDOWS_KEYS: Keymap = {
+  system: 'windows',
+  mods: { ctrl: { code: 0x11, flag: 1 }, shift: { code: 0x10, flag: 2 }, alt: { code: 0x12, flag: 4 }, super: { code: 0x5b, flag: 8 } },
+  modNames: PC_MOD_NAMES,
+  order: PC_ORDER,
+  named: {
+    return: 0x0d, enter: 0x0d, kpenter: 0x0d, tab: 0x09, space: 0x20, spacebar: 0x20,
+    // A PC's backspace erases before the cursor; delete after it.
+    backspace: 0x08, delete: 0x2e, del: 0x2e, forwarddelete: 0x2e,
+    escape: 0x1b, esc: 0x1b,
+    left: 0x25, up: 0x26, right: 0x27, down: 0x28, arrowleft: 0x25, arrowup: 0x26, arrowright: 0x27, arrowdown: 0x28,
+    home: 0x24, end: 0x23, pageup: 0x21, prior: 0x21, pagedown: 0x22, next: 0x22, insert: 0x2d, help: 0x2f,
+    ...range(0x70, 24, (i) => `f${i + 1}`),
+    capslock: 0x14, numlock: 0x90, scrolllock: 0x91, pause: 0x13, break: 0x13, printscreen: 0x2c, print: 0x2c,
+    menu: 0x5d, apps: 0x5d, contextmenu: 0x5d,
+    volumeup: 0xaf, volumedown: 0xae, mute: 0xad, volumemute: 0xad, playpause: 0xb3, medianext: 0xb0, mediaprev: 0xb1, mediaprevious: 0xb1, mediastop: 0xb2,
+  },
+  chars: {
+    ...range(0x41, 26, (i) => String.fromCharCode(97 + i)),
+    ...range(0x30, 10, (i) => String(i)),
+    ' ': 0x20, ';': 0xba, '=': 0xbb, ',': 0xbc, '-': 0xbd, '.': 0xbe, '/': 0xbf, '`': 0xc0, '[': 0xdb, '\\': 0xdc, ']': 0xdd, "'": 0xde,
+  },
+  escape: 0x1b,
+  modWords: 'ctrl, shift, alt or win',
+  holdWords: 'shift, ctrl, alt or win',
+  keyWords: PC_KEY_WORDS,
 };
 
-/** Keys that type no character: macOS's virtual key codes (the same on every keyboard layout). */
-const NAMED: Record<string, number> = {
-  return: 36, enter: 36, kpenter: 76, tab: 48, space: 49, spacebar: 49,
-  // The Mac's delete key erases before the cursor; forward delete after it.
-  delete: 51, backspace: 51, forwarddelete: 117, del: 117,
-  escape: 53, esc: 53,
-  left: 123, right: 124, down: 125, up: 126, arrowleft: 123, arrowright: 124, arrowdown: 125, arrowup: 126,
-  home: 115, end: 119, pageup: 116, prior: 116, pagedown: 121, next: 121, help: 114, insert: 114,
-  f1: 122, f2: 120, f3: 99, f4: 118, f5: 96, f6: 97, f7: 98, f8: 100, f9: 101, f10: 109, f11: 103, f12: 111,
-  f13: 105, f14: 107, f15: 113, f16: 106, f17: 64, f18: 79, f19: 80, f20: 90,
-  capslock: 57, volumeup: 72, volumedown: 73, mute: 74,
+/** Linux (X11): keysyms, which the driver finds on the keyboard as it is laid out. A character's keysym is its code. */
+export const LINUX_KEYS: Keymap = {
+  system: 'linux',
+  mods: { ctrl: { code: 0xffe3, flag: 1 }, shift: { code: 0xffe1, flag: 2 }, alt: { code: 0xffe9, flag: 4 }, super: { code: 0xffeb, flag: 8 } },
+  modNames: PC_MOD_NAMES,
+  order: PC_ORDER,
+  named: {
+    return: 0xff0d, enter: 0xff0d, kpenter: 0xff8d, tab: 0xff09, space: 0x20, spacebar: 0x20,
+    backspace: 0xff08, delete: 0xffff, del: 0xffff, forwarddelete: 0xffff,
+    escape: 0xff1b, esc: 0xff1b,
+    left: 0xff51, up: 0xff52, right: 0xff53, down: 0xff54, arrowleft: 0xff51, arrowup: 0xff52, arrowright: 0xff53, arrowdown: 0xff54,
+    home: 0xff50, end: 0xff57, pageup: 0xff55, prior: 0xff55, pagedown: 0xff56, next: 0xff56, insert: 0xff63, help: 0xff6a,
+    ...range(0xffbe, 24, (i) => `f${i + 1}`),
+    capslock: 0xffe5, numlock: 0xff7f, scrolllock: 0xff14, pause: 0xff13, break: 0xff6b, printscreen: 0xff61, print: 0xff61,
+    menu: 0xff67, apps: 0xff67, contextmenu: 0xff67,
+    volumeup: 0x1008ff13, volumedown: 0x1008ff11, mute: 0x1008ff12, volumemute: 0x1008ff12, playpause: 0x1008ff14, medianext: 0x1008ff17,
+    mediaprev: 0x1008ff16, mediaprevious: 0x1008ff16, mediastop: 0x1008ff15,
+  },
+  chars: Object.fromEntries([...'abcdefghijklmnopqrstuvwxyz0123456789 ;=,-./`[\\]\''].map((c) => [c, c.charCodeAt(0)])),
+  escape: 0xff1b,
+  modWords: 'ctrl, shift, alt or super',
+  holdWords: 'shift, ctrl, alt or super',
+  keyWords: PC_KEY_WORDS,
 };
 
-/** Characters by their key on a US keyboard (ANSI key codes): for shortcuts like cmd+c. */
-const CHAR_CODE: Record<string, number> = {
-  a: 0, s: 1, d: 2, f: 3, h: 4, g: 5, z: 6, x: 7, c: 8, v: 9, b: 11, q: 12, w: 13, e: 14, r: 15, y: 16, t: 17,
-  '1': 18, '2': 19, '3': 20, '4': 21, '6': 22, '5': 23, '=': 24, '9': 25, '7': 26, '-': 27, '8': 28, '0': 29,
-  ']': 30, o: 31, u: 32, '[': 33, i: 34, p: 35, l: 37, j: 38, "'": 39, k: 40, ';': 41, '\\': 42, ',': 43, '/': 44,
-  n: 45, m: 46, '.': 47, '`': 50, ' ': 49,
-};
+export const KEYMAPS: Record<System, Keymap> = { mac: MAC_KEYS, windows: WINDOWS_KEYS, linux: LINUX_KEYS };
+
 /** Characters typed with shift on a US keyboard, and the key under them. */
 const SHIFTED: Record<string, string> = {
   '!': '1', '@': '2', '#': '3', $: '4', '%': '5', '^': '6', '&': '7', '*': '8', '(': '9', ')': '0',
@@ -117,37 +223,39 @@ export interface Stroke {
 
 /** A name as the tables write it: small letters, no spaces, dashes or underscores, no left/right side. */
 const plain = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '');
-const modOf = (s: string): Mod | undefined => MOD_NAMES[s] ?? MOD_NAMES[plain(s)] ?? MOD_NAMES[plain(s).replace(/(l|r|left|right)$/, '')];
+const modOf = (s: string, km: Keymap): Mod | undefined =>
+  km.modNames[s] ?? km.modNames[plain(s)] ?? km.modNames[plain(s).replace(/(l|r|left|right)$/, '')];
+const codesOf = (ms: Mod[], km: Keymap) => ms.map((m) => km.mods[m]!.code);
+const flagsOf = (ms: Mod[], km: Keymap) => ms.reduce((f, m) => f | km.mods[m]!.flag, 0);
 
 /** One combination ("cmd+shift+t", "return", "a"): its stroke, or what is wrong with it. */
-function parseCombo(c: string): Stroke | string {
+function parseCombo(c: string, km: Keymap): Stroke | string {
   let tokens: string[];
   if (c === '+') tokens = ['+'];
   else if (c.endsWith('++')) tokens = [...c.slice(0, -2).split('+'), '+'];
   else tokens = c.split('+');
-  if (tokens.some((t) => !t)) return `“${c}” is not a key or combination: write it like “cmd+c” or “return”`;
+  if (tokens.some((t) => !t)) return `“${c}” is not a key or combination: write it like “${km.system === 'mac' ? 'cmd' : 'ctrl'}+c” or “return”`;
   const keyName = tokens.at(-1)!;
   const mods: Mod[] = [];
   for (const t of tokens.slice(0, -1)) {
-    const m = modOf(t);
-    if (!m) return `“${t}” in “${c}” is not a modifier: use cmd, shift, alt (option), ctrl or fn`;
+    const m = modOf(t, km);
+    if (!m) return `“${t}” in “${c}” is not a modifier: use ${km.modWords}`;
     if (!mods.includes(m)) mods.push(m);
   }
-  const ordered = MOD_ORDER.filter((m) => mods.includes(m));
-  const flagsOf = (ms: Mod[]) => ms.reduce((f, m) => f | FLAGS[m], 0);
+  const ordered = km.order.filter((m) => mods.includes(m));
   // A modifier on its own ("shift"), or as the last of several.
-  const alone = [...keyName].length > 1 ? modOf(keyName) : MOD_NAMES[keyName];
+  const alone = [...keyName].length > 1 ? modOf(keyName, km) : km.modNames[keyName];
   if (alone) {
     const held = ordered.filter((m) => m !== alone);
-    return { code: MOD_CODE[alone], mods: held.map((m) => MOD_CODE[m]), flags: flagsOf([...held, alone]) };
+    return { code: km.mods[alone]!.code, mods: codesOf(held, km), flags: flagsOf([...held, alone], km) };
   }
   let ch = [...keyName].length === 1 ? keyName : CHAR_NAMES[plain(keyName)];
   if (!ch) {
-    const code = NAMED[plain(keyName)];
-    if (code === undefined) return `“${keyName}” is not a key this tool knows: use names like return, tab, escape, delete, forward_delete, space, up, down, left, right, home, end, page_up, page_down, f1–f20, or a single character`;
-    return { code, mods: ordered.map((m) => MOD_CODE[m]), flags: flagsOf(ordered) };
+    const code = km.named[plain(keyName)];
+    if (code === undefined) return `“${keyName}” is not a key this tool knows: use names like ${km.keyWords}, or a single character`;
+    return { code, mods: codesOf(ordered, km), flags: flagsOf(ordered, km) };
   }
-  // A character with cmd, ctrl, alt or fn is a shortcut: its key on a US keyboard, shift added for capitals and symbols.
+  // A character with cmd, ctrl, alt, win or fn is a shortcut: its key on a US keyboard, shift added for capitals and symbols.
   const command = ordered.filter((m) => m !== 'shift');
   if (!command.length) {
     // Typed as it is, the same on every keyboard layout (shift+a is A, shift+1 is !).
@@ -159,22 +267,22 @@ function parseCombo(c: string): Stroke | string {
   if (SHIFTED[ch]) base = SHIFTED[ch];
   else if (ch !== ch.toLowerCase()) base = ch.toLowerCase();
   if (base !== ch && !all.includes('shift')) all.push('shift');
-  const code = CHAR_CODE[base];
+  const code = km.chars[base];
   if (code === undefined) return `“${ch}” can't be pressed with ${command.join('+')}: use a letter, digit or punctuation of a US keyboard`;
-  const sorted = MOD_ORDER.filter((m) => all.includes(m));
-  return { code, mods: sorted.map((m) => MOD_CODE[m]), flags: flagsOf(sorted) };
+  const sorted = km.order.filter((m) => all.includes(m));
+  return { code, mods: codesOf(sorted, km), flags: flagsOf(sorted, km) };
 }
 
 /** Keys as an agent writes them: one combination, or several separated by spaces ("cmd+a delete"). */
-export function parseKeys(s: string): Stroke[] | string {
+export function parseKeys(s: string, km: Keymap = MAC_KEYS): Stroke[] | string {
   const text = String(s ?? '').trim();
-  if (!text) return 'Say which key: like “return”, “escape” or “cmd+c”';
+  if (!text) return `Say which key: like “return”, “escape” or “${km.system === 'mac' ? 'cmd' : 'ctrl'}+c”`;
   // A single space is the space bar.
   const combos = text === '' ? [] : text.split(/\s+/);
   if (combos.length > 20) return 'At most 20 keys at once';
   const out: Stroke[] = [];
   for (const c of combos) {
-    const st = parseCombo(c);
+    const st = parseCombo(c, km);
     if (typeof st === 'string') return st;
     out.push(st);
   }
@@ -182,17 +290,17 @@ export function parseKeys(s: string): Stroke[] | string {
 }
 
 /** Modifiers held while clicking ("shift", "cmd+alt"): their key codes and flags. */
-export function parseMods(s: unknown): { mods: number[]; flags: number } | string {
+export function parseMods(s: unknown, km: Keymap = MAC_KEYS): { mods: number[]; flags: number } | string {
   const text = String(s ?? '').trim();
   if (!text) return { mods: [], flags: 0 };
   const names: Mod[] = [];
   for (const t of text.split(/[\s+,]+/).filter(Boolean)) {
-    const m = modOf(t);
-    if (!m) return `“${t}” is not a key to hold while clicking: use shift, cmd, alt (option) or ctrl`;
+    const m = modOf(t, km);
+    if (!m) return `“${t}” is not a key to hold while clicking: use ${km.holdWords}`;
     if (!names.includes(m)) names.push(m);
   }
-  const sorted = MOD_ORDER.filter((m) => names.includes(m));
-  return { mods: sorted.map((m) => MOD_CODE[m]), flags: sorted.reduce((f, m) => f | FLAGS[m], 0) };
+  const sorted = km.order.filter((m) => names.includes(m));
+  return { mods: codesOf(sorted, km), flags: flagsOf(sorted, km) };
 }
 
 /** A combination as people read it: "cmd+shift+T". */
@@ -254,7 +362,7 @@ const seconds = (v: unknown, fallback: number): number => {
 };
 
 /** One action from the agent's input, checked; or what is wrong with it. */
-export function parseAction(a: Record<string, unknown>, g: Geometry | undefined): Action | string {
+export function parseAction(a: Record<string, unknown>, g: Geometry | undefined, km: Keymap = MAC_KEYS): Action | string {
   if (!a || typeof a !== 'object') return 'Each step is an object with an action';
   const raw = String(a.action ?? '').trim();
   const name = ACTIONS[raw.toLowerCase().replace(/[\s-]+/g, '_')];
@@ -272,7 +380,7 @@ export function parseAction(a: Record<string, unknown>, g: Geometry | undefined)
     case 'middle_click': {
       const p = at('coordinate');
       if (typeof p === 'string') return p;
-      const held = parseMods(a.text ?? a.hold ?? a.modifiers);
+      const held = parseMods(a.text ?? a.hold ?? a.modifiers, km);
       if (typeof held === 'string') return held;
       const button: Button = name === 'right_click' ? 'right' : name === 'middle_click' ? 'middle' : 'left';
       const count = name === 'double_click' ? 2 : name === 'triple_click' ? 3 : 1;
@@ -312,18 +420,18 @@ export function parseAction(a: Record<string, unknown>, g: Geometry | undefined)
     }
     case 'key': {
       const keys = String(a.text ?? a.key ?? a.keys ?? '');
-      const strokes = parseKeys(keys);
+      const strokes = parseKeys(keys, km);
       if (typeof strokes === 'string') return strokes;
       return { do: 'key', strokes, keys: keysLabel(keys) };
     }
     case 'hold_key': {
       const keys = String(a.text ?? a.key ?? '');
-      const strokes = parseKeys(keys);
+      const strokes = parseKeys(keys, km);
       if (typeof strokes === 'string') return strokes;
       if (strokes.length !== 1) return 'hold_key holds one key or combination';
       let st = strokes[0];
       if (st.code === undefined) {
-        const base = CHAR_CODE[(st.char ?? '').toLowerCase()];
+        const base = km.chars[(st.char ?? '').toLowerCase()];
         if (base === undefined) return `“${st.char}” can't be held: use a key like shift, space, or a letter`;
         st = { ...st, code: base };
       }
@@ -335,8 +443,8 @@ export function parseAction(a: Record<string, unknown>, g: Geometry | undefined)
       return { do: 'cursor' };
     case 'open_app': {
       const app = String(a.app ?? a.name ?? a.text ?? '').trim();
-      if (!app) return 'open_app needs app: the name of a Mac app, like “Notes”';
-      if (app.length > 100 || /[\n\r\0]/.test(app) || app.startsWith('-')) return 'app is the name of a Mac app, like “Notes” or “Google Chrome”';
+      if (!app) return `open_app needs app: the name of an app, like “${APP_EXAMPLE[km.system]}”`;
+      if (app.length > 100 || /[\n\r\0]/.test(app) || app.startsWith('-')) return `app is the name of an app, like “${APP_EXAMPLE[km.system]}” or “Google Chrome”`;
       return { do: 'open', app };
     }
   }
@@ -344,18 +452,26 @@ export function parseAction(a: Record<string, unknown>, g: Geometry | undefined)
 }
 
 /** The whole call: one action, or `steps` (up to 10), and whether to take a screenshot after (yes unless false). */
-export function parseInput(input: Record<string, unknown>, g: Geometry | undefined): { actions: Action[]; screenshot: boolean } | { error: string } {
+export function parseInput(input: Record<string, unknown>, g: Geometry | undefined, km: Keymap = MAC_KEYS): { actions: Action[]; screenshot: boolean } | { error: string } {
   const a = input && typeof input === 'object' ? input : {};
   const list: unknown[] = Array.isArray(a.steps) ? a.steps : a.action !== undefined ? [a] : [];
   if (!list.length) return { error: `Give an action (${ACTION_NAMES.join(', ')}), or steps: a list of them` };
   if (list.length > MAX_STEPS) return { error: `At most ${MAX_STEPS} steps at once: take a screenshot and go on from there` };
   const actions: Action[] = [];
   for (const [i, s] of list.entries()) {
-    const x = parseAction(s as Record<string, unknown>, g);
+    const x = parseAction(s as Record<string, unknown>, g, km);
     if (typeof x === 'string') return { error: list.length > 1 ? `Step ${i + 1}: ${x}. Nothing was done.` : `${x}. Nothing was done.` };
     actions.push(x);
   }
   return { actions, screenshot: a.screenshot !== false && a.screenshot !== 'false' };
+}
+
+/** An app each system has, for examples. */
+const APP_EXAMPLE: Record<System, string> = { mac: 'Notes', windows: 'Notepad', linux: 'Text Editor' };
+
+/** Whether an action presses the escape key (which stops the agent when the user presses it). */
+export function pressesEscape(a: Action, km: Keymap): boolean {
+  return (a.do === 'key' && a.strokes.some((s) => s.code === km.escape)) || (a.do === 'hold' && a.stroke.code === km.escape);
 }
 
 // ---- what the driver does -----------------------------------------------------------------------------------

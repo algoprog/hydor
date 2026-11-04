@@ -3,8 +3,9 @@
 # of computer it is for, or on a GitHub runner of that kind; scripts/dist.sh then packs it):
 #   build/server  the server and the web app, built, with their production packages (native ones for this system)
 #   build/node    Node.js, which runs the server and the agents' npm installs
-#   build/bin     tmux, for the terminals (built from source: macOS has none, and Linux systems differ); not on Windows,
-#                 where the server runs terminals itself
+#   build/bin     tmux, for the terminals (built from source: macOS has none, and Linux systems differ); on Windows,
+#                 where the server runs terminals itself, hydor-computer.exe instead: computer use's helper, built
+#                 from server/computer/windows-helper.cs with the C# compiler Windows has
 #   build/BUILD   this build's name: its version, commit and when it was made (the app copies its server once per build)
 # The repository must be built first: npm ci && npm run build, at its top. On Windows, run it with Git's bash.
 # Settings (environment): NODE_VERSION (default below; the same major version as the one running this script)
@@ -39,6 +40,7 @@ tar -cf - \
   package.json package-lock.json CHANGELOG.md LICENSE \
   dist/server dist/web \
   server/find/shipped-vectors.json server/memory/embed_worker.py \
+  server/computer/x11-helper.py server/computer/windows-helper.cs \
   web/src/i18n docs/guide catalog skills plugins |
   tar -xf - -C "$out/server"
 (cd "$out/server" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
@@ -82,6 +84,17 @@ if [ "$os" != win32 ]; then
   echo "== tmux"
   mkdir -p "$out/bin"
   "$here/scripts/build-tmux.sh" "$out/bin"
+else
+  echo "== Computer use's helper"
+  mkdir -p "$out/bin"
+  framework="$(cygpath -u "$WINDIR")/Microsoft.NET/Framework64/v4.0.30319"
+  [ -f "$framework/csc.exe" ] || framework="$(cygpath -u "$WINDIR")/Microsoft.NET/Framework/v4.0.30319"
+  "$framework/csc.exe" -nologo -optimize+ -target:exe -out:"$(cygpath -w "$out/bin/hydor-computer.exe")" \
+    -reference:System.Drawing.dll "$(cygpath -w "$root/server/computer/windows-helper.cs")"
+  # It starts, and answers where the pointer and the main display are.
+  answer="$(printf '{"id":1,"ops":[{"op":"info"}]}\n' | "$out/bin/hydor-computer.exe")"
+  echo "$answer"
+  case "$answer" in *'"ok":true'*) ;; *) echo "The helper did not answer." >&2; exit 1 ;; esac
 fi
 
 version="$(node -p "require('$(native "$root/package.json")').version")"

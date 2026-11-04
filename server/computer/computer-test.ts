@@ -1,9 +1,12 @@
-// Script tests for computer use, all of which run on any computer: keys and combinations by their macOS key codes,
-// pixels of the screenshot as points on the screen (Retina and scaled displays), the agent's actions checked and turned
-// into the driver's steps, picture sizes; the driver script itself, run with stand-ins for macOS's bridge (the events it
-// posts, typing by Unicode or by pasting); and the tools with stand-ins for the Mac: off by default, macOS's permissions,
-// the card each session shows first, one session at a time, Stop, and the step pictures. What only a Mac can show (that
-// macOS takes the events and the screenshots) is not tried here. Build and run:
+// Script tests for computer use, all of which run on any computer: keys and combinations by each system's codes (macOS's
+// key codes, Windows' virtual-key codes, X11's keysyms), pixels of the screenshot as points on the screen (Retina and
+// scaled displays), the agent's actions checked and turned into the driver's steps, picture sizes; the Mac's driver
+// script, run with stand-ins for macOS's bridge (the events it posts, typing by Unicode or by pasting); the helper
+// programs' protocol (helper.ts, with a stand-in program); Linux's apps by their .desktop entries and its Wayland check;
+// and the tools with stand-ins for the computer: off by default, macOS's permissions, what keeps it from working, the
+// card each session shows first (in each system's words), one session at a time, Esc let go while the agent presses
+// it, Stop, and the step pictures. What only the systems themselves can show (that they take the events and the
+// screenshots) is in x11-test.ts for Linux, and in the desktop workflow for Windows. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/computer/computer-test.ts && DATA_DIR=/tmp/hydor-test-computer node dist/dev/computer-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +21,9 @@ process.env.HYDOR_COMPUTER_SETTLE_MS = '1';
 fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true });
 fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
 
-const { FLAGS, describe, fitSize, jpegSize, opsFor, parseInput, parseKeys, pngSize, toPicture, toScreen } = await import('./plan.ts');
+const { FLAGS, LINUX_KEYS, WINDOWS_KEYS, describe, fitSize, jpegSize, opsFor, parseInput, parseKeys, pngSize, pressesEscape, toPicture, toScreen } = await import('./plan.ts');
+const { Helper } = await import('./helper.ts');
+const { execArgs, findEntry, wayland } = await import('./linux.ts');
 const { DRIVER } = await import('./driver.ts');
 const access = await import('./access.ts');
 const { computerTools, machine } = await import('./tools.ts');
@@ -57,6 +62,38 @@ test('keys: names, combinations and characters as macOS key codes; a character a
   assert.match(String(parseKeys('cmd+é')), /US keyboard/);
 });
 
+test('keys on Windows: virtual-key codes; a Mac’s cmd is ctrl, super is the Windows key; delete erases after the cursor', () => {
+  const W = WINDOWS_KEYS;
+  assert.deepEqual(parseKeys('ctrl+c', W), [{ code: 0x43, mods: [0x11], flags: 1 }]);
+  assert.deepEqual(parseKeys('cmd+c', W), [{ code: 0x43, mods: [0x11], flags: 1 }], 'cmd means ctrl on a PC');
+  assert.deepEqual(parseKeys('ctrl+shift+Tab', W), [{ code: 0x09, mods: [0x11, 0x10], flags: 3 }]);
+  assert.deepEqual(parseKeys('alt+F4', W), [{ code: 0x73, mods: [0x12], flags: 4 }]);
+  assert.deepEqual(parseKeys('win', W), [{ code: 0x5b, mods: [], flags: 8 }], 'the Windows key alone');
+  assert.deepEqual(parseKeys('super+e', W), [{ code: 0x45, mods: [0x5b], flags: 8 }]);
+  assert.deepEqual(parseKeys('ctrl+?', W), [{ code: 0xbf, mods: [0x11, 0x10], flags: 3 }], '? is shift and /');
+  assert.deepEqual(parseKeys('BackSpace Delete', W), [{ code: 0x08, mods: [], flags: 0 }, { code: 0x2e, mods: [], flags: 0 }]);
+  assert.deepEqual(parseKeys('F24 Escape', W), [{ code: 0x87, mods: [], flags: 0 }, { code: 0x1b, mods: [], flags: 0 }]);
+  assert.deepEqual(parseKeys('shift+a', W), [{ char: 'A', mods: [], flags: 0 }], 'a character alone is typed as it is');
+  assert.match(String(parseKeys('fn+x', W)), /not a modifier: use ctrl, shift, alt or win/);
+  assert.match(String(parseKeys('launchpad', W)), /backspace, delete/);
+});
+
+test('keys on Linux: X11 keysyms, found on the keyboard as it is laid out', () => {
+  const L = LINUX_KEYS;
+  assert.deepEqual(parseKeys('ctrl+shift+t', L), [{ code: 0x74, mods: [0xffe3, 0xffe1], flags: 3 }]);
+  assert.deepEqual(parseKeys('Return KP_Enter', L), [{ code: 0xff0d, mods: [], flags: 0 }, { code: 0xff8d, mods: [], flags: 0 }]);
+  assert.deepEqual(parseKeys('super', L), [{ code: 0xffeb, mods: [], flags: 8 }]);
+  assert.deepEqual(parseKeys('Super_L', L), [{ code: 0xffeb, mods: [], flags: 8 }], 'xdotool’s names');
+  assert.deepEqual(parseKeys('ctrl+bracketleft', L), [{ code: 0x5b, mods: [0xffe3], flags: 1 }]);
+  assert.deepEqual(parseKeys('XF86AudioRaiseVolume', L).toString().includes('not a key'), true);
+  assert.deepEqual(parseKeys('volume_up', L), [{ code: 0x1008ff13, mods: [], flags: 0 }]);
+  assert.deepEqual(parseKeys('F13', L), [{ code: 0xffca, mods: [], flags: 0 }]);
+  const p = parseInput({ steps: [{ action: 'key', text: 'escape' }, { action: 'hold_key', text: 'esc', duration: 1 }, { action: 'key', text: 'ctrl+a' }] }, GEO, L);
+  assert.ok('actions' in p);
+  assert.deepEqual(p.actions.map((a) => pressesEscape(a, L)), [true, true, false], 'Escape, whichever way it is pressed');
+  assert.equal(pressesEscape(p.actions[0], WINDOWS_KEYS), false, 'by the codes of the system it is for');
+});
+
 test('coordinates: pixels of the screenshot as points on the screen, and back; sizes scaled down, never up', () => {
   assert.deepEqual(fitSize(2880, 1800), { width: 1280, height: 800 });
   assert.deepEqual(fitSize(3840, 2160), { width: 1280, height: 720 });
@@ -87,7 +124,7 @@ test('actions: checked, with what is wrong said plainly; steps, and a screenshot
   assert.match(err({ action: 'fly' }), /“fly” is not an action/);
   assert.match(err({ steps: [{ action: 'wait' }, { action: 'scroll', scroll_direction: 'sideways' }] }), /^Step 2: scroll_direction must be/);
   assert.match(err({ steps: Array.from({ length: 11 }, () => ({ action: 'wait' })) }), /At most 10 steps/);
-  assert.match(err({ action: 'open_app', app: '-a /tmp/x' }), /name of a Mac app/);
+  assert.match(err({ action: 'open_app', app: '-a /tmp/x' }), /name of an app/);
   assert.match(err({}), /Give an action/);
   const w = parseInput({ action: 'wait', duration: 99 }, undefined);
   assert.ok('actions' in w && w.actions[0].do === 'wait' && w.actions[0].seconds === 10, 'waits at most 10 s, and need no screenshot');
@@ -271,10 +308,11 @@ const call = async (key: string, name: string, args: Record<string, unknown> = {
   return typeof r === 'string' ? { text: r } : r;
 };
 
-test('only in the Mac app with Computer use on: no tools and no instructions otherwise; off at first', async () => {
-  access.hooks.inApp = () => false;
+test('only in a desktop app with Computer use on: no tools and no instructions otherwise; off at first', async () => {
+  access.hooks.system = () => null;
   assert.deepEqual(computer.tools!(ctxOf('a') as never), []);
-  access.hooks.inApp = () => true;
+  assert.equal((await access.computerState(db)).available, false);
+  access.hooks.system = () => 'mac';
   assert.equal(access.computerSettings(db).enabled, false, 'off at first');
   assert.deepEqual(computer.tools!(ctxOf('a') as never), []);
   assert.equal(computer.spawn!({} as never, deps), undefined);
@@ -284,6 +322,8 @@ test('only in the Mac app with Computer use on: no tools and no instructions oth
   assert.match(told, /browser tools/);
   assert.match(told, /screenshot before acting/);
   assert.match(told, /passwords/);
+  assert.match(told, /this Mac/);
+  assert.match(told, /Esc/);
 });
 
 test('macOS’s permissions first: a missing one is named, with where the user allows it', async () => {
@@ -308,7 +348,8 @@ test('the first use in a session asks on a card; no is respected; yes holds for 
   assert.equal(no.isError, true);
   assert.match(no.text, /The user said no/);
   assert.equal(cards.at(-1)?.title, 'Let the agent use your Mac?');
-  assert.match(cards.at(-1)?.detail ?? '', /⌘⇧Esc/);
+  assert.match(cards.at(-1)?.detail ?? '', /press \*\*Esc\*\*/);
+  assert.match(cards.at(-1)?.detail ?? '', /glow/);
   answer = 'accept';
   const shot = await call('a', 'computer_screenshot');
   assert.equal(shot.isError, undefined);
@@ -352,6 +393,115 @@ test('one session at a time; Stop ends it, and the session asks again before it 
   assert.deepEqual(drives.at(-1), [{ op: 'release' }]);
   access.setComputerSettings(db, { enabled: false });
   assert.equal((await call('a', 'computer_screenshot')).text, access.OFF, 'turned off: refused');
+});
+
+test('Esc is let go while the agent presses it: its Escape goes alone, between the other steps', async () => {
+  access.setComputerSettings(db, { enabled: true });
+  access.resetAccess();
+  answer = 'accept';
+  machine.drive = async (ops) => {
+    drives.push(ops);
+    return { done: ops.length, positions: [] };
+  };
+  await call('e', 'computer_screenshot');
+  drives.length = 0;
+  const r = await call('e', 'computer_act', { steps: [{ action: 'left_click', coordinate: [1, 1] }, { action: 'key', text: 'escape' }, { action: 'type', text: 'x' }], screenshot: false });
+  assert.equal(r.isError, undefined, r.text);
+  assert.deepEqual(
+    drives.map((ops) => (ops as { op: string }[]).map((o) => o.op)),
+    [['click'], ['key'], ['type']],
+    'three runs of the driver: before, the Escape, after',
+  );
+  assert.match(r.text, /2\. Pressed escape\./);
+});
+
+test('on Windows and Linux: their own words, keys and examples; what keeps it from working is said first', async () => {
+  access.hooks.system = () => 'windows';
+  access.resetAccess();
+  cards.length = 0;
+  const tools = computerTools(ctxOf('w') as never);
+  const act = tools.find((t) => t.name === 'computer_act')!;
+  assert.match(act.description, /this PC/);
+  assert.match(act.description, /ctrl\+c/);
+  assert.match(act.description, /backspace erases before the cursor, delete after it/);
+  assert.match((computer.spawn!({} as never, deps) as { instructions: string[] }).instructions.join(' '), /use this PC/);
+  await call('w', 'computer_screenshot');
+  assert.equal(cards.at(-1)?.title, 'Let the agent use your PC?');
+  assert.match(cards.at(-1)?.detail ?? '', /notification area/);
+  drives.length = 0;
+  const r = await call('w', 'computer_act', { action: 'key', text: 'cmd+v', screenshot: false });
+  assert.equal(r.isError, undefined, r.text);
+  assert.deepEqual(drives.at(-1), [{ op: 'key', code: 0x56, mods: [0x11], flags: 1 }], 'virtual-key codes, cmd as ctrl');
+  const st = await access.computerState(db);
+  assert.equal(st.system, 'windows');
+  assert.equal(st.permissions, undefined, 'no macOS permissions to ask for');
+
+  access.hooks.system = () => 'linux';
+  access.hooks.problem = async () => 'This Linux desktop runs on Wayland.';
+  access.resetAccess();
+  const no = await call('l', 'computer_screenshot');
+  assert.equal(no.isError, true);
+  assert.match(no.text, /cannot work on this computer now: This Linux desktop runs on Wayland\. Tell the user\./);
+  assert.equal((await access.computerState(db)).problem, 'This Linux desktop runs on Wayland.');
+  access.hooks.problem = async () => null;
+  cards.length = 0;
+  await call('l', 'computer_screenshot');
+  assert.equal(cards.at(-1)?.title, 'Let the agent use your computer?');
+  access.hooks.system = () => 'mac';
+});
+
+test('Linux: Wayland told apart from X11; apps found by their names and ids; Exec lines without field codes', () => {
+  assert.equal(wayland({ XDG_SESSION_TYPE: 'wayland', WAYLAND_DISPLAY: 'wayland-0', DISPLAY: ':0' }), true);
+  assert.equal(wayland({ XDG_SESSION_TYPE: 'x11', DISPLAY: ':0' }), false);
+  assert.equal(wayland({ WAYLAND_DISPLAY: 'wayland-0' }), true, 'no session type said: Wayland');
+  const e = (id: string, names: string[], generic: string[] = [], hidden = false) => ({ id, file: `/usr/share/applications/${id}`, names, generic, exec: '', hidden });
+  const list = [
+    e('org.gnome.TextEditor.desktop', ['Text Editor', 'Επεξεργαστής κειμένου']),
+    e('firefox_firefox.desktop', ['Firefox'], ['Web Browser']),
+    e('org.gnome.Nautilus.desktop', ['Files']),
+    e('display-im6.q16.desktop', ['ImageMagick (display Q16)'], [], true),
+  ];
+  assert.equal(findEntry('text editor', list)?.id, 'org.gnome.TextEditor.desktop');
+  assert.equal(findEntry('Επεξεργαστής κειμένου', list)?.id, 'org.gnome.TextEditor.desktop', 'by its name in the user’s language');
+  assert.equal(findEntry('texteditor', list)?.id, 'org.gnome.TextEditor.desktop', 'by the end of its id');
+  assert.equal(findEntry('web browser', list)?.id, 'firefox_firefox.desktop', 'by what it is');
+  assert.equal(findEntry('fire', list)?.id, 'firefox_firefox.desktop');
+  assert.equal(findEntry('imagemagick', list), null, 'hidden entries only by their exact name');
+  assert.equal(findEntry('photoshop', list), null);
+  assert.deepEqual(execArgs('firefox %u'), ['firefox']);
+  assert.deepEqual(execArgs('"/opt/My App/app" --new-window %F --name=%%x'), ['/opt/My App/app', '--new-window', '--name=%x']);
+  assert.deepEqual(execArgs('env FOO="a b" code --unity-launch %F'), ['env', 'FOO=a b', 'code', '--unity-launch']);
+});
+
+test('helper programs: started once, asked line by line, errors said, and ended by Stop (then started again)', async () => {
+  const prog = `
+    const rl = require('readline').createInterface({ input: process.stdin });
+    console.log(JSON.stringify({ ready: true, pid: process.pid, compositor: true }));
+    rl.on('line', (l) => {
+      const m = JSON.parse(l);
+      if (m.ops[0].op === 'fail') return console.log(JSON.stringify({ id: m.id, ok: false, error: 'it broke' }));
+      if (m.ops[0].op === 'slow') return;
+      console.log(JSON.stringify({ id: m.id, ok: true, out: { done: m.ops.length, text: m.ops[0].text } }));
+    });`;
+  const h = new Helper({ name: 'The test helper', command: () => ({ cmd: process.execPath, args: ['-e', prog] }) });
+  const r = await h.call({ ops: [{ op: 'type', text: 'héllo ☃ 你好' }] }, { timeoutMs: 5000 });
+  assert.deepEqual(r, { done: 1, text: 'héllo ☃ 你好' }, 'any character goes through');
+  const pid = h.facts?.pid;
+  assert.equal(h.facts?.compositor, true, 'what it said when ready');
+  await h.call({ ops: [{ op: 'x' }] }, { timeoutMs: 5000 });
+  assert.equal(h.facts?.pid, pid, 'the same program, asked again');
+  await assert.rejects(h.call({ ops: [{ op: 'fail' }] }, { timeoutMs: 5000 }), /it broke/);
+  const stop = new AbortController();
+  setTimeout(() => stop.abort(), 100);
+  await assert.rejects(h.call({ ops: [{ op: 'slow' }] }, { timeoutMs: 5000, signal: stop.signal }), /Stopped/);
+  await assert.rejects(h.call({ ops: [{ op: 'slow' }] }, { timeoutMs: 200 }), /took too long/);
+  await h.call({ ops: [{ op: 'x' }] }, { timeoutMs: 5000 });
+  assert.notEqual(h.facts?.pid, pid, 'started again after it was stopped');
+  h.stop();
+  const broken = new Helper({ name: 'The broken helper', command: () => ({ cmd: process.execPath, args: ['-e', 'console.error("libXtst is not on this computer"); process.exit(3)'] }) });
+  await assert.rejects(broken.start(), /The broken helper stopped \(exit 3\): libXtst is not on this computer/);
+  const missing = new Helper({ name: 'The missing helper', command: () => ({ cmd: '/nonexistent/python3', args: [] }) });
+  await assert.rejects(missing.start(), /ENOENT/);
 });
 
 for (const [name, fn] of tests) {

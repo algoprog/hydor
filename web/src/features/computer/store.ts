@@ -1,5 +1,5 @@
-// Computer use as the pages know it: Settings → Computer use's state, and the session whose agent is using the Mac
-// now (the server's news, { t: 'feature', id: 'computer' }).
+// Computer use as the pages know it: Settings → Computer use's state, and the session whose agent is using the
+// computer now (the server's news, { t: 'feature', id: 'computer' }).
 import { create } from 'zustand';
 import type { ComputerActive, ComputerEvent, ComputerState } from '@shared/computer';
 import { api, post } from '../../lib/api';
@@ -27,7 +27,7 @@ export async function loadComputer() {
   } catch {}
 }
 
-/** Stop: agents no longer use the Mac until you allow it again. */
+/** Stop: agents no longer use the computer until you allow it again. */
 export async function stopComputer() {
   try {
     const state = await post<ComputerState>('/api/computer/stop');
