@@ -2,7 +2,8 @@
 // workflow does, after packing), it shows glow.cjs over a plain window of a known colour, takes the agent's
 // screenshot as the server does there, and checks the screen's edges in it show that colour, not the glow:
 //   macOS    screencapture, with the glow hidden meanwhile (macOS 15.4 and later capture even windows that ask not)
-//   Windows  the built helper (HYDOR_COMPUTER_HELPER), with the glow left as it is: Windows keeps it out by itself
+//   Windows  the built helper (HYDOR_COMPUTER_HELPER), with the glow hidden meanwhile (its copy of the screen takes
+//            in windows that ask to be left out, as the first run of this test showed)
 //   Linux    the app's own capture, on an X display with a compositor (else the app shows no glow at all)
 // It also checks the person sees it: on Linux a capture without hiding it shows it; on a Mac, where captures may leave
 // it out by themselves, macOS's own list of the windows on screen has it, over the whole display, above the others.
@@ -66,7 +67,14 @@ async function agentShot() {
     }
     return nativeImage.createFromPath(f);
   }
-  if (WIN) return helperShot();
+  if (WIN) {
+    await glow.veil();
+    try {
+      return await helperShot();
+    } finally {
+      glow.unveil();
+    }
+  }
   const shot = await glow.capture(8192, 95);
   return nativeImage.createFromBuffer(Buffer.from(shot.jpeg, 'base64'));
 }

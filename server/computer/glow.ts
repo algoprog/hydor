@@ -1,20 +1,14 @@
 // What the desktop app does around an agent's actions (desktop/glow.cjs): the glow that lines the screen's edges while
 // an agent uses the computer is for the person at it, never for the agent, so it is hidden for the moment a screenshot
-// takes wherever the system would otherwise put it in the picture (macOS 15.4 and later capture even windows that ask
-// to be left out; Linux has no such thing; Windows leaves it out by itself since Windows 10 2004). And Esc, which stops
-// the agent, is let go while the agent itself presses it.
-import os from 'node:os';
+// takes. No system can be trusted to leave it out by itself: the windows ask to be left out of captures, but macOS
+// 15.4 and later may capture them all the same, Windows' copy of the screen took them in on GitHub's Windows Server
+// 2022 runners (desktop/scripts/glow-test.cjs), and Linux has no such thing (there the app takes the screenshot and
+// hides the glow itself). And Esc, which stops the agent, is let go while the agent itself presses it.
 import { askDesktop, desktop, tellDesktop } from '../desktop.ts';
 
-/** Whether the system keeps the glow out of screenshots by itself: Windows 10 2004 (build 19041) and later. */
-export function glowKeptOut(release = os.release()): boolean {
-  if (desktop?.platform !== 'windows') return false;
-  return Number(release.split('.')[2]) >= 19041;
-}
-
-/** Runs `fn` (a screenshot) with the glow hidden, unless the system keeps it out of pictures by itself. */
+/** Runs `fn` (a screenshot) with the glow hidden. */
 export async function withoutGlow<T>(fn: () => Promise<T>): Promise<T> {
-  if (!desktop || glowKeptOut()) return fn();
+  if (!desktop) return fn();
   const hidden = await askDesktop({ what: 'glow', show: false }, 2000).then(
     () => true,
     () => false,

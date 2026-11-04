@@ -297,7 +297,7 @@ The first time an agent in a session wants the computer, a card in the conversat
 - type text, in any language, and press keys and shortcuts like ⌘C on a Mac or Ctrl+C on Windows and Linux;
 - open an app by its name, as the Start menu or the applications menu shows it.
 
-While an agent works, a glow lines the edges of your screen, on every display, and a note at the bottom says "An agent is using your Mac" (your PC, your computer) and "Press Esc to stop". Clicks go through it, and it never takes the keyboard. It is for you only: the agent's screenshots never show it (on a Mac and on Linux it is hidden for the moment a screenshot takes, and comes back). On Linux it needs a desktop that composites its windows, as GNOME, KDE, Xfce, Cinnamon and MATE do; without one there is no glow, and the tray icon still says an agent is at work.
+While an agent works, a glow lines the edges of your screen, on every display, and a note at the bottom says "An agent is using your Mac" (your PC, your computer) and "Press Esc to stop". Clicks go through it, and it never takes the keyboard. It is for you only: the agent's screenshots never show it (it is hidden for the moment a screenshot takes, and comes back). On Linux it needs a desktop that composites its windows, as GNOME, KDE, Xfce, Cinnamon and MATE do; without one there is no glow, and the tray icon still says an agent is at work.
 
 Each step shows in the conversation as a line with a small picture of the screen after it: click the picture to see it large, and the line for the agent's full answer. The app keeps the pictures of each session's last 200 steps; those of sessions untouched for a month go.
 
