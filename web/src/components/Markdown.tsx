@@ -4,9 +4,10 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { normalizeMath } from './markdown-math';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, FileText } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
 import { CITE_RUN, citedReply, citeNumbers, type Cited } from '@shared/citations';
+import { codexCitations, FILE_CITATION } from '@shared/file-citations';
 import { CiteChip, SourcesRow } from './Citations';
 import { openLightbox } from './Lightbox';
 import { cx } from './ui';
@@ -141,12 +142,12 @@ function appPath(h: string): string | null {
 }
 
 /**
- * Links: local paths open in the app's file viewer; links to this app's own pages open here. In a document
- * (`baseDir` set), relative links are files next to it and `#section` links scroll to that heading. In the
- * guide (`app`), `/…` links are the app's pages.
+ * Links: local paths open in the app's file viewer (a file an agent cites, from Codex's file citations, as a chip with
+ * a file's icon); links to this app's own pages open here. In a document (`baseDir` set), relative links are files next
+ * to it and `#section` links scroll to that heading. In the guide (`app`), `/…` links are the app's pages.
  */
 function makeLink(baseDir?: string, app?: boolean): Components['a'] {
-  return function Link({ href, children }) {
+  return function Link({ href, title, children }) {
     const h = href ?? '';
     const own = app && h.startsWith('/') && !h.startsWith('//') ? h : appPath(h);
     if (own) {
@@ -181,14 +182,17 @@ function makeLink(baseDir?: string, app?: boolean): Components['a'] {
       const raw = decodeURIComponent((relative ? joinPath(baseDir!, h) : h.replace(/^file:\/\//, '')).replace(/[?#].*$/, ''));
       const path = normalizePath(raw);
       const line = Number(/#L(\d+)/.exec(h)?.[1]) || undefined;
+      const cited = title === FILE_CITATION;
       return (
         <a
           href={`${machineBase}/file?path=${encodeURIComponent(path)}`}
+          title={cited ? path : (title ?? undefined)}
           onClick={(e) => {
             e.preventDefault();
             openFile(path, line);
           }}
         >
+          {cited && <FileText size={13} className="mr-0.5 inline-block shrink-0 align-[-2px]" aria-hidden />}
           {children}
         </a>
       );
@@ -568,7 +572,7 @@ export const Markdown = memo(function Markdown({
   cwd?: string;
 }) {
   const src = useMemo(() => {
-    const t = normalizeMath(text, !notebook);
+    const t = normalizeMath(codexCitations(text), !notebook);
     return streaming ? holdOpenMaths(t) : t;
   }, [text, notebook, streaming]);
   useChemistry(src);

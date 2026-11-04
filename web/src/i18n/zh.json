@@ -10833,5 +10833,6 @@
 "Who you are and what you do, what you use, how you like answers, what to avoid. Say, “Data analyst in Lisbon; works in Python and SQL. Short answers, the conclusion first.”":"你是谁、做什么，用什么，喜欢怎样的回答，要避免什么。例如：“里斯本的数据分析师；用 Python 和 SQL 工作。回答简短，先说结论。”",
 "Write it":"自己写",
 "Written {0} by {1}":"{0}由{1}撰写",
-"Your profile":"你的档案"
+"Your profile":"你的档案",
+"(line {0})":"（第 {0} 行）"
 }

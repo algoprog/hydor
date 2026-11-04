@@ -10842,5 +10842,6 @@
 "Who you are and what you do, what you use, how you like answers, what to avoid. Say, “Data analyst in Lisbon; works in Python and SQL. Short answers, the conclusion first.”":"Ποιοι είστε και τι κάνετε, τι χρησιμοποιείτε, πώς σας αρέσουν οι απαντήσεις, τι να αποφεύγεται. Για παράδειγμα: «Αναλυτής δεδομένων στη Λισαβόνα· δουλεύει με Python και SQL. Σύντομες απαντήσεις, πρώτα το συμπέρασμα.»",
 "Write it":"Γράψτε το",
 "Written {0} by {1}":"Γράφτηκε {0} από {1}",
-"Your profile":"Το προφίλ σας"
+"Your profile":"Το προφίλ σας",
+"(line {0})":"(γραμμή {0})"
 }
