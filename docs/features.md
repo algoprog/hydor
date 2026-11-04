@@ -96,9 +96,11 @@ agents that speak ACP and take MCP servers.
   memory), a group's projects too, and its Library tab everything it holds there; its Settings tab sets its name,
   colour, guidelines, the assistant its sessions start as (one tap among them) and its group, saved from a bar
   that shows once something changed. Its Files tab shows its folders; files come in from
-  Files, a file's window or an agent's file cards with Add to a project. Its Skills tab holds skills only its
-  sessions get, with the skill library: written there, copied from the library to change for the project alone, or
-  proposed by an agent working in it and kept for the project when you approve. A group brings several projects
+  Files, a file's window or an agent's file cards with Add to a project. Its Skills tab lists every skill its
+  sessions get, each with a switch for the project alone (On here, Off here; Follow Settings goes back): its own
+  skills, written there, copied from the library to change for the project alone, or proposed by an agent working
+  in it and kept for the project when you approve; the library's; and Claude Code's and Codex's own for its folder,
+  switched for its sessions through their settings for the session, not their own files. A group brings several projects
   together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar
   groups each project's sessions under its name, and its filter shows one project's sessions. New project asks only for a
   name (its colour on the mark beside it) and where its files go, a new folder or one you have, with the folders you
@@ -296,9 +298,10 @@ agents that speak ACP and take MCP servers.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
   sixty that come with the app for every agent (ways of working, writing, documents, research and the web,
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
-  Code's and Codex's own, and each project's own. A search, a row of filters and a switch on every skill; write
-  your own for every agent or for one, change a built-in one (your version takes its place), remove and bring
-  back. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a project,
+  Code's and Codex's own, and each project's own. A search, a row of filters and a switch on every skill, for
+  every session (a project can switch any skill the other way for its own sessions, and the row says so: "Off in
+  Thesis"); write your own for every agent or for one, change a built-in one (your version takes its place),
+  remove and bring back. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a project,
   for the project alone. Other ACP agents get the list of skills to read when one fits. A new session's agent
   hears which skills fit its first message, found by words and by meaning, when any clearly do.
 - **Plugins** for every agent (Settings → Plugins): skills, tool servers (MCP), instructions, files of their own

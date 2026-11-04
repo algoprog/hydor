@@ -1,7 +1,7 @@
 // Script tests for spaces: a new space gets a folder of its own (or uses one given), its fields are cleaned,
 // its sessions are counted, it can leave the shared knowledge out, a session in it is told its instructions,
 // a group brings spaces together, a space has skills of its own that its sessions get with the skill
-// library's, and folders used lately that no space has are suggested for one. Build and run with a scratch data folder:
+// library's, it switches skills on or off for its own sessions, and folders used lately that no space has are suggested for one. Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/spaces/spaces-test.ts
 //   DATA_DIR=/tmp/hydor-test-spaces node dist/dev/spaces-test.js
 import assert from 'node:assert/strict';
@@ -17,8 +17,19 @@ import { guidelines } from '../guidelines/index.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { history } from '../skillpack/history.ts';
 import { skillpack } from '../skillpack/index.ts';
-import { folders, librarySkills, parseSkill, setFolders, skillText } from '../skillpack/library.ts';
-import { copyToSpace, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, spaceSkillsDir, spaceSkillsView, spaceSkillText } from '../skillpack/spaceSkills.ts';
+import { folders, librarySkills, parseSkill, setFolders, setOffSkills, skillText } from '../skillpack/library.ts';
+import {
+  clearSpaceSwitches,
+  copyToSpace,
+  removeSpaceSkill,
+  restoreSpaceSkill,
+  saveSpaceSkill,
+  setSpaceSwitch,
+  spaceSkillsDir,
+  spaceSkillsView,
+  spaceSkillText,
+  spaceSwitches,
+} from '../skillpack/spaceSkills.ts';
 import { createSpace, deleteSpace, sessionsIn, spaceById, spaces, spaceViews, updateSpace } from './index.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
 
@@ -262,6 +273,60 @@ test('a session in a space gets its skills with the library’s, its own in plac
   await skillpack.spawn!({ ...base, agent: 'codex', extra: { space: kitchen.id } }, deps);
   assert.equal(linkOf(view, 'writing'), path.join(APP_ROOT, 'skills', 'writing'));
   for (const sp of [home, kitchen, garden]) deleteSpace(db, sp.id);
+});
+
+test('a space switches skills on or off for its own sessions: the library’s, its own, and Claude Code’s and Codex’s own', async () => {
+  const deps = { db } as unknown as Deps;
+  const base = { cwd: tmp, runId: 'r', resume: false };
+  const sp = createSpace(db, { name: 'Workshop' });
+  saveSpaceSkill(db, sp.id, { name: 'jig-plans', description: 'Use when drawing a jig for the workshop', body: BODY });
+  // Settings → Skills has research off for every session; the workshop has it on, and docker and its own jig-plans off.
+  setOffSkills(['research']);
+  setSpaceSwitch(db, sp.id, { name: 'research', on: true });
+  setSpaceSwitch(db, sp.id, { name: 'docker', on: false });
+  setSpaceSwitch(db, sp.id, { name: 'jig-plans', on: false });
+  setSpaceSwitch(db, sp.id, { name: 'deploy', agent: 'claude', on: false });
+  setSpaceSwitch(db, sp.id, { name: 'imagegen', agent: 'codex', on: true });
+  assert.deepEqual(spaceSkillsView(db, sp.id).switches, { 'claude:deploy': false, 'codex:imagegen': true, docker: false, 'jig-plans': false, research: true });
+  // Elsewhere, as Settings has them.
+  const outside = await skillpack.spawn!({ ...base, agent: 'codex', extra: {} }, deps);
+  assert.ok(!fs.existsSync(path.join(folders().view, 'skills', 'research')));
+  assert.ok(fs.existsSync(path.join(folders().view, 'skills', 'docker')));
+  assert.equal(outside?.codexConfig, undefined);
+  // Codex in the workshop: its view has research and neither docker nor jig-plans; its own skills in its thread's settings.
+  const codex = await skillpack.spawn!({ ...base, agent: 'codex', extra: { space: sp.id } }, deps);
+  const view = path.dirname(codex!.skillRoots![0]);
+  assert.equal(linkOf(view, 'research'), path.join(APP_ROOT, 'skills', 'research'));
+  assert.ok(!fs.existsSync(path.join(view, 'skills', 'docker')));
+  assert.ok(!fs.existsSync(path.join(view, 'skills', 'jig-plans')));
+  assert.deepEqual(codex?.codexConfig, { skills: { config: [{ name: 'imagegen', enabled: true }] } });
+  // Claude Code: its own skills as settings on its command line, which come before the user's own.
+  const claude = await skillpack.spawn!({ ...base, agent: 'claude', extra: { space: sp.id } }, deps);
+  assert.deepEqual(claude?.args, ['--plugin-dir', view, '--settings', JSON.stringify({ skillOverrides: { deploy: 'off' } })]);
+  // Other agents (Gemini CLI…) read the list of the workshop's view.
+  const list = (await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'gemini', extra: { space: sp.id } }, deps))!.instructions!.join('\n');
+  assert.match(list, /\n- research: /);
+  assert.doesNotMatch(list, /\n- docker: |\n- jig-plans: /);
+  // The agent is not told of the space's own skill it switched off.
+  const told = (await spawnAdditions({ ...base, agent: 'codex', key: 'codex:w1', extra: { space: sp.id } })).instructions.join('\n');
+  assert.doesNotMatch(told, /Skills of the project's own/);
+  // A switch goes back to what Settings says; a renamed skill's follows it, a removed one's goes with it.
+  setSpaceSwitch(db, sp.id, { name: 'docker', on: null });
+  assert.equal('docker' in spaceSwitches(db, sp.id), false);
+  saveSpaceSkill(db, sp.id, { name: 'jig-drawings' }, 'jig-plans');
+  assert.equal(spaceSwitches(db, sp.id)['jig-drawings'], false);
+  removeSpaceSkill(db, sp.id, 'jig-drawings');
+  assert.equal('jig-drawings' in spaceSwitches(db, sp.id), false);
+  // What is not a skill's switch is refused.
+  assert.throws(() => setSpaceSwitch(db, sp.id, { name: 'Not A Name', on: false }), /Which skill/);
+  assert.throws(() => setSpaceSwitch(db, sp.id, { name: 'deploy', agent: 'gemini', on: false }), /agent: claude or codex/);
+  assert.throws(() => setSpaceSwitch(db, sp.id, { name: 'docker', on: 'yes' }), /on: true or false/);
+  clearSpaceSwitches(db, sp.id);
+  assert.deepEqual(spaceSkillsView(db, sp.id).switches, {});
+  setSpaceSwitch(db, sp.id, { name: 'docker', on: false });
+  deleteSpace(db, sp.id);
+  assert.deepEqual(spaceSwitches(db, sp.id), {}, 'they go with the space');
+  setOffSkills([]);
 });
 
 test('deleting a space puts its skills in the skill library, named for the space when the library has one of the name', () => {

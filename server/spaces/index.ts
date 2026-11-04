@@ -4,7 +4,7 @@
 // other folders of yours, where they are (Claude Code works in them as in its own); its knowledge bases are
 // searched by its sessions alone, with the shared ones too unless it leaves them out (server/knowledge/scope.ts);
 // every session started in it (extra.space) gets its guidelines (server/guidelines) and its own skills with the
-// skill library's (server/skillpack/spaceSkills.ts), and starts as its assistant. A group brings other spaces
+// skill library's, as it switches them on or off for itself (server/skillpack/spaceSkills.ts), and starts as its assistant. A group brings other spaces
 // together: its sessions also get their documents, guidelines, skills and folders (Claude Code works in those
 // folders too). Deleting a space keeps its folder and sessions, its knowledge bases become shared and its
 // skills join the skill library; it leaves the groups it was in.
@@ -18,7 +18,7 @@ import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
-import { copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, skillsOf, spaceSkillDoc, spaceSkillsView } from '../skillpack/spaceSkills.ts';
+import { clearSpaceSwitches, copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, setSpaceSwitch, skillsOf, spaceSkillDoc, spaceSkillsView, spaceSwitches } from '../skillpack/spaceSkills.ts';
 
 const made = new WeakSet<DB>();
 function tables(db: DB) {
@@ -320,7 +320,25 @@ export const spaces: Feature = {
       changed();
       d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id } });
     };
-    d.app.get('/api/spaces/:id/skills', async (req) => spaceSkillsView(d.db, space(req).id, withGroups(d.db, space(req).id)));
+    // Its own skills, those of the spaces it brings together (a group's), and the skills it switches on or off.
+    d.app.get('/api/spaces/:id/skills', async (req) => {
+      const s = space(req);
+      const members = membersNow(d.db, s).map((m) => ({ id: m.id, name: m.name, skills: spaceSkillsView(d.db, m.id, withGroups(d.db, m.id)).skills }));
+      return { ...spaceSkillsView(d.db, s.id, withGroups(d.db, s.id)), ...(members.length ? { members } : {}) };
+    });
+    // A skill on or off for its sessions alone (on: null for what Settings → Skills says), or every one back to that.
+    d.app.put('/api/spaces/:id/skill-switches', async (req) => {
+      const s = space(req);
+      const switches = setSpaceSwitch(d.db, s.id, body(req));
+      d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id, switches: true } });
+      return { switches };
+    });
+    d.app.delete('/api/spaces/:id/skill-switches', async (req) => {
+      const s = space(req);
+      clearSpaceSwitches(d.db, s.id);
+      d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id, switches: true } });
+      return { switches: {} };
+    });
     d.app.get('/api/spaces/:id/skills/:name', async (req) => {
       const doc = spaceSkillDoc(d.db, space(req), skill(req));
       if (!doc) throw new HttpError(404, `The project has no skill named ${skill(req)}`);
@@ -358,8 +376,9 @@ export const spaces: Feature = {
     const members = membersNow(d.db, sp);
     // Claude Code works in the space's other folders, and those of the spaces a group brings together, as in its own.
     const dirs = s.agent === 'claude' ? [...new Set([...(sp.folders ?? []), ...members.flatMap((m) => [m.folder, ...(m.folders ?? [])])])].filter((f) => f !== sp.folder && fs.existsSync(f)) : [];
-    // Its skills reach the agent with the library's (server/skillpack): here it is told they are there.
-    const skills = [...new Set([sp, ...members].flatMap((m) => skillsOf(m.id).map((k) => k.name)))];
+    // Its skills reach the agent with the library's (server/skillpack): here it is told they are there, but for any it switched off.
+    const switches = spaceSwitches(d.db, sp.id);
+    const skills = [...new Set([sp, ...members].flatMap((m) => skillsOf(m.id).map((k) => k.name)))].filter((n) => switches[n] !== false);
     return { instructions: [spaceInstructions(sp, members, folderGlance(sp.folder), skills)], ...(dirs.length ? { args: dirs.flatMap((f) => ['--add-dir', f]) } : {}) };
   },
 };

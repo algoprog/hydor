@@ -67,7 +67,21 @@ export interface SpaceSkills {
   skills: SpaceSkill[];
   /** Skills it had, which can come back. */
   removed: { name: string; at: number }[];
+  /**
+   * The skills it switches on or off for its own sessions, whatever Settings → Skills says for every other
+   * session, by switchKey: a skill of the library or its own by name, Claude Code's or Codex's own as
+   * claude:<name> or codex:<name>. A skill not named here is as Settings has it.
+   */
+  switches: Record<string, boolean>;
+  /** In a group: the skills of the spaces it brings together, which its sessions get too. */
+  members?: { id: string; name: string; skills: SpaceSkill[] }[];
 }
+
+/** A space's switch's key: a skill of the library or of a space by its name, an agent's own as agent:name. */
+export const switchKey = (name: string, agent?: 'claude' | 'codex') => (agent ? `${agent}:${name}` : name);
+
+/** The most switches a space keeps. */
+export const MAX_SWITCHES = 400;
 
 /** A skill as it reads, to show it whole: the library's, or a space's own. */
 export interface SkillDoc {
@@ -161,6 +175,8 @@ export interface SkillLibrary {
   folders: { bundled: string; learned: string; view: string };
   /** The spaces with skills of their own. */
   spaces: SpaceSkillGroup[];
+  /** The spaces that switch skills on or off for their own sessions (SpaceSkills.switches). */
+  switched: { id: string; name: string; switches: Record<string, boolean> }[];
 }
 
 /** Skill and folder names: lowercase letters, digits and dashes. */

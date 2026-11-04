@@ -47,7 +47,7 @@ interface SectionDef {
   label: string;
   icon: LucideIcon;
   sub: string;
-  /** Shown for one working folder at a time (project servers, skills and instruction files). */
+  /** Shown for one working folder at a time (project servers and instruction files). */
   folder?: boolean;
 }
 
@@ -71,7 +71,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
       { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM' },
       { id: 'guidelines', label: 'Agent Guidelines', icon: ScrollText, sub: 'What every agent follows: in every session, in a project, or in one session' },
       { id: 'mcp', label: 'MCP servers', icon: Plug, sub: 'Tools the agents can call', folder: true },
-      { id: 'skills', label: 'Skills', icon: Sparkles, sub: 'Written methods agents load when a task calls for one: built in, yours, from plugins and the agents’ own', folder: true },
+      { id: 'skills', label: 'Skills', icon: Sparkles, sub: 'Written methods agents load when a task calls for one: built in, yours, from plugins and the agents’ own' },
       { id: 'plugins', label: 'Plugins', icon: Blocks, sub: 'Add-ons that bring skills, tools and instructions to every agent' },
       { id: 'tasks', label: 'Scheduled tasks', icon: CalendarClock, sub: 'Agent work that starts by itself: on a schedule, once, or when a webhook calls' },
     ],
@@ -1202,7 +1202,7 @@ function SectionBody({ id, cwd, agent, onAgent, onCwd }: { id: SettingsSection; 
     case 'mcp':
       return <McpSettings cwd={cwd} />;
     case 'skills':
-      return <SkillsSettings cwd={cwd} />;
+      return <SkillsSettings />;
     case 'plugins':
       return <PluginsSettings />;
     case 'tasks':
@@ -1214,7 +1214,7 @@ function SectionBody({ id, cwd, agent, onAgent, onCwd }: { id: SettingsSection; 
   }
 }
 
-/** Which folder's servers, skills and instruction files are shown. */
+/** Which folder's servers and instruction files are shown. */
 function FolderScope({ cwd, onChange }: { cwd: string; onChange: (c: string) => void }) {
   return (
     <div className="flex shrink-0 items-center gap-1.5 text-[12.5px] text-fg-3">
