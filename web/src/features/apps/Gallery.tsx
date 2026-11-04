@@ -81,7 +81,7 @@ function CardMenu({ a, ready }: { a: AppDef | ReadyApp; ready?: boolean }) {
         label="More"
         size="sm"
         onClick={(e) => (e.stopPropagation(), setOpen((o) => !o))}
-        className="absolute top-2.5 right-2.5 bg-panel/80 opacity-100 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 sm:opacity-0 [@media(hover:none)]:opacity-100"
+        className="absolute top-2.5 right-2.5 bg-panel/80 opacity-100 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 max-sm:top-1/2 max-sm:right-2 max-sm:-translate-y-1/2 sm:opacity-0 [@media(hover:none)]:opacity-100"
       >
         <MoreHorizontal size={16} />
       </IconButton>
@@ -159,8 +159,12 @@ function AppCard({ a, ready }: { a: CardApp; ready?: boolean }) {
   // A ready-made app's words are the app's own (translated); yours are yours.
   const mine = ready ? undefined : 'no';
   return (
-    <button type="button" onClick={() => go(path)} className="flex h-full min-h-[128px] w-full flex-col rounded-2xl border border-line bg-panel p-4 text-left transition-colors hover:border-line-2 hover:bg-bg-1">
-      <div className="flex w-full items-start gap-3 pr-7">
+    <button
+      type="button"
+      onClick={() => go(path)}
+      className="flex h-full w-full flex-col bg-panel text-left transition-colors hover:bg-bg-1 max-sm:px-4 max-sm:py-3 sm:min-h-[128px] sm:rounded-2xl sm:border sm:border-line sm:p-4 sm:hover:border-line-2"
+    >
+      <div className="flex w-full items-start gap-3 pr-7 max-sm:items-center">
         <AppIcon icon={a.icon} color={a.color} size={42} />
         <div className="min-w-0 flex-1">
           <div translate={mine} className="truncate text-[15px] font-semibold tracking-tight">
@@ -171,7 +175,7 @@ function AppCard({ a, ready }: { a: CardApp; ready?: boolean }) {
           </div>
         </div>
       </div>
-      <div className="mt-auto flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 pt-3">
+      <div className="mt-auto flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 pt-3 max-sm:hidden">
         {view && (
           <Way icon={<LayoutDashboard size={12} />} title="Its answer opens in a view of its own: maps, charts, tables">
             Its own view
@@ -205,7 +209,25 @@ function YourApp({ a, ready }: { a: CardApp; ready?: boolean }) {
   );
 }
 
-const GRID = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3';
+/** Cards side by side; on a phone, the rows of one list (shorter, so more of them show). */
+const GRID = 'grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 max-sm:divide-y max-sm:divide-line max-sm:overflow-hidden max-sm:rounded-2xl max-sm:border max-sm:border-line';
+
+/** Your own app, made here: a tile at the end of yours that opens the builder (which also takes a description or a file). */
+function NewTile() {
+  return (
+    <button
+      type="button"
+      onClick={() => go('/apps/new')}
+      className="flex min-h-[128px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line-2 p-4 text-center text-fg-3 transition-colors hover:border-accent/60 hover:bg-accent-soft hover:text-accent max-sm:hidden"
+    >
+      <span className="grid h-10 w-10 place-items-center rounded-full bg-bg-2">
+        <Plus size={18} />
+      </span>
+      <span className="text-[14px] font-medium">Make an app</span>
+      <span className="text-[12.5px] leading-snug">Describe it to an agent, start from scratch, or install a file</span>
+    </button>
+  );
+}
 
 /** A part of the page: its title, a quiet line beside it, and what it holds. */
 function Part({ title, sub, children, action }: { title: ReactNode; sub?: ReactNode; children: ReactNode; action?: ReactNode }) {
@@ -360,7 +382,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
     <PageHeader
       title="Apps"
       tip={tab === 'connected' ? 'connections' : 'apps'}
-      sub={tab === 'connected' ? 'Services every agent can use, connected once, and the keys they use' : 'Small tools that find things out and show them clearly: open one here, or ask in any chat'}
+      sub={<span className="max-sm:hidden">{tab === 'connected' ? 'Services every agent can use, connected once, and the keys they use' : 'Small tools that find things out and show them clearly: open one here, or ask in any chat'}</span>}
       actions={tab === 'agent' ? <NewAppMenu /> : undefined}
     >
       <Tabs
@@ -459,13 +481,26 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
               </Part>
             )}
 
-            {ownShown.length > 0 && (
-              <Part title="Your own apps" sub={tr(`${ownShown.length}`)}>
-                <div className={GRID}>
-                  {ownShown.map((a) => (
-                    <YourApp key={a.id} a={a} />
-                  ))}
-                </div>
+            {(ownShown.length > 0 || (!words && cat === 'All')) && (
+              <Part title="Your own apps" sub={ownShown.length ? tr(`${ownShown.length}`) : undefined}>
+                {ownShown.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className={cx(GRID, 'sm:contents')}>
+                      {ownShown.map((a) => (
+                        <YourApp key={a.id} a={a} />
+                      ))}
+                    </div>
+                    {!words && cat === 'All' && <NewTile />}
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <NewTile />
+                    <button type="button" onClick={() => go('/apps/new')} className="flex items-center gap-3 rounded-2xl border border-dashed border-line-2 px-4 py-3 text-left text-fg-2 sm:hidden">
+                      <Plus size={18} className="shrink-0 text-accent" />
+                      <span className="text-[14px] font-medium">Make an app</span>
+                    </button>
+                  </div>
+                )}
               </Part>
             )}
 

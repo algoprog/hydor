@@ -26,7 +26,7 @@ The page is headed **Apps**, with two tabs: **Agent apps**, the apps this topic 
 - A short note on what apps are, in three parts: **Open it here**, **Or just ask in any chat** and **One job each**. **Got it** (✕) puts it away; **What are apps?**, beside the search box, brings it back.
 - **Find an app**: a box that narrows the apps by their names, descriptions and kinds as you type, and under it chips for their kinds (**All**, then each kind, the ready-made apps' first).
 - **Pick up where you left off**: your latest runs (four, with **All** for up to six), with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
-- **Your own apps**: the ones you made or installed from a file.
+- **Your own apps**: the ones you made or installed from a file, and the **Make an app** tile, which opens a new app.
 - **Ready-made apps**: the ones that come with Hydor, installed, under their kinds (**Research**, **Planning**, **Shopping**, **Weather**, **Sports**, **Food**, **Fun** and the rest). Each card, yours too, has its icon, name and description, **Its own view** when its answer opens in a view of its own (maps, charts, tables), **Works in chats** when agents run it for you in your sessions, **Public** when its public page is open, and when it last ran. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open** and **Download as a file**. When nothing matches what you typed, the page says "No app does that yet", with **Describe it to an agent**, which starts the App builder with your words.
 - **Ready-made apps to install**: there once you uninstall a ready-made app. Each card shows its kind, what it does and what you get from it (the pages of its view, such as the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**), and **Install** (see [Install or uninstall a ready-made app](#install-or-uninstall-a-ready-made-app)).
 - **Building blocks** (folded): small apps made to be steps of your own (sum up a page, translate, answer from the web, sort into kinds, pull out the facts), with the blocks you made yourself; **Add a step** offers them in every app's steps.
@@ -35,7 +35,7 @@ A run's state shows as a badge: **Waiting** (in line), **Starting**, **Working**
 
 Drop an app's file (`.hydor-app` or `.json`) anywhere on the page to install it: the card that says what it is opens first (see [Share an app as a file](#share-an-app-as-a-file)).
 
-On a phone the cards stack in one column and the kind chips scroll sideways.
+On a phone each part's apps are the rows of one list, and the kind chips scroll sideways.
 
 ## Use a ready-made app
 
@@ -223,14 +223,14 @@ Ready-made apps have no Runs tab: find their runs under **Latest runs** on the A
 
 There are four ways to start:
 
-- **From scratch**: **New app** on the Apps page, or go to [/apps/new](/apps/new).
+- **From scratch**: **New app** → **Start from scratch** on the Apps page, the **Make an app** tile under your own apps, or go to [/apps/new](/apps/new).
 - **By describing it**: on the Apps page (or the New app page), write what it should do under **Describe an app, and an agent makes it** and press **Make it**. A session starts as the **App builder** ([Assistants](/guide/assistants)), which makes the app, tries it and hands it over.
 - **From a ready-made app**: open it and press **Make it mine** (on a phone, **Edit**).
 - **From a session that went well**: in the session's menu (⋯), choose **More** → **Save as an app**. The page says "Drafting an app from the session…" while the helper model turns the session's first request into a form, a task and answer fields, from what you asked and what the agent replied. The parts that would change from one use to the next become questions. The draft keeps the session's agent, model, effort, mode and assistant. When the agent called tools a step can call by itself (it read a page, searched the web), the draft has steps too: those calls as tool steps, with the form's answers where they go, then a model or agent step for the rest. Steps that do not check out are left out, and the task for one agent stays; check the steps and try it before you save it. If the helper model can't draft it, you get the request as it was, in one **Request** question, with a note saying why; the helper model is set in [Settings → Agents → Models](/settings?s=models&find=Helper%20model).
 
 You can also ask an agent in any session to make an app for you (see [Ask an agent](#ask-an-agent)).
 
-The builder opens under the title **New app**: its name, description and icon on top, then its parts as tabs, **What it does** first, then **Form**, **Answer**, **Design**, **Examples** and **Settings** (who does it, its tools, its limits, what it keeps, whether it is a block, and, once saved, its folder and versions, each folded to a line that says how it is set until you open it). Fill them in, try it with **Test run**, then press **Create**. The app's page opens, ready to run.
+The builder opens under the title **New app**: its icon, name and description on top (click the name or the description to change it), then its parts as tabs, **What it does** first, then **Form**, **Answer**, **Design**, **Examples** and **Settings** (who does it, its tools, its limits, what it keeps, whether it is a block, and, once saved, its folder and versions, each folded to a line that says how it is set until you open it). Every tab is as wide as the others; on a computer the tabs stay at the top as you scroll, and on a phone they show in two rows. On a wide screen, **Form** and **Answer** have a **Preview** beside them that changes as you type: the form as the app's page asks it, and a made-up answer as a run shows it. Fill them in, try it with **Test run**, then press **Create**. The app's page opens, ready to run.
 
 ### Name, description and icon
 
@@ -250,7 +250,7 @@ The questions someone answers before each run. **Add a question** adds a row wit
 - For **Choice**: the choices, one per line (left empty, it offers Yes and No).
 - **Help text, example, default…** opens three more boxes: **Help under the question**, **An example answer** (shown greyed in the empty box) and **Filled in at first**.
 
-The arrows move a question up or down, and the bin removes it. Under each question you see its placeholder, such as `{{destination}}`: that is how the task refers to its answer, and the name programs use for it. A new question's placeholder follows its wording until the task uses it. An app can have up to 30 questions.
+A question's **⋯** menu has **Move up**, **Move down** and **Remove**. Under each question you see its placeholder, such as `{{destination}}`: that is how the task refers to its answer, and the name programs use for it. A new question's placeholder follows its wording until the task uses it. An app can have up to 30 questions.
 
 ### The task
 
@@ -260,7 +260,7 @@ What the agent is asked to do, with the answers put in (up to 30,000 characters;
 - The **Insert** chips put a question's placeholder where the cursor is. Questions the task doesn't use yet are highlighted. **today**, **now** and **weekday** put in the date, the date and time, and the day of the week where you are.
 - `{{question}}` is replaced by its answer.
 - Text between `{{#question}}` and `{{/question}}` stays only when the question was answered (and not with No). Text between `{{^question}}` and `{{/question}}` stays only when it was left empty.
-- **Preview** shows the task with each question's default, or its name in brackets, filled in. **Edit** goes back.
+- **Preview**, at the end of the row of **Insert** chips, shows the task with each question's default, or its name in brackets, filled in. **Edit** goes back.
 
 Warnings under the box tell you when a placeholder names no question (it stays as written) and when a needed question is never used in the task.
 
@@ -275,6 +275,8 @@ The fields the agent fills in when it is done. They show as a card or a table, a
 - **Needed**: the agent must fill it in.
 - **What goes here, for the agent (optional)**: a hint for the agent.
 - For a **Table**: its **Columns**, each with a name and a kind (**Text**, **Number**, **Yes / no**, **Date**, **Link** or **Picture**). **Add a column** adds one; a table keeps at least one.
+
+An answer field's **⋯** menu has **Move up**, **Move down** and **Remove**.
 
 A **Pictures, videos or files** field (and a **Picture** column) takes what the agent found or made: an address on the web, or a file on this computer (a photo in your Pictures folder, a chart it drew, a recording), each with a caption. Hydor keeps a copy of a file on this computer, and of a picture on the web (up to 15 MB), so it shows wherever the answer does; videos on the web stay links. A public page's runs may only point at the web.
 
@@ -315,7 +317,7 @@ What the runs may use from Hydor's own tools: web search, the browser, pages, me
 
 On your app's page:
 
-- **Edit** opens the builder, titled **Edit** followed by the app's name. Press **Save** when done. Changes apply to the next runs; runs already going keep the version they started with.
+- **Edit** opens the builder, titled **Edit** followed by the app's name. Press **Save** when done; until then, **Not saved yet** shows beside it. Changes apply to the next runs; runs already going keep the version they started with.
 - **More** (⋯) → **Duplicate** makes a copy named with " copy" at the end, at an address of its own. Its screen comes along as a page of its own; its public page starts closed, and its keys and the records it keeps are not copied.
 - **More** (⋯) → **Delete** asks "Delete …?": its runs, keys and public page go with it, and runs still going are stopped. The sessions it started stay. An app you installed from a file says **Uninstall** instead: it is deleted completely, the same way, and to have it again you install its file again.
 
