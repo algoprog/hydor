@@ -3,6 +3,24 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.25.1 · 4 November 2026
+
+Skills you can switch on or off for one project, whatever Settings says for every other session.
+
+- **Every skill a project gets, on its Skills tab**: a project's **Skills** tab now lists all the skills its
+  sessions get: its own, your skill library's (built in, yours, your plugins'), and Claude Code's and Codex's own
+  for its folder, with the same search and filters as Settings → Skills.
+- **Switches for one project**: each skill there has a switch for that project's sessions alone. A skill switched
+  the other way from Settings says **On here** or **Off here**, and **Changed here** lists them. **Follow Settings**,
+  in a skill's window, goes back to what Settings says; **Reset every switch here**, in the ⋯ menu, does it for all
+  of them. Claude Code's and Codex's own skills are switched for the project's sessions without changing those
+  agents' own settings.
+- **Settings → Skills is for every session**: its switches count wherever a project doesn't say otherwise, and a
+  skill's row says when one does ("Off in Thesis"). The folder chip at its top right is gone: Claude Code's and
+  Codex's own skills show as every folder has them, and a project folder's own are on that project's tab.
+- **Change a library skill for one project**: open it on the project's Skills tab and click **Change for this
+  project**, in place of the old From the library button.
+
 ## 0.25.0 · 4 November 2026
 
 A profile of you that every agent starts with, memory that brings the notes bearing most on your request, skills named
