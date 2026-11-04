@@ -3,6 +3,30 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.25.0 · 4 November 2026
+
+A profile of you that every agent starts with, memory that brings the notes bearing most on your request, skills named
+when they fit, web search that keeps working when the search providers can't, and the files Codex cites shown as files.
+
+- **Your profile**: memory keeps one profile of you (who you are and what you do, what you use, how you like answers,
+  what to avoid) that every agent gets once, at the start of a session, right after your Agent Guidelines. Agents add
+  to it only when something you say will help every agent serve you better, and the change shows under their reply,
+  with undo. Write or edit it yourself in Settings → Memory. **Profile length** sets the most words it may have (1,000
+  unless you change it); a longer one is kept as you wrote it while the helper model shortens it to fit.
+- **The notes that bear on your request**: each agent starts with the notes about you and the project that bear most
+  on what you asked, found by their words and, with search by meaning on, by what they mean, then the latest: 10
+  unless you change it with **Notes each agent starts with**. Agents look up the rest when they need it. With search
+  by meaning on, a new session waits a few seconds for its model, so your first message is matched by meaning too.
+- Agents write each note as one fact that stands on its own and names what it is about, so that it is found again
+  later; what every agent should always know goes in your profile instead. The nightly tidy-up still sums a project's
+  notes up in a profile of the project, and leaves yours to you and your agents.
+- **Skills that fit**: a new session's agent hears which skills fit its first message, when any clearly do, found by
+  their words and by meaning. **Suggest skills that fit**, in the ⋯ menu of Settings → Skills, turns it off.
+- **Web search when the providers can't answer**: when every search provider fails, Claude Code and Codex search with
+  their own web search instead of stopping there, and cite its pages as usual.
+- **Files Codex cites**: Codex points to files in its replies in a form of its own (`:codex-file-citation{…}`), which
+  showed as raw text. Now each shows as the file's name with a file icon, and opens the file, as in the ChatGPT app.
+
 ## 0.24.7 · 4 November 2026
 
 Projects and folders can be renamed right from the sidebar.
