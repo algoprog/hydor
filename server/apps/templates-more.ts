@@ -2287,7 +2287,7 @@ return {
           title: 'Put the list together',
           do: 'code',
           language: 'javascript',
-          with: { games: '{{pick.games}}', deals: '{{deals.items}}', media: '{{media.data}}', budget: '{{budget}}' },
+          with: { games: '{{pick.games}}', deals: '{{deals.items}}', media: '{{media.data}}', budget: '{{budget}}', summary: '{{pick.summary}}' },
           code:
             LIST +
             String.raw`// Each game with its picture and trailer, and its price where one was found; with a budget, those within it first.
@@ -2305,12 +2305,18 @@ const games = rows(input.games).map((g, i) => {
 });
 const within = (g) => (input.budget === 'Free to play' ? g.free : input.budget === 'Under 20' ? g.free || g.coming || (g.price !== null && g.price < 20) : true);
 games.sort((a, b) => Number(within(b)) - Number(within(a)) || a.at - b.at);
-return { games: games.map(({ at, ...g }) => g) };`,
-          outputs: [{ id: 'games', label: 'Games', type: 'table', columns: GAME_COLS }],
+// The picks in their first sentence: what follows it is a model's notes on what the sources lacked.
+const said = String(input.summary || '').replace(/\s+/g, ' ').trim();
+const first = (/^.*?[.!?](?=\s+[A-Z]|$)/.exec(said) || [said])[0];
+return { games: games.map(({ at, ...g }) => g), summary: first.length > 20 ? first : said };`,
+          outputs: [
+            { id: 'games', label: 'Games', type: 'table', columns: GAME_COLS },
+            { id: 'summary', label: 'In short', type: 'text' },
+          ],
           failed: 'agent',
         },
       ],
-      outputs: { summary: '{{pick.summary}}', games: '{{final.games}}' },
+      outputs: { summary: '{{final.summary}}', games: '{{final.games}}' },
     },
     answer: [
       { id: 'summary', label: 'In short', type: 'text', required: true },

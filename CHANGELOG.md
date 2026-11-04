@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.22.2 · 4 November 2026
+
+A cleaner headline for the Game finder.
+
+- **The picks in a sentence**: the Game finder's headline says what it picked, without notes on the details its
+  sources left out.
+
 ## 0.22.1 · 4 November 2026
 
 The Game finder keeps to what you ask for.
