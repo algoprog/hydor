@@ -6,7 +6,7 @@ Agents can answer with a page instead of plain text: a report, a chart, a table 
 
 ## Pages in the conversation
 
-When a picture says more than words, an agent shows a page: a report, a chart, a table, a diagram, a mock-up, or options to pick from. Any agent in the app can do this; ask for it in plain words ("show me this as a chart", "compare the three laptops in a table").
+When a picture says more than words, an agent shows a page: a report, a chart, a table, a diagram, a mock-up, or options to pick from. Any agent in the app can do this; ask for it in plain words ("show me this as a chart", "compare the three laptops in a table"). A single chart, diagram or picture usually comes inside the reply itself instead (see [Maths, diagrams, figures and pictures in replies](/guide/sessions#maths-diagrams-figures-and-pictures-in-replies)).
 
 On a wide screen the page opens beside the conversation as the agent starts writing it (see [Watch a page as it is written](#watch-a-page-as-it-is-written)), and the conversation keeps a small card for it: its title, what it is ("A page · 24 KB", "Kept in the Library · version 2") and **Open**, or **Beside** for the one shown there. Click a card to show its page beside the conversation.
 

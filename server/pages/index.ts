@@ -97,8 +97,9 @@ const SHOW_HTML: RunTool = {
   name: 'show_html',
   annotations: { readOnlyHint: true },
   description: [
-    'Show the user an HTML page inside the conversation: a report, a chart, a table, a diagram, a mock-up, options to pick from.',
-    'Use it when a visual is clearer than text, or when asked for one. The page renders in a sandboxed frame: in the conversation, beside it or',
+    'Show the user an HTML page inside the conversation: a report, a dashboard, a table, a mock-up, options to pick from.',
+    'Use it when a page is clearer than text, or when asked for one; a single figure, chart or diagram that belongs in your reply is lighter as a',
+    '```html live or ```mermaid block inside it. The page renders in a sandboxed frame: in the conversation, beside it or',
     'full screen, from a phone’s 360px to a whole screen wide, and grows to its content height. Make it fill whatever width it gets: no max-width or',
     'fixed width on the body or a wrapper; fluid layouts (grids with auto-fit columns, percentages, wrapping rows). Write a complete, self-contained page: inline CSS and',
     'JavaScript; scripts may load from CDNs (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com). It cannot reach this app or the',
@@ -357,7 +358,7 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  'Pages: show_html shows a page in the conversation (a report, a chart, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, and anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, unless they ask for a file made another way. get_page lists all of these, to change one. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown or LaTeX). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
+  'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, and anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, unless they ask for a file made another way. get_page lists all of these, to change one. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown or LaTeX). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
 
 /** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
 function askInstructions(db: Deps['db'], v: unknown): string | null {
@@ -612,14 +613,29 @@ function routes(d: Deps) {
     // A picture of its own address is the same picture for ever; SVG runs nothing as a picture, and is kept from running as a page.
     return reply.header('Cache-Control', 'private, max-age=31536000, immutable').header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox").type(a.mime).send(a.data);
   });
-  /** A picture on the web, for a deck shown inside the app (whose own pages load no picture from the web). */
+  /**
+   * A picture on the web, for what the app shows of it (whose own pages load no picture from the web): a deck or a
+   * document in its editor, and the pictures in agents' replies. What an address gave is remembered for a while (the
+   * picture kept, or why not), so a reply shown again, or on another device, fetches nothing.
+   */
+  const pictures = new Map<string, { sha?: string; error?: string; at: number }>();
   app.get('/api/pages/picture', async (req, reply) => {
     const url = String((req.query as { url?: string }).url ?? '');
-    if (!/^https?:\/\//i.test(url)) throw new HttpError(400, 'url is an http(s) address');
-    const notes: string[] = [];
-    const src = await takeIn(db, url, { notes });
-    const a = src.startsWith('naget-asset:') ? getAsset(db, src.slice('naget-asset:'.length)) : null;
-    if (!a) return reply.code(404).send({ error: notes[0] ?? 'Not a picture' });
+    if (!/^https?:\/\//i.test(url) || url.length > 4096) throw new HttpError(400, 'url is an http(s) address');
+    let seen = pictures.get(url);
+    if (seen && Date.now() - seen.at > (seen.sha ? 6 * 3600_000 : 10 * 60_000)) seen = undefined;
+    let a = seen?.sha ? getAsset(db, seen.sha) : null;
+    if (!a && !seen?.error) {
+      const notes: string[] = [];
+      const src = await takeIn(db, url, { notes });
+      const sha = src.startsWith('naget-asset:') ? src.slice('naget-asset:'.length) : undefined;
+      a = sha ? getAsset(db, sha) : null;
+      seen = a ? { sha, at: Date.now() } : { error: notes[0] ?? 'Not a picture', at: Date.now() };
+      pictures.delete(url);
+      pictures.set(url, seen);
+      if (pictures.size > 1000) pictures.delete(pictures.keys().next().value!);
+    }
+    if (!a) return reply.code(404).send({ error: seen?.error ?? 'Not a picture' });
     return reply.header('Cache-Control', 'private, max-age=86400').header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox").type(a.mime).send(a.data);
   });
   /** Google's fonts for decks shown in the app, through this server (the app's pages load no font from elsewhere). */

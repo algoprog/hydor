@@ -61,6 +61,9 @@
     "ws": "8.22.0",
     "zeromq": "6.8.0"
   },
+  "overrides": {
+    "katex": "$katex"
+  },
   "devDependencies": {
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.11.1",
@@ -91,6 +94,7 @@
     "esbuild": "0.28.2",
     "katex": "0.19.0",
     "lucide-react": "1.52.0",
+    "mermaid": "12.3.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "10.1.0",

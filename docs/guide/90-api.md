@@ -738,7 +738,7 @@ These routes serve the app’s own pages, need the user’s browser, or are the 
 - `POST /api/documents/pages` — has LibreOffice lay an Office file out as pages for the viewer.
 - `GET /api/documents/pages.pdf` — sends that PDF file itself (raw file).
 - `GET /api/pages/:id/export` — sends a page, deck, document, spreadsheet or LaTeX document as a file itself (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX or a web page; the **Export** menu). Agents make the file with their export_page tool, which writes it where they can hand it over with present_files.
-- `GET /api/pages/assets/:sha`, `GET /api/pages/picture`, `GET /api/pages/fonts.css`, `GET /api/pages/fonts/*` — the pictures and Google fonts the slides and document editors show, served as they are (raw files).
+- `GET /api/pages/assets/:sha`, `GET /api/pages/picture`, `GET /api/pages/fonts.css`, `GET /api/pages/fonts/*` — the pictures and Google fonts the slides and document editors show, and the pictures from the web in agents' replies (`/api/pages/picture?url=`: fetched by this server, public addresses only, and remembered for a while), served as they are (raw files).
 - `GET /api/pages/tex/:key/:page`, `GET /api/pages/tex/:key/pdf` — a typeset LaTeX document's pages as pictures and its PDF, served as they are (raw files).
 - `POST /api/voice/transcribe` — the page's microphone: the body is a raw recording.
 - `POST /api/voice/command` — the hands-free page: it acts at once (starts sessions, answers approvals) with no card for the user to OK first.

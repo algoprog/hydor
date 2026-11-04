@@ -14,6 +14,7 @@ import { custom } from '../custom/index.ts';
 import { documents } from '../documents/index.ts';
 import { fileAsk } from '../fileask/index.ts';
 import { find } from '../find/index.ts';
+import { formatting } from '../formatting/index.ts';
 import { guide } from '../guide/index.ts';
 import { guidelines } from '../guidelines/index.ts';
 import { images } from '../images/index.ts';
@@ -37,5 +38,5 @@ import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-// The user's guidelines lead what an agent is told.
-export const FEATURES: Feature[] = [guidelines, pages, shots, search, browser, computer, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, automations, voice, assistants, apps, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
+// The user's guidelines lead what an agent is told; how to format replies follows the pages it may show instead.
+export const FEATURES: Feature[] = [guidelines, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, automations, voice, assistants, apps, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
