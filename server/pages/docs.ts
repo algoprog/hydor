@@ -127,7 +127,7 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
   const base = [
     'html,body{margin:0;padding:0}',
     'body{background:var(--n-bg,#eceae6);-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
-    'html[data-n-theme=dark] body{background:#121110}',
+    'html[data-n-theme=dark] body{background:#000000}',
     '.nd-doc{padding:24px 16px 32px;box-sizing:border-box}',
     `.nd-sheet{box-sizing:border-box;background:#fff;width:${paper.w}mm;max-width:none;margin:0 auto 20px;padding:${m}mm;` +
       'box-shadow:0 1px 3px rgba(0,0,0,.12),0 10px 30px rgba(0,0,0,.07);border-radius:2px}',

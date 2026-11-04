@@ -8,7 +8,7 @@
 /** The ready-made classes and their colours. Light by default; body.n-page follows the app's dark theme. */
 export const KIT_CSS = `
 :root{--n-bg:#f6f5f1;--n-card:#fff;--n-fg:#1b1915;--n-muted:#615a4d;--n-line:#e0dbd0;--n-soft:#eae7df;--n-accent:#805a00;--n-accent-fg:#fff;--n-accent-soft:rgba(128,90,0,.12);--n-ok:#156b35;--n-warn:#9c4704;--n-err:#bd2525;--n-info:#1d4ed8;--n-c1:#805a00;--n-c2:#1d4ed8;--n-c3:#156b35;--n-c4:#9c4704;--n-c5:#c25a37;--n-c6:#5f4fd0;--n-radius:12px;--n-font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;--n-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-html[data-n-theme=dark] .n-page{--n-bg:#121110;--n-card:#1b1a17;--n-fg:#f2eee7;--n-muted:#9b9386;--n-line:#302c26;--n-soft:#22201c;--n-accent:#d4b158;--n-accent-fg:#1a1306;--n-accent-soft:rgba(212,177,88,.14);--n-ok:#6dbb84;--n-warn:#e0a25a;--n-err:#e57373;--n-info:#82a8ff;--n-c1:#d4b158;--n-c2:#82a8ff;--n-c3:#6dbb84;--n-c4:#e0a25a;--n-c5:#e8916f;--n-c6:#ada1ff;color-scheme:dark}
+html[data-n-theme=dark] .n-page{--n-bg:#000000;--n-card:#151820;--n-fg:#e9edf5;--n-muted:#8f99ab;--n-line:#262b36;--n-soft:#1b1f27;--n-accent:#8aa8ff;--n-accent-fg:#0b1226;--n-accent-soft:rgba(138,168,255,.14);--n-ok:#6fd39a;--n-warn:#f2b468;--n-err:#f28b8b;--n-info:#5cc8e8;--n-c1:#8aa8ff;--n-c2:#5cc8e8;--n-c3:#6fd39a;--n-c4:#f2b468;--n-c5:#f0a07f;--n-c6:#b9a9ff;color-scheme:dark}
 html[data-n-theme=dark]:has(>body.n-page){color-scheme:dark}
 .n-page{margin:0 auto;padding:20px;background:var(--n-bg);color:var(--n-fg);font:15px/1.55 var(--n-font);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
 .n-page code,.n-page kbd,.n-page samp,.n-page pre{font-family:var(--n-mono)}

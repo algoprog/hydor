@@ -226,10 +226,10 @@ function editor(cfg: EditorCfg) {
   };
   const svg = (k: string) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
   const dark = cfg.theme === 'dark';
-  const accent = dark ? '#d4b158' : '#b07c00';
-  const panel = dark ? '#24211d' : '#fff';
-  const line = dark ? '#36322b' : '#e2ddd2';
-  const ink = dark ? '#f2eee7' : '#1d1b17';
+  const accent = dark ? '#8aa8ff' : '#b07c00';
+  const panel = dark ? '#1b1f27' : '#fff';
+  const line = dark ? '#3a4150' : '#e2ddd2';
+  const ink = dark ? '#e9edf5' : '#1d1b17';
   shadow.innerHTML = `<style>
     :host{all:initial}
     .box{position:fixed;pointer-events:none;box-sizing:border-box;border-radius:3px;display:none}
