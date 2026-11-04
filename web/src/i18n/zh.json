@@ -10565,5 +10565,18 @@
 "Your agent":"你的智能体",
 "Your OpenRouter key":"你的 OpenRouter 密钥",
 "Your own AI helpers, called agents, that do real work on this computer: they read and write your files, search the web, make documents and pictures, and write code. Here is how it goes:":"你自己的 AI 助手，叫作智能体，它们在这台电脑上做实实在在的工作：读写你的文件、搜索网络、制作文档和图片，还会写代码。过程是这样的：",
-"Your sessions":"你的会话"
+"Your sessions":"你的会话",
+"A made-up answer, as a run shows it":"一个编的模拟答案，按运行结果的样子显示",
+"As a plain card; its view, under Design, shows it its own way":"以普通卡片显示；它在“设计”里的专属视图会用自己的方式显示",
+"As its page asks it":"和它的页面上问的一样",
+"Describe it to an agent, start from scratch, or install a file":"向智能体描述它、从零开始，或从文件安装",
+"How the task names its answer":"任务用这个名字引用它的回答",
+"Its kind":"类型",
+"Kinds of services":"服务类别",
+"Make an app":"制作应用",
+"No answer fields: the agent’s reply is the answer.":"没有答案字段：智能体的回复就是答案。",
+"No questions: it runs at once, without asking anything.":"没有问题：它会直接运行，什么都不问。",
+"None yet. Add one here, or keep a finished test run as one.":"还没有。在这里添加一个，或把一次完成的试运行保存为示例。",
+"Not in the task yet":"还没用在任务里",
+"Parts of the app":"应用的各部分"
 }

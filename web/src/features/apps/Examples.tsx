@@ -70,6 +70,7 @@ export function ExamplesEditor({ recipe, appId, onChange }: { recipe: AppRecipe;
 
   return (
     <div className="space-y-2">
+      {!examples.length && <p className="pb-1 text-[13px] leading-relaxed text-fg-3">None yet. Add one here, or keep a finished test run as one.</p>}
       {examples.map((e, i) => {
         const run = runs[e.id];
         const fields = formOf(recipe, e);
@@ -129,21 +130,21 @@ export function ExamplesEditor({ recipe, appId, onChange }: { recipe: AppRecipe;
           </div>
         );
       })}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          variant="subtle"
-          icon={<Plus size={14} />}
+      <div className="flex gap-2">
+        <button
+          type="button"
           onClick={() => {
             const id = fieldId('example', examples.map((x) => x.id));
             set([...examples, { id, inputs: Object.fromEntries(recipe.fields.filter((f) => f.default).map((f) => [f.id, f.default!])) }]);
             setOpen(id);
           }}
+          className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-line-2 text-[13.5px] font-medium text-fg-2 transition-colors hover:border-accent/60 hover:bg-accent-soft hover:text-accent"
         >
+          <Plus size={15} />
           Add an example
-        </Button>
+        </button>
         {examples.length > 0 && (
-          <Button size="sm" variant="ghost" icon={busy ? <Throbber /> : <FlaskConical size={14} />} onClick={() => void tryThem()} disabled={busy}>
+          <Button variant="secondary" className="!h-11 !rounded-xl" icon={busy ? <Throbber /> : <FlaskConical size={14} />} onClick={() => void tryThem()} disabled={busy}>
             Try them
           </Button>
         )}

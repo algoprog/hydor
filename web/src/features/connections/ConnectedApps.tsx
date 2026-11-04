@@ -2,15 +2,15 @@
 // their tools, disconnect), the marketplace to connect more (search, categories, featured ones) and the keys in the
 // vault. Its tab is in the address (?tab=market, ?tab=keys), so a link can open any of them.
 // (It was Settings → Connections; /settings?s=connections comes here.)
-import { useEffect, useMemo, useState } from 'react';
-import { BadgeCheck, ChevronDown, CircleAlert, CircleCheck, ExternalLink, GitPullRequest, PlugZap, RefreshCw, Search, Store, Unplug } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, ExternalLink, GitPullRequest, PlugZap, RefreshCw, Search, Store, Unplug } from 'lucide-react';
 import { CONNECTION_CATEGORIES, type CatalogApp, type ConnectionCategory, type ConnectionView } from '@shared/connections';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { useFeatureEvent } from '../../lib/featureEvents';
-import { Badge, Button, cx, Empty, inputCls, Section, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, Empty, IconButton, inputCls, Section, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { ConnectDialog, FLOW_KEY } from './ConnectDialog';
 import { Keys } from './Keys';
 import { AppIcon, authLabel, REPO_CATALOG, useConn } from './store';
@@ -52,8 +52,8 @@ function AppCard({ app, connected, onOpen, big }: { app: CatalogApp; connected?:
     <button
       onClick={onOpen}
       className={cx(
-        'group flex w-full min-w-0 gap-3 rounded-2xl border border-line bg-panel text-left transition-colors hover:border-line-2 hover:bg-bg-1 active:bg-bg-2',
-        big ? 'w-[248px] shrink-0 flex-col p-3.5 sm:w-[260px]' : 'items-start p-3',
+        'group flex w-full min-w-0 gap-3 bg-panel text-left transition-colors hover:bg-bg-1 active:bg-bg-2',
+        big ? 'w-[248px] shrink-0 flex-col rounded-2xl border border-line p-3.5 hover:border-line-2 sm:w-[260px]' : 'items-start px-4 py-3 @2xl:rounded-2xl @2xl:border @2xl:border-line @2xl:p-3 @2xl:hover:border-line-2',
       )}
     >
       <div className={cx('flex min-w-0 gap-3', big ? 'items-center' : 'contents')}>
@@ -108,63 +108,108 @@ function Marketplace({ onOpen }: { onOpen: (a: CatalogApp) => void }) {
   }, [apps, q, cat]);
   if (!apps) return <Throbber className="text-fg-3" />;
   const featured = !q && cat === 'all' ? apps.filter((a) => a.featured) : [];
+  const kinds = (['all', ...Object.keys(CONNECTION_CATEGORIES)] as const).filter((c) => c === 'all' || counts.get(c));
+  const label = (c: string) => (c === 'all' ? 'All services' : CONNECTION_CATEGORIES[c as ConnectionCategory]);
+  const count = (c: string) => (c === 'all' ? apps.length : counts.get(c));
   return (
-    <div className="space-y-4">
-      <div className="relative">
-        <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${apps.length} services: mail, Notion, invoices…`} className={cx(inputCls, 'pl-9 text-[16px] sm:text-[14px]')} type="search" />
-      </div>
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
-        {(['all', ...Object.keys(CONNECTION_CATEGORIES)] as const)
-          .filter((c) => c === 'all' || counts.get(c))
-          .map((c) => (
-            <button
-              key={c}
-              onClick={() => setCat(c as ConnectionCategory | 'all')}
-              className={cx(
-                'h-7.5 shrink-0 rounded-full border px-3 text-[12.5px] whitespace-nowrap transition-colors',
-                cat === c ? 'border-fg bg-fg text-bg' : 'border-line bg-panel text-fg-2 hover:border-line-2 hover:text-fg',
-              )}
-            >
-              {c === 'all' ? 'All' : CONNECTION_CATEGORIES[c as ConnectionCategory]}
-              <span className={cx('ml-1.5 tnum text-[11px]', cat === c ? 'opacity-70' : 'text-fg-3')}>{c === 'all' ? apps.length : counts.get(c)}</span>
-            </button>
-          ))}
-      </div>
-      {featured.length > 0 && (
-        <div>
-          <div className="mb-2 text-[12.5px] font-medium text-fg-3">Featured</div>
-          <div className="-mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
-            {featured.map((a) => (
-              <div key={a.id} className="snap-start">
-                <AppCard app={a} connected={byId.get(a.id)} onOpen={() => onOpen(a)} big />
-              </div>
+    // Where there is room, the kinds of services are a list beside them; where there is not, a row of chips above.
+    <div className="@4xl:grid @4xl:grid-cols-[212px_minmax(0,1fr)] @4xl:items-start @4xl:gap-7">
+      <nav aria-label="Kinds of services" className="space-y-0.5 @max-4xl:hidden @4xl:sticky @4xl:top-4">
+        {kinds.map((c) => (
+          <button
+            key={c}
+            type="button"
+            aria-pressed={cat === c}
+            onClick={() => setCat(c as ConnectionCategory | 'all')}
+            className={cx('flex h-8.5 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors', cat === c ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg')}
+          >
+            <span className="min-w-0 flex-1 truncate">{label(c)}</span>
+            <span className="tnum text-[12px] text-fg-3">{count(c)}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="min-w-0 space-y-5">
+        <div className="space-y-3">
+          <div className="relative">
+            <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${apps.length} services: mail, Notion, invoices…`} className={cx(inputCls, 'pl-9 text-[16px] sm:text-[14px]')} type="search" />
+          </div>
+          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] @4xl:hidden [&::-webkit-scrollbar]:hidden">
+            {kinds.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-pressed={cat === c}
+                onClick={() => setCat(c as ConnectionCategory | 'all')}
+                className={cx('h-8 shrink-0 rounded-full border px-3.5 text-[13px] whitespace-nowrap transition-colors', cat === c ? 'border-fg bg-fg text-bg' : 'border-line bg-panel text-fg-2 hover:border-line-2 hover:text-fg')}
+              >
+                {c === 'all' ? 'All' : CONNECTION_CATEGORIES[c as ConnectionCategory]}
+                <span className={cx('tnum ml-1.5 text-[11px]', cat === c ? 'opacity-70' : 'text-fg-3')}>{count(c)}</span>
+              </button>
             ))}
           </div>
         </div>
-      )}
-      <div>
-        {featured.length > 0 && <div className="mb-2 text-[12.5px] font-medium text-fg-3">All services</div>}
-        {shown.length ? (
-          <div className="grid gap-2.5 md:grid-cols-2 2xl:grid-cols-3">
-            {shown.map((a) => (
-              <AppCard key={a.id} app={a} connected={byId.get(a.id)} onOpen={() => onOpen(a)} />
-            ))}
-          </div>
-        ) : (
-          <Empty icon={<Search size={20} />} title="No service matches">
-            Try other words, or add it to the catalog yourself (below).
-          </Empty>
-        )}
-      </div>
-      <div className="flex gap-3 rounded-2xl border border-dashed border-line-2 px-4 py-3.5 text-[13px] leading-relaxed text-fg-2">
-        <GitPullRequest size={17} className="mt-0.5 shrink-0 text-fg-3" />
+        {featured.length > 0 && <Featured apps={featured} byId={byId} onOpen={onOpen} />}
         <div>
-          Missing a service? Anyone can add one: a small JSON file in the <code className="rounded bg-bg-2 px-1 font-mono text-[12px]">catalog/</code> folder of Hydor’s repository, sent as a pull request.{' '}
-          <a href={REPO_CATALOG} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
-            How to add one <ExternalLink size={11} />
-          </a>
+          <h3 className="mb-2.5 text-[15px] font-semibold tracking-tight">
+            {q ? 'Found' : label(cat)}
+            <span className="tnum ml-2 text-[13px] font-normal text-fg-3">{shown.length}</span>
+          </h3>
+          {shown.length ? (
+            <div className="grid @2xl:grid-cols-2 @2xl:gap-2.5 @max-2xl:divide-y @max-2xl:divide-line @max-2xl:overflow-hidden @max-2xl:rounded-2xl @max-2xl:border @max-2xl:border-line">
+              {shown.map((a) => (
+                <AppCard key={a.id} app={a} connected={byId.get(a.id)} onOpen={() => onOpen(a)} />
+              ))}
+            </div>
+          ) : (
+            <Empty icon={<Search size={20} />} title="No service matches">
+              Try other words, or add it to the catalog yourself (below).
+            </Empty>
+          )}
         </div>
+        <div className="flex gap-3 rounded-2xl border border-dashed border-line-2 px-4 py-3.5 text-[13px] leading-relaxed text-fg-2">
+          <GitPullRequest size={17} className="mt-0.5 shrink-0 text-fg-3" />
+          <div>
+            Missing a service? Anyone can add one: a small JSON file in the <code className="rounded bg-bg-2 px-1 font-mono text-[12px]">catalog/</code> folder of Hydor’s repository, sent as a pull request.{' '}
+            <a href={REPO_CATALOG} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
+              How to add one <ExternalLink size={11} />
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The featured services in a row that scrolls sideways, with arrows where there is a mouse. */
+function Featured({ apps, byId, onOpen }: { apps: CatalogApp[]; byId: Map<string, ConnectionView>; onOpen: (a: CatalogApp) => void }) {
+  const row = useRef<HTMLDivElement>(null);
+  const [ends, setEnds] = useState({ start: true, end: false });
+  const look = () => {
+    const el = row.current;
+    if (el) setEnds({ start: el.scrollLeft < 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 });
+  };
+  useEffect(look, [apps.length]);
+  const by = (dir: number) => row.current?.scrollBy({ left: dir * Math.max(260, row.current.clientWidth * 0.8), behavior: 'smooth' });
+  return (
+    <div>
+      <div className="mb-2.5 flex items-center gap-2">
+        <h3 className="min-w-0 flex-1 text-[15px] font-semibold tracking-tight">Featured</h3>
+        <span className="flex gap-1 max-sm:hidden">
+          <IconButton label="Back" size="sm" disabled={ends.start} onClick={() => by(-1)}>
+            <ChevronLeft size={16} />
+          </IconButton>
+          <IconButton label="More" size="sm" disabled={ends.end} onClick={() => by(1)}>
+            <ChevronRight size={16} />
+          </IconButton>
+        </span>
+      </div>
+      <div ref={row} onScroll={look} className="-mx-4 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:scroll-px-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+        {apps.map((a) => (
+          <div key={a.id} className="snap-start">
+            <AppCard app={a} connected={byId.get(a.id)} onOpen={() => onOpen(a)} big />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -328,19 +373,17 @@ export function ConnectedApps({ tab: asked, onTab }: { tab?: ConnTab | null; onT
   });
   const current = tab ?? 'market';
   return (
-    <div className="mx-auto max-w-[1120px] space-y-5 px-4 py-6 sm:px-6 sm:py-8">
-      <section className="flex flex-col gap-3 rounded-3xl border border-line bg-panel px-5 py-5 sm:flex-row sm:items-center sm:px-7">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent/12 text-accent">
+    <div className="@container mx-auto max-w-[1120px] space-y-5 px-4 py-6 sm:px-6 sm:py-7">
+      <section className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3.5 gap-y-2 rounded-3xl border border-line bg-panel px-5 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-7 sm:py-5">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent/12 text-accent sm:row-span-2">
           <PlugZap size={21} />
         </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[17px] leading-tight font-semibold tracking-tight">Your services, ready for every agent</h2>
-          <p className="mt-1 max-w-[680px] text-[13.5px] leading-relaxed text-fg-2">
-            Connect an account once (mail, calendar, Notion, GitHub…) and every agent and app can work with it. Keys you save (API keys, tokens) stay in your vault: agents use them by name and never see them.
-          </p>
-        </div>
+        <h2 className="text-[17px] leading-tight font-semibold tracking-tight sm:self-end">Your services, ready for every agent</h2>
+        <p className="col-span-2 max-w-[680px] text-[13.5px] leading-relaxed text-fg-2 sm:col-span-1 sm:col-start-2 sm:self-start">
+          Connect an account once (mail, calendar, Notion, GitHub…) and every agent and app can work with it. Keys you save (API keys, tokens) stay in your vault: agents use them by name and never see them.
+        </p>
         {current !== 'market' && (
-          <Button variant="primary" size="sm" icon={<Store size={14} />} onClick={() => setTab('market')} className="self-start sm:self-center">
+          <Button variant="primary" size="sm" icon={<Store size={14} />} onClick={() => setTab('market')} className="col-span-2 justify-self-start sm:col-span-1 sm:col-start-3 sm:row-span-2 sm:row-start-1 sm:self-center">
             Connect a service
           </Button>
         )}

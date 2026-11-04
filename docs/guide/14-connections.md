@@ -29,8 +29,8 @@ The page opens on **Connected** when you have connected something, and on **Mark
 Open [the Marketplace tab](/apps/connected?tab=market).
 
 - The search box ("Search … services: mail, Notion, invoices…") looks in names, descriptions, keywords and categories. Every word you type has to match.
-- The chips under it show one category at a time, each with how many services it has: **All**, **Notes & docs**, **Tasks & projects**, **Mail, chat & meetings**, **Calendar & scheduling**, **Files & storage**, **Design & media**, **Developer tools**, **Cloud & hosting**, **Databases & data**, **Analytics & monitoring**, **Sales, marketing & support**, **Payments & finance**, **Websites & shops**, **Search & the web**, **AI & automation**, **Travel & everyday** and **On this computer**. On a phone they scroll sideways.
-- **Featured**: a row of larger cards for well-known services (Notion, Linear, GitHub, Figma, Stripe, Zapier…). It shows while you haven't searched or picked a category. **All services** follows.
+- The categories, each with how many services it has, show one at a time: **All services** (**All** as a chip), **Notes & docs**, **Tasks & projects**, **Mail, chat & meetings**, **Calendar & scheduling**, **Files & storage**, **Design & media**, **Developer tools**, **Cloud & hosting**, **Databases & data**, **Analytics & monitoring**, **Sales, marketing & support**, **Payments & finance**, **Websites & shops**, **Search & the web**, **AI & automation**, **Travel & everyday** and **On this computer**. On a computer they are a list beside the services; on a narrower screen, chips under the search box that scroll sideways.
+- **Featured**: a row of larger cards for well-known services (Notion, Linear, GitHub, Figma, Stripe, Zapier…). It shows while you haven't searched or picked a category; on a computer its arrows scroll it. The services follow under **All services** (or the category picked, or **Found** when you search), with how many there are. On a phone they are the rows of one list.
 
 Each card shows the service's name, what an agent can do with it, and how it connects:
 

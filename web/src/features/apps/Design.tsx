@@ -28,7 +28,7 @@ const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSt
  * A made-up answer in the shape of its answer fields, to see a view with before it has run: its own files stand in
  * for pictures and videos, and columns named for a latitude and longitude get places near one another.
  */
-function sampleResult(answer: AnswerField[], assets: AppRecipe['assets'] = {}): Record<string, unknown> {
+export function sampleResult(answer: AnswerField[], assets: AppRecipe['assets'] = {}): Record<string, unknown> {
   const day = (n: number) => isoDay(new Date(Date.now() + n * 86_400_000));
   const files = Object.entries(assets);
   const pics = files.filter(([n, a]) => mediaKind(n, a.mime) === 'image').map(([n]) => `asset:${n}`);

@@ -3,6 +3,32 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.21.0 · 4 November 2026
+
+A new welcome tour, models suggested for your computer, a sidebar you can arrange, and a tidier app editor.
+
+- **A new welcome tour**: redesigned for people new to AI, in plain words and drawn in water. It shows what can do
+  the work (Claude or ChatGPT with the plan you pay for, pay as you go, free on this computer, other agents), then
+  lights up each part of the app with something to try. The password and sign-in screens match it.
+- **Models that suit your computer**: Settings → Models (and the tour) suggests models this computer can run, marks
+  the best one, and installs it in one click; bigger ones say what they need. vLLM can split a model across several
+  graphics cards and runs on Macs with Apple silicon, and OpenRouter suggests a few good models before you search.
+- **Arrange the sidebar**: drag a project's or a folder's group by its heading to put it where you like (on a phone,
+  hold it a moment first); the order is kept on every device. The logo fills with water under the pointer, and the
+  tools at the bottom hold still.
+- **The app editor keeps one width**: every tab (What it does, Form, Answer, Design, Examples, Settings) is as
+  wide as the others, so nothing jumps when you switch. The tabs have icons, stay at the top as you scroll, and on
+  a phone show in two rows, so none is out of sight.
+- **See the form as you build it**: on a wide screen, Form shows the form beside its questions as the app's page
+  asks it, and Answer shows a made-up answer as a run shows it, both changing as you type.
+- **Cleaner questions and answer fields**: each is a numbered card; moving it up or down and removing it are in
+  its ⋯ menu, and its help text, example and first answer are labelled. The name and description read like the
+  app's own heading, the task has its Insert chips and Preview in one bar, Settings is one list with an icon for
+  each part, and **Not saved yet** shows beside Save while you have changes.
+- **Apps pages on a phone and a computer**: on a phone each part's apps are rows of one list, so many more fit, and
+  a **Make an app** tile follows your own apps. Connected apps lists the kinds of services beside them on a
+  computer, Featured has arrows, and on a phone the services are rows of one list.
+
 ## 0.20.4 · 3 November 2026
 
 The agent points the right way to an app's answer.

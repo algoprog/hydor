@@ -4,7 +4,7 @@
 // what is on screen before saving. "Save as template" in a session's menu opens it with a draft from that
 // session.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, FlaskConical, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, ChevronDown, ClipboardList, Database, Ellipsis, Eye, FileOutput, FlaskConical, FolderOpen, Gauge, History, Images, KeyRound, Palette, Plus, Puzzle, Settings2, Sparkles, Trash2, Workflow, Wrench, X } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
@@ -17,14 +17,14 @@ import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
 import { FolderChip } from '../../components/FolderPicker';
-import { Button, cx, Dialog, IconButton, inputCls, Popover, Section, Segmented, Switch, Tabs, Throbber, useMediaQuery } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, MenuItem, Popover, Section, Segmented, Switch, Throbber, useMediaQuery } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
 import { appPath, useRunEvents, type RunDetail } from './api';
 import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
-import { RunBody } from './Result';
-import { DesignEditor } from './Design';
+import { ResultView, RunBody } from './Result';
+import { DesignEditor, sampleResult } from './Design';
 import { AppView } from './View';
 import { InstallFromFile } from './Install';
 import { Advice } from './Advice';
@@ -54,20 +54,135 @@ const viewWas = (): 'list' | 'graph' => {
   }
 };
 
+/** The builder's parts as tabs, each with its icon. */
+const PARTS: { value: Part; label: string; icon: typeof Workflow }[] = [
+  { value: 'does', label: 'What it does', icon: Workflow },
+  { value: 'form', label: 'Form', icon: ClipboardList },
+  { value: 'answer', label: 'Answer', icon: FileOutput },
+  { value: 'design', label: 'Design', icon: Palette },
+  { value: 'examples', label: 'Examples', icon: FlaskConical },
+  { value: 'settings', label: 'Settings', icon: Settings2 },
+];
+
+/** The parts' tabs: one row where the page is wide, two rows of three where it is narrow (a phone, beside a conversation), so none is out of sight. */
+function PartTabs({ value, onChange, counts }: { value: Part; onChange: (p: Part) => void; counts: Partial<Record<Part, number>> }) {
+  return (
+    <div role="tablist" aria-label="Parts of the app" className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-panel p-1 @2xl:grid-cols-6">
+      {PARTS.map(({ value: v, label, icon: I }) => {
+        const on = v === value;
+        const n = counts[v];
+        return (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(v)}
+            className={cx(
+              'relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-2 font-medium transition-colors @2xl:h-10 @2xl:flex-row @2xl:gap-2',
+              on ? 'bg-bg-2 text-fg ring-1 ring-line-2' : 'text-fg-3 hover:bg-bg-1 hover:text-fg',
+            )}
+          >
+            <I size={16} className={cx('shrink-0', on && 'text-accent')} />
+            <span className="max-w-full truncate text-[12px] @2xl:text-[13.5px]">{label}</span>
+            {!!n && <span className={cx('tnum absolute top-1.5 right-2 rounded-md px-1.5 text-[10.5px] leading-[16px] font-normal @2xl:static @2xl:text-[11.5px]', on ? 'bg-bg-3 text-fg-2' : 'bg-bg-2 text-fg-3')}>{n}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A list of Settings' parts in one box, each a row. */
+const LIST = 'divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel';
+
 /** A part of Settings, folded to a line that says how it is set until it is opened. */
-function Fold({ title, summary, sub, children }: { title: string; summary?: ReactNode; sub?: ReactNode; children: ReactNode }) {
+function Fold({ icon, title, summary, sub, children }: { icon: ReactNode; title: string; summary?: ReactNode; sub?: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <section className="rounded-2xl border border-line bg-panel">
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-3 px-5 py-3.5 text-left">
+    <section>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-bg-1 sm:px-5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-bg-2 text-fg-2">{icon}</span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[14px] font-semibold">{title}</span>
-          <span className="block truncate text-[12.5px] text-fg-3">{open ? sub : summary}</span>
+          <span className="block text-[14px] font-medium">{title}</span>
+          <span className={cx('block text-[12.5px] leading-snug text-fg-3', !open && 'truncate')}>{open ? sub : summary}</span>
         </span>
         <ChevronDown size={16} className={cx('shrink-0 text-fg-3 transition-transform', open && 'rotate-180')} />
       </button>
-      {open && <div className="px-5 pb-4">{children}</div>}
+      {open && <div className="px-4 pt-1 pb-5 sm:pr-5 sm:pl-[64px]">{children}</div>}
     </section>
+  );
+}
+
+/** A row of Settings that is one switch. */
+function SwitchRow({ icon, title, sub, on, onChange }: { icon: ReactNode; title: string; sub: ReactNode; on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <section className="flex items-center gap-3 px-4 py-3 sm:px-5">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-bg-2 text-fg-2">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14px] font-medium">{title}</span>
+        <span className="block text-[12.5px] leading-snug text-fg-3">{sub}</span>
+      </span>
+      <Switch on={on} label={title} onChange={onChange} />
+    </section>
+  );
+}
+
+/** A preview beside what it shows: a quiet box with what it is. */
+function PreviewBox({ note, children }: { note: ReactNode; children: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-line bg-panel">
+      <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+        <Eye size={14} className="shrink-0 text-fg-3" />
+        <span className="text-[12.5px] font-medium text-fg-2">Preview</span>
+        <span className="min-w-0 flex-1 text-[12px] leading-snug text-fg-3">{note}</span>
+      </div>
+      <div className="px-4 py-4">{children}</div>
+    </div>
+  );
+}
+
+/** The form as the app's page asks it, as it is on screen: a change shows at once. */
+function FormPreview({ fields }: { fields: AppField[] }) {
+  const shown = fields.filter((f) => f.label.trim());
+  const [values, setValues] = useState<FormValues>(() => initialValues(shown));
+  const [files, setFiles] = useState<FormFiles>({});
+  // A question added or its kind, choices or first answer changed: the form starts again.
+  const shape = JSON.stringify(shown.map((f) => [f.id, f.type, f.default ?? '', f.options ?? []]));
+  useEffect(() => setValues(initialValues(shown)), [shape]);
+  return (
+    <PreviewBox note="As its page asks it">
+      {shown.length ? (
+        <AppForm
+          fields={shown}
+          values={values}
+          files={files}
+          onChange={(k, v) => setValues((x) => ({ ...x, [k]: v }))}
+          onFile={(k, v) =>
+            setFiles((x) => {
+              const n = { ...x };
+              if (v) n[k] = v;
+              else delete n[k];
+              return n;
+            })
+          }
+        />
+      ) : (
+        <p className="text-[13px] leading-relaxed text-fg-3">No questions: it runs at once, without asking anything.</p>
+      )}
+    </PreviewBox>
+  );
+}
+
+/** A run's answer as a card, with made-up values in its shape. */
+function AnswerPreview({ recipe }: { recipe: AppRecipe }) {
+  const fields = recipe.answer.filter((a) => a.label.trim());
+  const shape = JSON.stringify(fields);
+  const result = useMemo(() => sampleResult(fields, recipe.assets), [shape, recipe.assets]);
+  return (
+    <PreviewBox note={recipe.ui ? 'As a plain card; its view, under Design, shows it its own way' : 'A made-up answer, as a run shows it'}>
+      {fields.length ? <ResultView answer={fields} result={result} name={recipe.name} assets={recipe.assets} /> : <p className="text-[13px] leading-relaxed text-fg-3">No answer fields: the agent’s reply is the answer.</p>}
+    </PreviewBox>
   );
 }
 
@@ -90,8 +205,8 @@ const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
   return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions };
 };
 
-/** A text box that grows with what is written in it, and with how narrow it is. */
-function Grow(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
+/** A text box that grows with what is written in it, and with how narrow it is. `base`: its look, the kit's field unless given. */
+function Grow({ base, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string; base?: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fit = () => {
     const el = ref.current;
@@ -113,17 +228,20 @@ function Grow(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  return <textarea ref={ref} rows={1} {...props} className={cx(inputCls, 'block h-auto resize-none py-2', props.className)} />;
+  return <textarea ref={ref} rows={1} {...props} className={cx(base ?? inputCls, 'block h-auto resize-none py-2', props.className)} />;
 }
+
+/** The name and description: text until pointed at, a box while written in. */
+const inline = 'w-full rounded-[10px] border border-transparent bg-transparent px-2.5 outline-none transition-colors placeholder:text-fg-3 hover:border-line-2 focus:border-accent/60 focus:bg-bg-1 focus:ring-3 focus:ring-accent/15';
 
 function IconPick({ icon, color, onChange }: { icon: string; color: string; onChange: (p: { icon?: string; color?: string }) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} className="relative shrink-0 rounded-[14px] transition active:scale-95" aria-label="Change the icon">
-        <AppIcon icon={icon} color={color} size={52} />
-        <span className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-elevated text-fg-3">
+      <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} className="group relative shrink-0 rounded-[16px] transition active:scale-95" aria-label="Change the icon" title="Change the icon">
+        <AppIcon icon={icon} color={color} size={60} />
+        <span className="absolute -right-1 -bottom-1 flex h-5.5 w-5.5 items-center justify-center rounded-full border border-line bg-elevated text-fg-3 transition-colors group-hover:text-fg">
           <ChevronDown size={12} />
         </span>
       </button>
@@ -150,22 +268,64 @@ function IconPick({ icon, color, onChange }: { icon: string; color: string; onCh
   );
 }
 
-function Row({ children, onUp, onDown, onRemove }: { children: ReactNode; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
+/** A question's or an answer field's ⋯: move it up or down, or remove it. */
+function RowMenu({ onUp, onDown, onRemove }: { onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const act = (f?: () => void) => () => {
+    setOpen(false);
+    f?.();
+  };
   return (
-    <div className="group flex gap-2 rounded-xl border border-line bg-bg-1 p-2.5">
-      <div className="flex shrink-0 flex-col">
-        <IconButton label="Move up" size="sm" onClick={onUp} disabled={!onUp}>
-          <ArrowUp size={14} />
-        </IconButton>
-        <IconButton label="Move down" size="sm" onClick={onDown} disabled={!onDown}>
-          <ArrowDown size={14} />
-        </IconButton>
-      </div>
-      <div className="min-w-0 flex-1 space-y-2">{children}</div>
-      <IconButton label="Remove" size="sm" onClick={onRemove}>
-        <Trash2 size={14} />
+    <>
+      <IconButton ref={ref} label="More" size="sm" onClick={() => setOpen((o) => !o)} active={open}>
+        <Ellipsis size={16} />
       </IconButton>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" width={190}>
+        <MenuItem icon={<ArrowUp size={14} />} disabled={!onUp} onClick={act(onUp)}>
+          Move up
+        </MenuItem>
+        <MenuItem icon={<ArrowDown size={14} />} disabled={!onDown} onClick={act(onDown)}>
+          Move down
+        </MenuItem>
+        <MenuItem icon={<Trash2 size={14} />} danger onClick={act(onRemove)}>
+          Remove
+        </MenuItem>
+      </Popover>
+    </>
+  );
+}
+
+/** A question or an answer field: its number, what it is, and its ⋯. */
+function Row({ n, children, onUp, onDown, onRemove }: { n: number; children: ReactNode; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
+  return (
+    <div className="flex gap-3 rounded-xl border border-line bg-bg-1 p-3">
+      <span className="tnum mt-[7px] grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg-3 text-[12px] font-semibold text-fg-2 @max-md:hidden">{n}</span>
+      <div className="min-w-0 flex-1 space-y-2.5">{children}</div>
+      <div className="-mr-1 pt-[3px]">
+        <RowMenu onUp={onUp} onDown={onDown} onRemove={onRemove} />
+      </div>
     </div>
+  );
+}
+
+/** Add one more to a list: a wide, quiet button at its end. */
+function AddRow({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line-2 text-[13.5px] font-medium text-fg-2 transition-colors hover:border-accent/60 hover:bg-accent-soft hover:text-accent">
+      <Plus size={15} />
+      {children}
+    </button>
+  );
+}
+
+/** A small label over a box. */
+function Labeled({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 block text-[12px] text-fg-3">{label}</span>
+      {children}
+    </label>
   );
 }
 
@@ -180,72 +340,83 @@ const move = <T,>(list: T[], i: number, by: number) => {
   return next;
 };
 
-function FieldRow({ f, auto, onChange, ...nav }: { f: AppField; auto: boolean; onChange: (f: AppField, id?: string) => void; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
+/** Needed, with its switch: what a question or an answer field cannot be without. */
+function Needed({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className="flex h-8.5 shrink-0 cursor-pointer items-center gap-2 text-[13px] text-fg-2">
+      <Switch on={on} onChange={onChange} label="Needed" />
+      Needed
+    </label>
+  );
+}
+
+function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; auto: boolean; onChange: (f: AppField, id?: string) => void; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
   const [more, setMore] = useState(!f.label);
   return (
-    <Row {...nav}>
+    <Row n={n} {...nav}>
       <div className="flex flex-wrap items-center gap-2">
-        <input className={cx(smallFit, 'min-w-[160px] flex-[2]')} placeholder="The question, e.g. Where to?" value={f.label} onChange={(e) => onChange({ ...f, label: e.target.value })} />
-        <select className={cx(smallFit, 'min-w-[120px] flex-1')} value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined })}>
+        <input className={cx(smallFit, 'min-w-[200px] flex-[3] font-medium')} placeholder="The question, e.g. Where to?" value={f.label} onChange={(e) => onChange({ ...f, label: e.target.value })} />
+        <select className={cx(smallFit, 'min-w-[130px] flex-1')} aria-label="Its kind" value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined })}>
           {FIELD_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
             </option>
           ))}
         </select>
-        <label className="flex shrink-0 items-center gap-1.5 text-[12.5px] text-fg-2">
-          <Switch on={!!f.required} onChange={(on) => onChange({ ...f, required: on || undefined })} label="Needed" />
-          Needed
-        </label>
+        <Needed on={!!f.required} onChange={(on) => onChange({ ...f, required: on || undefined })} />
       </div>
       {f.type === 'choice' && (
         <textarea
-          className={cx(inputCls, 'h-auto py-1.5 text-[13px]')}
+          className={cx(inputCls, 'h-auto py-1.5 text-[13px] leading-relaxed')}
           rows={Math.min(6, Math.max(2, (f.options?.length ?? 0) + 1))}
           placeholder="The choices, one per line"
           value={(f.options ?? []).join('\n')}
           onChange={(e) => onChange({ ...f, options: e.target.value.split('\n') })}
         />
       )}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-3">
-        <code className="rounded bg-bg-3 px-1.5 py-px font-mono text-[11.5px] text-fg-2" title={auto ? 'Follows the question until the task uses it' : undefined}>{`{{${f.id}}}`}</code>
-        <button type="button" onClick={() => setMore((m) => !m)} className="text-left hover:text-fg">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-fg-3">
+        <code className="rounded-md bg-bg-3 px-1.5 py-px font-mono text-[11.5px] text-fg-2" translate="no" title={auto ? 'Follows the question until the task uses it' : 'How the task names its answer'}>{`{{${f.id}}}`}</code>
+        <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="inline-flex items-center gap-1 text-left hover:text-fg">
           {more ? 'Fewer details' : 'Help text, example, default…'}
+          <ChevronDown size={12} className={cx('transition-transform', more && 'rotate-180')} />
         </button>
       </div>
       {more && (
-        <div className="grid gap-2 sm:grid-cols-3">
-          <input className={small} placeholder="Help under the question" value={f.help ?? ''} onChange={(e) => onChange({ ...f, help: e.target.value || undefined })} />
-          <input className={small} placeholder="An example answer" value={f.placeholder ?? ''} onChange={(e) => onChange({ ...f, placeholder: e.target.value || undefined })} />
-          <input className={small} placeholder="Filled in at first" value={f.default ?? ''} onChange={(e) => onChange({ ...f, default: e.target.value || undefined })} />
+        <div className="grid gap-2 @xl:grid-cols-3">
+          <Labeled label="Help under the question">
+            <input className={small} placeholder="Optional" value={f.help ?? ''} onChange={(e) => onChange({ ...f, help: e.target.value || undefined })} />
+          </Labeled>
+          <Labeled label="An example answer">
+            <input className={small} placeholder="Optional" value={f.placeholder ?? ''} onChange={(e) => onChange({ ...f, placeholder: e.target.value || undefined })} />
+          </Labeled>
+          <Labeled label="Filled in at first">
+            <input className={small} placeholder="Optional" value={f.default ?? ''} onChange={(e) => onChange({ ...f, default: e.target.value || undefined })} />
+          </Labeled>
         </div>
       )}
     </Row>
   );
 }
 
-function AnswerRow({ f, onChange, ...nav }: { f: AnswerField; onChange: (f: AnswerField) => void; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
+function AnswerRow({ f, n, onChange, ...nav }: { f: AnswerField; n: number; onChange: (f: AnswerField) => void; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
   const cols = f.columns ?? [];
   return (
-    <Row {...nav}>
+    <Row n={n} {...nav}>
       <div className="flex flex-wrap items-center gap-2">
-        <input className={cx(smallFit, 'min-w-[150px] flex-[2]')} placeholder="A heading, e.g. Recommendation" value={f.label} onChange={(e) => onChange({ ...f, label: e.target.value })} />
-        <select className={cx(smallFit, 'min-w-[110px] flex-1')} value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AnswerField['type'], columns: e.target.value === 'table' ? (f.columns?.length ? f.columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined })}>
+        <input className={cx(smallFit, 'min-w-[200px] flex-[3] font-medium')} placeholder="A heading, e.g. Recommendation" value={f.label} onChange={(e) => onChange({ ...f, label: e.target.value })} />
+        <select className={cx(smallFit, 'min-w-[130px] flex-1')} aria-label="Its kind" value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AnswerField['type'], columns: e.target.value === 'table' ? (f.columns?.length ? f.columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined })}>
           {ANSWER_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
             </option>
           ))}
         </select>
-        <label className="flex shrink-0 items-center gap-1.5 text-[12.5px] text-fg-2">
-          <Switch on={!!f.required} onChange={(on) => onChange({ ...f, required: on || undefined })} label="Needed" />
-          Needed
-        </label>
+        <Needed on={!!f.required} onChange={(on) => onChange({ ...f, required: on || undefined })} />
       </div>
       <input className={small} placeholder="What goes here, for the agent (optional)" value={f.description ?? ''} onChange={(e) => onChange({ ...f, description: e.target.value || undefined })} />
       {f.type === 'table' && (
-        <div className="space-y-1.5 rounded-lg border border-line bg-panel p-2">
-          <div className="text-[12px] text-fg-3">Columns</div>
+        <div className="space-y-1.5 rounded-lg border border-line bg-panel p-2.5">
+          <div className="text-[12px] font-medium text-fg-2">Columns</div>
           {cols.map((c, i) => (
             <div key={i} className="flex items-center gap-1.5">
               <input
@@ -275,29 +446,33 @@ function AnswerRow({ f, onChange, ...nav }: { f: AnswerField; onChange: (f: Answ
   );
 }
 
-/** A new template in words: the App builder makes it, in a session of its own. */
+/** A new app in words: the App builder makes it, in a session of its own. Or one from a file. */
 function Describe() {
   const [ask, setAsk] = useState('');
   return (
-    <form
-      className="min-w-[min(100%,320px)] flex-1 space-y-1.5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!ask.trim()) return;
-        go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me an app: ')}${ask.trim()}`)}`);
-      }}
-    >
-      <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2">
-        <Sparkles size={13} className="text-accent" />
+    // On a phone the way to install a file goes under the box, so the title keeps its line.
+    <section className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-2xl border border-accent/25 bg-accent-soft px-4 py-3.5 sm:px-5 sm:py-4">
+      <span className="order-1 flex min-w-0 flex-1 items-center gap-2 text-[14px] font-semibold">
+        <Sparkles size={15} className="shrink-0 text-accent" />
         Describe an app, and an agent makes it
       </span>
-      <div className="flex gap-2">
-        <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Keeps the links I send, sums each up, and lists the unread ones" className={cx(inputCls, 'min-w-0 flex-1')} />
-        <Button type="submit" variant="secondary" disabled={!ask.trim()}>
+      <span className="order-4 sm:order-2">
+        <InstallFromFile />
+      </span>
+      <form
+        className="order-3 flex w-full gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!ask.trim()) return;
+          go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me an app: ')}${ask.trim()}`)}`);
+        }}
+      >
+        <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Keeps the links I send, sums each up, and lists the unread ones" className={cx(inputCls.replace('bg-bg-1', 'bg-panel'), 'min-w-0 flex-1')} />
+        <Button type="submit" variant="primary" disabled={!ask.trim()}>
           Make it
         </Button>
-      </div>
-    </form>
+      </form>
+    </section>
   );
 }
 
@@ -604,6 +779,10 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   const limitsLine =
     [recipe.limits.runsPerDay ? tr(`${recipe.limits.runsPerDay} runs a day`) : null, recipe.limits.capUsd ? tr(`at most $${recipe.limits.capUsd} a run`) : null].filter(Boolean).join(' · ') || tr('No limits');
 
+  // Changed since it was loaded or saved here.
+  const changed = !!saved && JSON.stringify(recipe) !== loaded.current;
+  const counts: Partial<Record<Part, number>> = { does: recipe.flow ? allSteps(recipe.flow.steps).length : undefined, form: recipe.fields.length, answer: recipe.answer.length, examples: recipe.examples?.length };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
@@ -611,6 +790,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
         back={embedded ? undefined : { label: 'Back', onClick: () => go(back) }}
         actions={
           <>
+            {changed && <span className="mr-1 text-[12.5px] text-fg-3 max-sm:hidden">Not saved yet</span>}
             <Button size="sm" variant="ghost" icon={<FlaskConical size={14} />} onClick={() => (recipe.prompt.trim() || recipe.flow ? setTesting(true) : toast('Write the task first', 'error'))}>
               <span className="max-sm:hidden">Test run</span>
             </Button>
@@ -621,7 +801,8 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
         }
       />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className={cx('mx-auto space-y-4 px-4 py-6 pb-24 sm:px-6', part === 'does' && mode === 'graph' ? 'max-w-[1240px]' : part === 'design' ? 'max-w-[980px]' : 'max-w-[820px]')}>
+        {/* One width for every part, so nothing moves from one tab to the next. */}
+        <div className="@container mx-auto max-w-[1120px] space-y-4 px-4 py-5 pb-24 sm:px-6 sm:py-6">
           {note && (
             <div ref={noteBox} className="scroll-mt-16 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[13px] leading-snug">
               {note}
@@ -638,166 +819,161 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               </Button>
             </div>
           )}
-          {!saved && !template && !from && (
-            <div className="-mt-1 flex flex-wrap items-end gap-x-4 gap-y-2">
-              <Describe />
-              <InstallFromFile />
+          {!saved && !template && !from && <Describe />}
+          <section className="flex items-start gap-3 rounded-2xl border border-line bg-panel p-4 sm:gap-4 sm:p-5">
+            <IconPick icon={recipe.icon} color={recipe.color} onChange={set} />
+            <div className="-mt-1 min-w-0 flex-1 space-y-0.5">
+              <input className={cx(inline, 'h-10 !text-[19px] font-semibold tracking-tight')} aria-label="Name" placeholder="Name, e.g. Trip planner" value={recipe.name} onChange={(e) => set({ name: e.target.value })} />
+              <Grow base={inline} className="text-[14px] leading-snug text-fg-2" aria-label="Description" placeholder="What it does, in a sentence" value={recipe.description} onChange={(e) => set({ description: e.target.value })} />
             </div>
-          )}
-          <Section>
-            <div className="flex items-start gap-4">
-              <IconPick icon={recipe.icon} color={recipe.color} onChange={set} />
-              <div className="min-w-0 flex-1 space-y-2">
-                <input className={cx(inputCls, 'text-[15px] font-medium')} placeholder="Name, e.g. Trip planner" value={recipe.name} onChange={(e) => set({ name: e.target.value })} />
-                <Grow className="text-[13.5px] leading-snug" placeholder="What it does, in a sentence" value={recipe.description} onChange={(e) => set({ description: e.target.value })} />
-              </div>
-            </div>
-          </Section>
+          </section>
 
-          <Tabs
-            value={part}
-            onChange={setPart}
-            className="border-b border-line"
-            options={[
-              { value: 'does', label: 'What it does', count: recipe.flow ? allSteps(recipe.flow.steps).length : undefined },
-              { value: 'form', label: 'Form', count: recipe.fields.length },
-              { value: 'answer', label: 'Answer', count: recipe.answer.length },
-              { value: 'design', label: 'Design' },
-              { value: 'examples', label: 'Examples', count: recipe.examples?.length },
-              { value: 'settings', label: 'Settings' },
-            ]}
-          />
+          {/* The tabs stay in reach while a long part scrolls (not on a phone, where they take two rows). */}
+          <div className="z-20 -mx-2 bg-bg/90 px-2 py-1 backdrop-blur @2xl:sticky @2xl:top-0">
+            <PartTabs value={part} onChange={setPart} counts={counts} />
+          </div>
 
           {part === 'form' && (
-          <Section title="The form" sub="The questions someone answers before each run.">
-            <div className="space-y-2">
-              {recipe.fields.map((f, i) => (
-                <FieldRow
-                  key={i}
-                  f={f}
-                  auto={auto.has(f.id)}
-                  onChange={(nf) => changeField(i, nf)}
-                  onUp={i ? () => set({ fields: move(recipe.fields, i, -1) }) : undefined}
-                  onDown={i < recipe.fields.length - 1 ? () => set({ fields: move(recipe.fields, i, 1) }) : undefined}
-                  onRemove={() => set({ fields: recipe.fields.filter((_, j) => j !== i) })}
-                />
-              ))}
-              <Button size="sm" variant="subtle" icon={<Plus size={14} />} onClick={addField}>
-                Add a question
-              </Button>
+            <div className="grid items-start gap-4 @4xl:grid-cols-[minmax(0,1fr)_340px]">
+              <Section title="The form" sub="The questions someone answers before each run.">
+                <div className="space-y-2.5">
+                  {recipe.fields.map((f, i) => (
+                    <FieldRow
+                      key={i}
+                      n={i + 1}
+                      f={f}
+                      auto={auto.has(f.id)}
+                      onChange={(nf) => changeField(i, nf)}
+                      onUp={i ? () => set({ fields: move(recipe.fields, i, -1) }) : undefined}
+                      onDown={i < recipe.fields.length - 1 ? () => set({ fields: move(recipe.fields, i, 1) }) : undefined}
+                      onRemove={() => set({ fields: recipe.fields.filter((_, j) => j !== i) })}
+                    />
+                  ))}
+                  <AddRow onClick={addField}>Add a question</AddRow>
+                </div>
+              </Section>
+              <div className="@max-4xl:hidden @4xl:sticky @4xl:top-[68px]">
+                <FormPreview fields={recipe.fields} />
+              </div>
             </div>
-          </Section>
           )}
 
-          {part === 'does' && (recipe.flow ? (
-            <Section
-              title="What it does"
-              sub="Its steps: each can use the form’s answers, the built-in values (today, now…) and what the steps before it gave."
-              actions={modeSwitch}
-            >
-              <div className="space-y-3">
-                {saved && <Advice app={saved} recipe={recipe} onChange={set} session={session} />}
-                <StepsEditor
-                  view={mode === 'graph' ? 'graph' : 'list'}
-                  onPart={setPart}
-                  recipe={{ ...recipe, flow: recipe.flow }}
-                  appId={saved?.id ?? null}
-                  onChange={set}
-                  onAsk={session ? (st) => composeInsert(tr(`About the step “${titleOf(st)}” (${st.id}) of the app: `), session) : undefined}
-                />
-              </div>
-            </Section>
-          ) : (
-          <Section
-            title="The task"
-            sub="What the agent is asked to do, with the answers put in."
-            actions={
-              <span className="flex items-center gap-3">
-                <button type="button" onClick={() => setPreview((p) => !p)} className="text-[12.5px] text-fg-3 hover:text-fg">
-                  {preview ? 'Edit' : 'Preview'}
-                </button>
-                {modeSwitch}
-              </span>
-            }
-          >
-            {recipe.fields.length > 0 && (
-              <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                <span className="text-[12px] text-fg-3">Insert</span>
-                {recipe.fields.map((f) => (
-                  <button key={f.id} type="button" onClick={() => insert(`{{${f.id}}}`)} className={cx('h-6.5 rounded-md px-2 font-mono text-[11.5px] ring-1 ring-inset transition-colors', used.has(f.id) ? 'bg-bg-2 text-fg-2 ring-line' : 'bg-accent-soft text-accent ring-accent/30')}>
-                    {f.label || f.id}
-                  </button>
-                ))}
-                {(['today', 'now', 'weekday'] as const).map((b) => (
-                  <button key={b} type="button" onClick={() => insert(`{{${b}}}`)} className="h-6.5 rounded-md bg-bg-2 px-2 font-mono text-[11.5px] text-fg-3 ring-1 ring-line ring-inset">
-                    {b}
-                  </button>
-                ))}
-              </div>
-            )}
-            {preview ? (
-              <div className="max-h-[420px] overflow-y-auto rounded-[10px] border border-line-2 bg-bg-1 px-3 py-2 text-[13.5px] leading-relaxed whitespace-pre-wrap">{fillTemplate(recipe.prompt, sample, { known: ids }) || <span className="text-fg-3">Nothing yet.</span>}</div>
+          {part === 'does' &&
+            (recipe.flow ? (
+              <Section title="What it does" sub="Its steps: each can use the form’s answers, the built-in values (today, now…) and what the steps before it gave." actions={modeSwitch}>
+                <div className="space-y-3">
+                  {saved && <Advice app={saved} recipe={recipe} onChange={set} session={session} />}
+                  <StepsEditor
+                    view={mode === 'graph' ? 'graph' : 'list'}
+                    onPart={setPart}
+                    recipe={{ ...recipe, flow: recipe.flow }}
+                    appId={saved?.id ?? null}
+                    onChange={set}
+                    onAsk={session ? (st) => composeInsert(tr(`About the step “${titleOf(st)}” (${st.id}) of the app: `), session) : undefined}
+                  />
+                </div>
+              </Section>
             ) : (
-              <textarea
-                ref={prompt}
-                className={cx(inputCls, 'h-auto min-h-[180px] py-2 text-[13.5px] leading-relaxed')}
-                rows={10}
-                placeholder={'e.g. Plan a {{days}}-day trip to {{destination}}. Check opening hours for those dates, keep travel short, and give a budget.'}
-                value={recipe.prompt}
-                onChange={(e) => set({ prompt: e.target.value })}
-              />
-            )}
-            <div className="mt-2 space-y-1 text-[12px] leading-snug text-fg-3">
-              <div>
-                <code className="font-mono">{'{{question}}'}</code> is replaced by its answer. Text between <code className="font-mono">{'{{#question}}'}</code> and <code className="font-mono">{'{{/question}}'}</code> stays only when it was answered (and not with No).
-              </div>
-              {unknown.length > 0 && <div className="text-warn">{unknown.map((u) => `{{${u}}}`).join(', ')} {unknown.length > 1 ? 'are' : 'is'} not a question, so it stays as written.</div>}
-              {unusedNeeded.length > 0 && <div className="text-warn">{unusedNeeded.map((f) => f.label || f.id).join(', ')} {unusedNeeded.length > 1 ? 'are' : 'is'} never used in the task.</div>}
-            </div>
-          </Section>
-          ))}
+              <Section title="The task" sub="What the agent is asked to do, with the answers put in." actions={modeSwitch}>
+                <div className="overflow-hidden rounded-xl border border-line-2 bg-bg-1 transition-colors focus-within:border-accent/60 focus-within:ring-3 focus-within:ring-accent/15">
+                  {/* Its toolbar: the answers and built-in values to put in where the cursor is, and Preview. */}
+                  <div className="flex flex-wrap items-center gap-1.5 border-b border-line px-2.5 py-2">
+                    <span className="mr-0.5 text-[12px] text-fg-3">Insert</span>
+                    {recipe.fields.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        disabled={preview}
+                        onClick={() => insert(`{{${f.id}}}`)}
+                        title={used.has(f.id) ? `{{${f.id}}}` : 'Not in the task yet'}
+                        className={cx('h-6.5 rounded-md px-2 text-[12px] ring-1 ring-inset transition-colors disabled:opacity-50', used.has(f.id) ? 'bg-bg-2 text-fg-2 ring-line hover:text-fg' : 'bg-accent-soft text-accent ring-accent/30')}
+                      >
+                        {f.label || f.id}
+                      </button>
+                    ))}
+                    {(['today', 'now', 'weekday'] as const).map((b) => (
+                      <button key={b} type="button" disabled={preview} onClick={() => insert(`{{${b}}}`)} className="h-6.5 rounded-md bg-bg-2 px-2 font-mono text-[11.5px] text-fg-3 ring-1 ring-line ring-inset hover:text-fg disabled:opacity-50">
+                        {b}
+                      </button>
+                    ))}
+                    <span className="flex-1" />
+                    <button type="button" onClick={() => setPreview((p) => !p)} aria-pressed={preview} className={cx('inline-flex h-6.5 items-center gap-1.5 rounded-md px-2 text-[12.5px] transition-colors', preview ? 'bg-bg-3 text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}>
+                      <Eye size={13} />
+                      {preview ? 'Edit' : 'Preview'}
+                    </button>
+                  </div>
+                  {preview ? (
+                    <div className="max-h-[480px] min-h-[240px] overflow-y-auto px-3.5 py-3 text-[14px] leading-relaxed whitespace-pre-wrap">{fillTemplate(recipe.prompt, sample, { known: ids }) || <span className="text-fg-3">Nothing yet.</span>}</div>
+                  ) : (
+                    <textarea
+                      ref={prompt}
+                      className="block min-h-[240px] w-full resize-y bg-transparent px-3.5 py-3 text-[14px] leading-relaxed outline-none placeholder:text-fg-3"
+                      rows={12}
+                      aria-label="The task"
+                      placeholder={'e.g. Plan a {{days}}-day trip to {{destination}}. Check opening hours for those dates, keep travel short, and give a budget.'}
+                      value={recipe.prompt}
+                      onChange={(e) => set({ prompt: e.target.value })}
+                    />
+                  )}
+                </div>
+                <div className="mt-2.5 space-y-1 text-[12px] leading-snug text-fg-3">
+                  <div>
+                    <code className="font-mono">{'{{question}}'}</code> is replaced by its answer. Text between <code className="font-mono">{'{{#question}}'}</code> and <code className="font-mono">{'{{/question}}'}</code> stays only when it was answered (and not with No).
+                  </div>
+                  {unknown.length > 0 && <div className="text-warn">{unknown.map((u) => `{{${u}}}`).join(', ')} {unknown.length > 1 ? 'are' : 'is'} not a question, so it stays as written.</div>}
+                  {unusedNeeded.length > 0 && <div className="text-warn">{unusedNeeded.map((f) => f.label || f.id).join(', ')} {unusedNeeded.length > 1 ? 'are' : 'is'} never used in the task.</div>}
+                </div>
+              </Section>
+            ))}
 
           {part === 'answer' && (
-          <Section title="The answer" sub={recipe.flow ? 'What a run gives back: it shows as a card or a table, and comes back as JSON to programs. What it does says where each comes from.' : 'Fields the agent fills in when it is done (with submit_result): they show as a card or a table, and come back as JSON to programs. None: the reply is the answer.'}>
-            <div className="space-y-2">
-              {recipe.answer.map((a, i) => (
-                <AnswerRow
-                  key={i}
-                  f={a}
-                  onChange={(na) => set({ answer: recipe.answer.map((x, j) => (j === i ? na : x)) })}
-                  onUp={i ? () => set({ answer: move(recipe.answer, i, -1) }) : undefined}
-                  onDown={i < recipe.answer.length - 1 ? () => set({ answer: move(recipe.answer, i, 1) }) : undefined}
-                  onRemove={() => set({ answer: recipe.answer.filter((_, j) => j !== i) })}
-                />
-              ))}
-              <Button size="sm" variant="subtle" icon={<Plus size={14} />} onClick={addAnswer}>
-                Add an answer field
-              </Button>
+            <div className="grid items-start gap-4 @4xl:grid-cols-[minmax(0,1fr)_340px]">
+              <Section title="The answer" sub={recipe.flow ? 'What a run gives back: it shows as a card or a table, and comes back as JSON to programs. What it does says where each comes from.' : 'Fields the agent fills in when it is done (with submit_result): they show as a card or a table, and come back as JSON to programs. None: the reply is the answer.'}>
+                <div className="space-y-2.5">
+                  {recipe.answer.map((a, i) => (
+                    <AnswerRow
+                      key={i}
+                      n={i + 1}
+                      f={a}
+                      onChange={(na) => set({ answer: recipe.answer.map((x, j) => (j === i ? na : x)) })}
+                      onUp={i ? () => set({ answer: move(recipe.answer, i, -1) }) : undefined}
+                      onDown={i < recipe.answer.length - 1 ? () => set({ answer: move(recipe.answer, i, 1) }) : undefined}
+                      onRemove={() => set({ answer: recipe.answer.filter((_, j) => j !== i) })}
+                    />
+                  ))}
+                  <AddRow onClick={addAnswer}>Add an answer field</AddRow>
+                </div>
+              </Section>
+              <div className="@max-4xl:hidden @4xl:sticky @4xl:top-[68px] @4xl:max-h-[calc(100dvh-140px)] @4xl:overflow-y-auto @4xl:rounded-2xl">
+                <AnswerPreview recipe={recipe} />
+              </div>
             </div>
-          </Section>
           )}
 
           {part === 'design' && (
-          <Section title="How its answer looks" sub="Its view: pages of elements made for its answer, filled in by each run, and what a click there does.">
-            <DesignEditor recipe={recipe} appId={saved?.id ?? null} template={template} session={session} onChange={set} />
-          </Section>
+            <Section title="How its answer looks" sub="Its view: pages of elements made for its answer, filled in by each run, and what a click there does.">
+              <DesignEditor recipe={recipe} appId={saved?.id ?? null} template={template} session={session} onChange={set} />
+            </Section>
           )}
 
           {part === 'design' && (
-          <Fold title="Its own files" summary={Object.keys(recipe.assets ?? {}).length ? tr(`${Object.keys(recipe.assets ?? {}).length} files`) : tr('None yet')} sub="Pictures, videos, sounds and data that come with it, for its view to show.">
-            <FilesEditor recipe={recipe} onChange={set} />
-          </Fold>
+            <div className={LIST}>
+              <Fold icon={<Images size={16} />} title="Its own files" summary={Object.keys(recipe.assets ?? {}).length ? tr(`${Object.keys(recipe.assets ?? {}).length} files`) : tr('None yet')} sub="Pictures, videos, sounds and data that come with it, for its view to show.">
+                <FilesEditor recipe={recipe} onChange={set} />
+              </Fold>
+            </div>
           )}
 
           {part === 'examples' && (
-          <Section title="Examples" sub="Answers to try it with, and checks on what a run gives: to try a change, and to notice when it gets worse.">
-            <ExamplesEditor recipe={recipe} appId={saved?.id ?? null} onChange={set} />
-          </Section>
+            <Section title="Examples" sub="Answers to try it with, and checks on what a run gives: to try a change, and to notice when it gets worse.">
+              <ExamplesEditor recipe={recipe} appId={saved?.id ?? null} onChange={set} />
+            </Section>
           )}
 
           {part === 'settings' && (
-          <div className="space-y-3">
-          <Fold title="Who does it" summary={whoLine} sub="The agent, its model and mode. Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits).">
+          <div className="space-y-4">
+          <div className={LIST}>
+          <Fold icon={<Bot size={16} />} title="Who does it" summary={whoLine} sub="The agent, its model and mode. Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits).">
             <div className="flex flex-wrap items-center gap-1">
               <AgentPicker
                 agent={recipe.agent}
@@ -847,15 +1023,15 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             </div>
           </Fold>
 
-          <Fold title="Keys it needs" summary={recipe.secrets?.length ? recipe.secrets.map((s) => s.label || s.name).join(', ') : tr('None')} sub="API keys and tokens its runs use, kept in your vault, never in the app.">
+          <Fold icon={<KeyRound size={16} />} title="Keys it needs" summary={recipe.secrets?.length ? recipe.secrets.map((s) => s.label || s.name).join(', ') : tr('None')} sub="API keys and tokens its runs use, kept in your vault, never in the app.">
             <SecretsEditor recipe={recipe} onChange={set} />
           </Fold>
 
-          <Fold title="What it keeps" summary={keepsLine} sub="Lists of records it keeps between runs, which its steps, its agents and its screen share, and a memory of its own.">
+          <Fold icon={<Database size={16} />} title="What it keeps" summary={keepsLine} sub="Lists of records it keeps between runs, which its steps, its agents and its screen share, and a memory of its own.">
             <KeepsEditor recipe={recipe} onChange={set} />
           </Fold>
 
-          <Fold title="Tools" summary={recipe.tools === null ? tr('All of Hydor’s own tools') : tr(`${recipe.tools.length} picked`)} sub="What the runs may use from Hydor’s own tools (web search, pages, memory…). The agent’s own files and commands follow its mode.">
+          <Fold icon={<Wrench size={16} />} title="Tools" summary={recipe.tools === null ? tr('All of Hydor’s own tools') : tr(`${recipe.tools.length} picked`)} sub="What the runs may use from Hydor’s own tools (web search, pages, memory…). The agent’s own files and commands follow its mode.">
             <div className="flex items-center gap-3">
               <span className="min-w-0 flex-1 text-[13.5px]">{recipe.tools === null ? 'All of them' : `${recipe.tools.length} picked`}</span>
               <label className="flex items-center gap-2 text-[12.5px] text-fg-2">
@@ -864,7 +1040,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               </label>
             </div>
             {recipe.tools !== null && (
-              <div className="mt-2 grid gap-1 sm:grid-cols-2">
+              <div className="mt-2 grid gap-1 @xl:grid-cols-2 @5xl:grid-cols-3">
                 {(tools ?? []).map((t) => {
                   const on = recipe.tools!.includes(t.name);
                   return (
@@ -882,8 +1058,8 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             )}
           </Fold>
 
-          <Fold title="Limits" summary={limitsLine} sub="So that it cannot run or spend more than you mean it to.">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <Fold icon={<Gauge size={16} />} title="Limits" summary={limitsLine} sub="So that it cannot run or spend more than you mean it to.">
+            <div className="grid gap-3 @xl:grid-cols-2">
               <label className="block">
                 <span className="mb-1 block text-[12.5px] text-fg-3">Runs a day (from anywhere)</span>
                 <input className={cx(inputCls, 'tnum')} inputMode="numeric" placeholder="No limit" value={recipe.limits.runsPerDay ?? ''} onChange={(e) => set({ limits: { ...recipe.limits, runsPerDay: Number(e.target.value) > 0 ? Math.round(Number(e.target.value)) : undefined } })} />
@@ -895,31 +1071,28 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             </div>
           </Fold>
 
-          <section className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-5 py-3.5">
-            <span className="min-w-0 flex-1">
-              <span className="block text-[14px] font-semibold">A block</span>
-              <span className="block text-[12.5px] text-fg-3">Offered when other apps add a step: its form is what it is given, its answer what it gives.</span>
-            </span>
-            <Switch on={!!recipe.block} label="A block" onChange={(on) => set({ block: on || undefined })} />
-          </section>
+          <SwitchRow icon={<Puzzle size={16} />} title="A block" sub="Offered when other apps add a step: its form is what it is given, its answer what it gives." on={!!recipe.block} onChange={(on) => set({ block: on || undefined })} />
+          </div>
 
-          {saved && !embedded && (
-            <Fold title="Its folder" summary={saved.folder ?? tr('Not made yet')} sub="Work on it as files, in any editor or with a coding agent: what you save there comes here.">
-              <FolderBox app={saved} />
-            </Fold>
-          )}
           {saved && (
-            <Fold title="Versions" summary={tr('Each save that changed what it does, to bring back')} sub="Each save that changed what it does (by you, an agent or its folder), and how its examples went with it.">
-              <Versions
-                app={saved}
-                onBring={(r, n) => {
-                  setRecipe(recipeOf({ ...saved, ...r, screens: saved.screens }));
-                  why.current = tr(`Brought back version ${n}`);
-                  setNote(tr(`Version ${n} is on screen: save to bring it back (it becomes the newest version), or leave without saving.`));
-                  setTimeout(() => noteBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-                }}
-              />
-            </Fold>
+            <div className={LIST}>
+              {!embedded && (
+                <Fold icon={<FolderOpen size={16} />} title="Its folder" summary={saved.folder ?? tr('Not made yet')} sub="Work on it as files, in any editor or with a coding agent: what you save there comes here.">
+                  <FolderBox app={saved} />
+                </Fold>
+              )}
+              <Fold icon={<History size={16} />} title="Versions" summary={tr('Each save that changed what it does, to bring back')} sub="Each save that changed what it does (by you, an agent or its folder), and how its examples went with it.">
+                <Versions
+                  app={saved}
+                  onBring={(r, n) => {
+                    setRecipe(recipeOf({ ...saved, ...r, screens: saved.screens }));
+                    why.current = tr(`Brought back version ${n}`);
+                    setNote(tr(`Version ${n} is on screen: save to bring it back (it becomes the newest version), or leave without saving.`));
+                    setTimeout(() => noteBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                  }}
+                />
+              </Fold>
+            </div>
           )}
           </div>
           )}

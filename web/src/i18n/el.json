@@ -10574,5 +10574,18 @@
 "Your agent":"Ο πράκτοράς σας",
 "Your OpenRouter key":"Το κλειδί σας για το OpenRouter",
 "Your own AI helpers, called agents, that do real work on this computer: they read and write your files, search the web, make documents and pictures, and write code. Here is how it goes:":"Οι δικοί σας βοηθοί τεχνητής νοημοσύνης, που λέγονται πράκτορες, κάνουν πραγματική δουλειά σε αυτόν τον υπολογιστή: διαβάζουν και γράφουν τα αρχεία σας, ψάχνουν στο διαδίκτυο, φτιάχνουν έγγραφα και εικόνες, και γράφουν κώδικα. Έτσι γίνεται:",
-"Your sessions":"Οι συνεδρίες σας"
+"Your sessions":"Οι συνεδρίες σας",
+"A made-up answer, as a run shows it":"Μια επινοημένη απάντηση, όπως τη δείχνει μια εκτέλεση",
+"As a plain card; its view, under Design, shows it its own way":"Ως απλή κάρτα· η προβολή της, στη Σχεδίαση, τη δείχνει με τον δικό της τρόπο",
+"As its page asks it":"Όπως τη ρωτά η σελίδα της",
+"Describe it to an agent, start from scratch, or install a file":"Περιγράψτε τη σε έναν πράκτορα, ξεκινήστε από την αρχή ή εγκαταστήστε ένα αρχείο",
+"How the task names its answer":"Με αυτό το όνομα η εργασία αναφέρεται στην απάντησή της",
+"Its kind":"Το είδος της",
+"Kinds of services":"Είδη υπηρεσιών",
+"Make an app":"Φτιάξτε μια εφαρμογή",
+"No answer fields: the agent’s reply is the answer.":"Χωρίς πεδία απάντησης: η απάντηση του πράκτορα είναι το αποτέλεσμα.",
+"No questions: it runs at once, without asking anything.":"Χωρίς ερωτήσεις: εκτελείται αμέσως, χωρίς να ρωτήσει τίποτα.",
+"None yet. Add one here, or keep a finished test run as one.":"Κανένα ακόμα. Προσθέστε ένα εδώ ή κρατήστε μια ολοκληρωμένη δοκιμαστική εκτέλεση ως παράδειγμα.",
+"Not in the task yet":"Δεν υπάρχει ακόμα στην εργασία",
+"Parts of the app":"Τα μέρη της εφαρμογής"
 }
