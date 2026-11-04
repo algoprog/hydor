@@ -3,6 +3,28 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.24.4 · 4 November 2026
+
+Agents' replies show maths, diagrams, small interactive figures and pictures, and every agent knows how to use them.
+
+- **Maths looks right**: sub- and superscripts, fractions and equations set apart were misdrawn in every reply; they
+  are drawn as in a textbook now. Equations written on their own lines (align, equation, gather) and chemistry
+  (2H₂ + O₂ → 2H₂O) show too, and "$5x + 3 = 0$" is maths while "from $5 to $10" stays money.
+- **Diagrams**: flowcharts, sequence and state diagrams, timelines, mind maps, Gantt and pie charts are drawn in the
+  reply, in the app's colours, light or dark. Over each: the code, **Save as a picture (SVG)**, **Full screen** and
+  copy. One that can't be drawn shows its code and why.
+- **Figures and small tools in the reply**: a chart, an annotated figure, a calculator or a simulation with sliders
+  runs right inside the reply, sealed off like the pages agents show, in the app's look. It builds up as the reply
+  is written, and its bar has the code, **Save as a file** and **Full screen**.
+- **Pictures**: photos from the web and pictures on this computer show in replies, fitted to them; click one to see
+  it large. Web pictures come through the app's own server, so the sites never see your browser; one that can't load
+  becomes a link.
+- **Every agent is told**: Claude Code, Codex, Custom and the other agents now write their replies for the app, with
+  headings, lists and tables where they help, and use these where they make an answer clearer. Ask for plain text in
+  your guidelines if you prefer it.
+- Pictures attached inside a notebook's text cells now show, and links to files on this computer open them in the
+  app.
+
 ## 0.24.3 · 4 November 2026
 
 Preview shows a dev server live when you reach the app through a tunnel: click, type and scroll in it, instead of
