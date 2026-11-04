@@ -159,10 +159,14 @@ void main() {
 
   /* ---------- Which download to offer ---------- */
 
+  const RELEASE = 'https://github.com/algoprog/hydor/releases/latest/download';
   const DMG = {
-    arm: 'https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg',
-    x64: 'https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg',
+    arm: `${RELEASE}/Hydor-arm64-mac.dmg`,
+    x64: `${RELEASE}/Hydor-x64-mac.dmg`,
   };
+  const EXE = `${RELEASE}/Hydor-x64-win.exe`;
+  /** The Linux app: the .deb (Ubuntu, Debian) or the AppImage (any other), for x64 or ARM. */
+  const LINUX = (kind, arch) => `${RELEASE}/Hydor-${arch}-linux.${kind === 'deb' ? 'deb' : 'AppImage'}`;
 
   function platform() {
     const ua = navigator.userAgent;
@@ -189,6 +193,21 @@ void main() {
     return 'arm';
   }
 
+  /**
+   * A Linux computer's build: ARM or x64 (Chromium says; the user agent names aarch64), and the .deb where the user
+   * agent names Ubuntu or Debian (Firefox there does), else the AppImage, which runs on any.
+   */
+  async function linuxBuild() {
+    const ua = navigator.userAgent;
+    let arch = /aarch64|arm64|armv8/i.test(ua) ? 'arm64' : 'x64';
+    try {
+      const v = await navigator.userAgentData?.getHighEntropyValues?.(['architecture']);
+      if (v?.architecture === 'arm') arch = 'arm64';
+      else if (v?.architecture === 'x86') arch = 'x64';
+    } catch {}
+    return { arch, kind: /Ubuntu|Debian|Mint|Pop!_OS|elementary/i.test(ua) ? 'deb' : 'appimage' };
+  }
+
   function flash(sel) {
     const el = $(sel);
     if (!el) return;
@@ -200,22 +219,26 @@ void main() {
   async function downloads(gl) {
     const where = platform();
     const arch = where === 'mac' ? await macArch(gl) : 'arm';
-    const label = { mac: 'Download for Mac', windows: 'Get it with Docker', linux: 'Install on Linux', phone: 'Get it for your computer', other: 'Get Hydor' }[where];
-    const target = { mac: '', windows: '#get-docker', linux: '#get-linux', phone: '#download', other: '#download' }[where];
+    const linux = where === 'linux' ? await linuxBuild() : null;
+    const label = { mac: 'Download for Mac', windows: 'Download for Windows', linux: 'Download for Linux', phone: 'Get it for your computer', other: 'Get Hydor' }[where];
+    const href = { mac: DMG[arch], windows: EXE, linux: linux && LINUX(linux.kind, linux.arch) }[where];
     for (const a of $$('[data-get]')) {
       $('[data-get-label]', a).textContent = label;
-      a.href = target || DMG[arch];
-      if (target) a.addEventListener('click', () => flash(target === '#download' ? '#get-mac' : target));
+      a.href = href || '#download';
+      if (!href) a.addEventListener('click', () => flash('#get-mac'));
     }
     const note = $('[data-get-note]');
     if (note) {
+      const other = linux && (linux.kind === 'deb' ? 'appimage' : 'deb');
       const notes = {
-        windows: 'Free and open source · On Windows with Docker Desktop · <a href="#get-mac">Mac app</a> · <a href="#get-linux">Linux</a>',
-        linux: 'Free and open source · Runs as a service of your user · <a href="#get-docker">Docker</a> · <a href="#get-mac">Mac app</a>',
+        windows: 'Free and open source · Windows 10 or 11, with <a href="https://git-scm.com/download/win">Git for Windows</a> · <a href="#get-mac">Mac</a> · <a href="#get-linux">Linux</a>',
+        linux:
+          linux &&
+          `Free and open source · ${linux.kind === 'deb' ? 'The .deb, for Ubuntu and Debian' : 'The AppImage, for any Linux'}, ${linux.arch === 'arm64' ? 'ARM' : 'x64'} · <a href="${LINUX(other, linux.arch)}">${other === 'deb' ? '.deb' : 'AppImage'}</a> · <a href="#get-server">Linux server</a>`,
         phone: 'Free and open source · It runs on a computer, and you use it from your phone',
       };
       if (where === 'mac' && arch === 'x64')
-        note.innerHTML = `Free and open source · macOS 12 or newer, Intel · <a href="${DMG.arm}">Apple silicon</a> · <a href="#download">Docker and Linux</a>`;
+        note.innerHTML = `Free and open source · macOS 12 or newer, Intel · <a href="${DMG.arm}">Apple silicon</a> · <a href="#download">Windows and Linux</a>`;
       else if (notes[where]) note.innerHTML = notes[where];
     }
     if (where === 'mac' && arch === 'x64') {
@@ -227,6 +250,23 @@ void main() {
         x64.classList.replace('btn-ghost', 'btn-primary');
         x64.parentNode.insertBefore(x64, arm);
       }
+    }
+    if (linux) {
+      // The Linux card: this computer's processor, and its kind of build first and filled in.
+      const deb = $('[data-linux="deb"]');
+      const img = $('[data-linux="appimage"]');
+      const fine = $('[data-linux-note]');
+      if (deb && img) {
+        deb.href = LINUX('deb', linux.arch);
+        img.href = LINUX('appimage', linux.arch);
+        if (linux.kind === 'appimage') {
+          deb.classList.replace('btn-primary', 'btn-ghost');
+          img.classList.replace('btn-ghost', 'btn-primary');
+          img.parentNode.insertBefore(img, deb);
+        }
+      }
+      if (fine && linux.arch === 'arm64')
+        fine.innerHTML = `ARM. For x64: <a href="${LINUX('deb', 'x64')}">.deb</a> · <a href="${LINUX('appimage', 'x64')}">AppImage</a>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.`;
     }
   }
 
