@@ -29,7 +29,7 @@ import { skillpack } from './index.ts';
 import { composeSkill, folders, librarySkills, parseSkill, setFolders, skillText, syncView, viewSkills, visibleSkills } from './library.ts';
 import { history, libraryView, propose } from './proposals.ts';
 import { scanSkill, secretsMessage } from './scan.ts';
-import { spaceSkillsDir, spaceSkillText } from './spaceSkills.ts';
+import { setSpaceSwitch, spaceSkillsDir, spaceSkillText } from './spaceSkills.ts';
 import { matchTriggers, triggerPattern } from './triggers.ts';
 import { hashOf, setShippedForTests, shippedVectors } from '../find/index.ts';
 import { skillItemText } from '../find/sources.ts';
@@ -617,6 +617,13 @@ await test('in a space: kept for the space alone or for every session as the use
   const dirs = custom!.env!.HYDOR_SKILL_DIRS;
   assert.equal(fs.readlinkSync(path.join(dirs, 'sowing-plan')), path.join(spaceSkillsDir(sp.id), 'sowing-plan'));
   assert.equal(fs.readlinkSync(path.join(dirs, 'troubleshooting')), path.join(spaceSkillsDir(sp.id), 'troubleshooting'));
+  // A skill the space switches off for its own sessions: Settings → Skills shows which space, and its view leaves it out.
+  assert.deepEqual((await app.inject({ method: 'GET', url: '/api/skillpack' })).json().switched, []);
+  setSpaceSwitch(db, sp.id, { name: 'troubleshooting', on: false });
+  assert.deepEqual((await app.inject({ method: 'GET', url: '/api/skillpack' })).json().switched, [{ id: sp.id, name: 'Garden', switches: { troubleshooting: false } }]);
+  await skillpack.spawn!({ cwd: root, runId: 'r', resume: false, agent: 'acp', acpAgent: 'console', extra: { space: sp.id } }, deps);
+  assert.ok(!fs.existsSync(path.join(dirs, 'troubleshooting')));
+  setSpaceSwitch(db, sp.id, { name: 'troubleshooting', on: null });
 });
 
 await test('the line diff: hunks with context, counts, and a new file', () => {

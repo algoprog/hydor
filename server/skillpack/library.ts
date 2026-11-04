@@ -1,8 +1,8 @@
 // The skill library's folders: the skills that come with the app (skills/ in its folder), the ones the
 // user approved or put there (skills/ in the data folder), and one view of both that every agent
 // reads: a folder of links, one per skill, where a learned skill takes the place of a built-in one of
-// the same name. A space's sessions read a view of their own, with the space's skills too
-// (spaceSkills.ts). Claude Code loads the view as a plugin (--plugin-dir), Codex as an extra skills
+// the same name. A space's sessions read a view of their own, with the space's skills too and the
+// skills it switches on or off for itself (spaceSkills.ts). Claude Code loads the view as a plugin (--plugin-dir), Codex as an extra skills
 // folder (skills/extraRoots/set) and Custom from its skills list (HYDOR_SKILL_DIRS). Nothing is written
 // into the user's ~/.claude or ~/.codex.
 import fs from 'node:fs';
@@ -132,14 +132,15 @@ export function folderSkills(root: string, source: FolderSkill['source']): Folde
 /**
  * The skills Custom sees from a folder, in the order its skills list takes them (the project's, the
  * user's, then the library's through the view, or through `view`, a space's): the first of a name wins.
+ * `keepOwn`: which of the agents' own skills (the project's and the user's) count, for one agent's list.
  */
-export function visibleSkills(cwd: string, view?: string): FolderSkill[] {
+export function visibleSkills(cwd: string, view?: string, keepOwn: (s: FolderSkill) => boolean = () => true): FolderSkill[] {
   const home = os.homedir();
   const own = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
   const seen = new Set<string>();
   const out: FolderSkill[] = [];
   const lib = view ? folderSkills(view, 'space') : librarySkills().filter((s) => !off.has(s.dir)).map((s) => ({ ...s, file: path.join(viewSkills(), s.dir, 'SKILL.md') }));
-  for (const s of [...own.flatMap((d) => folderSkills(d, 'own')), ...lib]) {
+  for (const s of [...own.flatMap((d) => folderSkills(d, 'own')).filter(keepOwn), ...lib]) {
     if (seen.has(s.name)) continue;
     seen.add(s.name);
     out.push(s);
@@ -222,13 +223,19 @@ export function removeLearned(name: string) {
 
 /**
  * The library's skills by folder name, each linked to its learned folder or else its built-in one, then
- * the enabled plugins' skills whose names are free; none the user turned off.
+ * the enabled plugins' skills whose names are free; those the user turned off too.
  */
-function libraryLinks(): Map<string, string> {
+function allLibraryLinks(): Map<string, string> {
   const want = new Map<string, string>();
   for (const s of folderSkills(roots.bundled, 'bundled')) want.set(s.dir, path.join(roots.bundled, s.dir));
   for (const s of folderSkills(roots.learned, 'learned')) want.set(s.dir, path.join(roots.learned, s.dir));
   for (const s of pluginSkills()) if (!want.has(s.dir)) want.set(s.dir, s.folder);
+  return want;
+}
+
+/** The library's skills by folder name, none the user turned off. */
+function libraryLinks(): Map<string, string> {
+  const want = allLibraryLinks();
   for (const n of off) want.delete(n);
   return want;
 }
@@ -275,10 +282,14 @@ export function syncView() {
  * Brings the view of a space's sessions up to date and returns its plugin folder: the library's skills,
  * with those in `extra` folders of skills (the space's own first, then those of the spaces a group brings
  * together) in place of any of the same name. Still a plugin named "hydor", so skills keep their names.
+ * `switches`: the space's own say, by skill name (SpaceSkills.switches): a library skill the user turned
+ * off comes back for its sessions when switched on, and any skill switched off is left out.
  */
-export function syncSpaceView(id: string, extra: string[]): string {
-  const want = libraryLinks();
-  for (const dir of [...extra].reverse()) for (const s of folderSkills(dir, 'space')) if (!off.has(s.dir) || !want.has(s.dir)) want.set(s.dir, path.join(dir, s.dir));
+export function syncSpaceView(id: string, extra: string[], switches: Record<string, boolean> = {}): string {
+  const want = allLibraryLinks();
+  for (const n of off) if (switches[n] !== true) want.delete(n);
+  for (const dir of [...extra].reverse()) for (const s of folderSkills(dir, 'space')) want.set(s.dir, path.join(dir, s.dir));
+  for (const [n, on] of Object.entries(switches)) if (on === false) want.delete(n);
   const root = spaceViewRoot(id);
   syncLinks(root, want, 'Skills that come with Hydor, the ones you approved in it, and those of a project of yours.');
   return root;

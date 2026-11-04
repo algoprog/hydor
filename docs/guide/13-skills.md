@@ -1,6 +1,6 @@
 # Skills
 
-Skills are written methods agents load when a task calls for one: how to research a question, track down a bug, plan a project, make a Word document or clean up after a task. Every skill agents can use is on one page, [Settings → Skills](/settings?s=skills): the ones that come with the app, yours, those your plugins bring, Claude Code's and Codex's own, and your projects'. This topic covers them all, the skills agents learn with your approval, and keywords that bring a skill in for Custom.
+Skills are written methods agents load when a task calls for one: how to research a question, track down a bug, plan a project, make a Word document or clean up after a task. Every skill agents can use is on one page, [Settings → Skills](/settings?s=skills): the ones that come with the app, yours, those your plugins bring, Claude Code's and Codex's own, and your projects'. Its switches are for every session; a project can switch any skill the other way for its own sessions. This topic covers them all, the skills agents learn with your approval, and keywords that bring a skill in for Custom.
 
 ![Settings → Skills: every skill agents can use, grouped by what it is for](images/skills.webp)
 
@@ -33,7 +33,7 @@ Every session the app starts gets the skill library:
 
 Sessions started outside the app, in a terminal or in VS Code, don't see the library. Nothing of it is written into your Claude Code or Codex settings.
 
-A session in a project gets the project's own skills with the library's. A project's skill with the name of a library skill takes its place in that project's sessions.
+A session in a project gets the project's own skills with the library's, each as the project switches it (see [Turn a skill on or off for this project](/guide/spaces#turn-a-skill-on-or-off-for-this-project)). A project's skill with the name of a library skill takes its place in that project's sessions.
 
 Your own skills come before the built-in ones: one of yours with the name of a built-in skill takes its place. A plugin's skill with a name the library already has is left out, and its plugin's page says which skill agents get instead.
 
@@ -61,7 +61,7 @@ From the top, the page has:
 - the skills, in groups by what they are for: **Ways of working**, **Writing**, **Documents**, **Research and the web**, **Planning and decisions**, **Data and numbers**, **Design and pictures**, **Coding**, **AI models** and **This app**; then **Claude Code's own**, **Codex's own**, and a group for each project with skills of its own;
 - at the bottom, your skills you removed, to bring back.
 
-A project's skills (Claude Code's and Codex's, in a project folder) depend on the folder, so the page shows them for one folder at a time. The **Folder** chip sits beside the section's title (on a phone, under the line that describes it). It starts at the folder open in [Files](/files), or else your default folder. Click it to pick another.
+Claude Code's and Codex's own skills are listed as every folder has them: yours, and those that come with the agents. A project folder's own (in its `.claude/skills`) are on that project's **Skills** tab.
 
 ## Find a skill
 
@@ -73,10 +73,12 @@ You can also find a skill from the app's search box (Ctrl+K, ⌘K on a Mac): typ
 
 Every skill of the library and of Claude Code and Codex has a switch at the end of its row. A skill turned off stays where it is, but agents no longer get it; its row is greyed and says **Off**. Turn it back on with the same switch. You can also switch it in its window.
 
-- A library skill (built in, yours or a plugin's) turned off is left out for every agent, in every project.
+- A library skill (built in, yours or a plugin's) turned off is left out for every agent, in every project that doesn't switch it on for itself.
 - Claude Code keeps its own choice in its settings, by the skill's name; Codex keeps it in its own configuration.
 
-A project's skills have no switch here: change them on the project's **Skills** tab.
+The switches here are for every session. A project can switch any skill the other way for its own sessions, on its **Skills** tab: see [Turn a skill on or off for this project](/guide/spaces#turn-a-skill-on-or-off-for-this-project). Then the skill's row here says so: "Off in Thesis", or "On in 2 projects".
+
+A project's own skills have no switch here: change them on the project's **Skills** tab.
 
 ## Read a skill and its history
 
@@ -84,6 +86,7 @@ Click a skill's row, or a **Using skill** pill in a conversation. A window opens
 
 - where it comes from, its group, and how often agents used it;
 - its switch: **Agents get it**, or **Off: agents do not get it**;
+- the projects that switch it the other way for their sessions, each with **On** or **Off**: click one to open its Skills tab;
 - when to use it, and its keywords, if it has any ("Custom brings it in when you say" and the words);
 - the instructions, as agents read them;
 - **History**, when it has changes: every change, newest first, **Saved**, **Changed**, **Removed** or **Brought back**, how long ago, and how many lines were added and removed. Click a change to see it line by line;
@@ -210,10 +213,10 @@ Built-in skills can't be removed, but you can switch any of them off, or change 
 3. Under **When to use it**, write one line, such as "Use when checking a supplier's invoice before it is paid". Agents see this line in every session and read the rest only when it fits.
 4. Under **Instructions**, write the method: the steps in order, the checks, the mistakes to avoid. Markdown works.
 5. Optionally pick its **Group**, and **Words that bring it in**: words in a request that bring the skill into Custom's turn by themselves, separated by commas (see [Bring skills in by keywords](#bring-skills-in-by-keywords)).
-6. Under **Who gets it**, keep **Every agent**, or pick **Claude Code** or **Codex** for a skill only that agent gets. For Claude Code, pick **All folders** or **This folder** (the folder picked at the top).
+6. Under **Who gets it**, keep **Every agent**, or pick **Claude Code** or **Codex** for a skill only that agent gets.
 7. Click **Add skill**.
 
-A skill for every agent is saved in your skills folder (in the app's data folder, `~/.hydor/skills` unless your install keeps its data elsewhere) and shows under **Yours**. A Claude Code skill goes in `~/.claude/skills` (or the folder's `.claude/skills`), a Codex one in `~/.agents/skills`, which Codex reads in every folder. If a skill of that name is already there, the app says so and saves nothing.
+A skill for every agent is saved in your skills folder (in the app's data folder, `~/.hydor/skills` unless your install keeps its data elsewhere) and shows under **Yours**. A Claude Code skill goes in `~/.claude/skills`, a Codex one in `~/.agents/skills`, which each reads in every folder. If a skill of that name is already there, the app says so and saves nothing. A skill for one project alone is written on that project's **Skills** tab: see [Give a project skills of its own](/guide/spaces#give-a-project-skills-of-its-own).
 
 To change one of yours, open it and click **Change**: the same fields, saved with **Save**. Each change is kept in its history. You can also put skills in your skills folder yourself: one folder per skill, named in lowercase letters, digits and dashes, with its SKILL.md inside. They show under **Yours**.
 
@@ -232,7 +235,7 @@ When you approve an agent's improvement to a built-in skill, it is saved as your
 
 Agents stop getting it. If it was your version of a built-in skill, agents go back to the built-in one. The text stays in the skill's history, so you can bring it back: your removed skills are listed at the bottom of the page, after **Removed:**. Click a name there (hover over it to see when it was removed), and the skill comes back as it was.
 
-Claude Code's and Codex's own skills: **Delete** in their window removes the skill's folder from disk, with every file in it, after you confirm. It is there for your own skills, and for Claude Code also the folder's. Built-in, admin and plugin skills of those agents can't be deleted: switch them off instead. A deleted one can't be brought back from the app.
+Claude Code's and Codex's own skills: **Delete** in their window removes the skill's folder from disk, with every file in it, after you confirm. It is there for your own skills, and on a project's Skills tab for Claude Code also the project folder's. Built-in, admin and plugin skills of those agents can't be deleted: switch them off instead. A deleted one can't be brought back from the app.
 
 ## Approve, edit or dismiss a proposed skill
 
@@ -339,14 +342,14 @@ A skill's keywords are a list in the lines at the top of its SKILL.md, for examp
 
 Claude Code and Codex also read skills from folders of their own: yours, which they read in every folder, and a project's, which they read only there. They show on the Skills page under **Claude Code's own** and **Codex's own** (the filter **Claude Code and Codex** shows only them). Each row says where the skill comes from:
 
-- **this folder**: the folder's own skills.
+- **this folder**: a project folder's own skills, on that project's Skills tab.
 - **this repository**: Codex skills that come with the repository.
 - **all folders**: your own skills, for every folder.
 - **a plugin**: skills that come with one of the agent's own plugins (see [Claude Code's and Codex's own plugins](/guide/plugins#claude-codes-and-codexs-own-plugins)).
 - **built into it**: skills that come with Codex.
 - **set by an admin**: skills an administrator set up for Codex.
 
-For Claude Code the page lists your skills (in `~/.claude/skills`) and the folder's (in its `.claude/skills`; none when the folder is your home folder). For Codex it lists what Codex itself reports for that folder. When some could not be read (Codex not answering, a skill file it can't read), a line under the list says so.
+For Claude Code, Settings → Skills lists your skills (in `~/.claude/skills`); for Codex, what Codex itself reports for every folder. A project's **Skills** tab lists those of the project's folder too, with switches for that project alone. When some could not be read (Codex not answering, a skill file it can't read), a line under the list says so.
 
 Write one with **New skill**, picking **Claude Code** or **Codex** under **Who gets it** (see [Write a skill of your own](#write-a-skill-of-your-own)). Open one to read it; **Change** opens its SKILL.md in an editor: change it, click **Save**, then **Done**. **Open the folder in Files** shows the skill's folder, with any other files in it.
 
@@ -360,4 +363,4 @@ Write one with **New skill**, picking **Claude Code** or **Codex** under **Who g
 - "Remove my skill invoice-checks", or "Bring back the skill I removed yesterday."
 - "Turn off bringing skills in by keywords for Custom."
 - "Stop suggesting skills at the start of new sessions."
-- "List Claude Code's skills for ~/projects/shop and turn off the one called deploy."
+- "In my Shop website project, turn off Claude Code's deploy skill, and turn the docker skill on there only."

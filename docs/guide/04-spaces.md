@@ -123,7 +123,7 @@ The project's own documents, which only its sessions search, and whether they se
 
 ### Skills
 
-The project's own skills, which only its sessions get, with your skill library. See [Give a project skills of its own](#give-a-project-skills-of-its-own).
+Every skill the project's sessions get: its own, your skill library's, and Claude Code's and Codex's own, each with a switch for this project alone. See [Give a project skills of its own](#give-a-project-skills-of-its-own).
 
 ### Settings
 
@@ -138,31 +138,42 @@ Once you change something, a bar says **Unsaved changes**, with **Undo changes**
 
 ## Give a project skills of its own
 
-Skills are written methods that agents load when a task calls for them (see [Skills](/guide/skills)). Your skill library reaches every session; a project can also have skills of its own, which only its sessions get: how its work is done, step by step. "Cite in APA 7 and check every DOI" for a thesis, say, or "ingredients in grams, then numbered steps" for a family cookbook. They are on the project's **Skills** tab.
+Skills are written methods that agents load when a task calls for them (see [Skills](/guide/skills)). Your skill library reaches every session; a project can also have skills of its own, which only its sessions get: how its work is done, step by step. "Cite in APA 7 and check every DOI" for a thesis, say, or "ingredients in grams, then numbered steps" for a family cookbook. It can also turn any skill on or off for its own sessions. Both are on the project's **Skills** tab.
 
-With none yet, the tab says what they are for, with two buttons:
+The tab lists every skill the project's sessions get, in groups as on [Settings → Skills](/settings?s=skills), with a search box, **New skill**, the **⋯** menu, and filters: **All**, **Its own**, **Built in**, **Yours**, **From plugins**, **Claude Code and Codex** and **Changed here**. The project's own skills come first, under **Its own**; with none yet, that group says what they are for, with **New skill**.
 
-- **New skill** opens a window with three fields, then **Add the skill**:
-  - **Name**: lowercase words with dashes, such as `citation-style`. Spaces and capitals turn into that when you leave the field. Agents know the skill by this name.
-  - **When to use it**: one line, such as "Use when citing a source in the thesis". Agents see it in every session of the project, and read the rest of the skill only when a task fits.
-  - **The skill**: the steps in order, the checks and the mistakes to avoid, in Markdown.
-- **From the library** lists the skills of your skill library that the project doesn't have yet, with a field to find one by name or by what it is for. Until you type, eight show, and how many more there are. Pick one: it is copied into the project with its other files (examples, scripts), and the window to change it opens. Change it for the project alone: the library's stays as it is for every other session.
+**New skill** opens a window with three fields, then **Add the skill**:
+
+- **Name**: lowercase words with dashes, such as `citation-style`. Spaces and capitals turn into that when you leave the field. Agents know the skill by this name.
+- **When to use it**: one line, such as "Use when citing a source in the thesis". Agents see it in every session of the project, and read the rest of the skill only when a task fits.
+- **The skill**: the steps in order, the checks and the mistakes to avoid, in Markdown.
+
+To change a skill of your library for this project alone, open it on the tab and click **Change for this project**: it is copied into the project with its other files (examples, scripts), and the window to change it opens. The library's stays as it is for every other session.
 
 A skill needs a name of 2 to 64 characters, a line on when to use it of at least 10 characters, and steps of more than a few words; the whole skill holds at most 20,000 characters. A skill that looks like it holds a password, a key or a token is refused: write where the secret is kept instead.
 
+### Turn a skill on or off for this project
+
+Every skill on the tab has a switch at the end of its row: your library's (built in, yours and your plugins'), the project's own, and Claude Code's and Codex's own. A switch here is for this project's sessions alone; the switches on [Settings → Skills](/settings?s=skills) are for every other session.
+
+- A skill switched the other way from Settings says **On here** or **Off here**, and the filter **Changed here** shows only those. A skill turned off in Settings shows as **Off**: switch it on to have it in this project alone.
+- In its window, a skill switched here says what Settings has for every other session, and **Follow Settings** goes back to that. Switching it back by hand does the same.
+- In the **⋯** menu, **Reset every switch here** puts every skill back to what Settings says, after you confirm, and **Skills for every project** opens Settings → Skills.
+
+A new session in the project gets the switches as they are when it starts; one already going keeps what it started with, though Custom follows a change from its next turn. Claude Code's and Codex's own skills are switched for the project's sessions without changing those agents' own settings. In Settings → Skills, a skill a project switches the other way says so on its row ("Off in Thesis").
+
 ### The list of a project's skills
 
-Each skill shows as a row: its name, when to use it, how often agents in the project (and in groups that bring it in) used it, and how long ago it was saved. A skill with the name of one in your skill library has the badge **In place of the library's**: the project's sessions get it instead of the library's.
+Each of the project's own skills shows as a row: its name, when to use it, and how often agents in the project (and in groups that bring it in) used it. A skill with the name of one in your skill library has the badge **In place of the library's**: the project's sessions get it instead of the library's.
 
-- Click a name to read the skill and its **History** of changes; **Change** at the bottom of that window edits it.
-- The pencil changes it: its name, when to use it and its text. A new name keeps its other files and its history.
-- The bin removes it, after you confirm. The project's sessions stop seeing it, or go back to the library's skill of that name. Removed skills are listed under the list, after **Removed:**: click one to bring it back as it was.
+- Click it to read the skill and its **History** of changes. **Change**, at the bottom of that window, edits its name, when to use it and its text: a new name keeps its other files, its history and its switch.
+- **Remove**, in the same window, removes it after you confirm. The project's sessions stop seeing it, or go back to the library's skill of that name. Removed skills are listed under the list, after **Removed:**: click one to bring it back as it was.
 
-**New skill** and **From the library** stay under the list.
+In a group, the own skills of each project it brings together follow, under that project's name: the group's sessions get them too. Change them on that project's page. Claude Code's and Codex's own skills are listed for the project's folder: yours, and those in that folder (Claude Code's in its `.claude/skills`).
 
 ### How agents get them
 
-Every Claude Code, Codex and Custom session started in the project gets its skills together with your skill library: Claude Code in the same plugin named "hydor" (hydor:citation-style), Codex in the same extra folder of skills, Custom in its list of skills. The agent is also told which skills are the project's own, and to use one when it fits the task. Custom has a skill you add or change from its next turn; Claude Code and Codex from their next session.
+Every Claude Code, Codex and Custom session started in the project gets its skills together with your skill library, as the project switches them: Claude Code in the same plugin named "hydor" (hydor:citation-style), Codex in the same extra folder of skills, Custom in its list of skills. The agent is also told which skills are the project's own, and to use one when it fits the task. Custom has a skill you add or change from its next turn; Claude Code and Codex from their next session.
 
 The skills are kept in the app's data folder, not in the project's folder, so your files stay as they are. A group's sessions also get the skills of the projects it brings together (see [What sessions in a group get](#what-sessions-in-a-group-get)).
 
@@ -353,6 +364,7 @@ The knowledge tools never bring up another project's documents, not even when an
 - "Group my Thesis and Reading notes projects into one called Everything for the thesis."
 - "Give my Thesis project a skill: cite in APA 7, and check that every DOI resolves before I hand a chapter in."
 - "Copy the writing skill into my Garden project, and change it there to use plain words for children."
+- "In my Shop website project, turn the docker skill on and Claude Code's deploy skill off, for that project only."
 - "Add the folder ~/Documents/Manuals to my shared knowledge."
 - "Move the Contracts knowledge base into the Taxes 2026 project, and stop that project from searching the shared knowledge."
 - "Which knowledge bases do I have, and which documents couldn't be read?"

@@ -5,12 +5,15 @@
 // space's own skills with it (spaceSkills.ts), and a proposal there can be kept for the space alone.
 // Custom also gets a short rule on using skills, and the text of any skill whose keywords the user's
 // message uses, before each turn. Every agent starting a new session also hears which skills fit its first
-// message, found by words and meaning (match.ts), unless that is turned off.
+// message, found by words and meaning (match.ts), unless that is turned off. A project's sessions get the
+// skills it switches on or off for itself (spaceSkills.ts): the library's and its own through its view,
+// Claude Code's own as --settings skillOverrides, Codex's own as skills.config in its thread's settings.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { SessionExtra } from '../../shared/features.ts';
-import { skillLoaded } from '../../shared/skillpack.ts';
+import { skillLoaded, switchKey } from '../../shared/skillpack.ts';
 import type { TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
@@ -21,11 +24,11 @@ import { requestVector } from '../memory/embed.ts';
 import { addNote, notesOf } from '../notes.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { spaceOfSession } from '../spaces/index.ts';
-import { composeSkill, folders, isOff, librarySkills, parseSkill, setOffSkills, skillText, slug, syncView, viewSkills, visibleSkills } from './library.ts';
+import { composeSkill, folders, folderSkills, isOff, librarySkills, parseSkill, setOffSkills, skillText, slug, syncView, viewSkills, visibleSkills, type FolderSkill } from './library.ts';
 import { announce, decide, getProposal, history, libraryView, noteUse, pendingProposals, propose, removedSkills, removeSkill, restoreSkill, saveOwnSkill } from './proposals.ts';
-import { spaceSkillDoc, spaceSkillsView, spaceSkillText, spaceView } from './spaceSkills.ts';
+import { spaceSkillDoc, spaceSkillsView, spaceSkillText, spaceSwitches, spaceView } from './spaceSkills.ts';
 import { allSpaces } from '../spaces/index.ts';
-import { isSkillCategory, type SpaceSkillGroup } from '../../shared/skillpack.ts';
+import { isSkillCategory, type SkillLibrary, type SpaceSkillGroup } from '../../shared/skillpack.ts';
 import { matchSkills } from './match.ts';
 import { matchTriggers } from './triggers.ts';
 
@@ -38,14 +41,38 @@ const fitting = new Map<string, string>();
 
 const isCustom = (s: { agent: string; acpAgent?: string }) => s.agent === 'acp' && s.acpAgent === CONSOLE_ID;
 
+/** Claude Code's own skills the user turned off in its settings, for every folder (skillOverrides "off"). */
+function claudeOff(): Set<string> {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'settings.json'), 'utf8'));
+    return new Set(Object.entries((j?.skillOverrides ?? {}) as Record<string, unknown>).flatMap(([k, v]) => (v === 'off' ? [k] : [])));
+  } catch {
+    return new Set();
+  }
+}
+
+/** Which agent one of the skills in the agents' own folders (visibleSkills' "own") belongs to, by its folder. */
+const ownersAgent = (k: FolderSkill): 'claude' | 'codex' => (k.file.includes(`${path.sep}.claude${path.sep}skills${path.sep}`) ? 'claude' : 'codex');
+
+/**
+ * The skills a session's agent has, as visibleSkills finds them through `view`: for Claude Code and Codex, of the
+ * agents' own skills only theirs, and none switched off (in their settings, or by the session's project).
+ */
+function usableSkills(s: SpawnInfo, view: string, switches: Record<string, boolean>): FolderSkill[] {
+  if (s.agent !== 'claude' && s.agent !== 'codex') return visibleSkills(s.cwd, path.join(view, 'skills'));
+  const agent = s.agent;
+  const off = agent === 'claude' ? claudeOff() : new Set<string>();
+  return visibleSkills(s.cwd, path.join(view, 'skills'), (k) => ownersAgent(k) === agent && (switches[switchKey(k.name, agent)] ?? !off.has(k.name)));
+}
+
 /**
  * The skills that fit a new session's first message (match.ts), as a few lines for the instructions its agent starts
  * with, saying how that agent loads one. None for a session that goes on, an app's run, or with suggesting turned off.
  */
-async function fitLines(s: SpawnInfo, d: Deps, view: string): Promise<string | null> {
+async function fitLines(s: SpawnInfo, d: Deps, view: string, switches: Record<string, boolean>): Promise<string | null> {
   const ask = s.prompt?.trim();
   if (s.resume || !ask || !suggestOn(d.db) || (s.extra.app && typeof s.extra.app === 'object')) return null;
-  const found = await matchSkills(d.db, visibleSkills(s.cwd, path.join(view, 'skills')), ask, { vector: await requestVector(d.db, ask) });
+  const found = await matchSkills(d.db, usableSkills(s, view, switches), ask, { vector: await requestVector(d.db, ask) });
   if (!found.length) return null;
   const how = s.agent === 'claude' ? 'load it with the Skill tool' : isCustom(s) ? 'load it with the skill tool' : 'read its SKILL.md';
   const paths = s.agent !== 'claude' && !isCustom(s);
@@ -81,11 +108,19 @@ function spaceGroups(db: DB): SpaceSkillGroup[] {
   return out;
 }
 
-/** For agents that read skills by themselves (the other ACP agents): the library's skills, each with its file. */
-function skillIndex(): string | undefined {
-  const list = librarySkills().filter((s) => !isOff(s.dir));
+/** The spaces that switch skills on or off for their own sessions, for the skills page. */
+function switchedSpaces(db: DB): SkillLibrary['switched'] {
+  return allSpaces(db).flatMap((sp) => {
+    const switches = spaceSwitches(db, sp.id);
+    return Object.keys(switches).length ? [{ id: sp.id, name: sp.name, switches }] : [];
+  });
+}
+
+/** For agents that read skills by themselves (the other ACP agents): the skills of the session's view, each with its file. */
+function skillIndex(view: string): string | undefined {
+  const list = folderSkills(path.join(view, 'skills'), 'space');
   if (!list.length) return undefined;
-  const lines = list.map((s) => `- ${s.name}: ${s.description.replace(/\s+/g, ' ').slice(0, 220)} (${path.join(viewSkills(), s.dir, 'SKILL.md')})`);
+  const lines = list.map((s) => `- ${s.name}: ${s.description.replace(/\s+/g, ' ').slice(0, 220)} (${s.file})`);
   return [
     'Skills: written methods for kinds of work. Before a task, look through this list; when one fits, read its SKILL.md with your file tools and follow it (its folder holds any files it mentions). Skip skills for greetings, quick questions and small, clear changes.',
     ...lines,
@@ -111,10 +146,15 @@ function freshView(): boolean {
   }
 }
 
-/** A space's view of skills, brought up to date: the library's with its own and those of the spaces it brings together. */
-function spaceViewOf(where: NonNullable<ReturnType<typeof spaceOfSession>>): string | null {
+type Where = NonNullable<ReturnType<typeof spaceOfSession>>;
+
+/**
+ * A space's view of skills, brought up to date: the library's with its own and those of the spaces it brings
+ * together, as it switches them on or off.
+ */
+function spaceViewOf(db: DB, where: Where): string | null {
   try {
-    return spaceView(where.space.id, where.members.map((m) => m.id));
+    return spaceView(where.space.id, where.members.map((m) => m.id), spaceSwitches(db, where.space.id));
   } catch (e) {
     warnOnce(e);
     return null;
@@ -122,11 +162,14 @@ function spaceViewOf(where: NonNullable<ReturnType<typeof spaceOfSession>>): str
 }
 
 /** The plugin folder a session's agent reads its skills from, brought up to date: in a space, the space's view; else the library's. */
-function viewFor(db: DB, extra: SessionExtra): string | null {
+function viewFor(db: DB, where: Where | null): string | null {
   if (!freshView()) return null;
-  const where = spaceOfSession(db, extra);
-  return (where && spaceViewOf(where)) ?? folders().view;
+  return (where && spaceViewOf(db, where)) ?? folders().view;
 }
+
+/** What a space says of one agent's own skills: [name, on] for each it switches. */
+const agentSwitches = (switches: Record<string, boolean>, agent: 'claude' | 'codex'): [string, boolean][] =>
+  Object.entries(switches).flatMap(([k, on]): [string, boolean][] => (k.startsWith(`${agent}:`) ? [[k.slice(agent.length + 1), on]] : []));
 
 /** Whether the installed Claude Code takes --plugin-dir: an older one would not start with it. A yes is kept. */
 let pluginDir: Promise<boolean> | null = null;
@@ -278,7 +321,7 @@ function budget(d: Deps, key: string): number {
 async function customContext(s: { key: string; cwd: string; extra: SessionExtra }, d: Deps): Promise<string> {
   // In a space, its view is brought up to date for this turn: its skills (and the library's) reach Custom as soon as they change.
   const where = spaceOfSession(d.db, s.extra);
-  const view = where ? spaceViewOf(where) : null;
+  const view = where ? spaceViewOf(d.db, where) : null;
   const skills = view ? path.join(view, 'skills') : undefined;
   const rule = fitting.has(s.key) ? `${RULE}\n\n${fitting.get(s.key)}` : RULE;
   if (!triggersOn(d.db)) return rule;
@@ -331,7 +374,17 @@ export const skillpack: Feature = {
     const changed = () => d.broadcast({ t: 'feature', id: 'skillpack', data: { library: true } });
     app.get('/api/skillpack', async () => {
       freshView();
-      return { skills: libraryView(db), pending: pendingProposals(db), removed: removedSkills(db), triggers: triggersOn(db), suggest: suggestOn(db), folders: { ...folders(), view: viewSkills() }, spaces: spaceGroups(db) };
+      const out: SkillLibrary = {
+        skills: libraryView(db),
+        pending: pendingProposals(db),
+        removed: removedSkills(db),
+        triggers: triggersOn(db),
+        suggest: suggestOn(db),
+        folders: { ...folders(), view: viewSkills() },
+        spaces: spaceGroups(db),
+        switched: switchedSpaces(db),
+      };
+      return out;
     });
     // A skill the user writes: name, when to use it, the instructions (or a whole SKILL.md as text).
     app.post('/api/skillpack/skills', async (req) => {
@@ -414,15 +467,26 @@ export const skillpack: Feature = {
   },
   tools: () => [SKILL_SAVE, SKILL_PATCH],
   async spawn(s, d) {
-    const view = viewFor(d.db, s.extra);
+    const where = spaceOfSession(d.db, s.extra);
+    const view = viewFor(d.db, where);
     if (!view) return undefined;
     if (s.agent === 'claude' && !(await claudeTakesPlugins())) return undefined;
+    const switches = where ? spaceSwitches(d.db, where.space.id) : {};
     // The skills that fit the first message, once, in what the agent starts with (Custom's, in its context).
-    const fit = await fitLines(s, d, view).catch((e) => (warnOnce(e), null));
+    const fit = await fitLines(s, d, view, switches).catch((e) => (warnOnce(e), null));
     const said = fit ? { instructions: [fit] } : {};
-    // Claude Code: the view is a plugin for this session only. Codex: an extra folder of skills.
-    if (s.agent === 'claude') return { args: ['--plugin-dir', view], ...said };
-    if (s.agent === 'codex') return { skillRoots: [path.join(view, 'skills')], ...said };
+    // Claude Code: the view is a plugin for this session only, and its own skills as the project switches them
+    // (settings given on the command line come before the user's own). Codex: an extra folder of skills, and
+    // its own skills as the project switches them, in its thread's settings (on top of the user's).
+    if (s.agent === 'claude') {
+      const own = agentSwitches(switches, 'claude');
+      const settings = own.length ? ['--settings', JSON.stringify({ skillOverrides: Object.fromEntries(own.map(([n, on]) => [n, on ? 'on' : 'off'])) })] : [];
+      return { args: ['--plugin-dir', view, ...settings], ...said };
+    }
+    if (s.agent === 'codex') {
+      const own = agentSwitches(switches, 'codex');
+      return { skillRoots: [path.join(view, 'skills')], ...(own.length ? { codexConfig: { skills: { config: own.map(([name, enabled]) => ({ name, enabled })) } } } : {}), ...said };
+    }
     if (isCustom(s)) {
       if (fit && s.key) {
         fitting.set(s.key, fit);
@@ -432,7 +496,7 @@ export const skillpack: Feature = {
     }
     // Other ACP agents (Gemini CLI, OpenCode…) have no skills of their own: the list, to read when one fits.
     if (s.agent === 'acp') {
-      const index = skillIndex();
+      const index = skillIndex(view);
       return index || fit ? { instructions: [...(index ? [index] : []), ...(fit ? [fit] : [])] } : undefined;
     }
     return undefined;
