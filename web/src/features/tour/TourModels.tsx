@@ -393,7 +393,7 @@ function computerWords(st: ModelsState): { title: string; sub: string } {
   const total = m.gpus.reduce((a, g) => a + g.totalBytes, 0);
   return {
     title: [...kinds].map(([n, k]) => `${k > 1 ? `${k} × ` : ''}${n}`).join(' + '),
-    sub: `${size(total)} of graphics memory${m.gpus.length > 1 ? ' in all' : ''} · ${size(m.ramBytes)} of memory`,
+    sub: m.gpus.length > 1 ? `${size(total)} of graphics memory in all · ${size(m.ramBytes)} of memory` : `${size(total)} of graphics memory · ${size(m.ramBytes)} of memory`,
   };
 }
 
@@ -433,7 +433,7 @@ function Local({ st }: { st: ModelsState }) {
             ))}
           </div>
         ) : (
-          <p className="text-[14px] leading-relaxed text-fg-2">This computer is a little small for AI models. Pay as you go (the step before) gives you the best ones without needing a strong computer.</p>
+          <p className="text-[14px] leading-relaxed text-fg-2">This computer is a little small for AI models. Pay as you go gives you the best ones without needing a strong computer, and you can add it any time.</p>
         )}
         {unready && (
           <p className="mt-3 flex items-start gap-2 text-[12.5px] leading-relaxed text-fg-3">
