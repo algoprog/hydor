@@ -96,10 +96,10 @@ While an agent acts, the server tells the app (`computer`, with the words of its
 Linux desktop without a compositor), and the app (`desktop/glow.cjs`) lines every display's edges with a glow in
 see-through, click-through windows above everything, with a note at the bottom; registers Esc (and ⌘⇧Esc on a Mac)
 meanwhile, and sends `computer-stop` when one is pressed, or Stop is chosen in its menu. The agent's screenshots never
-show the glow: Windows (10 2004 and later) keeps windows that ask out of every capture (`setContentProtection`);
-macOS 15.4 and later put them in all the same, so the server asks the app to hide it (`ask` `glow`) while
-`screencapture` runs and tells it to come back (`glow`); on Linux the app takes the screenshot itself (`ask`
-`screenshot`), hiding it meanwhile. Around the agent's own Escape the server asks the app to let go of Esc (`ask`
+show the glow: its windows ask to be left out of captures (`setContentProtection`), but macOS 15.4 and later may put
+them in all the same, and Windows' copy of the screen did on GitHub's runners, so the server asks the app to hide it
+(`ask` `glow`) while the screenshot is taken and tells it to come back (`glow`); on Linux the app takes the screenshot
+itself (`ask` `screenshot`), hiding it meanwhile. Around the agent's own Escape the server asks the app to let go of Esc (`ask`
 `esc`) and gives it back (`esc`), so the agent does not stop itself. `server/computer/computer-test.ts` runs
 everything but the systems themselves (the Mac's driver with stand-ins for the bridge); `x11-test.ts` drives the X11
 helper against a test window on an X display, `windows-test.ts` the Windows helper against Notepad, and

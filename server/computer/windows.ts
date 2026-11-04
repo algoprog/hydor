@@ -2,8 +2,8 @@
 // desktop app ships it built, as bin/hydor-computer.exe beside the server (desktop/scripts/stage.sh builds it with the
 // C# compiler Windows has); without that (developing), PowerShell compiles the same file as it starts. It sees the
 // main display (a copy of the screen, scaled down and made a JPEG), uses the mouse and keyboard with SendInput, in the
-// screen's own pixels, and opens apps by their names in the Start menu. Windows keeps the app's glow out of pictures
-// of the screen by itself (since Windows 10 2004; before that it is hidden while the helper looks).
+// screen's own pixels, and opens apps by their names in the Start menu. The app's glow is hidden while the helper
+// looks: Windows' copy of the screen took it in, though its windows ask to be left out of captures.
 import fs from 'node:fs';
 import path from 'node:path';
 import { APP_ROOT } from '../config.ts';

@@ -1,9 +1,10 @@
 // The glow around the screen while an agent uses the computer (computer use, server/computer/): every display's edges
 // light up in Hydor's water colours, breathing slowly, and a note at the bottom says an agent is at it and that Esc stops
 // it. The windows are see-through, let every click through, never take the focus, and stay above everything (full-
-// screen apps too). They are for the person at the computer, never for the agent: Windows leaves them out of every
-// picture of the screen by itself (since Windows 10 2004); elsewhere they are hidden for the moment a screenshot takes
-// (veil, then unveil), and on Linux the app takes the screenshot itself (capture). On Linux
+// screen apps too). They are for the person at the computer, never for the agent: they are hidden for the moment a
+// screenshot takes (veil, then unveil), and on Linux the app takes the screenshot itself (capture). They also ask the
+// system to leave them out of captures (other apps' screen recordings and sharing), which neither macOS 15.4 and later
+// nor Windows' copy of the screen can be trusted to do, so hiding them is what keeps them out of the agent's. On Linux
 // they show only with a compositor (the server says, from X11), since a see-through window shows black without one.
 'use strict';
 const { BrowserWindow, desktopCapturer, screen } = require('electron');
@@ -12,8 +13,8 @@ const os = require('node:os');
 const MAC = process.platform === 'darwin';
 const WIN = process.platform === 'win32';
 const LINUX = !MAC && !WIN;
-/** Windows 10 2004 and later leave windows that ask out of every capture of the screen; before, they come out black. */
-const KEPT_OUT = WIN && Number(os.release().split('.')[2]) >= 19041;
+/** Windows 10 2004 and later leave out of captures the windows that ask; before, they would come out black in them. */
+const LEAVE_OUT = MAC || (WIN && Number(os.release().split('.')[2]) >= 19041);
 
 let on = false;
 let words = { using: 'An agent is using your computer', esc: 'Press Esc to stop' };
@@ -88,7 +89,7 @@ function make(display) {
     webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false, spellcheck: false },
   });
   w.setIgnoreMouseEvents(true);
-  w.setContentProtection(MAC || KEPT_OUT);
+  w.setContentProtection(LEAVE_OUT);
   w.setAlwaysOnTop(true, 'screen-saver');
   // Over full-screen apps and on every desktop (Spaces), without the app's Dock icon blinking (macOS).
   if (MAC) w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
@@ -191,4 +192,4 @@ async function capture(max, quality) {
   };
 }
 
-module.exports = { setGlow, veil, unveil, capture, KEPT_OUT, glowing: () => on };
+module.exports = { setGlow, veil, unveil, capture, glowing: () => on };

@@ -520,8 +520,7 @@ programs shows each program's version and what is out, with Check now, Update no
   permissions; on Linux it says what is in the way (a Wayland desktop, a library missing). Each session asks on a
   card before its agent starts; one session at a time. While an agent works, a glow in the app's water colours lines
   every display's edges, with a note at the bottom ("An agent is using your Mac · Press Esc to stop"); clicks go
-  through it, and the agent's screenshots never show it (Windows leaves it out by itself; on a Mac and on Linux it
-  is hidden while a screenshot is taken). Esc stops the agent (⌘⇧Esc too on a Mac), as do Stop in the menu bar or tray,
+  through it, and the agent's screenshots never show it (it is hidden for the moment a screenshot is taken). Esc stops the agent (⌘⇧Esc too on a Mac), as do Stop in the menu bar or tray,
   in the session and in Settings; the agent pressing Escape itself does not. Each step shows in the conversation with
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
