@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.24.6 · 4 November 2026
+
+Your ChatGPT projects no longer show in the sidebar as folders with long id names.
+
+- **ChatGPT projects in the sidebar**: the Codex app makes a folder for each of your ChatGPT projects, named only by an
+  id (g-p-6a8f48…), and the sidebar gave each of them a group under that name. Now a folder Codex knows the project
+  name for shows under that name; the others get no group, so their sessions go by day, and show **ChatGPT project**
+  as their folder.
+- **Folders of the same name**: two folders called the same, in folders also called the same, now show as much of
+  their place as it takes to tell them apart, where the sidebar showed the same label twice.
+
 ## 0.24.5 · 4 November 2026
 
 The logo fills with water while the app loads, and numbers written as maths show as maths.
