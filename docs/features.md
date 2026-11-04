@@ -470,9 +470,12 @@ programs shows each program's version and what is out, with Check now, Update no
   ahead of time, and what you make gets them as you make it. Search in, beside the field, looks only in the
   places you pick (sessions, messages, projects, pages, files, settings…), the same on every device; with nothing
   typed it lists what those places hold. `Ctrl+F` finds within a conversation.
-- A short welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter or on this
-  computer, other agents) and sets those up, on pages that fill the screen. Then it shows you around as the
-  app builds itself up: each part arrives as it is explained, the rest as the tour ends. Help shows it again.
+- A short welcome tour, made for people new to AI and drawn in water (Hydor is the Greek for it): a film of a
+  request being done, then what should do the work (Claude or ChatGPT with the plan you pay for, pay as you go
+  through OpenRouter, free models on this computer, other agents), each set up on pages over a sea whose waves rise
+  as you go, droplets for the steps: sign-ins, the suggested OpenRouter models, or a model suggested for this
+  computer installed with one click. Then it shows you around as the app builds itself up, a ring of water lighting
+  each part as it is explained, with first tasks to put in the message box; a splash ends it. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
   inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Library,
   Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the

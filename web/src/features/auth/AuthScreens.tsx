@@ -4,19 +4,19 @@ import { post, type ApiError } from '../../lib/api';
 import { useApp } from '../../lib/store';
 import { Button, cx, IconButton, inputCls } from '../../components/ui';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Aurora, setupDone, TOUR_SETUP_STEPS, TourProgress } from '../tour/Tour';
+import { Sea, setupDone, TOUR_SETUP_STEPS, TourProgress } from '../tour/Tour';
 import { Wordmark } from '../../components/Logo';
 
 const n = (i: number) => ({ '--i': i }) as CSSProperties;
 
-/** The sign-in screens: the full logo over soft drifting light, then the card rises in. */
+/** The sign-in screens: the full logo over the sea the welcome tour stands on, then the card rises in. */
 function Shell({ title, sub, leaving, children }: { title: string; sub: ReactNode; leaving?: boolean; children: ReactNode }) {
   return (
-    <div className="relative flex min-h-full items-center justify-center bg-bg px-4 py-10">
-      <Aurora className="aurora-page" />
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-bg px-4 py-10">
+      <Sea />
       <div className="relative w-full max-w-[380px]">
         <div className="mb-7 flex flex-col items-center gap-3.5 text-center">
-          <div className="tour-rise">
+          <div>
             <h1 className="sr-only">{title}</h1>
             <div className="flex justify-center text-fg" style={n(3)}>
               <Wordmark height={28} />
