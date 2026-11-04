@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.24.1 · 4 November 2026
+
+A welcome tour that fits the screen, with a clearer picture and gentle waves.
+
+- **Every page fits**: each page of the welcome tour fits the screen without scrolling, its picture and its words
+  in the same place on every page, and its texts are shorter and wrap evenly.
+- **What does the work, as streams**: beside each page, what you picked flows as streams into a pool around the Ω,
+  which fills as you pick more.
+- **Pictures, music, voices and videos** have a page of their own after Pay as you go.
+- Small dots show where you are in the tour instead of droplets, and the sea's waves drift gently.
+
 ## 0.24.0 · 4 November 2026
 
 Twelve new skills for agents, a new Ebooks plugin, a deeper Audio and video plugin, and sharper built-in skills.
