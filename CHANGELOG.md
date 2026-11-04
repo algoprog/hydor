@@ -3,6 +3,29 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.26.0 · 4 November 2026
+
+Explore, a magazine made for you; sessions that name themselves; and memory notes that no longer fill the page.
+
+- **Explore**: a new ready-made app, one click away from **Explore** at the top right of the start page. It reads your
+  profile, the notes memory keeps about you and the titles of your latest sessions, picks about six topics you would
+  enjoy (half from your work, half from the rest of your life, never anything private), and finds each one's news of
+  the past two weeks and long reads worth your time. It lays them out as a magazine: a cover line, a note from the
+  editor, a cover story, then a section for each topic, each story with its picture, what it says and why it is there.
+  Click a story to read it on its site (it is then marked read), or **Dig deeper** for a research report on it.
+  **Update** makes a new edition; in its settings, **Update every day** (off until you turn it on) has one ready each
+  morning, **Recent sessions to read** says how many of your sessions it learns from (1,000 unless you change it), and
+  **Also cover** and **Leave out** steer it. It opens on its own page, and agents don't run it in your chats.
+- **Sessions name themselves**: a moment after you start a session, the helper model gives it a title of a few words
+  for what you asked, which the sidebar, the session's header and the search box show instead of the start of your
+  message. Nothing shows in the conversation, Claude Code and Codex get the title for their own lists too, and a
+  name you give a session yourself is never replaced.
+- **Memory notes, a few at a time**: in Settings → Memory, each place shows its three newest notes, with **Show N
+  more** for the rest, and each note shows two lines until you click it, which also shows who wrote it and where.
+- Your own apps that open on a page of their own get the same **Update** and settings at the top: their form's
+  answers, kept, and **Update every day**.
+- The helper model's long questions (over 64 KB) go to Claude Code and Codex on their input, instead of failing.
+
 ## 0.25.1 · 4 November 2026
 
 Skills you can switch on or off for one project, whatever Settings says for every other session.
