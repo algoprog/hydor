@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.21.1 · 4 November 2026
+
+A quieter welcome tour, and bigger models on one graphics card.
+
+- **A quieter welcome tour**: plain pages in the app's own colours, one column with fine lines and one accent,
+  and nothing that glows, loops or splashes. The welcome says what Hydor is and how it works in three short
+  lines under the app's mark, the choices and models are rows on one panel as in Settings, and in the app a thin
+  ring marks each part as it is explained. The password and sign-in screens are plain again too.
+- **Bigger models on one graphics card**: a model too big for your card as it is now runs on it at 8-bit (FP8)
+  before it is split across several, so Gemma 4 12B runs on a single 24 GB card. How much memory a model needs
+  for a long conversation is reckoned more truly too, so fewer models look too big for this computer.
+
 ## 0.21.0 · 4 November 2026
 
 A new welcome tour, models suggested for your computer, a sidebar you can arrange, and a tidier app editor.
