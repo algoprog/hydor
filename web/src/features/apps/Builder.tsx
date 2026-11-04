@@ -641,7 +641,8 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
         },
         (e) => (toastError(e), setRecipe(BLANK)),
       );
-    api<{ tools: { name: string; description: string }[] }>('/api/apps/tools').then((r) => setTools(r.tools), () => setTools([]));
+    // The tools its agents may be allowed (not those only steps have).
+    api<{ tools: { name: string; description: string; stepOnly?: boolean }[] }>('/api/apps/tools').then((r) => setTools(r.tools.filter((t) => !t.stepOnly)), () => setTools([]));
     // Assistants, when that capability offers them.
     api<{ assistants?: { id: string; name: string }[] } | { id: string; name: string }[]>('/api/assistants').then(
       (r) => setAssistants((Array.isArray(r) ? r : (r.assistants ?? [])).filter((a) => a && typeof a.id === 'string')),

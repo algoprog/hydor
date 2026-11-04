@@ -55,6 +55,9 @@ type HistoryRow = MemoryHistoryRow & { sessionTitle?: string };
 const ORDER: Record<MemoryScope, number> = { global: 0, repo: 1, session: 2 };
 /** A place's profile first, then its topics, then its notes. */
 const KIND_ORDER = { profile: 0, topic: 1, note: 2 } as const;
+/** How many notes a place shows before "Show more": a few of each under All, more in one place's tab, a search or a list to review. */
+const FEW = 3;
+const MANY = 10;
 const ACTION: Record<MemoryHistoryRow['action'], string> = { added: 'Added', updated: 'Changed', deleted: 'Deleted', restored: 'Restored', expiry: 'End date' };
 /** What the server calls a session no longer listed. */
 const GONE = 'A session that is gone';
@@ -392,7 +395,8 @@ function EndDate({ e, onDone }: { e: MemoryListEntry; onDone: () => void }) {
 
 /** The line under a note: who wrote it and when, where it came from, how often agents needed it, its end date.
  * Each fact is an element of its own, so each is translated whole. */
-function NoteFacts({ e, inSessions }: { e: MemoryListEntry; inSessions: boolean }) {
+/** What there is to know of a note: when it was written, how often agents needed it, until when it holds; who wrote it and where, once it is open (`brief` leaves those out). */
+function NoteFacts({ e, inSessions, brief }: { e: MemoryListEntry; inSessions: boolean; brief?: boolean }) {
   const deleted = e.status === 'deleted';
   const changed = e.updatedAt !== e.createdAt;
   const who = SOURCE[e.source];
@@ -401,9 +405,9 @@ function NoteFacts({ e, inSessions }: { e: MemoryListEntry; inSessions: boolean 
   facts.push(
     <span>
       <span title={changed ? `Added ${when(e.createdAt)}\nChanged ${when(e.updatedAt)}` : `Added ${when(e.createdAt)}`}>
-        {deleted ? `Deleted ${ago(e.updatedAt)}` : changed ? `Changed ${ago(e.updatedAt)} by ${who}` : `Added ${ago(e.createdAt)} by ${who}`}
+        {deleted ? `Deleted ${ago(e.updatedAt)}` : brief ? (changed ? `Changed ${ago(e.updatedAt)}` : `Added ${ago(e.createdAt)}`) : changed ? `Changed ${ago(e.updatedAt)} by ${who}` : `Added ${ago(e.createdAt)} by ${who}`}
       </span>
-      {e.session && !deleted && !(inSessions && e.session === e.scopeKey) && (
+      {!brief && e.session && !deleted && !(inSessions && e.session === e.scopeKey) && (
         <>
           {' in '}
           <SessionLink k={e.session} title={e.sessionTitle} />
@@ -411,7 +415,7 @@ function NoteFacts({ e, inSessions }: { e: MemoryListEntry; inSessions: boolean 
       )}
     </span>,
   );
-  if (e.kind !== 'note') facts.push(<span>{e.covers === 1 ? 'sums up 1 note' : `sums up ${e.covers ?? 0} notes`}</span>);
+  if (e.kind !== 'note' && !brief) facts.push(<span>{e.covers === 1 ? 'sums up 1 note' : `sums up ${e.covers ?? 0} notes`}</span>);
   if (e.uses > 0) facts.push(<span title={e.usedAt ? `Last needed ${ago(e.usedAt)}` : undefined}>{e.uses === 1 ? 'needed once' : `needed ${e.uses} times`}</span>);
   if (e.expiresAt && !deleted) facts.push(<span className="text-fg-2">{`until ${dayOf(e.expiresAt)}`}</span>);
   return (
@@ -429,6 +433,13 @@ function NoteFacts({ e, inSessions }: { e: MemoryListEntry; inSessions: boolean 
 /** A note: its text and facts, its menu, and what that opens under it. */
 function EntryRow({ e, view, reload, inSessions }: { e: MemoryListEntry; view: View; reload: () => void; inSessions: boolean }) {
   const [editing, setEditing] = useState(false);
+  // Closed, a note shows two lines of its text and when it was written; a click (or Enter) opens it whole, with who wrote it and where.
+  const [whole, setWhole] = useState(false);
+  const toggle = (ev: { target: EventTarget | null }) => {
+    // A link to its session, inside, opens the session instead; selecting words to copy leaves it as it is.
+    if ((ev.target as HTMLElement | null)?.closest('a,button') || window.getSelection()?.toString()) return;
+    setWhole((w) => !w);
+  };
   const [open, setOpen] = useState<'history' | 'children' | 'end' | null>(null);
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -467,19 +478,19 @@ function EntryRow({ e, view, reload, inSessions }: { e: MemoryListEntry; view: V
               }
             />
           ) : (
-            <>
-              <div className={cx('text-[13.5px] leading-snug break-words', deleted ? 'text-fg-3 line-through decoration-fg-3/60' : 'text-fg')}>
+            <div role="button" tabIndex={0} aria-expanded={whole} onClick={toggle} onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget && (ev.preventDefault(), setWhole((w) => !w))} className="-mx-1 cursor-pointer rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+              <div className={cx('text-[13.5px] leading-snug break-words', deleted ? 'text-fg-3 line-through decoration-fg-3/60' : 'text-fg', !whole && 'line-clamp-2')}>
                 {e.kind !== 'note' && (
                   <Badge tone="info" className="mr-1.5 align-[1px]">
                     {e.kind === 'topic' ? 'Topic' : isUserProfile(e) ? 'Your profile' : 'Profile'}
                   </Badge>
                 )}
-                <span translate="no" className={isUserProfile(e) ? 'whitespace-pre-line' : undefined}>
+                <span translate="no" className={isUserProfile(e) && whole ? 'whitespace-pre-line' : undefined}>
                   {e.text}
                 </span>
               </div>
-              <NoteFacts e={e} inSessions={inSessions} />
-            </>
+              <NoteFacts e={e} inSessions={inSessions} brief={!whole} />
+            </div>
           )}
         </div>
         {!editing && (
@@ -564,6 +575,29 @@ interface Group {
   /** The project's folder; empty about you, and for the sessions' notes, which show together. */
   key: string;
   entries: MemoryListEntry[];
+}
+
+/** A place's notes: the first few (the newest, or a search's best), the rest a click away. */
+function NoteGroup({ g, view, reload, few }: { g: Group; view: View; reload: () => void; few: number }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? g.entries : g.entries.slice(0, few);
+  const more = g.entries.length - few;
+  return (
+    <div>
+      <GroupHead g={g} />
+      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+        {shown.map((e) => (
+          <EntryRow key={e.id} e={e} view={view} reload={reload} inSessions={g.scope === 'session'} />
+        ))}
+        {more > 0 && (
+          <button onClick={() => setAll((a) => !a)} className="flex w-full items-center gap-1 px-3.5 py-2 text-left text-[12.5px] text-fg-3 transition-colors hover:bg-bg-1 hover:text-fg">
+            {all ? 'Show fewer' : `Show ${more} more`}
+            <ChevronDown size={14} className={cx('transition-transform', all && 'rotate-180')} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function GroupHead({ g }: { g: Group }) {
@@ -1057,14 +1091,8 @@ function Notes() {
         ) : (
           <div className="space-y-4">
             {groups.map((g) => (
-              <div key={`${g.scope}:${g.key}`}>
-                <GroupHead g={g} />
-                <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
-                  {g.entries.map((e) => (
-                    <EntryRow key={e.id} e={e} view={view} reload={reload} inSessions={g.scope === 'session'} />
-                  ))}
-                </div>
-              </div>
+              // Anew for each view and search: each place opens with its first few again.
+              <NoteGroup key={`${view}:${query}:${g.scope}:${g.key}`} g={g} view={view} reload={reload} few={view === 'all' && !query ? FEW : MANY} />
             ))}
           </div>
         )}

@@ -15,7 +15,7 @@ import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS } from '../../shared/apps.ts';
-import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_TOOLS } from '../../shared/app-manifest.ts';
+import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
 import { ASSET_NAME, MEDIA_LIMITS, type AppAsset } from '../../shared/app-media.ts';
@@ -84,6 +84,7 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { setModelsHere } from './models.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
 import { saveAppSecrets, secretsOf } from './secrets.ts';
+import { dropDaily, homeOf, saveHome } from './home.ts';
 
 const keyLimiter = new Limiter();
 /** The largest request that installs an app: its file, as base64. */
@@ -233,9 +234,17 @@ function routes(d: Deps) {
   useFlows(flowRunner);
   // Scheduled tasks run templates too (Settings → Tasks): started here, and told when the run ends.
   d.scheduler?.useApps({
-    id: (idOrSlug) => getApp(db, idOrSlug)?.id,
-    name: (id) => getApp(db, id)?.name,
+    id: (idOrSlug) => (idOrSlug.startsWith('tpl:') ? (templateById(idOrSlug.slice(4)) ? idOrSlug : undefined) : getApp(db, idOrSlug)?.id),
+    name: (id) => (id.startsWith('tpl:') ? templateById(id.slice(4))?.name : getApp(db, id)?.name),
     start: ({ app: id, inputs, test }) => {
+      // A ready-made app ("tpl:<id>"), as it is: Explore's Update every day.
+      if (id.startsWith('tpl:')) {
+        const t = templateById(id.slice(4));
+        if (!t) throw new HttpError(404, 'Its app is gone');
+        installedOr409(db, t);
+        const r = startRun({ app: id, slug: t.id, recipe: t, source: 'task', inputs });
+        return { id: r.id, ...(r.key ? { key: r.key } : {}) };
+      }
       const a = getApp(db, id);
       if (!a) throw new HttpError(404, 'Its app is gone');
       if (!test) checkDaily(db, a);
@@ -276,8 +285,9 @@ function routes(d: Deps) {
     // When each last ran (its runs, not its steps' or its conversations).
     const last = new Map((db.prepare("select app_id as id, max(created_at) as at from app_runs where source not in ('step', 'chat') group by app_id").all() as { id: string; at: number }[]).map((r) => [r.id, r.at]));
     const apps = listApps(db).map((a) => ({ ...a, usage: usageShown(a.id, today), ...(last.get(a.id) ? { lastRunAt: last.get(a.id) } : {}) }));
-    const recent = listRuns(db, { limit: 12 })
-      .filter((r) => r.source !== 'batch' && r.source !== 'public')
+    // Not those of an app that opens on its own page (Explore): its page shows its latest, and its daily runs would crowd the rest out.
+    const recent = listRuns(db, { limit: 30 })
+      .filter((r) => r.source !== 'batch' && r.source !== 'public' && !pagesFor(r.recipe.ui, 'app').length)
       .slice(0, 6)
       .map(runView);
     // The ready-made apps, each installed or not, whether agents may run it, and when it last ran.
@@ -287,11 +297,18 @@ function routes(d: Deps) {
 
   /** The tools of the app's own MCP server an app may allow (from every capability), for the builder. */
   app.get('/api/apps/tools', async () => {
-    const ctx: RunCtx = { runId: 'apps-tools', key: 'acp:apps-tools-list', agent: 'acp', acpAgent: 'console', cwd: config.home, deps: d };
+    const ctx: RunCtx = { runId: 'apps-tools', key: 'acp:apps-tools-list', agent: 'acp', acpAgent: 'console', cwd: config.home, deps: d, step: true };
     const seen = new Set<string>();
     const tools = runTools(ctx)
       .filter((t) => t.name !== 'submit_result' && !seen.has(t.name) && seen.add(t.name))
-      .map((t) => ({ name: t.name, description: t.description.split(/(?<=\.)\s/)[0].slice(0, 200), web: PUBLIC_WEB_TOOLS.includes(t.name), ...(STEP_TOOLS.includes(t.name) ? { step: true, inputs: inputsOf(t.inputSchema) } : {}) }));
+      .map((t) => ({
+        name: t.name,
+        description: t.description.split(/(?<=\.)\s/)[0].slice(0, 200),
+        web: PUBLIC_WEB_TOOLS.includes(t.name),
+        ...(STEP_TOOLS.includes(t.name) ? { step: true, inputs: inputsOf(t.inputSchema) } : {}),
+        // A tool only steps have: not one to allow an app's agents.
+        ...(STEP_ONLY_TOOLS.includes(t.name) ? { stepOnly: true } : {}),
+      }));
     return { tools };
   });
 
@@ -343,19 +360,40 @@ function routes(d: Deps) {
 
   app.get('/api/apps/:id', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
-    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template) };
+    // Its own page in its view: what that page keeps, and the answers it runs with from there (with Update every day).
+    // `latest`: when its latest run of its main flow ended well (the start page's Explore shows a dot for a new one).
+    const ownPage = (id: string, r: AppRecipe) => {
+      if (!pagesFor(r.ui, 'app').length) return {};
+      const latest = listRuns(db, { app: id, limit: 20 }).find((x) => x.status === 'done' && !x.flow && !x.parent && x.source !== 'chat');
+      return { view: getView(db, `app:${id}`), home: homeOf(db, d.scheduler, id, r), ...(latest ? { latest: latest.endedAt ?? latest.createdAt } : {}) };
+    };
+    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), ...ownPage(`tpl:${template.id}`, template) };
     const today = dayStart();
-    // Its own page in its view: what that page keeps.
-    const own = pagesFor(a!.ui, 'app').length ? { view: getView(db, `app:${a!.id}`) } : {};
+    const own = ownPage(a!.id, a!);
     return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...own };
   });
 
   /** One value its own page's view keeps: null removes it. Gives all it keeps now. */
   app.put('/api/apps/:id/view', async (req) => {
-    const a = getApp(db, P(req).id);
-    if (!a) throw new HttpError(404, 'No such app');
+    const { app: a, template } = recipeOf(db, P(req).id);
+    const owner = template ? `tpl:${template.id}` : a!.id;
+    if (!pagesFor((a ?? template)!.ui, 'app').length) throw new HttpError(400, 'Its view has no page of its own');
     const b = (req.body ?? {}) as { name?: unknown; value?: unknown };
-    return { view: setView(db, `app:${a.id}`, b.name, b.value ?? null) };
+    return { view: setView(db, `app:${owner}`, b.name, b.value ?? null) };
+  });
+
+  /**
+   * An app that opens on its own page: the answers it runs with from there (its settings) and Update every day (a
+   * scheduled task at a time). Body: { inputs?: { question: answer }, daily?: { on, time: "HH:MM" } }. Gives its settings now.
+   */
+  app.put('/api/apps/:id/home', async (req) => {
+    const { app: a, template } = recipeOf(db, P(req).id);
+    const r = (a ?? template)!;
+    if (!pagesFor(r.ui, 'app').length) throw new HttpError(400, 'It does not open on a page of its own');
+    installedOr409(db, template);
+    const home = saveHome(db, d.scheduler, template ? `tpl:${template.id}` : a!.id, r, req.body);
+    d.broadcast({ t: 'feature', id: 'apps', data: { home: { app: template ? `tpl:${template.id}` : a!.id } } });
+    return { home };
   });
 
   app.put('/api/apps/:id', async (req) => {
@@ -390,6 +428,7 @@ function routes(d: Deps) {
     for (const r of listRuns(db, { app: a.id, status: ['queued', 'starting', 'running', 'waiting'], steps: true })) await stopRun(r.id);
     removeScreens(db, a);
     unwatch(a.id);
+    dropDaily(d.scheduler, a.id);
     deleteApp(db, a.id);
     deleteRuns(db, a.id);
     clearData(db, a.id);
@@ -411,6 +450,7 @@ function routes(d: Deps) {
   app.post('/api/apps/:id/uninstall', async (req) => {
     const t = builtinOf(P(req).id);
     setInstalled(db, t.id, false);
+    dropDaily(d.scheduler, `tpl:${t.id}`);
     return { template: t, installed: false, agents: agentsMay(db, t.id) };
   });
 

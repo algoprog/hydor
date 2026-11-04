@@ -36,6 +36,9 @@ import { providerModels } from '../../shared/app-models.ts';
 import { notesOf } from '../notes.ts';
 import { appSummary } from '../../shared/app-summary.ts';
 import { madeForSessions } from '../../shared/apps.ts';
+import type { ScheduledTask } from '../../shared/automations.ts';
+import type { Scheduler } from '../scheduler.ts';
+import { saveHome } from './home.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -194,9 +197,9 @@ test('form: defaults, numbers, dates, choices, yes/no and what to fix', () => {
 /** The ten ready-made tasks of before the apps for everyday things (templates-more.ts), each made of several kinds of step. */
 const FIRST_TEN = ['deep-research', 'trip-planner', 'compare-products', 'document-qa', 'meeting-actions', 'cover-letter', 'lesson-plan', 'news-digest', 'explain-contract', 'small-web-app'];
 
-test('templates: twenty-six tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
+test('templates: twenty-seven tasks in steps, each checking out as a save checks it, using its needed fields, giving every answer field it needs, asking a person only when someone is there, its programs readable; five blocks, whose steps check out and use theirs', async () => {
   const tasks = TEMPLATES.filter((t) => !t.block);
-  assert.equal(tasks.length, 26);
+  assert.equal(tasks.length, 27);
   assert.deepEqual(tasks.slice(0, 10).map((t) => t.id), FIRST_TEN, 'the first ten keep their place');
   const blocks = TEMPLATES.filter((t) => t.block);
   assert.equal(blocks.length, 5);
@@ -1059,6 +1062,62 @@ test('a session that cannot start fails the run with the reason', async () => {
   const after = store.getRun(db, r.id)!;
   assert.equal(after.status, 'failed');
   assert.match(after.error!, /did not start/);
+});
+
+test('an app that opens on its own page (Explore): its settings there are its form’s answers, kept; what its page keeps; Update every day is a daily task that runs it with them', async () => {
+  const ex = TEMPLATES.find((t) => t.id === 'explore')!;
+  assert.equal(ex.sessions, false, 'it opens on its own page');
+  assert.ok(!madeForSessions(ex), 'agents do not run it in sessions');
+  let r = (await http.inject({ method: 'GET', url: '/api/apps/tpl:explore' })).json();
+  assert.deepEqual(r.home, { inputs: { sessions: '1000', more: '', skip: '' }, daily: { on: false, time: '07:00' } });
+  assert.deepEqual(r.view, {});
+  r = (await http.inject({ method: 'PUT', url: '/api/apps/tpl:explore/home', payload: { inputs: { sessions: '300', nope: 'x' } } })).json();
+  assert.deepEqual(r.home.inputs, { sessions: '300', more: '', skip: '' }, 'only its questions are kept');
+  assert.equal((await http.inject({ method: 'PUT', url: '/api/apps/tpl:explore/home', payload: { daily: { on: true } } })).statusCode, 503, 'not without scheduled tasks');
+  assert.equal((await http.inject({ method: 'PUT', url: '/api/apps/tpl:explore/home', payload: { daily: { time: '7am' } } })).statusCode, 400);
+  assert.equal((await http.inject({ method: 'PUT', url: '/api/apps/tpl:deep-research/home', payload: {} })).statusCode, 400, 'an app without a page of its own has no settings there');
+  // What its page keeps (the stories read), edition after edition.
+  r = (await http.inject({ method: 'PUT', url: '/api/apps/tpl:explore/view', payload: { name: 'read.s1abc', value: true } })).json();
+  assert.deepEqual(r.view, { read: { s1abc: true } });
+  assert.deepEqual((await http.inject({ method: 'GET', url: '/api/apps/tpl:explore' })).json().view, { read: { s1abc: true } });
+  assert.equal((await http.inject({ method: 'PUT', url: '/api/apps/tpl:trip-planner/view', payload: { name: 'x', value: 1 } })).statusCode, 400);
+  // With scheduled tasks: on makes the daily task with its answers, a new time or new answers change it, off removes it.
+  const tasks: ScheduledTask[] = [];
+  const sched = {
+    list: () => tasks,
+    save: (input: Partial<ScheduledTask>, o: { origin?: string } = {}) => {
+      const old = tasks.find((t) => t.id === input.id);
+      const t = { ...input, id: input.id ?? `task${tasks.length + 1}`, origin: old?.origin ?? o.origin, enabled: input.enabled !== false } as ScheduledTask;
+      if (old) tasks.splice(tasks.indexOf(old), 1, t);
+      else tasks.push(t);
+      return t;
+    },
+    remove: (id: string) => {
+      const i = tasks.findIndex((t) => t.id === id);
+      if (i >= 0) tasks.splice(i, 1);
+    },
+  } as unknown as Scheduler;
+  let h = saveHome(db, sched, 'tpl:explore', ex, { daily: { on: true } });
+  assert.deepEqual(h.daily, { on: true, time: '07:00' });
+  assert.equal(tasks.length, 1);
+  assert.equal(tasks[0].origin, 'daily:tpl:explore');
+  assert.deepEqual(tasks[0].schedule, { kind: 'daily', time: '07:00' });
+  assert.deepEqual(tasks[0].app, { id: 'tpl:explore', inputs: { sessions: '300', more: '', skip: '' } });
+  h = saveHome(db, sched, 'tpl:explore', ex, { daily: { time: '06:30' }, inputs: { more: 'Formula 1' } });
+  assert.equal(tasks.length, 1, 'the same task, changed');
+  assert.deepEqual(tasks[0].schedule, { kind: 'daily', time: '06:30' });
+  assert.equal(tasks[0].app?.inputs.more, 'Formula 1');
+  assert.deepEqual(h.daily, { on: true, time: '06:30' });
+  h = saveHome(db, sched, 'tpl:explore', ex, { daily: { on: false } });
+  assert.equal(tasks.length, 0, 'off removes it');
+  assert.equal(h.daily.on, false);
+  assert.equal(h.inputs.more, 'Formula 1', 'its answers stay');
+  // A question it needs left empty, or a file each time: it cannot update by itself.
+  const needs = { name: 'Needs', fields: [{ id: 'city', label: 'City', type: 'text', required: true }] } as unknown as AppRecipe;
+  assert.throws(() => saveHome(db, sched, 'needs', needs, { daily: { on: true } }), /Fill in “City” first/);
+  assert.equal(saveHome(db, sched, 'needs', needs, { inputs: { city: 'Lisbon' }, daily: { on: true } }).daily.on, true);
+  const file = { name: 'File', fields: [{ id: 'doc', label: 'Document', type: 'file', required: true }] } as unknown as AppRecipe;
+  assert.throws(() => saveHome(db, sched, 'file', file, { daily: { on: true } }), /cannot update by itself/);
 });
 
 for (const [name, fn] of tests) {

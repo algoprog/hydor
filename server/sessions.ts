@@ -33,6 +33,7 @@ import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR,
 import { ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
 import { customGoal } from './custom/goal.ts';
+import { titleFor } from './titles.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -920,6 +921,9 @@ export class SessionManager extends EventEmitter {
 
   async create(o: CreateOpts): Promise<string> {
     if (o.agent === 'claude') await ensureClaude();
+    // A session started with a request and no title gets one from the helper model, asked now, beside the agent's start.
+    const request = (splitHandoff(o.prompt ?? '')?.request ?? o.prompt ?? '').trim();
+    const titling = !o.title?.trim() && request ? titleFor(this.db, request) : null;
     let cwd = path.resolve(o.cwd || config.defaultCwd);
     let wt: WorktreeInfo | undefined;
     if (o.worktree) {
@@ -952,6 +956,7 @@ export class SessionManager extends EventEmitter {
     if (o.extra && Object.keys(o.extra).length) setSessionExtra(this.db, l.key, o.extra);
     if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: o.model, effort: o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
+    if (titling) void titling.then((t) => (t ? this.autoTitle(l.key, t) : undefined));
     const here = onThisComputer(o.paths);
     const prompt = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
     const images = [...(o.images ?? []), ...here.images];
@@ -1775,6 +1780,16 @@ export class SessionManager extends EventEmitter {
 
   async stopTask(key: string, taskId: string) {
     await this.live(key).adapter.stopTask(taskId);
+  }
+
+  /** The title the helper model gave a new session: kept unless it has one by now (renamed meanwhile), and told to its agent. */
+  private async autoTitle(key: string, title: string) {
+    if (!this.db.prepare('update app_sessions set title = ? where key = ? and title is null').run(title.slice(0, 200), key).changes) return;
+    await this.lives
+      .get(key)
+      ?.adapter.rename(title)
+      .catch(() => {});
+    this.queueSummary(key);
   }
 
   async rename(key: string, title: string) {

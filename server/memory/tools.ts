@@ -14,6 +14,7 @@ import { secretIn, steeringIn } from './secrets.ts';
 import { addEntry, cleanText, deleteEntry, entries, markUsed, placesOf, repoRoot, sameText, sessionMemoryOn, setExpiry, updateEntry, visibleEntry, type Place } from './store.ts';
 import { endOfDay } from './tidy.ts';
 import { nearest, setVectors } from './vectors.ts';
+import { USER_PROFILE } from './about-user.ts';
 
 const SCOPES = ['global', 'repo', 'session'];
 const WHERE: Record<MemoryScope, string> = { global: 'about the user', repo: 'this project', session: 'this session' };
@@ -263,7 +264,8 @@ const READ: RunTool = {
   },
 };
 
-/** The tools for one run: none when memory is off for its session. */
+/** The tools for one run: none when memory is off for its session; an app's steps have user_profile too. */
 export function memoryTools(ctx: RunCtx): RunTool[] {
-  return sessionMemoryOn(ctx.deps.db, ctx.key) ? [REMEMBER, FORGET, RECALL, SEARCH, READ] : [];
+  if (!sessionMemoryOn(ctx.deps.db, ctx.key)) return [];
+  return ctx.step ? [REMEMBER, FORGET, RECALL, SEARCH, READ, USER_PROFILE] : [REMEMBER, FORGET, RECALL, SEARCH, READ];
 }

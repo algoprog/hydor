@@ -26,6 +26,7 @@ import { LimitBanner } from '../usage/LimitReset';
 import { useComposerMenu } from '../../components/ComposerMenu';
 import { AccountPicker } from './AccountPicker';
 import { AgentPicker } from './AgentPicker';
+import { ExploreButton } from './ExploreButton';
 import { machineId } from '../../lib/machine';
 import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
 import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
@@ -558,9 +559,11 @@ export function HomePage() {
   }, [link]);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div data-tour="home-top" className="flex h-14 shrink-0 items-center px-3 pt-[var(--safe-top)] sm:px-6">
+      <div data-tour="home-top" className="flex h-14 shrink-0 items-center gap-1.5 px-3 pt-[var(--safe-top)] sm:px-6">
         <NavButton />
         <span className="flex-1" />
+        {/* Explore: the magazine made for you, one click away. */}
+        <ExploreButton />
         {/* Desktop has the ? in the bottom-right corner. */}
         {mobile && (
           <IconButton label="Take the tour" onClick={() => startTour()}>

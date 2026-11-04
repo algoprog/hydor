@@ -62,8 +62,12 @@ function lastLine(s: string): string {
   return line.slice(0, 300);
 }
 
-/** Runs a CLI with nothing on stdin: what it wrote, and why it failed when it did (in words, never the whole command). */
-function run(bin: string, args: string[], o: { timeout: number; env?: Env; signal?: AbortSignal }): Promise<{ ok: boolean; stdout: string; stderr: string; why?: string; timedOut?: boolean }> {
+/** Prompts longer than this (in bytes) go on stdin: one argument may hold at most 128 KiB on Linux. */
+const ARG_MAX = 64 * 1024;
+const long = (text: string) => Buffer.byteLength(text) > ARG_MAX;
+
+/** Runs a CLI with `input` on stdin (else nothing): what it wrote, and why it failed when it did (in words, never the whole command). */
+function run(bin: string, args: string[], o: { timeout: number; env?: Env; signal?: AbortSignal; input?: string }): Promise<{ ok: boolean; stdout: string; stderr: string; why?: string; timedOut?: boolean }> {
   return new Promise((resolve) => {
     const child = execFile(bin, args, { cwd: os.tmpdir(), env: { ...agentBaseEnv(), ...o.env }, timeout: o.timeout, maxBuffer: 8 * 1024 * 1024, signal: o.signal }, (err, stdout, stderr) => {
       const out = String(stdout ?? '');
@@ -75,8 +79,9 @@ function run(bin: string, args: string[], o: { timeout: number; env?: Env; signa
       if (e.killed) return resolve({ ok: false, stdout: out, stderr: errs, why: `it did not answer within ${Math.round(o.timeout / 1000)} s`, timedOut: true });
       resolve({ ok: false, stdout: out, stderr: errs, why: lastLine(errs) || 'it failed' });
     });
-    // Nothing comes on stdin: left open, Claude waits 3 s for it on every call and Codex waits until it is killed.
-    child.stdin?.end();
+    // A long prompt comes on stdin; else nothing does: left open, Claude waits 3 s for it on every call and Codex waits until it is killed.
+    child.stdin?.on('error', () => {});
+    child.stdin?.end(o.input);
   });
 }
 
@@ -110,9 +115,10 @@ async function eachAccount(agent: 'claude' | 'codex', ask: (env: Env) => Promise
 const CLAUDE_FLAGS = ['--setting-sources', '', '--strict-mcp-config', '--no-session-persistence', '--disable-slash-commands', '--output-format', 'json'];
 
 export async function askClaude(q: OneShot): Promise<string> {
-  // --tools takes a list, so another flag must follow it; the prompt goes last.
-  const args = ['-p', '--model', q.model ?? 'haiku', '--tools', '', ...CLAUDE_FLAGS, '--system-prompt', q.system, q.prompt];
-  return eachAccount('claude', async (env) => claudeAnswer(await run(config.claudeBin, args, { timeout: q.timeoutMs ?? 90_000, env, signal: q.signal })), q.signal);
+  // --tools takes a list, so another flag must follow it; the prompt goes last, or on stdin when it is long.
+  const piped = long(q.prompt);
+  const args = ['-p', '--model', q.model ?? 'haiku', '--tools', '', ...CLAUDE_FLAGS, '--system-prompt', q.system, ...(piped ? [] : [q.prompt])];
+  return eachAccount('claude', async (env) => claudeAnswer(await run(config.claudeBin, args, { timeout: q.timeoutMs ?? 90_000, env, signal: q.signal, input: piped ? q.prompt : undefined })), q.signal);
 }
 
 async function askCodex(q: OneShot): Promise<string> {
@@ -122,7 +128,10 @@ async function askCodex(q: OneShot): Promise<string> {
       const file = path.join(os.tmpdir(), `wa-ask-${crypto.randomBytes(6).toString('hex')}.txt`);
       const timeout = Math.max(q.timeoutMs ?? 90_000, 90_000);
       try {
-        const r = await run(config.codexBin, ['exec', '--ephemeral', '--skip-git-repo-check', '-s', 'read-only', ...(q.codexModel ? ['-m', q.codexModel] : []), '-c', 'model_reasoning_effort="low"', '-o', file, `${q.system}\n\n${q.prompt}`], { timeout, env, signal: q.signal });
+        // The question, or "-" and the question on stdin when it is long.
+        const question = `${q.system}\n\n${q.prompt}`;
+        const piped = long(question);
+        const r = await run(config.codexBin, ['exec', '--ephemeral', '--skip-git-repo-check', '-s', 'read-only', ...(q.codexModel ? ['-m', q.codexModel] : []), '-c', 'model_reasoning_effort="low"', '-o', file, piped ? '-' : question], { timeout, env, signal: q.signal, input: piped ? question : undefined });
         const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
         if (r.ok && text.trim()) return text;
         throw new NoAnswer(r.why ?? 'it gave no answer', !r.timedOut && r.why !== 'it was stopped');
