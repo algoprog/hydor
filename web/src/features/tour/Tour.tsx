@@ -279,7 +279,7 @@ function UsesPicker() {
     }
     if (!models) return null;
     const pinned = models.openrouter.pinned.length;
-    if (u === 'openrouter') return models.openrouter.keyHint ? `Connected${pinned ? ` · ${pinned} model${pinned > 1 ? 's' : ''}` : ''}` : null;
+    if (u === 'openrouter') return !models.openrouter.keyHint ? null : pinned === 1 ? 'Connected · 1 model' : pinned ? `Connected · ${pinned} models` : 'Connected';
     if (u === 'local') {
       if (models.local.length) return `${models.local.length} model${models.local.length > 1 ? 's' : ''} here already`;
       const g = models.machine.gpus[0];
@@ -461,7 +461,8 @@ function TryThese({ finish }: { finish?: boolean }) {
             type="button"
             className="tour-try"
             onClick={(e) => {
-              tryWords(t);
+              // The words as they show, in the app's language.
+              tryWords(e.currentTarget.textContent?.trim() || t);
               if (finish) endTour(e.currentTarget);
             }}
           >
@@ -545,7 +546,10 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     list.push({
       id: 'accounts',
       title: claude && codex ? 'Sign in to your plans' : claude ? 'Sign in to Claude' : 'Sign in to ChatGPT',
-      body: `Hydor uses the plan you already pay for, so there is nothing more to pay. Sign in once${claude && codex ? ' to each' : ''}, and it works on every device; Settings → Accounts changes it later.`,
+      body:
+        claude && codex
+          ? 'Hydor uses the plans you already pay for, so there is nothing more to pay. Sign in once to each, and they work on every device; Settings → Accounts changes them later.'
+          : 'Hydor uses the plan you already pay for, so there is nothing more to pay. Sign in once, and it works on every device; Settings → Accounts changes it later.',
       scene: (u) => <SourcesMap on={u} focus={['claude', 'codex']} />,
       Extra: AccountsSetup,
     });
@@ -601,7 +605,9 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       route: '/',
       icon: <ShieldCheck size={16} />,
       title: 'Decide how much it may do',
-      body: `Options sets what the agent may do without asking you: from checking with you before every change, to working on its own${cli ? ', and how hard it thinks' : ''}. Change it any time.`,
+      body: cli
+        ? 'Options sets what the agent may do without asking you, from checking with you before every change to working on its own, and how hard it thinks. Change it any time.'
+        : 'Options sets what the agent may do without asking you, from checking with you before every change to working on its own. Change it any time.',
     },
     {
       id: 'sessions',

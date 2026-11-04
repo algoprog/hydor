@@ -155,7 +155,9 @@ export async function startServer(
     const most = [...o.machine.gpus].sort((a, b) => b.freeBytes - a.freeBytes)[0];
     throw new HttpError(
       400,
-      `It needs about ${gb(need)} of GPU memory; the most free is ${gb(most.freeBytes)} on GPU ${most.index}${o.machine.gpus.length > 1 && o.gpu == null ? `, and it does not fit split across the GPUs either` : ''}`,
+      o.machine.gpus.length > 1 && o.gpu == null
+        ? `It needs about ${gb(need)} of GPU memory: more than any one GPU has free (the most is ${gb(most.freeBytes)}, on GPU ${most.index}), and more than they have split between them`
+        : `It needs about ${gb(need)} of GPU memory; the most free is ${gb(most.freeBytes)} on GPU ${most.index}`,
     );
   }
   const gpu = plan.gpus[0];
