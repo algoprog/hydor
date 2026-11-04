@@ -477,6 +477,8 @@ programs shows each program's version and what is out, with Check now, Update no
   checks a new build as soon as it is out, says so (a notification from the Mac, and a note in every open page that
   counts down a minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the menu
   bar), swaps it in with agents carrying on, and goes back to the version before if the new one does not start.
+- While the app loads, in a browser or while the Mac app starts, its logo shows, HYDΩR with water rising in the Ω
+  and a wave moving across it, and the app takes its place the moment it has something to show.
 - Computer use in the Mac app (Settings → Computer use, off at first): agents see the Mac's screen and use its
   mouse and keyboard in any app (screenshots of the main display at about 1280 pixels, clicks, drags, scrolls,
   typing in any language, keys and shortcuts, opening apps by name), beside the browser, which stays the way for
