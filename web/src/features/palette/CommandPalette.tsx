@@ -194,7 +194,9 @@ function rank(q: string, all: Entry[], sessions: SessionSummary[], server: FindR
     add({ entry: { ...e, id: `m:${m.key}:${m.ts ?? i}`, group: 'In messages', icon: <MessageSquareText size={15} />, body: m.snippet.replace(/[\u0001\u0002]/g, ''), hint: m.ts ? timeAgo(m.ts) : e.hint }, score: rrf(i), label: <span className="line-clamp-1">{snippet(m.snippet)}</span>, sub: m.title });
   });
   server?.notes.forEach((n, i) => {
-    const where = n.scope === 'global' ? 'About you' : n.scope === 'repo' ? `Project · ${folderName(n.scopeKey, home)}` : 'A session';
+    // Your profile has a section of its own in Settings → Memory, pointed at by its title.
+    const profile = n.scope === 'global' && n.kind === 'profile';
+    const where = profile ? 'Your profile' : n.scope === 'global' ? 'About you' : n.scope === 'repo' ? `Project · ${folderName(n.scopeKey, home)}` : 'A session';
     add({
       entry: {
         id: `note:${n.id}`,
@@ -206,7 +208,7 @@ function rank(q: string, all: Entry[], sessions: SessionSummary[], server: FindR
         body: n.text,
         facts: [['Kept', where]],
         opens: 'Opens Settings → Memory, at this note',
-        run: () => go(`/settings?s=memory&find=${encodeURIComponent(n.text)}`),
+        run: () => go(`/settings?s=memory&find=${encodeURIComponent(profile ? 'Your profile' : n.text)}`),
       },
       score: rrf(i),
     });

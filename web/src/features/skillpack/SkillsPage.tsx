@@ -26,6 +26,7 @@ import {
   Trash2,
   X,
   type LucideIcon,
+  Lightbulb,
 } from 'lucide-react';
 import { composeSkill, parseSkill, SKILL_CATEGORIES, type LibrarySkill, type SkillDoc, type SkillLibrary, type SkillProposal } from '@shared/skillpack';
 import type { Agent, SkillEntry } from '@shared/types';
@@ -533,6 +534,10 @@ function HowItWorks({ lib, onClose }: { lib: SkillLibrary; onClose: () => void }
           built-in one takes its place.
         </p>
         <p>A project can have skills of its own, which only its sessions get: on the project’s page, its Skills tab.</p>
+        <p>
+          When a session starts with a message, its agent also hears which skills fit that message, if any clearly do: found by their words and, with search by meaning on in Settings → Memory, by
+          what they mean. Turn it off with Suggest skills that fit, in this page’s ⋯ menu.
+        </p>
       </div>
     </Dialog>
   );
@@ -681,6 +686,11 @@ export function SkillsSettings({ cwd }: { cwd: string }) {
     setLib({ ...lib, triggers: on });
     put('/api/skillpack/settings', { triggers: on }).catch((e) => (toastError(e), loadLib()));
   };
+  const setSuggest = (on: boolean) => {
+    if (!lib) return;
+    setLib({ ...lib, suggest: on });
+    put('/api/skillpack/settings', { suggest: on }).catch((e) => (toastError(e), loadLib()));
+  };
 
   if (!lib)
     return (
@@ -713,6 +723,9 @@ export function SkillsSettings({ cwd }: { cwd: string }) {
           <MoreHorizontal size={17} />
         </IconButton>
         <Popover anchor={menuAt} open={menu} onClose={() => setMenu(false)} align="end" width={290}>
+          <MenuItem icon={<Lightbulb size={14} />} checked={lib.suggest} onClick={() => (setMenu(false), setSuggest(!lib.suggest))}>
+            Suggest skills that fit
+          </MenuItem>
           <MenuItem icon={<Sparkles size={14} />} checked={lib.triggers} onClick={() => (setMenu(false), setTriggers(!lib.triggers))}>
             Bring skills in by keywords
           </MenuItem>

@@ -156,6 +156,8 @@ export interface SkillLibrary {
   removed: { name: string; at: number }[];
   /** Keyword triggers load skills into Custom's turns. */
   triggers: boolean;
+  /** Agents starting a new session hear which skills fit its first message (by words and meaning). */
+  suggest: boolean;
   folders: { bundled: string; learned: string; view: string };
   /** The spaces with skills of their own. */
   spaces: SpaceSkillGroup[];

@@ -120,6 +120,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['skills', 'Yours', 'skills learned approved my own written', 'Skills you wrote, or approved when an agent suggested them', 'Your skills'],
   ['skills', 'From plugins', 'plugin skills', 'Skills your plugins bring', 'Skills from plugins'],
   ['skills', 'Claude Code and Codex', 'claude code codex own skills folder', 'The agents’ own skills, which only they get', 'Claude Code’s and Codex’s own skills'],
+  ['skills', 'Suggest skills that fit', 'skill suggestions match retrieval relevant meaning words', 'A new session’s agent hears which skills fit its first message'],
   ['skills', 'Bring skills in by keywords', 'skill triggers keywords auto load', 'Keywords in a message load skills by themselves'],
   ['skills', 'Make my own version', 'change edit built-in skill override customise customize', 'Change a built-in skill: your version takes its place', 'Change a built-in skill'],
   // Agents › Plugins
@@ -169,8 +170,11 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Memory
   ['memory', 'Memory', 'remember notes recall forget', 'Agents start with what earlier sessions kept, and save notes when you ask'],
   ['memory', 'Search by meaning', 'embeddings semantic mdenseon model gpu cpu', 'Finds notes, and anything in this search, by what it means'],
+  ['memory', 'Notes each agent starts with', 'top k how many notes retrieval relevant context memory count', 'Besides your profile: the notes that bear most on what you ask, then the latest'],
   ['memory', 'Tidy up each night', 'merge duplicates summaries topics profile consolidate', 'The helper model merges notes that say the same thing and sums related ones up'],
   ['memory', 'Tidy up now', 'merge duplicates consolidate clean', 'Tidies memory up at once'],
+  ['memory', 'Your profile', 'user profile about me who i am preferences personal edit', 'What every agent gets about you at the start of a session; agents keep it current'],
+  ['memory', 'Profile length', 'profile longest words limit maximum size shorten', 'The most words your profile may have; longer, the helper model shortens it'],
   ['memory', 'Notes', 'memory notes remembered facts export json markdown', 'Every note kept, by place', 'Memory notes'],
   ['memory', 'Add a note', 'remember new note write fact tell agents', 'Write a note for agents to remember, about you or a project', 'Add a memory note'],
   ['memory', 'Deleted notes', 'trash bin restore undelete recover erase', 'Notes deleted in the last 30 days, to restore', 'Deleted memory notes'],

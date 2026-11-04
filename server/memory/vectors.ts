@@ -27,6 +27,9 @@ for (let d = 0; d < DIM; d++) for (let k = 0; k < K - 1; k++) cuts[d * (K - 1) +
 // What each value of each byte adds to a stored vector's squared length, to divide scores by its length.
 const squares = queryTable(new Float32Array(DIM), true);
 
+/** For tests: the levels now, to put back after setting others. */
+export const codebookForTests = () => levels.slice();
+
 /** For tests: other levels (DIM x K, each dimension's rising), for made-up vectors unlike the model's. */
 export function setCodebookForTests(next: Float32Array) {
   if (next.length !== levels.length) throw new Error('wrong size');

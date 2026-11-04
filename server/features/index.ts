@@ -23,6 +23,7 @@ import { knowledge } from '../knowledge/index.ts';
 import { language } from '../language/index.ts';
 import { media } from '../media/index.ts';
 import { memory } from '../memory/index.ts';
+import { profile } from '../memory/profile.ts';
 import { opinion } from '../opinion/index.ts';
 import { pages } from '../pages/index.ts';
 import { plugins } from '../plugins/index.ts';
@@ -38,5 +39,6 @@ import { swarm } from '../swarm/index.ts';
 import { voice } from '../voice/index.ts';
 import type { Feature } from './types.ts';
 
-// The user's guidelines lead what an agent is told; how to format replies follows the pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, automations, voice, assistants, apps, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];
+// The user's guidelines lead what an agent is told, their profile right after them; how to format replies follows the
+// pages it may show instead.
+export const FEATURES: Feature[] = [guidelines, profile, pages, formatting, shots, search, browser, computer, memory, knowledge, spaces, children, swarm, research, opinion, commits, budget, documents, fileAsk, images, media, connections, automations, voice, assistants, apps, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips];

@@ -118,6 +118,7 @@
 - [**你的**](/settings?s=skills&find=Yours)：你编写的技能，或智能体建议后你批准的技能。
 - [**来自插件**](/settings?s=skills&find=From%20plugins)：你的插件带来的技能。
 - [**Claude Code 和 Codex**](/settings?s=skills&find=Claude%20Code%20and%20Codex)：智能体自己的技能，只有它们自己会获得。
+- [**推荐合适的技能**](/settings?s=skills&find=Suggest%20skills%20that%20fit)：新会话的智能体会得知哪些技能适合它的第一条消息。
 - [**按关键词引入技能**](/settings?s=skills&find=Bring%20skills%20in%20by%20keywords)：消息中的关键词会自动加载技能。
 - [**制作我自己的版本**](/settings?s=skills&find=Make%20my%20own%20version)：修改内置技能：你的版本会替代它。
 
@@ -193,8 +194,11 @@
 
 - [**记忆**](/settings?s=memory&find=Memory)：智能体开始时会带上之前会话记下的内容，并在你要求时保存笔记。
 - [**按含义搜索**](/settings?s=memory&find=Search%20by%20meaning)：按含义查找笔记，以及此搜索中的任何内容。
+- [**每个智能体开始时获得的笔记**](/settings?s=memory&find=Notes%20each%20agent%20starts%20with)：除了你的档案：与你的请求最相关的笔记，然后是最新的笔记。
 - [**每晚整理**](/settings?s=memory&find=Tidy%20up%20each%20night)：辅助模型会合并内容相同的笔记，并归纳相关笔记。
 - [**立即整理**](/settings?s=memory&find=Tidy%20up%20now)：立即整理记忆。
+- [**你的档案**](/settings?s=memory&find=Your%20profile)：每个智能体在会话开始时获得的关于你的信息；智能体会让它保持最新。
+- [**档案长度**](/settings?s=memory&find=Profile%20length)：你的档案最多可有的词数；超出时，辅助模型会把它缩短。
 - [**备注**](/settings?s=memory&find=Notes)：所有已保存的笔记，按位置分类。
 - [**添加笔记**](/settings?s=memory&find=Add%20a%20note)：写一条笔记让智能体记住，关于你或某个项目。
 - [**已删除的笔记**](/settings?s=memory&find=Deleted%20notes)：最近 30 天内删除的笔记，可以恢复。

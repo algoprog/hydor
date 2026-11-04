@@ -1,6 +1,6 @@
 # Memory
 
-Agents in Hydor remember what matters from one session to the next: facts about you, about each project, and where a task stands. This topic covers what they keep and when, what an agent starts with, how to see, correct or undo what was saved, and everything in Settings → Memory, including search by meaning and the nightly tidy-up. Use it so agents stop asking the same things twice, and so you always know what they know.
+Agents in Hydor remember what matters from one session to the next: facts about you, about each project, and where a task stands, and a profile of you that every agent starts with. This topic covers what they keep and when, your profile, what an agent starts with, how to see, correct or undo what was saved, and everything in Settings → Memory, including search by meaning and the nightly tidy-up. Use it so agents stop asking the same things twice, and so you always know what they know.
 
 ![Settings → Memory: what agents remember about you and your projects](images/memory.webp)
 
@@ -14,7 +14,7 @@ Memory is a set of short notes, called memory notes. Each is a sentence or two, 
 
 A session sees and changes only three sets of notes: the ones about you, its own project's, and its own. An agent working in one project never sees another project's notes. The sessions of a [project](/guide/spaces) all work in the project's folder, so they share its project notes. A task that gets a new folder of its own (see [Assistants](/guide/assistants)) has that folder as its project.
 
-Once a place has many notes, two more kinds of entry appear there: **topics**, each summing up a group of related notes, and a **profile**, a short summary agents always get first. The nightly tidy-up writes them (see [Tidy up each night](/guide/memory#tidy-up-each-night)).
+Once a place has many notes, more kinds of entry appear there: **topics**, each summing up a group of related notes, and for a project a **profile**, a short summary agents always get first. The nightly tidy-up writes them (see [Tidy up each night](/guide/memory#tidy-up-each-night)). Your own profile is another thing: you and your agents write it (see [Your profile](/guide/memory#your-profile)).
 
 Memory works in the sessions this app runs, not in ones it only lists, such as a session open in a terminal or VS Code.
 
@@ -23,12 +23,22 @@ Memory works in the sessions this app runs, not in ones it only lists, such as a
 Agents save notes in two cases: when you ask ("Remember that I'm vegetarian", "Remember that the test server is test.example.com"), or when they learn something lasting that will matter later. Nothing is written by itself after a reply: notes come from agents choosing to save them, from notes you write or edit yourself, and from the nightly tidy-up, which only reworks notes already kept.
 
 - **The agent picks the place**: about you, this project, or this session.
+- **One fact per note, written to be found again**: each note says one thing in a sentence that stands on its own, naming what it is about (the project, the tool, the person or the place), so that a later request in other words still finds it. What every agent should always know about you goes in your profile instead.
 - **Some notes are true only until a date**: a trip, a deadline, a visit. The agent gives such a note an end date. From then on agents no longer get it, and within the hour it moves to Deleted notes, where you can restore it for 30 days.
 - **Corrections replace the old note**: to update a note, the agent rewrites it under its number instead of adding another. A note with the same text is not saved twice. With [search by meaning](/guide/memory#search-by-meaning) on, neither is a note that says the same thing in other words.
 - **Agents forget, too**: an agent removes a note when it turns out wrong or out of date, or when you ask ("Forget my old address").
 - **Never secrets**: a note that seems to hold a password, a key, a token or a card number is refused. So is text that reads like instructions to an agent ("ignore the previous instructions…"), since it would reach every later session.
 
 You can also write a note yourself with **Add a note** in [Settings → Memory](/settings?s=memory&find=Add%20a%20note), and edit, date and delete every note there.
+
+## Your profile
+
+Besides notes, memory keeps one profile of you: who you are and what you do, what you use, how you like answers, and what to avoid. While memory is on, every agent gets it once, at the start of a session, right after your [Agent Guidelines](/guide/guidelines), and lets it shape how it works with you; your guidelines and what you say in a session still come first. Notes hold what matters now and then; the profile holds what every agent should always know.
+
+- **Agents keep it current.** When something you say shows something lasting that will help every agent serve you better, such as your work, the tools you use or how you like replies, the agent rewrites the profile with it. Most messages change nothing. The change shows under its reply as **Your profile**, with undo (see [See what an agent saved after a reply](/guide/memory#see-what-an-agent-saved-after-a-reply)). Agents never put secrets in it, can't clear it, and can't overwrite a change made since their session started: they are shown the profile as it is now, and try again.
+- **Write it yourself.** In [Settings → Memory](/settings?s=memory&find=Your%20profile), **Your profile** shows it with its lines. **Edit** (or **Write it**, while there is none) opens it: Enter starts a new line, Ctrl+Enter (⌘+Enter on a Mac) or **Save** saves it, and Escape or **Cancel** leaves it as it was. The count under the text says how many words it has, of how many it may have.
+- **How long it may be.** **Profile length**, under it, is the most words it may have: 250, 500, 1,000 (the usual) or 2,000. Agents keep within it. A longer profile, saved by you or left over when you pick a shorter length, is kept as written while the helper model shortens it to fit in the background ("Shortening it to fit 1,000 words…"); the shorter version shows as changed **by the helper**. When the helper can't, the reason shows with **Try again**.
+- **Under it**: how many words it has, and when it last changed and by whom: **by you**, **by an agent** (with the session it came from) or **by the helper**. Its **⋯** (Profile menu) has **History of changes**, every version with who wrote it and why, and **Clear profile**, which asks first. A cleared profile stays under Deleted notes for 30 days, where **Restore** brings it back.
 
 ## See what an agent saved after a reply
 
@@ -37,7 +47,7 @@ When an agent saves, changes or removes notes during a turn, a chip appears unde
 Click the chip to open it. Each change shows:
 
 - A badge: **Added**, **Updated**, **Removed**, or **Undone**.
-- Where the note belongs (**About you**, **Project ·** and the folder's name, **This session**, or **Another session**), "saved by the agent", and how many changes it went through in that turn.
+- Where the note belongs (**About you**, **Project ·** and the folder's name, **This session**, or **Another session**; **Your profile** for a change to your profile), "saved by the agent", and how many changes it went through in that turn.
 - The text. For an update, the words taken out are struck through and the words put in are marked. When most of it was rewritten, the old text shows struck through above the new.
 - **Changed again since**, when the note was edited after this turn: click it to see what it says now.
 - A last line with the reason the agent gave, if any, and **Deleted since** or **No longer kept** when the note was deleted or erased after this turn.
@@ -45,23 +55,25 @@ Click the chip to open it. Each change shows:
 The buttons on each change:
 
 - **Undo this change** (or **Undo these changes**): an added note goes, an updated note gets its old text back, a removed note comes back.
-- **Edit**: change the text in place. Enter saves, Shift+Enter starts a new line, Escape cancels.
-- **Delete**: removes the note. It stays under Deleted in Settings for 30 days.
+- **Edit**: change the text in place. Enter saves, Shift+Enter starts a new line, Escape cancels. For your profile, it opens Settings → Memory, where the profile has room for its lines.
+- **Delete**: removes the note. It stays under Deleted in Settings for 30 days. Your profile has no Delete here: clear it in Settings.
 - **Restore**: brings back a note that was deleted since.
 
 The **⋯** (Memory options) at the top of the open chip has **Memory for this session**, which turns memory off or on for this session, and **All memory**, which opens Settings → Memory. Click the chip's top row to close it.
 
 ## What an agent starts with
 
-Each agent starts with a short explanation of memory and the notes that fit in 4,000 characters:
+Each agent starts with a short explanation of memory, your profile and a few notes, once, in the instructions it starts with:
 
 - **When**: Claude Code and Codex get them when the session starts or is resumed. Agents that speak ACP get them with your first message. [Custom](/guide/custom) gets them again before every turn, so it always has the notes that bear on your latest message.
-- **Which**: the places take turns, one note at a time, so a long list about one place can't crowd out the others: about you, then this project, then this session (when the session goes on). From each place come its profile first, then the topics and notes that bear on what you asked, then the latest. Notes that bear on your request are found by their words, and by what they mean when search by meaning is on. A note that a topic already given sums up is left out: the agent can still look it up.
+- **Which**: your profile (see [Your profile](/guide/memory#your-profile)); this project's profile, when it has one; this session's own notes, when the session goes on; then the notes and topics about you and this project that bear most on what you asked, 10 unless you change it with [Notes each agent starts with](/settings?s=memory&find=Notes%20each%20agent%20starts%20with). When fewer than that bear on it, the latest fill the rest, a place at a time, so one place can't crowd out the other. A note that a topic already given sums up is left out, and every note beyond these stays a lookup away.
+- **How notes are found**: by hybrid search. One list ranks notes by their words, rare words counting most; with search by meaning on, another ranks them by what they mean, so "keep it brief" finds "Likes short answers". The two lists are merged by rank, notes needed lately and often get a little more weight, and only notes close enough to your request count as bearing on it. With search by meaning on, a session that starts while its model is not running waits a few seconds for it, so your first message is matched by meaning too.
+- **Skills that fit**: the same kind of search names the skills that fit your first message, when any clearly do (see [Skills](/guide/skills#skills-that-fit-a-new-session)).
 - **How it treats them**: as background. The agent is told the notes may be out of date, that what you say now always comes first, and not to mention them unless they help.
 
 The notes an agent got because they bear on your request count as **needed**. Settings shows how often each note was needed and when last, and suggests removing the ones no agent has needed for months.
 
-Agents also get tools for memory: save a note (in a place, with an end date if it has one), correct a note, forget one, look notes up by words and meaning (including the notes a topic stands for), and search and read past conversations (see [Search earlier sessions](/guide/memory#search-earlier-sessions)). A note found with a lookup counts as needed too.
+Agents also get tools for memory: save a note (in a place, with an end date if it has one), correct a note, forget one, look notes up by words and meaning (including the notes a topic stands for), update your profile, and search and read past conversations (see [Search earlier sessions](/guide/memory#search-earlier-sessions)). A note found with a lookup counts as needed too.
 
 ## Turn memory off for one session
 
@@ -77,7 +89,7 @@ For a session that is already going, open the session's menu (⋯) → **Session
 
 With memory off, a session "neither reads nor writes notes":
 
-- Its agent gets no notes and no memory tools, and nothing from the session is saved.
+- Its agent gets no notes, no profile and no memory tools, and nothing from the session is saved.
 - Agents in other sessions can't find it when they search past conversations, and can't read it.
 
 A scheduled task's editor has the same Memory chip, so its runs can work without memory (see [Scheduled tasks](/guide/tasks)). Runs started from an app's public page always have memory off (see [Apps](/guide/apps)).
@@ -88,7 +100,7 @@ Turn off the **Memory** switch at the top of [Settings → Memory](/settings?s=m
 
 While it is off:
 
-- No agent gets notes or memory tools, and nothing is saved.
+- No agent gets notes, your profile or memory tools, and nothing is saved.
 - Your notes stay. Turn the switch back on and agents get them again.
 - The Memory option leaves the start page, and the search box (Ctrl+K) stops showing notes.
 - **Search by meaning** and **Tidy up each night** are greyed out, and the tidy-up report and **Tidy up now** are hidden.
@@ -96,7 +108,7 @@ While it is off:
 
 ## Settings → Memory
 
-Everything about memory is in [Settings → Capabilities → Memory](/settings?s=memory): "What agents remember about you, your projects and each session, and when it was written". At the top are three switches (**Memory**, **Search by meaning**, **Tidy up each night**), each with a line on what it does, and the last tidy-up. Below them is **Notes**, the list of every note. On a phone, Settings opens as a list: tap **Memory** to open it on its own page. There the notes take the screen's whole width, and every menu on the page opens as a sheet from the bottom of the screen.
+Everything about memory is in [Settings → Capabilities → Memory](/settings?s=memory): "What agents remember about you, your projects and each session, and when it was written". At the top are the switches (**Memory**, **Search by meaning**, **Tidy up each night**) and **Notes each agent starts with**, each with a line on what it does, and the last tidy-up. Below them are **Your profile** (see [Your profile](/guide/memory#your-profile)) and **Notes**, the list of every note. On a phone, Settings opens as a list: tap **Memory** to open it on its own page. There the notes take the screen's whole width, and every menu on the page opens as a sheet from the bottom of the screen.
 
 ### Search by meaning
 
@@ -129,6 +141,10 @@ Everything about memory is in [Settings → Capabilities → Memory](/settings?s
 
 When something goes wrong, the line turns into a warning with the reason (for example "The model took too long to load") and a **Try again** button. Turning the switch off stops the model; what was set up stays, so turning it on again is quick.
 
+### Notes each agent starts with
+
+[Notes each agent starts with](/settings?s=memory&find=Notes%20each%20agent%20starts%20with) sets how many notes and topics about you and the project an agent starts with, besides your profile: **5**, **10** (the usual), **20** or **40**. The line under it says what they are: "Besides your profile: the notes about you and the project that bear most on what you ask, found by their words and, with search by meaning on, by what they mean; then the latest. Agents look up the rest when they need it." More gives agents more to go on from the start, at the cost of more to read in every session; fewer keeps what they start with short. This session's own notes come besides these. See [What an agent starts with](/guide/memory#what-an-agent-starts-with).
+
 ### Tidy up each night
 
 [Tidy up each night](/settings?s=memory&find=Tidy%20up%20each%20night) keeps memory short and current. It is on by default. The helper model does the work: the small model the app uses for jobs beside sessions, picked in [Settings → Models → Helper model](/settings?s=models&find=Helper%20model) (see [Agents, accounts and models](/guide/agents-models)). It reads notes only, never conversations, so it learns nothing new. It leaves sessions' own notes alone: they are few, and go with their session.
@@ -136,7 +152,7 @@ When something goes wrong, the line turns into a warning with the reason (for ex
 Each tidy-up does two things:
 
 1. **Near-copies, wrong notes, end dates.** Each note added or changed since the last tidy-up is compared with the closest notes in the same place (by meaning when search by meaning is on, else by words). Notes that say the same thing, or where one updates another, are merged into one note that keeps every fact still true; where they disagree, the newer one wins, and the merged note must be shorter than the notes it joins. A note that a newer one shows to be wrong is deleted. A note true only until a date it names ("until Friday", "the trip in March") gets that end date. At most 200 notes are checked in one tidy-up; the rest wait for the next.
-2. **Topics and a profile.** Once a place's notes take more than about 2,400 characters (agents get 4,000 in all), related notes are summed up in topics, each covering a handful of notes (up to 12). Agents then get the topic, and can still look up the notes it stands for. The place also gets a short profile (at most 700 characters) that agents always get first: about you, who you are and how you like to work; about a project, what it is, how to build, test and run it, and its pitfalls. A topic or profile is written again when what it sums up changes.
+2. **Topics, and a project's profile.** Once a place's notes take more than about 2,400 characters, related notes are summed up in topics, each covering a handful of notes (up to 12). Agents then get the topic, and can still look up the notes it stands for. A project also gets a short profile (at most 700 characters) that agents always get first: what it is, how to build, test and run it, and its pitfalls. A topic or profile is written again when what it sums up changes. Your own profile is left to you and your agents (see [Your profile](/guide/memory#your-profile)).
 
 It runs once a night, between 2 and 5 o'clock by this computer's clock. If the app was not running then, it catches up once two days have passed since the last tidy-up. Every change it makes goes in the note's history as made by "the helper", and each change of the last tidy-up can be undone (below).
 
@@ -156,11 +172,11 @@ Under **Tidy up each night**, a line reports the last tidy-up:
 
 ### The Notes list
 
-[Notes](/settings?s=memory&find=Notes) lists every note kept, with the count under its title: "42 kept: 12 about you, 25 in projects, 5 in sessions". **Add a note**, beside the title, writes one of your own (below).
+[Notes](/settings?s=memory&find=Notes) lists every note kept, with the count under its title: "42 kept: 12 about you, 25 in projects, 5 in sessions". **Add a note**, beside the title, writes one of your own (below). Your profile is not among them, nor in the counts: it has its own place above.
 
 - **Search**: the field at the top ("Search the notes", or "Search the notes, by words or meaning" when search by meaning is ready) finds notes with every word you type, the last one as the start of a word, and with search by meaning on, notes that mean the same. The best come first. Escape clears it.
 - **Tabs**: **All**, **About you**, **Projects** and **Sessions**. Where there is room, each shows its count.
-- **Groups**: notes come grouped by place: About you first, then each project (its folder's name and path), then the sessions' notes together, each naming its session (click the name to open the session). Each group shows how many notes it holds. A place's profile comes first, then its topics, then its notes, newest change first; when you search, the best match comes first.
+- **Groups**: notes come grouped by place: About you first, then each project (its folder's name and path), then the sessions' notes together, each naming its session (click the name to open the session). Each group shows how many notes it holds. A project's profile comes first, then its topics, then its notes, newest change first; when you search, the best match comes first.
 - When some notes have gone unused for months, a line above the list says how many, with **Review** (see [Notes no agent needed lately](/guide/memory#notes-no-agent-needed-lately)).
 - At the bottom of the list: **Deleted notes**, **Export** and **Clear all…** (below).
 
@@ -200,7 +216,7 @@ Only notes about you and projects are suggested, never topics, profiles, notes w
 
 [Deleted notes](/settings?s=memory&find=Deleted%20notes), at the bottom of the list, opens the notes deleted by you, an agent, the tidy-up, or their end date: "Deleted notes stay here for 30 days, then go for good." A session's notes go for good soon after the session itself is deleted. The search field finds deleted notes by their words, and **All notes**, at the top, goes back.
 
-- **Restore** brings a note back. A note whose end date had passed comes back without it.
+- **Restore** brings a note back. A note whose end date had passed comes back without it. A cleared profile shows here as **Your profile**: restored, it is your profile again, in place of one written since.
 - The **⋯** menu has the note's **History of changes**, and **Erase for good**, which asks "Erase this note for good?" ("It goes with its history, and cannot come back.") and then removes it at once.
 
 ### Export your notes
@@ -222,6 +238,9 @@ You can search past sessions yourself with the search box (Ctrl+K, or ⌘K on a 
 ## Ask an agent
 
 - "What do you remember about me? Delete anything about my old job."
+- "Add to my profile that I'm a nurse and like answers in bullet points."
+- "Show me my profile, and shorten it to about 300 words."
+- "Start every session with 20 notes instead of 10."
 - "Turn on search by meaning, and keep it on the CPU."
 - "Tidy up memory now, then tell me what it merged."
 - "Which notes has no agent needed for months? Delete the ones about the old website."

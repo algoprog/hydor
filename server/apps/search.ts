@@ -11,9 +11,9 @@
 import type { AppRecipe } from '../../shared/apps.ts';
 import type { DB } from '../db.ts';
 import { appItemText } from '../find/sources.ts';
+import { terms } from '../find/bm25.ts';
 import { vectorOfText } from '../find/index.ts';
 import { meaningOn, queryVector } from '../memory/embed.ts';
-import { words } from '../memory/store.ts';
 import { queryTable, scale, scoreAt } from '../memory/vectors.ts';
 import type { Usable } from './use.ts';
 
@@ -34,15 +34,7 @@ const FRESH_DAYS = 30;
 
 // ---- words -------------------------------------------------------------------------------------------------
 
-/** A word as the index keeps it: plurals made singular ("recipes" → "recipe", "matches" → "match", "movies" → "movie"). */
-export function stem(w: string): string {
-  if (w.length > 4 && w.endsWith('ies')) return `${w.slice(0, -3)}ie`;
-  if (w.length > 4 && /(?:[sxz]|ch|sh)es$/.test(w)) return w.slice(0, -2);
-  if (w.length > 3 && w.endsWith('s') && !/(?:ss|us|is)$/.test(w)) return w.slice(0, -1);
-  return w;
-}
-
-const terms = (text: string) => words(text).map(stem);
+export { stem } from '../find/bm25.ts';
 
 /** What an app is found by, each part as many times as it counts: its name thrice, its kind twice, the rest once. */
 function fieldsOf(r: AppRecipe): string[] {

@@ -118,6 +118,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Yours**](/settings?s=skills&find=Yours): Skills you wrote, or approved when an agent suggested them.
 - [**From plugins**](/settings?s=skills&find=From%20plugins): Skills your plugins bring.
 - [**Claude Code and Codex**](/settings?s=skills&find=Claude%20Code%20and%20Codex): The agents’ own skills, which only they get.
+- [**Suggest skills that fit**](/settings?s=skills&find=Suggest%20skills%20that%20fit): A new session’s agent hears which skills fit its first message.
 - [**Bring skills in by keywords**](/settings?s=skills&find=Bring%20skills%20in%20by%20keywords): Keywords in a message load skills by themselves.
 - [**Make my own version**](/settings?s=skills&find=Make%20my%20own%20version): Change a built-in skill: your version takes its place.
 
@@ -193,8 +194,11 @@ You don’t have to know where an option lives: type what you want in the search
 
 - [**Memory**](/settings?s=memory&find=Memory): Agents start with what earlier sessions kept, and save notes when you ask.
 - [**Search by meaning**](/settings?s=memory&find=Search%20by%20meaning): Finds notes, and anything in this search, by what it means.
+- [**Notes each agent starts with**](/settings?s=memory&find=Notes%20each%20agent%20starts%20with): Besides your profile: the notes that bear most on what you ask, then the latest.
 - [**Tidy up each night**](/settings?s=memory&find=Tidy%20up%20each%20night): The helper model merges notes that say the same thing and sums related ones up.
 - [**Tidy up now**](/settings?s=memory&find=Tidy%20up%20now): Tidies memory up at once.
+- [**Your profile**](/settings?s=memory&find=Your%20profile): What every agent gets about you at the start of a session; agents keep it current.
+- [**Profile length**](/settings?s=memory&find=Profile%20length): The most words your profile may have; longer, the helper model shortens it.
 - [**Notes**](/settings?s=memory&find=Notes): Every note kept, by place.
 - [**Add a note**](/settings?s=memory&find=Add%20a%20note): Write a note for agents to remember, about you or a project.
 - [**Deleted notes**](/settings?s=memory&find=Deleted%20notes): Notes deleted in the last 30 days, to restore.

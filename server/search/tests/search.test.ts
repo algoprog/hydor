@@ -563,14 +563,25 @@ describe('the search service and its tools', () => {
     assert.equal(svc.searcher.resting.get('naget'), undefined, 'Naget Search does not rest');
   });
 
-  it('says clearly when no provider works', async () => {
+  it('says clearly when no provider works, and sends Claude Code and Codex to their own web search', async () => {
     const { f } = fake((c) => (c.url.startsWith('https://naget.com/') ? json(403, fixture('naget-403.json')) : html(202, fixture('duckduckgo-anomaly.html'))));
     const [web] = searchTools(new SearchService({ kv: memory(), fetch: f }));
-    const out = await web.run({ query: 'anything' }, run());
-    assert.equal(typeof out, 'object');
-    const o = out as { text: string; isError?: boolean };
-    assert.equal(o.isError, true);
-    assert.match(o.text, /^No search provider could answer\. Naget Search: needs a key for now: add one in Settings → Search\. DuckDuckGo: asked to prove this is not a bot; it will be asked again in a while\. Tell the user: Settings → Search can take a key/);
+    const as = async (agent: string, o: Partial<RunCtx> = {}) => (await web.run({ query: 'anything' }, { ...run(`${agent}:s1`), agent, ...o } as RunCtx)) as { text: string; isError?: boolean };
+    const custom = await as('acp', { acpAgent: 'console' });
+    assert.equal(custom.isError, true);
+    assert.match(custom.text, /^No search provider could answer\. Naget Search: needs a key for now: add one in Settings → Search\. DuckDuckGo: asked to prove this is not a bot; it will be asked again in a while\. Tell the user: Settings → Search can take a key/);
+    const claude = await as('claude');
+    assert.equal(claude.isError, true);
+    assert.match(claude.text, /^No search provider could answer\..* Search with your own WebSearch tool instead, for this search and the rest of this task/);
+    assert.doesNotMatch(claude.text, /Tell the user/);
+    assert.match((await as('codex')).text, /Search with your own built-in web search \(not this hydor tool\) instead/);
+    // A research turns the agents' own web search off (every search counts there): nothing to fall back on.
+    const db = new Database(':memory:');
+    db.exec('create table app_sessions (key text primary key, agent text, extra text, created_at integer, updated_at integer)');
+    db.prepare("insert into app_sessions (key, agent, extra, created_at, updated_at) values (?, 'claude', ?, 0, 0)").run('claude:lead', JSON.stringify({ research: { queries: 30, breadth: 3, depth: 2 } }));
+    const lead = await as('claude', { key: 'claude:lead', deps: { db } as unknown as Deps });
+    assert.match(lead.text, /Tell the user: Settings → Search/);
+    assert.doesNotMatch(lead.text, /WebSearch/);
   });
 
   it('returns bad arguments to the agent without searching', async () => {

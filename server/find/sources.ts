@@ -60,7 +60,9 @@ const catalog = (): Item[] => catalogItems().map((it) => ({ id: it.id, text: cat
 export const appItemText = (name: string, own: boolean, description?: string) => text(name, own ? 'An app' : 'A ready-made app', description);
 const templates = (): Item[] => TEMPLATES.map((t) => ({ id: `app:tpl:${t.id}`, text: appItemText(t.name, false, t.description) }));
 const assistant = (a: { id: string; name: string; description?: string }): Item => ({ id: `asst:${a.id}`, text: text(a.name, 'An assistant', a.description) });
-const skill = (s: { name: string; description: string }): Item => ({ id: `skill:${s.name}`, text: text(s.name.replace(/-/g, ' '), 'A skill', s.description) });
+/** A skill as the search box finds it (and agents' skill suggestions, skillpack/match.ts, by its vector). */
+export const skillItemText = (name: string, description?: string) => text(name.replace(/-/g, ' '), 'A skill', description);
+const skill = (s: { name: string; description: string }): Item => ({ id: `skill:${s.name}`, text: skillItemText(s.name, s.description) });
 
 /** Each kind's items now. */
 export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler'>): Item[] {

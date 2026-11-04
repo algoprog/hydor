@@ -1,8 +1,9 @@
 // Memory's tools on each session's own MCP server (every agent the app runs has them): remember, forget
 // and recall notes, and look through past conversations with the app's full-text index of all sessions.
+// (update_user_profile, for the user's profile, is in profile.ts.)
 // Notes are found by words and, when search by meaning is on, by meaning; what recall returns counts as
 // used. Sessions with memory off are left out of the search, and cannot be read from here.
-import type { MemoryEntry, MemoryScope } from '../../shared/memory.ts';
+import { isUserProfile, type MemoryEntry, type MemoryScope } from '../../shared/memory.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { ftsQuery } from '../indexer/index.ts';
 import { itemText, line } from '../mcp.ts';
@@ -54,16 +55,17 @@ function untilOf(v: unknown, now = Date.now()): number | null | undefined {
 const REMEMBER: RunTool = {
   name: 'remember',
   description: [
-    'Save a note to the memory Hydor keeps across sessions: later sessions, with any agent, see it.',
-    'scope "global": a lasting fact or preference about the user; "repo": a fact about this project (conventions, commands, where things are, decisions);',
-    '"session": where this task stands. One short, self-contained sentence. Use it when the user asks you to remember something, or you learn something',
-    'that will matter later. Give "until" (YYYY-MM-DD) for what is true only until a date (a trip, a deadline). To correct or update a note, give its',
-    'number as "replaces" rather than saving another. Never save passwords, keys or other secrets.',
+    'Save a note to the memory Hydor keeps across sessions: later sessions, with any agent, get it when it bears on what they are asked, and can look it up.',
+    'scope "global": a fact about the user that matters in some tasks (what every agent should always know about them goes in their profile instead, with update_user_profile);',
+    '"repo": a fact about this project (conventions, commands, where things are, decisions); "session": where this task stands.',
+    'One fact per note, in a short sentence that stands on its own: say what it is about and name things by their names (the project, tool, person or place), so that a later search in other words finds it.',
+    'Use it when the user asks you to remember something, or you learn something that will matter later. Give "until" (YYYY-MM-DD) for what is true only until a date (a trip, a deadline).',
+    'To correct or update a note, give its number as "replaces" rather than saving another. Never save passwords, keys or other secrets.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
-      text: { type: 'string', description: 'The note: one short, self-contained sentence.' },
+      text: { type: 'string', description: 'The note: one fact, in a short sentence that stands on its own.' },
       scope: { type: 'string', enum: SCOPES, description: 'Where it belongs: global (the default), repo or session.' },
       until: { type: 'string', description: 'When it stops being true, as YYYY-MM-DD (or a date and time); after that agents no longer get it.' },
       replaces: { type: 'number', description: 'The number of a note this one corrects or updates: that note gets this text.' },
@@ -86,6 +88,7 @@ const REMEMBER: RunTool = {
       const id = Number(String(a.replaces).replace(/^#/, ''));
       const old = visibleEntry(db, id, places);
       if (!old) throw new Error(`No note #${a.replaces} here to replace. recall lists the notes this session can see.`);
+      if (isUserProfile(old)) throw new Error(`#${id} is the user's profile: change it with update_user_profile.`);
       updateEntry(db, id, text, { ...by, why: 'Corrected' });
       if (until) setExpiry(db, id, until, by);
       changed(ctx);
@@ -122,6 +125,7 @@ const FORGET: RunTool = {
     const id = Number(String(a.id ?? '').replace(/^#/, ''));
     const e = visibleEntry(ctx.deps.db, id, placesOf({ cwd: ctx.cwd, key: ctx.key }));
     if (!e) throw new Error(`No note #${a.id} here. recall lists the notes this session can see.`);
+    if (isUserProfile(e)) throw new Error(`#${id} is the user's profile: only the user clears it, in Settings → Memory. To change it, use update_user_profile.`);
     deleteEntry(ctx.deps.db, id, { source: 'agent', session: ctx.key, why: typeof a.why === 'string' && a.why.trim() ? a.why.trim().slice(0, 200) : undefined });
     changed(ctx);
     return `Forgot #${id}: ${e.text}`;

@@ -6,7 +6,10 @@ Every agent the app runs (Claude Code, Codex, Custom and ACP agents) gets three 
 MCP server: `web_search`, `read_page` and `find_media`. A search goes to the providers in Settings → Search, in their
 order: the first one that is on answers, and when it can't (no key, a limit reached, out of reach, a bot
 check), the next one does. One that failed rests until it may be asked again, so every search doesn't
-wait on it. The answer tells the agent which provider answered, and which filters it could not keep to.
+wait on it. The answer tells the agent which provider answered, and which filters it could not keep to. When none
+can answer, Claude Code and Codex are told to search with their own built-in web search instead (Claude Code's
+WebSearch, Codex's web search), except in a deep research, which turns those off so that every search counts against
+its budget; other agents tell the user what to fix in Settings → Search.
 
 | Provider | Key | What it keeps a search to |
 | --- | --- | --- |

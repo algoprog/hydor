@@ -113,6 +113,7 @@ const stderrTail: string[] = [];
 let stub: ((texts: string[], kind: Kind) => Promise<Float32Array[]>) | null = null;
 export const setEmbedderForTests = (fn: typeof stub) => {
   stub = fn;
+  asked.clear();
 };
 
 function workerEnv(db: DB): NodeJS.ProcessEnv {
@@ -274,6 +275,36 @@ export async function queryVector(db: DB, text: string, o: { wait?: boolean; tim
 
 /** Search by meaning can answer without starting anything (stand-in included). */
 export const meaningReady = () => !!stub || !!worker?.ready;
+
+/** How long what an agent starts with waits for the model to start, at most (a few seconds on a CPU). */
+export const START_WAIT_MS = 8000;
+const asked = new Map<string, { at: number; v: Float32Array }>();
+
+/**
+ * A request's vector, for what an agent starts with (the notes and skills that fit it). With search by meaning on and
+ * the model not running, this waits a little for it to start rather than finding by words alone (the model goes on
+ * starting for what comes next); null when it is off, or not up in time. The same request again within a minute is
+ * answered from memory, so its notes and its skills share one.
+ */
+export async function requestVector(db: DB, text: string, waitMs = START_WAIT_MS): Promise<Float32Array | null> {
+  const t = text.trim().slice(0, 2000);
+  if (!t || (!stub && !meaningOn(db))) return null;
+  const now = Date.now();
+  const hit = asked.get(t);
+  if (hit && now - hit.at < 60_000) return hit.v;
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), waitMs);
+    timer.unref?.();
+  });
+  const v = await Promise.race([queryVector(db, t, { wait: true, timeoutMs: waitMs }).catch(() => null), late]);
+  clearTimeout(timer);
+  if (v) {
+    asked.set(t, { at: now, v });
+    if (asked.size > 20) asked.delete(asked.keys().next().value!);
+  }
+  return v;
+}
 
 // ---- vectors for the notes ----------------------------------------------------------------------
 

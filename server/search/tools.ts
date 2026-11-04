@@ -1,9 +1,11 @@
 // web_search and read_page, on each session's own MCP server: every agent the app runs gets them.
 // Their descriptions teach the model when to use what, and list the providers that are on and the
-// categories Naget Search can keep to (read from its taxonomy).
+// categories Naget Search can keep to (read from its taxonomy). When no provider can answer, Claude Code
+// and Codex are told to search with their own web search instead.
 import { formatSearch } from '../../shared/search.ts';
 import { extractText } from '../documents/extract.ts';
 import type { RunCtx, RunTool, ToolOutput } from '../features/types.ts';
+import { researchFor } from '../research/index.ts';
 import { fetchPage } from '../web/fetch.ts';
 import { ArgError, filtersText, pageArgs, searchArgs } from './args.ts';
 import { findMediaTool } from './media.ts';
@@ -11,6 +13,28 @@ import { readPage } from './page.ts';
 import { fallbackNote, NoProvider } from './run.ts';
 import type { SearchService } from './service.ts';
 import { SearchError } from './types.ts';
+
+/**
+ * The agent's own web search, when it has one to fall back on: Claude Code's WebSearch and Codex's built-in search.
+ * Not in a research, which turns them off so that every search goes through web_search and counts.
+ */
+function ownSearch(ctx: Pick<RunCtx, 'agent' | 'key' | 'deps'>): string | null {
+  if (ctx.agent !== 'claude' && ctx.agent !== 'codex') return null;
+  const db = ctx.deps?.db;
+  if (db && researchFor(db, ctx.key)) return null;
+  return ctx.agent === 'claude' ? 'your own WebSearch tool' : 'your own built-in web search (not this hydor tool)';
+}
+
+/** No provider could answer: Claude Code and Codex search with their own web search instead; other agents tell the user what to fix. */
+export function noProviderAnswer(e: NoProvider, ctx: Pick<RunCtx, 'agent' | 'key' | 'deps'>): ToolOutput {
+  const own = ownSearch(ctx);
+  if (own)
+    return {
+      text: `${e.message} Search with ${own} instead, for this search and the rest of this task while web_search cannot answer, and cite its pages as usual. Mention it to the user only if your own search fails too: Settings → Search can take a key or turn on another provider.`,
+      isError: true,
+    };
+  return { text: `${e.message} Tell the user: Settings → Search can take a key or turn on another provider.`, isError: true };
+}
 
 /** Added to every agent's instructions. */
 export const INSTRUCTIONS =
@@ -100,7 +124,7 @@ function webSearch(s: SearchService): RunTool {
       } catch (e) {
         if (e instanceof NoProvider) {
           s.changed();
-          return { text: `${e.message} Tell the user: Settings → Search can take a key or turn on another provider.`, isError: true };
+          return noProviderAnswer(e, ctx);
         }
         if (e instanceof SearchError) return { text: e.message, isError: true };
         throw e;
