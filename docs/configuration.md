@@ -3,7 +3,7 @@
 Settings, where the app keeps its data, and resetting the password. [Back to the README](../README.md).
 
 Everything is optional. Set these in the environment (or in `.env` for Docker Compose, or in `~/.config/hydor.env`
-for the service and the Mac app):
+for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.env`):
 
 | Variable | Default | What it does |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ for the service and the Mac app):
 | `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads it uses on the CPU |
 | `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with PyTorch and Transformers 5.6+ to run it with instead |
 | `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills and sounds' lengths and shapes with, and voice samples are read with |
-| `HYDOR_UPDATE_FEED` | the newest GitHub release's `hydor-mac.json` | Where the Mac app looks for new versions |
+| `HYDOR_UPDATE_FEED` | the newest GitHub release's `hydor-mac.json`, `hydor-windows.json` or `hydor-linux.json` | Where a desktop app looks for new versions |
 
 ## What it stores
 

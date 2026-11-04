@@ -6,6 +6,7 @@
 // folder (skills/extraRoots/set) and Custom from its skills list (HYDOR_SKILL_DIRS). Nothing is written
 // into the user's ~/.claude or ~/.codex.
 import fs from 'node:fs';
+import { linkPath } from '../platform.ts';
 import os from 'node:os';
 import path from 'node:path';
 import { composeSkill, parseSkill, SKILL_NAME, type SkillSource } from '../../shared/skillpack.ts';
@@ -265,7 +266,7 @@ function syncLinks(root: string, want: Map<string, string>, description: string)
       fs.lstatSync(p);
     } catch {
       try {
-        fs.symlinkSync(target, p, 'dir');
+        linkPath(target, p, 'dir');
       } catch (e) {
         console.warn(`[skillpack] could not link ${n}: ${(e as Error).message}`);
       }

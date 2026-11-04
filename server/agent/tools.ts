@@ -18,6 +18,7 @@ import { checkCommand, riskyWrite } from './shell.ts';
 import { keep, spill } from './spill.ts';
 import { FIND_TOOLS } from './toolsearch.ts';
 import { clip, diffContent as diff, isBinary, relPath, resolvePath, shellEnv, stripAnsi, textContent as text } from './util.ts';
+import { bashCommand, killTree, which } from '../platform.ts';
 
 export { clip };
 export type { AcpKind };
@@ -74,10 +75,9 @@ const rel = (ctx: ToolCtx, p: string) => relPath(ctx.cwd, p);
 const declined = (what = 'this') => ({ ok: false, output: `The user declined ${what}. Do not retry it; ask them, or do something else.` });
 
 // ripgrep: the system's, else the one that comes with Codex, else the built-in walk below.
-const rg = (() => {
-  for (const d of (process.env.PATH ?? '').split(':')) if (d && fs.existsSync(path.join(d, 'rg'))) return path.join(d, 'rg');
-  return bundledRg ?? null;
-})();
+const rg = which('rg') ?? bundledRg ?? null;
+/** A path below `root` as globs read it, with / between folders (Windows writes \). */
+const globPath = (root: string, f: string) => path.relative(root, f).split(path.sep).join('/');
 
 /** Files under a folder (ignored and heavy folders left out), up to a limit. */
 function walk(dir: string, limit = 20000): string[] {
@@ -497,7 +497,7 @@ export const TOOLS: Tool[] = [
       if (rg) files = (await runRg(['--files', '--hidden', '-g', '!.git', '-g', pattern], root, ctx.signal)).split('\n').filter(Boolean).map((f) => path.join(root, f));
       else {
         const re = globRe(pattern.includes('/') ? pattern : `**/${pattern}`);
-        files = walk(root).filter((f) => re.test(path.relative(root, f)));
+        files = walk(root).filter((f) => re.test(globPath(root, f)));
       }
       const withTime = files.slice(0, 5000).map((f) => ({ f, t: fs.statSync(f, { throwIfNoEntry: false })?.mtimeMs ?? 0 }));
       withTime.sort((x, y) => y.t - x.t);
@@ -531,7 +531,7 @@ export const TOOLS: Tool[] = [
         lines = [];
         const st = fs.statSync(root, { throwIfNoEntry: false });
         for (const f of st?.isFile() ? [root] : walk(root)) {
-          if (gre && !gre.test(path.relative(root, f))) continue;
+          if (gre && !gre.test(globPath(root, f))) continue;
           if (lines.length >= 400) break;
           let buf: Buffer;
           try {
@@ -575,8 +575,13 @@ export const TOOLS: Tool[] = [
       }
       const secs = Math.max(1, Math.min(Number(a.timeout) || 120, 600));
       return new Promise((done) => {
-        const sh = ctx.shell?.(command) ?? { cmd: '/bin/bash', args: ['-c', command] };
-        const p = spawn(sh.cmd, sh.args, { cwd: ctx.cwd, env: { ...shellEnv(), ...sh.env }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        let sh: { cmd: string; args: string[]; env?: Record<string, string> };
+        try {
+          sh = ctx.shell?.(command) ?? bashCommand(command);
+        } catch (e) {
+          return done({ ok: false, output: (e as Error).message });
+        }
+        const p = spawn(sh.cmd, sh.args, { cwd: ctx.cwd, env: { ...shellEnv(), ...sh.env }, detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
         let out = '';
         let shown = 0;
         const add = (d: string) => {
@@ -585,11 +590,7 @@ export const TOOLS: Tool[] = [
         };
         p.stdout.setEncoding('utf8').on('data', add);
         p.stderr.setEncoding('utf8').on('data', add);
-        const kill = () => {
-          try {
-            process.kill(-p.pid!, 'SIGKILL');
-          } catch {}
-        };
+        const kill = () => killTree(p.pid!, 'SIGKILL');
         let timedOut = false;
         const timer = setTimeout(() => ((timedOut = true), kill()), secs * 1000);
         const live = setInterval(() => out.length !== shown && ((shown = out.length), ctx.update(text(clip(stripAnsi(out), 8000)))), 1000);

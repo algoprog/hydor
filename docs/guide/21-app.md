@@ -120,14 +120,14 @@ It is kept by the app, so it works with no browser open.
 - **As a service of your user** (the usual install): the switch turns it on or off. It starts at boot even before anyone logs in; if the line says it starts only once you log in, run `sudo loginctl enable-linger $USER` once on the computer to change that.
 - **As a system service**: changing it needs administrator rights on the computer.
 - **In Docker**: its restart policy brings it back (`restart: unless-stopped`), and the switch can't change it.
-- **In the Mac app**: it opens in the background when you log in to the Mac, with its icon in the menu bar and its window closed. It is on from the first time you open it from the Applications folder.
+- **In a desktop app**: it opens in the background when you log in, with its icon in the menu bar (on Windows in the notification area of the taskbar, on Linux in the system tray) and its window closed. It is on from the first time you open it (the Mac app from the Applications folder).
 - **Started some other way**: turning it on sets it up as a service of your user. Where that isn't possible (no systemd for your user), the line says so.
 
-While the app loads, in a browser or while the Mac app starts, its logo shows with water rising in the Ω, and the app appears as soon as it is ready.
+While the app loads, in a browser or while a desktop app starts, its logo shows with water rising in the Ω, and the app appears as soon as it is ready.
 
 ## Keep the app up to date
 
-A copy installed from git (the installer's, or Docker's) looks for a newer version a few minutes after it starts and then once a day; the Mac app looks a minute after it opens and then every 4 hours. **About**, at the bottom of [Settings → App → General](/settings?s=general&find=Check%20now), shows the version you run and how things stand:
+A copy installed from git (the installer's, or Docker's) looks for a newer version a few minutes after it starts and then once a day; the desktop apps look a minute after they open and then every 4 hours. **About**, at the bottom of [Settings → App → General](/settings?s=general&find=Check%20now), shows the version you run and how things stand:
 
 - "Up to date · checked … ago", with **Check now** to look again at once.
 - When a newer version is out: "… updates out", the latest change's title, and **Update now**. It gets the new version, builds it and restarts the app; running agents carry on through the restart, and this tab reloads into the new version by itself. If the app can't restart itself, it gets and builds the new version, and you restart the app to use it.
@@ -136,22 +136,24 @@ A copy installed from git (the installer's, or Docker's) looks for a newer versi
 
 When a newer version is out, a dot shows on **Settings** in the sidebar. A copy not installed from git can't check: **Check now** says so.
 
-[**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first) installs a newer version by itself: a copy installed from git after 5 hours without a message from you, at most once a day; the Mac app as soon as one is out, after a minute's notice. Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or the Mac app in the Applications folder); otherwise the switch is off and says why.
+[**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first) installs a newer version by itself: a copy installed from git after 5 hours without a message from you, at most once a day; the desktop apps as soon as one is out, after a minute's notice (the Linux .deb asks for your password first). Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or a desktop app that can replace itself, such as the Mac app in the Applications folder); otherwise the switch is off and says why.
 
 Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Hydor was updated").
 
-### Updates in the Mac app
+### Updates in the desktop apps
 
-The Mac app goes by released versions instead. With [**Update automatically**](/settings?s=general&find=Update%20automatically) on, it downloads a new version as soon as it is out and checks that it is the build the release names, without waiting for you to be away. Then it tells you, in two places:
+The desktop apps (Mac, Windows and Linux) go by released versions instead. With [**Update automatically**](/settings?s=general&find=Update%20automatically) on, it downloads a new version as soon as it is out and checks that it is the build the release names, without waiting for you to be away. Then it tells you, in two places:
 
-- A notification from your Mac: "Hydor … is ready", restarting in a minute to install it. Clicking it opens the app; its **Restart Now** button installs the new version at once.
+- A notification: "Hydor … is ready", restarting in a minute to install it. Clicking it opens the app; its **Restart Now** button installs the new version at once.
 - A note in the corner of every open page of the app that counts down the seconds ("Restarting in 42 s to install it"), with **Restart now** and **Later**.
 
-When the minute is up, the app restarts into the new version: running agents carry on, and its window comes back by itself. **Later** puts it off for 4 hours, when the notification and the note come back. Until then, **Restart to Update to …** in the menu of the app's icon in the menu bar (and in the **Hydor** menu) installs it whenever you like, and so does **Restart now** under **About**, which says "Version … is ready to install" and when it asks again.
+When the minute is up, the app restarts into the new version: running agents carry on, and its window comes back by itself. **Later** puts it off for 4 hours, when the notification and the note come back. Until then, **Restart to Update to …** in the menu of the app's icon (in the menu bar, the notification area or the system tray, and in the app's own menu) installs it whenever you like, and so does **Restart now** under **About**, which says "Version … is ready to install" and when it asks again.
 
 With **Update automatically** off, nothing downloads by itself: **About** says "Version … is out", and **Update now** downloads it, checks it and opens it in place of the one you run ("Downloading the new version…", then "Opening the new version, this page reconnects by itself…").
 
-If the new version does not start, the version before comes back by itself and the line under **About** says why; that version then installs only when you press **Update now**. The Mac app can update itself only from the Applications folder (or another folder you can write to): opened from the disk image, it says to move it there.
+On Windows, the new version's installer runs without its window, installs over the app and opens it again. The Linux .deb asks for your password to install: a version that downloaded by itself waits, and **Restart to Update** (or **Restart now**) asks for the password and opens the new version.
+
+If the new version of the Mac app or an AppImage does not start, the version before comes back by itself and the line under **About** says why; that version then installs only when you press **Update now**. The Mac app can update itself only from the Applications folder (or another folder you can write to): opened from the disk image, it says to move it there. An AppImage likewise needs a folder you can write to, such as your home folder.
 
 ## Read the release notes
 

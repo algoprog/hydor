@@ -3,6 +3,7 @@
 // the user is asked first unless the session has full access (Plan mode refuses), and what the command
 // prints comes back with the values masked, so the agent never sees them.
 import { spawn } from 'node:child_process';
+import { bashCommand, killTree } from '../platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -129,8 +130,13 @@ interface Ran {
 function run(command: string, cwd: string, env: Record<string, string>, timeoutMs: number, signal?: AbortSignal): Promise<Ran> {
   return new Promise((resolve) => {
     const started = Date.now();
-    const shell = fs.existsSync('/bin/bash') ? '/bin/bash' : '/bin/sh';
-    const p = spawn(shell, ['-c', command], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    let sh: { cmd: string; args: string[] };
+    try {
+      sh = bashCommand(command);
+    } catch (e) {
+      return resolve({ code: 127, signal: null, out: '', truncated: false, timedOut: false, ms: 0, error: (e as Error).message });
+    }
+    const p = spawn(sh.cmd, sh.args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true, windowsHide: true });
     const chunks: Buffer[] = [];
     let size = 0;
     let truncated = false;
@@ -145,14 +151,8 @@ function run(command: string, cwd: string, env: Record<string, string>, timeoutM
     p.stdout.on('data', take);
     p.stderr.on('data', take);
     const stop = () => {
-      try {
-        process.kill(-p.pid!, 'SIGTERM');
-      } catch {}
-      setTimeout(() => {
-        try {
-          process.kill(-p.pid!, 'SIGKILL');
-        } catch {}
-      }, 3000).unref();
+      killTree(p.pid!, 'SIGTERM');
+      setTimeout(() => killTree(p.pid!, 'SIGKILL'), 3000).unref();
     };
     const timer = setTimeout(() => {
       timedOut = true;

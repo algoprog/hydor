@@ -498,13 +498,19 @@ programs shows each program's version and what is out, with Check now, Update no
 - An MCP server of its own, so an agent elsewhere can list, read, start and steer sessions here.
 
 ## Everywhere
-- A Mac app (macOS 12+, Apple silicon or Intel): the server, Node.js and tmux in one app, in a window of its own,
-  in the menu bar when the window is closed, opening at login. It shows notifications itself, finds your programs
-  through your login shell's PATH, and updates itself release by release: it looks every 4 hours, downloads and
-  checks a new build as soon as it is out, says so (a notification from the Mac, and a note in every open page that
-  counts down a minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the menu
-  bar), swaps it in with agents carrying on, and goes back to the version before if the new one does not start.
-- While the app loads, in a browser or while the Mac app starts, its logo shows, HYDΩR with water rising in the Ω
+- Desktop apps for Mac (macOS 12+, Apple silicon or Intel), Windows (10 and 11, x64) and Linux (x64 and ARM: a .deb
+  for Ubuntu and Debian, an AppImage for the others): the server and Node.js in one app (and tmux on a Mac and on
+  Linux), in a window of its own, in the menu bar (the notification area, the system tray) when the window is closed,
+  opening at login. They show notifications themselves, find your programs through your login shell's PATH (on
+  Windows, your own environment), and update themselves release by release: they look every 4 hours, download and
+  check a new build as soon as it is out, say so (a notification, and a note in every open page that counts down a
+  minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the icon's menu), and swap
+  it in with agents carrying on. A Mac app and an AppImage go back to the version before if the new one does not
+  start; on Windows the new version's installer runs without its window; the .deb installs once you give your
+  password.
+- On Windows the server runs as it does elsewhere: agents' commands in Git for Windows' bash, terminals the app keeps
+  itself (Windows has no tmux), and each version run from a copy of its own so agents carry on through updates.
+- While the app loads, in a browser or while a desktop app starts, its logo shows, HYDΩR with water rising in the Ω
   and a wave moving across it, and the app takes its place the moment it has something to show.
 - Computer use in the Mac app (Settings → Computer use, off at first): agents see the Mac's screen and use its
   mouse and keyboard in any app (screenshots of the main display at about 1280 pixels, clicks, drags, scrolls,

@@ -1,5 +1,6 @@
 // Browser terminals backed by a private tmux server, so shells survive page reloads and
 // web-server restarts. Each browser view attaches through a pseudo-terminal running `tmux attach`.
+// Windows has no tmux: there the server keeps each terminal itself (see the end), and they end with it.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import { agentBaseEnv } from './env.ts';
 import { resolvePath } from './files.ts';
+import { bashPath, killTree, WIN, windowsPathOf } from './platform.ts';
 
 const SOCK = path.join(config.dataDir, 'tmux.sock');
 const CONF = path.join(config.dataDir, 'tmux.conf');
@@ -45,6 +47,7 @@ function tmux(args: string[], timeout = 8000): Promise<{ stdout: string; stderr:
 }
 
 export function ensureTmuxConf() {
+  if (WIN) return;
   if (!fs.existsSync(CONF) || fs.readFileSync(CONF, 'utf8') !== TMUX_CONF) fs.writeFileSync(CONF, TMUX_CONF, { mode: 0o600 });
 }
 
@@ -54,6 +57,7 @@ function checkId(id: string) {
 }
 
 export async function listTerminals(): Promise<TerminalInfo[]> {
+  if (WIN) return win.list();
   const fmt = ['#{session_name}', '#{@wa_name}', '#{pane_current_path}', '#{pane_current_command}', '#{session_created}', '#{session_attached}'].join('\t');
   const { stdout, code } = await tmux(['list-sessions', '-F', fmt]);
   if (code !== 0) return [];
@@ -70,6 +74,7 @@ export async function createTerminal(o: { cwd?: string; name?: string; command?:
   ensureTmuxConf();
   const cwd = resolvePath(o.cwd);
   if (!fs.existsSync(cwd)) throw new HttpError(400, `Folder not found: ${cwd}`);
+  if (WIN) return win.create(cwd, o.name, o.command);
   const id = `t${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 2).toString(36)}`;
   const args = ['new-session', '-d', '-s', id, '-c', cwd, '-x', '160', '-y', '40'];
   if (o.command) args.push(o.command);
@@ -82,28 +87,32 @@ export async function createTerminal(o: { cwd?: string; name?: string; command?:
 
 export async function renameTerminal(id: string, name: string) {
   checkId(id);
+  if (WIN) return win.rename(id, name);
   await tmux(['set-option', '-t', id, '@wa_name', name.slice(0, 60)]);
 }
 
 export async function killTerminal(id: string) {
   checkId(id);
+  if (WIN) return win.kill(id);
   await tmux(['kill-session', '-t', id]);
 }
 
 /** Scrollback above the visible screen, with colours, so the browser terminal can show history. */
 export async function terminalHistory(id: string, lines = 5000): Promise<string> {
   checkId(id);
+  if (WIN) return win.history(id);
   const { stdout, code } = await tmux(['capture-pane', '-p', '-e', '-J', '-t', id, '-S', String(-lines), '-E', '-1'], 10_000);
   if (code !== 0) return '';
   const trimmed = stdout.replace(/\n+$/, '');
   return trimmed ? trimmed.replace(/\n/g, '\r\n') + '\r\n' : '';
 }
 
-const SHELLS = new Set(['bash', 'zsh', 'fish', 'sh', 'dash', 'ksh', 'mksh', 'tcsh', 'csh', 'nu', 'elvish', 'xonsh']);
+const SHELLS = new Set(['bash', 'zsh', 'fish', 'sh', 'dash', 'ksh', 'mksh', 'tcsh', 'csh', 'nu', 'elvish', 'xonsh', 'powershell', 'pwsh']);
 
 /** What runs in the terminal now (a shell waiting for a command, or a program), and its folder. */
 export async function paneContext(id: string): Promise<{ program: string; shell: boolean; cwd: string }> {
   checkId(id);
+  if (WIN) return win.context(id);
   const { stdout, code } = await tmux(['display-message', '-p', '-t', id, '#{pane_current_command}\t#{pane_current_path}\t#{alternate_on}\t#{pane_in_mode}']);
   if (code !== 0) throw new HttpError(404, 'That terminal has closed');
   const [cmd, cwd, alt, mode] = stdout.replace(/\n$/, '').split('\t');
@@ -111,8 +120,19 @@ export async function paneContext(id: string): Promise<{ program: string; shell:
   return { program, shell: SHELLS.has(program) && alt !== '1' && mode !== '1', cwd: cwd || config.home };
 }
 
-export function attachTerminal(id: string, cols: number, rows: number): pty.IPty {
+/** What a browser view of a terminal needs: its output, its end, and the keys and size it sends. */
+export interface TerminalView {
+  onData(fn: (d: string) => void): void;
+  onExit(fn: () => void): void;
+  write(d: string): void;
+  resize(cols: number, rows: number): void;
+  /** The view goes (the terminal stays). */
+  kill(): void;
+}
+
+export function attachTerminal(id: string, cols: number, rows: number): TerminalView {
   checkId(id);
+  if (WIN) return win.attach(id, cols, rows);
   ensureTmuxConf();
   return pty.spawn('tmux', ['-S', SOCK, '-f', CONF, 'attach-session', '-t', id], {
     name: 'xterm-256color',
@@ -122,3 +142,108 @@ export function attachTerminal(id: string, cols: number, rows: number): pty.IPty
     env: { ...agentBaseEnv(), TERM: 'xterm-256color' },
   });
 }
+
+// ---- Windows: terminals the server keeps itself ----------------------------------------------------------------------
+
+/**
+ * Each terminal is a shell in a pseudo-terminal of its own (Windows' ConPTY), kept by the server with the last part of
+ * what it printed: a view that attaches later is sent that first, then what follows, and every view types into the
+ * same shell. The shell is Git's bash, as agents' commands use (PowerShell without Git for Windows). Bash says where
+ * it is after each command (an OSC 7 sequence), which the terminal's suggestions and Ask use. The terminals end when
+ * the server stops.
+ */
+const win = (() => {
+  interface Term {
+    info: Omit<TerminalInfo, 'attached'>;
+    pty: pty.IPty;
+    /** What it printed, its last part. */
+    out: string;
+    views: Set<{ data: (d: string) => void; exit: () => void }>;
+    /** Where bash last said it is, and whether a full-screen program (an editor, say) is showing. */
+    cwd: string;
+    alt: boolean;
+    ended: boolean;
+  }
+  const KEEP = 1 << 20;
+  const terms = new Map<string, Term>();
+  const get = (id: string) => {
+    const t = terms.get(id);
+    if (!t || t.ended) throw new HttpError(404, 'That terminal has closed');
+    return t;
+  };
+  const program = (file: string) =>
+    path
+      .basename(file)
+      .replace(/\.exe$/i, '')
+      .toLowerCase();
+
+  function create(cwd: string, name?: string, command?: string): TerminalInfo {
+    const bash = bashPath();
+    const shell = bash ?? (fs.existsSync(path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'PowerShell', '7', 'pwsh.exe')) ? 'pwsh.exe' : 'powershell.exe');
+    const args = bash ? (command ? ['-l', '-c', command] : ['-l', '-i']) : command ? ['-NoLogo', '-Command', command] : ['-NoLogo'];
+    const env: Record<string, string> = { ...agentBaseEnv(), TERM: 'xterm-256color' };
+    // Bash says where it is before each prompt (pwd -W: as Windows writes it).
+    if (bash) env.PROMPT_COMMAND = 'printf "\\033]7;file://localhost/%s\\007" "$(pwd -W)"' + (env.PROMPT_COMMAND ? `; ${env.PROMPT_COMMAND}` : '');
+    const id = `t${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 2).toString(36)}`;
+    const p = pty.spawn(shell, args, { name: 'xterm-256color', cols: 160, rows: 40, cwd, env });
+    const t: Term = { info: { id, name: (name ?? '').slice(0, 60), cwd, command: program(shell), createdAt: Date.now() }, pty: p, out: '', views: new Set(), cwd, alt: false, ended: false };
+    p.onData((d) => {
+      t.out = (t.out + d).slice(-KEEP);
+      for (const m of d.matchAll(/\x1b\]7;file:\/\/[^/]*\/([^\x07\x1b]*)(?:\x07|\x1b\\)/g)) t.cwd = windowsPathOf(m[1]);
+      const screen = /\x1b\[\?(?:1049|1047|47)([hl])(?![\s\S]*\x1b\[\?(?:1049|1047|47)[hl])/.exec(d);
+      if (screen) t.alt = screen[1] === 'h';
+      for (const v of t.views) v.data(d);
+    });
+    p.onExit(() => {
+      t.ended = true;
+      terms.delete(id);
+      for (const v of t.views) v.exit();
+      t.views.clear();
+    });
+    terms.set(id, t);
+    return { ...t.info, attached: 0 };
+  }
+
+  return {
+    list: (): TerminalInfo[] => [...terms.values()].filter((t) => !t.ended).map((t) => ({ ...t.info, cwd: t.cwd, attached: t.views.size })),
+    create,
+    rename(id: string, name: string) {
+      get(id).info.name = name.slice(0, 60);
+    },
+    kill(id: string) {
+      const t = terms.get(id);
+      if (!t) return;
+      const pid = t.pty.pid;
+      // The pseudo-terminal ends the programs in it; whatever is left of the shell's tree goes a moment later.
+      try {
+        t.pty.kill();
+      } catch {}
+      setTimeout(() => killTree(pid), 1000).unref?.();
+    },
+    history: (id: string): string => get(id).out,
+    context(id: string) {
+      const t = get(id);
+      return { program: t.info.command, shell: !t.alt, cwd: t.cwd || config.home };
+    },
+    attach(id: string, cols: number, rows: number): TerminalView {
+      const t = get(id);
+      const view = { data: (_: string) => {}, exit: () => {} };
+      t.views.add(view);
+      const size = (c: number, r: number) => {
+        try {
+          t.pty.resize(Math.max(10, Math.min(c || 120, 500)), Math.max(4, Math.min(r || 32, 300)));
+        } catch {}
+      };
+      size(cols, rows);
+      return {
+        onData: (fn) => void (view.data = fn),
+        onExit: (fn) => void (view.exit = fn),
+        write: (d) => {
+          if (!t.ended) t.pty.write(d);
+        },
+        resize: size,
+        kill: () => void t.views.delete(view),
+      };
+    },
+  };
+})();

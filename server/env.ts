@@ -3,6 +3,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.ts';
+import { bashPath, pathDirs, withPath, WIN } from './platform.ts';
 
 // Variables that describe the parent process, not the user's login environment.
 const DROP = new Set([
@@ -31,6 +32,7 @@ let cached: Record<string, string> | null = null;
  */
 export function agentBaseEnv(): Record<string, string> {
   if (cached) return cached;
+  if (WIN) return (cached = windowsEnv());
   const user = os.userInfo();
   const shell = fs.existsSync('/bin/bash') ? '/bin/bash' : user.shell || '/bin/sh';
   const marker = '__HYDOR_ENV__';
@@ -76,4 +78,27 @@ export function agentBaseEnv(): Record<string, string> {
   env.COLORTERM = 'truecolor';
   cached = env;
   return env;
+}
+
+/**
+ * Windows: a program there gets your whole environment as it is, so this process's own is the agents', with the same
+ * names left out; then ~/.local/bin first (where Claude Code installs itself), the agents' programs the app installed
+ * itself, and Git's tools (for bash and the commands agents run) last.
+ */
+function windowsEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) if (v != null && !DROP.has(k) && !DROP_PREFIX.some((p) => k.startsWith(p))) env[k] = v;
+  const have = new Set(pathDirs(env).map((d) => d.toLowerCase()));
+  const before = [path.join(os.homedir(), '.local', 'bin')].filter((d) => !have.has(d.toLowerCase()));
+  const after = [path.join(config.dataDir, 'clients', 'node_modules', '.bin')];
+  const bash = bashPath();
+  if (bash) {
+    // …\Git\bin\bash.exe: the commands are in …\Git\usr\bin (and git in …\Git\cmd).
+    const git = path.resolve(path.dirname(bash), '..');
+    for (const d of [path.join(git, 'cmd'), path.join(git, 'usr', 'bin')]) if (!have.has(d.toLowerCase()) && fs.existsSync(d)) after.push(d);
+  }
+  const out = withPath(env, before, after);
+  out.TERM = 'xterm-256color';
+  out.COLORTERM = 'truecolor';
+  return out;
 }

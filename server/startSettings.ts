@@ -2,6 +2,7 @@
 // the folder, memory and a spending cap), so it opens that way again, on every device. The page sends
 // what changed; this keeps the whole, tidied, and leaves out a folder that is gone.
 import fs from 'node:fs';
+import { isAbsPath } from './platform.ts';
 import type { StartRun, StartSettings } from '../shared/types.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 
@@ -43,7 +44,7 @@ function tidy(x: unknown): StartSettings {
   if (space) s.space = space;
   if (typeof o.task === 'boolean') s.task = o.task;
   const cwd = text(o.cwd, 4096);
-  if (cwd?.startsWith('/')) s.cwd = cwd;
+  if (cwd && isAbsPath(cwd)) s.cwd = cwd;
   if (typeof o.worktree === 'boolean') s.worktree = o.worktree;
   if (o.memory === false) s.memory = false;
   if (typeof o.capUsd === 'number' && Number.isFinite(o.capUsd) && o.capUsd > 0 && o.capUsd <= 1_000_000) s.capUsd = o.capUsd;

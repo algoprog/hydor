@@ -1,8 +1,8 @@
 // Whether the app comes back when this computer starts: as a systemd service of your user (lingering,
 // so it starts before anyone logs in), as a system service, or by Docker's restart policy. On by
 // default: a copy started by hand from a git install sets up its user service the first time it runs.
-// In the Mac app it is a login item (a launch agent that opens the app in the background when you log in),
-// on from its first start as well.
+// In the desktop apps it is a login item that opens the app in the background when you log in, on from its first
+// start as well: a launch agent on a Mac, your account's Run key on Windows, an autostart entry on Linux.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -16,7 +16,7 @@ import { ENV_FILE, UNIT, UNIT_DIR, UNIT_PATH, unitText } from './service.ts';
 
 const user = os.userInfo().username;
 function run(cmd: string, args: string[]) {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 10_000 });
+  const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 10_000, windowsHide: true });
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
 }
 
@@ -48,14 +48,51 @@ const plistText = (app: string) => `<?xml version="1.0" encoding="UTF-8"?>
 </dict>
 </plist>
 `;
+/** Windows: the Run key of your account opens the app, without its window, when you sign in. */
+const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+const runValue = (app: string) => `"${app}" --hidden`;
+/** Linux: an autostart entry, which the desktop opens when you log in. */
+const AUTOSTART = path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'autostart', 'hydor.desktop');
+const desktopEntry = (app: string) => `[Desktop Entry]
+Type=Application
+Name=Hydor
+Comment=Opens Hydor in the background when you log in
+Exec="${app.replace(/(["`$\\])/g, '\\$1')}" --hidden
+Icon=hydor
+Terminal=false
+X-GNOME-Autostart-enabled=true
+`;
+
+/** What the login item opens now, or null when there is none. */
+function loginItem(): string | null {
+  try {
+    if (desktop!.platform === 'mac') return fs.readFileSync(PLIST, 'utf8');
+    if (desktop!.platform === 'linux') return fs.readFileSync(AUTOSTART, 'utf8');
+  } catch {
+    return null;
+  }
+  const r = run('reg', ['query', RUN_KEY, '/v', 'Hydor']);
+  return r.ok ? r.out : null;
+}
+
+/** Whether the login item opens the app where it is now. */
+const loginItemHere = (item: string) => item.includes(desktop!.platform === 'mac' ? `<string>${xml(desktop!.app)}</string>` : desktop!.app);
+
 function setLoginItem(on: boolean) {
-  if (!on) return fs.rmSync(PLIST, { force: true });
-  fs.mkdirSync(path.dirname(PLIST), { recursive: true });
-  fs.writeFileSync(PLIST, plistText(desktop!.app));
+  const app = desktop!.app;
+  if (desktop!.platform === 'windows') {
+    const r = on ? run('reg', ['add', RUN_KEY, '/v', 'Hydor', '/t', 'REG_SZ', '/d', runValue(app), '/f']) : run('reg', ['delete', RUN_KEY, '/v', 'Hydor', '/f']);
+    if (on && !r.ok) throw new HttpError(500, `Could not add Hydor to the programs Windows opens when you sign in: ${r.out.split('\n').pop()}`);
+    return;
+  }
+  const file = desktop!.platform === 'mac' ? PLIST : AUTOSTART;
+  if (!on) return fs.rmSync(file, { force: true });
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, desktop!.platform === 'mac' ? plistText(app) : desktopEntry(app));
 }
 
 export function startupState(): StartupState {
-  if (desktop) return { on: fs.existsSync(PLIST), how: 'login-item', can: true };
+  if (desktop) return { on: loginItem() !== null, how: 'login-item', can: true, platform: desktop.platform };
   if (inDocker()) return { on: true, how: 'docker', can: false };
   const own = ownUnit();
   if (own && !own.user) return { on: run('systemctl', ['is-enabled', own.unit]).out === 'enabled', how: 'system-service', unit: own.unit, can: true };
@@ -110,7 +147,10 @@ export function setStartup(on: boolean): StartupState {
 /** On by default: the first run of a copy started by hand from a git install sets up its service (not test copies). */
 export function startupDefault(db: DB) {
   // The app may have moved since (to Applications, say): the login item opens it where it is now.
-  if (desktop && fs.existsSync(PLIST) && !fs.readFileSync(PLIST, 'utf8').includes(`<string>${xml(desktop.app)}</string>`)) setLoginItem(true);
+  if (desktop) {
+    const item = loginItem();
+    if (item !== null && !loginItemHere(item)) setLoginItem(true);
+  }
   if (kvGet(db, 'startup.default')) return;
   kvSet(db, 'startup.default', String(Date.now()));
   const st = startupState();

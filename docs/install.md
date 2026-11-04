@@ -1,15 +1,18 @@
 # Installation
 
-How to run Hydor as the Mac app, with Docker or as a service of your user, and keep it up to date. [Back to the README](../README.md).
+How to run Hydor as a desktop app (Mac, Windows, Linux), with Docker or as a service of your user, and keep it up to
+date. [Back to the README](../README.md).
 
 ## Requirements
 
-- **macOS 12 or newer** (Apple silicon or Intel) for the Mac app, or **Linux**, x86-64 or ARM64. On Windows, use
-  Docker (or WSL2).
+- **macOS 12 or newer** (Apple silicon or Intel) for the Mac app; **Windows 10 or 11** (x64) for the Windows app, with
+  [Git for Windows](https://git-scm.com/download/win); **Linux**, x86-64 or ARM64, for the Linux app (a system from
+  2022 or later: Ubuntu 22.04, Debian 12, Fedora 36, RHEL 9 or newer), Docker or the installer.
 - **A subscription for at least one agent:** a Claude plan (Pro, Max, Team or Enterprise) or an Anthropic
   Console account for Claude Code, and a ChatGPT plan for Codex. You sign in from the app.
-- With the Mac app or Docker, nothing else (the Mac app brings its own Node.js and tmux). On Linux without Docker: Node.js 22.12 or newer, `git`, `tmux`, a C/C++ toolchain for the
-  native modules (`build-essential` and `python3` on Debian or Ubuntu), and
+- With a desktop app or Docker, nothing else (the apps bring their own Node.js, and tmux on a Mac and on Linux). On
+  Linux with the installer: Node.js 22.12 or newer, `git`, `tmux`, a C/C++ toolchain for the native modules
+  (`build-essential` and `python3` on Debian or Ubuntu), and
   [Claude Code](https://docs.anthropic.com/en/docs/claude-code) if you want it (Codex is installed with the app).
 - Optional: [TeX Live](https://tug.org/texlive/) to typeset LaTeX documents in Pages, with bubblewrap to keep it
   in a sandbox of its own (on Debian or Ubuntu `sudo apt install texlive-latex-extra texlive-xetex latexmk
@@ -49,6 +52,61 @@ when this computer starts**).
 
 Opened from the disk image or the Downloads folder, the app offers to move itself to Applications, where it can
 update itself.
+
+## The Windows app
+
+Download `Hydor-<version>-x64-win.exe` from the [Releases page](https://github.com/algoprog/hydor/releases/latest) and
+run it: it installs Hydor for your account (no administrator needed), adds it to the Start menu and the desktop, and
+opens it on the page where you choose a password. The installer is not signed yet, so Windows SmartScreen may say it
+protected your PC: choose **More info**, then **Run anyway**.
+
+Install [Git for Windows](https://git-scm.com/download/win) as well: agents run their commands in its bash, as Claude
+Code does on Windows, and the app's terminals open it too (PowerShell without it).
+
+The app runs the server with the Node.js that comes with it, and shows Hydor in its own window. Closing the window keeps
+it running, with its icon in the notification area of the taskbar: click it to open Hydor, or right-click it for **Open
+in Browser**, **Settings…** and **Quit Hydor**. It opens in the background when you sign in to Windows (Settings →
+General → **Start when this computer starts**).
+
+- Sessions run as you, with your `%USERPROFILE%\.claude` and `%USERPROFILE%\.codex`, and the environment Windows
+  gives your apps (your `PATH`).
+- Its data is in `%USERPROFILE%\.hydor`. Settings such as `PORT` go in `%USERPROFILE%\.config\hydor.env`, one
+  `NAME=value` per line; quit and open the app to apply them.
+- The server's log is in `%APPDATA%\Hydor\logs\server.log` (**Help → Show the Server Log**: press Alt for the menu).
+- Each version runs from a copy of itself in `%LOCALAPPDATA%\Hydor\runtime`, made the first time it opens, so agents
+  keep running through updates (Windows cannot replace files a program uses); copies nothing runs from any more go.
+- Windows has no tmux: the app keeps the terminals itself, and they close when it quits.
+- Not in the Windows app yet: computer use, the agent sandbox and **Run code** steps in apps (they need macOS or
+  Linux), local voice transcription, and the figures on the System page.
+
+## The Linux app
+
+On Ubuntu, Debian and systems like them, download `Hydor-<version>-amd64.deb` (`-arm64.deb` on ARM) from the
+[Releases page](https://github.com/algoprog/hydor/releases/latest) and install it:
+
+```bash
+sudo apt install ./Hydor-*-amd64.deb
+```
+
+On any other system (Fedora, Arch, openSUSE…), download `Hydor-<version>-x86_64.AppImage` (`-arm64.AppImage` on ARM),
+make it executable and open it:
+
+```bash
+chmod +x Hydor-*.AppImage && ./Hydor-*.AppImage
+```
+
+Like the Mac app, it brings its own Node.js and tmux, shows Hydor in a window of its own, keeps running in the system
+tray when the window is closed, and opens in the background when you log in.
+
+- Its data is in `~/.hydor`, settings go in `~/.config/hydor.env`, and the server's log is in
+  `~/.config/Hydor/logs/server.log`.
+- The AppImage runs its server from a copy in `~/.local/share/Hydor/runtime`, so agents keep running after it closes
+  or updates. Keep it in a folder you can write to (your home folder, say) so it can update itself.
+- The `.deb` updates with your password: once a new version has downloaded, **Restart to Update** asks for it, and
+  the app opens again as the new version.
+- The tray icon needs a desktop with a system tray (GNOME needs the AppIndicator extension, which Ubuntu has); without
+  one, open Hydor again from your applications to get its window back.
+- Not in the Linux app yet: computer use (it is in the Mac app).
 
 ## With Docker
 
@@ -171,16 +229,20 @@ node dist/server/cli.js app import reading-list.hydor-app   # says what it will 
 
 ## Updates
 
-The Mac app updates by release: a minute after it opens and then every 4 hours it looks at the newest release on
-GitHub, and when it is newer, it downloads the build for your Mac at once and checks it against the release's
-checksum (and, for a signed app, that the same developer signed it). Then it says so, with a notification from the
-Mac and a note in every open page that counts down a minute (**Restart now**, **Later**), and opens the new version
-in place of the one you run. **Later** puts it off for 4 hours; **Restart to Update** in the menu-bar icon's menu
-installs it whenever you like. Running agents carry on. With **Update automatically** off (Settings → General),
-nothing downloads by itself: Settings says a version is out, and **Update now** installs it. If the new version's
-server does not start, the app goes back to the version before by itself, says why in Settings → General, and
-leaves that version for **Update now**. It needs to be in a folder you can write to (Applications is): opened from
-the disk image, it can't update.
+The desktop apps update by release: a minute after one opens and then every 4 hours it looks at the newest release
+on GitHub, and when it is newer, it downloads the build for your system at once and checks it against the release's
+checksum (and, for a signed Mac app, that the same developer signed it). Then it says so, with a notification and a
+note in every open page that counts down a minute (**Restart now**, **Later**), and opens the new version in place of
+the one you run. **Later** puts it off for 4 hours; **Restart to Update** in the menu of its icon (the menu bar, the
+notification area, the tray) installs it whenever you like. Running agents carry on. With **Update automatically** off
+(Settings → General), nothing downloads by itself: Settings says a version is out, and **Update now** installs it.
+
+- **Mac**: if the new version's server does not start, the app goes back to the version before by itself, says why
+  in Settings → General, and leaves that version for **Update now**. It needs to be in a folder you can write to
+  (Applications is): opened from the disk image, it can't update.
+- **Windows**: the new version's installer runs without its window, installs over the app and opens it again.
+- **Linux**: an AppImage replaces its own file, and goes back to the version before if the new one does not start; the
+  `.deb` asks for your password to install, so a version that downloaded by itself waits for **Restart to Update**.
 
 A copy installed from git checks for a newer version once a day and installs it by itself after 5 hours without a
 message from you, at most once a day. Agents can be at work meanwhile: they carry on through the

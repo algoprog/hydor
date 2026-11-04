@@ -8,6 +8,7 @@
 // in an environment of the template's own made by uv (python3 -m venv and pip when uv is not here). What
 // the steps and agents get: the environment's commands first on PATH, VIRTUAL_ENV, NODE_PATH.
 import { spawn } from 'node:child_process';
+import { which } from '../platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,14 +41,8 @@ function saved(slug: string): Saved | null {
 
 /** Whether a command is on this computer's PATH. */
 export function hasCommand(name: string): boolean {
-  for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
-    if (!dir) continue;
-    try {
-      fs.accessSync(path.join(dir, name), fs.constants.X_OK);
-      return true;
-    } catch {}
-  }
-  return false;
+  // (On Windows with its ending: python finds python.exe.)
+  return !!which(name);
 }
 
 /** How the commands that install are run; a test puts a stand-in here. */

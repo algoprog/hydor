@@ -20,6 +20,7 @@ import { acpBriefing, acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
 import { RpcPeer } from './rpc.ts';
+import { which, WIN } from '../platform.ts';
 
 type Json = Record<string, any>;
 
@@ -86,15 +87,9 @@ export function removeAcpAgent(db: DB, id: string) {
 
 /** The command's full path when it is installed (on PATH or given as a path). */
 export function findCommand(cmd: string, env: Record<string, string> = process.env as Record<string, string>): string | null {
-  if (cmd.includes('/')) return fs.existsSync(cmd) ? cmd : null;
-  for (const dir of (env.PATH ?? '').split(':').filter(Boolean)) {
-    const p = path.join(dir, cmd);
-    try {
-      fs.accessSync(p, fs.constants.X_OK);
-      return p;
-    } catch {}
-  }
-  return null;
+  if (!WIN && cmd.includes('/')) return fs.existsSync(cmd) ? cmd : null;
+  // On Windows with its ending: gemini is gemini.cmd (the runner starts it through Node.js).
+  return which(cmd, env);
 }
 
 export const acpTranscriptPath = (id: string) => path.join(ACP_DIR, `${id}.jsonl`);

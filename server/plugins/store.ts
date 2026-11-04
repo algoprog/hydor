@@ -6,6 +6,7 @@
 // in the app's plugin editor), data/<name> (PLUGIN_DATA: its packages and files, kept across updates) and
 // view/<name> (what agents read: its skills, its servers' launch specs).
 import fs from 'node:fs';
+import { linkPath } from '../platform.ts';
 import path from 'node:path';
 import { satisfies, type PluginAgent, type PluginSource, type PluginView } from '../../shared/plugins.ts';
 import { APP_ROOT, config } from '../config.ts';
@@ -172,7 +173,7 @@ function writeSkill(src: string, dest: string, root: string, data: string) {
     if (e === 'SKILL.md') fs.writeFileSync(path.join(dest, e), fill(fs.readFileSync(from, 'utf8'), root, data));
     else
       try {
-        fs.symlinkSync(from, path.join(dest, e));
+        linkPath(from, path.join(dest, e));
       } catch {}
   }
 }

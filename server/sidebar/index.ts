@@ -2,6 +2,8 @@
 // and folders among the sessions. Kept here, so every device shows the same order, and open pages change at once.
 // Another machine's pages show this server's.
 import { MAX_FOLDER_NAME, MAX_FOLDER_NAMES, RETIRED_TOOLS, SIDEBAR_TOOLS, folderNameMap, isSidebarTool, placeOrder, toolOrder, usualOrder, type SidebarTool } from '../../shared/sidebar.ts';
+import { isAbsPath, trimSep } from '../platform.ts';
+import path from 'node:path';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Feature } from '../features/types.ts';
@@ -61,14 +63,14 @@ export function folderNames(db: DB): Record<string, string> {
 
 /** Gives a folder a name of yours, or with an empty name goes back to the folder's own. */
 export function setFolderName(db: DB, folder: unknown, name: unknown): Record<string, string> {
-  if (typeof folder !== 'string' || !/^\/[^\0\n]*$/.test(folder) || folder.length > 1100) throw new HttpError(400, 'path: the folder, as a full path (/home/you/code/app)');
+  if (typeof folder !== 'string' || !isAbsPath(folder) || /[\0\n]/.test(folder) || folder.length > 1100) throw new HttpError(400, 'path: the folder, as a full path (/home/you/code/app)');
   if (name !== undefined && name !== null && typeof name !== 'string') throw new HttpError(400, 'name: the name to show for the folder ("" for its own)');
   const n = (name ?? '').trim();
   if (n.length > MAX_FOLDER_NAME) throw new HttpError(400, `name: at most ${MAX_FOLDER_NAME} characters`);
-  const dir = folder.length > 1 ? folder.replace(/\/+$/, '') : folder;
+  const dir = trimSep(folder);
   const names = folderNames(db);
   delete names[dir];
-  if (n && n !== dir.split('/').pop()) {
+  if (n && n !== path.basename(dir)) {
     if (Object.keys(names).length >= MAX_FOLDER_NAMES) throw new HttpError(400, `At most ${MAX_FOLDER_NAMES} folders keep a name: give one back its own first`);
     names[dir] = n;
   }

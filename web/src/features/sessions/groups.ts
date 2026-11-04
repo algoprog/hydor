@@ -10,7 +10,7 @@
 import { isChatgptProjectFolder, type FolderOrigin } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
-import { basename, dayGroup, dirname } from '../../lib/format';
+import { basename, dayGroup, dirname, inside, isWinPath, joinPath, pathParts, sepOf } from '../../lib/format';
 import { folderSources, fromOrigins, type FolderSource } from '../../lib/origin';
 
 export type GroupKind = 'active' | 'pinned' | 'space' | 'folder' | 'day' | 'snoozed';
@@ -46,19 +46,19 @@ export const lastActivityAt = (s: SessionSummary) => Math.max(s.updatedAt ?? s.c
 /** Whether a space or folder group shows folded: as you left it, else when none of its sessions was at work this week. */
 export const isFolded = (g: SessionGroup, folds: Record<string, boolean>, now: number) => folds[g.id] ?? now - (g.items[0]?.updatedAt ?? 0) > STALE_MS;
 
-const trim = (p: string) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
+const trim = (p: string) => (p.length > 1 && !/^[A-Za-z]:[\\/]$/.test(p) ? p.replace(isWinPath(p) ? /[\\/]+$/ : /\/+$/, '') : p);
 
 /**
  * Whether no one picked a folder: the home folder, the default one, or one under the app's own places (`auto`, from
  * the server; a server too old to say gets the usual ones).
  */
 export function unpickedFolders(home?: string, defaultCwd?: string, auto?: string[]): (dir: string) => boolean {
-  const own = auto ?? (home ? [`${home}/Hydor`, `${home}/hydor-apps`, `${home}/.hydor`, `${home}/Naget`, `${home}/naget-apps`, `${home}/.naget-agent`, `${home}/.web-agent`, '/tmp'] : ['/tmp']);
+  const own = auto ?? (home ? [...['Hydor', 'hydor-apps', '.hydor', 'Naget', 'naget-apps', '.naget-agent', '.web-agent'].map((n) => joinPath(home, n)), '/tmp'] : ['/tmp']);
   const roots = own.map(trim);
   const exact = new Set(['/', home, defaultCwd].filter((d): d is string => !!d).map(trim));
   return (dir) => {
     const d = trim(dir);
-    return exact.has(d) || roots.some((r) => d === r || d.startsWith(r + '/')) || isChatgptProjectFolder(d);
+    return exact.has(d) || roots.some((r) => inside(d, r)) || isChatgptProjectFolder(d);
   };
 }
 
@@ -68,12 +68,12 @@ export function unpickedFolders(home?: string, defaultCwd?: string, auto?: strin
  * folders of the same name told apart by as many of the folders they are in as it takes ("client/app", "server/app").
  */
 export function folderLabels(dirs: string[], names: Record<string, string> = {}): Map<string, string> {
-  const parts = (d: string) => d.split('/').filter(Boolean);
   const label = (d: string, depth: number) => {
     if (names[d]) return names[d];
-    const p = parts(d);
-    // A folder at the top shows whole once it needs telling apart ("/app").
-    return depth > 1 && depth >= p.length ? `/${p.join('/')}` : p.slice(-depth).join('/') || d;
+    const p = pathParts(d);
+    const sep = sepOf(d);
+    // A folder at the top shows whole once it needs telling apart ("/app", "C:\app").
+    return depth > 1 && depth >= p.length ? (isWinPath(d) ? d : `/${p.join('/')}`) : p.slice(-depth).join(sep) || d;
   };
   const out = new Map(dirs.map((d) => [d, label(d, 1)]));
   for (let depth = 2; depth <= 8; depth++) {

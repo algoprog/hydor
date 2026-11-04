@@ -12,6 +12,7 @@
 //
 // Messages are JSON-RPC, one per line. Imports nothing from the server.
 import { spawn } from 'node:child_process';
+import { spawnProgram } from '../platform.ts';
 import http from 'node:http';
 
 type Msg = { jsonrpc?: string; id?: string | number | null; method?: string; params?: any; result?: any; error?: any };
@@ -100,11 +101,17 @@ async function launch() {
   const on = (name: unknown) => (!only || only.has(String(name))) && !skip.has(String(name));
   const masks = [...new Set(spec.mask.filter((s) => s.length >= 6).flatMap((s) => [s, JSON.stringify(s).slice(1, -1), encodeURIComponent(s), new URLSearchParams({ v: s }).toString().slice(2)]))].sort((a, b) => b.length - a.length);
   const mask = (t: string) => masks.reduce((s, m) => (s.includes(m) ? s.split(m).join('[hidden]') : s), t);
-  const child = spawn(spec.command, spec.args, { env: { ...process.env, ...spec.env }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawnProgram(spec.command, spec.args, { env: { ...process.env, ...spec.env }, stdio: ['pipe', 'pipe', 'pipe'] });
   child.on('error', (e) => die(`${spec.name} did not start: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? `${spec.command} is not installed` : e.message}`));
   child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
   child.stdin!.on('error', () => {});
-  for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) process.on(s, () => child.kill(s));
+  // (Windows has no SIGHUP to pass on: there the program just ends.)
+  for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const)
+    process.on(s, () => {
+      try {
+        child.kill(s);
+      } catch {}
+    });
   // tools/list requests on their way, so their answers can be trimmed to the tools that are on.
   const listing = new Set<string>();
   const off = (m: Msg) => m.method === 'tools/call' && !on(m.params?.name);

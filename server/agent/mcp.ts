@@ -2,6 +2,7 @@
 // .mcp.json, Codex's config.toml) and those the app hands over (its show_html page server). Over stdio
 // (newline-delimited JSON-RPC) or Streamable HTTP; their tools join Console's as mcp__<server>__<tool>.
 import { spawn, type ChildProcess } from 'node:child_process';
+import { spawnProgram } from '../platform.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -219,7 +220,7 @@ export class McpClient {
 
   async connect(): Promise<void> {
     if (this.def.type === 'stdio') {
-      this.proc = spawn(this.def.command!, this.def.args ?? [], { env: { ...process.env, ...(this.def.env ?? {}) }, stdio: ['pipe', 'pipe', 'ignore'] });
+      this.proc = spawnProgram(this.def.command!, this.def.args ?? [], { env: { ...process.env, ...(this.def.env ?? {}) }, stdio: ['pipe', 'pipe', 'ignore'] });
       let buf = '';
       this.proc.stdout!.on('data', (d) => {
         buf += d.toString();

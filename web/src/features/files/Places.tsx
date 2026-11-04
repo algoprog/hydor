@@ -6,7 +6,7 @@ import { useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Clock, Folder, FolderOpen, House, Pin, Search, Trash2, X } from 'lucide-react';
 import { FolderFinder, useRecentFolders } from '../../components/FolderPicker';
 import { cx, MenuItem, Popover } from '../../components/ui';
-import { basename, dirname, tildify } from '../../lib/format';
+import { basename, dirname, inside, isWinPath, joinPath, pathParts, sepOf, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { useApp } from '../../lib/store';
 import { SpaceMark } from '../spaces/parts';
@@ -85,17 +85,19 @@ export function Crumbs({
   const findRef = useRef<HTMLButtonElement>(null);
   const foldRef = useRef<HTMLButtonElement>(null);
   const lead = useFolderLead((p) => (setFind(false), onDir(p)), dir);
+  // The computer: / , or on Windows the folder's drive (C:\).
+  const root = isWinPath(dir) ? `${dir.slice(0, 2)}\\` : '/';
   const top =
-    base && (dir === base.path || dir.startsWith(`${base.path}/`))
+    base && inside(dir, base.path)
       ? base
-      : home && (dir === home || dir.startsWith(`${home}/`))
+      : home && inside(dir, home)
         ? { path: home, label: 'Home folder', icon: <House size={14} /> }
-        : { path: '/', label: 'Computer', icon: <Folder size={14} /> };
-  const rest = dir === top.path ? [] : dir.slice(top.path === '/' ? 1 : top.path.length + 1).split('/');
+        : { path: root, label: 'Computer', icon: <Folder size={14} /> };
+  const rest = dir === top.path ? [] : pathParts(dir).slice(pathParts(top.path).length);
   // Home shows as its house alone, once the path goes on from it.
   const steps = [
     { dir: top.path, label: top.label, icon: top.icon, bare: top.path === home && rest.length > 0 },
-    ...rest.map((n, i) => ({ dir: `${top.path === '/' ? '' : top.path}/${rest.slice(0, i + 1).join('/')}`, label: n, icon: undefined as ReactNode, bare: false })),
+    ...rest.map((n, i) => ({ dir: joinPath(top.path, rest.slice(0, i + 1).join(sepOf(dir))), label: n, icon: undefined as ReactNode, bare: false })),
   ];
   // Five or more: the first, a fold with those between, and the last two.
   const folded = steps.length > 4 ? steps.slice(1, -2) : [];

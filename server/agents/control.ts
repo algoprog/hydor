@@ -13,6 +13,7 @@ import { ensureClaude } from '../clients.ts';
 import { claimClaudeReset, claudeOauthAccount, claudeResets } from './claudeResets.ts';
 import { codexEnv, codexModels } from './codex.ts';
 import { RpcPeer } from './rpc.ts';
+import { execProgram, launch, spawnProgram } from '../platform.ts';
 
 type Json = Record<string, any>;
 
@@ -20,8 +21,8 @@ const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z
 
 function execJson(cmd: string, args: string[], env: Record<string, string>, timeoutMs = 20_000): Promise<{ out: string; code: number }> {
   return new Promise((resolve) => {
-    execFile(cmd, args, { env, cwd: paths.probe, timeout: timeoutMs, maxBuffer: 4 << 20 }, (err, stdout) => {
-      resolve({ out: String(stdout ?? ''), code: err ? ((err as any).code ?? 1) : 0 });
+    execProgram(cmd, args, { env, cwd: paths.probe, timeout: timeoutMs, maxBuffer: 4 << 20 }, (err, stdout) => {
+      resolve({ out: stdout, code: err ? ((err as any).code ?? 1) : 0 });
     });
   });
 }
@@ -83,7 +84,7 @@ export class CodexControl extends EventEmitter {
   private ensure(): Promise<void> {
     if (this.ready) return this.ready;
     this.ready = new Promise<void>((resolve, reject) => {
-      const proc = spawn(config.codexBin, ['app-server'], { cwd: paths.probe, env: codexEnv({ ...agentBaseEnv(), ...this.extraEnv }), stdio: ['pipe', 'pipe', 'pipe'] });
+      const proc = spawnProgram(config.codexBin, ['app-server'], { cwd: paths.probe, env: codexEnv({ ...agentBaseEnv(), ...this.extraEnv }), stdio: ['pipe', 'pipe', 'pipe'] });
       this.proc = proc;
       const rpc = new RpcPeer((o) => proc.stdin.write(JSON.stringify(o) + '\n'), `ctl-${crypto.randomBytes(3).toString('hex')}`);
       this.rpc = rpc;
@@ -342,7 +343,7 @@ export class ClaudeControl extends EventEmitter {
   private probe(): Promise<{ init: Json | null; usage: Json | null }> {
     if (this.inflight) return this.inflight;
     this.inflight = new Promise((resolve) => {
-      const proc = spawn(
+      const proc = spawnProgram(
         config.claudeBin,
         ['--output-format', 'stream-json', '--verbose', '--input-format', 'stream-json', '--strict-mcp-config', '--permission-prompt-tool', 'stdio'],
         { cwd: paths.probe, env: this.env(), stdio: ['pipe', 'pipe', 'ignore'] },
@@ -502,13 +503,9 @@ export class ClaudeControl extends EventEmitter {
     const id = crypto.randomBytes(8).toString('hex');
     const flow: LoginFlow & { term?: pty.IPty; buf?: string } = { id, agent: 'claude', method, state: 'starting', buf: '' };
     this.flows.set(id, flow);
-    const term = pty.spawn(config.claudeBin, ['auth', 'login', method === 'console' ? '--console' : '--claudeai'], {
-      name: 'xterm-256color',
-      cols: 400,
-      rows: 40,
-      cwd: paths.probe,
-      env: { ...this.env(), BROWSER: 'true' },
-    });
+    const env = { ...this.env(), BROWSER: 'true' };
+    const login = launch(config.claudeBin, ['auth', 'login', method === 'console' ? '--console' : '--claudeai'], env);
+    const term = pty.spawn(login.cmd, login.args, { name: 'xterm-256color', cols: 400, rows: 40, cwd: paths.probe, env });
     flow.term = term;
     term.onData((d) => {
       flow.buf = (flow.buf ?? '') + d;

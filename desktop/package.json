@@ -1,9 +1,11 @@
 {
-  "name": "hydor-mac",
+  "name": "hydor",
   "productName": "Hydor",
+  "desktopName": "hydor.desktop",
   "version": "0.0.0",
   "private": true,
-  "description": "Hydor for macOS: the app, its server and the agents, in one app that keeps itself up to date.",
+  "description": "Hydor for macOS, Windows and Linux: the app, its server and the agents, in one app that keeps itself up to date.",
+  "homepage": "https://github.com/algoprog/hydor",
   "author": "Naget, Inc.",
   "license": "MIT",
   "main": "main.cjs",

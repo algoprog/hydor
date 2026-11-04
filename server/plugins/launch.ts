@@ -5,6 +5,7 @@
 // command as one token with its arguments (never through a shell), and passes stdio, signals and the exit
 // code through.
 import { spawn } from 'node:child_process';
+import { launch } from '../platform.ts';
 import fs from 'node:fs';
 
 interface Spec {
@@ -25,8 +26,16 @@ try {
 try {
   fs.mkdirSync(spec.env.PLUGIN_DATA, { recursive: true });
 } catch {}
-const child = spawn(spec.command, spec.args, { cwd: spec.cwd, env: { ...process.env, ...spec.env }, stdio: 'inherit' });
-for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(sig, () => child.kill(sig));
+const env = { ...process.env, ...spec.env };
+const program = launch(spec.command, spec.args, env);
+const child = spawn(program.cmd, program.args, { cwd: spec.cwd, env, stdio: 'inherit', windowsHide: true });
+// (Windows has no SIGHUP to pass on: there the program just ends.)
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const)
+  process.on(sig, () => {
+    try {
+      child.kill(sig);
+    } catch {}
+  });
 child.on('error', (e) => {
   process.stderr.write(`hydor plugin launcher: could not start ${spec.command}: ${e.message}\n`);
   process.exit(127);

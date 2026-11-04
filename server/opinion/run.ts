@@ -3,6 +3,7 @@
 // in the session's folder, so they can open a file to check something; or one of Custom's models
 // through the helper.
 import { spawn } from 'node:child_process';
+import { spawnProgram } from '../platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -17,7 +18,7 @@ export const REVIEW_TIMEOUT = 8 * 60_000;
 /** Runs a CLI with the question on its input; its output, or why it failed. */
 function cli(bin: string, args: string[], input: string, cwd: string, timeout = REVIEW_TIMEOUT): Promise<string> {
   return new Promise((resolve, reject) => {
-    const p = spawn(bin, args, { cwd, env: agentBaseEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
+    const p = spawnProgram(bin, args, { cwd, env: agentBaseEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '';
     let err = '';
     const timer = setTimeout(() => {

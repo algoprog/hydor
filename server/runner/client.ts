@@ -4,7 +4,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { APP_ROOT, paths } from '../config.ts';
-import { encodeFrame, FrameDecoder, LineSplitter, FRAME_CONTROL, FRAME_STDERR, FRAME_STDOUT } from './frames.ts';
+import { encodeFrame, FrameDecoder, LineSplitter, readAddress, FRAME_CONTROL, FRAME_STDERR, FRAME_STDOUT, type RunnerAddress } from './frames.ts';
 import type { Agent } from '../../shared/types.ts';
 
 export interface RunSpec {
@@ -71,7 +71,7 @@ export class Runner extends EventEmitter {
     fs.writeFileSync(path.join(dir, 'spec.json'), JSON.stringify(spec), { mode: 0o600 });
     fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta), { mode: 0o600 });
     const runnerJs = path.join(APP_ROOT, 'dist/server/runner.js');
-    const p = spawn(process.execPath, [runnerJs, dir], { detached: true, stdio: 'ignore', cwd: dir });
+    const p = spawn(process.execPath, [runnerJs, dir], { detached: true, stdio: 'ignore', cwd: dir, windowsHide: true });
     p.unref();
     return new Runner(dir, meta);
   }
@@ -86,7 +86,9 @@ export class Runner extends EventEmitter {
         const meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')) as RunMeta;
         out.push(new Runner(dir, meta));
       } catch {
-        fs.rmSync(dir, { recursive: true, force: true });
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+        } catch {}
       }
     }
     return out;
@@ -113,7 +115,6 @@ export class Runner extends EventEmitter {
 
   /** Connects, replays everything the agent printed so far, then streams live output. */
   async connect(timeoutMs = 15_000): Promise<void> {
-    const sockPath = path.join(this.dir, 'sock');
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const exit = this.readJson<ExitInfo>('exit.json');
@@ -122,9 +123,10 @@ export class Runner extends EventEmitter {
         this.markExit(exit);
         return;
       }
-      if (fs.existsSync(sockPath)) {
+      const address = readAddress(this.dir, fs, path);
+      if (address) {
         try {
-          await this.attach(sockPath);
+          await this.attach(address);
           return;
         } catch {
           // socket not accepting yet
@@ -165,9 +167,11 @@ export class Runner extends EventEmitter {
     }
   }
 
-  private attach(sockPath: string): Promise<void> {
+  private attach(address: RunnerAddress): Promise<void> {
     return new Promise((resolve, reject) => {
-      const sock = net.connect(sockPath);
+      const sock = net.connect(address.path);
+      // On Windows the runner hears nothing else until it has its key.
+      if (address.key) sock.write(encodeFrame(FRAME_CONTROL, JSON.stringify({ op: 'auth', key: address.key })));
       const decoder = new FrameDecoder();
       const lines = new LineSplitter();
       let hello = false;
@@ -269,6 +273,9 @@ export class Runner extends EventEmitter {
         fs.copyFileSync(err, path.join(paths.logs, `${this.meta.runId}.stderr.log`));
       }
     } catch {}
-    fs.rmSync(this.dir, { recursive: true, force: true });
+    // Windows may still hold a file in it for a moment (the runner on its way out, an antivirus): it goes later.
+    try {
+      fs.rmSync(this.dir, { recursive: true, force: true, maxRetries: 3 });
+    } catch {}
   }
 }

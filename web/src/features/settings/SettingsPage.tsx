@@ -18,7 +18,7 @@ import { Button, cx, Dialog, IconButton, MenuItem, Popover, Throbber, inputCls, 
 import { currentLang, setLang } from '../../i18n';
 import { LOCALE } from '../../i18n/locale';
 import { restartToUpdate, updateLater } from '../../components/UpdateNotice';
-import { chime, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
+import { chime, desktopSystem, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
 import { PageHeader } from '../layout/PageHeader';
 import { followUpPref, type FollowUp } from '../session/Composer';
 import { InstructionsSettings, McpSettings } from './AgentSettings';
@@ -519,6 +519,20 @@ function ReadyLine({ ready }: { ready: NonNullable<UpdateState['ready']> }) {
   );
 }
 
+/** Why a desktop app cannot update itself where it is (as the server says when you try). */
+function cannotUpdate(update: UpdateState): string {
+  switch (update.format) {
+    case 'app':
+      return 'Move Hydor to your Applications folder to update it.';
+    case 'appimage':
+      return 'Put the AppImage in a folder you can write to (your home folder, say) to update it.';
+    case 'deb':
+      return 'Updating the .deb needs pkexec: install the new version from the Releases page.';
+    default:
+      return 'This copy does not update itself: install the new version from the Releases page.';
+  }
+}
+
 /** Whether a newer version is out (for copies installed from git), updating to it, and how the last update went. */
 function UpdateLine() {
   const update = useApp((s) => s.boot?.update);
@@ -593,8 +607,10 @@ function UpdateLine() {
             <span className="text-[12px] text-fg-3">
               {update.kind === 'app'
                 ? update.canRestart
-                  ? 'It downloads the new version and opens it in place of this one; running agents carry on.'
-                  : 'Move Hydor to your Applications folder to update it.'
+                  ? update.format === 'deb'
+                    ? 'It downloads the new version and installs it once you give your password; running agents carry on.'
+                    : 'It downloads the new version and opens it in place of this one; running agents carry on.'
+                  : cannotUpdate(update)
                 : update.canRestart
                   ? 'It pulls, builds and restarts; running agents carry on.'
                   : 'It pulls and builds; restart the server afterwards to use it.'}
@@ -646,10 +662,12 @@ function AutoUpdateSetting() {
       hint={
         update.canRestart
           ? update.kind === 'app'
-            ? 'Downloads a new version as soon as it is out, says so, and restarts into it a minute later (Later puts it off). Running agents carry on.'
+            ? update.format === 'deb'
+              ? 'Downloads a new version as soon as it is out; Restart to Update installs it, once you give your password. Running agents carry on.'
+              : 'Downloads a new version as soon as it is out, says so, and restarts into it a minute later (Later puts it off). Running agents carry on.'
             : 'After 5 hours without a message from you, at most once a day. Running agents carry on.'
           : update.kind === 'app'
-            ? 'Move Hydor to your Applications folder to update it.'
+            ? cannotUpdate(update)
             : 'This server cannot restart itself. Run it as a service (install.sh) or with Docker to update automatically.'
       }
     >
@@ -671,9 +689,17 @@ function StartupSetting() {
   if (!st) return null;
   const hint =
     st.how === 'login-item'
-      ? st.on
-        ? 'Opens in the background when you log in to this Mac, from your menu bar.'
-        : 'Does not open by itself when you log in to this Mac.'
+      ? st.platform === 'windows'
+        ? st.on
+          ? 'Opens in the background when you sign in to Windows, in the notification area of the taskbar.'
+          : 'Does not open by itself when you sign in to Windows.'
+        : st.platform === 'linux'
+          ? st.on
+            ? 'Opens in the background when you log in, in the system tray.'
+            : 'Does not open by itself when you log in.'
+          : st.on
+            ? 'Opens in the background when you log in to this Mac, from your menu bar.'
+            : 'Does not open by itself when you log in to this Mac.'
       : st.how === 'docker'
       ? 'In Docker its restart policy brings it back: restart: unless-stopped in compose.yaml.'
       : st.how === 'system-service'
@@ -830,7 +856,11 @@ function NotificationSettings() {
   };
   const hint =
     state === 'app'
-      ? 'The Mac app shows them itself while it runs, even with its window closed (it stays in the menu bar).'
+      ? desktopSystem === 'windows'
+        ? 'The app shows them itself while it runs, even with its window closed (it stays in the notification area).'
+        : desktopSystem === 'linux'
+          ? 'The app shows them itself while it runs, even with its window closed (it stays in the system tray).'
+          : 'The Mac app shows them itself while it runs, even with its window closed (it stays in the menu bar).'
       : state === 'unsupported'
       ? appleNotInstalled
         ? 'On iPhone or iPad: Share → Add to Home Screen, open Hydor from there, then turn this on.'

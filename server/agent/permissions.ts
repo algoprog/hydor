@@ -50,12 +50,12 @@ export function isSecret(p: string): boolean {
   if (/^(id_(rsa|dsa|ecdsa|ed25519)(_sk)?|.+\.(pem|key|p12|pfx|jks|keystore|kdbx)|\.netrc|\.npmrc|\.pypirc|\.git-credentials|\.pgpass|\.vault-token|credentials(\.json)?|\.htpasswd)$/.test(name)) return true;
   if (within(p, APP_DATA)) return true;
   const rel = within(p, HOME) ? path.relative(HOME, p) : '';
-  return /^(\.ssh|\.aws|\.gnupg|\.azure|\.kube|\.docker|\.password-store|\.config\/(gcloud|gh)|\.claude\/\.credentials\.json|\.codex\/auth\.json)(\/|$)/.test(rel);
+  return /^(\.ssh|\.aws|\.gnupg|\.azure|\.kube|\.docker|\.password-store|\.config[\\/](gcloud|gh)|\.claude[\\/]\.credentials\.json|\.codex[\\/]auth\.json)([\\/]|$)/.test(rel);
 }
 
 /** The folder a rule for this file covers: itself for a folder, else the one it is in. */
 function folderOf(p: string): string {
-  if (p.length > 1 && p.endsWith('/')) return p.replace(/\/+$/, '');
+  if (p.length > 1 && /[\\/]$/.test(p) && p !== path.parse(p).root) return p.replace(/[\\/]+$/, '');
   return fs.statSync(p, { throwIfNoEntry: false })?.isDirectory() ? p : path.dirname(p);
 }
 
@@ -71,7 +71,7 @@ export function ruleCovers(allow: string[], part: Part): boolean {
 
 /** Where a path really is: symlinks followed (for a file not made yet, its folder's). */
 function real(p: string, depth = 0): string {
-  const slash = p.length > 1 && p.endsWith('/') ? '/' : '';
+  const slash = p.length > 1 && /[\\/]$/.test(p) ? p.slice(-1) : '';
   try {
     return fs.realpathSync(p) + slash;
   } catch {
@@ -86,7 +86,7 @@ function real(p: string, depth = 0): string {
 }
 
 /** Git's own files: its settings and hooks run commands the next time git runs. */
-const gitInternal = (p: string) => /(^|\/)\.git(\/|$)/.test(p);
+const gitInternal = (p: string) => /(^|[\\/])\.git([\\/]|$)/.test(p);
 
 /**
  * Whether `r` goes ahead, and if not, what "Always allow" would save. `readable` are folders read freely:

@@ -8,15 +8,15 @@
 // undone: the app's copy goes back to the version before, an npm install of yours too, and the sessions
 // keep running your Claude Code's previous version, which its installer keeps beside the new one. A
 // version that failed is not tried again by itself; the next one is.
-import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ClientInfo, ClientUpdateItem, ClientUpdates } from '../shared/types.ts';
 import { HttpError } from './auth.ts';
-import { APP_ROOT, config, paths } from './config.ts';
+import { APP_ROOT, CODEX_TARGET, config, EXE, paths } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { agentBaseEnv } from './env.ts';
+import { execProgram, programFile, spawnProgram, which, WIN, withPath } from './platform.ts';
 import { LineSplitter } from './runner/frames.ts';
 
 export const CLIENTS_DIR = path.join(config.dataDir, 'clients');
@@ -35,6 +35,8 @@ export const PACKAGES: Record<string, { pkg: string; name: string; update?: stri
 const HOUR = 3600_000;
 const nodeDir = path.dirname(process.execPath);
 const npmBin = fs.existsSync(path.join(nodeDir, 'npm')) ? path.join(nodeDir, 'npm') : 'npm';
+/** On Windows, npm's own script beside node.exe, run by it (its npm and npm.cmd need a shell). */
+const npmCli = path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js');
 const VERSION = /\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/;
 
 type Json = Record<string, any>;
@@ -42,17 +44,17 @@ type Json = Record<string, any>;
 function run(cmd: string, args: string[], timeout: number, env: Record<string, string>): Promise<{ ok: boolean; out: string; stdout: string }> {
   fs.mkdirSync(paths.probe, { recursive: true });
   return new Promise((resolve) =>
-    execFile(cmd, args, { env, cwd: paths.probe, timeout, maxBuffer: 16 << 20 }, (err, stdout, stderr) =>
-      resolve({ ok: !err, out: `${stdout ?? ''}\n${stderr ?? ''}`.trim(), stdout: String(stdout ?? '') }),
+    execProgram(cmd, args, { env, cwd: paths.probe, timeout, maxBuffer: 16 << 20 }, (err, stdout, stderr) =>
+      resolve({ ok: !err, out: `${stdout}\n${stderr}`.trim(), stdout }),
     ),
   );
 }
 
 /** The app's npm, with the dev packages' NODE_ENV left out. */
 function npm(args: string[], timeout: number) {
-  const env: Record<string, string> = { ...(process.env as Record<string, string>), PATH: `${nodeDir}:${process.env.PATH ?? '/usr/bin:/bin'}` };
+  const env = withPath(process.env as Record<string, string>, [nodeDir]);
   delete env.NODE_ENV;
-  return run(npmBin, args, timeout, env);
+  return WIN && fs.existsSync(npmCli) ? run(process.execPath, [npmCli, ...args], timeout, env) : run(npmBin, args, timeout, env);
 }
 
 /** The last few lines of a program's output. */
@@ -93,20 +95,13 @@ export function newer(a: string, b: string): boolean {
 
 /** The version the app installed of a program, if it did. */
 export const managedVersion = (cmd: string): string | null => (PACKAGES[cmd] ? (readJson(path.join(CLIENTS_DIR, 'node_modules', PACKAGES[cmd].pkg, 'package.json'))?.version ?? null) : null);
-const managedBin = (cmd: string) => (fs.existsSync(path.join(CLIENTS_BIN, cmd)) ? path.join(CLIENTS_BIN, cmd) : null);
+const managedBin = (cmd: string) => (WIN ? programFile(path.join(CLIENTS_BIN, cmd)) : fs.existsSync(path.join(CLIENTS_BIN, cmd)) ? path.join(CLIENTS_BIN, cmd) : null);
 const bundledCodex = (): string | null => readJson(path.join(APP_ROOT, 'node_modules/@openai/codex/package.json'))?.version ?? null;
 
 /** A command on the agents' PATH, the app's own folder aside (or a path that exists). */
 function onPath(cmd: string): string | null {
-  if (cmd.includes('/')) return fs.existsSync(cmd) ? cmd : null;
-  for (const d of (agentBaseEnv().PATH ?? process.env.PATH ?? '').split(':').concat(path.join(config.home, '.local/bin'))) {
-    if (!d || d === CLIENTS_BIN) continue;
-    try {
-      fs.accessSync(path.join(d, cmd), fs.constants.X_OK);
-      return path.join(d, cmd);
-    } catch {}
-  }
-  return null;
+  if (/[\\/]/.test(cmd)) return WIN ? programFile(cmd) : fs.existsSync(cmd) ? cmd : null;
+  return which(cmd, withPath(agentBaseEnv(), [], [path.join(config.home, '.local', 'bin')]), (d) => d === CLIENTS_BIN);
 }
 
 /** Your own copy of a program, unless CLAUDE_BIN or CODEX_BIN names the one to run (that one is left as it is). */
@@ -149,18 +144,12 @@ export async function ensureCommand(cmd: string): Promise<string | null> {
   return install(cmd);
 }
 
-const CODEX_NATIVE: Record<string, [string, string]> = {
-  'linux-x64': ['codex-linux-x64', 'x86_64-unknown-linux-musl'],
-  'linux-arm64': ['codex-linux-arm64', 'aarch64-unknown-linux-musl'],
-  'darwin-x64': ['codex-darwin-x64', 'x86_64-apple-darwin'],
-  'darwin-arm64': ['codex-darwin-arm64', 'aarch64-apple-darwin'],
-};
 /** The Codex the app runs when nothing newer is installed: the one it came with (config.ts). */
 const firstCodexBin = config.codexBin;
 /** The native program of the app's own Codex copy, which the sessions run rather than its npm launcher. */
 function managedCodexNative(): string | null {
-  const t = CODEX_NATIVE[`${process.platform}-${process.arch}`];
-  const bin = t && path.join(CLIENTS_DIR, `node_modules/@openai/${t[0]}/vendor/${t[1]}/bin/codex`);
+  const t = CODEX_TARGET[`${process.platform}-${process.arch}`];
+  const bin = t && path.join(CLIENTS_DIR, `node_modules/@openai/${t[0]}/vendor/${t[1]}/bin/codex${EXE}`);
   return bin && fs.existsSync(bin) ? bin : null;
 }
 
@@ -185,7 +174,7 @@ function talk(bin: string, args: string[], env: Record<string, string>, first: o
   return new Promise((resolve) => {
     let err = '';
     let settled = false;
-    const proc = spawn(bin, args, { cwd: paths.probe, env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = spawnProgram(bin, args, { cwd: paths.probe, env, stdio: ['pipe', 'pipe', 'pipe'] });
     const finish = (why: string | null) => {
       if (settled) return;
       settled = true;

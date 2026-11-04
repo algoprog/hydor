@@ -1,18 +1,32 @@
-// The Mac app (mac/): when the server runs inside it, the app starts it with HYDOR_DESKTOP=mac and a message
-// channel (Node's IPC), starts it again whenever it exits (agents carry on, as with the Linux service), and
-// installs the new versions the server downloads (updates.ts). Elsewhere `desktop` is null.
+// The desktop apps (desktop/): when the server runs inside one, the app starts it with HYDOR_DESKTOP (mac, windows or
+// linux) and a message channel (Node's IPC), starts it again whenever it exits (agents carry on, as with the Linux
+// service), and installs the new versions the server downloads (updates.ts). Elsewhere `desktop` is null.
 //
 // The channel both ways: the server tells the app what to show (a new version ready, an agent using the Mac) and
 // what to do (install), asks it what only it can find out or do (macOS's permissions for computer use, and asking
-// for them), and hears what you chose in its menus (Restart to Update, Stop).
+// for them), and hears what you chose in its menus (Restart to Update, Stop) and, on Windows, that it should stop
+// (quit: Windows has no signal a program can catch for that).
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 
+export type DesktopPlatform = 'mac' | 'windows' | 'linux';
+/**
+ * How the app was installed, which decides how it updates: a Mac app (`app`), Windows' installer (`nsis`), an
+ * AppImage, the Linux .deb package; `dir` (an unpacked build) and `dev` do not update themselves.
+ */
+export type DesktopFormat = 'app' | 'nsis' | 'appimage' | 'deb' | 'dir' | 'dev';
+
 export interface Desktop {
-  /** The app's bundle, `/Applications/Hydor.app`. */
+  platform: DesktopPlatform;
+  format: DesktopFormat;
+  /** What opens the app: its bundle (`/Applications/Hydor.app`), Hydor.exe, the AppImage, or /opt/Hydor/hydor. */
   app: string;
-  /** Whether the app may replace itself: in a folder you can write to, not run from the disk image or a translocated copy. */
+  /**
+   * Whether the app may replace itself: a Mac app in a folder you can write to, not run from the disk image or a
+   * translocated copy; an AppImage in a folder you can write to; Windows' installer for your account; the .deb with
+   * your password (pkexec).
+   */
   updatable: boolean;
   /** Where updates are downloaded and unpacked. */
   cache: string;
@@ -20,21 +34,33 @@ export interface Desktop {
   updateError?: { from: string; to: string; error: string };
 }
 
+const PLATFORMS: DesktopPlatform[] = ['mac', 'windows', 'linux'];
+const FORMATS: DesktopFormat[] = ['app', 'nsis', 'appimage', 'deb', 'dir', 'dev'];
+
 function read(): Desktop | null {
-  if (process.env.HYDOR_DESKTOP !== 'mac' || !process.env.HYDOR_DESKTOP_APP) return null;
+  const platform = process.env.HYDOR_DESKTOP as DesktopPlatform;
+  if (!PLATFORMS.includes(platform) || !process.env.HYDOR_DESKTOP_APP) return null;
+  const given = process.env.HYDOR_DESKTOP_FORMAT as DesktopFormat;
+  // A Mac app from before the others came says no format.
+  const format = FORMATS.includes(given) ? given : platform === 'mac' ? 'app' : 'dir';
   let updateError: Desktop['updateError'];
   try {
     updateError = process.env.HYDOR_UPDATE_ERROR ? JSON.parse(process.env.HYDOR_UPDATE_ERROR) : undefined;
   } catch {}
   return {
+    platform,
+    format,
     app: process.env.HYDOR_DESKTOP_APP,
     updatable: process.env.HYDOR_DESKTOP_UPDATABLE === '1',
-    cache: process.env.HYDOR_DESKTOP_CACHE || path.join(os.homedir(), 'Library/Caches/Hydor'),
+    cache: process.env.HYDOR_DESKTOP_CACHE || (platform === 'mac' ? path.join(os.homedir(), 'Library/Caches/Hydor') : path.join(os.tmpdir(), 'hydor-cache')),
     updateError,
   };
 }
 
 export const desktop = read();
+
+/** The system's name, as the app's words say it. */
+export const SYSTEM_NAME: Record<DesktopPlatform, string> = { mac: 'Mac', windows: 'Windows', linux: 'Linux' };
 
 /** A notification from the Mac, with a button. */
 export interface DesktopNotice {
@@ -60,8 +86,8 @@ export type ToDesktop =
   | { type: 'computer'; active: boolean; title?: string }
   | ({ type: 'ask'; id: string } & DesktopAsk);
 
-/** Messages from the Mac app: Restart to Update (its menu, the notification), Stop (its menu, ⌘⇧Esc), and answers. */
-export type FromDesktop = { type: 'update-now' } | { type: 'computer-stop' } | { type: 'reply'; id: string; ok: boolean; error?: string; [k: string]: unknown };
+/** Messages from the app: Restart to Update (its menu, the notification), Stop (its menu, ⌘⇧Esc), quit (Windows), and answers. */
+export type FromDesktop = { type: 'update-now' } | { type: 'computer-stop' } | { type: 'quit' } | { type: 'reply'; id: string; ok: boolean; error?: string; [k: string]: unknown };
 
 export function tellDesktop(m: ToDesktop): boolean {
   if (!desktop || !process.send || !process.connected) return false;

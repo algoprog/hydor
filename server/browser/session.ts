@@ -389,8 +389,11 @@ export function reapStale() {
       if (cmd.includes(BROWSER_DIR)) process.kill(pid, 'SIGKILL');
     } catch {}
   }
-  fs.rmSync(PIDS, { force: true });
-  fs.rmSync(path.join(BROWSER_DIR, 'run'), { recursive: true, force: true });
+  // (Windows may still hold a file of a browser that has not quite ended: it goes next time.)
+  try {
+    fs.rmSync(PIDS, { force: true });
+    fs.rmSync(path.join(BROWSER_DIR, 'run'), { recursive: true, force: true });
+  } catch {}
 }
 
 const safeName = (n: string) => n.replace(/[/\\\0:*?"<>|]/g, '_').replace(/^\.+/, '_').slice(0, 150) || 'download';

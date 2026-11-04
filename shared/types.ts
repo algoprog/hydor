@@ -1213,8 +1213,11 @@ export interface UpdateResult {
 
 /** A newer version, and updating to it, for a copy installed from git with an upstream, or for the Mac app. */
 export interface UpdateState {
-  /** How this copy updates: from git, commit by commit, or the Mac app, release by release. */
+  /** How this copy updates: from git, commit by commit, or a desktop app, release by release. */
   kind?: 'git' | 'app';
+  /** A desktop app's system, and how it was installed (server/desktop.ts): what Settings says about updating it. */
+  platform?: 'mac' | 'windows' | 'linux';
+  format?: 'app' | 'nsis' | 'appimage' | 'deb' | 'dir' | 'dev';
   /** Commits behind the upstream at the last check (the Mac app: 1 when a newer release is out). */
   behind: number;
   /** The newest upstream commit's subject (the Mac app: the newest version). */
@@ -1341,6 +1344,8 @@ export interface StartupState {
   linger?: boolean;
   /** Whether it can be changed from here. */
   can: boolean;
+  /** A desktop app's login item: on which system (what Settings calls it). */
+  platform?: 'mac' | 'windows' | 'linux';
 }
 
 export interface MachineInfo {

@@ -3,6 +3,7 @@
 // refers to the file instead of carrying its bytes), and described by the app's helper model for a model
 // that does not see images.
 import { spawnSync } from 'node:child_process';
+import { which } from '../platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -66,15 +67,9 @@ export function imageSize(b: Buffer): { width: number; height: number } | null {
 let found: { magick?: string; ffmpeg?: string } | null = null;
 function converters() {
   if (found) return found;
-  const isFile = (p: string) => {
-    try {
-      return fs.statSync(p).isFile();
-    } catch {
-      return false;
-    }
-  };
-  const look = (n: string) => (process.env.PATH ?? '').split(':').filter(Boolean).map((dir) => path.join(dir, n)).find(isFile);
-  return (found = { magick: look('magick') ?? look('convert'), ffmpeg: look('ffmpeg') });
+  const look = (n: string) => which(n) ?? undefined;
+  // (Windows' own convert.exe changes a disk's file system: ImageMagick is magick there.)
+  return (found = { magick: look('magick') ?? (process.platform === 'win32' ? undefined : look('convert')), ffmpeg: look('ffmpeg') });
 }
 
 /** Scales an image down to `side` pixels on its longer side with what this machine has; null without a tool for it. */

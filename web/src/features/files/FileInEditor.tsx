@@ -11,7 +11,7 @@ import { editorKindOf, type FileOpened, type FileSaved } from '@shared/documents
 import { TEX_MAIN } from '@shared/latex';
 import type { Workbook } from '@shared/sheets';
 import { api, ApiError, put } from '../../lib/api';
-import { basename, dirname, tildify } from '../../lib/format';
+import { basename, dirname, isWinPath, tildify } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { filePath, go, useFilePeek } from '../../lib/nav';
 import { toast, useApp, useUI } from '../../lib/store';
@@ -283,7 +283,7 @@ export function FileInEditor({
   const textLabel = kind === 'tex' || delimited ? 'Edit as text' : 'Show as a preview';
   const textIcon = kind === 'tex' || delimited ? <FileCode2 size={14} /> : <Eye size={14} />;
   const unsaved = dirty && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />;
-  const crumbs = tildify(path, home).split('/');
+  const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
 
   const lead = mobile ? (
     <>

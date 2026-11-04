@@ -235,7 +235,7 @@ export function systemPrompt(o: {
     );
   }
   const git = gitBranch(o.cwd);
-  lines.push('', `Mode: ${MODE_TEXT[o.mode]}`, '', `Environment: folder ${o.cwd}${git ? ` (git branch ${git})` : ''}; ${os.type()} ${os.release()}; today is ${new Date().toISOString().slice(0, 10)}.`);
+  lines.push('', `Mode: ${MODE_TEXT[o.mode]}`, '', `Environment: folder ${o.cwd}${git ? ` (git branch ${git})` : ''}; ${os.type()} ${os.release()}; today is ${new Date().toISOString().slice(0, 10)}.${process.platform === 'win32' ? ' Commands run in Git for Windows\' bash, where C:\\Users is /c/Users; the file tools take Windows paths.' : ''}`);
   const ins = instructions(o.cwd);
   if (ins) lines.push('', 'Project instructions:', ins);
   // What the app's capabilities add (memory, the assistant's instructions…).

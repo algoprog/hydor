@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spill } from './spill.ts';
 import type { Tool, ToolCtx } from './tools.ts';
 import { shellEnv, stripAnsi, textContent } from './util.ts';
+import { bashCommand, killTree, killTreeSync } from '../platform.ts';
 
 export interface Proc {
   id: string;
@@ -42,8 +43,8 @@ export function startProc(command: string, o: { cwd: string; dir: string; sessio
   const log = path.join(folder, `${id}-${Date.now().toString(36)}.log`);
   const out = fs.createWriteStream(log, { mode: 0o600 });
   // Through the session's shell: the sandbox in Auto and Full modes, where it is on.
-  const sh = o.shell?.(command) ?? { cmd: '/bin/bash', args: ['-c', command] };
-  const child = spawn(sh.cmd, sh.args, { cwd: o.cwd, env: { ...shellEnv(), ...sh.env }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const sh: { cmd: string; args: string[]; env?: Record<string, string> } = o.shell?.(command) ?? bashCommand(command);
+  const child = spawn(sh.cmd, sh.args, { cwd: o.cwd, env: { ...shellEnv(), ...sh.env }, detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   const p: Proc = { id, session: o.session, command, pid: child.pid ?? 0, started: Date.now(), log, recent: '', total: 0, seen: 0, child, changed: new Set() };
   const add = (d: string) => {
     out.write(d);
@@ -110,15 +111,7 @@ export function unread(p: Proc, ctx: Pick<ToolCtx, 'dir' | 'maxOutput'>): string
 /** Stops a process and everything it started. */
 export async function stopProc(p: Proc): Promise<void> {
   if (p.ended !== undefined) return;
-  const kill = (sig: NodeJS.Signals) => {
-    try {
-      process.kill(-p.pid, sig);
-    } catch {
-      try {
-        p.child.kill(sig);
-      } catch {}
-    }
-  };
+  const kill = (sig: NodeJS.Signals) => killTree(p.pid, sig);
   kill('SIGTERM');
   await settle(p, 3000);
   if (p.ended === undefined) {
@@ -130,10 +123,7 @@ export async function stopProc(p: Proc): Promise<void> {
 /** On exit, nothing is left running. */
 process.on('exit', () => {
   for (const p of procs.values())
-    if (p.ended === undefined)
-      try {
-        process.kill(-p.pid, 'SIGKILL');
-      } catch {}
+    if (p.ended === undefined) killTreeSync(p.pid, 'SIGKILL');
 });
 
 const pick = (a: any, ctx: ToolCtx) => {
