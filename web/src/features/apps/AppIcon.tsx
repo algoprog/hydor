@@ -2,6 +2,7 @@
 import {
   AppWindow,
   BookOpen,
+  Compass,
   Bot,
   Briefcase,
   Calculator,
@@ -96,6 +97,7 @@ export const ICONS: Record<string, LucideIcon> = {
   'trending-up': TrendingUp,
   'map-pin': MapPin,
   history: History,
+  compass: Compass,
 };
 
 export function AppIcon({ icon, color, size = 40, className }: { icon: string; color: string; size?: number; className?: string }) {

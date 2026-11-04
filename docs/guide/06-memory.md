@@ -176,15 +176,15 @@ Under **Tidy up each night**, a line reports the last tidy-up:
 
 - **Search**: the field at the top ("Search the notes", or "Search the notes, by words or meaning" when search by meaning is ready) finds notes with every word you type, the last one as the start of a word, and with search by meaning on, notes that mean the same. The best come first. Escape clears it.
 - **Tabs**: **All**, **About you**, **Projects** and **Sessions**. Where there is room, each shows its count.
-- **Groups**: notes come grouped by place: About you first, then each project (its folder's name and path), then the sessions' notes together, each naming its session (click the name to open the session). Each group shows how many notes it holds. A project's profile comes first, then its topics, then its notes, newest change first; when you search, the best match comes first.
+- **Groups**: notes come grouped by place: About you first, then each project (its folder's name and path), then the sessions' notes together, each naming its session (click the name to open the session). Each group shows how many notes it holds. A project's profile comes first, then its topics, then its notes, newest change first; when you search, the best match comes first. Under **All**, each group shows its first three notes, with **Show 12 more** (or however many there are) under them, and **Show fewer** to fold them again; in one place's tab, in a search and in the lists to review, the first ten.
 - When some notes have gone unused for months, a line above the list says how many, with **Review** (see [Notes no agent needed lately](/guide/memory#notes-no-agent-needed-lately)).
 - At the bottom of the list: **Deleted notes**, **Export** and **Clear all…** (below).
 
-Each note shows its text (with a **Topic** or **Profile** badge when it is one) and a line under it:
+Each note shows the first two lines of its text (with a **Topic** or **Profile** badge when it is one) and a line under it. Click a note, or press Enter on it, to read it whole, with who wrote it and where; click it again to fold it. The line under it says:
 
-- **Added** and when, or **Changed** and when if it changed since, and who did it: **by you**, **by an agent** or **by the helper** (the tidy-up). Point at the time to see the exact dates.
-- **in** the session it came from, which you can click to open.
-- For a topic or profile, how many notes it **sums up**.
+- **Added** and when, or **Changed** and when if it changed since, and, once the note is open, who did it: **by you**, **by an agent** or **by the helper** (the tidy-up). Point at the time to see the exact dates.
+- Once the note is open, **in** the session it came from, which you can click to open.
+- For a topic or profile, once it is open, how many notes it **sums up**.
 - **needed** once or N times: how often an agent got it as bearing on a request, or found it by looking it up. Point at it to see when last.
 - **until** a date, when it has an end date.
 

@@ -25,7 +25,7 @@ The page is headed **Apps**, with two tabs: **Agent apps**, the apps this topic 
 
 - A short note on what apps are, in three parts: **Open it here**, **Or just ask in any chat** and **One job each**. **Got it** (✕) puts it away; **What are apps?**, beside the search box, brings it back.
 - **Find an app**: a box that narrows the apps by their names, descriptions and kinds as you type, and under it chips for their kinds (**All**, then each kind, the ready-made apps' first).
-- **Pick up where you left off**: your latest runs (four, with **All** for up to six), with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead. Click one to open it.
+- **Pick up where you left off**: your latest runs (four, with **All** for up to six), with the answers they were given, how they stand and when they ended. Runs from rows of a CSV and from public pages stay under their own app instead, as do those of an app that opens on its own page (Explore), which shows its latest there. Click one to open it.
 - **Your own apps**: the ones you made or installed from a file, and the **Make an app** tile, which opens a new app.
 - **Ready-made apps**: the ones that come with Hydor, installed, under their kinds (**Research**, **Planning**, **Shopping**, **Weather**, **Sports**, **Food**, **Fun** and the rest). Each card, yours too, has its icon, name and description, **Its own view** when its answer opens in a view of its own (maps, charts, tables), **Works in chats** when agents run it for you in your sessions, **Public** when its public page is open, and when it last ran. Its **More** (⋯, at its top right; on a computer it shows when you point at the card) has **Open** and **Download as a file**. When nothing matches what you typed, the page says "No app does that yet", with **Describe it to an agent**, which starts the App builder with your words.
 - **Ready-made apps to install**: there once you uninstall a ready-made app. Each card shows its kind, what it does and what you get from it (the pages of its view, such as the Trip planner's **Your trip**, **Day by day**, **Book ahead** and **Budget**), and **Install** (see [Install or uninstall a ready-made app](#install-or-uninstall-a-ready-made-app)).
@@ -72,6 +72,18 @@ The apps for everyday things are smaller and quicker: they get real data from fr
 - **Explore a place**: what is around any place, on a map: sights, museums, parks and landmarks with a picture and a line each, the best for you picked out and put in walking order. Its view has **The walk** (the stops numbered and joined on the map, each to mark seen; **The weather there**) and **Everything around** (show one kind).
 
 You can't change a ready-made app itself. To adjust one, open it and press **Make it mine** (on a phone, **Edit**): the builder opens with a copy that becomes your own app when you create it.
+
+### Explore
+
+**Explore** is a magazine made for you: articles and recent news on what you work on and care about. Open it from **Explore** at the top right of the start page, or from the Apps page. It has no form to fill in each time: it opens on its own page, on its latest edition, and agents don't run it in your sessions.
+
+- **How it picks**: it reads your profile, the notes memory keeps about you and the titles of your latest sessions (leaving out sessions with memory off, the sessions agents start for parts of their work, and app runs nobody watched), and has the helper model choose about six topics you would enjoy now: about half from your work and half from the rest of your life, never anything private. For each, it searches news sites for stories of the past two weeks and looks for long reads (explainers, analyses, essays), reads the best pages side by side, sums each one up and finds its picture. A site that keeps programs out is summed up from what the search showed of it. An edition takes a minute or two.
+- **An edition**: its date and cover line, a note from the editor, the topics (click one to show only its stories, **Everything** for all), the cover story, then a section for each topic. Each story has its picture, **News** or **Long read**, its source and date, what it says, and why it is in your edition. Click its picture or headline to read it on its site: it is then marked **✓ Read**, in later editions too. **Dig deeper** starts a deep research report on it. Under the edition, **Earlier** lists the ones before it, each opening as it was.
+- **Update**, at the top, makes a new edition now. While it works, a line says what it is doing, with **Follow it**, and the edition you have stays until the new one is ready. Before the first one, **Make the first one** does the same.
+- **Settings**, the sliders beside **Update**: **Update every day** (off until you turn it on) has a new edition ready each morning, at the time under it (07:00 unless you change it). It is a [scheduled task](/guide/tasks), so Settings → Scheduled tasks lists it too; turning it off removes it. Below it, **Recent sessions to read** (how many of your latest sessions' titles it reads: 1,000 unless you change it, at most 1,000), **Also cover** (topics always in it, one a line) and **Leave out** (topics or sites to skip, between commas). **Save** keeps them for every update, the daily ones included.
+- **Make it mine** and **Uninstall** are in its **More** (⋯) menu.
+
+Each edition asks the helper model about twenty quick questions and searches the web a dozen times; with Claude Code signed in, the questions come out of your plan.
 
 ### Install or uninstall a ready-made app
 
@@ -488,7 +500,7 @@ In an app's **Edit**, the **Design** tab shows its view with its latest run's an
 - **Change it as code**: the view as JSON, its pages, elements (HTML with values such as `{{result.days}}`, and CSS) and events, as the guide's API topic describes them ([Apps: views](/guide/api#apps-views)); the preview follows what you type.
 - **Remove its view**: its answer shows as a plain card again once you save.
 
-A view's events can go to a page (with the item clicked), tick something off or set a filter (kept with the run when it says so), copy, open an address, ask the run's agent for a change (an app without steps), run one of its other flows, run it again with some answers changed, start another app, and add, change or remove a record it keeps. Pages marked for the app's own page show there in place of its form, with what it keeps and its latest run. A view is part of the app: it has versions with it, travels in its file, and its elements are files of its own in its folder (ui/).
+A view's events can go to a page (with the item clicked), tick something off or set a filter (kept with the run when it says so), copy, open an address, ask the run's agent for a change (an app without steps), run one of its other flows, run it again with some answers changed, start another app, and add, change or remove a record it keeps. Pages marked for the app's own page show there in place of its form, with what it keeps and its latest run. Such a page has **Update** at its top, which runs the app now, and **Settings** beside it: the answers of its form, kept for those runs, and **Update every day**, as [Explore](#explore) has. A view is part of the app: it has versions with it, travels in its file, and its elements are files of its own in its folder (ui/).
 
 Besides its own elements, a view has built-in ones: text, lists to tick off, tables and bar charts, and these for media:
 
@@ -552,3 +564,4 @@ Agents in Hydor can make and run apps for you through its API, with your OK on a
 - "In my Price check app's view, add a button on each shop that runs it again for that shop only."
 - "Firm up my Link digest app, and try it on its examples first."
 - "Make the Look up its title step of my Link digest hand its work to an agent when it fails."
+- "Have Explore make a new edition every morning at 6:30, always with Formula 1 in it."

@@ -802,6 +802,51 @@ test('search_sessions: messages only by default, sessions with memory off left o
   await assert.rejects(read.run({ key: 'claude:private' }, ctx), /memory turned off/);
 });
 
+test('user_profile: only an app step has it; the profile, notes about the user and the latest titles, newest first, each once, without sessions kept out', async () => {
+  const day = 86_400_000;
+  const now = Date.now();
+  // Only this test's sessions (the ones before it leave theirs).
+  db.prepare('delete from sessions').run();
+  db.prepare('delete from app_sessions').run();
+  const ses = db.prepare("insert into sessions (key, agent, id, path, title, first_prompt, cwd, updated_at, hidden) values (?, 'claude', ?, '', ?, ?, ?, ?, ?)");
+  const app = db.prepare('insert into app_sessions (key, agent, title, archived, extra, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)');
+  ses.run('claude:t1', 't1', 'Weekend trip to Lisbon', null, plain, now - 2 * day, 0);
+  ses.run('claude:t2', 't2', null, 'How do transformers work?', plain, now - 3 * day, 0);
+  ses.run('claude:t3', 't3', 'Daily brief · Nov 3, 07:00', null, plain, now - day, 0);
+  ses.run('claude:t4', 't4', 'Daily brief · Nov 2, 07:00', null, plain, now - 2 * day, 0);
+  ses.run('claude:sub', 'sub', 'A subagent', null, plain, now, 1);
+  ses.run('claude:off', 'off', 'Private matter', null, plain, now, 0);
+  ses.run('claude:kid', 'kid', 'Child work', null, plain, now, 0);
+  ses.run('claude:run', 'run', 'Explore · 1000', null, plain, now, 0);
+  setSessionExtra(db, 'claude:off', { memory: false });
+  setSessionExtra(db, 'claude:kid', { parent: 'claude:t1' });
+  app.run('claude:run', 'claude', null, 1, JSON.stringify({ app: { id: 'tpl:explore', run: 'r1', name: 'Explore' } }), now, now);
+  // Started here and not indexed yet.
+  app.run('acp:fresh', 'acp', 'Formula 1 season', 0, null, now - 1000, now - 1000);
+  saveProfile(db, 'Builds AI agents.\nLikes games and travel.', { source: 'user' });
+  store.addEntry(db, { scope: 'global', scopeKey: '', text: 'The user follows Formula 1.' }, { source: 'user' });
+  const deps = { db, broadcast() {} } as unknown as RunCtx['deps'];
+  const agent: RunCtx = { runId: 'r3', key: 'claude:asker', agent: 'claude', cwd: plain, deps };
+  assert.ok(!memoryTools(agent).some((t) => t.name === 'user_profile'), 'agents in sessions do not get it');
+  const step: RunCtx = { runId: 'flow-r4', key: 'acp:flow-r4', agent: 'acp', cwd: plain, deps, step: true };
+  const tool = memoryTools(step).find((t) => t.name === 'user_profile')!;
+  const out = JSON.parse(String(await tool.run({ sessions: 10 }, step)));
+  assert.equal(out.profile, 'Builds AI agents.\nLikes games and travel.');
+  assert.deepEqual(out.notes, ['The user follows Formula 1.']);
+  assert.deepEqual(
+    out.sessions.map((x: { title: string; days: number; times: number }) => [x.title, x.days, x.times]),
+    [
+      ['Formula 1 season', 0, 1],
+      ['Daily brief · Nov 3, 07:00', 1, 2],
+      ['Weekend trip to Lisbon', 2, 1],
+      ['How do transformers work?', 3, 1],
+    ],
+  );
+  assert.equal(out.count, 4);
+  assert.equal(JSON.parse(String(await tool.run({ sessions: 2, notes: 0 }, step))).sessions.length, 2, 'as many as asked');
+  assert.deepEqual(JSON.parse(String(await tool.run({ sessions: 2, notes: 0 }, step))).notes, []);
+});
+
 // ---- run ---------------------------------------------------------------------------------------------
 
 for (const [name, fn] of tests) {

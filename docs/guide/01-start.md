@@ -92,6 +92,8 @@ That is their usual order. To change it, drag a tool to another place among them
 
 On a computer, a line under the box reminds you: "Enter to start · Shift+Enter for a new line". Below it, **Today** sums up the day so far (lines changed, tokens, prompts, sessions); click it for the Activity page. When an agent's plan has run out of usage, a banner above the box says so and when it resets. On a phone, **Recent** lists your six latest sessions under the box.
 
+At the top right, **Explore** opens a magazine made for you: articles and recent news on what you work on and care about, picked from your profile and your latest sessions (see [Explore](/guide/apps#explore)). A dot on it means a new edition is ready that you haven't opened yet.
+
 Everything on the start page is explained in [Start a session](/guide/sessions#start-a-session).
 
 ## Start your first session

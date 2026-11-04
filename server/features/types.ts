@@ -37,6 +37,8 @@ export interface RunCtx {
   signal?: AbortSignal;
   /** Where a notice about this work opens and what it is called, when that is not its session (a template run's tool step). */
   notice?: { url: string; title: string };
+  /** An app's step calls the tool, not an agent: the tools made for steps alone are there too (user_profile). */
+  step?: boolean;
 }
 
 /** A tool's answer: text, and images for the agents that take them (a screenshot). */

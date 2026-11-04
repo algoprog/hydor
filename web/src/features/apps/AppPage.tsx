@@ -3,7 +3,7 @@
 // may run it. A template runs as it is, with the agent and model picked here, or becomes an app of your own;
 // one you uninstalled shows what it is, to install it again.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppWindow, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { AppWindow, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Plus, RefreshCw, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
 import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
 import { appInfo } from '@shared/app-manifest';
@@ -16,12 +16,12 @@ import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { EffortPicker, ModelPicker, ModePicker, modelLabel, useCatalog } from '../../components/AgentPickers';
-import { Button, cx, Empty, IconButton, MenuItem, Popover, Section, Tabs, Throbber, useConfirm } from '../../components/ui';
+import { Button, cx, Empty, IconButton, inputCls, MenuItem, Popover, Section, SheetsOnPhone, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
 import { AgentsCard, AppAbout } from './About';
 import { AppKeys, AppKeysCard, emptyKeys, keysBody, keysMissing, type KeyInput, type KeyState } from './AppKeys';
-import { appPath, money, runPath, SOURCE_LABEL, useRunEvents, type AppDetail, type RunDetail } from './api';
+import { appPath, money, runPath, SOURCE_LABEL, useRunDetail, useRunEvents, type AppDetail, type HomeSettings, type RunDetail } from './api';
 import { AppIcon } from './AppIcon';
 import { BatchTab } from './Batch';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
@@ -33,6 +33,8 @@ import { AppView } from './View';
 import { Schedules } from './Schedules';
 import { ShareTab } from './Share';
 import { tr } from '../../i18n/runtime';
+import { LOCALE } from '../../i18n/locale';
+import { EXPLORE_ID, sawExplore } from '../home/ExploreButton';
 
 type Tab = 'run' | 'runs' | 'rows' | 'share';
 
@@ -308,26 +310,271 @@ function NotInstalled({ id, t, onInstalled }: { id: string; t: AppTemplate; onIn
 }
 
 /**
- * The app's own page in its view (its pages with on: "app"), in place of its form: what it keeps, its latest run
- * of its main flow (`last`), and its events, with everything an owner's page may do.
+ * An app that opens on its own page (its view's "app" pages): its latest finished run of its main flow, which the view
+ * shows; the one working now; the latest one that did not finish, when it came after; and the earlier finished ones.
  */
-function HomeView({ app, view }: { app: AppDef; view?: Record<string, unknown> }) {
-  const [last, setLast] = useState<AppRun | null | undefined>(undefined);
-  const load = () => api<{ runs: AppRun[] }>(`/api/apps/${enc(app.id)}/runs`).then((r) => setLast(r.runs.find((x) => x.status === 'done' && !x.flow && !x.parent && x.source !== 'chat') ?? null), () => setLast(null));
+interface OwnPage {
+  /** Its latest finished run (undefined: not known yet, null: none). */
+  last: AppRun | null | undefined;
+  active: AppRun | null;
+  failed: AppRun | null;
+  earlier: AppRun[];
+  reload: () => Promise<void>;
+}
+
+function useOwnPage(id: string, on: boolean): OwnPage {
+  const [runs, setRuns] = useState<AppRun[] | null>(null);
+  const load = () =>
+    api<{ runs: AppRun[] }>(`/api/apps/${enc(id)}/runs`).then(
+      (r) => setRuns(r.runs.filter((x) => !x.flow && !x.parent && x.source !== 'chat')),
+      () => setRuns([]),
+    );
   useEffect(() => {
-    void load();
-  }, [app.id]);
-  useRunEvents((r) => r.app === app.id && !r.flow && !r.parent && r.status === 'done' && void load());
-  const info = useMemo(() => appInfo(app.id, app), [app]);
-  if (last === undefined)
+    if (on) void load();
+  }, [id, on]);
+  useRunEvents((r) => on && r.app === id && !r.flow && !r.parent && void load());
+  return useMemo(() => {
+    if (!runs) return { last: undefined, active: null, failed: null, earlier: [], reload: load };
+    const done = runs.filter((r) => r.status === 'done');
+    const last = done[0] ?? null;
+    const active = runs.find((r) => isActive(r.status)) ?? null;
+    const ended = runs.find((r) => !isActive(r.status)) ?? null;
+    const failed = ended && ended.status !== 'done' && (!last || ended.createdAt > last.createdAt) ? ended : null;
+    return { last, active, failed, earlier: done.slice(1, 6), reload: load };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runs]);
+}
+
+/** What a run is doing now, in a line: its step running, else how it stands. */
+function NowLine({ id, template }: { id: string; template: boolean }) {
+  const { d } = useRunDetail(id);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const step = [...(d?.progress.steps ?? [])].reverse().find((x) => x.status === 'running')?.title;
+  const since = d?.run.startedAt ?? d?.run.createdAt;
+  const secs = since ? Math.max(0, Math.round((Date.now() - since) / 1000)) : 0;
+  return (
+    <span className="min-w-0 truncate">
+      {step ? (template ? tr(step) : step) : d?.run.status === 'queued' ? 'Waiting its turn' : 'Starting'}
+      {since ? ` · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : ''}
+    </span>
+  );
+}
+
+/** A run of an app's main flow from its own page, with the answers kept as its settings. */
+async function runFromPage(id: string, home: HomeSettings | undefined, after: () => void) {
+  try {
+    await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: home?.inputs ?? {}, source: 'screen' });
+    after();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+/** Update, at the top of an app's own page: runs it now with its settings; while it works, it says so. */
+function UpdateButton({ id, own, home }: { id: string; own: OwnPage; home?: HomeSettings }) {
+  const [busy, setBusy] = useState(false);
+  const working = !!own.active || busy;
+  // Before its first run, the page itself offers to make it.
+  if (!own.last && !working) return null;
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      icon={working ? <Throbber /> : <RefreshCw size={14} />}
+      disabled={working}
+      title={own.last ? `Last updated ${timeAgo(own.last.endedAt ?? own.last.createdAt)} ago` : undefined}
+      onClick={() => (setBusy(true), void runFromPage(id, home, own.reload).finally(() => setBusy(false)))}
+    >
+      <span className="max-sm:hidden">{working ? 'Updating…' : 'Update'}</span>
+    </Button>
+  );
+}
+
+/** Its settings: Update every day (and when), then its form's answers, which each update takes. */
+function HomeSettingsPanel({ id, recipe, template, home, onSaved }: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void }) {
+  const [values, setValues] = useState<FormValues>(() => ({ ...initialValues(recipe.fields), ...home.inputs }));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const changed = recipe.fields.some((f) => String(values[f.id] ?? '') !== String(home.inputs[f.id] ?? ''));
+  const save = async (body: Record<string, unknown>) => {
+    setSaving(true);
+    try {
+      const r = await put<{ home: HomeSettings }>(`/api/apps/${enc(id)}/home`, body);
+      onSaved(r.home);
+      return true;
+    } catch (e) {
+      toastError(e);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+  const fields = recipe.fields.filter((f) => f.type !== 'file');
+  return (
+    <div className="px-1 pt-1 pb-1">
+      <div className="flex items-start gap-3 px-2 py-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-[13.5px] font-medium">Update every day</div>
+          <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{home.daily.on ? 'A new one is ready for you each morning; it shows in Scheduled tasks too.' : 'Off: it changes only when you press Update.'}</div>
+        </div>
+        <Switch label="Update every day" on={home.daily.on} disabled={saving} onChange={(on) => void save({ daily: { on } })} />
+      </div>
+      {home.daily.on && (
+        <label className="flex items-center gap-3 px-2 pb-2.5 text-[13px] text-fg-2">
+          <span className="flex-1">At</span>
+          <input type="time" value={home.daily.time} disabled={saving} onChange={(e) => /^\d{2}:\d{2}$/.test(e.target.value) && void save({ daily: { time: e.target.value } })} className={cx(inputCls, 'h-8 w-[7.5rem] text-[13px]')} />
+        </label>
+      )}
+      {fields.length > 0 && (
+        <div className="mt-1 border-t border-line px-2 pt-3 pb-1">
+          <AppForm
+            fields={fields}
+            values={values}
+            files={{}}
+            errors={errors}
+            disabled={saving}
+            onChange={(k, v) => (setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))}
+            onFile={() => {}}
+          />
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <span className="flex-1 text-[12px] leading-snug text-fg-3">Each update uses these.</span>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={!changed || saving}
+              onClick={async () => {
+                const errs = formErrors(fields, values, {});
+                setErrors(errs);
+                if (Object.keys(errs).length) return;
+                if (await save({ inputs: Object.fromEntries(fields.map((f) => [f.id, String(values[f.id] ?? '')])) })) toast('Saved', 'ok');
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The settings button at the top of an app's own page, and their panel. */
+function HomeSettingsButton(props: { id: string; recipe: AppDef | AppTemplate; template: boolean; home: HomeSettings; onSaved: (h: HomeSettings) => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <IconButton label="Settings" ref={ref} active={open} onClick={() => setOpen((o) => !o)}>
+        <SlidersHorizontal size={16} />
+      </IconButton>
+      <SheetsOnPhone.Provider value>
+        <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" width={340} title="Settings">
+          <HomeSettingsPanel {...props} />
+        </Popover>
+      </SheetsOnPhone.Provider>
+    </>
+  );
+}
+
+/** The first answer of a run that reads as a line (an edition's cover line), for the list of earlier ones. */
+function firstLine(recipe: AppDef | AppTemplate, r: AppRun): string {
+  for (const f of recipe.answer) {
+    const v = r.result?.[f.id];
+    if (f.type === 'text' && typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return '';
+}
+
+/**
+ * The app's own page in its view (its pages with on: "app"), in place of its form: what it keeps, its latest run of
+ * its main flow (`last`), and its events, with everything an owner's page may do. Above it, the run working now; with
+ * no run yet, what it is and a button that makes the first; under it, the earlier ones.
+ */
+function HomeView({ id, recipe, template, view, home, own, onHome }: { id: string; recipe: AppDef | AppTemplate; template: boolean; view?: Record<string, unknown>; home?: HomeSettings; own: OwnPage; onHome: (h: HomeSettings) => void }) {
+  const info = useMemo(() => appInfo(id, recipe), [id, recipe]);
+  const [starting, setStarting] = useState(false);
+  if (own.last === undefined)
     return (
       <div className="flex justify-center py-20 text-fg-3">
         <Throbber size={28} />
       </div>
     );
+  const working = own.active && (
+    <div className="mb-5 flex items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3 text-[13px]">
+      <Throbber className="shrink-0 text-accent" />
+      <span className="shrink-0 font-medium">{own.last ? 'Updating' : 'Making the first one'}</span>
+      <span className="flex min-w-0 flex-1 text-fg-3">
+        <NowLine id={own.active.id} template={template} />
+      </span>
+      <button type="button" onClick={() => go(runPath(own.active!.id))} className="shrink-0 text-[12.5px] font-medium text-accent hover:underline">
+        Follow it
+      </button>
+    </div>
+  );
+  const failed = !own.active && own.failed && (
+    <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-warn/30 bg-warn/8 px-4 py-3 text-[13px] text-fg-2">
+      <TriangleAlert size={15} className="mt-0.5 shrink-0 text-warn" />
+      <span className="min-w-0 flex-1">
+        {own.failed.status === 'stopped' ? 'The last update was stopped.' : `The last update did not finish${own.failed.error ? `: ${own.failed.error}` : '.'}`}{' '}
+        <button type="button" onClick={() => go(runPath(own.failed!.id))} className="font-medium text-accent hover:underline">
+          See what happened
+        </button>
+      </span>
+    </div>
+  );
   return (
-    <div className="mx-auto max-w-[920px] px-4 py-6 sm:px-6">
-      <AppView ui={app.ui!} name={app.name} description={app.description} appId={app.id} on="app" last={last} answer={app.answer} view={view} info={info} can={['keep', 'run', 'start', 'data']} assets={app.assets} />
+    <div className="mx-auto max-w-[1040px] px-4 py-6 sm:px-6">
+      {working}
+      {failed}
+      {own.last ? (
+        <AppView ui={recipe.ui!} name={recipe.name} description={recipe.description} appId={id} on="app" last={own.last} answer={recipe.answer} view={view} info={info} can={['keep', 'run', 'start', 'data']} assets={recipe.assets} translate={template} />
+      ) : (
+        !own.active && (
+          <div className="mx-auto flex max-w-[560px] flex-col items-center py-10 text-center sm:py-16">
+            <AppIcon icon={recipe.icon} color={recipe.color} size={64} />
+            <h2 className="mt-4 text-[22px] font-semibold tracking-tight" translate={template ? undefined : 'no'}>
+              {recipe.name}
+            </h2>
+            <p className="mt-1.5 text-[14.5px] leading-relaxed text-fg-2" translate={template ? undefined : 'no'}>
+              {recipe.description}
+            </p>
+            <Button variant="primary" icon={starting ? <Throbber /> : <Play size={14} fill="currentColor" />} disabled={starting} className="mt-6 h-10 px-5" onClick={() => (setStarting(true), void runFromPage(id, home, own.reload).finally(() => setStarting(false)))}>
+              Make the first one
+            </Button>
+            {home && (
+              <label className="mt-5 flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2.5 text-left">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-medium">Update every day</span>
+                  <span className="block text-[12px] text-fg-3">{home.daily.on ? `A new one at ${home.daily.time} each day` : 'A new one ready for you each morning'}</span>
+                </span>
+                <Switch label="Update every day" on={home.daily.on} onChange={(on) => void put<{ home: HomeSettings }>(`/api/apps/${enc(id)}/home`, { daily: { on } }).then((r) => onHome(r.home), toastError)} />
+              </label>
+            )}
+          </div>
+        )
+      )}
+      {own.earlier.length > 0 && (
+        <section className="mt-8 border-t border-line pt-4">
+          <h3 className="mb-1 text-[12px] font-semibold tracking-wide text-fg-3 uppercase">Earlier</h3>
+          <ul>
+            {own.earlier.map((r) => (
+              <li key={r.id}>
+                <button type="button" onClick={() => go(runPath(r.id))} className="-mx-2 flex w-[calc(100%+1rem)] items-baseline gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-bg-1">
+                  <span className="w-28 shrink-0 text-[12.5px] text-fg-3">{new Date(r.endedAt ?? r.createdAt).toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13.5px]" translate="no">
+                    {firstLine(recipe, r) || inputsLine(recipe.fields, r.inputs, 80) || '—'}
+                  </span>
+                  <ChevronRight size={14} className="shrink-0 self-center text-fg-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
@@ -423,6 +670,16 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
       toastError(e);
     }
   };
+  // An app that opens on its own page (its view's "app" pages, as Explore's magazine): there in place of its form,
+  // with Update and its settings at the top.
+  const ownPage = !!recipe && installed && tab === 'run' && !again && pagesFor(recipe.ui, 'app').length > 0;
+  const own = useOwnPage(id, ownPage);
+  // Seen: the start page's Explore shows no dot for the edition you are looking at.
+  useEffect(() => {
+    if (id === EXPLORE_ID && own.last) sawExplore();
+  }, [id, own.last]);
+  const [home, setHome] = useState<HomeSettings | undefined>(undefined);
+  useEffect(() => setHome(d?.home), [d]);
   // Whether agents in your sessions may run it: the switch beside its form.
   const agentsOn = template ? d?.agents !== false : d?.app?.agents !== false;
   const agentsCard = recipe && installed && (
@@ -455,14 +712,24 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
           (template ? (
             installed && (
               <>
-                <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`/apps/new?template=${enc(id.slice(4))}`)}>
-                  <span className="max-sm:hidden">Make it mine</span>
-                  <span className="sm:hidden">Edit</span>
-                </Button>
+                {ownPage && <UpdateButton id={id} own={own} home={home} />}
+                {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template home={home} onSaved={setHome} />}
+                {/* On its own page, Make it mine waits in the menu: Update and Settings are what it is for. */}
+                {!ownPage && (
+                  <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`/apps/new?template=${enc(id.slice(4))}`)}>
+                    <span className="max-sm:hidden">Make it mine</span>
+                    <span className="sm:hidden">Edit</span>
+                  </Button>
+                )}
                 <IconButton label="More" ref={more} onClick={() => setMenu((m) => !m)}>
                   <MoreHorizontal size={17} />
                 </IconButton>
                 <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={220}>
+                  {ownPage && (
+                    <MenuItem icon={<Pencil size={15} />} onClick={() => (setMenu(false), go(`/apps/new?template=${enc(id.slice(4))}`))}>
+                      Make it mine
+                    </MenuItem>
+                  )}
                   <MenuItem icon={<Trash2 size={15} />} danger onClick={uninstall}>
                     Uninstall
                   </MenuItem>
@@ -471,6 +738,8 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
             )
           ) : (
             <>
+              {ownPage && <UpdateButton id={id} own={own} home={home} />}
+              {ownPage && home && <HomeSettingsButton id={id} recipe={recipe} template={false} home={home} onSaved={setHome} />}
               <Button size="sm" icon={<Pencil size={14} />} onClick={() => go(`${appPath(id)}/edit`)}>
                 Edit
               </Button>
@@ -567,8 +836,8 @@ export function AppPage({ id, tab, again }: { id: string; tab: Tab; again?: stri
             {/* Its view's own page, or its screen, in place of its form (the form comes back to run again with earlier answers). */}
             {template && !installed && d?.template ? (
               <NotInstalled id={id} t={d.template} onInstalled={load} />
-            ) : tab === 'run' && d?.app && pagesFor(d.app.ui, 'app').length > 0 && !again ? (
-              <HomeView app={d.app} view={d.view} />
+            ) : ownPage ? (
+              <HomeView id={id} recipe={recipe} template={template} view={d?.view} home={home} own={own} onHome={setHome} />
             ) : tab === 'run' && d?.app?.screens?.main && !again ? (
               <div className="h-full min-h-[420px]">
                 <AppScreen app={d.app} />

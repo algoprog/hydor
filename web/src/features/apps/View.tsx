@@ -124,7 +124,8 @@ export function AppView({
         case 'keep': {
           need('keep');
           const body = { name: text(a.name, 250), value: a.value ?? null };
-          if (on === 'app') return saved ? (await put<{ view: unknown }>(`/api/apps/${enc(appId)}/view`, body)).view : null;
+          // The app's own page keeps it with the app, a ready-made one's too (Explore's stories read).
+          if (on === 'app') return appId !== 'test' && !publicView ? (await put<{ view: unknown }>(`/api/apps/${enc(appId)}/view`, body)).view : null;
           return run ? (await put<{ view: unknown }>(`/api/apps/runs/${enc(run.id)}/view`, body)).view : null;
         }
         case 'ask': {

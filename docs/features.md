@@ -14,6 +14,10 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   session shows it, and it becomes the session as soon as the agent is up, with no loading in between; if it
   can't start, the page says why and your message goes back in the start page's box. Pages, tabs, menus and
   dialogs open at once, with no fade.
+- Sessions name themselves: a moment after one starts with a request, the helper model gives it a title of a few
+  words ("Weekend trip to Lisbon"), shown in the sidebar, the header and the search box instead of the start of the
+  message, and passed to Claude Code and Codex for their own lists. Nothing shows in the conversation; sessions
+  started together with the same request share one title; a title you give it with Rename always stays.
 - Switch models or assistants mid-session; the model menu lists the session's own agent's models, and another
   assistant applies from your next message, the conversation carrying on. "Continue in Codex" (or
   Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
@@ -81,7 +85,8 @@ agents that speak ACP and take MCP servers.
   own computer (on a GPU, or on the CPU in about 1.5 GB, only while needed), then the latest. Each night the helper
   model tidies memory up: it merges notes that say the same thing and, when there are more than fit, sums related
   ones up in topics and, for a project, a short profile; every change can be undone.
-  Settings → Memory lists every note with when it was written, changed and last needed, lets you add your
+  Settings → Memory lists every note with when it was written, changed and last needed (each place its three
+  newest first, with Show N more; each note two lines until you open it), lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
   Agents can also look up earlier sessions.
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
@@ -187,8 +192,16 @@ agents that speak ACP and take MCP servers.
   use it switch keeps agents from running it, and blocks and apps made for their own page stay out. An app's page has its form beside what you get, its latest
   runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
   ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
-  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). Beside those ten
-  come sixteen small, quick apps for everyday things that get real data from free services, no key needed, and show it
+  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). Explore, one
+  click from the top right of the start page, is a magazine made for you: it reads your profile, memory's notes about
+  you and the titles of up to 1,000 of your latest sessions, has the helper model pick about six topics you would
+  enjoy (half from your work, half from the rest of your life), finds each one's news of the past two weeks and long
+  reads, reads the best pages side by side and lays them out as an edition with a cover line, a cover story and a
+  section for each topic, each story with its picture, what it says and why it is there (opening one marks it read;
+  Dig deeper starts a research report on it). It opens on its own page rather than in chats, with Update and its
+  settings at the top: Update every day (a scheduled task, off until you turn it on), how many sessions it reads,
+  what to always cover and what to leave out. An app of your own whose view has pages for its own page gets the same
+  Update and settings. Beside those come sixteen small, quick apps for everyday things that get real data from free services, no key needed, and show it
   as charts, maps and cards: a weather outlook and the best time to go somewhere (Open-Meteo), a team tracker and
   match previews (TheSportsDB and the web), recipes from what is in your fridge and a week of dinners with one
   shopping list by aisle (TheMealDB), gift ideas, what to watch tonight and where it streams (TVmaze), a game finder

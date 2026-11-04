@@ -29,6 +29,12 @@ export interface AppKey {
   lastUsed?: number;
 }
 
+/** An app that opens on its own page: the answers it runs with from there, and whether (and when) it updates every day. */
+export interface HomeSettings {
+  inputs: Record<string, string>;
+  daily: { on: boolean; time: string };
+}
+
 export interface AppDetail {
   app?: AppDef;
   template?: AppTemplate;
@@ -43,6 +49,10 @@ export interface AppDetail {
   env?: EnvView;
   /** What its own page's view keeps (an app whose view has pages for its own page). */
   view?: Record<string, unknown>;
+  /** Such an app's settings there: the answers it runs with from its page, and Update every day. */
+  home?: HomeSettings;
+  /** When its latest run of its main flow ended well. */
+  latest?: number;
   /** The keys it needs, and how the vault has each (never a value). */
   secrets?: KeyState[];
 }

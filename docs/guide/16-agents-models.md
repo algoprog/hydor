@@ -204,6 +204,7 @@ In Custom's **Model** menu, hover over a model to see where it runs and how much
 
 The helper model does small jobs beside your sessions, outside any conversation:
 
+- naming each new session from your request (its title in the sidebar);
 - checking steps in Custom's Auto mode, and checking a Custom goal after each turn;
 - tidying up memory each night;
 - answering one question about a web page the browser has open;

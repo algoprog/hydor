@@ -351,6 +351,7 @@ export const APP_ICONS = [
   'app-window', 'pen-line', 'lightbulb', 'calendar', 'chart', 'code', 'globe', 'book-open', 'briefcase', 'heart',
   'shopping-cart', 'utensils', 'dumbbell', 'music', 'camera', 'map', 'message-square', 'languages', 'calculator', 'home', 'wrench', 'bot',
   'cloud-sun', 'sun', 'trophy', 'chef-hat', 'gift', 'clapperboard', 'tv', 'gamepad', 'ticket', 'piggy-bank', 'trending-up', 'map-pin', 'history',
+  'compass',
 ] as const;
 
 /** The colours of an app's tile, readable in light and dark. */

@@ -8,6 +8,8 @@ A session is one conversation with an agent, in one folder: you say what you wan
 
 **New session** at the top of the sidebar opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session's page opens at once, with your message and the agent at work on it (**Working**). If the session can't start, its page says why, and **Back to the start page** puts your message (and what you attached) back in the box.
 
+A moment after it starts, the session gets its title: a few words for what you asked ("Weekend trip to Lisbon", "Fix the checkout tests"), which the helper model ([Settings → Agents → Models](/settings?s=models&find=Helper%20model)) writes on the side, without anything showing in the conversation. The sidebar, the session's header and the search box show it, and Claude Code and Codex get it too, for their own lists. Until it comes, and when the helper model can't answer, the start of your message stands in. A title you give the session yourself with **Rename** is never replaced.
+
 The row under the message box holds **Agent**, **Model**, **Folder** (or **Project**), **Assistant** and, at its end, **Options**. On a phone each of them opens as a sheet from the bottom of the screen.
 
 ### Pick the agent and its model
