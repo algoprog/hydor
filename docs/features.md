@@ -323,12 +323,17 @@ about risky ones, and commands can run in a sandbox that lets them change files 
 
 Its models come from Settings → Models:
 
-- **OpenRouter**: add a key, then search its catalog (each model's maker, context, longest reply, price,
-  release date, and whether it reasons, sees images or calls tools; filter and sort) and add the models to offer.
+- **OpenRouter**: add a key, then add the suggested models (GPT-6 Luna, fast and cheap; GLM 5.3, good with fewer
+  refusals; GPT-6.1 Sol, better; Claude Opus 5.5, best overall) or search its catalog (each model's maker, context,
+  longest reply, price, release date, and whether it reasons, sees images or calls tools; filter and sort).
 - **Ollama**: the models of an Ollama server, with GGUF weights pulled straight from Hugging Face.
-- **vLLM**: Hugging Face models downloaded here and served on a GPU, started when a session first uses them.
+- **vLLM**: Hugging Face models downloaded here and served on a GPU, split across 2, 4 or 8 GPUs when one has too
+  little memory, or on a Mac's Apple silicon (vllm-metal), started when a session first uses them.
 - **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, another provider).
 
+Before any search, the models suggested for this computer show by what it can run, each with how it would run here
+and Install: LFM3-VL 2B (almost any computer), Gemma 4 12B (a good graphics card), Flint (a Mac with Apple silicon and
+32 GB or more) and GLM-5.3 Flash (a server with several large GPUs), the strongest that runs well marked Best here.
 Hugging Face is searched by name, like OpenRouter's catalog: each model shows its maker, size, format (GGUF
 for Ollama, safetensors for vLLM), downloads, likes and date, and a first verdict from its size on how it
 would run here (a model too big for vLLM as stored may still run at 4-bit with Ollama). Filter to what runs

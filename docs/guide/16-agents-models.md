@@ -223,24 +223,35 @@ Automatic can't look at pictures. If you use Custom with a model that doesn't se
 
 The **On this machine** section of [Settings → Agents → Models](/settings?s=models&find=On%20this%20machine) starts with a summary of this computer:
 
-- **Graphics**: the graphics cards (GPUs) and their memory, or "No GPU" (models then run on the processor).
+- **Graphics**: the graphics cards (GPUs) and their memory; on a Mac with Apple silicon, its chip ("Apple M3 Max", whose graphics share the computer's memory); or "No GPU" (models then run on the processor).
 - **Memory**: total and free.
 - **Disk**: free space, and how much the installed models take.
 - Whether **Ollama** and **vLLM** are installed, with their versions, or a link to install them.
-- With a graphics card, how big a model fits: "Fits about 30B parameters at 4-bit on one GPU". Parameters are a measure of a model's size; 4-bit is a common compressed form that needs about a quarter of the memory.
+- With a graphics card, how big a model fits: "Fits about 30B parameters at 4-bit on one GPU" (on a Mac: "Fits about 40B parameters at 4-bit"). Parameters are a measure of a model's size; 4-bit is a common compressed form that needs about a quarter of the memory.
 
 Below it:
 
 - **Downloads in progress**, each with a progress bar, how much is done, and whether it's for Ollama or vLLM. **Cancel** stops one. A failed or cancelled one shows why, with **Dismiss**.
 - **Installed models**, each with its runtime (Ollama or vLLM), size, details (such as its size and compression for Ollama models), "sees images" where it can, and whether it's running.
-  - A vLLM model has **Start** and **Stop**. It starts by itself when a session first uses it (the first start takes a minute or two), on the graphics card with the most free memory, and keeps running, even when the app restarts, until you click **Stop**. If it can't start, the reason shows under it.
+  - A vLLM model has **Start** and **Stop**. It starts by itself when a session first uses it (the first start takes a minute or two), on the graphics card with the most free memory, or split across 2, 4 or 8 of them when no one card has room for it ("running on GPUs 1, 2"); on a Mac, on its Apple silicon. It keeps running, even when the app restarts, until you click **Stop**. If it can't start, the reason shows under it.
   - **Remove** deletes the model's files from this computer, after you confirm. You can install it again later.
 
 When there are none yet: "No models here yet: add one from Hugging Face below."
 
 ## Add a model from Hugging Face
 
-Hugging Face is the main site for open models. The [Add a model from Hugging Face](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face) section ("Search, see how each would run here, and install it") searches it and tells you, before anything downloads, how each model would run on this computer.
+Hugging Face is the main site for open models. The [Add a model from Hugging Face](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face) section ("The ones suggested for this computer, or search, see how each would run here, and install it") suggests a few, searches it, and tells you, before anything downloads, how each model would run on this computer.
+
+### Suggested for this computer
+
+Before you search, **Suggested for this computer** lists the models the app recommends that run on this computer, by what it has:
+
+- **LFM3-VL 2B** (Liquid AI): small and quick, and it reads pictures. Runs on almost any computer.
+- **Gemma 4 12B** (Google): a capable all-rounder that reads pictures, for a computer with a good graphics card.
+- **Flint** (Recursive): made for coding agents, for a Mac with Apple silicon and 32 GB or more.
+- **GLM-5.3 Flash** (Z.ai): among the strongest open models, for a server with several large graphics cards.
+
+Each shows whether it runs well or slowly here, how it would run ("vLLM, split across 2 GPUs", "vLLM, on Apple silicon"), its download size, and **Install**. **Best here** marks the strongest one that runs well. They run with vLLM by default; a computer with neither an NVIDIA graphics card nor Apple silicon gets the small one's version for Ollama instead. A warning follows when what runs them isn't set up yet ("vLLM is not set up", "Ollama is not running"): see [Connect Ollama, vLLM or another endpoint](#connect-ollama-vllm-or-another-endpoint). **2 more for bigger computers** (or however many) shows the others, with what each needs. The welcome tour suggests the same ones.
 
 ### Search and filter
 
@@ -279,7 +290,7 @@ The figures assume a conversation of up to about 32,000 tokens, the length a mod
 
 ### Install, and what happens next
 
-Click **Install** (Ollama) or **Download** (vLLM). The download shows under **On this machine** with its progress. When it finishes, the model appears in Custom's **Model** menu. A vLLM download that was cut off picks up where it stopped when you try again.
+Click **Install** (Ollama) or **Download** (vLLM). The download shows under **On this machine** with its progress. When it finishes, the model appears in Custom's **Model** menu. A vLLM download that was cut off picks up where it stopped when you try again. A vLLM model too big for any one graphics card is split across several when it starts, if together they have room.
 
 ### Gated and private models
 
@@ -295,6 +306,10 @@ OpenRouter (openrouter.ai) gives you hundreds of models from many makers through
 2. In [Settings → Agents → Models](/settings?s=models&find=OpenRouter), paste it into **Your OpenRouter key: sk-or-…** and click **Save**.
 
 The section then shows **Connected to OpenRouter** with the start and end of your key. **Remove** forgets the key. The key stays on the server and is never shown again.
+
+### Suggested models
+
+Before you search, **Suggested** lists four models for Custom, each with why: **GPT-6 Luna** (Fast and cheap), **GLM 5.3** (Good, with fewer refusals), **GPT-6.1 Sol** (Better) and **Claude Opus 5.5** (Best overall). **Add** puts one in the pickers. For pictures, music, voices and videos, the app's choices are Seedream 5.0 Pro (and Flash, quicker and cheaper), Lyria 3 Pro, Seed Audio 1.0 and Seedance 2.5: see [Settings → Capabilities → Images, video and audio](/settings?s=images).
 
 ### Search the catalog
 
@@ -323,7 +338,7 @@ Ollama is a free program that runs models on your computer, on the graphics card
 
 ### vLLM
 
-vLLM is a fast server for models on NVIDIA graphics cards. The app finds it by itself on the PATH or in a conda or venv environment, and shows its version and where it is. If it says "not found (pip install vllm), or give its command", install it, or type the full path of its `vllm` command and click **Save**. Leave the field empty to let the app look by itself.
+vLLM is a fast server for models on NVIDIA graphics cards, and the way models from Hugging Face run here by default. A model too big for one card runs split across 2, 4 or 8 cards. On a Mac, vLLM runs on Apple silicon with its Metal plugin (vllm-metal). The app finds it by itself on the PATH or in a conda or venv environment, and shows its version and where it is. If it says "not found (pip install vllm), or give its command", install it, or type the full path of its `vllm` command and click **Save**. Leave the field empty to let the app look by itself.
 
 ### Other OpenAI-compatible endpoints
 

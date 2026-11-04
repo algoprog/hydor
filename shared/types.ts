@@ -1344,18 +1344,24 @@ export interface StartupState {
 }
 
 export interface MachineInfo {
+  /** NVIDIA graphics cards (nvidia-smi). */
   gpus: { index: number; name: string; totalBytes: number; freeBytes: number }[];
   ramBytes: number;
   ramFreeBytes: number;
   diskFreeBytes: number;
   cpus: number;
+  /** A Mac with Apple silicon: its chip ("Apple M3 Max"), whose graphics share the memory (ramBytes). */
+  apple?: { chip: string };
 }
 
 /** Whether a model runs well here: where, the memory it needs, roughly how fast. */
 export interface ModelFit {
   verdict: 'good' | 'slow' | 'tight' | 'no';
+  /** 'gpu' is an NVIDIA card, or a Mac's Apple silicon graphics. */
   where: 'gpu' | 'cpu' | 'none';
   gpu?: number;
+  /** Split across these NVIDIA cards (vLLM's tensor parallelism), when one alone has too little memory. */
+  gpus?: number[];
   needBytes: number;
   tokensPerSec?: number;
   downloadBytes: number;
@@ -1394,7 +1400,10 @@ export interface VllmServer {
   repo: string;
   port: number;
   pid: number;
+  /** The card it runs on (the first, when split); -1 on a Mac, whose graphics have no number. */
   gpu: number;
+  /** Every card it is split across (tensor parallelism), when more than one. */
+  gpus?: number[];
   util: number;
   maxLen: number;
   parser?: string;
@@ -1415,7 +1424,7 @@ export interface LocalModel {
   vision?: boolean;
   supported?: boolean | null;
   reason?: string;
-  server?: Pick<VllmServer, 'state' | 'port' | 'gpu' | 'error' | 'startedAt' | 'util' | 'maxLen'>;
+  server?: Pick<VllmServer, 'state' | 'port' | 'gpu' | 'gpus' | 'error' | 'startedAt' | 'util' | 'maxLen'>;
   installedAt?: number;
 }
 

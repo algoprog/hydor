@@ -39,7 +39,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - Switch between several accounts and machines from the sidebar, and sign in several Claude or Codex plans: when
   one hits its limit, sessions carry on with another
 - OpenRouter costs and token usage appear automatically, with prices fetched from OpenRouter
-- Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model on your GPU with vLLM
+- Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model with vLLM on your
+  GPU (split across several when one is too small) or your Mac's Apple silicon, with models suggested for what it has
 - Get help with anything, not just code: assistants for research, writing and planning (switch between them
   mid-session), web search (Naget Search by default) and a browser you can watch and take over (in the Mac app, your Mac itself
   too: its screen, mouse and keyboard, once you allow it), documents in and
