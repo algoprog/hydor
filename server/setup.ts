@@ -3,6 +3,7 @@
 // so the config files stay in the shape the agents expect. Env and header values are never
 // sent to the browser: listings carry only their names.
 import { execFile, spawn } from 'node:child_process';
+import { execProgram, spawnProgram } from './platform.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -39,9 +40,9 @@ function run(agent: Agent, args: string[], opts: { cwd?: string; timeoutMs?: num
   const bin = agent === 'claude' ? config.claudeBin : config.codexBin;
   const env = agent === 'claude' ? agentBaseEnv() : codexEnv(agentBaseEnv());
   return new Promise((resolve) => {
-    const p = execFile(bin, args, { cwd: opts.cwd ?? HOME, env, timeout: opts.timeoutMs ?? 60_000, maxBuffer: 64 << 20 }, (e, stdout, stderr) => {
+    const p = execProgram(bin, args, { cwd: opts.cwd ?? HOME, env, timeout: opts.timeoutMs ?? 60_000, maxBuffer: 64 << 20 }, (e, stdout, stderr) => {
       const code = e ? (typeof (e as any).code === 'number' ? (e as any).code : 1) : 0;
-      resolve({ code, out: String(stdout ?? ''), err: String(stderr ?? '') });
+      resolve({ code, out: stdout, err: stderr });
     });
     p.stdin?.end();
   });
@@ -167,7 +168,7 @@ export async function mcpStatus(agent: Agent, control: CodexControl, cwdArg?: st
   }
   const cwd = folder(cwdArg);
   return new Promise((resolve) => {
-    const proc = spawn(config.claudeBin, ['--output-format', 'stream-json', '--verbose', '--input-format', 'stream-json', '--permission-prompt-tool', 'stdio'], {
+    const proc = spawnProgram(config.claudeBin, ['--output-format', 'stream-json', '--verbose', '--input-format', 'stream-json', '--permission-prompt-tool', 'stdio'], {
       cwd,
       env: agentBaseEnv(),
       stdio: ['pipe', 'pipe', 'ignore'],

@@ -7,7 +7,7 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
                                   ├─ one small runner process per live session
                                   │    └─ claude (stream-json)  or  codex app-server
                                   ├─ indexer: reads the agents' transcripts into SQLite full-text search
-                                  ├─ tmux server for the terminals
+                                  ├─ tmux server for the terminals (on Windows the server keeps them)
                                   └─ the web app (React), served from dist/web
 ```
 
@@ -15,7 +15,13 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   themselves, which is why sessions started in VS Code or a terminal show up too. The live stream only adds
   what is not written yet: text as it streams, commands still running, approvals.
 - **Agents outlive the server.** Each live agent runs under a detached runner that holds its input and output
-  and logs everything. Restart or upgrade the server and it reconnects, replaying what it missed.
+  and logs everything. Restart or upgrade the server and it reconnects, replaying what it missed. The server talks to
+  a runner over a Unix socket only you can open; on Windows over a named pipe, which hears nothing from a client
+  until it gives the key written in your data folder.
+- **The desktop apps carry the server.** The Mac, Windows and Linux apps start the server with the Node.js inside
+  them, talk to it over a message channel (its address, updates, quitting), and start it again whenever it exits. On
+  Windows and from an AppImage, each version runs from a copy of itself in your local data folder, so agents that
+  outlive the app and its updates never hold the app's own files.
 - **Your accounts, your machine.** The app talks to the agents through their official command-line tools and
   never sees your model credentials; sign-in happens in the agents' own login flows.
 

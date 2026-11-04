@@ -47,14 +47,16 @@ export async function initNotifications() {
   } catch {}
 }
 
-/** 'app': in the Mac app, which shows the notices itself while it runs (it has no web push). */
+/** 'app': in a desktop app, which shows the notices itself while it runs (it has no web push). */
 export type PushState = 'unsupported' | 'denied' | 'off' | 'on' | 'app';
 
-/** The Mac app's window (mac/main.cjs adds this to its user agent). */
-export const inMacApp = /\b(?:HydorMac|NagetAgentMac)\//.test(navigator.userAgent);
+/** A desktop app's window (desktop/main.cjs adds this to its user agent: HydorMac, HydorWindows, HydorLinux). */
+export const inDesktopApp = /\b(?:HydorMac|HydorWindows|HydorLinux|NagetAgentMac)\//.test(navigator.userAgent);
+/** Which desktop app the window is: 'mac', 'windows' or 'linux' (null in a browser). */
+export const desktopSystem: 'mac' | 'windows' | 'linux' | null = /\bHydorWindows\//.test(navigator.userAgent) ? 'windows' : /\bHydorLinux\//.test(navigator.userAgent) ? 'linux' : inDesktopApp ? 'mac' : null;
 
 export async function pushState(): Promise<PushState> {
-  if (inMacApp) return 'app';
+  if (inDesktopApp) return 'app';
   if (!supported()) return 'unsupported';
   if (Notification.permission === 'denied') return 'denied';
   const reg = await navigator.serviceWorker.ready;
@@ -66,7 +68,7 @@ export async function pushState(): Promise<PushState> {
 }
 
 export async function enablePush(): Promise<PushState> {
-  if (inMacApp) return 'app';
+  if (inDesktopApp) return 'app';
   if (!supported()) return 'unsupported';
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') return perm === 'denied' ? 'denied' : 'off';

@@ -3,14 +3,17 @@
 //   node runner.js <runDir>
 //
 // Reads <runDir>/spec.json ({cmd, args, cwd, env}), starts the agent with pipes,
-// appends its stdout to out.log, and serves a Unix socket (<runDir>/sock) through
-// which the web server writes to the agent's stdin and receives live output.
+// appends its stdout to out.log, and serves a Unix socket (<runDir>/sock; on Windows a
+// named pipe, see RunnerAddress) through which the web server writes to the agent's
+// stdin and receives live output.
 // The runner outlives web-server restarts; the agent ends when its stdin closes.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { encodeFrame, FrameDecoder, FRAME_CONTROL, FRAME_STDERR, FRAME_STDOUT } from './frames.ts';
+import { launch } from '../platform.ts';
 
 const runDir = process.argv[2];
 if (!runDir) {
@@ -26,7 +29,10 @@ interface Spec {
 }
 
 const spec = JSON.parse(fs.readFileSync(path.join(runDir, 'spec.json'), 'utf8')) as Spec;
+const WIN = process.platform === 'win32';
+/** The file that says where this runner listens: the socket itself, or on Windows the pipe's name and key. */
 const sockPath = path.join(runDir, 'sock');
+const address: { path: string; key?: string } = WIN ? { path: `\\\\.\\pipe\\hydor-runner-${crypto.randomBytes(12).toString('hex')}`, key: crypto.randomBytes(24).toString('hex') } : { path: sockPath };
 const MAX_STDERR = 8 * 1024 * 1024;
 
 const outFd = fs.openSync(path.join(runDir, 'out.log'), 'a');
@@ -34,13 +40,18 @@ let outSize = fs.fstatSync(outFd).size;
 const errFd = fs.openSync(path.join(runDir, 'err.log'), 'a');
 let errSize = fs.fstatSync(errFd).size;
 
-process.on('SIGHUP', () => {});
-process.on('SIGPIPE', () => {});
+if (!WIN) {
+  process.on('SIGHUP', () => {});
+  process.on('SIGPIPE', () => {});
+}
 
-const child = spawn(spec.cmd, spec.args, {
+// On Windows, npm's .cmd launchers run through Node.js (see launch).
+const program = launch(spec.cmd, spec.args, spec.env);
+const child = spawn(program.cmd, program.args, {
   cwd: spec.cwd,
   env: spec.env,
   stdio: ['pipe', 'pipe', 'pipe'],
+  windowsHide: true,
 });
 
 const startedAt = Date.now();
@@ -120,18 +131,29 @@ function finish(code: number | null, signal: NodeJS.Signals | null, error?: stri
 }
 
 const server = net.createServer((sock) => {
-  clients.add(sock);
-  sock.write(
-    encodeFrame(FRAME_CONTROL, JSON.stringify({ op: 'hello', size: outSize, childPid: child.pid ?? null, startedAt })),
-  );
   const decoder = new FrameDecoder();
+  // A client hears the agent once it is known: at once on a Unix socket (only you can open it), on Windows after it
+  // sends the key from the address file.
+  let known = false;
+  const welcome = () => {
+    known = true;
+    clients.add(sock);
+    sock.write(encodeFrame(FRAME_CONTROL, JSON.stringify({ op: 'hello', size: outSize, childPid: child.pid ?? null, startedAt })));
+  };
+  if (!address.key) welcome();
   sock.on('data', (chunk) => {
     decoder.push(chunk, (type, payload) => {
       if (type !== FRAME_CONTROL) return;
-      let msg: { op: string; data?: string; sig?: NodeJS.Signals; graceMs?: number };
+      let msg: { op: string; data?: string; sig?: NodeJS.Signals; graceMs?: number; key?: string };
       try {
         msg = JSON.parse(payload.toString('utf8'));
       } catch {
+        return;
+      }
+      if (!known) {
+        const ok = msg.op === 'auth' && typeof msg.key === 'string' && msg.key.length === address.key!.length && crypto.timingSafeEqual(Buffer.from(msg.key), Buffer.from(address.key!));
+        if (ok) welcome();
+        else sock.destroy();
         return;
       }
       if (msg.op === 'write' && typeof msg.data === 'string' && !exited) child.stdin.write(msg.data);
@@ -149,7 +171,13 @@ process.on('SIGINT', () => stop(2000));
 try {
   fs.rmSync(sockPath, { force: true });
 } catch {}
-server.listen(sockPath, () => {
+server.listen(address.path, () => {
+  if (WIN) {
+    // Written whole, then put in place: a client never reads half of it.
+    fs.writeFileSync(`${sockPath}.tmp`, JSON.stringify(address), { mode: 0o600 });
+    fs.renameSync(`${sockPath}.tmp`, sockPath);
+    return;
+  }
   try {
     fs.chmodSync(sockPath, 0o600);
   } catch {}

@@ -86,7 +86,17 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
   // In a file only this user can read, not on the command line: its addresses carry the run's token.
   if (Object.keys(servers).length) args.push('--mcp-config', mcpConfigFile(o.sessionId, { mcpServers: servers }));
   if (o.pageServer) args.push('--allowedTools', `mcp__${PAGE_SERVER}`);
-  if (o.add?.instructions.length) args.push('--append-system-prompt', o.add.instructions.join('\n\n'));
+  if (o.add?.instructions.length) {
+    const text = o.add.instructions.join('\n\n');
+    // Windows takes command lines of 32,767 characters at most: there the instructions go in a file of their own.
+    if (process.platform === 'win32') {
+      const dir = path.join(config.dataDir, 'mcp');
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+      const file = path.join(dir, `${o.sessionId.replace(/[^\w-]/g, '')}-instructions.md`);
+      fs.writeFileSync(file, text, { mode: 0o600 });
+      args.push('--append-system-prompt-file', file);
+    } else args.push('--append-system-prompt', text);
+  }
   if (o.add?.args?.length) args.push(...o.add.args);
   // An assistant's limits: tools switched off, and none of the user's own MCP servers.
   if (o.add?.disallowedTools?.length) args.push('--disallowedTools', o.add.disallowedTools.join(','));

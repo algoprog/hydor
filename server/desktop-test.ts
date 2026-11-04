@@ -3,8 +3,10 @@
 // to install; a version the app had to roll back is reported and not installed by itself again. With updates on,
 // a new version downloads by itself at once, the app is told it waits (with the words of its notification) and it
 // installs after its minute; Later puts it off, and the menu bar's Restart to Update installs it at once. Also the
-// channel's questions to the app and their answers. The test plays the Mac app: it starts itself again as the
-// server's side, with a message channel, as mac/main.cjs does, and stands in for macOS's ditto. Build and run:
+// channel's questions to the app and their answers. The Windows and Linux apps read their own feeds and get their own
+// kind of build (the installer, the AppImage, the .deb, which waits for your password rather than installing by
+// itself). The test plays the app: it starts itself again as the server's side, with a message channel, as
+// desktop/main.cjs does, and stands in for macOS's ditto. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/desktop-test.ts && DATA_DIR=/tmp/hydor-test-desktop node dist/dev/desktop-test.js
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
@@ -19,7 +21,7 @@ const ZIP = Buffer.from('the build, as the release carries it');
 const sha = (b: Buffer) => createHash('sha512').update(b).digest('base64');
 type Msg = { type: string; [k: string]: unknown };
 
-if (process.env.HYDOR_DESKTOP !== 'mac') {
+if (!process.env.HYDOR_TEST_SIDE) {
   // ---- the Mac app's side: a release to download, and the server started with a message channel ----
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-desktop-'));
   const bin = path.join(tmp, 'bin');
@@ -27,8 +29,10 @@ if (process.env.HYDOR_DESKTOP !== 'mac') {
   // ditto -x -k <zip> <folder> unpacks; the stand-in puts an app there.
   fs.writeFileSync(path.join(bin, 'ditto'), '#!/bin/sh\n[ "$1" = -x ] && mkdir -p "$4/Hydor.app/Contents" && exit 0\nexec cp -R "$1" "$2"\n', { mode: 0o755 });
   const server = http.createServer((req, res) => {
-    const feed = (sum: string) => JSON.stringify({ version: '9.9.9', files: { [process.arch]: { url: `http://127.0.0.1:${port}/app.zip`, sha512: sum, size: ZIP.length } } });
-    if (req.url === '/good.json') res.end(feed(sha(ZIP)));
+    const feed = (sum: string, key: string = process.arch) => JSON.stringify({ version: '9.9.9', files: { [key]: { url: `http://127.0.0.1:${port}/app.zip`, sha512: sum, size: ZIP.length } } });
+    const kind = /^\/good-(nsis|appimage|deb)\.json$/.exec(req.url ?? '')?.[1];
+    if (kind) res.end(feed(sha(ZIP), `${kind}-${process.arch}`));
+    else if (req.url === '/good.json') res.end(feed(sha(ZIP)));
     else if (req.url === '/bad.json') res.end(feed(sha(Buffer.from('another build'))));
     else if (req.url === '/app.zip') res.end(ZIP);
     else res.writeHead(404).end();
@@ -45,6 +49,7 @@ if (process.env.HYDOR_DESKTOP !== 'mac') {
           DATA_DIR: path.join(tmp, 'data'),
           HOME: tmp,
           PATH: `${bin}:${process.env.PATH}`,
+          HYDOR_TEST_SIDE: '1',
           HYDOR_DESKTOP: 'mac',
           HYDOR_DESKTOP_APP: path.join(tmp, 'Applications/Hydor.app'),
           HYDOR_DESKTOP_UPDATABLE: '1',
@@ -105,7 +110,30 @@ if (process.env.HYDOR_DESKTOP !== 'mac') {
     const order = later.messages.filter((m) => m.type === 'update' || m.type === 'install').map((m) => (m.type === 'install' ? 'install' : m.notice ? 'notice' : m.version ? 'waiting' : 'none'));
     assert.deepEqual(order.slice(-3), ['notice', 'waiting', 'install'], `the notice, Later, then Restart to Update (${order.join(', ')})`);
     console.log('  ok  Later puts it off past its minute, and Restart to Update in the menu bar installs it');
-    console.log(`${passed(first, second, auto, later) + 3} passed`);
+    fs.rmSync(path.join(tmp, 'data'), { recursive: true, force: true });
+
+    // The Windows app and an AppImage: their own feeds and builds, handed to the app as they are.
+    const others: { messages: Msg[] }[] = [];
+    for (const [platform, format, ending] of [
+      ['windows', 'nsis', '-setup.exe'],
+      ['linux', 'appimage', '.AppImage'],
+    ] as const) {
+      const r = await run({ HYDOR_DESKTOP: platform, HYDOR_DESKTOP_FORMAT: format, HYDOR_TEST_PLATFORM: '1' });
+      assert.equal(r.code, 0, `the ${format} checks passed`);
+      const got = r.messages.find((m) => m.type === 'install');
+      assert.ok(got && String(got.app).endsWith(ending), `the ${format} build is handed over as it is (${got?.app})`);
+      assert.ok(fs.existsSync(String(got.app)));
+      if (format === 'appimage') assert.ok(fs.statSync(String(got.app)).mode & 0o100, 'an AppImage that can run');
+      console.log(`  ok  ${platform === 'windows' ? 'the Windows installer' : 'an AppImage'} is downloaded, checked and handed to the app`);
+      others.push(r);
+      fs.rmSync(path.join(tmp, 'data'), { recursive: true, force: true });
+    }
+    // The .deb with updates on: it downloads by itself, and waits for Restart to Update (your password).
+    const deb = await run({ HYDOR_DESKTOP: 'linux', HYDOR_DESKTOP_FORMAT: 'deb', HYDOR_TEST_PLATFORM: '1' });
+    assert.equal(deb.code, 0, 'the .deb checks passed');
+    assert.ok(!deb.messages.some((m) => m.type === 'install'), 'it did not install by itself');
+    console.log('  ok  the .deb downloads a new version by itself and waits for you to install it');
+    console.log(`${passed(first, second, auto, later, ...others, deb) + 6} passed`);
   } finally {
     server.close();
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -131,7 +159,28 @@ if (process.env.HYDOR_DESKTOP !== 'mac') {
     process.send!({ type: 'passed' });
   };
 
-  if (process.env.HYDOR_TEST_ROLLED_BACK) {
+  if (process.env.HYDOR_TEST_PLATFORM) {
+    const format = process.env.HYDOR_DESKTOP_FORMAT!;
+    feed(`good-${format}.json`);
+    if (format === 'deb') {
+      setAutoUpdate(true);
+      await checkUpdates();
+      await until(() => !!updateState()?.ready, 'the download');
+      const u = updateState()!;
+      assert.deepEqual([u.platform, u.format, u.ready?.version, u.ready?.installIn, u.ready?.later], ['linux', 'deb', '9.9.9', undefined, undefined], 'it waits, without counting down');
+      await new Promise((r) => setTimeout(r, 700));
+      assert.equal(updateState()?.running, undefined, 'and does not install by itself');
+      ok('the .deb: a version downloaded by itself waits for your password');
+    } else {
+      setAutoUpdate(false);
+      let u = (await checkUpdates())!;
+      assert.deepEqual([u.kind, u.behind, u.latest, u.platform, u.format], ['app', 1, '9.9.9', process.env.HYDOR_DESKTOP, format], 'its own feed says a version is out');
+      startUpdate(false);
+      u = await settled();
+      assert.equal(u.running?.phase, 'restart', 'it waits for the app to install it');
+      ok(`${format}: its own feed and build`);
+    }
+  } else if (process.env.HYDOR_TEST_ROLLED_BACK) {
     const u = updateState() ?? (feed('good.json'), await checkUpdates())!;
     assert.equal(u.last?.ok, false);
     assert.match(u.last?.error ?? '', /did not start/);

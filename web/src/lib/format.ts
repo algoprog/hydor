@@ -25,10 +25,11 @@ export function ago(ts?: number | null, now = Date.now()): string {
 
 /** A path as a person reads it: relative to `cwd` when inside it, `~` for home, long ones shortened. */
 export function prettyPath(p: string, cwd?: string, home?: string): string {
-  if (cwd && cwd !== '/' && p.startsWith(cwd + '/')) return p.slice(cwd.length + 1);
+  const sep = sepOf(p);
+  if (cwd && cwd !== '/' && p !== cwd && inside(p, cwd)) return p.slice(cwd.replace(/[\\/]+$/, '').length + 1);
   const t = tildify(p, home);
-  const parts = t.split('/');
-  return parts.length > 5 ? `…/${parts.slice(-3).join('/')}` : t;
+  const parts = t.split(isWinPath(p) ? /[\\/]/ : '/');
+  return parts.length > 5 ? `…${sep}${parts.slice(-3).join(sep)}` : t;
 }
 
 export function untilText(ts?: number | null, now = Date.now()): string {
@@ -93,19 +94,37 @@ export function tildify(p?: string | null, home?: string): string {
   return p.replace(homeRe, '~');
 }
 
+/** Whether a path is written the Windows way: C:\Users\me (or C:/Users/me), \\server\share. */
+export const isWinPath = (p: string) => /^[A-Za-z]:([\\/]|$)/.test(p) || p.startsWith('\\\\');
+/** The separator a path is written with: \ in a Windows one, / elsewhere. */
+export const sepOf = (p: string) => (isWinPath(p) ? '\\' : '/');
+/** A path's folders (and file), its root (/, C:\) left out but a drive kept (C:). */
+export const pathParts = (p: string) => p.split(isWinPath(p) ? /[\\/]/ : '/').filter(Boolean);
+/** Whether `p` is `dir` or inside it (a Windows one with either separator). */
+export function inside(p: string, dir: string): boolean {
+  const d = dir.length > 1 && !/^[A-Za-z]:[\\/]$/.test(dir) ? dir.replace(isWinPath(dir) ? /[\\/]+$/ : /\/+$/, '') : dir;
+  if (p === d) return true;
+  if (/[\\/]$/.test(d)) return p.startsWith(d) || (isWinPath(d) && p.replace(/\//g, '\\').startsWith(d.replace(/\//g, '\\')));
+  return p.startsWith(d + '/') || (isWinPath(d) && p.startsWith(d + '\\'));
+}
+
 export function basename(p: string): string {
-  const parts = p.split('/').filter(Boolean);
+  const parts = pathParts(p);
   return parts[parts.length - 1] ?? p;
 }
 
 export function dirname(p: string): string {
+  if (isWinPath(p)) {
+    const i = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
+    return i <= 2 ? `${p.slice(0, 2)}\\` : p.slice(0, i);
+  }
   const i = p.lastIndexOf('/');
   return i <= 0 ? '/' : p.slice(0, i);
 }
 
 export function joinPath(a: string, b: string): string {
-  if (b.startsWith('/')) return b;
-  return `${a.replace(/\/+$/, '')}/${b}`;
+  if (b.startsWith('/') || isWinPath(b)) return b;
+  return `${a.replace(isWinPath(a) ? /[\\/]+$/ : /\/+$/, '')}${sepOf(a)}${b}`;
 }
 
 // Made once: `toLocaleString` with options builds a new formatter on every call, and the session list

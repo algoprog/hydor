@@ -7,6 +7,7 @@
 // Every git command runs with arguments as a list (never a shell), never asks for anything (no password
 // prompt, no editor) and gives up after a while; names and paths are checked before they reach git.
 import { execFile, spawn } from 'node:child_process';
+import { isAbsPath } from './platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -330,7 +331,7 @@ export class GitRepos {
     const cwds = this.db.prepare('select key, cwd, updated_at as t from sessions where cwd is not null and hidden = 0').all() as { key: string; cwd: string; t: number }[];
     for (const c of cwds) add(c.cwd, c.key, c.t ?? 0);
     const edits = this.db.prepare("select text as p, key, max(ts) as t from chunk_text where kind = 'file' group by text, key").all() as { p: string; key: string; t: number }[];
-    for (const e of edits) if (e.p.startsWith('/')) add(path.dirname(e.p), e.key, e.t ?? 0);
+    for (const e of edits) if (isAbsPath(e.p)) add(path.dirname(e.p), e.key, e.t ?? 0);
     this.cands = { at: Date.now(), map: repos };
     return repos;
   }
@@ -339,7 +340,7 @@ export class GitRepos {
   private manual(): Manual[] {
     try {
       const v = JSON.parse(kvGet(this.db, MANUAL_KEY) ?? '[]');
-      return Array.isArray(v) ? v.filter((x): x is Manual => typeof x?.path === 'string' && x.path.startsWith('/')) : [];
+      return Array.isArray(v) ? v.filter((x): x is Manual => typeof x?.path === 'string' && isAbsPath(x.path)) : [];
     } catch {
       return [];
     }

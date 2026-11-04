@@ -5,6 +5,7 @@
 // would save, the files it touches, and whether it is risky enough to ask every time. What cannot be
 // read with confidence (a function definition, case, eval of a variable, an unclosed quote) is opaque.
 import fs from 'node:fs';
+import { WIN, windowsPathOf } from '../platform.ts';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -832,7 +833,12 @@ export function checkCommand(src: string, cwd: string): ShellCheck {
   const risk = (why: string) => void (out.risk ??= why);
   // Where the next command runs: a cd moves it ('' once it went somewhere unknown).
   let dir = cwd;
-  const at = (w: string) => (path.isAbsolute(w) ? path.normalize(w) : dir ? path.resolve(dir, w) : '');
+  const at = (word: string) => {
+    // Git's bash on Windows: /c/Users/me is C:\Users\me there (and its /dev/null is its own).
+    if (WIN && word.startsWith('/dev/')) return word;
+    const w = WIN ? windowsPathOf(word) : word;
+    return path.isAbsolute(w) ? path.normalize(w) : dir ? path.resolve(dir, w) : '';
+  };
   const read = (w: string) => {
     const p = at(w);
     if (p && !/^\/dev\/(null|stdin|stdout|stderr|tty|fd\/)/.test(p)) out.paths.push({ path: p });
@@ -848,7 +854,7 @@ export function checkCommand(src: string, cwd: string): ShellCheck {
     const p = w.includes(UNKNOWN) ? '' : at(w);
     if (!p) return risk(`deletes ${what} it cannot name in advance`);
     // Outside the session folder, or the folder itself; with the home folder (or a top folder) as the session folder, anything.
-    if (!within(p, cwd) || p === cwd || cwd === HOME || path.dirname(cwd) === '/') risk(`deletes ${what} outside the session folder`);
+    if (!within(p, cwd) || p === cwd || cwd === HOME || path.dirname(cwd) === path.parse(cwd).root) risk(`deletes ${what} outside the session folder`);
   };
   /** A word naming a file to check: away from where it runs (absolute, ~, up with ".."), or one that may hold keys or passwords. */
   const isLink = (w: string) => {

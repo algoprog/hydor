@@ -6,7 +6,7 @@ import { ArrowLeft, Braces, Check, ChevronDown, ChevronUp, Download, Eraser, Fas
 import type { KernelEnv, KernelInfo, KernelStatus } from '@shared/types';
 import { api, ApiError, enc, put } from '../../lib/api';
 import type { CellEditorHandle } from '../../lib/codemirror';
-import { ago, basename, bytes, dirname, duration, tildify } from '../../lib/format';
+import { ago, basename, bytes, dirname, duration, isWinPath, tildify } from '../../lib/format';
 import { highlight } from '../../lib/highlight';
 import { toast, toastError, useApp } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
@@ -884,7 +884,7 @@ export default function NotebookView({ path, onSource, embedded, onDirty }: { pa
   const clearAll = () => dispatch({ type: 'clear' });
   const download = () => (location.href = mu(`/api/fs/raw?path=${enc(path)}&download=1`));
   const busy = kernel?.status === 'busy';
-  const crumbs = tildify(path, home).split('/');
+  const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
 
   return (
     <div className="flex h-full min-h-0 flex-col">

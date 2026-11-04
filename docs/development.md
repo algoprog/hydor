@@ -36,47 +36,70 @@ servers:
 OUTDIR=dist/dev node scripts/build-server.mjs server/plugins/plugins-test.ts && HYDOR_TEST_REAL_SETUP=1 DATA_DIR=/tmp/hydor-test-plugins node dist/dev/plugins-test.js
 ```
 
-## The Mac app
+## The desktop apps
 
-`mac/` wraps the server in an Electron app (`mac/main.cjs`): it starts the server with the Node.js inside it and a
-message channel (`server/desktop.ts`), shows it in a window, keeps it in the menu bar, and installs the updates the
-server downloads (`server/updates.ts`, release by release from `hydor-mac.json` on the newest GitHub release),
-going back to the version before when a new one does not start.
+`desktop/` wraps the server in an Electron app (`desktop/main.cjs`) for macOS, Windows and Linux: it starts the server
+with the Node.js inside it and a message channel (`server/desktop.ts`), shows it in a window, keeps it in the menu bar
+(the notification area, the system tray), and installs the updates the server downloads (`server/updates.ts`, release
+by release from `hydor-mac.json`, `hydor-windows.json` or `hydor-linux.json` on the newest GitHub release). How a copy
+was installed decides how it updates (`HYDOR_DESKTOP_FORMAT`): a Mac app (`app`) and an AppImage swap themselves for the
+new version and go back to the one before when it does not start; Windows (`nsis`) runs the new installer without its
+window (`/S --updated --force-run`); the `.deb` installs with `pkexec dpkg -i`, so a version downloaded by itself waits
+for Restart to Update.
+
+On Windows and from an AppImage the app first copies its server, Node.js and tmux to `runtime/<version>-<build>` in
+its local data folder (`%LOCALAPPDATA%\Hydor`, `~/.local/share/Hydor`) and runs them from there: agents outlive the
+app, and Windows cannot replace a file a program has open (its installer stops every program running from the app's
+folder), while an AppImage's files go when it closes. Copies nothing runs from any more are removed a minute after
+the server starts.
 
 The channel goes both ways. The server tells the app what to show and do: `ready` (its address), `update` (a new
 version downloaded and waiting, for Restart to Update in the menus; with `notice`, the words of the notification
-the Mac shows a minute before it installs) and `install`. It asks the app what only the app can find out or do
-(`ask`, answered with `reply`), and hears what you picked in the app's menus (`update-now`). The server looks for a
-release a minute after it starts and every 4 hours; with Update automatically on it downloads a new one at once,
-counts down a minute in every page (`update.ready.installIn`) and then sends `install`; Later
-(`POST /api/update/later`) puts it off for 4 hours. `server/desktop-test.ts` plays the app over the real channel;
-`HYDOR_UPDATE_NOTICE_MS` shortens the minute when trying it.
+the app shows a minute before it installs) and `install`. It asks the app what only the app can find out or do
+(`ask`, answered with `reply`), and hears what you picked in the app's menus (`update-now`) and, on Windows, `quit`
+(there is no SIGTERM a program can catch there). The server looks for a release a minute after it starts and every
+4 hours; with Update automatically on it downloads a new one at once, counts down a minute in every page
+(`update.ready.installIn`) and then sends `install`; Later (`POST /api/update/later`) puts it off for 4 hours.
+`server/desktop-test.ts` plays the app over the real channel, for each kind of copy; `HYDOR_UPDATE_NOTICE_MS` shortens
+the minute when trying it.
 
-Computer use (`server/computer/`) works through that channel too. The tools run macOS's own programs as children of
-the server, so macOS checks the app's permissions: `screencapture` for the main display, `sips` to scale it to
-1280 pixels and make a JPEG, `open -a` for apps, and `osascript -l JavaScript` with one driver script (`driver.ts`)
-that posts CGEvents through the ObjC bridge: clicks with their click count, drags, scroll wheels, key combinations by
-their US-keyboard codes, and text as Unicode on key events (a pasted fallback puts the clipboard back). `plan.ts`
-checks actions and maps the screenshot's pixels to points (Retina, scaled resolutions); `access.ts` keeps the
+The server on Windows (`server/platform.ts` holds what differs): runners listen on a named pipe with a random name and
+answer only a client that sends the key in their `sock` file; commands run in Git for Windows' bash; npm's `.cmd`
+launchers start through Node.js and the script they name; programs stop with their whole tree (`taskkill /T`);
+terminals are shells in ConPTY that the server keeps, with what they printed, since there is no tmux; links to folders
+are junctions. `server/platform-test.ts` checks all of it on the system it runs on, and the desktop workflow runs it on
+each.
+
+Computer use (`server/computer/`, the Mac app only) works through that channel too. The tools run macOS's own programs
+as children of the server, so macOS checks the app's permissions: `screencapture` for the main display, `sips` to scale
+it to 1280 pixels and make a JPEG, `open -a` for apps, and `osascript -l JavaScript` with one driver script
+(`driver.ts`) that posts CGEvents through the ObjC bridge: clicks with their click count, drags, scroll wheels, key
+combinations by their US-keyboard codes, and text as Unicode on key events (a pasted fallback puts the clipboard back).
+`plan.ts` checks actions and maps the screenshot's pixels to points (Retina, scaled resolutions); `access.ts` keeps the
 setting, the per-session card, Stop and the one session at the Mac. The server asks the app for macOS's permissions
 (`ask` `permissions`, and `request` to show macOS's prompt and its System Settings pane), tells it while an agent
 acts (`computer`: the menu bar's title and Stop, with ⌘⇧Esc registered meanwhile) and hears `computer-stop`.
 `server/computer/computer-test.ts` runs everything but macOS itself, the driver with stand-ins for the bridge.
 
-Releases are built by `.github/workflows/mac.yml` on GitHub's Macs, for Apple silicon and Intel, when a tag
-`v<version>` (the version in `package.json`) is pushed; it publishes the `.dmg` and `.zip` builds and
-`hydor-mac.json` on the Releases page, with the version's notes from `CHANGELOG.md`. Running it by hand (Actions →
-Mac app) builds without publishing. With the signing secrets the workflow lists, the app is signed with a Developer
-ID and notarized; without them it is signed ad hoc.
+Releases are built by `.github/workflows/desktop.yml` on GitHub's own computers when a tag `v<version>` (the version in
+`package.json`) is pushed: the Mac app for Apple silicon and Intel, the Windows installer for x64, and the Linux
+AppImage and `.deb` for x64 and ARM (on Ubuntu 22.04, so they need its C library, 2.34, or newer). Each build is
+checked before it is kept: its server starts from inside it, the app itself opens and starts its server (the AppImage
+from its own copy; on Windows also once installed with its installer, then uninstalled). It publishes them on the
+Releases page with the update feeds and the version's notes from `CHANGELOG.md`, and copies under names without the
+version for the README's links. Running it by hand (Actions → Desktop apps) builds without publishing. With the
+signing secrets the workflow lists, the Mac app is signed with a Developer ID and notarized; without them it is signed
+ad hoc. The Windows installer is not signed.
 
-On a Mac, by hand:
+By hand, on the kind of computer the app is for (on Windows in Git's bash; on Linux with `libncurses-dev` for tmux):
 
 ```bash
-npm ci && npm run build          # at the top of the repository
-mac/scripts/stage.sh             # the server with its production packages, Node.js and tmux, in mac/build/
-cd mac && npm ci && scripts/dist.sh   # mac/dist/Hydor-<version>-<arch>-mac.dmg and .zip
-scripts/smoke.sh "dist/mac-arm64/Hydor.app"   # its server starts (dist/mac/ on Intel)
-npm start                        # or: the app around this repository's own build, to work on main.cjs
+npm ci && npm run build              # at the top of the repository
+desktop/scripts/stage.sh             # the server with its production packages, Node.js (and tmux), in desktop/build/
+cd desktop && npm ci && scripts/dist.sh   # desktop/dist/: the .dmg and .zip, the installer, or the AppImage and .deb
+node scripts/smoke.mjs dist/mac-arm64/Hydor.app   # its server starts (dist/mac/, dist/win-unpacked, dist/linux-unpacked)
+node scripts/launch-test.mjs dist/linux-unpacked/hydor   # the app opens and starts its server
+npm start                            # or: the app around this repository's own build, to work on main.cjs
 ```
 
 To try the updater without a release, point the server at a feed of your own with `HYDOR_UPDATE_FEED` (in
@@ -86,7 +109,7 @@ To try the updater without a release, point the server at a feed of your own wit
 
 `Dockerfile` makes the image: the app as a git checkout (so it can update itself in place), with Claude Code and
 Codex. `.github/workflows/docker.yml` builds it on GitHub's runners for `linux/amd64` and `linux/arm64` (ARM under
-emulation) when a tag `v<version>` is pushed, beside the Mac app's release, and pushes `algoprog/hydor:<version>` and
+emulation) when a tag `v<version>` is pushed, beside the desktop apps' release, and pushes `algoprog/hydor:<version>` and
 `algoprog/hydor:latest` to Docker Hub, signed in with the repository secret `DOCKERHUB_TOKEN`. Running it by hand
 (Actions → Docker image) builds both without pushing. To build one here: `docker build -t hydor .`
 

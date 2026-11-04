@@ -22,16 +22,20 @@ function firstExisting(...candidates: (string | undefined)[]): string | undefine
 }
 
 // The Codex binary the npm package ships for this platform (as its own launcher picks it).
-const CODEX_TARGET: Record<string, [string, string]> = {
+export const CODEX_TARGET: Record<string, [string, string]> = {
   'linux-x64': ['codex-linux-x64', 'x86_64-unknown-linux-musl'],
   'linux-arm64': ['codex-linux-arm64', 'aarch64-unknown-linux-musl'],
   'darwin-x64': ['codex-darwin-x64', 'x86_64-apple-darwin'],
   'darwin-arm64': ['codex-darwin-arm64', 'aarch64-apple-darwin'],
+  'win32-x64': ['codex-win32-x64', 'x86_64-pc-windows-msvc'],
+  'win32-arm64': ['codex-win32-arm64', 'aarch64-pc-windows-msvc'],
 };
+/** Programs' file names here: codex.exe on Windows. */
+export const EXE = process.platform === 'win32' ? '.exe' : '';
 const codexTarget = CODEX_TARGET[`${process.platform}-${process.arch}`];
-const vendoredCodex = codexTarget && path.join(APP_ROOT, `node_modules/@openai/${codexTarget[0]}/vendor/${codexTarget[1]}/bin/codex`);
+const vendoredCodex = codexTarget && path.join(APP_ROOT, `node_modules/@openai/${codexTarget[0]}/vendor/${codexTarget[1]}/bin/codex${EXE}`);
 /** The ripgrep that comes with Codex, when this platform's package has one. */
-export const bundledRg = codexTarget && firstExisting(path.join(APP_ROOT, `node_modules/@openai/${codexTarget[0]}/vendor/${codexTarget[1]}/codex-path/rg`));
+export const bundledRg = codexTarget && firstExisting(path.join(APP_ROOT, `node_modules/@openai/${codexTarget[0]}/vendor/${codexTarget[1]}/codex-path/rg${EXE}`));
 
 /** The app's own data: ~/.hydor, or where an older install keeps it (~/.naget-agent, ~/.web-agent). */
 function dataDir(): string {
@@ -48,8 +52,8 @@ export const config = {
   taskRoot: [path.join(home, 'Hydor'), path.join(home, 'Naget')].find((d) => fs.existsSync(d)) ?? path.join(home, 'Hydor'),
   home,
   defaultCwd: process.env.DEFAULT_CWD ?? home,
-  claudeBin: process.env.CLAUDE_BIN ?? firstExisting(path.join(home, '.local/bin/claude')) ?? 'claude',
-  codexBin: process.env.CODEX_BIN ?? firstExisting(vendoredCodex, path.join(home, '.local/bin/codex')) ?? 'codex',
+  claudeBin: process.env.CLAUDE_BIN ?? firstExisting(path.join(home, `.local/bin/claude${EXE}`)) ?? 'claude',
+  codexBin: process.env.CODEX_BIN ?? firstExisting(vendoredCodex, path.join(home, `.local/bin/codex${EXE}`)) ?? 'codex',
   codexPackageRoot: path.join(APP_ROOT, 'node_modules/@openai/codex'),
   claudeProjectsDir: process.env.CLAUDE_PROJECTS_DIR ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(home, '.claude'), 'projects'),
   codexHome: process.env.CODEX_HOME ?? path.join(home, '.codex'),

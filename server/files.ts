@@ -29,7 +29,7 @@ export interface FsEntry {
 export function resolvePath(p: string | undefined): string {
   let s = String(p ?? '').trim();
   if (!s) return config.defaultCwd;
-  if (s === '~' || s.startsWith('~/')) s = path.join(os.homedir(), s.slice(1));
+  if (s === '~' || s.startsWith('~/') || (process.platform === 'win32' && s.startsWith('~\\'))) s = path.join(os.homedir(), s.slice(1));
   return path.resolve(s);
 }
 
@@ -352,7 +352,8 @@ function noteWhere(change: (w: Where) => void) {
  */
 export async function deletePath(pIn: string, o: { forGood?: boolean } = {}) {
   const p = resolvePath(pIn);
-  if (p === '/' || p === os.homedir()) throw new HttpError(400, 'Refusing to delete that');
+  // Nor a drive (C:\) on Windows.
+  if (p === '/' || p === os.homedir() || p === path.parse(p).root) throw new HttpError(400, 'Refusing to delete that');
   if (p === TRASH || p.startsWith(TRASH + path.sep)) throw new HttpError(400, 'It is in the trash already: delete it for good from Trash instead');
   if (!fs.existsSync(p) && !fs.lstatSync(p, { throwIfNoEntry: false })) throw new HttpError(404, 'Not found');
   await fs.promises.mkdir(TRASH, { recursive: true });

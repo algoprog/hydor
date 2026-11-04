@@ -9,6 +9,8 @@
 // folders too). Deleting a space keeps its folder and sessions, its knowledge bases become shared and its
 // skills join the skill library; it leaves the groups it was in.
 import crypto from 'node:crypto';
+import os from 'node:os';
+import { isAbsPath } from '../platform.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isGroup, MAX_FOLDERS, MAX_GROUP, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, type Space, type SpaceView } from '../../shared/spaces.ts';
@@ -88,7 +90,7 @@ function newFolder(db: DB, name: string): string {
   }
 }
 
-const home = (p: string) => p.replace(/^~(?=\/|$)/, process.env.HOME ?? '~');
+const home = (p: string) => p.replace(/^~(?=[\\/]|$)/, os.homedir());
 const isFolder = (p: string) => {
   try {
     return fs.statSync(p).isDirectory();
@@ -285,7 +287,7 @@ export const spaces: Feature = {
     d.app.get('/api/spaces/suggestions', async () => ({ folders: spaceSuggestions(d.db) }));
     d.app.post('/api/spaces/suggestions/hide', async (req) => {
       const folder = typeof body(req).folder === 'string' ? String(body(req).folder).trim() : '';
-      if (!folder.startsWith('/')) throw new HttpError(400, 'Which folder?');
+      if (!isAbsPath(folder)) throw new HttpError(400, 'Which folder?');
       hideSuggestion(d.db, folder);
       changed();
       return { folders: spaceSuggestions(d.db) };

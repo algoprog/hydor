@@ -4,6 +4,7 @@
 // at a time, never in a freer mode than the parent, and within a share of the parent's spending cap.
 // It is all tools on the app's own MCP server, so any agent can delegate to any other.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { MAX_RUNNING_DEFAULT, MAX_RUNNING_LIMIT, SWARM_SIZE_DEFAULT, SWARM_SIZE_LIMIT, type ChildNote, type ChildSettings } from '../../shared/children.ts';
 import { researchOf } from '../../shared/research.ts';
@@ -122,7 +123,7 @@ export function pickAgent(d: Deps, ctx: Pick<RunCtx, 'agent' | 'acpAgent' | 'key
 function folder(arg: unknown, cwd: string): string {
   const p = String(arg ?? '').trim();
   if (!p) return cwd;
-  const dir = path.resolve(cwd, p.replace(/^~(?=\/|$)/, process.env.HOME ?? '~'));
+  const dir = path.resolve(cwd, p.replace(/^~(?=[\\/]|$)/, os.homedir()));
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new Error(`There is no folder ${dir}.`);
   return dir;
 }

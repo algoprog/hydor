@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Builds tmux for the Mac app with its libraries linked in (libevent, and the two tmux asks for on macOS:
+# Builds tmux for the desktop app with its libraries linked in (libevent, and the two tmux asks for on macOS:
 # jemalloc, as macOS's calloc does not always clear memory, and utf8proc, for the width of emoji and other
-# complex characters), so it needs nothing beyond macOS itself.
+# complex characters), so it needs nothing beyond macOS itself. On Linux the terminal library (ncurses' tinfo) goes
+# in too, so it needs nothing beyond the C library; it reads the system's terminal descriptions where Debian,
+# Ubuntu, Fedora and Arch keep them (/etc/terminfo, /lib/terminfo, /usr/share/terminfo).
 #   scripts/build-tmux.sh <folder to put tmux in>
 set -euo pipefail
 dest="$(mkdir -p "$1" && cd "$1" && pwd)"
@@ -43,9 +45,16 @@ echo "utf8proc"
 echo "tmux"
 # The whole of jemalloc goes in: on macOS it takes over malloc by registering itself as it loads, which a
 # static link would otherwise leave out.
-if [ "$(uname -s)" = Darwin ]; then force_load="-Wl,-force_load,$deps/lib/libjemalloc.a"; else force_load="$deps/lib/libjemalloc.a -lpthread"; fi
+curses=()
+if [ "$(uname -s)" = Darwin ]; then force_load="-Wl,-force_load,$deps/lib/libjemalloc.a"; else
+  force_load="$deps/lib/libjemalloc.a -lpthread"
+  tinfo="$(cc -print-file-name=libtinfo.a)"
+  [ -f "$tinfo" ] || { echo "Install ncurses' static library first (Debian, Ubuntu: libncurses-dev)" >&2; exit 1; }
+  curses=(LIBTINFO_LIBS="$tinfo")
+fi
 (cd "tmux-$TMUX_VERSION" &&
-  LIBEVENT_CORE_CFLAGS="-I$deps/include" LIBEVENT_CORE_LIBS="$deps/lib/libevent_core.a" \
+  env ${curses[@]+"${curses[@]}"} \
+    LIBEVENT_CORE_CFLAGS="-I$deps/include" LIBEVENT_CORE_LIBS="$deps/lib/libevent_core.a" \
     LIBEVENT_CFLAGS="-I$deps/include" LIBEVENT_LIBS="$deps/lib/libevent_core.a" \
     JEMALLOC_CFLAGS="-I$deps/include" JEMALLOC_LIBS="$force_load" \
     LIBUTF8PROC_CFLAGS="-I$deps/include" LIBUTF8PROC_LIBS="$deps/lib/libutf8proc.a" \
@@ -62,6 +71,13 @@ if command -v otool >/dev/null; then
     echo "tmux links to libraries macOS does not have" >&2
     exit 1
   fi
+elif [ "$(uname -s)" = Linux ]; then
+  if ldd "$dest/tmux" | grep -v -E 'linux-vdso|ld-linux|/lib(c|m|dl|rt|util|resolv|pthread)\.so'; then
+    echo "tmux links to libraries beyond the C library" >&2
+    exit 1
+  fi
+  # The newest C library it needs (the app runs where that one is).
+  objdump -T "$dest/tmux" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
 fi
 "$dest/tmux" -V
 # jemalloc and utf8proc are in it.

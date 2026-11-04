@@ -16,6 +16,11 @@
 <p align="center">
   <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-Apple_silicon-111?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Apple silicon)" /></a>
   <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-Intel-111?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Intel)" /></a>
+  <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-win.exe"><img src="https://img.shields.io/badge/Download_for_Windows-x64-111?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjIiIHk9IjMiIHdpZHRoPSIyMCIgaGVpZ2h0PSIxNCIgcng9IjIiLz48cGF0aCBkPSJNOCAyMWg4TTEyIDE3djQiLz48L3N2Zz4=" alt="Download for Windows (x64)" /></a>
+</p>
+<p align="center">
+  <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-linux.deb"><img src="https://img.shields.io/badge/Download_for_Linux-.deb-111?style=for-the-badge&logo=ubuntu&logoColor=white" alt="Download for Linux (.deb, for Ubuntu and Debian)" /></a>
+  <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-linux.AppImage"><img src="https://img.shields.io/badge/Download_for_Linux-AppImage-111?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux (AppImage)" /></a>
   <a href="https://hub.docker.com/r/algoprog/hydor"><img src="https://img.shields.io/badge/Docker-algoprog%2Fhydor-1D63ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker image algoprog/hydor" /></a>
 </p>
 <p align="center">
@@ -69,10 +74,20 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 
 ## Quick start
 
-On a Mac (macOS 12 or newer): download the Mac app for
-[Apple silicon](https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg) or
-[Intel](https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg) (or pick from the
-[latest release](https://github.com/algoprog/hydor/releases/latest)) and drag it to Applications. It brings everything it needs and keeps itself up to date. See [the Mac app](docs/install.md#the-mac-app).
+Download the app for your computer. Each one brings everything it needs, runs Hydor in a window of its own, and
+keeps itself up to date:
+
+- **Mac** (macOS 12 or newer): for [Apple silicon](https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg) or [Intel](https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-mac.dmg); drag it
+  to Applications. See [the Mac app](docs/install.md#the-mac-app).
+- **Windows** (10 or 11, x64): [the installer](https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-win.exe), for your account. Agents run their commands in
+  [Git for Windows](https://git-scm.com/download/win)' bash, so install that too. See
+  [the Windows app](docs/install.md#the-windows-app).
+- **Linux** (x64 or ARM, from 2022 on: Ubuntu 22.04, Debian 12, Fedora 36 or newer): the `.deb` for Ubuntu and Debian
+  ([x64](https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-linux.deb), [ARM](https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-linux.deb)), or the AppImage for any other
+  ([x64](https://github.com/algoprog/hydor/releases/latest/download/Hydor-x64-linux.AppImage), [ARM](https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-linux.AppImage)). See
+  [the Linux app](docs/install.md#the-linux-app).
+
+Or pick one from the [latest release](https://github.com/algoprog/hydor/releases/latest).
 
 With Docker, on Linux, macOS or Windows (Intel/AMD and ARM):
 

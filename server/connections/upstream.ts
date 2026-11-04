@@ -2,6 +2,7 @@
 // older HTTP with server-sent events (a stream that names where to post, answers coming on the
 // stream), or a local command over stdin and stdout (for the Test button; agents start those themselves).
 import { spawn } from 'node:child_process';
+import { spawnProgram } from '../platform.ts';
 import crypto from 'node:crypto';
 import { agentBaseEnv } from '../env.ts';
 
@@ -327,7 +328,7 @@ export function stdioTools(o: { command: string; args: string[]; env: Record<str
   return new Promise((resolve, reject) => {
     let p: ReturnType<typeof spawn>;
     try {
-      p = spawn(o.command, o.args, { cwd: o.cwd, env: { ...agentBaseEnv(), ...o.env }, stdio: ['pipe', 'pipe', 'pipe'] });
+      p = spawnProgram(o.command, o.args, { cwd: o.cwd, env: { ...agentBaseEnv(), ...o.env }, stdio: ['pipe', 'pipe', 'pipe'] });
     } catch (e) {
       return reject(e);
     }

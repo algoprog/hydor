@@ -50,7 +50,8 @@ import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_POR
 import { Kernels } from './notebook/kernels.ts';
 import * as setup from './setup.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
-import { tellDesktop } from './desktop.ts';
+import { onDesktop, tellDesktop } from './desktop.ts';
+import { isAbsPath, trimSep, within } from './platform.ts';
 import { startSettings, updateStartSettings } from './startSettings.ts';
 import { claudeRetention, setClaudeRetention } from './claudeHistory.ts';
 import { computeStats } from './stats.ts';
@@ -1051,7 +1052,7 @@ const filePins = (): string[] => {
 app.get('/api/fs/pins', async () => ({ pins: filePins() }));
 app.put('/api/fs/pins', async (req) => {
   const v = ((req.body ?? {}) as Record<string, unknown>).pins;
-  const pins = [...new Set((Array.isArray(v) ? v : []).filter((p): p is string => typeof p === 'string' && p.startsWith('/') && p.length <= 4096))].slice(0, 30);
+  const pins = [...new Set((Array.isArray(v) ? v : []).filter((p): p is string => typeof p === 'string' && isAbsPath(p) && p.length <= 4096))].slice(0, 30);
   kvSet(db, 'files.pins', JSON.stringify(pins));
   return { pins };
 });
@@ -1069,8 +1070,8 @@ app.get('/api/fs/diff', async (req) => ({ diff: await files.gitDiff((req.query a
 app.get('/api/fs/recent', async (req) => {
   if ((req.query as Record<string, string>).picked !== '1') return { dirs: sessions.recentDirs() };
   // The start page's recent folders: those picked, not the ones the app made for a task, an app's run or a worktree.
-  const made = madeRoots().map((r) => r.replace(/\/+$/, '') + '/');
-  return { dirs: sessions.recentDirs(200).filter((d) => !made.some((r) => d.startsWith(r))).slice(0, 12) };
+  const made = madeRoots();
+  return { dirs: sessions.recentDirs(200).filter((d) => !made.some((r) => d !== trimSep(r) && within(d, r))).slice(0, 12) };
 });
 
 // ---- git -----------------------------------------------------------------------------------
@@ -1078,7 +1079,7 @@ app.get('/api/fs/recent', async (req) => {
 const gitArgs = (req: FastifyRequest) => ({ ...((req.query ?? {}) as Record<string, unknown>), ...((req.body ?? {}) as Record<string, unknown>) });
 const repoPath = (req: FastifyRequest) => {
   const p = String(gitArgs(req).path ?? '');
-  if (!p.startsWith('/')) throw new HttpError(400, 'Which repository?');
+  if (!isAbsPath(p)) throw new HttpError(400, 'Which repository?');
   return p;
 };
 const gitStr = (req: FastifyRequest, k: string) => String(gitArgs(req)[k] ?? '').trim();
@@ -1840,3 +1841,5 @@ const shutdown = async () => {
 };
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+// The Windows app asks over its channel (Windows has no SIGTERM a program can catch).
+onDesktop('quit', () => void shutdown());

@@ -4,6 +4,7 @@
 // model on "Automatic" (an app's model steps, memory notes…). An account that has reached its usage limit, or
 // is signed out, hands the question to the next one signed in, as sessions switch accounts at a limit.
 import { execFile } from 'node:child_process';
+import { execProgram } from './platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -69,9 +70,9 @@ const long = (text: string) => Buffer.byteLength(text) > ARG_MAX;
 /** Runs a CLI with `input` on stdin (else nothing): what it wrote, and why it failed when it did (in words, never the whole command). */
 function run(bin: string, args: string[], o: { timeout: number; env?: Env; signal?: AbortSignal; input?: string }): Promise<{ ok: boolean; stdout: string; stderr: string; why?: string; timedOut?: boolean }> {
   return new Promise((resolve) => {
-    const child = execFile(bin, args, { cwd: os.tmpdir(), env: { ...agentBaseEnv(), ...o.env }, timeout: o.timeout, maxBuffer: 8 * 1024 * 1024, signal: o.signal }, (err, stdout, stderr) => {
-      const out = String(stdout ?? '');
-      const errs = String(stderr ?? '');
+    const child = execProgram(bin, args, { cwd: os.tmpdir(), env: { ...agentBaseEnv(), ...o.env }, timeout: o.timeout, maxBuffer: 8 * 1024 * 1024, signal: o.signal }, (err, stdout, stderr) => {
+      const out = stdout;
+      const errs = stderr;
       if (!err) return resolve({ ok: true, stdout: out, stderr: errs });
       const e = err as NodeJS.ErrnoException & { killed?: boolean };
       if (o.signal?.aborted) return resolve({ ok: false, stdout: out, stderr: errs, why: 'it was stopped' });

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNo
 import { Check, ChevronDown, ChevronRight, Folder, FolderOpen, History, House, Search } from 'lucide-react';
 import type { DirEntry } from '@shared/types';
 import { api } from '../lib/api';
-import { basename, dirname, tildify } from '../lib/format';
+import { basename, dirname, isWinPath, joinPath, tildify } from '../lib/format';
 import { useApp } from '../lib/store';
 import { folderName, givenName, useFolderNames } from '../lib/folderNames';
 import { cx, MenuSep, Popover, useSheets } from './ui';
@@ -126,11 +126,11 @@ export function FolderFinder({
   // Folders you renamed show, and are found, by their names.
   useFolderNames((x) => x.mine);
   const text = q.trim();
-  const asPath = text.startsWith('/') || text.startsWith('~') || text.includes('/');
-  const full = text.startsWith('~') ? home + text.slice(1) : text.startsWith('/') ? text : `${home}/${text}`;
-  const cut = full.lastIndexOf('/');
+  const asPath = text.startsWith('/') || text.startsWith('~') || text.includes('/') || isWinPath(text) || text.includes('\\');
+  const full = text.startsWith('~') ? home + text.slice(1) : text.startsWith('/') || isWinPath(text) ? text : joinPath(home, text);
+  const cut = Math.max(full.lastIndexOf('/'), isWinPath(full) ? full.lastIndexOf('\\') : -1);
   // A path lists the folder it names up to its last slash; a name looks in home and in the folder in use.
-  const base = asPath ? full.slice(0, Math.max(cut, 1)) : home;
+  const base = asPath ? (isWinPath(full) && cut <= 2 ? `${full.slice(0, 2)}\\` : full.slice(0, Math.max(cut, 1))) : home;
   const part = (asPath ? full.slice(cut + 1) : text).toLowerCase();
   const hidden = part.startsWith('.');
   const inBase = useSubfolders(text ? base : null, hidden);

@@ -17,6 +17,7 @@
 // Typesetting is kept by the hash of what goes in (the last 30 on disk), and the same document is never typeset
 // twice at once.
 import { execFileSync, spawn } from 'node:child_process';
+import { linkPath } from '../platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -917,7 +918,7 @@ function mirror(folder: string, dir: string, plan: FolderPlan) {
       if (e.dir) fs.mkdirSync(to, { recursive: true });
       else {
         fs.mkdirSync(path.dirname(to), { recursive: true });
-        fs.symlinkSync(path.join(folder, e.rel), to);
+        linkPath(path.join(folder, e.rel), to);
       }
     } catch {}
   }

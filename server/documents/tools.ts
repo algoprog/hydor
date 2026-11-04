@@ -1,6 +1,7 @@
 // The programs documents use when they are here (pdftotext, LibreOffice), and where their helpers keep
 // files (the app's data folder). Node built-ins only: Custom's own process uses this too.
 import { execFile } from 'node:child_process';
+import { programFile } from '../platform.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,13 +24,12 @@ export function which(cmd: string, also: string[] = []): string | null {
   let found: string | null = null;
   const dirs = [...(process.env.PATH ?? '').split(path.delimiter), '/usr/bin', '/usr/local/bin', '/opt/homebrew/bin'];
   for (const c of [...dirs.filter(Boolean).map((d) => path.join(d, cmd)), ...also]) {
-    try {
-      fs.accessSync(c, fs.constants.X_OK);
-      if (fs.statSync(c).isFile()) {
-        found = c;
-        break;
-      }
-    } catch {}
+    // (On Windows with its ending: soffice finds soffice.exe.)
+    const f = programFile(c);
+    if (f) {
+      found = f;
+      break;
+    }
   }
   seen.set(cmd, { at: Date.now(), path: found });
   return found;

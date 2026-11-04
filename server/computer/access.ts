@@ -23,7 +23,8 @@ export const setComputerDeps = (d: Deps) => (deps = d);
 
 /** Where the server runs and what macOS allows; the tests put stand-ins here. */
 export const hooks = {
-  inApp: () => !!desktop,
+  // The Mac app only: the Windows and Linux apps have no computer use yet.
+  inApp: () => desktop?.platform === 'mac',
   permissions: async (): Promise<ComputerPermissions | null> => {
     const r = await askDesktop<{ accessibility?: unknown; screen?: unknown }>({ what: 'permissions' }, 4000);
     return { accessibility: r.accessibility === true, screen: SCREEN.includes(r.screen as ScreenAccess) ? (r.screen as ScreenAccess) : 'unknown' };

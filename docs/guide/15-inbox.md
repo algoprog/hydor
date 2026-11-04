@@ -96,7 +96,7 @@ Notices from your other machines come through this one, so one device hears from
 
 [Settings → App → Notifications](/settings?s=notifications) has two switches, set on each device (each browser) for itself, and a test:
 
-- [**Notify this device**](/settings?s=notifications&find=Notify%20this%20device): a notification when a session finishes, fails or needs your answer, even with the app closed. Turning it on asks the browser for permission to show notifications. Each device turns it on for itself: your phone and your computer separately. In the Mac app it is always on: the app shows the notifications itself while it runs, even with its window closed.
+- [**Notify this device**](/settings?s=notifications&find=Notify%20this%20device): a notification when a session finishes, fails or needs your answer, even with the app closed. Turning it on asks the browser for permission to show notifications. Each device turns it on for itself: your phone and your computer separately. In a desktop app (Mac, Windows, Linux) it is always on: the app shows the notifications itself while it runs, even with its window closed.
 - [**Sound**](/settings?s=notifications&find=Sound): a short chime with each notice while the app is open, rising when a session finishes and falling when it needs you or failed. Off at first; turning it on plays the chime once.
 - [**Send a test**](/settings?s=notifications&find=Send%20a%20test) (the **Try it** row, shown once **Notify this device** is on): sends a notification to every device that turned notifications on. It says "Notifications work on this device." and shows when the app is not in view, so switch away from it to see it. A message tells you how many devices it was sent to, or "No device got it."
 

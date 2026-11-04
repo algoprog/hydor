@@ -1,6 +1,7 @@
 // Memory in the pages: whether it is on (for all sessions, and for one), and the server's news that
 // notes changed, so open lists and notes refresh.
 import { useEffect } from 'react';
+import { basename } from '../../lib/format';
 import { create } from 'zustand';
 import type { MemoryEntry, MemoryScope, MemorySource, MemoryState } from '@shared/memory';
 import { api, enc, patch } from '../../lib/api';
@@ -51,7 +52,7 @@ export function setSessionMemory(key: string, on: boolean) {
 export const SOURCE: Record<MemorySource, string> = { auto: 'the helper', agent: 'an agent', user: 'you' };
 
 /** The last part of a folder's path, for a project's name. */
-export const folderName = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
+export const folderName = (p: string) => basename(p) || p;
 
 /** A plain name for where an entry belongs, as seen from a session (`here`). */
 export function placeName(scope: MemoryScope, scopeKey: string, here?: string): string {

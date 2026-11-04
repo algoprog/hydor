@@ -1,7 +1,8 @@
+import { basename } from './format';
 // Shell commands in plain words for the timeline ("Read index.ts", "Run the tests"), for agents that
 // don't describe their commands themselves. Only common commands get a name; the rest show as typed.
 
-const base = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
+const base = (p: string) => basename(p) || p;
 const quoted = (s: string) => `“${s.length > 40 ? s.slice(0, 39) + '…' : s}”`;
 const unescape = (re: string) => re.replace(/\\([.()[\]{}|*+?^$\\/-])/g, '$1');
 

@@ -23,6 +23,7 @@
 //   GET /pg/:token (the page's own address), /pg/:token/html, /pg/:token/manifest.webmanifest, POST /pg/:token/storage
 //   GET /site/:token/* (published sites, sandboxed)
 import fs from 'node:fs';
+import { isAbsPath } from '../platform.ts';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
@@ -548,7 +549,7 @@ function routes(d: Deps) {
   app.post('/api/pages/file-edit', { bodyLimit: 12 * 1024 * 1024 }, async (req) => {
     const b = B(req);
     const sessionKey = key(b.sessionKey);
-    if (!sessionKey || typeof b.path !== 'string' || !b.path.startsWith('/') || typeof b.before !== 'string' || typeof b.after !== 'string') throw new HttpError(400, 'Which session, file, and what changed?');
+    if (!sessionKey || typeof b.path !== 'string' || !isAbsPath(b.path) || typeof b.before !== 'string' || typeof b.after !== 'string') throw new HttpError(400, 'Which session, file, and what changed?');
     if (b.before !== b.after) noteFileEdit(db, sessionKey, b.path.slice(0, 4096), b.before, b.after);
     return { ok: true };
   });

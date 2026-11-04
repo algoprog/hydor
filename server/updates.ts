@@ -4,13 +4,15 @@
 // Docker image's restart loop: both leave the agents running) also updates itself, after 5 hours
 // without a message from you and at most once a day. Agents may be at work meanwhile.
 //
-// In the Mac app (desktop.ts) it is by version instead: the newest release on GitHub says which version is
-// out and where each Mac's build is. The app looks a minute after it starts and then every 4 hours. With updates
-// on, it downloads a new version at once, checks it and unpacks it, says so (a notification from the Mac, and a
-// note in every open page that counts down a minute, with Restart now and Later), then hands it to the app, which
-// swaps itself for it, starts again, and goes back to the version before if the new one does not start. Later
-// puts it off for 4 hours; Restart to Update in the menu bar and Restart now in Settings install it at any time.
-// With updates off nothing downloads by itself: Update now downloads, checks and installs at once.
+// In the desktop apps (desktop.ts) it is by version instead: the newest release on GitHub says which version is
+// out and where each system's builds are (hydor-mac.json, hydor-windows.json, hydor-linux.json). The app looks a
+// minute after it starts and then every 4 hours. With updates on, it downloads a new version at once, checks it (and
+// unpacks a Mac's), says so (a notification, and a note in every open page that counts down a minute, with Restart
+// now and Later), then hands it to the app, which installs it its own way (desktop/main.cjs) and starts again: a Mac
+// app or an AppImage goes back to the version before if the new one does not start. Later puts it off for 4 hours;
+// Restart to Update in the menus and Restart now in Settings install it at any time. The .deb asks for your password
+// to install, so there a version downloaded by itself waits for you. With updates off nothing downloads by itself:
+// Update now downloads, checks and installs at once.
 import { execFile, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -24,7 +26,7 @@ import { HttpError } from './auth.ts';
 import { newer } from './clients.ts';
 import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
-import { desktop, onDesktop, tellDesktop } from './desktop.ts';
+import { desktop, onDesktop, SYSTEM_NAME, tellDesktop } from './desktop.ts';
 import { agentBaseEnv } from './env.ts';
 import { git } from './git.ts';
 import { appWords } from './language/index.ts';
@@ -81,6 +83,7 @@ export function updateState(): UpdateState | null {
   return {
     ...check,
     kind: desktop ? 'app' : 'git',
+    ...(desktop ? { platform: desktop.platform, format: desktop.format } : {}),
     auto: !!ctx && autoOn(ctx.db),
     canRestart: !!restarter(),
     running,
@@ -177,7 +180,7 @@ export function startUpdate(auto: boolean): UpdateState | null {
   if (!ctx) throw new HttpError(503, 'Starting up');
   if (running) throw new HttpError(409, 'An update is already running');
   if (desktop) {
-    if (!desktop.updatable) throw new HttpError(400, 'Move Hydor to your Applications folder to update it');
+    if (!desktop.updatable) cannotUpdate();
     if (ready) {
       installReady(ctx.db, auto);
       return updateState();
@@ -241,7 +244,7 @@ export function setAutoUpdate(on: boolean): UpdateState | null {
     kvSet(ctx.db, 'update.auto', on ? '1' : '0');
     // A version waiting: it now installs after its notice, or waits for you.
     if (ready) {
-      ready = { ...ready, ...(on ? appInstallTimes(Date.now(), ready.version, laterOf(ctx.db)) : { askAt: 0, installAt: 0 }), told: false };
+      ready = { ...ready, ...(on && installsAlone() ? appInstallTimes(Date.now(), ready.version, laterOf(ctx.db)) : { askAt: 0, installAt: 0 }), told: false };
       schedule();
     } else if (on) autoDownload();
   }
@@ -333,18 +336,37 @@ export function watchUpdates(db: DB, onChange: (u: UpdateState | null) => void) 
   }, 10 * 60_000).unref();
 }
 
-// ---- the Mac app: by release --------------------------------------------------------------------------------
+/** Why this copy cannot update itself, as Settings says it too. */
+function cannotUpdate(): never {
+  switch (desktop?.format) {
+    case 'app':
+      throw new HttpError(400, 'Move Hydor to your Applications folder to update it');
+    case 'appimage':
+      throw new HttpError(400, 'Put the AppImage in a folder you can write to (your home folder, say) to update it');
+    case 'deb':
+      throw new HttpError(400, 'Updating the .deb needs pkexec: install the new version from the Releases page');
+    default:
+      throw new HttpError(400, 'This copy does not update itself: install the new version from the Releases page');
+  }
+}
 
-/** The newest release's Mac builds (mac/scripts/feed.mjs writes it, the release carries it). */
+/** Whether a version downloaded by itself installs by itself too: not the .deb, which asks for your password. */
+const installsAlone = () => desktop?.format !== 'deb';
+
+// ---- the desktop apps: by release ------------------------------------------------------------------------
+
+/** The newest release's builds for this system (desktop/scripts/feed.mjs writes it, the release carries it). */
 interface Feed {
   version: string;
   files: Record<string, { url: string; sha512: string; size: number }>;
 }
-const feedUrl = () => process.env.HYDOR_UPDATE_FEED || 'https://github.com/algoprog/hydor/releases/latest/download/hydor-mac.json';
+const feedUrl = () => process.env.HYDOR_UPDATE_FEED || `https://github.com/algoprog/hydor/releases/latest/download/hydor-${desktop?.platform ?? 'mac'}.json`;
+/** This copy's build in the feed: a Mac's by its processor, the others' by their kind and processor (appimage-x64). */
+const buildKey = () => (!desktop || desktop.platform === 'mac' ? process.arch : `${desktop.format}-${process.arch}`);
 
 async function feed(): Promise<Feed> {
   const r = await fetch(feedUrl(), { signal: AbortSignal.timeout(30_000), headers: { 'user-agent': `hydor/${config.version}` } });
-  if (!r.ok) throw new Error(r.status === 404 ? 'no Mac release is published yet' : `GitHub answered ${r.status}`);
+  if (!r.ok) throw new Error(r.status === 404 ? `no ${SYSTEM_NAME[desktop?.platform ?? 'mac']} release is published yet` : `GitHub answered ${r.status}`);
   const f = (await r.json()) as Feed;
   if (typeof f?.version !== 'string' || typeof f.files !== 'object') throw new Error('the release does not say its version');
   return f;
@@ -353,7 +375,7 @@ async function feed(): Promise<Feed> {
 async function checkRelease(): Promise<UpdateState | null> {
   try {
     const f = await feed();
-    const out = newer(f.version, config.version) && !!f.files[process.arch];
+    const out = newer(f.version, config.version) && !!f.files[buildKey()];
     check = { behind: out ? 1 : 0, latest: out ? f.version : undefined, checkedAt: Date.now() };
   } catch (e) {
     check = { behind: check?.behind ?? 0, latest: check?.latest, checkedAt: Date.now(), error: (e as Error).message.slice(0, 200) };
@@ -397,12 +419,19 @@ async function teamOf(app: string): Promise<string | null> {
   return team && team !== 'not set' ? team : null;
 }
 
-/** Downloads the build for this Mac, checks it is the one the release names, and unpacks it next to the others. */
+/**
+ * Downloads this copy's build, checks it is the one the release names, and for a Mac unpacks it next to the others.
+ * Its path: the new Hydor.app, AppImage, installer (.exe) or package (.deb).
+ */
 async function fetchBuild(to: string, file: Feed['files'][string]): Promise<string> {
   const dir = path.join(desktop!.cache, 'updates');
-  fs.rmSync(dir, { recursive: true, force: true });
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch {}
   fs.mkdirSync(dir, { recursive: true });
-  const zip = path.join(dir, `${to}.zip`);
+  const mac = desktop!.platform === 'mac';
+  const ext = { app: '.zip', nsis: '-setup.exe', appimage: '.AppImage', deb: '.deb', dir: '', dev: '.zip' }[desktop!.format];
+  const zip = path.join(dir, `Hydor-${to}${ext}`);
   const r = await fetch(file.url, { signal: AbortSignal.timeout(30 * 60_000), headers: { 'user-agent': `hydor/${config.version}` } });
   if (!r.ok || !r.body) throw new Error(`the download failed (${r.status})`);
   const hash = createHash('sha512');
@@ -410,6 +439,10 @@ async function fetchBuild(to: string, file: Feed['files'][string]): Promise<stri
   body.on('data', (c: Buffer) => hash.update(c));
   await pipeline(body, fs.createWriteStream(zip));
   if (fs.statSync(zip).size !== file.size || hash.digest('base64') !== file.sha512) throw new Error('the download is not the build the release names (its checksum differs)');
+  if (!mac) {
+    if (desktop!.format === 'appimage') fs.chmodSync(zip, 0o755);
+    return zip;
+  }
   const out = path.join(dir, 'app');
   const x = await run('ditto', ['-x', '-k', zip, out], 10 * 60_000);
   fs.rmSync(zip, { force: true });
@@ -437,7 +470,7 @@ async function updateApp(db: DB, auto: boolean, then: 'install' | 'wait') {
   };
   try {
     const f = await feed();
-    const file = f.files[process.arch];
+    const file = f.files[buildKey()];
     if (!newer(f.version, from) || !file) {
       check = { behind: 0, checkedAt: Date.now() };
       if (then === 'wait') {
@@ -448,8 +481,8 @@ async function updateApp(db: DB, auto: boolean, then: 'install' | 'wait') {
     }
     const to = f.version;
     const app = await fetchBuild(to, file);
-    // A signed app takes only a build signed by the same developer.
-    const team = await teamOf(desktop!.app);
+    // A signed Mac app takes only a build signed by the same developer.
+    const team = desktop!.platform === 'mac' ? await teamOf(desktop!.app) : null;
     if (team) {
       const v = await run('codesign', ['--verify', '--deep', '--strict', app]);
       if (!v.ok) return fail('the new version’s signature does not check out', to);
@@ -458,7 +491,7 @@ async function updateApp(db: DB, auto: boolean, then: 'install' | 'wait') {
     running = undefined;
     ready = { version: to, app, at: Date.now(), askAt: 0, installAt: 0 };
     if (then === 'install') return installReady(db, auto);
-    if (autoOn(db)) ready = { ...ready, ...appInstallTimes(Date.now(), to, laterOf(db)) };
+    if (autoOn(db) && installsAlone()) ready = { ...ready, ...appInstallTimes(Date.now(), to, laterOf(db)) };
     schedule();
     emit();
   } catch (e) {

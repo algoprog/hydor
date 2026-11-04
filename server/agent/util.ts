@@ -1,8 +1,9 @@
 // Small helpers Custom's tools share.
 import path from 'node:path';
+import os from 'node:os';
 
 /** A path the model gave, from the session's folder (~ is the home folder). */
-export const resolvePath = (cwd: string, p: unknown) => path.resolve(cwd, String(p ?? '.').replace(/^~(?=\/|$)/, process.env.HOME ?? '~'));
+export const resolvePath = (cwd: string, p: unknown) => path.resolve(cwd, String(p ?? '.').replace(/^~(?=[\\/]|$)/, os.homedir()));
 
 /** A path as the model is shown it: from the session's folder when inside it. */
 export const relPath = (cwd: string, p: string) => (p.startsWith(cwd + path.sep) ? p.slice(cwd.length + 1) : p);

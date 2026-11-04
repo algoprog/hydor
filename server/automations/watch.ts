@@ -4,6 +4,7 @@
 // state) to compare with; the first look only takes note. What they read comes from outside: the
 // scheduler quotes it to the agent as data, never as instructions.
 import { spawn } from 'node:child_process';
+import { bashCommand, killTree, WIN } from '../platform.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -72,7 +73,13 @@ async function fetchText(input: string, local?: boolean, maxBytes = 3_000_000): 
 /** A command's output (stdout and stderr together) and exit code, in a minute at most. */
 export function runCommand(command: string, cwd: string, timeoutMs = 60_000): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
-    const p = spawn('/bin/sh', ['-c', command], { cwd: fs.existsSync(cwd) ? cwd : os.homedir(), detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let sh: { cmd: string; args: string[] };
+    try {
+      sh = WIN ? bashCommand(command) : { cmd: '/bin/sh', args: ['-c', command] };
+    } catch (e) {
+      return resolve({ code: 127, output: (e as Error).message });
+    }
+    const p = spawn(sh.cmd, sh.args, { cwd: fs.existsSync(cwd) ? cwd : os.homedir(), detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     let out = '';
     const add = (b: Buffer) => {
       if (out.length < 200_000) out += b.toString('utf8');
@@ -80,9 +87,7 @@ export function runCommand(command: string, cwd: string, timeoutMs = 60_000): Pr
     p.stdout.on('data', add);
     p.stderr.on('data', add);
     const timer = setTimeout(() => {
-      try {
-        process.kill(-p.pid!, 'SIGKILL');
-      } catch {}
+      killTree(p.pid!, 'SIGKILL');
       out += `\n[stopped after ${Math.round(timeoutMs / 1000)} s]`;
     }, timeoutMs);
     p.on('error', (e) => {

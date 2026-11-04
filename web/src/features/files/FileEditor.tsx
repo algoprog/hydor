@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, MessageSquarePlus, RotateCcw, Save, Search, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle } from '../../lib/codemirror';
-import { basename, bytes, dirname, tildify } from '../../lib/format';
+import { basename, bytes, dirname, isWinPath, tildify } from '../../lib/format';
 import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
@@ -269,7 +269,7 @@ export function FileEditor({
   }, [dirty]);
 
   const raw = mu(`/api/fs/raw?path=${encodeURIComponent(path)}`);
-  const crumbs = tildify(path, home).split('/');
+  const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
   const text = !!file && !file.binary && !file.tooLarge;
   const togglePreview = () => setMode((m) => (m === 'preview' ? 'edit' : 'preview'));
   const toggleDiff = () => setMode((m) => (m === 'diff' ? 'edit' : 'diff'));

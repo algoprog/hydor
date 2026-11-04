@@ -23,7 +23,7 @@ export type MeaningDevice = 'auto' | 'cpu';
 const dir = () => path.join(config.dataDir, 'memory');
 const venv = () => path.join(dir(), 'venv');
 /** The Python that runs the worker: one given (HYDOR_EMBED_PYTHON, with PyTorch and Transformers), else the private one. */
-const python = () => process.env.HYDOR_EMBED_PYTHON || path.join(venv(), 'bin', 'python');
+const python = () => process.env.HYDOR_EMBED_PYTHON || path.join(venv(), ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']));
 /** What the environment holds: another list means setting it up again. */
 const PACKAGES = 'torch transformers>=5.6,<6';
 const WORKER = path.join(APP_ROOT, 'server/memory/embed_worker.py');
@@ -402,7 +402,9 @@ function setup(db: DB): Promise<void> {
         if (!fs.existsSync(python())) await run(uv, ['venv', '--quiet', '--python', '>=3.10', venv()], 'Making a private Python environment');
         await run(uv, ['pip', 'install', '--quiet', '--python', python(), `--torch-backend=${gpu ? 'auto' : 'cpu'}`, 'torch', 'transformers>=5.6,<6'], `Installing PyTorch${gpu ? '' : ' (CPU build)'} and Transformers: a few minutes`);
       } else {
-        const sys = which('python3');
+        // Windows: python.exe from python.org, else its py launcher.
+        const sys = process.platform === 'win32' ? (which('python') ?? which('py')) : which('python3');
+        if (!sys && process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (python.org, or: winget install Python.Python.3.12).');
         if (!sys) throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
         if (!fs.existsSync(python())) await run(sys, ['-c', 'import sys, venv; sys.exit(0 if sys.version_info >= (3, 10) else 1)'], 'Checking Python (3.10 or newer)');
         if (!fs.existsSync(python())) await run(sys, ['-m', 'venv', venv()], 'Making a private Python environment');

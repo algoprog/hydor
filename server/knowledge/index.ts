@@ -3,6 +3,7 @@
 // citing each passage's file and page: a session the shared ones and its space's own (server/knowledge/scope.ts).
 // Folders are read where they are and looked over again every hour.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { KnowledgeState } from '../../shared/knowledge.ts';
 import { HttpError } from '../auth.ts';
@@ -62,7 +63,7 @@ function routes(d: Deps) {
     baseRow(db, id(req));
     const p = String(body(req).path ?? '').trim();
     if (!p) throw new HttpError(400, 'Which folder?');
-    const s = addSource(db, id(req), 'folder', p.replace(/^~(?=\/|$)/, process.env.HOME ?? '~'));
+    const s = addSource(db, id(req), 'folder', p.replace(/^~(?=[\\/]|$)/, os.homedir()));
     rescan(id(req));
     return s;
   });

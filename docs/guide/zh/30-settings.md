@@ -23,7 +23,7 @@
 - [**用量限制解除后继续**](/settings?s=general&find=Resume%20after%20usage%20limits)：在套餐额度重置一分钟后继续会话。
 - [**删除不活跃的会话**](/settings?s=general&find=Delete%20inactive%20sessions)：删除一年（或你选择的时长）无人使用的会话；在此之前，每个对话都会保留。
 - [**开机时启动**](/settings?s=general&find=Start%20when%20this%20computer%20starts)：电脑启动时自动启动本应用。
-- [**自动更新**](/settings?s=general&find=Update%20automatically)：自动安装新版本：Mac 应用在新版本一发布时安装，并提前一分钟告诉你；从 git 安装的副本则在你一段时间没有使用时安装。
+- [**自动更新**](/settings?s=general&find=Update%20automatically)：自动安装新版本：桌面应用在新版本一发布时安装，并提前一分钟告诉你；从 git 安装的副本则在你一段时间没有使用时安装。
 - [**开始导览**](/settings?s=general&find=Take%20the%20tour)：了解应用各部分的作用。
 - [**小贴士**](/settings?s=general&find=Tips)：欢迎导览之后，在你第一次用到应用的某个部分时为你指出它。
 - [**立即检查**](/settings?s=general&find=Check%20now)：立即检查新版本。

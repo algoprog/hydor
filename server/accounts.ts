@@ -3,6 +3,7 @@
 // (CLAUDE_CONFIG_DIR / CODEX_HOME), with its own sign-in and history. Settings, instructions, skills
 // and plugins are linked in from the default account, so only the sign-in differs.
 import crypto from 'node:crypto';
+import { linkPath } from './platform.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Agent, AgentAccount } from '../shared/types.ts';
@@ -151,7 +152,7 @@ export function addAccount(db: DB, agent: Agent, name: string): AgentAccount {
     const src = path.join(shared.from, f);
     if (fs.existsSync(src)) {
       try {
-        fs.symlinkSync(src, path.join(dir, f));
+        linkPath(src, path.join(dir, f));
       } catch {}
     }
   }

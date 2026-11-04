@@ -9,6 +9,7 @@
 // skills it switches on or off for itself (spaceSkills.ts): the library's and its own through its view,
 // Claude Code's own as --settings skillOverrides, Codex's own as skills.config in its thread's settings.
 import { execFile } from 'node:child_process';
+import { execProgram } from '../platform.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -174,7 +175,7 @@ const agentSwitches = (switches: Record<string, boolean>, agent: 'claude' | 'cod
 /** Whether the installed Claude Code takes --plugin-dir: an older one would not start with it. A yes is kept. */
 let pluginDir: Promise<boolean> | null = null;
 function claudeTakesPlugins(): Promise<boolean> {
-  pluginDir ??= new Promise<boolean>((resolve) => execFile(config.claudeBin, ['--help'], { timeout: 20_000 }, (_e, out) => resolve(/--plugin-dir\b/.test(String(out ?? ''))))).then((ok) => {
+  pluginDir ??= new Promise<boolean>((resolve) => execProgram(config.claudeBin, ['--help'], { timeout: 20_000 }, (_e, out) => resolve(/--plugin-dir\b/.test(out)))).then((ok) => {
     if (!ok) pluginDir = null;
     return ok;
   });

@@ -1,6 +1,6 @@
 # The Docker image: built for Intel/AMD (linux/amd64) and ARM (linux/arm64) on GitHub's runners, and pushed to
 # Docker Hub as algoprog/hydor:<version> and algoprog/hydor:latest when a version tag (v1.2.3) is pushed, beside
-# the Mac app's release. Run it by hand (Actions → Docker image → Run workflow) to build both without pushing.
+# the desktop apps' release. Run it by hand (Actions → Docker image → Run workflow) to build both without pushing.
 #
 # Repository secret:
 #   DOCKERHUB_TOKEN   a Docker Hub access token of the algoprog account, with Read & Write

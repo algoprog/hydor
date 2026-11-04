@@ -58,3 +58,26 @@ export class LineSplitter {
     this.rest = start < data.length ? Buffer.from(data.subarray(start)) : null;
   }
 }
+
+/**
+ * Where a runner listens. On Linux and macOS: a Unix socket, `sock` in its folder, which only you may open. On
+ * Windows: a named pipe with a random name; `sock` in its folder is then a file that holds that name and a key, which
+ * a client sends first ({ op: 'auth' }) before it hears anything, since a pipe cannot be kept to its owner the way the
+ * socket's file is (your data folder can).
+ */
+export interface RunnerAddress {
+  path: string;
+  key?: string;
+}
+
+/** The address a runner in `dir` listens at, once it does (null before). */
+export function readAddress(dir: string, fs: typeof import('node:fs'), path: typeof import('node:path')): RunnerAddress | null {
+  const file = path.join(dir, 'sock');
+  if (process.platform !== 'win32') return fs.existsSync(file) ? { path: file } : null;
+  try {
+    const a = JSON.parse(fs.readFileSync(file, 'utf8')) as RunnerAddress;
+    return typeof a?.path === 'string' && typeof a.key === 'string' ? a : null;
+  } catch {
+    return null;
+  }
+}
