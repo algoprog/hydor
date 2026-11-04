@@ -1,21 +1,27 @@
-// The tour's model steps, made for a first look rather than for every option (Settings → Models keeps
-// those): OpenRouter is a key and a few models picked from a short list; this computer is what it has,
-// what runs well on it, and a click to get one. Both read and change the same state as Settings.
+// The tour's model steps, made for a first look rather than for every option (Settings → Models keeps those):
+// OpenRouter is a key, then the models the app suggests: four for Custom, from fast and cheap to the best, and the
+// ones that make pictures, music, voices and videos; a search finds any other. This computer is what it has and the
+// models suggested for it (GET /api/models/picks), each a click to install: they run with vLLM by default, which the
+// tour never needs to name; Settings → Models changes how. Both read and change the same state as Settings.
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowUpRight, Check, Cpu, Download, KeyRound, Plus, Search, X } from 'lucide-react';
-import type { HfInspect, HfModel, HfQuant, LocalModel, ModelDownload, ModelFit, ModelsState, OpenRouterModel } from '@shared/types';
+import { ArrowUpRight, Check, ChevronDown, Clapperboard, Cpu, Download, Image as ImageIcon, KeyRound, Mic, Music, Plus, Search, Sparkles, X } from 'lucide-react';
+import type { ModelsState, OpenRouterModel } from '@shared/types';
+import type { ImageModel, ImagesState } from '@shared/images';
+import type { VideoModel, VideosState } from '@shared/media';
+import { OPENROUTER_PICKS, type LocalPickView, type OpenRouterRole } from '@shared/model-picks';
 import { api, post, put } from '../../lib/api';
-import { toast, toastError } from '../../lib/store';
+import { go } from '../../lib/nav';
+import { toastError } from '../../lib/store';
 import { Button, cx, Throbber } from '../../components/ui';
-import { aboutParams, count, dollars, paramsShort, repoOf, shortGpu, size, tokens, useModels } from '../settings/ModelsSettings';
+import { dollars, shortGpu, size, tokens, useModels } from '../settings/ModelsSettings';
 
 /** Rows of a list on one quiet panel. */
-const panel = 'overflow-hidden rounded-2xl bg-panel/60 ring-1 ring-line divide-y divide-line';
+const panel = 'overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-line divide-y divide-line';
 
-function Wait() {
+function Wait({ label }: { label: string }) {
   return (
-    <div className="flex justify-center py-8 text-fg-3">
-      <Throbber size={24} />
+    <div className="flex items-center gap-2.5 py-6 text-[13.5px] text-fg-3">
+      <Throbber size={18} /> {label}
     </div>
   );
 }
@@ -32,61 +38,42 @@ function Label({ children, aside }: { children: ReactNode; aside?: ReactNode }) 
 }
 
 /** A maker's initial on a tile of its own colour. */
-function Mark({ name }: { name: string }) {
+function Mark({ name, children }: { name: string; children?: ReactNode }) {
   let h = 0;
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
   return (
     <span className="org-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[13.5px] font-semibold" style={{ '--h': h } as CSSProperties} aria-hidden>
-      {name.replace(/^~/, '').charAt(0).toUpperCase()}
+      {children ?? name.replace(/^~/, '').charAt(0).toUpperCase()}
     </span>
   );
 }
 
-/** The search box: large and quiet, with a throbber while it looks and a way to clear it. */
-function Find({ value, onChange, placeholder, busy, onEnter }: { value: string; onChange: (v: string) => void; placeholder: string; busy?: boolean; onEnter?: () => void }) {
+/** Add, or Added (a click takes it out again); Use, or In use, for the models that make things. */
+function Toggle({ on, onClick, name, words = ['Add', 'Added'] }: { on: boolean; onClick: () => void; name: string; words?: [string, string] }) {
   return (
-    <div className="relative">
-      <Search size={17} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-fg-3" />
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
-        placeholder={placeholder}
-        spellCheck={false}
-        autoComplete="off"
-        className="h-12 w-full rounded-xl bg-panel/70 pr-11 pl-11 text-[15px] text-fg ring-1 ring-line transition-[box-shadow,background-color] outline-none placeholder:text-fg-3 focus:bg-panel focus:ring-2 focus:ring-accent/45"
-      />
-      {busy ? (
-        <Throbber className="absolute top-1/2 right-4 -translate-y-1/2 text-fg-3" />
-      ) : (
-        value && (
-          <button type="button" aria-label="Clear" onClick={() => onChange('')} className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-lg p-1.5 text-fg-3 hover:bg-fg/[0.06] hover:text-fg">
-            <X size={15} />
-          </button>
-        )
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={on ? `${words[1]}: ${name}` : `${words[0]} ${name}`}
+      className={cx(
+        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors',
+        on ? 'bg-accent/15 text-accent hover:bg-accent/25' : 'text-fg-2 ring-1 ring-line-2 hover:bg-fg/[0.06] hover:text-fg',
       )}
-    </div>
-  );
-}
-
-/** Show all of a long list, or the first few again. */
-function More({ n, open, onToggle }: { n: number; open: boolean; onToggle: () => void }) {
-  return (
-    <button type="button" onClick={onToggle} className="text-[13px] font-medium text-fg-3 transition-colors hover:text-fg">
-      {open ? 'Show fewer' : `Show all ${n}`}
+    >
+      {on ? <Check size={14} strokeWidth={2.6} className="anim-pop-in" /> : <Plus size={14} />}
+      {on ? words[1] : words[0]}
     </button>
   );
 }
 
-const FIRST = 6;
-
 // ---- OpenRouter ----------------------------------------------------------------------------------------
 
-/** OpenRouter: its key, then the models it brings into the pickers. */
+/** OpenRouter: its key, then the models it suggests. */
 export function TourOpenRouter() {
   const st = useModels();
-  if (!st) return <Wait />;
-  return st.openrouter.keyHint ? <OrModels st={st} /> : <OrKey />;
+  if (!st) return <Wait label="Looking at your models…" />;
+  return st.openrouter.keyHint ? <OrPicks st={st} /> : <OrKey />;
 }
 
 function OrKey() {
@@ -105,66 +92,126 @@ function OrKey() {
   };
   return (
     <div>
+      <ol className="mb-5 space-y-2.5 text-[14px] text-fg-2">
+        {[
+          <>
+            Make a free account at{' '}
+            <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium text-accent hover:underline">
+              openrouter.ai
+              <ArrowUpRight size={13} />
+            </a>{' '}
+            and add a little credit (you pay only for what you use).
+          </>,
+          'Create a key there: a long code starting with sk-or-, like a password for your account.',
+          'Paste it here.',
+        ].map((t, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="tour-num">{i + 1}</span>
+            <span className="min-w-0 pt-px">{t}</span>
+          </li>
+        ))}
+      </ol>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           if (key.trim() && !busy) void connect();
         }}
-        className="flex items-center gap-2 rounded-xl bg-panel/70 p-1.5 pl-4 ring-1 ring-line transition-[box-shadow] focus-within:ring-2 focus-within:ring-accent/45"
+        className="flex items-center gap-2 rounded-xl bg-panel/80 p-1.5 pl-4 ring-1 ring-line transition-[box-shadow] focus-within:ring-2 focus-within:ring-accent/45"
       >
         <KeyRound size={17} className="shrink-0 text-fg-3" />
         <input
           type="password"
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          placeholder="Paste your OpenRouter key: sk-or-…"
+          placeholder="Paste your key: sk-or-…"
           autoComplete="off"
           spellCheck={false}
+          aria-label="Your OpenRouter key"
           className="h-9 min-w-0 flex-1 bg-transparent text-[15px] text-fg outline-none placeholder:text-fg-3"
         />
         <Button type="submit" variant="primary" className="h-9 rounded-lg px-4" disabled={!key.trim() || busy}>
           {busy ? 'Connecting…' : 'Connect'}
         </Button>
       </form>
-      <p className="mt-3 text-[13.5px] leading-relaxed text-fg-3">
-        No key yet?{' '}
-        <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium text-accent hover:underline">
-          Create one at openrouter.ai
-          <ArrowUpRight size={13} />
-        </a>{' '}
-        Make an account there, add some credit, and create a key. You pay OpenRouter only for what you use.
-      </p>
     </div>
   );
 }
 
-function OrModels({ st }: { st: ModelsState }) {
-  const [q, setQ] = useState('');
-  const [hits, setHits] = useState<OpenRouterModel[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [all, setAll] = useState(false);
-  const words = q.trim();
+/** What a model that makes things costs, in words: an image, a song, a second. */
+const usd = (n: number) => (n >= 0.095 ? n.toFixed(2) : String(Number(n.toPrecision(1))));
+
+interface MediaInfo {
+  label: string;
+  price?: string;
+}
+
+/** The models that make pictures, music, voices and videos, as their own lists describe them, and which is in use. */
+function useMedia() {
+  const [using, setUsing] = useState<Partial<Record<Exclude<OpenRouterRole, 'text'>, string>>>({});
+  const [info, setInfo] = useState<Record<string, MediaInfo>>({});
+  const [audio, setAudio] = useState(true);
   useEffect(() => {
     let alive = true;
-    setAll(false);
-    // Before any words: the newest that call tools, as Custom works through them.
-    const p = new URLSearchParams(words ? { q: words } : { q: '', sort: 'new', f: 'tools' });
-    setBusy(true);
-    const t = setTimeout(
-      () =>
-        api<{ models: OpenRouterModel[] }>(`/api/models/openrouter?${p}`)
-          .then((r) => alive && setHits(r.models), toastError)
-          .finally(() => alive && setBusy(false)),
-      words ? 220 : 0,
+    api<ImagesState>('/api/images/settings').then((s) => alive && setUsing((u) => ({ ...u, image: s.using })), () => {});
+    api<VideosState>('/api/videos/settings').then((s) => alive && setUsing((u) => ({ ...u, video: s.using })), () => {});
+    api<{ usingMusic?: string; usingSpeech?: string }>('/api/audio/settings').then(
+      (s) => alive && setUsing((u) => ({ ...u, music: s.usingMusic, speech: s.usingSpeech })),
+      () => alive && setAudio(false),
     );
+    const add = (list: { id: string; label: string; price?: string }[]) => alive && setInfo((m) => ({ ...m, ...Object.fromEntries(list.map((x) => [x.id, { label: x.label, price: x.price }])) }));
+    api<{ models: ImageModel[] }>('/api/images/models?q=seedream').then((r) => add(r.models.map((m) => ({ id: m.id, label: m.label, price: m.perImage ? `about $${usd(m.perImage)} a picture` : undefined }))), () => {});
+    api<{ models: VideoModel[] }>('/api/videos/models?q=seedance').then((r) => add(r.models.map((m) => ({ id: m.id, label: m.label, price: m.perSecond ? `$${usd(m.perSecond)} a second` : undefined }))), () => {});
+    for (const kind of ['music', 'speech'])
+      api<{ models: { id: string; label: string; perSong?: number; perSecond?: number }[] }>(`/api/audio/models?kind=${kind}`).then(
+        (r) => add(r.models.map((m) => ({ id: m.id, label: m.label, price: m.perSong ? `$${usd(m.perSong)} a song` : m.perSecond ? `$${usd(m.perSecond)} a second` : undefined }))),
+        () => {},
+      );
     return () => {
       alive = false;
-      clearTimeout(t);
     };
-  }, [words]);
+  }, []);
+  const use = (role: Exclude<OpenRouterRole, 'text'>, id: string) => {
+    setUsing((u) => ({ ...u, [role]: id }));
+    const done = (p: Promise<unknown>) => p.catch(toastError);
+    if (role === 'image') done(put('/api/images/settings', { model: id }));
+    else if (role === 'video') done(put('/api/videos/settings', { model: id }));
+    else done(put('/api/audio/settings', { [role]: id }));
+  };
+  return { using, info, use, audio };
+}
+
+const ROLE_ICON: Record<Exclude<OpenRouterRole, 'text'>, ReactNode> = {
+  image: <ImageIcon size={16} />,
+  music: <Music size={16} />,
+  speech: <Mic size={16} />,
+  video: <Clapperboard size={16} />,
+};
+
+/** A model's name from its id, until its list says better: "bytedance-seed/seedream-5-0-pro" → "Seedream 5 0 Pro". */
+const nameOf = (id: string) =>
+  id
+    .split('/')
+    .pop()!
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+function OrPicks({ st }: { st: ModelsState }) {
+  const [text, setText] = useState<(OpenRouterModel & { note: string })[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const media = useMedia();
+  useEffect(() => {
+    api<{ models: (OpenRouterModel & { note: string })[] }>('/api/models/openrouter/picks').then(
+      (r) => setText(r.models),
+      () => setText([]),
+    );
+  }, []);
   const pinned = new Set(st.openrouter.pinned.map((m) => m.id));
   const save = (body: Record<string, unknown>) => put('/api/models', body).catch(toastError);
-  const list = hits ?? [];
+  const missing = (text ?? []).filter((m) => !pinned.has(m.id));
+  const addAll = async () => {
+    for (const m of missing) await save({ pin: m.id });
+  };
+  const mediaPicks = OPENROUTER_PICKS.filter((p) => p.role !== 'text' && (media.audio || (p.role !== 'music' && p.role !== 'speech')));
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13.5px]">
@@ -176,318 +223,140 @@ function OrModels({ st }: { st: ModelsState }) {
         </button>
       </div>
       <div>
-        <Label>Your models</Label>
-        {st.openrouter.pinned.length ? (
-          <div className="flex flex-wrap gap-2">
-            {st.openrouter.pinned.map((m) => (
-              <span key={m.id} className="anim-pop-in inline-flex h-9 max-w-full items-center gap-1.5 rounded-full bg-accent/10 pr-1.5 pl-3.5 text-[13.5px] font-medium text-fg ring-1 ring-accent/30">
-                <span className="truncate">{m.label}</span>
-                <button type="button" aria-label={`Remove ${m.label}`} title="Take it out of the pickers" onClick={() => save({ unpin: m.id })} className="shrink-0 rounded-full p-1 text-fg-3 transition-colors hover:bg-fg/[0.08] hover:text-fg">
-                  <X size={13} />
-                </button>
-              </span>
-            ))}
-          </div>
+        <Label aside={missing.length > 1 && <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={() => void addAll()}>{`Add all ${missing.length}`}</Button>}>
+          For your agent: pick one or more
+        </Label>
+        {!text ? (
+          <Wait label="Finding them…" />
         ) : (
-          <p className="text-[13.5px] text-fg-3">None yet. Add one or more below: you pick them under the message box when Custom is the agent.</p>
+          <div className={panel}>
+            {text.map((m) => {
+              const org = m.org ?? (m.detail ?? m.id).replace(/^openrouter\//, '').split('/')[0];
+              return (
+                <div key={m.id} className="flex items-center gap-3.5 px-4 py-3">
+                  <Mark name={org} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="text-[14px] font-medium text-fg">{m.label}</span>
+                      <span className="tour-note">{m.note}</span>
+                    </div>
+                    <div className="tnum mt-0.5 truncate text-[12.5px] text-fg-3" title="Prices are per million tokens (a token is about ¾ of a word): in is what it reads, out is what it writes">
+                      {[org, m.price ? `${dollars(m.price.input)} in, ${dollars(m.price.output)} out` : '', m.contextLength ? `reads ${tokens(m.contextLength)} at once` : ''].filter(Boolean).join(' · ')}
+                    </div>
+                  </div>
+                  <Toggle on={pinned.has(m.id)} onClick={() => save(pinned.has(m.id) ? { unpin: m.id } : { pin: m.id })} name={m.label} />
+                </div>
+              );
+            })}
+          </div>
         )}
+        {(() => {
+          // Models added before, besides these: still yours, a click away from leaving.
+          const others = text ? st.openrouter.pinned.filter((m) => !text.some((t) => t.id === m.id)) : [];
+          return others.length ? (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12.5px] text-fg-3">
+              <span className="mr-1">Also yours:</span>
+              {others.map((m) => (
+                <span key={m.id} className="inline-flex h-7 items-center gap-1 rounded-full bg-bg-2 pr-1 pl-2.5 text-fg-2 ring-1 ring-line">
+                  <span translate="no">{m.label}</span>
+                  <button type="button" aria-label={`Take ${m.label} out`} title="Take it out of the pickers" onClick={() => save({ unpin: m.id })} className="rounded-full p-0.5 text-fg-3 hover:bg-fg/[0.08] hover:text-fg">
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null;
+        })()}
+        <p className="mt-2.5 text-[12.5px] text-fg-3">You pick among those you add under the message box, when Custom (the app’s own agent) does the work.</p>
       </div>
       <div>
-        <Find value={q} onChange={setQ} placeholder="Search hundreds of models: deepseek, qwen, claude…" busy={busy} />
-        {hits && (
-          <div className="mt-6">
-            <Label aside={list.length > FIRST && <More n={list.length} open={all} onToggle={() => setAll((x) => !x)} />}>
-              {words ? (list.length ? 'Found' : 'Nothing found by that name') : 'The newest that can do tasks'}
-            </Label>
-            {list.length > 0 && (
-              <div className={panel}>
-                {(all ? list : list.slice(0, FIRST)).map((m) => (
-                  <OrRow key={m.id} m={m} added={pinned.has(m.id)} onToggle={() => save(pinned.has(m.id) ? { unpin: m.id } : { pin: m.id })} />
-                ))}
+        <Label>For pictures, music, voices and videos</Label>
+        <div className={panel}>
+          {mediaPicks.map((p) => {
+            const role = p.role as Exclude<OpenRouterRole, 'text'>;
+            const i = media.info[p.id];
+            const label = i?.label ?? nameOf(p.id);
+            return (
+              <div key={p.id} className="flex items-center gap-3.5 px-4 py-3">
+                <span className="tour-media-icon">{ROLE_ICON[role]}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="text-[14px] font-medium text-fg">{label}</span>
+                    <span className="tour-note">{p.note}</span>
+                  </div>
+                  {i?.price && <div className="tnum mt-0.5 text-[12.5px] text-fg-3">{i.price}</div>}
+                </div>
+                <Toggle on={media.using[role] === p.id} onClick={() => media.using[role] !== p.id && media.use(role, p.id)} name={label} words={['Use', 'In use']} />
               </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** One model: who makes it, how much it reads at once, its price per million tokens, and Add. */
-function OrRow({ m, added, onToggle }: { m: OpenRouterModel; added: boolean; onToggle: () => void }) {
-  const free = !!m.price && m.price.input === 0 && m.price.output === 0;
-  const org = m.org ?? (m.detail ?? m.id).replace(/^openrouter\//, '').replace(/^~/, '').split('/')[0];
-  const facts = [
-    org,
-    m.contextLength ? `${tokens(m.contextLength)} context` : '',
-    free ? 'free' : m.price ? `${dollars(m.price.input)} in, ${dollars(m.price.output)} out` : '',
-    m.tools && m.tools !== 'native' ? 'less reliable at tasks' : '',
-  ].filter(Boolean);
-  return (
-    <div className="flex items-center gap-3.5 px-4 py-3 transition-colors hover:bg-fg/[0.025]">
-      <Mark name={org} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-medium text-fg">{m.label}</div>
-        <div className="tnum mt-0.5 text-[12.5px] text-fg-3 sm:truncate" title="Context: how much it can read at once. Prices are per million tokens (a token is about ¾ of a word): in is what it reads, out is what it writes">
-          {facts.join(' · ')}
+            );
+          })}
         </div>
+        <p className="mt-2.5 text-[12.5px] text-fg-3">Any agent makes them when you ask (“a logo for my bakery”, “a calm piano tune”), and shows you the price before it starts.</p>
       </div>
-      <Toggle on={added} onClick={onToggle} name={m.label} />
-    </div>
-  );
-}
-
-/** Add, or Added (a click takes it out again). */
-function Toggle({ on, onClick, name }: { on: boolean; onClick: () => void; name: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      aria-label={on ? `Take ${name} out` : `Add ${name}`}
-      className={cx(
-        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors',
-        on ? 'bg-accent/15 text-accent hover:bg-accent/25' : 'text-fg-2 ring-1 ring-line-2 hover:bg-fg/[0.06] hover:text-fg',
-      )}
-    >
-      {on ? <Check size={14} strokeWidth={2.6} className="anim-pop-in" /> : <Plus size={14} />}
-      {on ? 'Added' : 'Add'}
-    </button>
-  );
-}
-
-// ---- this computer ---------------------------------------------------------------------------------
-
-/** Models on this computer: what it has, what is here or coming, and Hugging Face for more. */
-export function TourLocal() {
-  const st = useModels();
-  if (!st) return <Wait />;
-  return (
-    <div className="space-y-8">
-      <Machine st={st} />
-      <Here st={st} />
-      <FromHf st={st} />
-    </div>
-  );
-}
-
-/** The graphics, memory and disk in words, the two runtimes, and how big a model runs well here. */
-function Machine({ st }: { st: ModelsState }) {
-  const m = st.machine;
-  const kinds = new Map<string, number>();
-  for (const g of m.gpus) kinds.set(shortGpu(g.name), (kinds.get(shortGpu(g.name)) ?? 0) + 1);
-  const gpus = [...kinds].map(([n, k]) => `${k > 1 ? `${k} × ` : ''}${n}`).join(' + ');
-  const each = m.gpus.length ? `${size(Math.max(...m.gpus.map((g) => g.totalBytes)))}${m.gpus.length > 1 ? ' each' : ''}` : '';
-  const best = [...m.gpus].sort((a, b) => b.freeBytes - a.freeBytes)[0];
-  return (
-    <div>
-      <div className="flex items-start gap-4">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-accent">
-          <Cpu size={22} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[18px] leading-tight font-semibold tracking-tight text-fg">{gpus || 'No graphics card'}</div>
-          <div className="mt-1 text-[13.5px] text-fg-3">{[each, `${size(m.ramBytes)} of memory`, `${size(st.storage.freeBytes)} free for models`].filter(Boolean).join(' · ')}</div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px]">
-            <Runtime name="Ollama" version={st.ollama.version} get="https://ollama.com/download" />
-            <Runtime name="vLLM" version={st.vllm.path ? (st.vllm.version ?? 'found') : undefined} hint="Optional, for advanced setups: pip install vllm, for NVIDIA cards" />
-          </div>
-        </div>
-      </div>
-      <p className="mt-5 flex items-center gap-2 text-[14px] text-fg-2">
-        <Check size={15} strokeWidth={2.6} className="shrink-0 text-ok" />
-        {best ? `Models up to about ${aboutParams(best.freeBytes)}B in size (billions of parameters, a model’s size) run well here.` : 'Small models run here, slowly; bigger ones need a graphics card.'}
-      </p>
-    </div>
-  );
-}
-
-/** A runtime with its version, or how to get it. */
-function Runtime({ name, version, get, hint }: { name: string; version?: string; get?: string; hint?: string }) {
-  if (version)
-    return (
-      <span className="inline-flex items-center gap-2 text-fg-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-ok" />
-        {name} <span className="text-fg-3">{version}</span>
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-2 text-fg-3" title={hint}>
-      <span className="h-1.5 w-1.5 rounded-full ring-1 ring-line-2" />
-      {name}
-      {get ? (
-        <a href={get} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium text-accent hover:underline">
-          Install
-          <ArrowUpRight size={12} />
-        </a>
-      ) : (
-        <span>not installed</span>
-      )}
-    </span>
-  );
-}
-
-/** What is on this computer, and what is on its way. */
-function Here({ st }: { st: ModelsState }) {
-  const coming = st.downloads.filter((d) => d.status === 'running' || d.status === 'failed');
-  if (!st.local.length && !coming.length) return null;
-  return (
-    <div>
-      <Label>On this computer</Label>
-      <div className={panel}>
-        {coming.map((d) => (
-          <Coming key={d.key} d={d} />
-        ))}
-        {st.local.map((m) => (
-          <Have key={m.id} m={m} />
-        ))}
+      <div>
+        <button type="button" onClick={() => setSearching((x) => !x)} aria-expanded={searching} className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-fg-2 transition-colors hover:text-fg">
+          <Search size={14} /> Search all of OpenRouter’s models
+          <ChevronDown size={14} className={cx('transition-transform', searching && 'rotate-180')} />
+        </button>
+        {searching && <OrSearch pinned={pinned} onToggle={(id) => save(pinned.has(id) ? { unpin: id } : { pin: id })} />}
       </div>
     </div>
   );
 }
 
-function Coming({ d }: { d: ModelDownload }) {
-  const pct = d.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 0;
-  return (
-    <div className="flex items-center gap-3.5 px-4 py-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-bg-2 text-fg-3">
-        <Download size={16} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-medium text-fg">{d.name.replace(/^hf\.co\//, '')}</div>
-        {d.status === 'failed' ? (
-          <div className="mt-0.5 truncate text-[12.5px] text-err">{d.error ?? 'The download stopped'}</div>
-        ) : (
-          <div className="mt-1.5 flex items-center gap-3">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-fg/10">
-              <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct || 3}%` }} />
-            </div>
-            <span className="tnum shrink-0 text-[12px] text-fg-3">{d.totalBytes ? `${Math.floor(pct)}%` : size(d.doneBytes)}</span>
-          </div>
-        )}
-      </div>
-      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
-        {d.status === 'running' ? 'Cancel' : 'Dismiss'}
-      </Button>
-    </div>
-  );
-}
-
-function Have({ m }: { m: LocalModel }) {
-  return (
-    <div className="flex items-center gap-3.5 px-4 py-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ok/12 text-ok">
-        <Check size={16} strokeWidth={2.6} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-medium text-fg">{m.repo}</div>
-        <div className="mt-0.5 truncate text-[12.5px] text-fg-3">
-          {[m.runtime === 'ollama' ? 'Ollama' : 'vLLM', size(m.sizeBytes), m.vision ? 'sees images' : ''].filter(Boolean).join(' · ')}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** How a model runs here, in words and a colour. */
-function Runs({ fit }: { fit: ModelFit }) {
-  const [tone, words] =
-    fit.verdict === 'good'
-      ? ['text-ok', `Runs well${fit.tokensPerSec ? `, about ${Math.max(1, Math.round(fit.tokensPerSec * 0.75))} words a second` : ''}`]
-      : fit.verdict === 'slow'
-        ? ['text-warn', 'Runs slowly here']
-        : fit.verdict === 'tight'
-          ? ['text-warn', 'Runs very slowly here']
-          : ['text-err', 'Too big for this computer'];
-  return (
-    <span className={cx('inline-flex items-center gap-1.5 font-medium', tone)}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {words}
-    </span>
-  );
-}
-
-/** The better of a model's two first guesses: as stored (vLLM), or at 4-bit with Ollama. */
-function guess(m: HfModel): ModelFit | undefined {
-  const g = m.fitGguf;
-  if (m.fit && g && m.fit.verdict !== 'good' && (g.verdict === 'good' || (m.fit.verdict === 'no' && g.verdict !== 'no'))) return g;
-  return m.fit ?? g;
-}
-
-type Look = HfInspect | 'busy' | { error: string };
-
-/** Hugging Face: before anything is typed the most downloaded that run well here; Get shows how one
- * would install, and the best size to take. */
-function FromHf({ st }: { st: ModelsState }) {
+/** Any of OpenRouter's models, found by name. */
+function OrSearch({ pinned, onToggle }: { pinned: Set<string>; onToggle: (id: string) => void }) {
   const [q, setQ] = useState('');
-  const [hits, setHits] = useState<HfModel[] | null>(null);
+  const [hits, setHits] = useState<OpenRouterModel[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [all, setAll] = useState(false);
-  const [open, setOpen] = useState<string | null>(null);
-  const [checks, setChecks] = useState<Record<string, Look>>({});
   const words = q.trim();
-  const direct = repoOf(words);
   useEffect(() => {
+    if (!words) return setHits(null);
     let alive = true;
-    setAll(false);
-    const p = new URLSearchParams(words ? { q: direct ?? words, sort: 'downloads' } : { q: '', sort: 'downloads', f: 'fits' });
     setBusy(true);
     const t = setTimeout(
       () =>
-        api<{ models: HfModel[] }>(`/api/models/hf?${p}`)
-          .then((r) => alive && setHits(r.models), toastError)
+        api<{ models: OpenRouterModel[] }>(`/api/models/openrouter?${new URLSearchParams({ q: words })}`)
+          .then((r) => alive && setHits(r.models.slice(0, 8)), toastError)
           .finally(() => alive && setBusy(false)),
-      words ? 300 : 0,
+      220,
     );
     return () => {
       alive = false;
       clearTimeout(t);
     };
-  }, [words, direct]);
-  const get = async (repo: string) => {
-    if (open === repo) return setOpen(null);
-    setOpen(repo);
-    const had = checks[repo];
-    if (had && had !== 'busy' && !('error' in had)) return;
-    setChecks((c) => ({ ...c, [repo]: 'busy' }));
-    try {
-      const info = await post<HfInspect>('/api/models/inspect', { input: repo });
-      setChecks((c) => ({ ...c, [repo]: info }));
-    } catch (e) {
-      setChecks((c) => ({ ...c, [repo]: { error: (e as Error).message } }));
-    }
-  };
-  const list = hits ?? [];
-  // A model named in full comes first, even when the search does not list it.
-  const named = direct && !list.some((m) => m.id.toLowerCase() === direct.toLowerCase()) ? direct : null;
-  const rows: HfModel[] = [...(named ? [{ id: named, kind: 'other' as const }] : []), ...list];
-  const detail = (repo: string) => {
-    const c = checks[repo];
-    if (!c || c === 'busy')
-      return (
-        <div className="flex items-center gap-2 text-[13px] text-fg-3">
-          <Throbber /> Looking at its files…
-        </div>
-      );
-    if ('error' in c) return <div className="text-[13px] text-err">{c.error}</div>;
-    return <Ways info={c} st={st} onCheck={(r) => void get(r)} onStarted={() => setOpen(null)} />;
-  };
+  }, [words]);
   return (
-    <div>
-      <Find value={q} onChange={setQ} placeholder="Search free models: qwen, gemma, llama…" busy={busy} onEnter={() => direct && void get(direct)} />
+    <div className="mt-3">
+      <div className="relative">
+        <Search size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-fg-3" />
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="deepseek, qwen, kimi…"
+          spellCheck={false}
+          autoComplete="off"
+          aria-label="Search OpenRouter's models"
+          className="h-11 w-full rounded-xl bg-panel/80 pr-10 pl-10 text-[14.5px] text-fg ring-1 ring-line outline-none placeholder:text-fg-3 focus:ring-2 focus:ring-accent/45"
+        />
+        {busy && <Throbber className="absolute top-1/2 right-3.5 -translate-y-1/2 text-fg-3" />}
+      </div>
       {hits && (
-        <div className="mt-6">
-          <Label aside={rows.length > FIRST && <More n={rows.length} open={all} onToggle={() => setAll((x) => !x)} />}>
-            {words ? (rows.length ? 'Found on Hugging Face' : 'Nothing found by that name') : 'Popular, and running well here'}
-          </Label>
-          {rows.length > 0 && (
-            <div className={panel}>
-              {(all ? rows : rows.slice(0, FIRST)).map((m) => (
-                <HfRow key={m.id} m={m} open={open === m.id} onGet={() => void get(m.id)}>
-                  {open === m.id && detail(m.id)}
-                </HfRow>
-              ))}
-            </div>
+        <div className={cx(panel, 'mt-3')}>
+          {hits.length ? (
+            hits.map((m) => (
+              <div key={m.id} className="flex items-center gap-3.5 px-4 py-2.5">
+                <Mark name={m.org ?? m.id.split('/')[1] ?? m.id} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[14px] font-medium text-fg">{m.label}</div>
+                  <div className="tnum truncate text-[12.5px] text-fg-3">{[m.org, m.price ? `${dollars(m.price.input)} in, ${dollars(m.price.output)} out` : ''].filter(Boolean).join(' · ')}</div>
+                </div>
+                <Toggle on={pinned.has(m.id)} onClick={() => onToggle(m.id)} name={m.label} />
+              </div>
+            ))
+          ) : (
+            <div className="px-4 py-5 text-[13px] text-fg-3">Nothing by that name.</div>
           )}
         </div>
       )}
@@ -495,129 +364,184 @@ function FromHf({ st }: { st: ModelsState }) {
   );
 }
 
-function HfRow({ m, open, onGet, children }: { m: HfModel; open: boolean; onGet: () => void; children?: ReactNode }) {
-  const [org, name] = m.id.split('/');
-  const fit = guess(m);
-  const facts = [m.params ? `${paramsShort(m.params)} parameters` : '', m.downloads ? `${count(m.downloads)} downloads` : '', m.vision ? 'sees images' : ''].filter(Boolean);
+// ---- this computer ---------------------------------------------------------------------------------
+
+/** The models suggested for this computer, as the server sees them; again whenever downloads or models change. */
+function usePicks(st: ModelsState): LocalPickView[] | null {
+  const [picks, setPicks] = useState<LocalPickView[] | null>(null);
+  const sig = [st.local.map((m) => m.id).join(), st.downloads.map((d) => `${d.key}:${d.status}`).join(), st.vllm.path ?? '', st.ollama.version ?? ''].join('|');
+  useEffect(() => {
+    let alive = true;
+    api<{ picks: LocalPickView[] }>('/api/models/picks').then(
+      (r) => alive && setPicks(r.picks),
+      () => alive && setPicks([]),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [sig]);
+  return picks;
+}
+
+/** This computer, in plain words: its graphics and memory. */
+function computerWords(st: ModelsState): { title: string; sub: string } {
+  const m = st.machine;
+  if (m.apple) return { title: m.apple.chip.replace(/^Apple\s+/, 'Apple '), sub: `${size(m.ramBytes)} of memory, shared with its graphics` };
+  if (!m.gpus.length) return { title: 'No graphics card', sub: `${size(m.ramBytes)} of memory: small models run, slowly` };
+  const kinds = new Map<string, number>();
+  for (const g of m.gpus) kinds.set(shortGpu(g.name), (kinds.get(shortGpu(g.name)) ?? 0) + 1);
+  const total = m.gpus.reduce((a, g) => a + g.totalBytes, 0);
+  return {
+    title: [...kinds].map(([n, k]) => `${k > 1 ? `${k} × ` : ''}${n}`).join(' + '),
+    sub: `${size(total)} of graphics memory${m.gpus.length > 1 ? ' in all' : ''} · ${size(m.ramBytes)} of memory`,
+  };
+}
+
+/** Models on this computer: what it has, and the suggested ones that run on it, a click to install. */
+export function TourLocal() {
+  const st = useModels();
+  if (!st) return <Wait label="Looking at this computer…" />;
+  return <Local st={st} />;
+}
+
+function Local({ st }: { st: ModelsState }) {
+  const picks = usePicks(st);
+  const [more, setMore] = useState(false);
+  const pc = computerWords(st);
+  const runs = picks?.filter((p) => p.runs) ?? [];
+  const not = picks?.filter((p) => !p.runs) ?? [];
+  const unready = runs.some((p) => !p.ready);
   return (
-    <div className={cx('transition-colors', open ? 'bg-fg/[0.03]' : 'hover:bg-fg/[0.025]')}>
-      <div className="flex items-center gap-3.5 px-4 py-3">
-        <Mark name={org} />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px]">
-            <span className="text-fg-3">{org}/</span>
-            <span className="font-medium text-fg">{name}</span>
-          </div>
-          <div className="tnum mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12.5px] text-fg-3">
-            {fit && <Runs fit={fit} />}
-            {facts.length > 0 && <span>{facts.join(' · ')}</span>}
-            {m.gated && <span className="text-warn">asks for access</span>}
-          </div>
+    <div className="space-y-7">
+      <div className="flex items-center gap-4 rounded-2xl bg-panel/70 p-4 ring-1 ring-line">
+        <span className="tour-media-icon h-11 w-11 rounded-xl">
+          <Cpu size={20} />
+        </span>
+        <div className="min-w-0">
+          <div className="text-[15.5px] leading-tight font-semibold text-fg">{pc.title}</div>
+          <div className="mt-0.5 text-[13px] text-fg-3">{pc.sub}</div>
         </div>
-        <button
-          type="button"
-          onClick={onGet}
-          aria-expanded={open}
-          className={cx(
-            'inline-flex h-8 shrink-0 items-center rounded-full px-3.5 text-[13px] font-medium transition-colors',
-            open ? 'text-fg-3 hover:text-fg' : 'text-fg-2 ring-1 ring-line-2 hover:bg-fg/[0.06] hover:text-fg',
-          )}
-        >
-          {open ? 'Close' : 'Get'}
-        </button>
       </div>
-      {open && <div className="anim-expand px-4 pb-4 sm:pl-[66px]">{children}</div>}
+      <div>
+        <Label>Suggested for this computer</Label>
+        {!picks ? (
+          <Wait label="Checking what runs well here…" />
+        ) : runs.length ? (
+          <div className={panel}>
+            {runs.map((p) => (
+              <Pick key={p.repo} p={p} st={st} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-[14px] leading-relaxed text-fg-2">This computer is a little small for AI models. Pay as you go (the step before) gives you the best ones without needing a strong computer.</p>
+        )}
+        {unready && (
+          <p className="mt-3 flex items-start gap-2 text-[12.5px] leading-relaxed text-fg-3">
+            <Sparkles size={13} className="mt-0.5 shrink-0 text-accent" />
+            <span>
+              They download now; to run them, this computer needs one more free program.{' '}
+              <button type="button" className="font-medium text-accent hover:underline" onClick={() => go('/settings?s=models')}>
+                Settings → Models
+              </button>{' '}
+              sets it up, whenever you like.
+            </span>
+          </p>
+        )}
+      </div>
+      {not.length > 0 && (
+        <div>
+          <button type="button" onClick={() => setMore((x) => !x)} aria-expanded={more} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-fg-3 transition-colors hover:text-fg">
+            {not.length === 1 ? '1 more needs a bigger computer' : `${not.length} more need a bigger computer`}
+            <ChevronDown size={14} className={cx('transition-transform', more && 'rotate-180')} />
+          </button>
+          {more && (
+            <div className={cx(panel, 'mt-3 opacity-80')}>
+              {not.map((p) => (
+                <div key={p.repo} className="flex items-center gap-3.5 px-4 py-3">
+                  <Mark name={p.maker} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-medium text-fg">{p.name}</div>
+                    <div className="mt-0.5 text-[12.5px] text-fg-3">{[p.maker, `needs ${p.needs ? p.needs[0].toLowerCase() + p.needs.slice(1) : 'more than this computer has'}`].join(' · ')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <p className="text-[12.5px] text-fg-3">
+        Hundreds more, and how each runs, are in{' '}
+        <button type="button" className="font-medium text-accent hover:underline" onClick={() => go('/settings?s=models')}>
+          Settings → Models
+        </button>
+        .
+      </p>
     </div>
   );
 }
 
-/** The size to take: the usual 4-bit one when it runs well, else the best that does, else the smallest. */
-function pick(qs: HfQuant[]): HfQuant | undefined {
-  const good = qs.filter((x) => x.fit.verdict === 'good');
-  return good.find((x) => /q4_k_m/i.test(x.tag)) ?? [...good].sort((a, b) => b.sizeBytes - a.sizeBytes)[0] ?? [...qs].sort((a, b) => a.sizeBytes - b.sizeBytes)[0];
-}
-
-/** How a model would come here: the best GGUF size for Ollama (the others a click away), or its weights
- * for vLLM; or why not. */
-function Ways({ info, st, onCheck, onStarted }: { info: HfInspect; st: ModelsState; onCheck: (repo: string) => void; onStarted: () => void }) {
-  const [others, setOthers] = useState(false);
-  const install = (body: { repo?: string; ollama?: string }) =>
-    post('/api/models/install', body).then(() => {
-      toast('Downloading: it shows under On this computer', 'ok');
-      onStarted();
-    }, toastError);
-  const note = (children: ReactNode) => <p className="text-[13px] leading-relaxed text-fg-3">{children}</p>;
-  const gated = info.gated && note(<span className="text-warn">It asks for access: accept its terms on Hugging Face and add a token in Settings → Models first.</span>);
-  if (info.kind === 'gguf') {
-    const best = pick(info.quants);
-    const rest = info.quants.filter((x) => x !== best);
-    const row = (x: HfQuant, main: boolean) => (
-      <div key={x.tag} className="flex items-center gap-3 py-2">
+/** One suggested model: who makes it, what it is good for, how it runs here; Install, its download, or Installed. */
+function Pick({ p, st }: { p: LocalPickView; st: ModelsState }) {
+  const [busy, setBusy] = useState(false);
+  const d = p.coming ? st.downloads.find((x) => x.key === p.coming) : undefined;
+  const failed = !p.have && st.downloads.find((x) => x.status === 'failed' && p.install && x.name === ('repo' in p.install ? p.install.repo : p.install.ollama));
+  const pct = d?.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 0;
+  const speed = p.fit.tokensPerSec ? Math.max(1, Math.round(p.fit.tokensPerSec * 0.75)) : 0;
+  const install = async () => {
+    if (!p.install) return;
+    setBusy(true);
+    try {
+      await post('/api/models/install', p.install);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className={cx('px-4 py-3.5', p.best && 'tour-best')}>
+      <div className="flex items-start gap-3.5">
+        <Mark name={p.maker} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[13.5px]">
-            <span className="font-medium text-fg">{x.tag}</span>
-            <span className="text-fg-3">{size(x.sizeBytes)}</span>
-            {main && <span className="rounded-full bg-accent/15 px-2 py-px text-[11px] font-medium text-accent">Best here</span>}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-[14.5px] font-medium text-fg">{p.name}</span>
+            {p.best && <span className="tour-note tour-note-best">Best for this computer</span>}
           </div>
-          <div className="mt-0.5 text-[12.5px]">
-            <Runs fit={x.fit} />
+          <div className="mt-0.5 text-[13px] leading-snug text-fg-2">{p.blurb}</div>
+          <div className="tnum mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12.5px] text-fg-3">
+            <span className={cx('inline-flex items-center gap-1.5 font-medium', p.fit.verdict === 'good' ? 'text-ok' : 'text-warn')}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+              {p.fit.verdict === 'good' ? (speed ? `Runs well: about ${speed} words a second` : 'Runs well here') : 'Runs here, slowly'}
+            </span>
+            <span>{size(p.sizeBytes)} download</span>
+            {p.vision && <span>reads pictures</span>}
           </div>
         </div>
-        <Button size="sm" variant={main ? 'primary' : 'ghost'} className="rounded-full" icon={<Download size={13} />} disabled={!st.ollama.version || x.fit.verdict === 'no'} onClick={() => void install({ ollama: x.ollamaName })}>
-          Get
-        </Button>
-      </div>
-    );
-    return (
-      <div className="space-y-2">
-        {gated}
-        {!st.ollama.version && note('This needs Ollama, a free program that runs models, and it is not running here yet: install it (the Install link above), then come back.')}
-        {best && row(best, true)}
-        {rest.length > 0 && (
-          <>
-            <button type="button" onClick={() => setOthers((x) => !x)} className="text-left text-[13px] font-medium text-fg-3 transition-colors hover:text-fg">
-              {others ? 'Fewer sizes' : `${rest.length} other size${rest.length > 1 ? 's' : ''}: smaller ones are quicker, bigger ones better`}
-            </button>
-            {others && <div className="divide-y divide-line">{rest.map((x) => row(x, false))}</div>}
-          </>
-        )}
-      </div>
-    );
-  }
-  if (info.kind === 'safetensors' && info.vllm) {
-    const v = info.vllm;
-    return (
-      <div className="space-y-2">
-        {gated}
-        {v.supported === true ? (
-          <div className="flex items-center gap-3 py-1">
-            <div className="min-w-0 flex-1">
-              <div className="text-[13.5px] text-fg">
-                The full model, with vLLM <span className="text-fg-3">· {size(v.fit.downloadBytes)}</span>
-              </div>
-              <div className="mt-0.5 text-[12.5px]">
-                <Runs fit={v.fit} />
-              </div>
-            </div>
-            <Button size="sm" variant="primary" className="rounded-full" icon={<Download size={13} />} disabled={v.fit.verdict === 'no'} onClick={() => void install({ repo: info.repo })}>
-              Get
+        <div className="shrink-0 pt-0.5">
+          {p.have ? (
+            <span className="anim-pop-in inline-flex h-8 items-center gap-1.5 px-1 text-[13px] font-medium text-ok">
+              <Check size={15} strokeWidth={2.6} /> Installed
+            </span>
+          ) : d ? (
+            <Button size="sm" variant="ghost" className="rounded-full" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
+              Cancel
             </Button>
-          </div>
-        ) : (
-          note(v.supported === null ? 'This one needs vLLM, a program for advanced setups, and it is not installed here.' : (v.reason ?? 'vLLM can’t run this model here.'))
-        )}
-        {info.ggufRepo &&
-          v.supported !== true &&
-          note(
-            <>
-              A smaller version runs with Ollama:{' '}
-              <button type="button" className="font-medium text-accent hover:underline" onClick={() => onCheck(info.ggufRepo!)}>
-                {info.ggufRepo}
-              </button>
-            </>,
+          ) : (
+            <Button size="sm" variant={p.best ? 'primary' : 'secondary'} className="rounded-full" icon={<Download size={13} />} disabled={busy || !p.install} onClick={() => void install()}>
+              Install
+            </Button>
           )}
+        </div>
       </div>
-    );
-  }
-  return note('This model can’t run here: it has no files Ollama or vLLM can use.');
+      {d && (
+        <div className="mt-3 flex items-center gap-3 pl-[50px]">
+          <div className="tour-pipe h-2 flex-1 overflow-hidden rounded-full bg-fg/10">
+            <div className="tour-pipe-water h-full rounded-full" style={{ width: `${pct || 3}%` }} />
+          </div>
+          <span className="tnum shrink-0 text-[12px] text-fg-3">{d.totalBytes ? `${Math.floor(pct)}%` : size(d.doneBytes)}</span>
+        </div>
+      )}
+      {failed && !d && <div className="mt-2 pl-[50px] text-[12.5px] text-err">{failed.error ?? 'The download stopped'}: try again.</div>}
+    </div>
+  );
 }

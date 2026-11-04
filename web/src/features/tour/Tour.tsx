@@ -1,19 +1,19 @@
-// The welcome tour. The first time someone opens the app (right after choosing a password on a new
-// install), and whenever they start it again from Help, it asks what they want to use (Claude Code, Codex,
-// models through OpenRouter or on this computer, other agents) and sets each of those up, on pages that
-// fill the screen while the app behind is empty. Then it builds the app up as it shows it around: a step
-// points at an element marked data-tour="…", which arrives as the step comes, with the rest of the page
-// dimmed and blurred around it; whatever no step points at arrives when the tour ends. A step without a
-// target after the pages shows in the middle of the screen. After it, tips (features/tips) show the rest of the
-// app as you come to each part: finishing the tour turns them on, skipping it turns them off for good.
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+// The welcome tour. The first time someone opens the app (right after choosing a password on a new install), and
+// whenever they start it again from Help, it shows what Hydor is with a short film of a request being done, asks
+// what should do the work (Claude, ChatGPT's Codex, models through OpenRouter or on this computer, other agents) and
+// sets up each one picked, on pages that fill the screen over the sea, its waves rising a little with each step, a
+// picture beside each page. Then it builds the app up as it shows it around: a step lights an element marked
+// data-tour="…", which arrives as the step comes, with the rest of the page dimmed around it and a card beside it,
+// some with something to try; whatever no step lights arrives when the tour ends, with a splash. After it, tips
+// (features/tips) show the rest of the app as you come to each part: finishing the tour turns them on, skipping it
+// turns them off for good. The pictures are in scenes.tsx; the words are short and plain, for people new to AI.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
-import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, CornerDownLeft, Cpu, Eye, FileDiff, FolderOpen, GitFork, MessageSquareText, Plus, ShieldCheck, Smartphone, X } from 'lucide-react';
+import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, Cpu, LayoutGrid, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import type { AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
-import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { saveStart, startSettings } from '../../lib/start';
 import { enablePush, pushState, type PushState } from '../../lib/notify';
@@ -21,18 +21,19 @@ import { toastError, useApp, useUI } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
-import { TileGradient, WaterOmega } from '../../components/Logo';
+import { Wordmark } from '../../components/Logo';
 import { LoginDialog } from '../settings/SettingsPage';
 import { shortGpu } from '../settings/ModelsSettings';
 import { TourLocal, TourOpenRouter } from './TourModels';
+import { Sea, SourcesMap, SPLASH, TideMark, TourProgress, WelcomeFilm, type Use } from './scenes';
 import { machineBase, machineId } from '../../lib/machine';
 import { tourDone } from '../tips/state';
+
+export { Sea, TourProgress, type Use };
 
 /** Raise it when the tour changes enough to be worth showing again to everyone. */
 export const TOUR_VERSION = 2;
 
-/** What someone wants to use: the tour sets up those and leaves the rest out. */
-export type Use = 'claude' | 'codex' | 'openrouter' | 'local' | 'agents';
 const USES: Use[] = ['claude', 'codex', 'openrouter', 'local', 'agents'];
 const USES_KEY = 'wa.tour.uses';
 
@@ -47,29 +48,31 @@ function savedUses(): Use[] | null {
 
 interface Step {
   id: string;
-  /** Its name in the list of steps beside the pages. */
-  label: string;
-  /** The element pointed at: [data-tour="…"]. It stays hidden until its step (or comes with the part it is
-   * one of, as Settings does with the tools), so name it in styles.css ("the tour builds the app up") too.
-   * None: the card sits in the middle. */
+  /** The element lit: [data-tour="…"]. It stays hidden until its step (or comes with the part it is one of, as
+   * Settings does with the tools), so name it in styles.css ("the tour builds the app up") too. None, after the
+   * pages: the card sits in the middle. */
   target?: string;
-  /** What stays in the light around the target, when that is only a part of it (the whole message box
-   * for the row under it): the ring marks the target, the card keeps clear of this. */
+  /** What stays in the light around the target, when that is only a part of it (the whole message box for the row
+   * under it): the ring marks the target, the card keeps clear of this. */
   focus?: string;
   title: string;
   body: ReactNode;
   /** Something to do right in the step. */
   Extra?: () => ReactNode;
+  /** A page's picture, beside its words (under them on a phone). */
+  scene?: (uses: Use[]) => ReactNode;
+  /** A card's icon, in the app. */
+  icon?: ReactNode;
   /** The page the target is on. */
   route?: string;
   /** The target is in the sidebar: shown first (the drawer, on phones), and arriving with it. */
   sidebar?: boolean;
-  /** The card's width on wider screens (a page's column is at least 520px). */
+  /** The card's width on wider screens. */
   width?: number;
-  /** The welcome page's mark on top. */
-  hero?: boolean;
   /** Next waits for this. */
   ready?: (uses: Use[]) => boolean;
+  /** Next's words, when not "Next". */
+  next?: string;
 }
 
 interface TourState {
@@ -84,7 +87,7 @@ interface TourState {
   picked: boolean;
   /** Right after choosing the password: that screen was the welcome. */
   fresh: boolean;
-  /** Gold dust where the tour was finished. */
+  /** The splash where the tour was finished. */
   burst: { x: number; y: number; id: number } | null;
 }
 
@@ -96,9 +99,8 @@ export const tourOpen = () => useTour.getState().open;
 let closeTimer = 0;
 let builtTimer = 0;
 
-/** The app builds up as the tour shows it: <html data-tour-build> names the parts shown so far, with
- * "all" as the tour ends, and the app is empty but for them (styles.css, "the tour builds the app up").
- * Null: the app is whole again. */
+/** The app builds up as the tour shows it: <html data-tour-build> names the parts shown so far, with "all" as the
+ * tour ends, and the app is empty but for them (styles.css, "the tour builds the app up"). Null: the app is whole. */
 function build(parts: string | null) {
   if (parts === null) delete document.documentElement.dataset.tourBuild;
   else document.documentElement.dataset.tourBuild = parts;
@@ -121,9 +123,9 @@ export const setupDone = () => {
   build('');
 };
 
-/** Closes the tour (fading) as the rest of the app arrives; finishing it sends gold dust from the
- * button and points at the message box. Finishing it turns the tips after it on; skipping it turns them off;
- * closing it (✕ or Esc) leaves them as they were. */
+/** Closes the tour as the rest of the app arrives; finishing it throws a splash from the button and readies the
+ * message box. Finishing it turns the tips after it on; skipping it turns them off; closing it (✕ or Esc) leaves
+ * them as they were. */
 function endTour(finishedAt?: HTMLElement | null, skipped = false) {
   const s = useTour.getState();
   if (!s.open || s.closing) return;
@@ -139,7 +141,7 @@ function endTour(finishedAt?: HTMLElement | null, skipped = false) {
   builtTimer = window.setTimeout(() => {
     build(null);
     if (r) invite();
-  }, 1150);
+  }, 1000);
   const boot = useApp.getState().boot;
   if (boot && boot.tourSeen < TOUR_VERSION) useApp.getState().set({ boot: { ...boot, tourSeen: TOUR_VERSION } });
   post('/api/tour', { version: TOUR_VERSION }).catch(() => {});
@@ -171,80 +173,29 @@ function pickAgent(uses: Use[]) {
   window.dispatchEvent(new CustomEvent('wa:agent', { detail: next }));
 }
 
-// ---- the app mark, arriving ------------------------------------------------------------------------
-
-/** The app mark coming to life: the deep blue tile settles, and water rises in its Ω until it is full, its surface
- * a wave that calms as it reaches the top. */
-export function HeroMark({ size = 64 }: { size?: number }) {
-  const id = useId();
-  return (
-    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
-      <span className="hero-glow" aria-hidden />
-      <svg width={size} height={size} viewBox="0 0 512 512" className="relative text-white" aria-hidden>
-        <defs>
-          <TileGradient id={`${id}t`} />
-        </defs>
-        <rect className="hero-tile" x="4" y="4" width="504" height="504" rx="114" fill={`url(#${id}t)`} stroke="rgba(255,255,255,0.10)" strokeWidth="8" />
-        <WaterOmega id={id} water="hero-water" bright />
-      </svg>
-    </span>
-  );
+/** Puts words in the message box, as a link to the start page does, and leaves them for you to send or change. */
+function tryWords(text: string) {
+  go(`/?prompt=${encodeURIComponent(text)}`);
+  setTimeout(() => {
+    if (!window.matchMedia('(pointer: coarse)').matches) document.querySelector<HTMLTextAreaElement>('[data-tour="composer"] textarea')?.focus({ preventScroll: true });
+  }, 120);
 }
 
-/** Soft light drifting behind the mark. */
-export function Aurora({ className }: { className?: string }) {
-  return (
-    <div className={cx('aurora', className)} aria-hidden>
-      <span />
-      <span />
-      <span />
-    </div>
-  );
-}
-
-/** Gold dust drifting in the light: a speck catches it now and then. */
-const DUST = [
-  { x: '27%', y: '26%', s: 5, d: 1500 },
-  { x: '70%', y: '20%', s: 4, d: 2400 },
-  { x: '76%', y: '66%', s: 6, d: 1900 },
-  { x: '22%', y: '70%', s: 4, d: 3000 },
-  { x: '60%', y: '84%', s: 3, d: 3600 },
-  { x: '40%', y: '14%', s: 3, d: 4200 },
-];
-
-/** The welcome page's mark, drawing itself in the light, in line with the words under it. */
-function TourHero() {
-  return (
-    <div className="relative mb-8 h-[76px] w-[76px]">
-      <div className="pointer-events-none absolute -inset-x-[82px] -inset-y-[28px]" aria-hidden>
-        {DUST.map((g, n) => (
-          <span key={n} className="dust absolute rounded-full" style={{ left: g.x, top: g.y, width: g.s, height: g.s, animationDelay: `${g.d}ms` }} />
-        ))}
-      </div>
-      <HeroMark size={76} />
-    </div>
-  );
-}
-
-/** Gold dust flying out from where the tour was finished. */
-const BURST = Array.from({ length: 14 }, (_, n) => {
-  const a = (n / 14) * Math.PI * 2 + (n % 2 ? 0.22 : 0);
-  const d = [66, 48, 36][n % 3];
-  return { dx: Math.round(Math.cos(a) * d), dy: Math.round(Math.sin(a) * d), s: [7, 5, 4][n % 3], delay: (n % 4) * 30 };
-});
+// ---- the splash at the end ---------------------------------------------------------------------------------
 
 function Burst() {
   const b = useTour((s) => s.burst);
   useEffect(() => {
     if (!b) return;
-    const t = setTimeout(() => useTour.setState({ burst: null }), 1100);
+    const t = setTimeout(() => useTour.setState({ burst: null }), 1300);
     return () => clearTimeout(t);
   }, [b]);
   if (!b) return null;
   return createPortal(
-    <div className="burst pointer-events-none fixed inset-0 z-[60]" aria-hidden>
-      {BURST.map((p, n) => (
-        <span key={`${b.id}-${n}`} style={{ left: b.x, top: b.y, width: p.s, height: p.s, animationDelay: `${p.delay}ms`, '--dx': `${p.dx}px`, '--dy': `${p.dy}px` } as CSSProperties} />
+    <div className="tour-splash pointer-events-none fixed inset-0 z-[60]" aria-hidden>
+      <span className="tour-splash-ring" style={{ left: b.x, top: b.y }} />
+      {SPLASH.map((p, n) => (
+        <span key={`${b.id}-${n}`} style={{ left: b.x, top: b.y, width: p.s, height: p.s * 1.25, animationDelay: `${p.delay}ms`, '--dx': `${p.dx}px`, '--dy': `${p.dy}px` } as CSSProperties} />
       ))}
     </div>,
     document.body,
@@ -253,32 +204,23 @@ function Burst() {
 
 // ---- things to do inside steps ----------------------------------------------------------
 
-/** One thing the app does, on the welcome page: a card, or a row on a phone. */
-function Highlight({ icon, title, children, i }: { icon: ReactNode; title: string; children: ReactNode; i: number }) {
+/** One thing about the app, on the welcome page. */
+function Point({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-3.5 rounded-2xl border border-line bg-panel/70 p-4 sm:block" style={{ '--i': i } as CSSProperties}>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">{icon}</span>
-      <div className="min-w-0 sm:mt-3.5">
-        <div className="text-[14px] font-medium text-fg">{title}</div>
-        <div className="mt-1 text-[12.5px] leading-snug text-fg-3">{children}</div>
+    <div className="flex items-start gap-3.5">
+      <span className="tour-point-icon">{icon}</span>
+      <div className="min-w-0 pt-0.5">
+        <div className="text-[14.5px] font-medium text-fg">{title}</div>
+        <div className="mt-0.5 text-[13.5px] leading-snug text-fg-3">{children}</div>
       </div>
-    </div>
-  );
-}
-
-function Feature({ icon, children, i }: { icon: ReactNode; children: ReactNode; i: number }) {
-  return (
-    <div className="flex items-start gap-3" style={{ '--i': i } as CSSProperties}>
-      <span className="mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bg-2 text-fg-2">{icon}</span>
-      <span className="min-w-0 flex-1 text-[13px] leading-snug text-fg-2">{children}</span>
     </div>
   );
 }
 
 function Loading() {
   return (
-    <div className="flex justify-center py-6 text-fg-3">
-      <Throbber size={26} />
+    <div className="flex items-center gap-2.5 py-5 text-[13.5px] text-fg-3">
+      <Throbber size={18} /> Checking…
     </div>
   );
 }
@@ -292,13 +234,12 @@ const Connected = ({ label = 'Connected' }: { label?: string }) => (
   </span>
 );
 
-
 const TILES: { id: Use; title: string; sub: string; icon: ReactNode }[] = [
-  { id: 'claude', title: 'Claude Code', sub: 'Anthropic’s Claude, with your Claude subscription', icon: <AgentIcon agent="claude" size={18} /> },
-  { id: 'codex', title: 'Codex', sub: 'OpenAI’s agent, with your ChatGPT subscription', icon: <AgentIcon agent="codex" size={18} /> },
-  { id: 'openrouter', title: 'Many AI models, pay as you go', sub: 'Hundreds of models (DeepSeek, Qwen, Kimi…) with one OpenRouter account', icon: <Cloud size={17} /> },
-  { id: 'local', title: 'AI on this computer', sub: 'Free models that run here, so nothing leaves your computer', icon: <Cpu size={17} /> },
-  { id: 'agents', title: 'Other agents', sub: 'If you already use Gemini CLI, OpenCode, Goose or the like', icon: <Blocks size={17} /> },
+  { id: 'claude', title: 'Claude', sub: 'I pay for Claude (Pro or Max): use that plan', icon: <AgentIcon agent="claude" size={19} /> },
+  { id: 'codex', title: 'ChatGPT', sub: 'I pay for ChatGPT (Plus or Pro): use its agent, Codex', icon: <AgentIcon agent="codex" size={19} /> },
+  { id: 'openrouter', title: 'Pay as you go', sub: 'The best AI models from every company, with one account', icon: <Cloud size={18} /> },
+  { id: 'local', title: 'Free, on this computer', sub: 'Private AI that runs right here: nothing leaves this computer', icon: <Cpu size={18} /> },
+  { id: 'agents', title: 'Other agents', sub: 'I already use Gemini CLI, OpenCode, Goose or the like', icon: <Blocks size={18} /> },
 ];
 
 /** The choice the tour adapts to; what is set up already starts ticked. */
@@ -338,37 +279,33 @@ function UsesPicker() {
     }
     if (!models) return null;
     const pinned = models.openrouter.pinned.length;
-    if (u === 'openrouter') return models.openrouter.keyHint ? `Key added${pinned ? ` · ${pinned} model${pinned > 1 ? 's' : ''}` : ''}` : null;
+    if (u === 'openrouter') return models.openrouter.keyHint ? `Connected${pinned ? ` · ${pinned} model${pinned > 1 ? 's' : ''}` : ''}` : null;
     if (u === 'local') {
       if (models.local.length) return `${models.local.length} model${models.local.length > 1 ? 's' : ''} here already`;
       const g = models.machine.gpus[0];
-      return g ? `Free models on your ${shortGpu(g.name)}, so nothing leaves your computer` : 'Small free models; bigger ones need a graphics card';
+      return models.machine.apple ? `Private AI on your ${models.machine.apple.chip.replace(/^Apple\s+/, '')}` : g ? `Private AI on your ${shortGpu(g.name)}` : null;
     }
     return null;
   };
   return (
-    <div className="stagger grid gap-3 sm:grid-cols-2">
-      {TILES.map((t, n) => {
+    <div className="grid gap-2.5 sm:grid-cols-2">
+      {TILES.map((t) => {
         const on = uses.includes(t.id);
+        const s = status(t.id);
         return (
           <button
             key={t.id}
             type="button"
             aria-pressed={on}
             onClick={() => toggle(t.id)}
-            style={{ '--i': n } as CSSProperties}
-            className={cx(
-              'flex items-start gap-3.5 rounded-2xl border p-4 text-left transition-[background-color,border-color,box-shadow,translate,scale] duration-200 active:scale-[0.985]',
-              on ? 'border-accent/50 bg-accent/[0.07]' : 'border-line bg-panel/70 hover:-translate-y-px hover:border-line-2 hover:bg-panel hover:shadow-md',
-              t.id === 'agents' && 'sm:col-span-2',
-            )}
+            className={cx('tour-tile group', on && 'tour-tile-on', t.id === 'agents' && 'sm:col-span-2')}
           >
-            <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors', on ? 'bg-accent/15 text-accent' : 'bg-bg-2 text-fg-2')}>{t.icon}</span>
+            <span className="tour-tile-icon">{t.icon}</span>
             <span className="min-w-0 flex-1 pt-px">
-              <span className="block text-[14px] leading-tight font-medium text-fg">{t.title}</span>
-              <span className="mt-1 block text-[12.5px] leading-snug text-fg-3">{status(t.id) ?? t.sub}</span>
+              <span className="block text-[14.5px] leading-tight font-medium text-fg">{t.title}</span>
+              <span className={cx('mt-1 block text-[12.5px] leading-snug', s ? 'text-ok' : 'text-fg-3')}>{s ?? t.sub}</span>
             </span>
-            <span className={cx('mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors duration-200', on ? 'border-accent bg-accent text-accent-fg' : 'border-line-2')}>
+            <span className="tour-tile-check" aria-hidden>
               {on && <Check size={11} strokeWidth={3.5} className="anim-draw" />}
             </span>
           </button>
@@ -394,31 +331,31 @@ function AccountsSetup() {
   }, [rev]);
   const agents = (['claude', 'codex'] as const).filter((a) => uses.includes(a));
   return (
-    <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+    <div className="divide-y divide-line overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-line">
       {agents.map((a) => {
         const s = acc?.[a];
         return (
-          <div key={a} className="flex items-center gap-3 px-3.5 py-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-bg-2">
-              <AgentIcon agent={a} size={18} />
+          <div key={a} className="flex items-center gap-3.5 px-4 py-3.5">
+            <span className="tour-tile-icon">
+              <AgentIcon agent={a} size={19} />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="text-[13.5px] font-medium text-fg">{agentName(a)}</div>
-              <div className="truncate text-[12px] text-fg-3">
+              <div className="text-[14px] font-medium text-fg">{a === 'claude' ? 'Claude' : `ChatGPT (${agentName(a)})`}</div>
+              <div className="truncate text-[12.5px] text-fg-3">
                 {!s
                   ? 'Checking…'
                   : s.loggedIn
                     ? `${s.email ?? 'Signed in'}${s.plan ? ` · ${planName(s.plan)}` : ''}`
                     : missing.includes(a)
-                      ? 'Not on this computer yet: signing in installs it first'
-                      : (s.error ?? (a === 'claude' ? 'A Claude subscription (Pro, Max or Team) or an Anthropic Console account' : 'A ChatGPT subscription: Plus, Pro, Business or Enterprise'))}
+                      ? 'Signing in installs it first: it takes a minute'
+                      : (s.error ?? (a === 'claude' ? 'A Claude plan (Pro, Max or Team) or an Anthropic Console account' : 'A ChatGPT plan: Plus, Pro, Business or Enterprise'))}
               </div>
             </div>
             {s &&
               (s.loggedIn ? (
                 <Connected />
               ) : (
-                <Button size="sm" variant="primary" onClick={() => useTour.setState({ signIn: a })}>
+                <Button size="sm" variant="primary" className="rounded-full px-4" onClick={() => useTour.setState({ signIn: a })}>
                   Sign in
                 </Button>
               ))}
@@ -444,20 +381,20 @@ function AgentsSetup() {
   const installs = (d: AgentDef) => !!d.hint?.startsWith('npm install');
   const rows = [...data.agents.filter((a) => !a.builtin).map((a) => ({ a, added: true })), ...data.presets.map((a) => ({ a, added: false }))];
   return (
-    <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+    <div className="divide-y divide-line overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-line">
       {rows.map(({ a, added }) => (
-        <div key={a.id} className="flex items-center gap-3 px-3.5 py-2.5">
+        <div key={a.id} className="flex items-center gap-3.5 px-4 py-3">
           <AgentIcon agent="acp" name={a.name} size={22} />
           <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] font-medium text-fg">{a.name}</div>
-            <div className="truncate text-[12px] text-fg-3">
-              {a.installed ? (added ? 'Ready: sign in to it once in its own program' : 'Installed on this computer') : added ? (installs(a) ? 'Installing…' : `Install it: ${a.hint}`) : installs(a) ? 'The app installs it' : `Install it first: ${a.hint}`}
+            <div className="text-[14px] font-medium text-fg">{a.name}</div>
+            <div className="truncate text-[12.5px] text-fg-3">
+              {a.installed ? (added ? 'Ready: sign in to it once in its own program' : 'On this computer') : added ? (installs(a) ? 'Installing…' : `Install it: ${a.hint}`) : installs(a) ? 'The app installs it' : `Install it first: ${a.hint}`}
             </div>
           </div>
           {added ? (
             <Connected label="Added" />
           ) : (
-            <Button size="sm" variant={a.installed ? 'primary' : 'secondary'} icon={<Plus size={13} />} onClick={() => add(a)}>
+            <Button size="sm" variant={a.installed ? 'primary' : 'secondary'} className="rounded-full" icon={<Plus size={13} />} onClick={() => add(a)}>
               Add
             </Button>
           )}
@@ -485,9 +422,7 @@ function NotifySetup() {
   if (st === 'unsupported' || st === 'denied')
     return (
       <div className="text-[12.5px] text-fg-3">
-        {st === 'denied'
-          ? 'Notifications are blocked for this site; allow them in the browser settings first.'
-          : 'This browser can’t show notifications here. On an iPhone, add the app to your Home Screen first.'}
+        {st === 'denied' ? 'Notifications are blocked for this site; allow them in the browser’s settings first.' : 'This browser can’t show notifications here. On an iPhone, add the app to your Home Screen first.'}
       </div>
     );
   return (
@@ -512,6 +447,52 @@ function NotifySetup() {
   );
 }
 
+/** First things to try: each puts its words in the message box (and, at the end, ends the tour there). */
+const FIRST_TASKS = ['Plan a 3-day trip to Lisbon in May', 'Sum up a PDF I drop in', 'Make a budget spreadsheet for a small café'];
+
+function TryThese({ finish }: { finish?: boolean }) {
+  return (
+    <div>
+      <div className="mb-2 text-[12px] font-medium text-fg-3">{finish ? 'Start with one of these:' : 'Try it: put one in the box'}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {FIRST_TASKS.map((t) => (
+          <button
+            key={t}
+            type="button"
+            className="tour-try"
+            onClick={(e) => {
+              tryWords(t);
+              if (finish) endTour(e.currentTarget);
+            }}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** What the dot by each session means, moving as it does in the list. */
+function DotsLegend() {
+  return (
+    <div className="grid gap-1.5 text-[13px] text-fg-2">
+      {(
+        [
+          ['bg-busy breathe', 'Working on it'],
+          ['bg-warn', 'Needs you: a question, or a yes or no'],
+          ['bg-ok', 'Done'],
+        ] as const
+      ).map(([c, t]) => (
+        <span key={t} className="flex items-center gap-2.5">
+          <span className={cx('h-2.5 w-2.5 shrink-0 rounded-full', c)} />
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ---- the steps ----------------------------------------------------------------------------
 
 /** "a, b or c" */
@@ -523,175 +504,139 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   const codex = has('codex');
   const cli = claude || codex;
   const models = has('openrouter') || has('local');
-  const cliNames = claude && codex ? 'Claude Code and Codex' : claude ? 'Claude Code' : 'Codex';
   const list: Step[] = [];
   if (!fresh)
     list.push({
       id: 'welcome',
-      label: 'Welcome',
-      hero: true,
       title: 'Welcome to Hydor',
-      body: 'AI helpers (agents) that do real work on this computer for you: research, writing, documents, files, code and everyday tasks. Use them from any browser, at your desk or on your phone. This short tour sets up the ones you want and shows you around.',
-      width: 440,
+      body: 'Your own AI helpers, called agents, that do real work on this computer: they read and write your files, search the web, make documents and pictures, and write code. Here is how it goes:',
+      scene: () => (
+        <div className="flex w-full flex-col items-center gap-8">
+          <span className="max-lg:hidden">
+            <TideMark size={84} />
+          </span>
+          <WelcomeFilm />
+        </div>
+      ),
+      next: 'Let’s set it up',
       Extra: () => (
-        <div className="stagger grid gap-3 sm:grid-cols-3">
-          <Highlight i={0} icon={<FolderOpen size={16} />} title="Works with your files">
-            Point it at any folder on this computer, and pick the AI it uses.
-          </Highlight>
-          <Highlight i={1} icon={<Eye size={16} />} title="Follow it live">
-            See what it does as it works, say yes or no to what it asks, and answer its questions.
-          </Highlight>
-          <Highlight i={2} icon={<Smartphone size={16} />} title="On your phone too">
-            Pick up anywhere, and get a notification when it’s done.
-          </Highlight>
+        <div className="grid gap-4">
+          <Point icon={<MessageSquareText size={17} />} title="Ask in your own words">
+            Like “sum up the report in my Downloads folder”, or “plan a weekend in Rome”.
+          </Point>
+          <Point icon={<Sparkles size={17} />} title="Watch it work">
+            Every step shows as it happens, at your desk or on your phone.
+          </Point>
+          <Point icon={<ShieldCheck size={17} />} title="You stay in charge">
+            It asks before anything you haven’t allowed, and you can stop it at any time.
+          </Point>
         </div>
       ),
     });
   list.push({
     id: 'choose',
-    label: 'What to use',
-    title: 'What would you like to use?',
-    body: 'Pick one or more. Not sure? If you pay for Claude or ChatGPT already, start with that one. You can add the others later in Settings.',
+    title: 'What should do the work?',
+    body: 'Pick one or more. If you already pay for Claude or ChatGPT, start with that one. Not sure? Pay as you go suits everyone. You can add the others later.',
+    scene: (u) => <SourcesMap on={u} />,
     Extra: UsesPicker,
-    width: 620,
     ready: (u) => u.length > 0,
   });
   if (cli)
     list.push({
       id: 'accounts',
-      label: claude && codex ? 'Subscriptions' : 'Sign in',
-      title: claude && codex ? 'Connect your subscriptions' : `Sign in to ${cliNames}`,
-      body:
-        claude && codex
-          ? 'Claude Code and Codex use the subscriptions you already pay for. Sign in to each here; Settings → Accounts changes them later.'
-          : claude
-            ? 'It uses your Claude subscription (Pro or Max) or an Anthropic Console account. Sign in once; Settings → Accounts changes it later.'
-            : 'It uses your ChatGPT subscription. Sign in once; Settings → Accounts changes it later.',
+      title: claude && codex ? 'Sign in to your plans' : claude ? 'Sign in to Claude' : 'Sign in to ChatGPT',
+      body: `Hydor uses the plan you already pay for, so there is nothing more to pay. Sign in once${claude && codex ? ' to each' : ''}, and it works on every device; Settings → Accounts changes it later.`,
+      scene: (u) => <SourcesMap on={u} focus={['claude', 'codex']} />,
       Extra: AccountsSetup,
-      width: 460,
     });
   if (has('openrouter'))
     list.push({
       id: 'openrouter',
-      label: 'OpenRouter',
-      title: 'Many AI models, pay as you go',
-      body: 'OpenRouter is a service that gives you hundreds of AI models from many companies with one account: you add some credit there and pay only for what you use. Connect it with your key (a code from your OpenRouter account, like a password), then pick the models you want. Custom, the app’s own agent, works with them.',
+      title: 'Pay as you go',
+      body: 'OpenRouter is one account for AI models from every company. You add a little credit there, and pay only for what you use: often cents a task. The app’s own agent, Custom, works with these models.',
+      scene: (u) => <SourcesMap on={u} focus="openrouter" />,
       Extra: TourOpenRouter,
-      width: 560,
     });
   if (has('local'))
     list.push({
       id: 'local',
-      label: 'On this computer',
-      title: 'AI on this computer',
-      body: 'Custom, the app’s own agent, can work with free AI models that run right here, so nothing you do leaves this computer. They need Ollama, a free program that runs them. Pick a model below: each says how well it would run here before anything downloads. A computer with a good graphics card runs them best.',
+      title: 'Free AI on this computer',
+      body: 'These models run right here, so nothing you do leaves your computer, and they cost nothing to use. Here are the ones that run well on yours: pick one to install.',
+      scene: (u) => <SourcesMap on={u} focus="local" />,
       Extra: TourLocal,
-      width: 560,
     });
   if (has('agents'))
     list.push({
       id: 'agents',
-      label: 'More agents',
-      title: 'More agents',
-      body: 'If you already use other AI agents, such as Gemini CLI or Goose, they work here too. Add the ones you use: the app installs those it knows, and each asks you to sign in once in its own program.',
+      title: 'Other agents',
+      body: 'Agents you already use, such as Gemini CLI or Goose, work here too. Add yours: the app installs those it knows, and each asks you to sign in once in its own program.',
+      scene: (u) => <SourcesMap on={u} focus="agents" />,
       Extra: AgentsSetup,
-      width: 480,
     });
   const names = [claude && 'Claude Code', codex && 'Codex', models && 'Custom with your models', has('agents') && 'the agents you added'].filter((x): x is string => !!x);
-  // Where the models come from, said beside the model.
-  const modelFrom =
-    cli && models
-      ? ' (from your plans or your own)'
-      : cli && claude && codex
-        ? ' (from either company)'
-        : models
-          ? ` (${has('openrouter') && has('local') ? 'the OpenRouter models you added or the ones on this computer' : has('openrouter') ? 'any of the OpenRouter models you added' : 'one of those on this computer'})`
-          : '';
   // The app arrives in this order, the message box before the row under it.
   list.push(
     {
       id: 'composer',
-      label: 'The message box',
       target: 'composer',
       route: '/',
-      title: 'Say what you want done',
-      body: 'Ask a question or describe a task in your own words, like “sort the photos in my Downloads folder” or “sum up this PDF”. Drop in pictures and files too, or type @ to name a file. Press Enter to start: each conversation is called a session.',
+      icon: <MessageSquareText size={16} />,
+      title: 'Ask for anything',
+      body: 'Write what you want done, in plain words, and press Enter: an agent gets to work. Drop in files and pictures too. Each conversation is called a session.',
+      Extra: () => <TryThese />,
     },
     {
       id: 'start-bar',
-      label: 'Agent and folder',
       target: 'start-bar',
       focus: 'composer',
       route: '/',
-      title: 'Pick an agent and a folder',
-      body: `Under the message box you choose the agent that does the work${names.length ? ` (${either(names)})` : ''}, the AI model it uses${modelFrom}, the folder on this computer it works in, and the assistant it starts as (ready-made instructions for a kind of work). What you pick stays for next time.`,
+      icon: <SlidersHorizontal size={16} />,
+      title: 'Choose who does it, and where',
+      body: `Under the box: the agent that does the work${names.length ? ` (${either(names)})` : ''}, the AI model it thinks with, and the folder on this computer it may use. What you pick stays for next time.`,
     },
     {
       id: 'pickers',
-      label: 'Options',
       target: 'pickers',
       focus: 'composer',
       route: '/',
-      title: cli ? 'Effort, permissions and more' : 'Permissions and more',
-      body: `Options sets ${cli ? 'how hard the agent thinks, ' : ''}what it may do without asking you first (from checking with you before every change to doing everything on its own), whether it remembers things for next time, and how much it may spend.`,
+      icon: <ShieldCheck size={16} />,
+      title: 'Decide how much it may do',
+      body: `Options sets what the agent may do without asking you: from checking with you before every change, to working on its own${cli ? ', and how hard it thinks' : ''}. Change it any time.`,
     },
     {
       id: 'sessions',
-      label: 'Sessions',
       target: 'sessions',
       sidebar: true,
-      title: 'Every session, live',
-      body: `${cli ? `Every ${cliNames} session on this computer shows up here, even ones started outside the app, and keeps going when you close the page.` : 'Every session you start shows up here, and keeps going when you close the page.'} The dot says what each one is doing: blue working, amber needs you, green done. ${MOD}K finds any of them.`,
+      icon: <MessagesSquare size={16} />,
+      title: 'Your sessions',
+      body: 'Every conversation is listed here, and keeps going when you close the page. The dot beside each one says how it is doing:',
+      Extra: DotsLegend,
     },
     {
       id: 'tools',
-      label: 'Tools',
       target: 'tools',
       sidebar: true,
-      title: 'Your computer, from anywhere',
-      body: cli
-        ? 'The Library keeps what agents made for you, and Apps the tools you run again and again. Usage shows how much of your subscription is left and when it resets. System is this computer: its files, how busy it is, and Git, a terminal and previews of web apps for programmers.'
-        : 'The Library keeps what agents made for you, and Apps the tools you run again and again. System is this computer: its files, how busy it is, and Git, a terminal and previews of web apps for programmers.',
+      icon: <LayoutGrid size={16} />,
+      title: 'Everything else',
+      body: 'Library keeps what agents made for you, Apps the tasks you run again and again, Usage what your plans have left, System this computer’s files, and Help the guide to every part of the app.',
     },
     {
       id: 'notify',
-      label: 'Notifications',
       target: 'nav-settings',
       sidebar: true,
-      title: 'Get notified',
-      body: 'Hear when a session finishes or needs your answer, even with the app closed. Settings also holds your accounts, AI models, connected services and the guidelines every agent follows.',
+      icon: <Bell size={16} />,
+      title: 'Hear when it’s done',
+      body: 'Get a notification when an agent finishes or needs you, even with the app closed. Settings holds this, and everything else you can change.',
       Extra: NotifySetup,
     },
     {
-      id: 'session',
-      label: 'Inside a session',
-      title: 'Inside a session',
-      body: 'Once a session starts:',
-      width: 440,
-      Extra: () => (
-        <div className="stagger space-y-2.5">
-          <Feature i={0} icon={<MessageSquareText size={15} />}>
-            The agent’s messages read like a chat; the steps it takes fold into small boxes you can open.
-          </Feature>
-          <Feature i={1} icon={<ShieldCheck size={15} />}>
-            Approve or deny what it wants to do, and answer its questions.
-          </Feature>
-          <Feature i={2} icon={<CornerDownLeft size={15} />}>
-            Message it while it works: it reads your note right away, or {MOD}Enter keeps it for when it’s done.
-          </Feature>
-          {cli && (
-            <Feature i={3} icon={<GitFork size={15} />}>
-              {claude && codex ? 'Copy a session to try another way (Fork), or hand it to the other agent with the whole conversation.' : 'Copy a session to try another way (Fork).'}
-            </Feature>
-          )}
-          <Feature i={4} icon={<FileDiff size={15} />}>
-            See every file it changed, and what changed in each. {MOD}F finds words in the conversation.
-          </Feature>
-          <div className="pt-1 text-[12.5px] text-fg-3" style={{ '--i': 5 } as CSSProperties}>
-            Help (<CircleHelp size={13} className="inline -translate-y-px" />) explains every part of the app, and takes you on this tour again. As you go on, tips point out the rest, one part at a time.
-          </div>
-        </div>
-      ),
+      id: 'done',
+      icon: <Sparkles size={16} />,
+      title: 'You’re all set',
+      body: 'Agents are ready to help. Help (?) explains every part of the app, and short tips will show you the rest as you go.',
+      width: 420,
+      next: 'Get started',
+      Extra: () => <TryThese finish />,
     },
   );
   return list;
@@ -700,21 +645,10 @@ function steps(uses: Use[], fresh: boolean): Step[] {
 /** Steps of a new install's tour before anything is picked, the password included. */
 export const TOUR_SETUP_STEPS = steps([], true).length + 1;
 
-/** Where the tour stands: one dot per step. */
-export function TourProgress({ at, total, className }: { at: number; total: number; className?: string }) {
-  return (
-    <div className={cx('flex items-center gap-1.5', className)} aria-label={`Step ${at + 1} of ${total}`}>
-      {Array.from({ length: total }, (_, n) => (
-        <span key={n} className={cx('h-1.5 rounded-full transition-all duration-500 ease-out', n === at ? 'w-4 bg-accent' : n < at ? 'w-1.5 bg-fg-3' : 'w-1.5 bg-line-2')} />
-      ))}
-    </div>
-  );
-}
-
 // ---- the overlay ----------------------------------------------------------------------------
 
 const PAD = 6;
-const GAP = 14;
+const GAP = 16;
 const EDGE = 16;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 interface Box {
@@ -748,9 +682,9 @@ function placeCard(r: DOMRect | null, w: number, h: number, mobile: boolean, sid
 /** A target's box with room around it. */
 const around = (r: DOMRect): Box => ({ x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 });
 
-/** Elements' boxes where they come to rest: whatever is moving them in (their own entrance or one around
- * them, the sidebar sliding in, the drawer opening) is taken to its end for the reading and put back as it
- * was. So the light and the card go straight to a part's place, instead of following it there. */
+/** Elements' boxes where they come to rest: whatever is moving them in (their own entrance or one around them, the
+ * sidebar sliding in, the drawer opening) is taken to its end for the reading and put back as it was. So the light
+ * and the card go straight to a part's place, instead of following it there. */
 function settled(els: Element[]): DOMRect[] {
   const moving = document.getAnimations().flatMap((a) => {
     const fx = a.effect;
@@ -775,7 +709,7 @@ function glide(cur: Box | null, goal: Box, k: number): Box {
   return Math.abs(b.x - goal.x) + Math.abs(b.y - goal.y) + Math.abs(b.w - goal.w) + Math.abs(b.h - goal.h) < 0.5 ? goal : b;
 }
 
-/** The dimmed, blurred page with a rounded hole where the target is. */
+/** The dimmed page with a rounded hole where the target is. */
 function holePath(b: Box): string {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -790,21 +724,25 @@ function holePath(b: Box): string {
 
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
-/** A setup step: the whole screen, over the app that is not there yet. Its words start in the same place
- * every step, and Back, where the tour stands and Next stay put at the foot of the screen; a long step
- * scrolls under them, seen through frosted glass. It dissolves (out) as the app comes in or the tour
- * closes; a new install's first one follows the password screen without a fade. */
+/**
+ * A setup step: the whole screen, over the app that is not there yet. Its picture on the left (on top on a phone),
+ * its words on the right, starting in the same place every step; Back, the droplets and Next stay put at the foot,
+ * over the sea, whose waves rise a little with each step. A long step scrolls under them. The page goes (out) as the
+ * app comes in or the tour closes, the sea rushing up as it does; a new install's first one follows the password
+ * screen with no change between them.
+ */
 function TourPage(p: {
   list: Step[];
   /** The step shown. */
   k: number;
   fresh: boolean;
-  /** The way the tour moved: forward 1, back -1. */
-  dir: number;
+  uses: Use[];
   out: boolean;
+  /** Into the app, rather than closed. */
+  dive: boolean;
   now?: boolean;
   ready: boolean;
-  /** None while it dissolves: its buttons are still. */
+  /** None while it goes: its buttons are still. */
   onBack?: () => void;
   onNext?: () => void;
   onSkip?: () => void;
@@ -815,39 +753,28 @@ function TourPage(p: {
   const phone = useIsMobile();
   const [still] = useState(p.now);
   const scroller = useRef<HTMLDivElement>(null);
-  const end = useRef<HTMLDivElement>(null);
+  // The words scroll above the buttons, never under them.
   const foot = useRef<HTMLDivElement>(null);
-  // Room under the words for the buttons, and whether the words run on under them (models found).
-  const [footH, setFootH] = useState(96);
-  const [under, setUnder] = useState(false);
-  useEffect(() => {
-    const s = scroller.current;
+  const [footH, setFootH] = useState(phone ? 132 : 104);
+  useLayoutEffect(() => {
     const f = foot.current;
-    const e = end.current;
-    if (!s || !f || !e) return;
-    const check = () => {
-      setFootH(f.offsetHeight);
-      setUnder(e.getBoundingClientRect().top > f.getBoundingClientRect().top + 1);
-    };
-    check();
-    s.addEventListener('scroll', check, { passive: true });
-    const ro = new ResizeObserver(check);
-    ro.observe(s);
+    if (!f) return;
+    const measure = () => setFootH(f.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(f);
-    if (s.firstElementChild) ro.observe(s.firstElementChild);
-    return () => {
-      s.removeEventListener('scroll', check);
-      ro.disconnect();
-    };
+    return () => ro.disconnect();
   }, []);
-  // Each step starts at its top. (In braces: newer browsers return a promise from scrollTo, which React
-  // would take for the effect's cleanup and call.)
+  // Each step starts at its top. (In braces: newer browsers return a promise from scrollTo, which React would take for
+  // the effect's cleanup and call.)
   useEffect(() => {
     scroller.current?.scrollTo({ top: 0 });
   }, [k]);
   const Extra = step.Extra;
-  const column = 'mx-auto w-full max-w-[760px] px-5 sm:px-10 2xl:max-w-[840px]';
-  const where = ready ? <TourProgress at={k + (fresh ? 1 : 0)} total={list.length + (fresh ? 1 : 0)} /> : <span className="text-[12.5px] text-fg-3">Pick one or more</span>;
+  const pages = list.findIndex((s) => !!s.target);
+  const at = k + (fresh ? 1 : 0);
+  const total = list.length + (fresh ? 1 : 0);
+  const where = ready ? <TourProgress at={at} total={total} /> : <span className="text-[12.5px] text-fg-3">Pick one or more</span>;
   const back = (
     <Button variant="ghost" className="h-10 rounded-xl px-3.5 text-[14px]" onClick={k > 0 ? p.onBack : p.onSkip} title={k > 0 ? undefined : 'No tour, and no tips later'}>
       {k > 0 ? 'Back' : phone ? 'Skip' : 'Skip the tour'}
@@ -855,7 +782,7 @@ function TourPage(p: {
   );
   const next = (
     <Button ref={p.nextRef} variant="primary" className={cx('gap-2 rounded-xl px-5', phone ? 'h-11 flex-1 text-[15px]' : 'h-10 text-[14px]')} onClick={p.onNext} disabled={!ready}>
-      {step.id === 'welcome' ? 'Show me around' : 'Next'}
+      {step.next ?? 'Next'}
       <ArrowRight size={16} />
     </Button>
   );
@@ -864,9 +791,12 @@ function TourPage(p: {
       role="dialog"
       aria-modal="true"
       aria-labelledby={out ? undefined : 'tour-title'}
-      className={cx('tour-page fixed inset-0 bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none')}
+      className={cx('tour-page fixed inset-0 overflow-hidden bg-bg', still && 'tour-page-now', out && 'tour-page-out pointer-events-none', out && p.dive && 'tour-page-dive')}
     >
-      <Aurora className="aurora-page" />
+      <Sea level={pages > 0 ? Math.min(1, k / pages) : 0} rush={out && p.dive} />
+      <div className="absolute top-[calc(var(--safe-top)+18px)] left-5 z-10 text-fg sm:top-6 sm:left-7">
+        <Wordmark height={14} />
+      </div>
       <button
         onClick={() => endTour()}
         className="absolute top-[calc(var(--safe-top)+12px)] right-3 z-10 rounded-lg p-1.5 text-fg-3 transition-colors hover:bg-fg/[0.06] hover:text-fg sm:top-5 sm:right-5"
@@ -875,37 +805,28 @@ function TourPage(p: {
       >
         <X size={18} />
       </button>
-      <div ref={scroller} className="absolute inset-0 overflow-y-auto overscroll-contain">
-        <div className={cx(column, 'pt-[calc(var(--safe-top)+64px)] sm:pt-[clamp(56px,14vh,160px)]')} style={{ paddingBottom: footH + 24 }}>
-          <div key={step.id} className="tour-step" style={{ '--dx': `${p.dir * 22}px` } as CSSProperties}>
-            {step.hero && <TourHero />}
-            <h2 id={out ? undefined : 'tour-title'} className="text-[27px] leading-[1.15] font-semibold tracking-tight text-balance text-fg sm:text-[34px]" style={{ '--i': 0 } as CSSProperties}>
-              {step.title}
-            </h2>
-            <div className="mt-3.5 max-w-[36rem] text-[15px] leading-relaxed text-pretty text-fg-2 sm:text-[16px]" style={{ '--i': 1 } as CSSProperties}>
-              {step.body}
+      <div ref={scroller} className="tour-scroll absolute inset-x-0 top-0 overflow-y-auto overscroll-contain" style={{ bottom: footH }}>
+        <div className="tour-stage mx-auto flex min-h-full w-full max-w-[1120px] px-5 pt-[calc(var(--safe-top)+64px)] pb-10 sm:px-10 lg:items-center lg:pt-20">
+          <div key={step.id} className="flex w-full flex-col gap-7 lg:flex-row lg:items-start lg:gap-14">
+            {step.scene && <div className="tour-scene flex shrink-0 justify-center lg:sticky lg:top-8 lg:w-[400px]">{step.scene(p.uses)}</div>}
+            <div className="min-w-0 flex-1 lg:max-w-[600px]">
+              <div className="mb-3 text-[12.5px] font-medium tracking-[0.12em] text-fg-3 uppercase">{`Step ${at + 1} of ${total}`}</div>
+              <h2 id={out ? undefined : 'tour-title'} className="text-[27px] leading-[1.12] font-semibold tracking-tight text-balance text-fg sm:text-[34px]">
+                {step.title}
+              </h2>
+              <div className="mt-3 max-w-[34rem] text-[15px] leading-relaxed text-pretty text-fg-2 sm:text-[16px]">{step.body}</div>
+              {Extra && (
+                <div className="mt-7">
+                  <Extra />
+                </div>
+              )}
             </div>
-            {Extra && (
-              <div className="mt-9" style={{ '--i': 2 } as CSSProperties}>
-                <Extra />
-              </div>
-            )}
           </div>
-          <div ref={end} className="h-px" />
         </div>
       </div>
-      <div
-        ref={foot}
-        className={cx(
-          'absolute inset-x-0 bottom-0 z-[1] border-t transition-[background-color,border-color] duration-300',
-          // Glass only while something runs under it: a backdrop blur kept on all the time can draw black
-          // in Safari as the next step slides in.
-          under ? 'border-line/70 bg-bg/60 backdrop-blur-lg' : 'border-transparent',
-        )}
-      >
+      <div ref={foot} className="tour-foot absolute inset-x-0 bottom-0 z-[1]">
         {phone ? (
-          // The dots over the buttons, so neither moves with the words on them.
-          <div className={cx(column, 'pt-3 pb-[calc(var(--safe-bottom)+20px)]')}>
+          <div className="px-5 pt-3 pb-[calc(var(--safe-bottom)+18px)]">
             <div className="mb-3 flex justify-center">{where}</div>
             <div className="flex items-center gap-2">
               {back}
@@ -913,8 +834,7 @@ function TourPage(p: {
             </div>
           </div>
         ) : (
-          // Up off the bottom edge, at the same height on every step.
-          <div className={cx(column, 'relative flex items-center justify-between pt-5 pb-[clamp(32px,12vh,140px)]')}>
+          <div className="relative mx-auto flex w-full max-w-[1120px] items-center justify-between px-10 pt-5 pb-[clamp(28px,7vh,72px)]">
             {back}
             <span className="absolute left-1/2 -translate-x-1/2">{where}</span>
             {next}
@@ -936,8 +856,8 @@ export function Tour() {
   const [seen, setSeen] = useState<{ id: string; r: DOMRect | null } | null>(null);
   // The step whose target has been waited for long enough.
   const [waited, setWaited] = useState<string>();
-  // Where the card is, and whether it glides from there: once it has come in (until then it has no place
-  // to glide from, and its first one moves as it learns its size).
+  // Where the card is, and whether it glides from there: once it has come in (until then it has no place to glide
+  // from, and its first one moves as it learns its size).
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const [glides, setGlides] = useState(false);
   const [inner, setInner] = useState<HTMLDivElement | null>(null);
@@ -952,19 +872,16 @@ export function Tour() {
   // The steps before the first one in the app are pages.
   const pages = list.findIndex((s) => !!s.target);
   const onPage = i < pages;
-  // A page stays a moment once the tour moves into the app (or closes), dissolving as the app comes in.
-  const [page, setPage] = useState<{ n: number; out: boolean } | null>(null);
+  // A page stays a moment once the tour moves into the app (or closes), going as the app comes in.
+  const [page, setPage] = useState<{ n: number; out: boolean; dive: boolean } | null>(null);
   const pageNow = step && onPage && !closing ? i : null;
-  if (pageNow !== null && (page?.n !== pageNow || page.out)) setPage({ n: pageNow, out: false });
-  else if (pageNow === null && page && !page.out) setPage({ n: page.n, out: true });
+  if (pageNow !== null && (page?.n !== pageNow || page.out)) setPage({ n: pageNow, out: false, dive: false });
+  else if (pageNow === null && page && !page.out) setPage({ n: page.n, out: true, dive: !closing });
   useEffect(() => {
     if (!page?.out) return;
-    const t = setTimeout(() => setPage(null), 380);
+    const t = setTimeout(() => setPage(null), 560);
     return () => clearTimeout(t);
   }, [page]);
-  // Which way the tour last moved: a page comes in from that side.
-  const [move, setMove] = useState({ i, dir: 1 });
-  if (move.i !== i) setMove({ i, dir: i > move.i ? 1 : -1 });
 
   // The parts of the app shown so far: each step's own, and the sidebar around those in it.
   const shown = useMemo(() => [...new Set(list.slice(0, i + 1).flatMap((s) => (!s.target ? [] : s.sidebar ? ['sidebar', s.target] : [s.target])))].join(' '), [list, i]);
@@ -972,8 +889,8 @@ export function Tour() {
     if (open) build(closing ? `${shown} all` : shown);
   }, [open, closing, shown]);
 
-  // The first visit (or the first after the tour changed) opens it on the home page; a new install goes
-  // on from its password at once.
+  // The first visit (or the first after the tour changed) opens it on the home page; a new install goes on from its
+  // password at once.
   useEffect(() => {
     if (auto.current || open) return;
     if (afterSetup) {
@@ -1000,10 +917,10 @@ export function Tour() {
     if (step.route === '/') pickAgent(useTour.getState().uses);
   }, [step, mobile, closing]);
 
-  // Follow the target (it may appear late, a page or the drawer opening, and move), and glide the hole
-  // after what is in the light (the target, or the whole it is part of) and the ring after the target,
-  // to where they come to rest; with no target both shut in the middle, and while one is still coming
-  // they stay where they are. The pages have no light: it comes in where the app's first step points.
+  // Follow the target (it may appear late, a page or the drawer opening, and move), and glide the hole after what is
+  // in the light (the target, or the whole it is part of) and the ring after the target, to where they come to rest;
+  // with no target both shut in the middle, and while one is still coming they stay where they are. The pages have no
+  // light: it comes in where the app's first step points.
   useEffect(() => {
     if (!open) return;
     const id = step?.id ?? '';
@@ -1113,11 +1030,11 @@ export function Tour() {
 
   // The step's target, where it comes to rest, once found.
   const target = seen?.id === step.id ? seen.r : null;
-  // One still coming: the card stays where it is (out of sight once it is known to be missing) until it is
-  // found, or a moment has gone by and it goes to the middle. It first comes in once it has a place.
+  // One still coming: the card stays where it is (out of sight once it is known to be missing) until it is found, or
+  // a moment has gone by and it goes to the middle. It first comes in once it has a place.
   const coming = !!step.target && !target && waited !== step.id;
   const missing = coming && seen?.id === step.id;
-  const w = mobile ? window.innerWidth - EDGE * 2 : (step.width ?? 360);
+  const w = mobile ? window.innerWidth - EDGE * 2 : (step.width ?? 372);
   const maxH = window.innerHeight - EDGE * 2;
   const want = size.inner + size.foot + 2;
   const h = size.inner ? Math.min(want, maxH) : 0;
@@ -1128,6 +1045,7 @@ export function Tour() {
   // A new install's password screen was step 1.
   const total = list.length + (fresh ? 1 : 0);
   const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  const last = i >= list.length - 1;
   return (
     <>
       {createPortal(
@@ -1138,14 +1056,18 @@ export function Tour() {
               <div ref={scrim} className={cx('scrim tour-scrim pointer-events-none fixed inset-0', closing && 'opacity-0')} />
               {/* Out of sight until the light first lands. */}
               <div ref={ring} className={cx('tour-ring pointer-events-none fixed top-0 left-0 rounded-[14px] opacity-0', closing && 'invisible')}>
-                {target && <span key={step.id} className="tour-ping" />}
+                {target && (
+                  <span key={step.id} className="tour-ping">
+                    <span />
+                  </span>
+                )}
               </div>
               {place && (
                 <div
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="tour-title"
-                  className={cx('tour-card fixed flex flex-col overflow-hidden rounded-2xl border border-line-2 bg-elevated shadow-lg', closing && 'tour-card-out', missing && 'pointer-events-none opacity-0')}
+                  className={cx('tour-card fixed flex flex-col overflow-hidden rounded-[20px] border border-line-2 bg-elevated', closing && 'tour-card-out', missing && 'pointer-events-none opacity-0')}
                   onAnimationEnd={(e) => e.target === e.currentTarget && setGlides(true)}
                   style={{
                     left: place.left,
@@ -1157,7 +1079,7 @@ export function Tour() {
                 >
                   <button
                     onClick={() => endTour()}
-                    className="absolute top-3 right-3 z-10 rounded-md p-1 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
+                    className="absolute top-3.5 right-3.5 z-10 rounded-md p-1 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
                     aria-label="Close the tour"
                     title="Close the tour (Esc)"
                   >
@@ -1165,31 +1087,35 @@ export function Tour() {
                   </button>
                   <div className="min-h-0 flex-1" style={{ overflowY: want > maxH ? 'auto' : 'hidden' }}>
                     <div ref={setInner} className="px-5 pt-5 pb-4">
-                      <div key={step.id} className="tour-rise">
-                        <h2 id="tour-title" className="pr-7 text-[16.5px] font-semibold tracking-tight text-fg" style={{ '--i': 0 } as CSSProperties}>
+                      {last && (
+                        <div className="mb-6 flex justify-center pt-4">
+                          <TideMark size={60} />
+                        </div>
+                      )}
+                      <div className={cx('flex items-center gap-2.5 pr-7', last && 'justify-center pr-0')}>
+                        {!last && <span className="tour-card-icon">{step.icon}</span>}
+                        <h2 id="tour-title" className={cx('text-[17px] font-semibold tracking-tight text-fg', last && 'text-[20px]')}>
                           {step.title}
                         </h2>
-                        <div className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2" style={{ '--i': 1 } as CSSProperties}>
-                          {step.body}
-                        </div>
-                        {Extra && (
-                          <div className="mt-3.5" style={{ '--i': 2 } as CSSProperties}>
-                            <Extra />
-                          </div>
-                        )}
                       </div>
+                      <div className={cx('mt-2 text-[14px] leading-relaxed text-fg-2', last && 'text-center')}>{step.body}</div>
+                      {Extra && (
+                        <div className="mt-4">
+                          <Extra />
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div ref={setFoot} className="flex shrink-0 items-center gap-2 border-t border-line bg-bg-1 px-4 py-2.5">
+                  <div ref={setFoot} className="flex shrink-0 items-center gap-2 border-t border-line bg-bg-1/80 px-4 py-2.5">
                     <Button size="sm" variant="ghost" onClick={i > 0 ? back : () => endTour(null, true)} title={i > 0 ? undefined : 'No tour, and no tips later'}>
                       {i > 0 ? 'Back' : 'Skip the tour'}
                     </Button>
                     <span className="flex min-w-0 flex-1 justify-center">
                       <TourProgress at={i + (fresh ? 1 : 0)} total={total} />
                     </span>
-                    <Button ref={nextBtn} size="sm" variant="primary" className="gap-1.5" onClick={next} disabled={!ready}>
-                      {i >= list.length - 1 ? 'Get started' : 'Next'}
-                      {i < list.length - 1 && <ArrowRight size={14} />}
+                    <Button ref={nextBtn} size="sm" variant="primary" className="gap-1.5 rounded-lg" onClick={next} disabled={!ready}>
+                      {step.next ?? 'Next'}
+                      {!last && <ArrowRight size={14} />}
                     </Button>
                   </div>
                 </div>
@@ -1201,8 +1127,9 @@ export function Tour() {
               list={list}
               k={page.n}
               fresh={fresh}
-              dir={move.dir}
+              uses={uses}
               out={page.out}
+              dive={page.dive}
               now={fresh && page.n === 0}
               ready={page.out || ready}
               {...(!page.out && { onBack: back, onNext: next, onSkip: () => endTour(null, true), nextRef: nextBtn })}

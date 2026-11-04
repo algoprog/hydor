@@ -164,7 +164,7 @@ Once after the app updates, a note in the corner says "Updated to Hydor …" wit
 
 ## Take the tour
 
-The welcome tour asks what you want to use (Claude Code, Codex, models through OpenRouter, models on this computer, other agents), sets each of those up on pages that fill the screen, then shows you around the app part by part. It opens by itself the first time you use the app.
+The welcome tour is made for people new to AI. It opens with a short film of a request being done (you ask in your own words, the agent works step by step, the result is ready), then asks what should do the work: **Claude** or **ChatGPT** (with the plan you already pay for), **Pay as you go** (models from every company through OpenRouter), **Free, on this computer** (models that run here), or **Other agents**. It sets each one you pick up on pages that fill the screen: signing in, adding your OpenRouter key and picking from the suggested models, or installing one of the models suggested for this computer with one click. A picture beside each page shows what you picked, water flowing from each into the Ω; the droplets at the bottom fill as you go. Then it shows you around the app part by part, with something to try on the way: a first task you can put in the message box with one click. It opens by itself the first time you use the app.
 
 To take it again: [Settings → App → General → Welcome tour → **Take the tour**](/settings?s=general&find=Take%20the%20tour), **Take the tour** in the search box, or **Take the tour** at the top of **Help** in the sidebar. More in [Getting started](/guide/start).
 
