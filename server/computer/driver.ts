@@ -227,5 +227,5 @@ export interface DriverOut {
   positions: { x: number; y: number }[];
   /** How text was typed: on key events (array, string, nsevent) or pasted. */
   typed?: string;
-  info?: { pos?: { x: number; y: number }; display?: { x: number; y: number; w: number; h: number }; displays?: number; app?: string };
+  info?: { pos?: { x: number; y: number }; display?: { x: number; y: number; w: number; h: number }; displays?: number; app?: string; window?: string };
 }

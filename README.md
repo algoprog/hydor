@@ -50,7 +50,8 @@ the ones you start in VS Code or a terminal show up too.
   run right inside a reply, and pictures from the web or your files.
 - **Help with anything, not just code**: assistants (Researcher, Writer, Tutor, Planner, Analyst, Coder, App
   builder), web search with the sources each reply cites, a browser you can watch and take over, and deep
-  research that ends in a cited report.
+  research that ends in a cited report. In the desktop apps, agents can also use your computer itself, its screen,
+  mouse and keyboard in any app, once you allow it: a glow lines the screen while they work, and Esc stops them.
 - **Apps**: small tools for one job (a trip plan, a product comparison, the weather, a quiz) whose answers open in
   views of their own, with maps, charts, pictures and videos. Use the ready-made ones or make your own; agents
   run them for you in any chat. **Explore**, at the top right of the start page, is a magazine made for you:

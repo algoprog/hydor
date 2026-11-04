@@ -1,4 +1,4 @@
-// Computer steps in the conversation: what the agent did on the Mac in a line, with a small picture of the screen
+// Computer steps in the conversation: what the agent did on the computer in a line, with a small picture of the screen
 // after it (its answer starts "Computer step N"); the picture opens large, the line opens the full answer.
 import { memo, useState } from 'react';
 import { ChevronRight, Monitor, MousePointerClick, XCircle } from 'lucide-react';

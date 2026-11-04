@@ -15,7 +15,7 @@ module.exports = {
   productName: 'Hydor',
   copyright: 'Copyright © Naget, Inc.',
   directories: { output: 'dist', buildResources: 'resources' },
-  files: ['main.cjs', 'package.json'],
+  files: ['main.cjs', 'glow.cjs', 'package.json'],
   extraResources: [
     // build/ as a whole, not build/server: electron-builder always leaves out a node_modules at the top of
     // a folder it copies, and the server's packages are in server/node_modules.
@@ -73,6 +73,7 @@ module.exports = {
     electronLanguages: ['en-US', 'zh-CN', 'el'],
   },
   appImage: { artifactName: 'Hydor-${version}-${arch}.${ext}' },
-  // git for projects and their history; the rest Electron needs comes with electron-builder's own list.
-  deb: { artifactName: 'Hydor-${version}-${arch}.${ext}', recommends: ['git'] },
+  // git for projects and their history, python3 for computer use on X11 (with libxtst6, in electron-builder's own list
+  // of what Electron needs).
+  deb: { artifactName: 'Hydor-${version}-${arch}.${ext}', recommends: ['git', 'python3'] },
 };

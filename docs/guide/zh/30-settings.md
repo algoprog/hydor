@@ -182,9 +182,9 @@
 
 ### 电脑操控
 
-[设置 → 电脑操控](/settings?s=computer)：智能体能看到你 Mac 的屏幕，并使用它的鼠标和键盘，仅限 Mac 应用。详见[搜索和浏览器](/guide/web)。
+[设置 → 电脑操控](/settings?s=computer)：智能体能看到你的屏幕，并使用鼠标和键盘，仅限桌面应用。详见[搜索和浏览器](/guide/web)。
 
-- [**允许智能体使用这台 Mac**](/settings?s=computer&find=Let%20agents%20use%20this%20Mac)：智能体能看到屏幕，并在任何应用中使用鼠标和键盘；每个会话都会先问你。
+- [**允许智能体使用这台电脑**](/settings?s=computer&find=Let%20agents%20use%20this%20computer)：智能体能看到屏幕，并在任何应用中使用鼠标和键盘（网站的事它们仍交给浏览器）。每个会话都会先问你。
 - [**辅助功能**](/settings?s=computer&find=Accessibility)：macOS 允许 Hydor 使用鼠标和键盘的权限。
 - [**屏幕录制**](/settings?s=computer&find=Screen%20Recording)：macOS 允许 Hydor 查看屏幕的权限。
 

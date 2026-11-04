@@ -73,9 +73,9 @@ jobs:
       - name: The tag matches the version
         if: startsWith(github.ref, 'refs/tags/v')
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
-      - name: Linux's build tools (tmux's terminal library, a screen for opening the app, and tmux for the server's test)
+      - name: Linux's build tools (tmux's terminal library, a screen for opening the app, tmux for the server's test, and X11's XTest and a compositor for computer use's)
         if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libncurses-dev bison xvfb tmux
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libncurses-dev bison xvfb tmux libxtst6 xcompmgr
       - name: Build the app
         run: npm ci --no-audit --no-fund && npm run build
       - name: The server on this system (agents, terminals, commands)
@@ -98,6 +98,36 @@ jobs:
         run: node desktop/scripts/smoke.mjs "${{ matrix.unpacked }}"
       - name: The app opens and starts its server
         run: node desktop/scripts/launch-test.mjs "${{ matrix.program }}"
+      # Computer use on the system itself: the mouse, the keyboard, typing in any script and opening apps (on Windows
+      # with the helper this build ships, then with PowerShell compiling it), and the glow over the screen staying out
+      # of the agent's screenshots. Windows' and macOS's runners decide what a program may see and press there, so their
+      # results are reported without holding a release back.
+      - name: Computer use on this system
+        continue-on-error: ${{ runner.os != 'Linux' }}
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            OUTDIR=dist/dev node scripts/build-server.mjs server/computer/x11-test.ts
+            HYDOR_TEST_XVFB=1 DATA_DIR=/tmp/hydor-test-x11 node dist/dev/x11-test.js
+          elif [ "$RUNNER_OS" = Windows ]; then
+            OUTDIR=dist/dev node scripts/build-server.mjs server/computer/windows-test.ts
+            HYDOR_COMPUTER_HELPER="$(cygpath -w "$PWD/desktop/build/bin/hydor-computer.exe")" node dist/dev/windows-test.js
+            node dist/dev/windows-test.js
+          else
+            echo "macOS: the agent's driver is checked in server/computer/computer-test.ts; the glow below."
+          fi
+      - name: The glow stays out of the agent's screenshots
+        continue-on-error: ${{ runner.os != 'Linux' }}
+        working-directory: desktop
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            Xvfb :91 -screen 0 1920x1080x24 +extension RANDR +extension Composite -nolisten tcp & sleep 1
+            DISPLAY=:91 xcompmgr -n & sleep 1
+            DISPLAY=:91 npx electron --no-sandbox scripts/glow-test.cjs
+          elif [ "$RUNNER_OS" = Windows ]; then
+            HYDOR_COMPUTER_HELPER="$(cygpath -w "$PWD/build/bin/hydor-computer.exe")" npx electron scripts/glow-test.cjs
+          else
+            npx electron scripts/glow-test.cjs
+          fi
       - name: The AppImage opens and starts its server, from its own copy
         if: runner.os == 'Linux'
         run: node desktop/scripts/launch-test.mjs desktop/dist/Hydor-*.AppImage

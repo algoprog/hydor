@@ -243,14 +243,14 @@ These are the agents' own skills, which only that agent gets (Settings → Agent
 - `PATCH /api/browser/profiles/:id` — renames a profile. Body: `{ name: string — 1–40 characters }`. Returns: same as GET.
 - `DELETE /api/browser/profiles/:id` — deletes a profile with its sign-ins, and closes the browsers using it. Returns: same as GET.
 
-## Computer use (the Mac app)
+## Computer use (the desktop apps)
 
-Agents see the Mac's screen and use its mouse and keyboard with their own tools (computer_screenshot, computer_act), only in the Mac app with Computer use on, and only after the user allowed it on a card in the session. **ComputerState**: `{ available: boolean — the server runs in the Mac app (elsewhere nothing works), enabled: boolean — Let agents use this Mac (off at first), permissions?: { accessibility: boolean — macOS lets Hydor use the mouse and keyboard, screen: 'granted'|'denied'|'not-determined'|'restricted'|'unknown' — Screen Recording } | null — null when the Mac app did not say, active: { key, title, since } | null — the session whose agent is using the Mac now, allowed: number — sessions the user allowed (until Stop or the app restarts) }`.
+Agents see the computer's screen and use its mouse and keyboard with their own tools (computer_screenshot, computer_act), only in the desktop app (Mac, Windows, or Linux on an X11 desktop) with Computer use on, and only after the user allowed it on a card in the session. While an agent acts, a glow lines the screen's edges, which its screenshots never show, and Esc stops it. **ComputerState**: `{ available: boolean — the server runs in a desktop app (elsewhere nothing works), system: 'mac'|'windows'|'linux'|null — which one, problem?: string | null — what keeps it from working on this computer now (a Linux desktop on Wayland, a library missing), in words, enabled: boolean — Let agents use this computer (off at first), permissions?: { accessibility: boolean — macOS lets Hydor use the mouse and keyboard, screen: 'granted'|'denied'|'not-determined'|'restricted'|'unknown' — Screen Recording } | null — only in the Mac app; null when it did not say, active: { key, title, since } | null — the session whose agent is using the computer now, allowed: number — sessions the user allowed (until Stop or the app restarts) }`.
 
 - `GET /api/computer` — Settings → Computer use. Returns: ComputerState.
 - `PUT /api/computer/settings` — turns computer use on or off. Body: `{ enabled: boolean }`. Turning it off stops what an agent is doing, and every session asks again. Returns: ComputerState.
 - `POST /api/computer/permissions/:which` — `accessibility` or `screen`: macOS's own question the first time, then its System Settings at the right place, where the user turns Hydor on. Only the user does this (agents are refused). Returns: ComputerState with the permissions read again. 400 outside the Mac app.
-- `POST /api/computer/stop` — Stop: what agents do on the Mac ends, and every session asks again before its agent goes on. Returns: ComputerState.
+- `POST /api/computer/stop` — Stop (as Esc does): what agents do on the computer ends, and every session asks again before its agent goes on. Returns: ComputerState.
 
 ## Deep research
 

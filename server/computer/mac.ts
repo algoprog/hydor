@@ -1,13 +1,16 @@
 // Computer use on the Mac itself, with the programs macOS has: screencapture for the screen (the main display, no
 // sound), sips to scale it down to what models read well and make it a JPEG, osascript for the driver (driver.ts),
 // and open for apps. Each runs as a child of the server, which runs in the Mac app, so macOS asks for (and checks)
-// the app's permissions: Screen Recording to see, Accessibility to use the mouse and keyboard.
+// the app's permissions: Screen Recording to see, Accessibility to use the mouse and keyboard. macOS 15.4 and later
+// put even windows that ask to be left out in screenshots, so the app's glow is hidden while screencapture looks.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DRIVER, type DriverOut } from './driver.ts';
-import { driverTimeout, fitSize, jpegSize, MAX_SIDE, pngSize, type Geometry, type Op } from './plan.ts';
+import { withoutGlow } from './glow.ts';
+import type { Machine, Shot } from './machine.ts';
+import { driverTimeout, fitSize, jpegSize, MAX_SIDE, pngSize, type Op } from './plan.ts';
 
 /** Runs a program; its error is the last line it wrote (osascript's "execution error: …" without the code). */
 function exec(cmd: string, args: string[], timeout: number, signal?: AbortSignal): Promise<string> {
@@ -32,21 +35,12 @@ export async function drive(ops: Op[], signal?: AbortSignal): Promise<DriverOut>
   }
 }
 
-export interface Shot {
-  jpeg: Buffer;
-  geo: Geometry;
-  /** The app in front, the pointer (in points) and how many displays there are. */
-  app?: string;
-  pos?: { x: number; y: number };
-  displays?: number;
-}
-
 /** The main display, scaled down to MAX_SIDE on its longer side, as a JPEG; and where it is in points. */
 export async function screenshot(signal?: AbortSignal): Promise<Shot> {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hydor-screen-'));
   try {
     const png = path.join(dir, 'screen.png');
-    const [, out] = await Promise.all([exec('/usr/sbin/screencapture', ['-x', '-m', '-t', 'png', png], 20_000, signal), drive([{ op: 'info' }], signal)]);
+    const [, out] = await Promise.all([withoutGlow(() => exec('/usr/sbin/screencapture', ['-x', '-m', '-t', 'png', png], 20_000, signal)), drive([{ op: 'info' }], signal)]);
     const head = Buffer.alloc(24);
     let size: { width: number; height: number } | null = null;
     try {
@@ -74,3 +68,5 @@ export async function screenshot(signal?: AbortSignal): Promise<Shot> {
 export async function openApp(name: string, signal?: AbortSignal): Promise<void> {
   await exec('/usr/bin/open', ['-a', name], 20_000, signal);
 }
+
+export const macMachine: Machine = { drive, screenshot, openApp };

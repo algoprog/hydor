@@ -1,19 +1,20 @@
-// Computer use, in the Mac app: agents see the Mac's screen and use its mouse and keyboard, in any app, beside the
-// browser (which stays the way for websites). Off at first (Settings → Capabilities → Computer use, which also asks
-// macOS for its two permissions); each session asks the user before its agent starts; Stop in the menu bar, ⌘⇧Esc,
-// Settings or the session's line ends it. Elsewhere than the Mac app it is not offered.
+// Computer use, in the desktop apps (Mac, Windows, Linux on X11): agents see the computer's screen and use its mouse and
+// keyboard, in any app, beside the browser (which stays the way for websites). Off at first (Settings → Capabilities
+// → Computer use, which on a Mac also asks macOS for its two permissions); each session asks the user before its agent
+// starts. While an agent acts, a glow lines the screen's edges (desktop/glow.cjs), with a note that Esc stops it; Esc,
+// Stop in the menu bar or tray (⌘⇧Esc too on a Mac), Settings or the session's line ends it. Elsewhere than the
+// desktop apps it is not offered.
 import fs from 'node:fs';
 import type { FastifyRequest } from 'fastify';
-import { STOPPED_NOTE } from '../../shared/computer.ts';
 import { HttpError } from '../auth.ts';
 import { askDesktop, onDesktop } from '../desktop.ts';
 import type { Deps, Feature } from '../features/types.ts';
-import { clearActive, computerSettings, computerState, forgetSession, hooks, setComputerDeps, setComputerSettings, stopAll } from './access.ts';
+import { clearActive, computerSettings, computerState, forgetSession, hooks, setComputerDeps, setComputerSettings, stopAll, wordsHere } from './access.ts';
 import { dropSteps, pruneSteps, stepFile } from './steps.ts';
-import { COMPUTER_INSTRUCTIONS, computerTools, forgetGeometry } from './tools.ts';
+import { computerInstructions, computerTools, forgetGeometry } from './tools.ts';
 import type { DB } from '../db.ts';
 
-const usable = (db: DB) => hooks.inApp() && computerSettings(db).enabled;
+const usable = (db: DB) => !!hooks.system() && computerSettings(db).enabled;
 
 function routes(d: Deps) {
   const { app, db } = d;
@@ -27,7 +28,7 @@ function routes(d: Deps) {
   app.post('/api/computer/permissions/:which', async (req) => {
     const which = P(req).which;
     if (which !== 'accessibility' && which !== 'screen') throw new HttpError(400, 'Which permission: accessibility or screen');
-    if (!hooks.inApp()) throw new HttpError(400, 'Computer use needs the Hydor Mac app');
+    if (hooks.system() !== 'mac') throw new HttpError(400, 'Only the Mac app asks macOS for permissions');
     try {
       await askDesktop({ what: 'request', which }, 15_000);
     } catch (e) {
@@ -54,15 +55,15 @@ export const computer: Feature = {
     routes(d);
   },
   tools: (ctx) => (usable(ctx.deps.db) ? computerTools(ctx) : []),
-  spawn: (_s, d) => (usable(d.db) ? { instructions: [COMPUTER_INSTRUCTIONS] } : undefined),
-  // A turn's end: the agent is no longer at the Mac.
+  spawn: (_s, d) => (usable(d.db) ? { instructions: [computerInstructions()] } : undefined),
+  // A turn's end: the agent is no longer at the computer.
   turnEnd: (t) => clearActive(t.key),
   start(d) {
     setComputerDeps(d);
     pruneSteps();
-    // Stop in the Mac app's menu bar, or ⌘⇧Esc.
+    // Esc, Stop in the desktop app's menu bar or tray, or ⌘⇧Esc on a Mac.
     onDesktop('computer-stop', () => {
-      if (stopAll()) d.broadcast({ t: 'toast', level: 'info', text: STOPPED_NOTE });
+      if (stopAll()) d.broadcast({ t: 'toast', level: 'info', text: wordsHere().stopped });
     });
     d.sessions.on('live', (key: string, live: unknown) => {
       if (!live) {

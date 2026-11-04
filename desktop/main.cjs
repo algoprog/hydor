@@ -20,13 +20,16 @@
 // Mac app or an AppImage puts the version before back, and the server is told why, so Settings says it, and that
 // version is not installed by itself again.
 //
-// Computer use (server/computer/, on a Mac): agents see the screen and use the mouse and keyboard through programs the
-// server starts, which macOS counts as this app's doing, so the permissions (Accessibility, Screen Recording) are this
-// app's: the server asks here what macOS allows and to ask you for the rest ({ type: 'ask' }, answered with
-// { type: 'reply' }). While an agent acts ({ type: 'computer' }), the menu bar says so, with Stop, and ⌘⇧Esc stops it
-// too ({ type: 'computer-stop' } to the server).
+// Computer use (server/computer/, on a Mac, Windows, and Linux with X11): agents see the screen and use the mouse and
+// keyboard through programs the server starts. On a Mac, macOS counts them as this app's doing, so the permissions
+// (Accessibility, Screen Recording) are this app's: the server asks here what macOS allows and to ask you for the rest
+// ({ type: 'ask' }, answered with { type: 'reply' }). While an agent acts ({ type: 'computer' }), a glow lines the
+// screen's edges with a note that Esc stops it (glow.cjs), the menu bar or tray says so, with Stop, and Esc (⌘⇧Esc too
+// on a Mac) stops it ({ type: 'computer-stop' } to the server). The glow is hidden while the agent looks at the screen,
+// and Esc let go while the agent itself presses it; on Linux the app takes the agent's screenshots.
 'use strict';
 const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, nativeImage, nativeTheme, session, shell, systemPreferences } = require('electron');
+const glow = require('./glow.cjs');
 const { spawn, execFile, execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -462,6 +465,10 @@ function onMessage(m) {
     onUpdate(m);
   } else if (m.type === 'computer') {
     onComputer(m);
+  } else if (m.type === 'glow') {
+    glow.unveil();
+  } else if (m.type === 'esc') {
+    lendEsc(false);
   } else if (m.type === 'ask' && typeof m.id === 'string') {
     void answer(m);
   }
@@ -474,15 +481,19 @@ function toServer(m) {
   } catch {}
 }
 
-// ---- what the server shows here: a new version waiting, an agent using the Mac ------------------------------------
+// ---- what the server shows here: a new version waiting, an agent using the computer --------------------------------
 
 /** A new version downloaded and waiting (its version), for Restart to Update in the menus. */
 let updateReady = null;
-/** An agent using the Mac (computer use) while it acts: { title } of its session. */
+/** An agent using the computer (computer use) while it acts: { title } of its session, and `using`, in the user's words. */
 let computerActive = null;
 /** Notifications on screen, kept so they are still there to click. */
 const notices = new Set();
+/** What stops an agent at the computer: Esc, and on a Mac also ⌘⇧Esc, which macOS leaves free. */
+const ESC = 'Escape';
 const STOP_KEYS = 'Command+Shift+Escape';
+/** The agent itself is pressing Esc: the app lets go of it meanwhile, so the agent does not stop itself. */
+let escLent = false;
 
 function onUpdate(m) {
   updateReady = typeof m.version === 'string' && m.version ? m.version : null;
@@ -511,24 +522,49 @@ function notify(n) {
   note.show();
 }
 
+const SYSTEM_USING = MAC ? 'An agent is using your Mac' : WIN ? 'An agent is using your PC' : 'An agent is using your computer';
+
+/** Esc (and ⌘⇧Esc) stop the agent, only while one acts: the keys stay the other apps' otherwise. */
+function holdStops() {
+  if (!computerActive) return;
+  const hold = (keys, name) => {
+    try {
+      if (!globalShortcut.isRegistered(keys) && !globalShortcut.register(keys, stopComputer)) console.error(`[hydor] ${name} is taken by another app`);
+    } catch {}
+  };
+  if (!escLent) hold(ESC, 'Esc');
+  if (MAC) hold(STOP_KEYS, '⌘⇧Esc');
+}
+
+function dropStops(keys) {
+  for (const k of keys)
+    try {
+      if (globalShortcut.isRegistered(k)) globalShortcut.unregister(k);
+    } catch {}
+}
+
+/** The agent presses Esc itself (lent), or has (given back). */
+function lendEsc(lent) {
+  escLent = lent;
+  if (lent) dropStops([ESC]);
+  else holdStops();
+}
+
 function onComputer(m) {
-  if (!MAC) return;
   const was = !!computerActive;
-  computerActive = m.active ? { title: typeof m.title === 'string' ? m.title : '' } : null;
-  // ⌘⇧Esc stops it, only while an agent acts (the keys stay the other apps' otherwise).
-  if (computerActive && !was) {
-    try {
-      if (!globalShortcut.register(STOP_KEYS, stopComputer)) console.error('[hydor] ⌘⇧Esc is taken by another app');
-    } catch {}
-  } else if (!computerActive && was) {
-    try {
-      globalShortcut.unregister(STOP_KEYS);
-    } catch {}
+  computerActive = m.active ? { title: typeof m.title === 'string' ? m.title : '', using: typeof m.using === 'string' && m.using ? m.using : SYSTEM_USING } : null;
+  if (computerActive) {
+    glow.setGlow(m.glow !== false, { using: computerActive.using, esc: typeof m.esc === 'string' ? m.esc : '' });
+    holdStops();
+  } else if (was) {
+    glow.setGlow(false);
+    escLent = false;
+    dropStops([ESC, STOP_KEYS]);
   }
   rebuildTray();
 }
 
-/** Stop (the menu bar, ⌘⇧Esc): the agent's actions end, and no agent uses the Mac until you allow it again. */
+/** Stop (Esc, the menu bar or tray, ⌘⇧Esc): the agent's actions end, and no agent uses the computer until you allow it again. */
 function stopComputer() {
   toServer({ type: 'computer-stop' });
   onComputer({ active: false });
@@ -560,10 +596,23 @@ function permissions() {
   return { accessibility: systemPreferences.isTrustedAccessibilityClient(false), screen };
 }
 
-/** The server asks: what macOS allows, or to ask you for a permission (macOS's own prompt, then its settings). */
+/**
+ * The server asks: to hide the glow for a screenshot, to let go of Esc while the agent presses it, a picture of the
+ * screen (Linux), what macOS allows, or to ask you for a permission (macOS's own prompt, then its settings).
+ */
 async function answer(m) {
   const reply = (r) => toServer({ type: 'reply', id: m.id, ok: true, ...r });
   try {
+    if (m.what === 'glow') {
+      if (m.show === false) await glow.veil();
+      else glow.unveil();
+      return reply({});
+    }
+    if (m.what === 'esc') {
+      lendEsc(m.on === false);
+      return reply({});
+    }
+    if (m.what === 'screenshot') return reply(await glow.capture(Number(m.max) || 1280, Number(m.quality) || 70));
     if (!MAC) return toServer({ type: 'reply', id: m.id, ok: false, error: 'only the Mac app can do that' });
     if (m.what === 'permissions') return reply(permissions());
     if (m.what === 'request' && m.which === 'accessibility') {
@@ -901,17 +950,18 @@ function rebuildTray() {
     // Windows (and some Linux desktops): a click on the icon opens the app; its menu is on the other button.
     if (!MAC) tray.on('click', () => go());
   }
-  // While an agent uses the Mac, the menu bar says so beside the icon, and its menu starts with Stop.
+  // While an agent uses the computer, the menu bar says so beside the icon (a Mac), and the menu starts with Stop.
   const agent = computerActive
     ? [
-        { label: 'An agent is using your Mac', enabled: false },
+        { label: computerActive.using, enabled: false },
         ...(computerActive.title ? [{ label: `In “${computerActive.title.slice(0, 60)}”`, enabled: false }] : []),
-        { label: 'Stop', accelerator: STOP_KEYS, click: stopComputer },
+        // Esc as the menu's hint (Linux's tray menus show none).
+        { label: 'Stop', ...(MAC || WIN ? { accelerator: 'Escape' } : {}), click: stopComputer },
         { type: 'separator' },
       ]
     : [];
   if (MAC) tray.setTitle(computerActive ? 'Agent using your Mac' : '');
-  tray.setToolTip(computerActive ? 'Hydor: an agent is using your Mac' : 'Hydor');
+  tray.setToolTip(computerActive ? `Hydor: ${computerActive.using}` : 'Hydor');
   tray.setContextMenu(
     Menu.buildFromTemplate([
       ...agent,

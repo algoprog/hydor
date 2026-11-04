@@ -2,10 +2,12 @@
 // linux) and a message channel (Node's IPC), starts it again whenever it exits (agents carry on, as with the Linux
 // service), and installs the new versions the server downloads (updates.ts). Elsewhere `desktop` is null.
 //
-// The channel both ways: the server tells the app what to show (a new version ready, an agent using the Mac) and
-// what to do (install), asks it what only it can find out or do (macOS's permissions for computer use, and asking
-// for them), and hears what you chose in its menus (Restart to Update, Stop) and, on Windows, that it should stop
-// (quit: Windows has no signal a program can catch for that).
+// The channel both ways: the server tells the app what to show (a new version ready, an agent using the computer, with
+// the glow around the screen) and what to do (install), asks it what only it can find out or do (macOS's permissions
+// for computer use, and asking for them; hiding the glow for a moment while it looks at the screen; letting go of Esc
+// while the agent itself presses it; on Linux, a picture of the screen), and hears what you chose in its menus
+// (Restart to Update, Stop, Esc) and, on Windows, that it should stop (quit: Windows has no signal a program can catch
+// for that).
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -62,7 +64,7 @@ export const desktop = read();
 /** The system's name, as the app's words say it. */
 export const SYSTEM_NAME: Record<DesktopPlatform, string> = { mac: 'Mac', windows: 'Windows', linux: 'Linux' };
 
-/** A notification from the Mac, with a button. */
+/** A notification from the system, with a button. */
 export interface DesktopNotice {
   title: string;
   body: string;
@@ -71,9 +73,17 @@ export interface DesktopNotice {
 }
 
 /** What the app is asked, and answers (askDesktop). */
-export type DesktopAsk = { what: 'permissions' } | { what: 'request'; which: 'accessibility' | 'screen' };
+export type DesktopAsk =
+  | { what: 'permissions' }
+  | { what: 'request'; which: 'accessibility' | 'screen' }
+  /** Hide the glow around the screen, and answer once it is gone (a screenshot follows; { type: 'glow' } shows it again). */
+  | { what: 'glow'; show: false }
+  /** Let go of Esc (the agent is about to press it), and answer once it has; { type: 'esc' } takes it back. */
+  | { what: 'esc'; on: false }
+  /** The main display as a JPEG at most `max` pixels on its longer side, the glow hidden meanwhile (Linux). */
+  | { what: 'screenshot'; max: number; quality: number };
 
-/** Messages to the Mac app. */
+/** Messages to the desktop app. */
 export type ToDesktop =
   | { type: 'ready'; url: string; setupToken?: string }
   | { type: 'install'; app: string; from: string; to: string }
@@ -82,11 +92,19 @@ export type ToDesktop =
    * notification from the Mac says it restarts into it in a minute (clicking it opens the app, its button installs now).
    */
   | { type: 'update'; version: string | null; notice?: DesktopNotice }
-  /** An agent is using the Mac (computer use), or no longer: the menu bar says so, with Stop (and ⌘⇧Esc meanwhile). */
-  | { type: 'computer'; active: boolean; title?: string }
+  /**
+   * An agent is using the computer (computer use), or no longer: a glow lines the screen's edges (unless `glow` is
+   * false: a Linux desktop without a compositor), its note says `using` and `esc`, Esc stops it (and ⌘⇧Esc on a Mac),
+   * and the menu bar or tray says so, with Stop.
+   */
+  | { type: 'computer'; active: boolean; title?: string; using?: string; esc?: string; glow?: boolean }
+  /** The glow back after a screenshot. */
+  | { type: 'glow'; show: true }
+  /** Esc stops the agent again, after it pressed Esc itself. */
+  | { type: 'esc'; on: true }
   | ({ type: 'ask'; id: string } & DesktopAsk);
 
-/** Messages from the app: Restart to Update (its menu, the notification), Stop (its menu, ⌘⇧Esc), quit (Windows), and answers. */
+/** Messages from the app: Restart to Update (its menu, the notification), Stop (its menu, Esc, ⌘⇧Esc), quit (Windows), and answers. */
 export type FromDesktop = { type: 'update-now' } | { type: 'computer-stop' } | { type: 'quit' } | { type: 'reply'; id: string; ok: boolean; error?: string; [k: string]: unknown };
 
 export function tellDesktop(m: ToDesktop): boolean {
@@ -114,7 +132,7 @@ function listen() {
       if (!w) return;
       waiting.delete(String(m.id));
       clearTimeout(w.timer);
-      if (m.ok === false) w.reject(new Error(String(m.error ?? 'the Mac app could not do it')));
+      if (m.ok === false) w.reject(new Error(String(m.error ?? 'the desktop app could not do it')));
       else w.resolve(m as Record<string, unknown>);
       return;
     }
@@ -128,7 +146,7 @@ function listen() {
   });
 }
 
-/** Hears one kind of message from the Mac app (nothing elsewhere). Returns how to stop. */
+/** Hears one kind of message from the desktop app (nothing elsewhere). Returns how to stop. */
 export function onDesktop(type: Exclude<FromDesktop['type'], 'reply'>, fn: (m: FromDesktop) => void): () => void {
   listen();
   let set = listeners.get(type);
@@ -139,22 +157,22 @@ export function onDesktop(type: Exclude<FromDesktop['type'], 'reply'>, fn: (m: F
   };
 }
 
-/** Asks the Mac app, and waits for its answer (fails outside it, or when it does not answer in time). */
+/** Asks the desktop app, and waits for its answer (fails outside it, or when it does not answer in time). */
 export function askDesktop<T extends Record<string, unknown>>(q: DesktopAsk, timeoutMs = 8000): Promise<T> {
-  if (!desktop) return Promise.reject(new Error('Not in the Mac app'));
+  if (!desktop) return Promise.reject(new Error('Not in the desktop app'));
   listen();
   const id = crypto.randomBytes(6).toString('hex');
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       waiting.delete(id);
-      reject(new Error('the Mac app did not answer'));
+      reject(new Error('the desktop app did not answer'));
     }, timeoutMs);
     timer.unref?.();
     waiting.set(id, { resolve: resolve as (v: Record<string, unknown>) => void, reject, timer });
     if (!tellDesktop({ type: 'ask', id, ...q } as ToDesktop)) {
       clearTimeout(timer);
       waiting.delete(id);
-      reject(new Error('the Mac app did not answer'));
+      reject(new Error('the desktop app did not answer'));
     }
   });
 }

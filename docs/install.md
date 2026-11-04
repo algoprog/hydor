@@ -46,7 +46,8 @@ when this computer starts**).
 - **Quit Hydor** stops the server; running agents carry on and are picked up again the next time it opens.
 - Computer use: agents can see your Mac's screen and use its mouse and keyboard, once you turn it on in Settings →
   Computer use and give Hydor macOS's Accessibility and Screen Recording permissions (its **Allow…** buttons
-  ask). Each session asks you first; **Stop** in the menu bar or ⌘⇧Esc stops it. Builds not signed with a Developer
+  ask). Each session asks you first; a glow lines the screen while an agent works, and **Esc** (or **Stop** in the
+  menu bar, or ⌘⇧Esc) stops it. Builds not signed with a Developer
   ID may need the permissions given again after an update (macOS ties them to the app's signature).
 - Not in the Mac app yet: **Run code** steps in apps and the agent sandbox need Linux's bubblewrap.
 
@@ -76,7 +77,11 @@ General → **Start when this computer starts**).
 - Each version runs from a copy of itself in `%LOCALAPPDATA%\Hydor\runtime`, made the first time it opens, so agents
   keep running through updates (Windows cannot replace files a program uses); copies nothing runs from any more go.
 - Windows has no tmux: the app keeps the terminals itself, and they close when it quits.
-- Not in the Windows app yet: computer use, the agent sandbox and **Run code** steps in apps (they need macOS or
+- Computer use: agents can see your PC's screen and use its mouse and keyboard, once you turn it on in Settings →
+  Computer use (nothing to allow in Windows). Each session asks you first; a glow lines the screen while an agent
+  works, and **Esc** (or **Stop** from the icon in the notification area) stops it. Programs running as
+  administrator are out of its reach.
+- Not in the Windows app yet: the agent sandbox and **Run code** steps in apps (they need macOS or
   Linux), local voice transcription, and the figures on the System page.
 
 ## The Linux app
@@ -106,7 +111,11 @@ tray when the window is closed, and opens in the background when you log in.
   the app opens again as the new version.
 - The tray icon needs a desktop with a system tray (GNOME needs the AppIndicator extension, which Ubuntu has); without
   one, open Hydor again from your applications to get its window back.
-- Not in the Linux app yet: computer use (it is in the Mac app).
+- Computer use (Settings → Computer use): agents can see the screen and use the mouse and keyboard on an X11 (Xorg)
+  desktop, with Python 3 and the XTest library (`libxtst6`, which the `.deb` brings). On a Wayland desktop, as GNOME
+  and KDE are on most systems now, apps cannot see or use the others, so computer use needs an X11 session (on
+  Ubuntu, the gear on the login screen → **Ubuntu on Xorg**). A glow lines the screen while an agent works (on
+  desktops that composite their windows), and **Esc** (or **Stop** in the tray) stops it.
 
 ## With Docker
 
