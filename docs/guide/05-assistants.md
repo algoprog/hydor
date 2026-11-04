@@ -75,7 +75,7 @@ For a big question that needs many searches, see deep research in [Deep research
 - After each step, it checks with a short question or a small exercise, and waits for your answer before going on.
 - When you answer, it says what was right, corrects what was not kindly and specifically, and adapts: another explanation or example when you're stuck, a faster pace when you're ahead.
 - With homework or exercises, it guides you with hints and questions, and gives the full solution only when you ask for it or are still stuck after trying.
-- It shows a diagram or a small interactive page in the session when a picture explains better than words, and closes a topic with a short recap.
+- When a picture explains better than words, it draws one right in its reply: a diagram, an equation, a figure or a small interactive one to try. It closes a topic with a short recap.
 
 ### Planner
 
@@ -94,7 +94,7 @@ For a big question that needs many searches, see deep research in [Deep research
 - It looks at the data before analysing it (its columns, size, types and gaps) and reports problems such as missing values, duplicates or odd formats before drawing conclusions.
 - It computes with code (a short Python or JavaScript script, or a formula), never by estimating by eye, and keeps the scripts in the session's folder so the work can be repeated.
 - It answers the question first, in plain words with the key numbers, then shows how it got them. It states assumptions and limits, and doesn't claim causes the data can't show.
-- It shows results as charts and tables on a page in the session when that helps: the simplest chart that fits (bars to compare, lines over time), with labelled axes and units, readable on a phone.
+- It shows results as charts and tables when that helps, in its reply (or on a page in the session when there are several): the simplest chart that fits (bars to compare, lines over time), with labelled axes and units, readable on a phone.
 - It saves cleaned data and results as files (CSV, or XLSX when you ask) when you'll want them.
 
 ### App builder

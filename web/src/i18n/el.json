@@ -10785,5 +10785,13 @@
 "This computer is a little small for AI models. Pay as you go gives you the best ones without a strong computer, and you can add it any time.":"Αυτός ο υπολογιστής είναι λίγο μικρός για μοντέλα τεχνητής νοημοσύνης. Το «Πληρώνετε όσο χρησιμοποιείτε» σας δίνει τα καλύτερα χωρίς δυνατό υπολογιστή, και μπορείτε να το προσθέσετε όποτε θέλετε.",
 "Too big for this computer:":"Πολύ μεγάλα για αυτόν τον υπολογιστή:",
 "Write what you want done and press Enter: an agent gets to work. Drop in files and pictures too. Each conversation is called a session.":"Γράψτε τι θέλετε να γίνει και πατήστε Enter: ένας πράκτορας πιάνει δουλειά. Σύρετε μέσα και αρχεία ή εικόνες. Κάθε συζήτηση λέγεται συνεδρία.",
-"You pick among those you add under the message box, when Custom Agent does the work.":"Επιλέγετε ανάμεσα σε όσα προσθέτετε κάτω από το πλαίσιο μηνύματος, όταν τη δουλειά την κάνει ο Custom Agent."
+"You pick among those you add under the message box, when Custom Agent does the work.":"Επιλέγετε ανάμεσα σε όσα προσθέτετε κάτω από το πλαίσιο μηνύματος, όταν τη δουλειά την κάνει ο Custom Agent.",
+"Copy the code":"Αντιγραφή του κώδικα",
+"Diagram":"Διάγραμμα",
+"Save as a picture (SVG)":"Αποθήκευση ως εικόνα (SVG)",
+"See all of it":"Δείτε το ολόκληρο",
+"Show it":"Εμφάνιση αποτελέσματος",
+"Show the code":"Εμφάνιση του κώδικα",
+"Show the diagram":"Εμφάνιση του διαγράμματος",
+"This diagram could not be drawn":"Δεν ήταν δυνατό να σχεδιαστεί αυτό το διάγραμμα"
 }

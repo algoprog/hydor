@@ -10776,5 +10776,13 @@
 "This computer is a little small for AI models. Pay as you go gives you the best ones without a strong computer, and you can add it any time.":"这台电脑跑 AI 模型有点吃力。按用量付费不需要强大的电脑就能用上最好的模型，你随时都可以添加。",
 "Too big for this computer:":"对这台电脑来说太大：",
 "Write what you want done and press Enter: an agent gets to work. Drop in files and pictures too. Each conversation is called a session.":"写下你想做的事，按 Enter：智能体就会开始工作。也可以拖入文件和图片。每段对话叫作一个会话。",
-"You pick among those you add under the message box, when Custom Agent does the work.":"当 Custom Agent 工作时，你可以在消息框下方从你添加的模型中挑选。"
+"You pick among those you add under the message box, when Custom Agent does the work.":"当 Custom Agent 工作时，你可以在消息框下方从你添加的模型中挑选。",
+"Copy the code":"复制代码",
+"Diagram":"示意图",
+"Save as a picture (SVG)":"另存为图片（SVG）",
+"See all of it":"查看全部",
+"Show it":"显示效果",
+"Show the code":"显示代码",
+"Show the diagram":"显示示意图",
+"This diagram could not be drawn":"无法绘制此示意图"
 }

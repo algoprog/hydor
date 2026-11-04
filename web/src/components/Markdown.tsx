@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import { createContext, lazy, memo, Suspense, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -7,29 +7,62 @@ import { Check, Copy } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
 import { CITE_RUN, citedReply, citeNumbers, type Cited } from '@shared/citations';
 import { CiteChip, SourcesRow } from './Citations';
+import { openLightbox } from './Lightbox';
 import { cx } from './ui';
 import { goApp, openFile } from '../lib/nav';
 import { joinPath } from '../lib/format';
-import { machineBase } from '../lib/machine';
+import { machineBase, mu } from '../lib/machine';
+import { tr } from '../i18n/runtime';
+
+/** The environments that stand as an equation of their own, which KaTeX draws only in a display block. */
+const BARE_ENV = /(?<!\\\[\s*)(^|\n)[ \t]*(\\begin\{(equation|align|gather|alignat)(\*?)\}[\s\S]*?\\end\{\3\4\})/g;
 
 /**
- * Claude writes \(…\) and \[…\]; remark-math wants $…$ and $$…$$. A $ right before a digit is
- * money ("$4.70 per question"), not maths, so it is escaped, except in notebooks (`money` false),
- * where $ is always maths. Code is left alone.
+ * Whether the $ at `i` of a line opens maths rather than money: maths that closes on the same line, as Pandoc reads it
+ * (the closing $ follows a non-space and is not followed by a digit), and reads as maths ("$5x + 3 = 0$", "$2^{10}$").
+ * "From $5 to $10" stays money: the second $ is followed by a digit.
+ */
+function opensMaths(line: string, i: number): boolean {
+  for (let j = i + 2; j < line.length; j++) {
+    if (line[j] !== '$' || line[j - 1] === '\\') continue;
+    if (/\s/.test(line[j - 1]) || /\d/.test(line[j + 1] ?? '') || line[j + 1] === '$') return false;
+    return /[\\^_=+*/<>{}()|]|\d[a-zA-Z]/.test(line.slice(i + 1, j));
+  }
+  return false;
+}
+
+/** A $ right before a digit is money ("$4.70 per question"), escaped, unless it opens maths. */
+const escapeMoney = (text: string) =>
+  text
+    .split('\n')
+    .map((line) => line.replace(/(^|[^\\$])\$(?=\d)/g, (m, pre: string, at: number) => (opensMaths(line, at + pre.length) ? m : `${pre}\\$`)))
+    .join('\n');
+
+/**
+ * Claude writes \(…\) and \[…\]; remark-math wants $…$ and $$…$$. Environments written on their own
+ * (\begin{align}…) go in a display block. A $ right before a digit is money, escaped, except in notebooks
+ * (`money` false), where $ is always maths. Code (also a block still coming) and maths in $$ are left alone.
  */
 function normalizeMath(src: string, money = true): string {
-  if (!src.includes('$') && !src.includes('\\(') && !src.includes('\\[')) return src;
-  const parts = src.split(/(```[\s\S]*?```|`[^`\n]*`)/g);
+  if (!src.includes('$') && !src.includes('\\(') && !src.includes('\\[') && !src.includes('\\begin{')) return src;
+  const parts = src.split(/(```[\s\S]*?```|```[\s\S]*$|~~~[\s\S]*?~~~|`[^`\n]*`|\$\$[\s\S]*?\$\$)/g);
   return parts
     .map((p, i) =>
       i % 2 === 1
         ? p
-        : p
-            .replace(/(^|[^\\$])\$(?=\d)/g, (m, pre) => (money ? `${pre}\\$` : m))
+        : (money ? escapeMoney(p) : p)
+            .replace(BARE_ENV, (_m, pre: string, env: string) => `${pre}\n$$\n${env}\n$$\n`)
             .replace(/\\\[([\s\S]+?)\\\]/g, (_m, x) => `\n$$\n${x.trim()}\n$$\n`)
             .replace(/\\\((.+?)\\\)/g, (_m, x) => `$${x}$`),
     )
     .join('');
+}
+
+/** While a reply comes, an equation shown apart that is not finished yet waits for its end (not drawn as an error meanwhile). */
+function holdOpenMaths(src: string): string {
+  const outside = src.replace(/```[\s\S]*?(```|$)|`[^`\n]*`/g, (m) => ' '.repeat(m.length));
+  const at = [...outside.matchAll(/\$\$/g)];
+  return at.length % 2 ? src.slice(0, at[at.length - 1].index) : src;
 }
 
 function hastText(node: any): string {
@@ -68,7 +101,23 @@ export function CopyButton({ text, className, label = 'Copy' }: { text: string |
   );
 }
 
-export const CodeBlock = memo(function CodeBlock({ code, lang, maxHeight = 520, className }: { code: string; lang?: string | null; maxHeight?: number; className?: string }) {
+/** A small button in the bar over a block (code, a diagram, a live block), beside its copy button. */
+export function BarButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className="inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Code, highlighted; `bare`: without its own frame and header (inside a block that has them: a diagram's code). */
+export const CodeBlock = memo(function CodeBlock({ code, lang, maxHeight = 520, className, bare }: { code: string; lang?: string | null; maxHeight?: number; className?: string; bare?: boolean }) {
   const [html, setHtml] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const text = code.replace(/\n$/, '');
@@ -85,12 +134,14 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, maxHeight = 520, 
   const lines = useMemo(() => text.split('\n').length, [text]);
   const tall = lines > 28;
   return (
-    <div className={cx('code-block group relative my-2', className)}>
-      <div className="flex h-7 items-center gap-2 border-b border-line px-3 text-[11px] text-fg-3">
-        <span className="font-mono">{resolveLang(lang) ?? lang ?? 'text'}</span>
-        <span className="flex-1" />
-        <CopyButton text={text} />
-      </div>
+    <div className={cx(bare ? 'code-body group relative' : 'code-block group relative my-2', className)}>
+      {!bare && (
+        <div className="flex h-7 items-center gap-2 border-b border-line px-3 text-[11px] text-fg-3">
+          <span className="font-mono">{resolveLang(lang) ?? lang ?? 'text'}</span>
+          <span className="flex-1" />
+          <CopyButton text={text} />
+        </div>
+      )}
       <div style={{ maxHeight: tall && !expanded ? maxHeight : undefined }} className={cx(tall && !expanded && 'overflow-hidden')}>
         {html ? <div dangerouslySetInnerHTML={{ __html: html }} /> : <pre><code>{text}</code></pre>}
       </div>
@@ -222,13 +273,129 @@ function rehypeHeadingIds(o?: { ids?: string[] }) {
   };
 }
 
+/**
+ * What the blocks drawn in place need from the Markdown around them: its text as given to the parser (to tell a
+ * finished block from one still coming), and, in an agent's reply (`rich`), its session.
+ */
+export interface MdInfo {
+  src: string;
+  streaming: boolean;
+  /** An agent's reply: ```html live blocks run, and pictures show from the web and this computer. */
+  rich: boolean;
+  sessionKey?: string;
+  /** The session's folder, for pictures given by a relative path. */
+  cwd?: string;
+}
+export const MdCtx = createContext<MdInfo>({ src: '', streaming: false, rich: false });
+
+// Loaded the first time a reply has one: Mermaid is big, and the page frame is the Pages' own.
+const MermaidBlock = lazy(() => import('./MermaidBlock'));
+const HtmlBlock = lazy(() => import('./HtmlBlock'));
+
+/** The word after ```html that runs the block in place: ```html live (or render, preview…). Plain ```html stays code. */
+const LIVE = /^(live|render|preview|show|run|widget|demo|interactive|figure|app)$/i;
+
+/** Whether a fenced block is closed already: while a reply comes, its last block may still be arriving. */
+function fenceClosed(src: string, pos: any): boolean {
+  const a = pos?.start?.offset;
+  const b = pos?.end?.offset;
+  if (typeof a !== 'number' || typeof b !== 'number') return true;
+  // Inside a quote or a list, the lines start with "> " or spaces.
+  const lines = src
+    .slice(a, b)
+    .trimEnd()
+    .split('\n')
+    .map((l) => l.replace(/^(?:[ \t]*>)*[ \t]*/, ''));
+  const open = /^(`{3,}|~{3,})/.exec(lines[0])?.[1];
+  if (!open) return true;
+  const close = lines.length > 1 ? /^(`{3,}|~{3,})\s*$/.exec(lines[lines.length - 1])?.[1] : undefined;
+  return !!close && close[0] === open[0] && close.length >= open.length;
+}
+
+/** A fenced block: a ```mermaid diagram drawn, a ```html live block run in place (in a reply), otherwise code. */
+function Pre({ node }: { node?: any }) {
+  const md = useContext(MdCtx);
+  const code = node?.children?.[0];
+  const cls = String(code?.properties?.className?.[0] ?? '');
+  const lang = /language-([^\s]+)/.exec(cls)?.[1];
+  const text = hastText(code);
+  const kind = lang?.toLowerCase();
+  if (kind === 'mermaid' || (md.rich && kind === 'html' && String(code?.data?.meta ?? '').split(/\s+/).some((w) => LIVE.test(w)))) {
+    const done = !md.streaming || fenceClosed(md.src, node?.position);
+    return <Suspense fallback={<CodeBlock code={text} lang={lang} />}>{kind === 'mermaid' ? <MermaidBlock code={text} done={done} /> : <HtmlBlock code={text} done={done} />}</Suspense>;
+  }
+  return <CodeBlock code={text} lang={lang} />;
+}
+
+/**
+ * Where a picture in an agent's reply loads from: the web through this server (the app's pages load nothing from other
+ * sites, and the site never sees who looks), a file of this computer (a path, absolute or from the session's folder),
+ * or a data: address as it is. Null: it shows as a link.
+ */
+export function replyPicture(src: string, cwd?: string): string | null {
+  const s = src.trim();
+  if (/^data:image\//i.test(s)) return s;
+  if (/^https?:\/\//i.test(s)) return mu(`/api/pages/picture?url=${encodeURIComponent(s)}`);
+  let file = s.replace(/^file:\/\//i, '').split(/[?#]/)[0];
+  if (!file || /^[a-z][a-z0-9+.-]*:/i.test(file) || file.startsWith('//')) return null;
+  try {
+    file = decodeURIComponent(file);
+  } catch {}
+  if (!file.startsWith('/') && file !== '~' && !file.startsWith('~/')) {
+    if (!cwd) return null;
+    file = normalizePath(joinPath(cwd, file));
+  }
+  return mu(`/api/fs/raw?path=${encodeURIComponent(file)}`);
+}
+
+/** A picture in an agent's reply: fitted to the reply, opened large on a click, and a link when it cannot load. */
+function ReplyPicture({ src, alt, title }: { src?: string; alt?: string; title?: string }) {
+  const { cwd } = useContext(MdCtx);
+  const from = String(src ?? '');
+  const url = useMemo(() => replyPicture(from, cwd), [from, cwd]);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+  if (!url || failed) {
+    const Link = plainLink;
+    return <Link href={from}>{`${alt?.trim() || tr('Picture')} ↗`}</Link>;
+  }
+  const web = /^https?:\/\//i.test(from);
+  return (
+    <span className="md-figure">
+      <img
+        src={url}
+        alt={alt ?? ''}
+        title={title || undefined}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        onClick={(e) => {
+          // A picture that is a link (to its source) follows the link.
+          if ((e.currentTarget as HTMLElement).closest('a')) return;
+          openLightbox([{ src: url, name: title || alt || undefined, href: web ? from : undefined }]);
+        }}
+        className="md-pic"
+      />
+      {title && <span className="md-caption">{title}</span>}
+    </span>
+  );
+}
+
+/**
+ * The addresses a text may use: react-markdown's safe ones, and files of this computer (file://, which open in the app's
+ * file viewer, never as the browser's own page), and for pictures data:image/… and a notebook's attachment:… too.
+ */
+function urlTransform(url: string, key: string): string {
+  if (/^file:\/\//i.test(url)) return url;
+  if (key === 'src' && /^(data:image\/|attachment:)/i.test(url)) return url;
+  return defaultUrlTransform(url);
+}
+
+/** Links as the Markdown of a reply has them (local paths in the file viewer, the web in a new tab). */
+const plainLink = makeLink()!;
+
 const components: Components = {
-  pre({ node }) {
-    const code = (node as any)?.children?.[0];
-    const cls = String(code?.properties?.className?.[0] ?? '');
-    const lang = /language-([^\s]+)/.exec(cls)?.[1];
-    return <CodeBlock code={hastText(code)} lang={lang} />;
-  },
+  pre: Pre as Components['pre'],
   // Tables keep natural column widths and scroll sideways when they do not fit; long cells
   // wrap at a readable width instead of squeezing their neighbours.
   table({ children }) {
@@ -372,10 +539,37 @@ const rehypePlugins = [[rehypeKatex, katexOpts]] as any;
 const rehypeStreaming = [[rehypeKatex, katexOpts], rehypeStreamWords] as any;
 
 /**
+ * KaTeX's chemistry (\ce{H2O}, \pu{…}), loaded the first time a text has some: until then those show as written.
+ * Each Markdown waiting for it draws again once it is in.
+ */
+let chem: 'no' | 'loading' | 'yes' = 'no';
+const chemWaiting = new Set<() => void>();
+function useChemistry(text: string) {
+  const need = chem !== 'yes' && (text.includes('\\ce{') || text.includes('\\pu{'));
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    if (!need) return;
+    const f = () => redraw((n) => n + 1);
+    chemWaiting.add(f);
+    if (chem === 'no') {
+      chem = 'loading';
+      import('katex/contrib/mhchem')
+        .then(() => {
+          chem = 'yes';
+          for (const g of chemWaiting) g();
+        })
+        .catch(() => (chem = 'no'));
+    }
+    return () => void chemWaiting.delete(f);
+  }, [need]);
+}
+
+/**
  * `resolveImage` maps an image source to a URL that may load here, or null to show it as a link
  * (this page's policy blocks other sites' images). `rehypeExtra` runs first (documents and notebooks:
  * their HTML). `baseDir`: the folder of the document shown, for its relative links and #anchors.
- * `breaks`: a single line break stays one (what agents write).
+ * `breaks`: a single line break stays one (what agents write). ```mermaid blocks are drawn as diagrams everywhere;
+ * `rich` (an agent's reply) also runs ```html live blocks in place and shows its pictures (`resolveImage` aside).
  */
 export const Markdown = memo(function Markdown({
   text,
@@ -390,6 +584,9 @@ export const Markdown = memo(function Markdown({
   app,
   headingIds,
   cites,
+  rich,
+  sessionKey,
+  cwd,
 }: {
   text: string;
   className?: string;
@@ -406,31 +603,42 @@ export const Markdown = memo(function Markdown({
   headingIds?: string[];
   /** A reply's sources by the numbers it cites them by: each citing number shows as a chip that links to its page. */
   cites?: Map<number, Cited>;
+  /** An agent's reply: ```html live blocks run in place, and its pictures show (from the web, through this server). */
+  rich?: boolean;
+  /** The reply's session: a live block's choices go to its message box. */
+  sessionKey?: string;
+  /** The session's folder: pictures given by a relative path are there. */
+  cwd?: string;
 }) {
-  const src = useMemo(() => normalizeMath(text, !notebook), [text, notebook]);
+  const src = useMemo(() => {
+    const t = normalizeMath(text, !notebook);
+    return streaming ? holdOpenMaths(t) : t;
+  }, [text, notebook, streaming]);
+  useChemistry(src);
+  const info = useMemo<MdInfo>(() => ({ src, streaming: !!streaming, rich: !!rich, sessionKey, cwd }), [src, streaming, rich, sessionKey, cwd]);
   const comps = useMemo<Components>(() => {
     const base: Components = {
       ...components,
       a: makeLink(baseDir, app),
       ...(cites ? citeComponents(cites, makeLink(baseDir, app)) : {}),
     };
-    return resolveImage
-      ? {
-          ...base,
-          img({ src: from, alt, width, height, align }: any) {
-            const url = resolveImage(String(from ?? ''));
-            // `align="left|right"` (old HTML that READMEs still use) floats the image beside the text.
-            const float = align === 'left' || align === 'right' ? { float: align, margin: align === 'right' ? '0 0 8px 16px' : '0 16px 8px 0' } : undefined;
-            if (url) return <img src={url} alt={alt ?? ''} width={width} height={height} style={float as React.CSSProperties | undefined} />;
-            return (
-              <a href={String(from ?? '')} target="_blank" rel="noopener noreferrer">
-                {alt || 'image'} ↗
-              </a>
-            );
-          },
-        }
-      : base;
-  }, [resolveImage, baseDir, app, cites]);
+    if (resolveImage)
+      return {
+        ...base,
+        img({ src: from, alt, width, height, align }: any) {
+          const url = resolveImage(String(from ?? ''));
+          // `align="left|right"` (old HTML that READMEs still use) floats the image beside the text.
+          const float = align === 'left' || align === 'right' ? { float: align, margin: align === 'right' ? '0 0 8px 16px' : '0 16px 8px 0' } : undefined;
+          if (url) return <img src={url} alt={alt ?? ''} width={width} height={height} style={float as React.CSSProperties | undefined} />;
+          return (
+            <a href={String(from ?? '')} target="_blank" rel="noopener noreferrer">
+              {alt || 'image'} ↗
+            </a>
+          );
+        },
+      };
+    return rich ? { ...base, img: ReplyPicture as Components['img'] } : base;
+  }, [resolveImage, baseDir, app, cites, rich]);
   const remark = useMemo(() => {
     const list = breaks ? remarkBreaks : remarkPlugins;
     return cites?.size ? [...list, [remarkCites, { known: new Set(cites.keys()) }]] : list;
@@ -440,12 +648,14 @@ export const Markdown = memo(function Markdown({
     [rehypeExtra, streaming, baseDir, app, headingIds],
   );
   return (
-    <div className={cx('md', className)}>
-      <ReactMarkdown remarkPlugins={remark} rehypePlugins={rehype} components={comps}>
-        {src}
-      </ReactMarkdown>
-      {children}
-    </div>
+    <MdCtx.Provider value={info}>
+      <div className={cx('md', className)}>
+        <ReactMarkdown remarkPlugins={remark} rehypePlugins={rehype} components={comps} urlTransform={urlTransform}>
+          {src}
+        </ReactMarkdown>
+        {children}
+      </div>
+    </MdCtx.Provider>
   );
 });
 
@@ -453,12 +663,12 @@ export const Markdown = memo(function Markdown({
  * An agent's reply: the sources it cites as chips in its text and one Sources line under it, instead of the list it
  * ends with (shared/citations.ts). While it is still coming (`streaming`), the line waits for its end.
  */
-export function ReplyMarkdown({ text, streaming, ...rest }: Omit<Parameters<typeof Markdown>[0], 'cites'>) {
+export function ReplyMarkdown({ text, streaming, rich = true, ...rest }: Omit<Parameters<typeof Markdown>[0], 'cites'>) {
   const cited = useMemo(() => citedReply(text, { streaming }), [text, streaming]);
   const cites = useMemo(() => (cited.sources.length ? new Map(cited.sources.map((s) => [s.n, s])) : undefined), [cited]);
   return (
     <>
-      <Markdown text={cited.body} cites={cites} streaming={streaming} {...rest} />
+      <Markdown text={cited.body} cites={cites} streaming={streaming} rich={rich} {...rest} />
       {!streaming && cited.sources.length > 0 && <SourcesRow sources={cited.sources} />}
     </>
   );

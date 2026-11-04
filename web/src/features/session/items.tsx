@@ -995,10 +995,10 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
  */
 export const AssistantBlock = memo(function AssistantBlock({ item, note }: { item: Extract<TimelineItem, { kind: 'assistant' }>; note?: boolean }) {
   const { text, revealing } = useSmoothText(item.text, !!item.streaming);
-  const { fork } = useContext(SessionCtx);
+  const { fork, sessionKey, cwd } = useContext(SessionCtx);
   return (
     <div data-seq={item.seq} data-text={item.id} data-quote className="tl-item group relative">
-      <ReplyMarkdown text={text} streaming={revealing} breaks className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
+      <ReplyMarkdown text={text} streaming={revealing} breaks sessionKey={sessionKey} cwd={cwd} className={cx(!note && item.phase === 'commentary' && '!text-fg-2')} />
       {!item.streaming && (
         <div className="absolute -top-1 -right-1 flex opacity-0 transition-opacity group-hover:opacity-100">
           {fork && item.entry && !note && (

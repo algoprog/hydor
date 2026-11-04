@@ -9,6 +9,8 @@ import { cx } from './ui';
 export interface LightboxImage {
   src: string;
   name?: string;
+  /** Where Open in a new tab goes, when not to `src`: a picture's own address on the web, shown through this server. */
+  href?: string;
 }
 
 const useLightbox = create<{ images: LightboxImage[]; index: number }>(() => ({ images: [], index: 0 }));
@@ -51,7 +53,7 @@ export function Lightbox() {
             {index + 1} / {images.length}
           </span>
         )}
-        <a href={img.src} target="_blank" rel="noopener noreferrer" className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white" title="Open in a new tab" aria-label="Open in a new tab">
+        <a href={img.href ?? img.src} target="_blank" rel="noopener noreferrer" className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white" title="Open in a new tab" aria-label="Open in a new tab">
           <ExternalLink size={16} />
         </a>
         <button onClick={close} className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white" title="Close (Esc)" aria-label="Close">

@@ -374,7 +374,14 @@ programs shows each program's version and what is out, with Check now, Update no
   plain-words names ("Run the tests", "Read index.ts"), each a click away from its full output. A reply long enough
   to fill the screen stops at its first line as it grows, so you read it from its beginning; a short one sits
   under what came before, with no empty space below it.
-- Agents can answer with a page (a chart, a report, a mock-up), shown in the conversation as it is written, or
+- Replies made to read: every agent knows the app shows them as rich text, with Markdown (headings, lists, tables,
+  code), maths in LaTeX drawn as in a textbook (KaTeX, chemistry included), Mermaid diagrams (flowcharts, sequences,
+  timelines, mind maps, Gantt and pie charts…) drawn in the app's colours with their code, a full-screen view and an
+  SVG to save, figures and small interactive tools (a chart, a calculator, a simulation with sliders) that run in
+  place in a sealed-off frame as the reply comes, and pictures from the web (fetched by the app's own server, so the
+  sites never see your browser) or from this computer, opened large on a click. The user's guidelines can ask for
+  plain text instead.
+- Agents can answer with a page (a report, a dashboard, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen.
 - Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
   from before and after, on a computer's or a phone's screen: a reply's screenshots as one card of small
