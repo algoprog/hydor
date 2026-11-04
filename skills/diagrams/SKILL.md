@@ -12,7 +12,9 @@ where. Decide the question, write the content in words, draw it with Mermaid (te
 turns into a diagram), then look at the result and fix what is hard to read. Draw it by hand in SVG
 when Mermaid cannot put things where the meaning needs them. Charts of numbers (bars, lines, pies)
 are not diagrams: see the dashboards skill. A project schedule with owners and dates is the
-project-plan skill's; a mind map of fresh ideas starts with the brainstorming skill.
+project-plan skill's; a mind map of fresh ideas starts with the brainstorming skill; a one-page
+explainer that mixes a diagram with numbers, pictures and text is an infographic (the infographics
+skill).
 
 ## 1. Pick the question, then the type
 
@@ -28,7 +30,8 @@ project-plan skill's; a mind map of fresh ideas starts with the brainstorming sk
 | How are the records of a database related? | Entity-relationship diagram | `erDiagram` |
 
 Mermaid also draws class, journey, quadrant, Sankey, Kanban and more; the syntax of each is at
-mermaid.js.org. Examples of the common ones, all tested, are in `references/mermaid.md`.
+mermaid.js.org. Examples of the common ones, all tested, are in `references/mermaid.md`. For a
+software system, draw the C4 levels (context, then containers): `references/c4.md`.
 
 ## 2. Write the content before the drawing
 
@@ -55,6 +58,8 @@ mermaid.js.org. Examples of the common ones, all tested, are in `references/merm
   (Mermaid places nodes roughly in the order they appear), or try the older dagre layout with a
   config block at the top of the diagram (shown in the reference).
 - In an HTML page, write `&lt;` and `&amp;` for `<` and `&` inside labels; `-->` is fine as it is.
+- More traps, each tried (ids starting with o or x, spacing, wrapping, quotes): the end of
+  `references/mermaid.md`.
 
 ## 4. Show it, keep it
 
@@ -66,6 +71,8 @@ mermaid.js.org. Examples of the common ones, all tested, are in `references/merm
   the language `mermaid` is enough.
 - An image file: `npx -p @mermaid-js/mermaid-cli mmdc -i diagram.mmd -o diagram.svg` (it downloads
   a browser the first time; say so), or take a screenshot of the page.
+- Documents and slides (`save_doc`, `save_slides`) do not draw Mermaid: put the diagram in as a
+  picture, a PNG from mmdc (`-o diagram.png`) or a screenshot.
 
 ## 5. Look at it, then fix it
 

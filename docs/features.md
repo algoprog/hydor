@@ -287,7 +287,7 @@ agents that speak ACP and take MCP servers.
   own, with no shell escape and, where bubblewrap is installed, in its sandbox. They export as the PDF, the main
   .tex file or the whole project as a .zip.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
-  fifty that come with the app for every agent (ways of working, writing, documents, research and the web,
+  sixty that come with the app for every agent (ways of working, writing, documents, research and the web,
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
   Code's and Codex's own, and each project's own. A search, a row of filters and a switch on every skill; write
   your own for every agent or for one, change a built-in one (your version takes its place), remove and bring
@@ -295,8 +295,8 @@ agents that speak ACP and take MCP servers.
   for the project alone. Other ACP agents get the list of skills to read when one fits.
 - **Plugins** for every agent (Settings → Plugins): skills, tool servers (MCP), instructions, files of their own
   and what they need (other plugins, Python and Node packages in an environment of their own, programs, files to
-  download, keys from the vault), in the open Agent Plugins 1.0 format (Claude Code's layout read too). Seven come
-  with the app (Audio and video, Library docs, Meeting recordings, Python for data, Speech to text, SQLite
+  download, keys from the vault), in the open Agent Plugins 1.0 format (Claude Code's layout read too). Eight come
+  with the app (Audio and video, Ebooks, Library docs, Meeting recordings, Python for data, Speech to text, SQLite
   databases, Text from pictures); add others from a Git link, a .zip or a folder, after a look at what each gives
   and needs, with the plugins it needs added first and turned on and off together. Make your own in an editor
   (skills, tools, needs, files, instructions), or have an agent make one, and pack it into a .zip to share.

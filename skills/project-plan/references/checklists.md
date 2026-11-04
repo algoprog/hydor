@@ -68,6 +68,9 @@ Go through the list for the project's kind and add what applies. The long waits 
 ## Software
 
 - Requirements written as what users can do, with acceptance criteria.
+- Work cut into thin slices that each work end to end (one more thing a user can do), rather than
+  layers (all the database, then all the screens): each slice shows real progress and brings
+  problems out early.
 - Design reviewed before building; risky parts tried out first.
 - Environments: development, test, production; access for the people who need it.
 - Data: migration written and rehearsed on a copy; a backup before the real run.
@@ -75,6 +78,7 @@ Go through the list for the project's kind and add what applies. The long waits 
 - Security and privacy review; secrets out of the code. (wait, where another team does it)
 - Performance under expected load.
 - Documentation for users and for whoever runs it.
-- Release plan: feature flags or a staged rollout, monitoring and alerts, a rollback plan.
+- Release plan: feature flags or a staged rollout, monitoring and alerts, a rollback plan, and for
+  each stage the signal that means stop and roll back.
 - Support told what is coming; release notes; training if needed.
 - After: watch errors and usage for a week; a short review of what to do differently.

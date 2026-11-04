@@ -25,6 +25,9 @@ thing at a time, and see it fixed.
 - Ask what changed: an update, an edit, a new part, a move, the weather, a different supplier.
 - Compare with a case that works. The difference between the two is where the cause lives.
 - Keep what you know apart from what you assume.
+- On a server or another computer reached over SSH, the servers skill has the facts to gather first
+  (a service's status and logs, the disks, the firewall) and how to change things without locking
+  yourself out.
 
 ## 3. One hypothesis at a time
 

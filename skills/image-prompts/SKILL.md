@@ -11,6 +11,10 @@ An image model draws what the words make likely, so say what you want concretely
 then the setting, composition, light, style and mood, with any text spelled out exactly. Look at what
 comes back, change one thing at a time, and keep what works.
 
+For a whole infographic, a YouTube thumbnail with its title, or a logo as part of a brand (with its
+colours, fonts and voice), follow the infographics, youtube-thumbnails or brand-kit skill; they use
+this one for the pictures.
+
 ## 1. The brief
 
 - **Where it will be used:** a post, a slide, a website banner, a printed poster, an app icon, a

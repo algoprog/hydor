@@ -72,6 +72,11 @@ args = SFTConfig(
 )
 trainer = SFTTrainer(model=model, args=args, train_dataset=data["train"], eval_dataset=data["eval"],
                      processing_class=tokenizer, peft_config=lora)
+# Before training: the exact text the loss learns from, and the examples left after cutting to max_length
+batch = trainer.data_collator([trainer.train_dataset[0]])
+ids, labels = batch["input_ids"][0], batch["labels"][0]
+print("learns from:", repr(tokenizer.decode(ids[labels != -100])))
+print(len(trainer.train_dataset), "of", len(data["train"]), "training examples kept")
 trainer.train()
 trainer.save_model(a.out)                   # the adapter: adapter_model.safetensors + adapter_config.json
 tokenizer.save_pretrained(a.out)
@@ -86,7 +91,18 @@ Notes:
 - With `assistant_only_loss=True`, TRL needs a chat template that marks the assistant's turns; it
   swaps one in for common model families and warns if the end-of-turn token is left out (then the
   model may not learn to stop: check real answers).
-- Several GPUs: `accelerate launch train_lora.py ...`.
+- Read the "learns from" line before letting a run go on: every assistant reply of the first
+  example, each ending with the end-of-turn token (`<|im_end|>` for Qwen; Qwen3 also adds an empty
+  `<think>` block to the last reply). System or user text in it means the masking is wrong. A reply
+  cut short, or fewer examples kept than you have, means `max_length` is too small: TRL keeps the
+  start of each example and silently drops those with nothing left to learn (an `IndexError` on that
+  line means none were left).
+- Several GPUs: `accelerate launch train_lora.py ...` puts a whole copy of the model on each card:
+  faster, but each card must still hold all of it. A model too big for one card needs it split
+  across them (FSDP or DeepSpeed ZeRO-3, chosen in `accelerate config`).
+- An interrupted run (a rented GPU stopped, a crash) goes on from its newest `checkpoint-*` folder in
+  `--out` with `trainer.train(resume_from_checkpoint=True)`, optimizer and schedule included.
+  Loading only the saved adapter starts the schedule over.
 
 ## merge_lora.py
 
@@ -139,3 +155,16 @@ llama-quantize model-f16.gguf model-Q4_K_M.gguf Q4_K_M     # from a llama.cpp re
   save_method="merged_16bit")`, `model.save_pretrained_gguf("out/gguf", tokenizer, quantization_method="q4_k_m")`.
 
 Evaluate the exported file again: a 4-bit file answers a little differently from the 16-bit model.
+
+## With Unsloth instead of TRL
+
+- Install in a fresh environment: `uv pip install unsloth --torch-backend=auto` (it picks the PyTorch
+  build for the installed driver). No code at all: the Unsloth Desktop app, or `unsloth studio` in a
+  browser, trains, tests and exports through forms.
+- Start from Unsloth's notebook for the same model, not another model's: loaders, layer names and
+  chat templates differ.
+- `import unsloth` before transformers, trl and peft, or it warns and trains slower with more memory.
+- Learning only the replies: `from unsloth.chat_templates import train_on_responses_only`, then
+  `trainer = train_on_responses_only(trainer)`. Without markers it finds them in the model's template
+  and prints them; markers copied from another model's notebook match nothing. It reports how many
+  examples it removed for having nothing left to learn.

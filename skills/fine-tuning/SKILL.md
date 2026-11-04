@@ -19,7 +19,7 @@ training and merging scripts are in `references/train-and-export.md`.
 | --- | --- | --- |
 | The model does not know your facts or documents | Retrieval (RAG) or the documents in the prompt | Rarely: facts learned in training go stale and get mixed up |
 | Format, tone or style is inconsistent | A clearer prompt with examples; structured output | Prompting has plateaued on a measured test |
-| A narrow task at high volume (classify, extract, rewrite) | A big model with a good prompt | A small tuned model can match it cheaper and faster |
+| A narrow task at high volume (classify, extract, rewrite) | A big model with a good prompt; for sorting texts into fixed labels you have examples of, embeddings plus a simple classifier | A small tuned model can match it cheaper and faster |
 | Reasoning on new kinds of problems | A stronger model, better prompting | Only with lots of high-quality examples |
 
 Before anything else, build the test set (model-evaluation skill) and measure the base model with
@@ -48,8 +48,14 @@ a stable task, and a way to measure success.
 - **QLoRA:** LoRA on a base loaded in 4-bit: a third to a half of the memory, so a bigger model
   fits; a bit slower, a small loss in quality.
 - **Full fine-tuning:** every weight; several times the memory and data. Rarely needed.
-- **Tools:** TRL's `SFTTrainer` with PEFT (the standard); Unsloth (same ideas, faster and leaner on
-  one NVIDIA GPU, exports straight to GGUF); a hosted fine-tuning service when there is no GPU.
+- **Tools:** TRL's `SFTTrainer` with PEFT (the standard); Unsloth (same ideas, faster and leaner,
+  exports straight to GGUF; its Desktop app and `unsloth studio` page train without code, on NVIDIA
+  GPUs and Macs); a hosted fine-tuning service when there is no GPU.
+- **Beyond example replies:** all of this is supervised fine-tuning (SFT). Preference training
+  (DPO: a better and a worse reply to each prompt) suits style and judgement calls; reinforcement
+  learning with a scoring program (GRPO) suits answers a program can check, such as sums or code
+  with tests. Both usually start from an SFT model. Before a GRPO run, try the scorer on known
+  right, wrong, empty and badly formatted answers: a wrong answer must never outscore a right one.
 - **Base model:** an instruct model of a size you can serve (start at 1 to 8 billion parameters),
   from the family you will deploy, with a licence that allows your use.
 
@@ -91,6 +97,9 @@ best checkpoint.
 ## 6. Train, and watch it
 
 - First a short trial (20 steps, a hundred examples) to catch errors cheaply; then the full run.
+  Before it trains, the script prints the exact text the loss learns from and how many examples
+  survived the cut to `max_length`: you should see only the assistant's replies, each with its
+  end-of-turn token, and all your examples (what to do otherwise is in the reference).
 - Training loss should fall steadily; validation loss falls, then flattens. Validation loss rising
   while training loss keeps falling is overfitting: fewer epochs, a lower learning rate, more
   varied data. A loss that will not move: the learning rate is too low, or the data or template is
@@ -125,3 +134,5 @@ best checkpoint.
 - Training with one chat template and serving with another.
 - Loss computed on the prompts too, so the model learns to write the user's messages.
 - Merging into a 4-bit base; many epochs on a tiny dataset.
+- Losing the work with a rented GPU or a notebook session: download the adapter and checkpoints
+  before the machine stops, as its disk usually goes with it.

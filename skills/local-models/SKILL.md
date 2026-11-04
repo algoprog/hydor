@@ -76,7 +76,7 @@ names the exact base model.
 | Runtime | Best for | Serves at |
 | --- | --- | --- |
 | Ollama | The easiest start; any machine; GGUF | `http://localhost:11434/v1` |
-| llama.cpp `llama-server` | Full control; any hardware; GGUF | `http://localhost:8080/v1` (set `--port`) |
+| llama.cpp `llama-server` | Full control; any hardware; GGUF | `http://localhost:9931/v1` (8080 in builds before October 2026; or set `--port`) |
 | vLLM | NVIDIA or AMD GPUs; many users at once; safetensors, AWQ, GPTQ, FP8 | `http://localhost:8000/v1` |
 | LM Studio | A desktop app with a model browser | `http://localhost:1234/v1` |
 
@@ -91,7 +91,9 @@ network to use it; then set an API key (`--api-key` in vLLM and llama.cpp).
 - Ollama picks a default from the graphics memory (4,096 tokens below 24 GB): set
   `OLLAMA_CONTEXT_LENGTH=32768` for the server, or `PARAMETER num_ctx 32768` in a Modelfile. Its
   OpenAI-compatible endpoint cannot change it per request.
-- llama.cpp: `-c 32768` (the default, 0, means the model's full length, which may not fit).
+- llama.cpp: `-c 32768`. Left unset, builds since December 2025 take the largest context that fits
+  the free memory (at least 4,096 tokens), which may be less than an agent needs; older builds take
+  the model's full length, which may not fit.
 - vLLM: `--max-model-len 32768`; it refuses to start when one full-length request would not fit.
 - Past the length the model was trained for, quality drops unless its card describes an extension
   (such as YaRN). Prompts longer than the context are cut, often silently, from the start.
@@ -105,7 +107,9 @@ network to use it; then set an API key (`--api-key` in vLLM and llama.cpp).
   Each request gets slower as more run together.
 - Measure: `ollama run <model> --verbose` prints rates; otherwise time a request and divide
   `usage.completion_tokens` by the seconds. `ollama ps` shows "100% GPU" when nothing spilled to
-  the processor.
+  the processor; llama.cpp's startup log says `offloaded 37/37 layers to GPU` (fewer means part runs
+  on the processor, much slower), and `llama-server --list-devices` lists the graphics cards the
+  build can use (none: a build without GPU support).
 
 ## 8. Check that it works
 
@@ -123,5 +127,7 @@ network to use it; then set an API key (`--api-key` in vLLM and llama.cpp).
 - Ollama's small default context: agents then fail in confusing ways.
 - A server listening on all addresses with no key on a shared network.
 - A GGUF without its chat template, or a base (not instruct) model: rambling or broken answers.
+- Testing a thinking model with a small `max_tokens`: the reasoning uses it up and the answer comes
+  back empty with `finish_reason: length`.
 - Comparing speeds measured with different contexts, quantizations or batch sizes.
 - Filling the disk: models collect in `~/.cache/huggingface` and `~/.ollama/models`.

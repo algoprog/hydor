@@ -30,7 +30,9 @@ and costs one undo.
   Assert the current output even where it looks wrong, and note suspicious cases for the user instead of
   fixing them now.
 - Code that is hard to test alone: test one level up (an HTTP request in process, a CLI run on sample
-  input compared with a saved output).
+  input compared with a saved output), or open one small seam: pass the clock, the random source, the
+  HTTP client or the file system in as a parameter that defaults to the real one, so callers see no
+  change and a test can hand in a fake.
 - Prove the tests can catch a break: change something on purpose once, see a test fail, undo it.
 
 ## 3. Small steps, green after each
@@ -60,6 +62,7 @@ The loop: one refactoring, run the fast tests, commit (or at least checkpoint), 
 | The same group of parameters passed around | One parameter object or small type |
 | Boolean flags that switch behaviour (`render(x, true, false)`) | Two functions with clear names |
 | A huge file or module | Split by responsibility, one cohesive group at a time |
+| One change means edits in many files | Bring that knowledge into one place (a module, a table, a constant) |
 | Magic numbers and strings | Named constants |
 
 Steps and traps for each: `references/catalog.md`.
@@ -92,6 +95,10 @@ Stop when the goal is met, not when the code is perfect. Stop and ask when the n
 behaviour, when you find a bug (note it, report it, fix it separately), when adding tests turns into a
 project of its own, or when the work grows past the agreed scope.
 
+When the aim was to add something and pinning the old code would be a project of its own, leave the old
+code alone: write the new part as a new function with its own tests and call it from one line in the
+old code, or wrap the old function in a new one that does the extra work before or after it.
+
 ## Pitfalls
 
 - A big-bang rewrite: days of red tests and a diff nobody can review.
@@ -100,5 +107,5 @@ project of its own, or when the work grows past the agreed scope.
   translation keys): it compiles and still breaks stored data or other clients.
 - "While I'm here" fixes that change behaviour inside a refactoring commit.
 - Abstracting too early: two similar copies are often fine; extract at the third, when you can see what
-  really varies.
+  really varies. If you cannot give the shared piece a good name, it is the wrong abstraction.
 - Reformatting whole files along with real changes.

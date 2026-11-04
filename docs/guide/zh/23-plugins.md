@@ -42,7 +42,8 @@
 
 ## 应用自带的插件
 
-- **Audio and video**（音频和视频）：转换、剪辑、拼接、压缩和检查音频和视频，提取声音，制作 GIF 和缩略图，添加字幕，下载你有权下载的媒体。它需要这台电脑上有 ffmpeg（它的页面会说明如何获取），并会在它自己的环境中安装 yt-dlp。
+- **Audio and video**（音频和视频）：转换、剪辑、拼接、压缩和检查音频和视频，提取声音，统一播客的响度，缩短过长的停顿，按要保留的片段清单剪辑录音，制作竖屏短片、GIF 和缩略图，添加字幕，下载你有权下载的媒体。它需要这台电脑上有 ffmpeg（它的页面会说明如何获取），并会在它自己的环境中安装 yt-dlp。
+- **Ebooks**（电子书）：读取 EPUB 的信息、目录和正文，用 Markdown 或 HTML 写的书稿制作带封面和目录的规范 EPUB，并在交给 Kindle、Apple Books 或 Kobo 之前检查或修复它。它会在自己的环境中安装所需的 Python 包；这台电脑上有 EPUBCheck 时，它还会运行各书店使用的那项检查，有 pandoc 时也能处理 Word 文件。
 - **Library docs**（库文档）：来自 Context7 服务的编程库和框架的最新文档和代码示例，让智能体按你用的版本写代码。不会安装任何东西；问题会发送给 Context7。
 - **Meeting recordings**（会议录音）：把会议、通话或采访的录音整理成笔记：摘要、决定、带负责人和日期的待办事项、未解决的问题和一封跟进邮件，每一条都附上说出它的时间点。它会一并带来 **Speech to text**。
 - **Python for data**（Python 数据分析）：一个独立的 Python，带有 pandas、NumPy、SciPy、Matplotlib、openpyxl 和 PyArrow，用来分析表格和制作图表，不会往你自己的 Python 里安装任何东西。

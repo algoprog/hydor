@@ -8,13 +8,17 @@
 
 ## Decisions
 
-- <What was decided.> [00:12:05]
+- <What was decided; any objection or condition ("pending the budget sign-off").> [00:12:05]
 
 ## Action items
 
 | What | Who | By when | Said at |
 | --- | --- | --- | --- |
-| <task> | <name, or "no owner yet"> | <date (inferred from "by Friday")> | [00:31:40] |
+| <task> | <name, who said yes; or "no owner yet"> | <date (inferred from "by Friday"); "maybe Friday"; or "no date"> | [00:31:40] |
+
+## Proposed, not agreed
+
+- <Suggestion, who made it> [00:22:10]
 
 ## Open questions and risks
 
@@ -31,5 +35,10 @@ Thanks for today. We agreed:
 
 Next steps:
 - <who>: <what>, by <when>
+
+Still open:
+- <action without an owner yet, or question>
+
+If I have missed anything or got it wrong, reply and I will correct the notes.
 
 <Name>

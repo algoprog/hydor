@@ -20,6 +20,14 @@ missing.
 - Match what is there: heading format, date format, sections, how pull requests and authors are linked.
 - No format yet: newest first, one section per version, the groups in step 4. A template is in
   `references/template.md`.
+- An `## [Unreleased]` section at the top (Keep a Changelog): move its entries under the new
+  version's heading, leave an empty `## [Unreleased]` above it, and add the new version's compare
+  link at the bottom.
+- A changelog written by a tool from commit messages (release-please, semantic-release, git-cliff):
+  fix the wording at its source, or edit the text after the tool has run. With release-please, a
+  `BEGIN_COMMIT_OVERRIDE` … `END_COMMIT_OVERRIDE` block of corrected messages in a squash-merged pull
+  request's description replaces its message, and `Release-As: 2.0.0` in a commit body sets the
+  next version.
 
 ## 2. Gather what changed
 
@@ -49,8 +57,8 @@ For software with a public interface, semantic versioning, MAJOR.MINOR.PATCH:
 | New features, deprecations, compatible improvements | MINOR |
 | Only bug fixes, including security fixes that break nothing | PATCH |
 
-- Before 1.0.0 anything may change; many projects bump MINOR for breaking changes in 0.x. Follow the
-  project's habit.
+- Before 1.0.0 anything may change; many projects bump MINOR for breaking changes in 0.x (npm's
+  `^0.3.1` does not take 0.4.0, so nobody is moved onto it unasked). Follow the project's habit.
 - Pre-releases: `2.0.0-rc.1`, `2.0.0-beta.2`.
 - Unsure whether a change breaks someone? Treat it as breaking.
 - The version usually lives in files too (`package.json` and its lock file, `pyproject.toml`,
@@ -61,13 +69,15 @@ For software with a public interface, semantic versioning, MAJOR.MINOR.PATCH:
 
 Group by what each change means to them, in this order, leaving out empty groups:
 
-1. **Breaking changes**, with what to do (step 5).
+1. **Breaking changes**, with what to do (step 5). For software others build on, say "No breaking
+   changes" when there are none.
 2. **Security:** what was fixed, how serious, the advisory or CVE id, affected versions; no exploit
    details. Say "upgrade promptly" when it is serious.
 3. **New:** things users can do now.
 4. **Improved:** faster, clearer, easier; changed behaviour that breaks nothing.
 5. **Fixed:** bugs users could have met, described by their symptom.
 6. **Deprecated and removed:** what to use instead, and when the old way goes.
+7. **Known issues:** what still goes wrong in this version, with a way round it or when a fix is due.
 
 Each line:
 
@@ -81,6 +91,9 @@ Each line:
   the project does.
 
 Open each version with one line that sums it up: the two or three things that matter most.
+
+A release that had to be pulled keeps its entry, marked as withdrawn (`[YANKED]` after the date in
+Keep a Changelog), with the reason and the version to use instead.
 
 ## 5. Upgrade notes for breaking changes
 

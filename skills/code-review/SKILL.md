@@ -15,11 +15,18 @@ findings that matter, each with where it is, why it matters and a concrete fix.
 
 - The diff: `git diff --stat main...HEAD` for its size and shape, then `git diff main...HEAD` (three dots:
   what the branch changed since it left main) and `git log --oneline main..HEAD`. Uncommitted work:
-  `git diff` and `git diff --staged`. One commit: `git show <sha>`.
+  `git diff` and `git diff --staged`. One commit: `git show <sha>`. Add `-w` to hide changes that are
+  only whitespace (a reformat can bury the real change), and `-W` to see each changed function whole.
 - A GitHub pull request: `gh pr view 123 --comments`, `gh pr diff 123`, and `gh pr checkout 123` to run it.
   Without `gh`: `git fetch origin pull/123/head:pr-123`.
 - The intent: the description, the linked issue, the commit messages. Write it down in one sentence. If
-  you cannot tell what the change is for, that is your first finding.
+  you cannot tell what the change is for, that is your first finding. When the description and the code
+  disagree, ask which is right: sometimes it is the description.
+- **Depth follows risk, not size.** Forty lines touching login, permissions, payments, deleting data, a
+  migration, a public API or the build deserve the full checklist and a run; nine hundred lines of tests
+  or docs may need only a careful read.
+- Generated files, lockfiles and vendored code: do not read them line by line. Check that what generates
+  them is in the diff and, for a lockfile, which new packages arrived (`references/checklist.md`).
 - Big diffs (more than a few hundred lines of logic): review one part at a time (data model, core logic,
   interfaces, UI), each with its tests, and say whether the change should be split.
 
@@ -46,17 +53,26 @@ For each changed function, ask:
   state, check-then-act races, a missing lock or unique constraint.
 - **Edges:** off by one, time zones and daylight saving, money in floats, the last page, limits.
 - **Intent:** does it do what the description says in every branch, behind every flag, on every platform?
+- **Written by an AI** (an agent's pull request, or your own work): check that every function, option,
+  config key and package it uses really exists in the installed version (its docs or source, not
+  memory), that the tests come from the request rather than from what the code happens to do, and that
+  its comments claim no more than the code does.
 
 ## 4. Then the rest, in order of cost
 
 - **Security:** input reaching SQL, a shell, HTML, file paths or outgoing URLs; a new route or query
   without an authorisation check; secrets in code or logs. For anything sensitive, use security-check.
-- **Tests:** would a test fail without this change? Are error paths and edges covered? Do the tests
-  assert outcomes rather than internals?
+- **Tests:** would a test fail without this change? To know, put back the old code but keep the new
+  tests (with everything committed: `git checkout main -- src/file.py`), run them and watch one fail,
+  then `git checkout HEAD -- src/file.py`. Are error paths, edges and refusals (a user who may not do it
+  is turned away) covered? Do the tests assert outcomes rather than internals?
+- **Weakened tests:** tests deleted or skipped, assertions loosened, snapshots re-recorded. They are easy
+  to miss in a diff and the quiet way to make a failing suite pass; each needs a stated reason.
 - **Performance where it matters:** a query per item in a loop, unbounded lists, repeated work, large
   payloads (see the performance skill).
 - **Readability:** names say what things are; each function does one thing; no dead or commented-out
-  code; no debug output; complexity that earns its place.
+  code; no debug output; complexity that earns its place. Code you cannot follow after a careful read is
+  a finding: the next reader will not follow it either.
 - **Consistency:** follows the codebase's patterns, error handling, naming and layout, and its written
   rules (CONTRIBUTING, CLAUDE.md, AGENTS.md). A new pattern needs a reason.
 - **Operability:** logs and errors someone on call can use; new settings documented; migrations
@@ -83,12 +99,15 @@ with SELECT ... FOR UPDATE inside a transaction.
 | Suggestion | Optional: a clearer name, a simpler way. Mark it optional and keep these few. |
 | Question | You are not sure. Ask; do not assert. |
 
-- Open with a short summary: what the change does, whether it is ready, and the blocking items.
+- Open with a short summary: what the change does, whether it is ready, the blocking items, and what
+  you did not review or could not run (silence reads as "checked").
 - Check before you claim. "This crashes on an empty list" needs a run, or the line that proves it. If
   you could not check, make it a question.
 - Show the fix when it is short (a snippet or the exact change).
 - Write about the code, not the author: "this loop runs a query per item", not "you wrote slow code".
 - Leave to the tools what the formatter, linter and type checker enforce: run them instead.
+- Findings from a review bot or another model are leads, not verdicts: keep those you can tie to a line
+  and confirm yourself; drop the rest or ask them as questions.
 
 ## Reviewing your own work before handing it over
 
@@ -97,13 +116,18 @@ Review your own diff the same way before you say it is done:
 - `git diff` against where you started, read top to bottom as if someone else wrote it.
 - Remove debug output, commented-out code, stray files and unrelated changes (reformatted lines you did
   not need to touch).
+- Put back any test you skipped or loosened to get the suite passing. If one truly had to change, say
+  which and why when you hand over.
 - Run the tests, linter and type checker, and use the feature once for real.
 - Check the result against the request line by line (evidence-before-done), then tidy up (clean-up).
 
-## Posting the review
+## Posting the review, and the next round
 
 Post comments or approve only when asked. With `gh`: `gh pr review 123 --comment --body-file review.md`,
 or `--request-changes` or `--approve` instead of `--comment`. Otherwise give the review in the reply.
+
+On the next round, check each blocking finding is really fixed (run its check; a changed line is not a
+fix) and read what changed since the commit you reviewed (`git diff <that-sha> HEAD`).
 
 ## Pitfalls
 
@@ -113,3 +137,4 @@ or `--request-changes` or `--approve` instead of `--comment`. Otherwise give the
 - Asserting a bug you did not check.
 - Rewriting the change to your own taste instead of the codebase's conventions.
 - Approving because the tests pass: they only cover what the author thought of.
+- Missing a deleted assertion or a skipped test because it looked like tidying.

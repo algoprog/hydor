@@ -32,6 +32,9 @@ Faster exports, shared folders, and the end of the old API keys.
 ### Deprecated
 - The `/v1/files` API route. Use `/v2/files`; `/v1/files` will be removed in 3.0.
 
+### Known issues
+- On iPads with iOS 16 or older the Share button is hidden: share from the web app until 2.4.1.
+
 ## 2.3.1 · 14 October 2026
 ...
 ```
@@ -93,6 +96,7 @@ After:
 - [ ] Every commit since the last tag is either in the notes or deliberately left out.
 - [ ] Breaking changes first, each with what to do.
 - [ ] Security fixes with severity and affected versions, without exploit details.
+- [ ] Known issues listed, each with a way round it.
 - [ ] Each line says what the reader gets or must do, in the product's own words.
 - [ ] Version number matches the files and the tag; the date is right.
 - [ ] Names of settings, flags and screens checked against the software.

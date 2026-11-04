@@ -33,12 +33,20 @@ llama-server -hf Qwen/Qwen3-8B-GGUF:Q4_K_M -c 32768 -ngl 99 --host 127.0.0.1 --p
 llama-server -m ./Qwen3-8B-Q4_K_M.gguf -c 65536 -np 2 -ctk q8_0 -ctv q8_0 --port 8080
 ```
 
-- `-c` context (0 means the model's full length); `-ngl` layers on the GPU (`auto` by default; a
-  number lower than the layer count keeps the rest on the processor); `-np` parallel slots;
-  `-fa on|off|auto` flash attention; `--jinja` (default on) uses the model's chat template;
-  `--api-key KEY` requires a key; `--lora adapter.gguf` adds a LoRA adapter.
-- Health check: `curl -s http://127.0.0.1:8080/health`. A built-in chat page is at the server's
-  address in a browser.
+- `-c` context; `-ngl` layers on the GPU (`auto` by default; a number lower than the layer count
+  keeps the rest on the processor). Builds since December 2025 fit whatever you leave unset to the
+  free memory (`--fit`, on by default): first a shorter context (down to 4,096 tokens), then fewer
+  layers on the GPU. Read the startup log for the context and the `offloaded N/N layers to GPU` line.
+- `-np` parallel slots; `-fa on|off|auto` flash attention; `--jinja` (default on) uses the model's
+  chat template; `--api-key KEY` requires a key; `--lora adapter.gguf` adds a LoRA adapter.
+- Without `--port` it listens on 9931 (8080 before October 2026 builds).
+- Leave `--tools` off: it gives the model the server's own file and shell tools (experimental),
+  which anyone who can reach the server could then use. The agent has its own tools.
+- Health check: `curl -s http://127.0.0.1:8080/health` answers 503 while the model loads and 200
+  when it is ready. A built-in chat page is at the server's address in a browser.
+- Speed alone: `llama-bench -m ./Qwen3-8B-Q4_K_M.gguf -p 512 -n 128` prints prompt reading (`pp`)
+  and writing (`tg`) speeds in tokens a second, averaged over five runs. It leaves out tokenising
+  and sampling, so time a real request for the wait before the first word.
 - Get the binaries from llama.cpp's GitHub releases (CUDA, Vulkan, Metal and CPU builds), a package
   manager, or build with CMake.
 
@@ -59,6 +67,11 @@ vllm serve Qwen/Qwen3-32B --tensor-parallel-size 2             # split across tw
   `--api-key` requires a key; `--enable-auto-tool-choice --tool-call-parser hermes` (or the parser
   the model's card names) enables tool calls.
 - Gated models need `HF_TOKEN` in the environment. Downloads go to `~/.cache/huggingface`.
+- In Docker, without installing anything else (`--ipc=host`, or a large `--shm-size`, lets its
+  processes share memory; splitting a model across GPUs fails without it):
+  `docker run --gpus all -v ~/.cache/huggingface:/root/.cache/huggingface -e HF_TOKEN -p 8000:8000
+  --ipc=host vllm/vllm-openai:latest --model Qwen/Qwen3-8B --max-model-len 32768`. Pin a version tag
+  (`vllm/vllm-openai:v<version>`) to keep the same behaviour after a restart.
 - Startup prints the KV cache size and the maximum concurrency for the chosen length: read it.
 
 ## LM Studio and MLX (Macs)
@@ -80,7 +93,11 @@ curl -sS -w '\n%{time_total} s\n' http://localhost:8000/v1/chat/completions \
 Use the model name the server lists at `/v1/models` (Ollama: `qwen3:8b`). Check
 `choices[0].message.content`, `finish_reason` (`stop`, not `length`), and `usage`. Models that think
 before answering spend tokens on reasoning first: give them room in `max_tokens`, or turn thinking
-off as their card describes.
+off as their card describes. An empty `content` with `finish_reason: length` means the reasoning
+used the whole budget (it shows in `reasoning_content` in llama.cpp, `reasoning` in vLLM). For
+Qwen3 and other templates with the switch, `"chat_template_kwargs": {"enable_thinking": false}`
+in the request turns thinking off in vLLM and llama.cpp; for the whole server, llama.cpp's
+`--reasoning off` or vLLM's `--default-chat-template-kwargs '{"enable_thinking": false}'`.
 
 Speed: `usage.completion_tokens` divided by the time. Under load, send several requests at once
 (or use `vllm bench serve` for vLLM) and compare total tokens per second.

@@ -14,7 +14,7 @@ Agents don't read every skill all the time. At the start of a session an agent s
 
 The Skills page shows skills from five places, each marked on its row:
 
-- **Built in**: the skills that come with the app (more than fifty). They update with the app.
+- **Built in**: the skills that come with the app (more than sixty). They update with the app.
 - **Yours**: skills you wrote on this page, approved when an agent suggested them, or put in your skills folder yourself.
 - **From plugins**: the skills of the [plugins](/guide/plugins) you turned on. They come and go with their plugin.
 - **Claude Code and Codex**: the agents' own skills, in their own folders. Only that agent gets them.
@@ -113,11 +113,13 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 
 **Writing**
 
-- **writing**: for anything people will read (a report, an article, a letter, a speech, a story). The agent settles who reads it and what for, outlines before it drafts, and edits in separate passes.
+- **writing**: for anything people will read (a report, an article, a letter, a speech). The agent settles who reads it and what for, outlines before it drafts, and edits in separate passes.
+- **creative-writing**: stories, novels, memoir, poems and scripts: finding the story, planning, drafting without stalling, getting unstuck, revising in order, feedback, and getting published (query letters, synopses, agents, self-publishing and the traps to avoid), with the writer's voice kept theirs.
 - **email**: sorts an inbox (what needs a reply, what can wait, what to archive) and writes the emails that need care: replies, chasers, apologies, declining or saying no, at the right length and tone.
 - **plain-language**: rewrites an existing text to read clearly and humanly, without jargon, filler or stiff, AI-sounding phrasing, at the right reading level, keeping what it says.
 - **translation**: translates documents, messages, pages, app texts and subtitles faithfully and naturally, with a glossary for terms and names, numbers and dates for the place it is for, and a check of the result.
 - **social-media**: plans and writes posts for each platform (LinkedIn, X, Instagram, Mastodon, Bluesky…), adapts one message to several, and keeps a content calendar.
+- **seo**: getting a website, shop or blog found in search engines and in AI answers: a check of its pages, titles and descriptions, indexing, structured data and AI crawlers, and honest measuring, with no promised rankings.
 - **release-notes**: writes release notes and changelog entries from commits and pull requests, for the people reading them, and picks the next version number.
 
 **Documents**
@@ -130,6 +132,7 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 **Research and the web**
 
 - **research**: plans the searches a question needs, searches wide and then narrow (papers, patents, news, filings), checks each key claim against two independent sources or one primary source, and answers with citations, saying what it could not confirm.
+- **spin-check**: whether an ad, a viral post, a pitch or a claim is true, misleading or a scam: claim by claim, each checked against the source that can settle it, the persuasion tricks named, and a verdict for each.
 - **papers**: works closely with academic papers: who cites one, a legal full text, reading and summarising, a table comparing studies, judging a study's quality, and citing it properly.
 - **blocked-pages**: when a page won't load or read (an error, a paywall, a cookie wall or bot check, a page that needs JavaScript), it tries the other ways to its content in order, and never gets round what you have no right to.
 - **web-scraping**: collects structured data from websites (listings, tables, prices, a catalogue) into CSV or JSON politely and reliably, and checks it.
@@ -140,9 +143,12 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 
 - **decision-brief**: helps you choose: the options (doing nothing among them, when it is real), what matters and how much, the trade-offs and risks, and a clear recommendation, on one page.
 - **project-plan**: plans a project of any kind (an event, a move, a launch, a renovation): milestones, tasks with owners and dates, what depends on what, risks, and a timeline to keep up to date.
+- **meetings**: whether to meet at all, an agenda written as questions, who to invite, chairing it, one-on-ones and the follow-up, and getting ready for a meeting someone else runs.
 - **weekly-review**: a weekly reset: what is open and promised, what stalled, and next week's priorities and time.
 - **brainstorming**: many ideas with named methods (reversal, constraints, analogies, the worst idea…), then sorting them and picking a few to try.
 - **study-coach**: learning a subject or a skill: what you know already, a plan, explanations at your level, practice questions, and flashcards to come back to.
+- **job-interviews**: getting ready for a job interview: what the role needs, a bank of true examples, mock interviews one question at a time with honest feedback, hard questions, and a review of how one went; for interviewers too.
+- **solo-business**: a business of your own (freelancing, a service, a product, a side business): what you need from it, an offer tested with paying customers before building much, prices that pay for your time, and when to change course or stop.
 
 **Data and numbers**
 
@@ -155,7 +161,10 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 
 - **image-prompts**: making pictures (and short videos) with the app's image models: what to describe, sizes, text in pictures, keeping a character or style the same across pictures, and editing one.
 - **diagrams**: flowcharts, timelines, org charts, mind maps and architecture diagrams people can read, shown in the conversation or kept as a page.
+- **infographics**: one-page visual explainers (an infographic, a poster comparing options, a process or timeline graphic): the message and sourced facts first, the structure that fits them, a style, then the real export checked at the size people will see it.
 - **ui-mockups**: before a screen or page is built, two or three quick, clearly different mockups shown in the conversation to compare and pick from.
+- **brand-kit**: a brand for a small business, club or project: who it is for, its voice, colours with their contrast checked, free fonts, logo ideas, and a brand card and book, put to use on profiles and cards.
+- **youtube-thumbnails**: a thumbnail and title that make one honest promise: three different ideas, legible when tiny, previewed beside other videos, and tested with YouTube's Test & Compare.
 
 **Coding**
 
@@ -168,8 +177,10 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 - **github**: pull requests, reviews, checks and their logs, issues and releases on GitHub, with the gh command or its API.
 - **api-requests**: calling and debugging web APIs: sign-ins with your saved keys, error answers, pages of results, rate limits and retries.
 - **frontend-polish**: making a web page look and feel finished: layout, spacing, type, colour and contrast, every state, phones, the keyboard, checked on real screenshots.
+- **web-accessibility**: websites and web apps everyone can use (the keyboard, screen readers, zoom, contrast, captions, forms and dialogs), checked with tools and by hand, and reported honestly.
 - **web-app-qa**: testing a web app like a demanding user, in the browser, and writing up the bugs found with steps and evidence.
 - **docker**: Dockerfiles and compose files, building and debugging containers, and cleaning up carefully.
+- **servers**: looking after a server or another computer over SSH (updates, a failing service, a full disk, users and keys, the firewall, backups), always with a way back in before touching access, one machine first and a check after each change.
 - **security-check**: a practical security review: secrets, injections, who may do what, outdated packages, each problem reported by how serious it is.
 - **performance**: making software faster by measuring first, finding the biggest cost, fixing it and measuring again.
 - **mcp-servers**: building an MCP server so agents get new tools, designing its tools well, testing it, and adding it to an agent.
@@ -183,6 +194,7 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 
 **This app**
 
+- **everyday-help**: for "what can you do for me?": a short conversation about your days, one question at a time, then one or two ideas matched to what the app really does, and one small thing set up if you say yes.
 - **app-builder**: for making or changing one of your apps. The agent pins down what goes in and comes out, picks the cheapest step for each part, gives the app examples with checks and tries them before handing it over, saying what a run costs.
 - **skill-authoring**: writing a good skill: when one is worth it, the line on when to use it, its structure and checks, and improving it after use.
 - **plugin-authoring**: making, packing and sharing a plugin (see [Plugins](/guide/plugins)): what goes in it, its format, checking it and adding it.
@@ -309,7 +321,7 @@ When keywords bring a skill in, a pill shows in the conversation under your mess
 - A skill brought in stays for that message and the next two, so a process like asking first or researching can run over several turns. A newer message's skills take the place of older ones.
 - A long skill is cut to fit what the model can take; the agent is told to load the rest itself.
 
-The built-in skills with keywords are app-builder ("make a template", "make an app", "automate"…), clarify-first ("plan a trip", "business plan", "renovat*"…), clean-up ("clean up after", "leftover files"…), decisions-log ("while I'm away", "overnight"…), evidence-before-done ("double-check", "verify"…), research ("research", "find sources", "fact-check"…), troubleshooting ("not working", "keeps crashing", "debug*"…) and writing ("draft a", "proofread", "cover letter"…). Most of the others have a few too, and the document skills have none: Custom loads them when a task fits. You see a skill's keywords when you open it.
+The built-in skills with keywords are app-builder ("make a template", "make an app", "automate"…), clarify-first ("plan a trip", "business plan", "renovat*"…), clean-up ("clean up after", "leftover files"…), decisions-log ("while I'm away", "overnight"…), evidence-before-done ("double-check", "verify"…), research ("research", "find sources", "literature review"…), troubleshooting ("not working", "keeps crashing", "debug*"…) and writing ("draft a", "proofread", "cover letter"…). Most of the others have a few too, and the document skills have none: Custom loads them when a task fits. You see a skill's keywords when you open it.
 
 ### Give a skill keywords
 

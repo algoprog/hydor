@@ -42,7 +42,8 @@ A plugin that needs other plugins brings them along: they are added first, and t
 
 ## The plugins that come with the app
 
-- **Audio and video**: convert, trim, join, compress and inspect audio and video, pull out the sound, make GIFs and thumbnails, add subtitles, and download media you have the right to. It needs ffmpeg on this computer (its page says how to get it), and installs yt-dlp in its own environment.
+- **Audio and video**: convert, trim, join, compress and inspect audio and video, pull out the sound, even out a podcast's loudness, shorten long pauses, cut a recording from a list of the parts to keep, make vertical clips, GIFs and thumbnails, add subtitles, and download media you have the right to. It needs ffmpeg on this computer (its page says how to get it), and installs yt-dlp in its own environment.
+- **Ebooks**: read an EPUB's details, contents and text, make a valid EPUB with a cover and a table of contents from a manuscript in Markdown or HTML, and check or repair one before it goes to Kindle, Apple Books or Kobo. It installs the Python packages it needs in its own environment; with EPUBCheck on this computer it also runs the check the stores use, and with pandoc it takes Word files too.
 - **Library docs**: current documentation and code examples for programming libraries and frameworks, from Context7's service, so agents write code for the version you use. Nothing is installed; the questions go to Context7.
 - **Meeting recordings**: from a recording of a meeting, call or interview to notes: a summary, decisions, action items with owners and dates, open questions and a follow-up email, each with the time it was said. It brings **Speech to text** along.
 - **Python for data**: a Python of its own with pandas, NumPy, SciPy, Matplotlib, openpyxl and PyArrow, to analyse tables and make charts without installing anything into your own Python.

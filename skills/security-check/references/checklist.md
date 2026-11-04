@@ -68,10 +68,17 @@ Placeholders and test values are fine; real-looking values are findings. Report 
       if possible.
 - [ ] Sign-in, sign-up and reset are rate-limited; messages do not reveal whether an account exists.
 - [ ] Reset and invite tokens are random, single-use, short-lived, and stored hashed.
+- [ ] API keys the app issues: random, stored hashed, shown once, scoped, revocable, and accepted only in a
+      header (never in the URL, where logs and browser history keep it).
 - [ ] Sessions: new id at sign-in, expiry, server-side invalidation at sign-out and password change.
 - [ ] Cookies: `HttpOnly`, `Secure`, `SameSite`; CSRF protection on state-changing requests with cookie auth.
-- [ ] JWT: algorithm pinned, signature verified, `exp`, `aud`, `iss` checked; keys rotated.
-- [ ] Multi-tenant data: every query filters by tenant; tested with two tenants.
+- [ ] JWT: algorithm pinned, signature verified, `exp`, `aud`, `iss` checked; keys rotated; keys taken only
+      from your own key set, never from the token's own header (`jwk`, `jku`).
+- [ ] Multi-tenant data: every query filters by tenant; tested with two tenants. The user and tenant come
+      from the session or token, never from a field, parameter or header the client sends.
+- [ ] Exports, bulk actions, search, file downloads and background jobs check access like the single-item
+      routes do.
+- [ ] A permission check that errors (timeout, exception) refuses the request.
 
 ## Configuration and headers
 
@@ -84,7 +91,17 @@ Placeholders and test values are fine; real-looking values are findings. Report 
 - [ ] Containers run as non-root, read-only file system where practical, no secrets in images.
 - [ ] Backups exist, are encrypted, and restoring them has been tried.
 - [ ] Logs record security events (sign-ins, permission denials) without passwords, tokens or full
-      card numbers.
+      card numbers; request logging leaves out `Authorization` and `Cookie` headers and whole bodies.
+- [ ] Secrets are not passed as command-line arguments (anyone on the machine sees them in `ps`), echoed
+      in CI logs, or baked into image layers (`docker history --no-trunc <image>` shows build arguments).
+
+## CI and build
+
+- [ ] Third-party actions pinned to a full commit hash; the workflow's token has only the `permissions:`
+      it needs.
+- [ ] Workflows started by outside pull requests (`pull_request_target`, `workflow_run`) never check out
+      and run the pull request's code with secrets available.
+- [ ] Package installs in CI use the lock file (`npm ci`, `pip install -r` with pinned versions).
 
 ## Uploads and files
 
@@ -112,6 +129,9 @@ Placeholders and test values are fine; real-looking values are findings. Report 
 - [ ] Model output is escaped before it is rendered as HTML, and validated before it is used in queries,
       commands or file paths.
 - [ ] Secrets never go into prompts.
+- [ ] Retrieval (search, embeddings) returns only documents the current user may read.
+- [ ] Actions that send, pay, delete or publish ask the user first.
+- [ ] Rate and spending limits on model calls: a loop or an attacker can run up the bill.
 
 ## Severity guide
 

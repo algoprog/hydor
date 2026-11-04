@@ -1,6 +1,6 @@
 ---
 name: python-data
-description: Use when analysing a table (CSV, Excel, Parquet) or making charts with Python and the Python for data plugin is on: its environment already has pandas, NumPy, SciPy, Matplotlib, openpyxl and PyArrow.
+description: Use when analysing a table (CSV, Excel, Parquet) or making charts with Python while the Python for data plugin is on (its environment already has pandas, NumPy, SciPy, Matplotlib, openpyxl and PyArrow).
 category: data
 triggers: [pandas, analyse this csv, analyze this csv, plot the data, chart from the data]
 ---

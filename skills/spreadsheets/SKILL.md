@@ -28,7 +28,14 @@ scripts in `scripts/` (next to this file):
 Use the `read_document` tool (hydor): every sheet comes as a table with its row numbers and
 column letters, numbers as formatted, and some formulas. Big sheets show their first rows; for the
 whole of a big one, load it in Python: `load_workbook(path, read_only=True, data_only=True)` gives
-the values as last calculated (`data_only=False` gives the formulas). CSV: the `csv` module.
+the values as last calculated (`data_only=False` gives the formulas). openpyxl gives what is stored,
+not what the cell shows: 0.155 in a cell formatted as a percentage is 15.5%, and a date is a plain
+number (46330) unless its cell has a date format; check `cell.number_format` before quoting one.
+
+CSV: the `csv` module, opened with `encoding="utf-8-sig"` so a byte-order mark does not end up in
+the first header. Files from European Excel often use `;` between fields and a decimal comma:
+`csv.Sniffer().sniff(sample, delimiters=",;\t")` finds the separator, and `1,50` stays text until
+you turn it into 1.5 yourself.
 
 ## Making one
 
@@ -47,7 +54,10 @@ the values as last calculated (`data_only=False` gives the formulas). CSV: the `
    installed the check works them out and lists errors: fix those. `scripts/render-pages` shows how
    it prints.
 4. **Hand it over** with `present_files` and a short caption; in your reply, a sentence on what is
-   in it.
+   in it. openpyxl saves formulas without their results, so a quick preview that does not
+   recalculate, or a program that reads stored values (pandas, `data_only=True`), shows those
+   cells empty until the file has been opened and saved in Excel or LibreOffice: say so when that
+   matters.
 
 ```python
 from openpyxl import Workbook
@@ -82,4 +92,10 @@ wb.save("budget.xlsx")
 `load_workbook("theirs.xlsx")` keeps formulas, styles and most of the layout (not pivot tables, and
 charts only when you rebuild them). Save under a new name unless told otherwise. `.xls` and `.ods`:
 convert first with `soffice --headless --convert-to xlsx file.xls`. To hand back a CSV instead, write
-it with the `csv` module (UTF-8, with a header row).
+it with the `csv` module, with a header row and `encoding="utf-8-sig"`: without that mark, Excel
+shows accented letters garbled (Café as CafÃ©).
+
+"File is not a zip file" for a workbook that is there: `head -c 4 file.xlsx | od -An -tx1` shows
+`50 4b 03 04` for a normal one (so this one is damaged: ask for it again), `d0 cf 11 e0` for one
+locked with a password or an old .xls under a new name (try converting it with soffice; if that
+fails, ask for a copy saved without the password), and nothing for an empty file.

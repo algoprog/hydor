@@ -234,3 +234,38 @@ config:
 flowchart TD
   A --> B
 ```
+
+Spacing and wrapping for one diagram (spacing works only with dagre; wrapping with both layouts):
+
+```
+---
+config:
+  layout: dagre
+  flowchart:
+    nodeSpacing: 60
+    rankSpacing: 80
+    wrappingWidth: 320
+---
+flowchart LR
+  A[Order received] --> B[Packed] --> C[Sent]
+```
+
+## Pitfalls, each tried in Mermaid 12
+
+- **A box whose id starts with o or x, right after a link:** `dev---ops` draws a link with a circle
+  end to a box called "ps" (`--o` and `--x` are link ends). Write `dev--- ops`, or `Ops`.
+- **Spacing that does nothing:** `nodeSpacing` and `rankSpacing` are ignored by the default ELK
+  layout; they work with `layout: dagre`, as above.
+- **Labels wrapped into narrow boxes:** `wrappingWidth: 320` (above) keeps each line as written.
+- **A subgraph's own `direction`** is ignored once a box inside it links to one outside it: plan the
+  direction of the whole diagram instead.
+- **Quotes and # inside a label:** write `#quot;` and `#35;` in a quoted label:
+  `A["Say #quot;hello#quot; at #35;1"]`.
+- **Activation bars in a sequence diagram:** `A->>+B: request` opens one on B and `B-->>-A: reply`
+  closes it; every `+` needs its `-`.
+- **Mermaid's C4 syntax** (`C4Context`, `C4Container`): experimental; flowcharts work better, as in
+  `references/c4.md`.
+- **Markdown made into PDF or Word without a browser** (Pandoc and most converters): a `mermaid` block
+  comes out as code. Render it to an image first (mmdc, or a screenshot) and put the image in.
+- **Documents and slides in the app** (`save_doc`, `save_slides`) do not draw Mermaid either: add the
+  diagram as a picture, a PNG from mmdc or a screenshot.

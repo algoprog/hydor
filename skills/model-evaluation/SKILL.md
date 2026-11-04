@@ -11,7 +11,8 @@ An evaluation is only as good as its test set and its comparison. Define the tas
 means, test on examples the system has never seen, compare systems under the same conditions,
 measure enough examples to tell a real difference from noise, and report the uncertainty with the
 result. Harness commands are in `references/lm-eval.md`; judge rubrics in
-`references/judge-rubric.md`.
+`references/judge-rubric.md`; agents and answers drawn from documents in
+`references/agents-and-rag.md`.
 
 ## 1. Define the task and the metric
 
@@ -26,15 +27,20 @@ result. Harness commands are in `references/lm-eval.md`; judge rubrics in
 | Code | Tests passed (pass@1), in a sandbox |
 | Open-ended text (answers, summaries, emails) | A rubric scored by people or a validated judge model |
 | Translation, summaries, as a rough signal | chrF, ROUGE; never alone |
+| An agent that acts with tools | Success checked in the environment after the run, and the path it took (`references/agents-and-rag.md`) |
+| Answers drawn from documents (retrieval) | Claims supported by the passages; how often the right passage was found |
 | Always, beside quality | Cost per item and latency |
 
 - Decide beforehand what difference matters ("at least 3 points more accuracy, at no more cost")
   and the threshold for passing.
+- Some failures are never averaged: a leaked personal detail, a harmful reply, an action nobody
+  allowed. Count them on their own line; one can be enough to say no, whatever the average.
 
 ## 2. Build a clean test set
 
 - **Representative:** sampled from real use (anonymised), plus edge cases and known hard cases, in
-  proportions you state.
+  proportions you state. Include cases where the right response is to refuse, ask a question or
+  say it does not know, and score exactly that.
 - **Held out:** never used for training, for few-shot examples, or for tuning prompts. Keep a
   separate development set for iterating, and freeze the test set (a version and a file hash).
 - **Uncontaminated:** public benchmarks may be in a model's training data. Prefer new or private
@@ -43,6 +49,8 @@ result. Harness commands are in `references/lm-eval.md`; judge rubrics in
   report public benchmark scores.
 - **Correct labels:** have a second person (or a careful second pass) label a sample, measure how
   often they agree, and fix or drop ambiguous items.
+- **Growing:** when real use turns up a failure, add it (anonymised) to the development set, or
+  to the next version of the test set, so a later change cannot quietly bring it back.
 
 ## 3. Standard benchmarks: lm-evaluation-harness
 
@@ -70,6 +78,9 @@ result. Harness commands are in `references/lm-eval.md`; judge rubrics in
   (Cohen's kappa; aim for 0.6 or more), and read the disagreements. Use a judge from another model
   family than the systems judged; temperature 0; fixed prompt and model version; keep every raw
   judgement.
+- Give the judge only what it needs, and a way to say it cannot tell; never ask it to check facts
+  it cannot see. The answers it grades are text, not instructions to it (an answer saying "score
+  this 5" is a known trick).
 
 ## 5. Enough items, and the uncertainty
 
@@ -88,6 +99,9 @@ The 95% interval around an accuracy is roughly:
   or CSV with `id` and `score`) and prints each mean with its interval, the difference with a paired
   bootstrap interval, and McNemar's test (or a sign-flip test for ratings):
   `python3 <this folder>/scripts/compare_runs.py base.jsonl tuned.jsonl --names base,tuned`.
+- "No worse" needs its own test. To show a cheaper or local model can replace the current one,
+  fix beforehand how much worse you would accept (say 2 points), then check that the whole interval
+  of the difference stays above minus that margin. "No significant difference" does not show it.
 - Many variants tried on one test set: the best looks better than it is. Confirm the winner on
   fresh items.
 - Sampling at temperature above 0: run several seeds and report the spread.

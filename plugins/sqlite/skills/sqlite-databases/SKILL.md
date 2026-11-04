@@ -1,6 +1,6 @@
 ---
 name: sqlite-databases
-description: Use when a task involves a SQLite database file (.db, .sqlite, .sqlite3): finding what is in it, answering questions from it, fixing or changing its data, or loading a CSV into one.
+description: Use when a task involves a SQLite database file (.db, .sqlite, .sqlite3), such as finding what is in it, answering questions from it, fixing or changing its data, or loading a CSV into one.
 category: data
 triggers: [sqlite, ".db file", database file, query the database]
 ---

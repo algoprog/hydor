@@ -22,7 +22,8 @@ One bug per report. Write it so someone who has never seen the app can reproduce
 - Console: `<exact error text>`
 - Request: `<METHOD> <address>` returned `<status>`: `<short response body>`
 
-**Notes:** <anything that narrows it down: works in Firefox, started after build X, only with coupons>
+**Notes:** <anything that narrows it down: works in Firefox, started after build X, only with coupons;
+a suspected cause, marked as a guess>
 ```
 
 ## Example

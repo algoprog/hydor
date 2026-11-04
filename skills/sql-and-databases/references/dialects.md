@@ -78,6 +78,26 @@ keys turned off for the copy (the "12-step" procedure in SQLite's documentation)
 
 Store moments in UTC; convert to the user's time zone only for display.
 
+## Finding index problems (PostgreSQL)
+
+```sql
+-- Indexes no query has used (unique ones left out: they enforce rules even when nothing reads them)
+SELECT s.relname AS table_name, s.indexrelname AS index_name,
+       pg_size_pretty(pg_relation_size(s.indexrelid)) AS size
+FROM pg_stat_user_indexes s JOIN pg_index i ON i.indexrelid = s.indexrelid
+WHERE s.idx_scan = 0 AND NOT i.indisunique
+ORDER BY pg_relation_size(s.indexrelid) DESC;
+
+-- Tables that full scans read the most rows from: candidates for a missing index
+SELECT relname AS table_name, seq_scan, seq_tup_read, idx_scan
+FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 10;
+```
+
+- The counts cover this server only (a replica keeps its own) and run from the last reset
+  (`SELECT stats_reset FROM pg_stat_database WHERE datname = current_database();`, empty when never
+  reset). Judge over weeks of normal use, including monthly jobs, before dropping anything.
+- Drop with `DROP INDEX CONCURRENTLY name;` (outside a transaction), so writes go on meanwhile.
+
 ## Backups
 
 | | Backup | Restore |

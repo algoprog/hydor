@@ -62,8 +62,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
   asking you for what is missing on the app's own card
 - Give every agent memory of you and your projects, your documents (knowledge bases it searches and cites),
   your services (connected once, beside your apps), keys and sign-ins it uses without ever seeing them, more than
-  fifty skills on one page (with yours and those agents learn), plugins that bundle skills, tools and what they
-  need for every agent (seven built in, others from a link or a file, or made and shared by you), child
+  sixty skills on one page (with yours and those agents learn), plugins that bundle skills, tools and what they
+  need for every agent (eight built in, others from a link or a file, or made and shared by you), child
   sessions, and tasks that run on a schedule or when something changes
 - Keep each project together in a project, with its own documents, guidelines and skills, run deep research that
   ends in a cited report, compare models side by side, and use the app in English, Chinese or Greek

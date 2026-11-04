@@ -1,6 +1,6 @@
 ---
 name: writing
-description: Use when writing or substantially editing something people will read, such as a report, article, proposal, letter or email, documentation, a speech or a story. Not for a one-line reply.
+description: Use when writing or substantially editing something people will read, such as a report, article, proposal, letter or email, documentation or a speech. Not for fiction or a book (creative-writing), or a one-line reply.
 category: writing
 triggers: [draft a, draft an, proofread, essay, blog post, article about, cover letter, newsletter, press release, speech, proposal for, report on]
 ---
@@ -8,7 +8,8 @@ triggers: [draft a, draft an, proofread, essay, blog post, article about, cover 
 # Writing
 
 Clear writing comes from knowing who reads it and what they should take away, settling the structure
-before the sentences, and editing in separate passes.
+before the sentences, and editing in separate passes. For fiction, memoir, poems, a script or a whole
+book, follow the creative-writing skill instead.
 
 ## 1. Brief first
 
@@ -28,6 +29,8 @@ Write these down in three to five lines; they are the test for every later choic
 - Outline the sections in the order the reader needs them. For practical writing, lead with the
   conclusion or the request, then the support. For a story or a speech, set up, build, resolve.
 - Give each section one job, and a heading that says what it is.
+- A memo or proposal that asks for a decision, a README, a how-to guide: their shapes are in
+  `references/memos-and-docs.md`.
 
 ## 3. Draft
 
