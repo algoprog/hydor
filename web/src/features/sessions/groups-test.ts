@@ -3,6 +3,7 @@
 // groups in their order. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/sessions/groups-test.ts && node dist/dev/groups-test.js
 import assert from 'node:assert/strict';
+import type { FolderOrigin } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
 import { ACTIVE_MS, groupSessions, isFolded, STALE_MS, unpickedFolders, type SessionGroup } from './groups';
@@ -25,10 +26,10 @@ const ses = (cwd: string | undefined, ago: number, more: Partial<SessionSummary>
 const space = (id: string, name: string): SpaceView => ({ id, name, color: 'blue', folder: `${HOME}/Naget/Spaces/${id}`, createdAt: 0, sessions: 0, docs: 0, skills: 0 }) as SpaceView;
 const unpicked = unpickedFolders(HOME, HOME, [`${HOME}/Naget`, `${HOME}/naget-apps`, `${HOME}/.naget-agent/worktrees`, `${HOME}/.naget-agent`, '/tmp']);
 /** The list as the sidebar has it: newest first. */
-const group = (list: SessionSummary[], o: { byFolder?: boolean; spaces?: SpaceView[] } = {}) =>
+const group = (list: SessionSummary[], o: { byFolder?: boolean; spaces?: SpaceView[]; origins?: Record<string, FolderOrigin[]> } = {}) =>
   groupSessions(
     [...list].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
-    { now, byFolder: o.byFolder ?? true, spaces: o.spaces ?? [], unpicked },
+    { now, byFolder: o.byFolder ?? true, spaces: o.spaces ?? [], unpicked, origins: o.origins },
   );
 const shape = (gs: SessionGroup[]) => gs.map((g) => `${g.label}: ${g.items.map((s) => s.title).join(', ')}`);
 
@@ -229,7 +230,7 @@ test('ChatGPT projects\' folders (named by an id) get no group, unless Codex nam
   assert.equal(gs.filter((g) => g.kind === 'day').flatMap((g) => g.items).length, 2, 'the unnamed ChatGPT project\'s sessions go by day');
 });
 
-test('a folder none of whose sessions Hydor started says where they came from, by agent and account; one it started in does not', () => {
+test('a folder whose first session was started outside Hydor says where its sessions came from, by agent and account', () => {
   n = 0;
   const gs = group([
     // Codex in VS Code and a terminal, and Claude Code in its desktop app under an added account.
@@ -239,10 +240,10 @@ test('a folder none of whose sessions Hydor started says where they came from, b
     ses(`${HOME}/code/shop`, 4 * H, { source: 'claude-desktop', account: 'work' }),
     // A sub-agent's thread counts for its parent.
     ses(`${HOME}/code/shop`, 5 * H, { agent: 'codex', source: 'subagent' }),
-    // One session started here: the folder is Hydor's too.
+    // Begun in Hydor, then worked on from a terminal too: Hydor's.
     ses(`${HOME}/code/blog`, 6 * H, { source: 'cli' }),
     ses(`${HOME}/code/blog`, 7 * H, { source: 'sdk-cli', createdByApp: true }),
-    // Started here, and active now, so outside the folder's group: it still counts.
+    // Begun in VS Code, then worked on from Hydor (now, so it is in Active): from VS Code still.
     ses(`${HOME}/code/notes`, 1000, { createdByApp: true }),
     ses(`${HOME}/code/notes`, 8 * H, { source: 'claude-vscode' }),
     ses(`${HOME}/code/notes`, 9 * H, { source: 'claude-vscode' }),
@@ -256,13 +257,43 @@ test('a folder none of whose sessions Hydor started says where they came from, b
     { agent: 'claude', account: 'work', sessions: 1, apps: ['Claude desktop'] },
   ]);
   assert.equal(at('blog').from, undefined);
-  assert.equal(at('notes').from, undefined);
+  assert.deepEqual(at('notes').from, [{ agent: 'claude', account: undefined, sessions: 2, apps: ['VS Code'] }]);
   assert.deepEqual(at('old').from, [{ agent: 'claude', account: undefined, sessions: 2, apps: [] }]);
   // A space is Hydor's own.
   n = 0;
   const sp = group([ses(`${HOME}/code/x`, H, { extra: { space: 's1' } }), ses(`${HOME}/code/x`, 2 * H, { extra: { space: 's1' } })], { spaces: [space('s1', 'Shop')] });
   assert.equal(sp[0].kind, 'space');
   assert.equal(sp[0].from, undefined);
+});
+
+test('the server, which knows the sessions the list has not loaded, says where a folder began; the list decides for one it did not know', () => {
+  n = 0;
+  const list = [
+    ses(`${HOME}/code/shop`, 1 * H, { agent: 'codex', source: 'vscode' }),
+    ses(`${HOME}/code/shop`, 2 * H, { agent: 'codex', source: 'vscode' }),
+    ses(`${HOME}/code/blog`, 3 * H, { createdByApp: true }),
+    ses(`${HOME}/code/blog`, 4 * H, { createdByApp: true }),
+    ses(`${HOME}/code/new`, 5 * H, { source: 'cli' }),
+    ses(`${HOME}/code/new`, 6 * H, { source: 'cli' }),
+  ];
+  const gs = group(list, {
+    origins: {
+      // Its first session, long ago, was started in Hydor.
+      [`${HOME}/code/shop`]: [],
+      // Begun in Codex: VS Code most, and codex exec; Claude Code's desktop app's names collapse into one.
+      [`${HOME}/code/blog`]: [
+        { agent: 'codex', sources: ['vscode', 'exec'], sessions: 9 },
+        { agent: 'claude', account: 'work', sources: ['sdk-cli', 'sdk-ts'], sessions: 2 },
+      ],
+    },
+  });
+  const at = (dir: string) => gs.find((g) => g.path === `${HOME}/code/${dir}`)!;
+  assert.equal(at('shop').from, undefined);
+  assert.deepEqual(at('blog').from, [
+    { agent: 'codex', account: undefined, sessions: 9, apps: ['VS Code', 'codex exec'] },
+    { agent: 'claude', account: 'work', sessions: 2, apps: ['Another app'] },
+  ]);
+  assert.deepEqual(at('new').from, [{ agent: 'claude', account: undefined, sessions: 2, apps: ['Terminal'] }]);
 });
 
 test('with grouping off, everything but active, pinned and snoozed goes by day, as before', () => {

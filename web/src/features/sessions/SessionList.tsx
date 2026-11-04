@@ -596,9 +596,9 @@ function sourceLines(from: FolderSource[], accounts?: AgentAccount[]) {
 
 /**
  * A space's or a folder's heading: it folds the group away, and drags it to another place among them; its pen starts
- * a new session there, and its ⋯ (or a right-click, or a double-click on the name) renames it. A folder whose sessions
- * were all started outside Hydor shows the marks of the agents they came from after its name, and its tooltip and ⋯
- * say where they were started.
+ * a new session there, and its ⋯ (or a right-click, or a double-click on the name) renames it. A folder whose work
+ * began outside Hydor shows the marks of the agents its sessions came from after its name, and its tooltip and ⋯ say
+ * which apps they were started in.
  */
 function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGroup; folded: boolean; home?: string; onFold?: () => void; handle?: PlaceHandle; lifted?: boolean }) {
   const unread = folded && g.items.some(unreadOf);
@@ -777,6 +777,8 @@ export function SessionList({ query }: { query: string }) {
   const unpicked = useMemo(() => unpickedFolders(home, defaultCwd, autoFolders), [home, defaultCwd, autoFolders]);
   // Names for folders: yours (kept for every device) over Codex projects'.
   const codexNames = useApp((s) => s.boot?.folderNames);
+  // Where each folder's work began, from the server, which knows sessions the list has not loaded.
+  const origins = useApp((s) => s.boot?.folderOrigins);
   const myNames = useFolderNames((s) => s.mine);
   const folderNames = useMemo(() => namedFolders(myNames), [myNames, codexNames]);
   const [, redraw] = useState(0);
@@ -787,7 +789,7 @@ export function SessionList({ query }: { query: string }) {
   const groups = useMemo(() => {
     const listed = order.map((k) => byKey[k]).filter((s): s is SessionSummary => !!s && !s.archived && shown(s) && !nest.under.has(s.key));
     // The list showing one space: its sessions go by day.
-    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places, names: folderNames });
+    const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places, names: folderNames, origins });
     const snz = out.find((g) => g.kind === 'snoozed');
     if (snz) snz.items.sort((a, b) => (a.snoozedUntil ?? 0) - (b.snoozedUntil ?? 0));
     const act = out.find((g) => g.kind === 'active');
@@ -797,7 +799,7 @@ export function SessionList({ query }: { query: string }) {
     if (pin) pin.items = byManualOrder(pin.items, (l) => l);
     for (const g of out) g.keys = g.items.map((s) => s.key);
     return out;
-  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames]);
+  }, [byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames, origins]);
 
   // Move sessions out of Active even when no new session events arrive.
   useEffect(() => {

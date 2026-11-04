@@ -68,6 +68,7 @@ import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
 import { codexFolderNames } from './codex-projects.ts';
+import { folderOrigins } from './sidebar/origins.ts';
 
 ensureDirs();
 ensureProbeDir();
@@ -249,6 +250,8 @@ app.get('/api/bootstrap', async () => ({
   autoFolders: [...new Set([...madeRoots(), DEFAULT_TASK_ROOT, config.dataDir, os.tmpdir(), '/tmp'].map((r) => r.replace(/\/+$/, '')))],
   // Names for folders Codex keeps projects in (its ChatGPT projects' folders are named only by an id).
   folderNames: codexFolderNames(),
+  // Where each folder's work began: the sidebar marks those that began outside Hydor with where their sessions came from.
+  folderOrigins: folderOrigins(db),
   prefs: { claude: sessions.defaults('claude'), codex: sessions.defaults('codex') },
   start: startSettings(db),
   indexing: indexer.progress,
