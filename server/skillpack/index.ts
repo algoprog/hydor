@@ -4,7 +4,8 @@
 // Codex and Custom all get the library when they start (library.ts); a session in a space gets the
 // space's own skills with it (spaceSkills.ts), and a proposal there can be kept for the space alone.
 // Custom also gets a short rule on using skills, and the text of any skill whose keywords the user's
-// message uses, before each turn.
+// message uses, before each turn. Every agent starting a new session also hears which skills fit its first
+// message, found by words and meaning (match.ts), unless that is turned off.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +16,8 @@ import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
-import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
+import type { Deps, Feature, RunCtx, RunTool, SpawnInfo } from '../features/types.ts';
+import { requestVector } from '../memory/embed.ts';
 import { addNote, notesOf } from '../notes.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { spaceOfSession } from '../spaces/index.ts';
@@ -24,9 +26,38 @@ import { announce, decide, getProposal, history, libraryView, noteUse, pendingPr
 import { spaceSkillDoc, spaceSkillsView, spaceSkillText, spaceView } from './spaceSkills.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { isSkillCategory, type SpaceSkillGroup } from '../../shared/skillpack.ts';
+import { matchSkills } from './match.ts';
 import { matchTriggers } from './triggers.ts';
 
 const triggersOn = (db: DB) => kvGet(db, 'skillpack.triggers') !== '0';
+/** Naming the skills that fit a new session's first message (on unless turned off). */
+const suggestOn = (db: DB) => kvGet(db, 'skillpack.suggest') !== '0';
+
+/** Custom's line of skills that fit, by session: its instructions are made afresh for each turn (customContext). */
+const fitting = new Map<string, string>();
+
+const isCustom = (s: { agent: string; acpAgent?: string }) => s.agent === 'acp' && s.acpAgent === CONSOLE_ID;
+
+/**
+ * The skills that fit a new session's first message (match.ts), as a few lines for the instructions its agent starts
+ * with, saying how that agent loads one. None for a session that goes on, an app's run, or with suggesting turned off.
+ */
+async function fitLines(s: SpawnInfo, d: Deps, view: string): Promise<string | null> {
+  const ask = s.prompt?.trim();
+  if (s.resume || !ask || !suggestOn(d.db) || (s.extra.app && typeof s.extra.app === 'object')) return null;
+  const found = await matchSkills(d.db, visibleSkills(s.cwd, path.join(view, 'skills')), ask, { vector: await requestVector(d.db, ask) });
+  if (!found.length) return null;
+  const how = s.agent === 'claude' ? 'load it with the Skill tool' : isCustom(s) ? 'load it with the skill tool' : 'read its SKILL.md';
+  const paths = s.agent !== 'claude' && !isCustom(s);
+  const short = (t: string) => {
+    const x = t.replace(/\s+/g, ' ').trim();
+    return x.length > 200 ? `${x.slice(0, 199).trimEnd()}…` : x;
+  };
+  return [
+    `Skills that fit this task, found by its first message: when one does, ${how} before you start, and follow it; if none does, carry on.`,
+    ...found.map(({ skill: k }) => `- ${k.name}: ${short(k.description)}${paths ? ` (${k.file})` : ''}`),
+  ].join('\n');
+}
 
 /** The skills the user turned off, as kept. */
 function loadOff(db: DB) {
@@ -249,7 +280,8 @@ async function customContext(s: { key: string; cwd: string; extra: SessionExtra 
   const where = spaceOfSession(d.db, s.extra);
   const view = where ? spaceViewOf(where) : null;
   const skills = view ? path.join(view, 'skills') : undefined;
-  if (!triggersOn(d.db)) return RULE;
+  const rule = fitting.has(s.key) ? `${RULE}\n\n${fitting.get(s.key)}` : RULE;
+  if (!triggersOn(d.db)) return rule;
   const ask = await latestAsk(d, s.key);
   const st = active.get(s.key) ?? { prompt: '', skills: [] };
   if (ask && ask.id !== st.prompt) {
@@ -267,7 +299,7 @@ async function customContext(s: { key: string; cwd: string; extra: SessionExtra 
     }
     active.set(s.key, st);
   }
-  if (!st.skills.length) return RULE;
+  if (!st.skills.length) return rule;
   const visible = new Map(visibleSkills(s.cwd, skills).map((x) => [x.name, x]));
   let room = budget(d, s.key);
   const parts: string[] = [];
@@ -284,8 +316,8 @@ async function customContext(s: { key: string; cwd: string; extra: SessionExtra 
     room -= cut.length;
     parts.push(`<skill name="${a.name}" folder="${path.dirname(sk.file)}">\n${cut}\n</skill>`);
   }
-  if (!parts.length) return RULE;
-  return [RULE, '', 'Skills loaded for this conversation because the user’s words call for them (follow them where they fit the task; their folders hold any files they mention):', ...parts].join('\n');
+  if (!parts.length) return rule;
+  return [rule, '', 'Skills loaded for this conversation because the user’s words call for them (follow them where they fit the task; their folders hold any files they mention):', ...parts].join('\n');
 }
 
 // ---- the feature ---------------------------------------------------------------------------------
@@ -299,7 +331,7 @@ export const skillpack: Feature = {
     const changed = () => d.broadcast({ t: 'feature', id: 'skillpack', data: { library: true } });
     app.get('/api/skillpack', async () => {
       freshView();
-      return { skills: libraryView(db), pending: pendingProposals(db), removed: removedSkills(db), triggers: triggersOn(db), folders: { ...folders(), view: viewSkills() }, spaces: spaceGroups(db) };
+      return { skills: libraryView(db), pending: pendingProposals(db), removed: removedSkills(db), triggers: triggersOn(db), suggest: suggestOn(db), folders: { ...folders(), view: viewSkills() }, spaces: spaceGroups(db) };
     });
     // A skill the user writes: name, when to use it, the instructions (or a whole SKILL.md as text).
     app.post('/api/skillpack/skills', async (req) => {
@@ -370,7 +402,8 @@ export const skillpack: Feature = {
     });
     app.put('/api/skillpack/settings', async (req) => {
       if (typeof body(req).triggers === 'boolean') kvSet(db, 'skillpack.triggers', body(req).triggers ? '1' : '0');
-      return { triggers: triggersOn(db) };
+      if (typeof body(req).suggest === 'boolean') kvSet(db, 'skillpack.suggest', body(req).suggest ? '1' : '0');
+      return { triggers: triggersOn(db), suggest: suggestOn(db) };
     });
     // Proposals from agents: the card asks, the answer goes back to the agent.
     app.get('/api/skillpack/proposals/:id', async (req) => ({ proposal: getProposal(db, param(req, 'id')) }));
@@ -383,14 +416,24 @@ export const skillpack: Feature = {
   async spawn(s, d) {
     const view = viewFor(d.db, s.extra);
     if (!view) return undefined;
+    if (s.agent === 'claude' && !(await claudeTakesPlugins())) return undefined;
+    // The skills that fit the first message, once, in what the agent starts with (Custom's, in its context).
+    const fit = await fitLines(s, d, view).catch((e) => (warnOnce(e), null));
+    const said = fit ? { instructions: [fit] } : {};
     // Claude Code: the view is a plugin for this session only. Codex: an extra folder of skills.
-    if (s.agent === 'claude') return (await claudeTakesPlugins()) ? { args: ['--plugin-dir', view] } : undefined;
-    if (s.agent === 'codex') return { skillRoots: [path.join(view, 'skills')] };
-    if (s.agent === 'acp' && s.acpAgent === CONSOLE_ID) return { env: { HYDOR_SKILL_DIRS: path.join(view, 'skills') } };
+    if (s.agent === 'claude') return { args: ['--plugin-dir', view], ...said };
+    if (s.agent === 'codex') return { skillRoots: [path.join(view, 'skills')], ...said };
+    if (isCustom(s)) {
+      if (fit && s.key) {
+        fitting.set(s.key, fit);
+        if (fitting.size > 500) fitting.delete(fitting.keys().next().value!);
+      }
+      return { env: { HYDOR_SKILL_DIRS: path.join(view, 'skills') } };
+    }
     // Other ACP agents (Gemini CLI, OpenCode…) have no skills of their own: the list, to read when one fits.
     if (s.agent === 'acp') {
       const index = skillIndex();
-      return index ? { instructions: [index] } : undefined;
+      return index || fit ? { instructions: [...(index ? [index] : []), ...(fit ? [fit] : [])] } : undefined;
     }
     return undefined;
   },

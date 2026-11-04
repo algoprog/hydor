@@ -1,9 +1,10 @@
-// Memory across sessions: what agents know about the user (global), a project (repo) and a session. Agents
-// save notes with their tools, when the user asks or they learn something lasting, and the user in
-// Settings; a note under a reply shows what the agent changed there. Agents get the notes that fit when they
-// start (Custom before each turn), those bearing on the request first: found by words, and by meaning when
-// that is on (embed.ts). Each night the helper model tidies memory up (tidy.ts), and every hour notes past
-// their end date go. Settings → Memory turns it off for all sessions, a session's menu for one.
+// Memory across sessions: what agents know about the user (global), a project (repo) and a session, and the
+// user's profile (profile.ts, a capability of its own so its block follows the user's guidelines). Agents save
+// notes with their tools, when the user asks or they learn something lasting, and the user in Settings; a note
+// under a reply shows what the agent changed there. Agents start (Custom before each turn) with the k notes that
+// bear most on the request, a top-k found by words and, when that is on, by meaning (search.ts, embed.ts), then
+// the latest (inject.ts). Each night the helper model tidies memory up (tidy.ts), and every hour notes past their
+// end date go. Settings → Memory turns it off for all sessions, a session's menu for one.
 import { CONSOLE_ID } from '../agents/acp.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { kick, watchNotes } from './embed.ts';

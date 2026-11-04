@@ -1,14 +1,15 @@
-// Memory's routes for the pages: the switches (memory, search by meaning and where it runs), every entry with
-// its history, searches, edits and end dates, notes no agent needed for long, what a topic sums up, the
-// tidy-up (run now, undo one of its changes), undoing a change from the note under a reply, export and
-// clearing all.
+// Memory's routes for the pages: the switches (memory, search by meaning and where it runs, how many notes agents
+// start with), the user's profile, every entry with its history, searches, edits and end dates, notes no agent
+// needed for long, what a topic sums up, the tidy-up (run now, undo one of its changes), undoing a change from the
+// note under a reply, export and clearing all.
 import path from 'node:path';
 import type { MemoryChange, MemoryEntry, MemoryKind, MemoryListEntry, MemoryNoteData, MemoryScope, MemoryState } from '../../shared/memory.ts';
-import { scopeName } from '../../shared/memory.ts';
+import { isUserProfile, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, scopeName, TOP_K_MAX, wordCount } from '../../shared/memory.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
 import { getNote, updateNote } from '../notes.ts';
 import { meaningState, setMeaning, type MeaningDevice } from './embed.ts';
+import { fitProfile, helperText, profileFit, saveProfile, userProfile } from './profile.ts';
 import { findNotes } from './search.ts';
 import { secretIn } from './secrets.ts';
 import {
@@ -23,13 +24,18 @@ import {
   keepEntry,
   memoryCounts,
   memoryOn,
+  PROFILE_CHARS,
+  profileWords,
   restoreEntry,
   setEnabled,
   setExpiry,
+  setProfileWords,
   setTidyOn,
+  setTopK,
   staleCount,
   staleEntries,
   tidyOn,
+  topK,
   updateEntry,
   words,
   type ChangeBy,
@@ -39,7 +45,7 @@ import { helperAsk, lastTidy, tidy, undoTidy } from './tidy.ts';
 const SCOPES: MemoryScope[] = ['global', 'repo', 'session'];
 
 /** A session's title, looked up once per request. */
-function titles(d: Deps) {
+function titles(d: Pick<Deps, 'sessions'>) {
   const seen = new Map<string, string | undefined>();
   return (key?: string) => {
     if (!key) return undefined;
@@ -48,7 +54,7 @@ function titles(d: Deps) {
   };
 }
 
-function labelled(d: Deps, list: MemoryEntry[]): MemoryListEntry[] {
+function labelled(d: Pick<Deps, 'sessions'>, list: MemoryEntry[]): MemoryListEntry[] {
   const title = titles(d);
   return list.map((e) => ({
     ...e,
@@ -93,15 +99,31 @@ function exportMarkdown(list: MemoryListEntry[]): string {
       const e0 = es[0];
       out.push('', `## ${s === 'global' ? 'About you' : s === 'repo' ? `Project: ${e0.scopeLabel} (${e0.scopeKey})` : `Session: ${e0.scopeLabel} (${e0.scopeKey})`}`, '');
       for (const e of es) {
-        const what = [e.kind !== 'note' && e.kind, `added ${day(e.createdAt)}`, e.updatedAt !== e.createdAt && `changed ${day(e.updatedAt)}`, e.expiresAt && `until ${day(e.expiresAt)}`].filter(Boolean).join(', ');
-        out.push(`- ${e.text} _(${what})_`);
+        const what = [e.kind !== 'note' && (isUserProfile(e) ? 'your profile' : e.kind), `added ${day(e.createdAt)}`, e.updatedAt !== e.createdAt && `changed ${day(e.updatedAt)}`, e.expiresAt && `until ${day(e.expiresAt)}`]
+          .filter(Boolean)
+          .join(', ');
+        // The profile's lines stay lines, under its bullet.
+        out.push(`- ${e.text.replace(/\n+/g, '\n  ')} _(${what})_`);
       }
     }
   return out.join('\n') + '\n';
 }
 
-export function memoryState(db: Deps['db']): MemoryState {
-  return { enabled: memoryOn(db), counts: memoryCounts(db), meaning: meaningState(db), tidyOn: tidyOn(db), tidy: lastTidy(db), stale: staleCount(db) };
+export function memoryState(d: Pick<Deps, 'db' | 'sessions'>): MemoryState {
+  const { db } = d;
+  const p = userProfile(db);
+  return {
+    enabled: memoryOn(db),
+    counts: memoryCounts(db),
+    profile: p ? labelled(d, [p])[0] : null,
+    profileWords: profileWords(db),
+    profileFit: profileFit(),
+    topK: topK(db),
+    meaning: meaningState(db),
+    tidyOn: tidyOn(db),
+    tidy: lastTidy(db),
+    stale: staleCount(db),
+  };
 }
 
 /** Plain matching for the deleted ones (the index only searches the active): every word, in any order. */
@@ -112,16 +134,66 @@ export function memoryRoutes(d: Deps) {
   const changed = () => d.broadcast({ t: 'feature', id: 'memory', data: { changed: true } });
   // Who did it says enough for your own changes; only an undo says more.
   const byUser = (why?: string): ChangeBy => ({ source: 'user', why });
+  /** The user's profile is one: an earlier version brought back takes the place of the one there was. */
+  const oneProfile = (id: number) => {
+    const e = getEntry(db, id);
+    if (!e || !isUserProfile(e) || e.status !== 'active') return;
+    for (const other of entries(db, { scope: 'global', scopeKey: '', kinds: ['profile'] })) if (other.id !== id) deleteEntry(db, other.id, byUser('An earlier version was brought back'));
+  };
 
-  app.get('/api/memory', async () => memoryState(db));
+  app.get('/api/memory', async () => memoryState(d));
   app.put('/api/memory', async (req) => {
-    const b = (req.body ?? {}) as { enabled?: unknown; meaning?: unknown; device?: unknown; retry?: unknown; tidy?: unknown };
+    const b = (req.body ?? {}) as { enabled?: unknown; meaning?: unknown; device?: unknown; retry?: unknown; tidy?: unknown; topK?: unknown; profileWords?: unknown };
+    if (b.topK !== undefined) {
+      const k = Number(b.topK);
+      if (!Number.isInteger(k) || k < 1 || k > TOP_K_MAX) throw new HttpError(400, `The number of notes should be from 1 to ${TOP_K_MAX}`);
+      setTopK(db, k);
+    }
+    if (b.profileWords !== undefined) {
+      const n = Number(b.profileWords);
+      if (!Number.isInteger(n) || n < PROFILE_WORDS_MIN || n > PROFILE_WORDS_MAX) throw new HttpError(400, `The profile's length should be from ${PROFILE_WORDS_MIN} to ${PROFILE_WORDS_MAX} words`);
+      setProfileWords(db, n);
+      // Fewer words than the profile has: the helper shortens it to fit.
+      fitProfile(db, helperText(db), changed);
+    }
     if (typeof b.enabled === 'boolean') setEnabled(db, b.enabled);
     if (typeof b.tidy === 'boolean') setTidyOn(db, b.tidy);
     const device = b.device === 'cpu' || b.device === 'auto' ? (b.device as MeaningDevice) : undefined;
     if (typeof b.meaning === 'boolean' || device || b.retry === true) setMeaning(db, { on: typeof b.meaning === 'boolean' ? b.meaning : undefined, device, retry: b.retry === true });
     changed();
-    return memoryState(db);
+    return memoryState(d);
+  });
+
+  /** The user's profile: every agent gets it while memory is on. */
+  app.get('/api/memory/profile', async () => {
+    const p = userProfile(db);
+    return { profile: p ? labelled(d, [p])[0] : null, maxWords: profileWords(db) };
+  });
+
+  /**
+   * Writes the profile as the user; empty text clears it (it stays among the deleted notes for 30 days). Longer than its
+   * words, it is kept as written and the helper shortens it to fit, in the background (`fitting`).
+   */
+  app.put('/api/memory/profile', async (req) => {
+    const raw = (req.body as { text?: unknown } | undefined)?.text;
+    if (typeof raw !== 'string') throw new HttpError(400, 'text should be the profile, or empty to clear it');
+    const text = raw.trim();
+    if (text.length > PROFILE_CHARS) throw new HttpError(400, `That is too long for a profile: at most ${PROFILE_CHARS.toLocaleString('en')} characters`);
+    if (text) {
+      const secret = secretIn(text);
+      if (secret) throw new HttpError(400, `That seems to hold ${secret}: secrets are never kept in memory`);
+    }
+    const r = saveProfile(db, text, byUser());
+    const fitting = fitProfile(db, helperText(db), changed);
+    if (r.changed || fitting) changed();
+    return { profile: r.profile ? labelled(d, [r.profile])[0] : null, maxWords: profileWords(db), fitting };
+  });
+
+  /** Shortens the profile to fit its words now (after the helper could not): false when it fits already. */
+  app.post('/api/memory/profile/fit', async () => {
+    const started = fitProfile(db, helperText(db), changed);
+    if (started) changed();
+    return { started };
   });
 
   /** Entries: all of them, a search, one place, one kind, deleted ones, the ones no agent needed for long (`stale=1`), or some by id. */
@@ -167,8 +239,10 @@ export function memoryRoutes(d: Deps) {
     if (!cur) throw new HttpError(404, 'That entry is gone');
     if (b.text !== undefined) {
       const text = checkText(b.text);
-      if (cur.status === 'deleted') restoreEntry(db, id, byUser(), text);
-      else updateEntry(db, id, text, byUser());
+      if (cur.status === 'deleted') {
+        restoreEntry(db, id, byUser(), text);
+        oneProfile(id);
+      } else updateEntry(db, id, text, byUser());
     }
     if (b.expiresAt !== undefined) setExpiry(db, id, checkExpiry(b.expiresAt), byUser());
     changed();
@@ -187,6 +261,7 @@ export function memoryRoutes(d: Deps) {
   app.post('/api/memory/entries/:id/restore', async (req) => {
     const id = idOf((req.params as { id: string }).id);
     if (!restoreEntry(db, id, byUser())) throw new HttpError(404, 'That entry is not deleted');
+    oneProfile(id);
     changed();
     return { entry: labelled(d, [getEntry(db, id)!])[0] };
   });
@@ -244,11 +319,16 @@ export function memoryRoutes(d: Deps) {
       if (cur) deleteEntry(db, c.entry, by);
     } else if (c.action === 'updated') {
       if (!cur) throw new HttpError(404, 'That entry is gone');
-      if (cur.status === 'deleted') restoreEntry(db, c.entry, by, c.before);
-      else updateEntry(db, c.entry, c.before ?? cur.text, by);
+      if (cur.status === 'deleted') {
+        restoreEntry(db, c.entry, by, c.before);
+        oneProfile(c.entry);
+      } else updateEntry(db, c.entry, c.before ?? cur.text, by);
     } else if (c.action === 'expiry') {
       if (cur) setExpiry(db, c.entry, c.expiredBefore ?? null, by);
-    } else if (cur) restoreEntry(db, c.entry, by);
+    } else if (cur) {
+      restoreEntry(db, c.entry, by);
+      oneProfile(c.entry);
+    }
     const next: MemoryNoteData = { ...data, changes: data.changes.map((x, j) => (j === i ? { ...x, undone: true } : x)) };
     changed();
     return { note: updateNote(db, note.id, next) };

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArchiveRestore, Brain, ChevronRight, MoreHorizontal, Pencil, Settings2, Trash2, Undo2 } from 'lucide-react';
 import type { SessionNote } from '@shared/features';
-import { changeSummary, type MemoryChange, type MemoryEntry, type MemoryNoteData } from '@shared/memory';
+import { changeSummary, isUserProfile, type MemoryChange, type MemoryEntry, type MemoryNoteData } from '@shared/memory';
 import { cx, IconButton, MenuItem, Popover } from '../../components/ui';
 import { del, enc, patch, post } from '../../lib/api';
 import { go } from '../../lib/nav';
@@ -140,12 +140,14 @@ function ChangeRow({ row, entry, here, reload }: { row: Row; entry?: MemoryEntry
     for (const s of [...steps].reverse()) if (!s.c.undone) await post(`/api/memory/notes/${enc(s.noteId)}/undo`, { index: s.index });
   };
   const struck = gone && !c.undone && c.action !== 'deleted';
+  // Your profile is edited, and cleared, in Settings → Memory: there it has room for its lines.
+  const profile = isUserProfile(c);
   return (
     <div className={cx('px-4 py-2.5', c.undone && 'opacity-60')}>
       <div className="flex min-h-7 items-center gap-2">
         <ChangeBadge c={c} />
         <span className="min-w-0 truncate text-[12px] text-fg-3">
-          {placeName(c.scope, c.scopeKey, here)}
+          {profile ? 'Your profile' : placeName(c.scope, c.scopeKey, here)}
           {c.source === 'agent' && ' · saved by the agent'}
           {steps.length > 1 && ` · ${steps.length} changes`}
         </span>
@@ -156,11 +158,11 @@ function ChangeRow({ row, entry, here, reload }: { row: Row; entry?: MemoryEntry
               <Undo2 size={14} />
             </IconButton>
             {active && (
-              <IconButton size="sm" label="Edit" onClick={() => setEditing(true)}>
+              <IconButton size="sm" label="Edit" onClick={() => (profile ? go('/settings?s=memory&find=Your%20profile') : setEditing(true))}>
                 <Pencil size={14} />
               </IconButton>
             )}
-            {active && (
+            {active && !profile && (
               <IconButton size="sm" label="Delete" onClick={() => act(del(`/api/memory/entries/${c.entry}`))}>
                 <Trash2 size={14} />
               </IconButton>
@@ -187,7 +189,7 @@ function ChangeRow({ row, entry, here, reload }: { row: Row; entry?: MemoryEntry
         </div>
       ) : (
         <div className="mt-1 text-[13.5px] leading-snug break-words">
-          <div translate="no">
+          <div translate="no" className={profile ? 'whitespace-pre-line' : undefined}>
             {struck ? (
               <div className="text-fg-3 line-through decoration-fg-3/60">{c.after}</div>
             ) : c.before && c.after ? (

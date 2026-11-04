@@ -1,8 +1,9 @@
 // Checks for the skill library, run as a script (no test framework): the bundled skills' frontmatter,
 // discovery (the bundled, learned and project folders, through the view every agent reads), keyword
 // triggers and Custom's instructions, recognising a skill being loaded, the secret and steering scan,
-// a proposal's round trip (proposed, approved or dismissed, saved with its diff and history), and
-// proposals in a space (kept for the space alone, or changing one of its own skills).
+// a proposal's round trip (proposed, approved or dismissed, saved with its diff and history), proposals
+// in a space (kept for the space alone, or changing one of its own skills), and the skills named to a new
+// session as fitting its first message (by words, and by meaning with made-up vectors).
 //
 //   OUTDIR=dist/skill-tests node scripts/build-server.mjs server/skillpack/tests.ts
 //   DATA_DIR=/tmp/hydor-skill-tests node dist/skill-tests/tests.js
@@ -30,6 +31,10 @@ import { history, libraryView, propose } from './proposals.ts';
 import { scanSkill, secretsMessage } from './scan.ts';
 import { spaceSkillsDir, spaceSkillText } from './spaceSkills.ts';
 import { matchTriggers, triggerPattern } from './triggers.ts';
+import { hashOf, setShippedForTests, shippedVectors } from '../find/index.ts';
+import { skillItemText } from '../find/sources.ts';
+import { codebookForTests, DIM, quantize, setCodebookForTests } from '../memory/vectors.ts';
+import { matchSkills, SKILL_SIM } from './match.ts';
 
 let passed = 0;
 const failures: string[] = [];
@@ -286,6 +291,73 @@ await test("Custom's instructions: the routing rule, the triggered skill's text,
   say('u5', 'Please research folding bikes for a small flat');
   assert.doesNotMatch(String(await skillpack.context!({ key, cwd: root, extra: {} }, deps)), /<skill /, 'off in Settings');
   await app.inject({ method: 'PUT', url: '/api/skillpack/settings', payload: { triggers: true } });
+});
+
+console.log('skills that fit');
+
+await test('a new session hears the skills that fit its first message, once, as each agent loads them', async () => {
+  const base = { cwd: root, runId: 'r', resume: false, extra: {} };
+  const docker = 'Set up a Dockerfile and a compose file for my node app';
+  const said = (await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker }, deps))?.instructions?.join('\n') ?? '';
+  assert.match(said, /^Skills that fit this task, found by its first message: when one does, load it with the Skill tool before you start, and follow it; if none does, carry on\./);
+  assert.match(said, /\n- docker: Use when/);
+  assert.doesNotMatch(said, /SKILL\.md/, 'Claude Code loads them by name');
+  const codex = (await skillpack.spawn!({ ...base, agent: 'codex', prompt: docker }, deps))?.instructions?.join('\n') ?? '';
+  assert.match(codex, /read its SKILL\.md before you start/);
+  assert.ok(codex.includes(path.join(viewSkills(), 'docker', 'SKILL.md')), 'with the file to read');
+  for (const prompt of ['thanks!', 'What is the capital of Australia and how many people live there?', 'Fix the typo in the README heading', undefined])
+    assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt }, deps))?.instructions, undefined, String(prompt));
+  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', resume: true, prompt: docker }, deps))?.instructions, undefined, 'not for a session that goes on');
+  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker, extra: { app: { run: 'x' } } }, deps))?.instructions, undefined, 'not for an app’s run');
+  // Custom: in the instructions made for each of its turns, from its first message.
+  const key = 'acp:fit';
+  await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'console', key, prompt: 'Help me prepare for my job interview at a bank next week' }, deps);
+  assert.match(String(await skillpack.context!({ key, cwd: root, extra: {} }, deps)), /load it with the skill tool before you start[\s\S]*\n- job-interviews: /);
+  // Off in Settings → Skills.
+  assert.equal((await app.inject({ method: 'GET', url: '/api/skillpack' })).json().suggest, true, 'on unless turned off');
+  await app.inject({ method: 'PUT', url: '/api/skillpack/settings', payload: { suggest: false } });
+  assert.equal((await app.inject({ method: 'GET', url: '/api/skillpack' })).json().suggest, false);
+  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker }, deps))?.instructions, undefined);
+  await app.inject({ method: 'PUT', url: '/api/skillpack/settings', payload: { suggest: true } });
+});
+
+await test('by meaning, only the closest skill and only when alike enough; by words, only a clear lead', async () => {
+  // Made-up unit vectors: a seeded random direction for each skill, and requests near one of them or near none.
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648), seed / 2147483648 - 0.5);
+  const unit = (v: number[]) => {
+    const n = Math.hypot(...v);
+    return Float32Array.from(v, (x) => x / n);
+  };
+  const dir = () => unit(Array.from({ length: DIM }, rnd));
+  // Two made-up skills among the library's (words are weighed against all of them, as in use).
+  const list = [
+    { name: 'tide-tables', description: 'Use when reading tide tables.', triggers: [] as string[] },
+    { name: 'kite-repair', description: 'Use when mending a kite.', triggers: [] as string[] },
+    ...librarySkills().map((x) => ({ name: x.name, description: x.description, triggers: x.triggers })),
+  ];
+  const [a, b] = [dir(), dir()];
+  // Levels spread evenly suit made-up vectors (the model's own codebook is fitted to its vectors).
+  const levels = codebookForTests();
+  setCodebookForTests(new Float32Array(DIM * 16).map((_, i) => -0.12 + ((i % 16) * 0.24) / 15));
+  const was = shippedVectors();
+  setShippedForTests(new Map([[hashOf(skillItemText(list[0].name, list[0].description)), quantize(a)], [hashOf(skillItemText(list[1].name, list[1].description)), quantize(b)]]));
+  try {
+    const ask = 'please handle the quarterly thing today';
+    const near = unit(Array.from(a, (x, i) => x + 0.6 * b[i]));
+    const found = await matchSkills(db, list, ask, { vector: near });
+    assert.deepEqual(found.map((f) => f.skill.name), ['tide-tables'], 'the closest only');
+    assert.ok((found[0].meaning ?? 0) >= SKILL_SIM);
+    assert.deepEqual(await matchSkills(db, list, ask, { vector: dir() }), [], 'none alike enough');
+    assert.deepEqual(await matchSkills(db, list, 'hi there', { vector: a }), [], 'none for a short message');
+    // Words alone: a clear lead of two or more of the request's words.
+    const byWords = await matchSkills(db, list, 'my kite needs repair after the storm', { vector: null });
+    assert.deepEqual(byWords.map((f) => f.skill.name), ['kite-repair'], JSON.stringify(byWords.map((f) => [f.skill.name, f.words])));
+    assert.deepEqual(await matchSkills(db, list, 'my kite flew well after the storm today', { vector: null }), [], 'one word is not enough');
+  } finally {
+    setShippedForTests(was);
+    setCodebookForTests(levels);
+  }
 });
 
 console.log('skills being loaded');

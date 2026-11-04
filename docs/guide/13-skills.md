@@ -56,7 +56,7 @@ Go to **Settings → Agents → Skills** ([open it](/settings?s=skills)). On a p
 From the top, the page has:
 
 - a box with the skills agents suggested, when there are some (see [Approve, edit or dismiss a proposed skill](#approve-edit-or-dismiss-a-proposed-skill));
-- a search box, **New skill**, and the **⋯** menu: **Bring skills in by keywords**, **Your skills folder** (opens it in Files), **Get more with plugins** (opens [Settings → Plugins](/settings?s=plugins)) and **How agents get skills**;
+- a search box, **New skill**, and the **⋯** menu: **Suggest skills that fit**, **Bring skills in by keywords**, **Your skills folder** (opens it in Files), **Get more with plugins** (opens [Settings → Plugins](/settings?s=plugins)) and **How agents get skills**;
 - a row of filters: **All**, **Built in**, **Yours**, **From plugins**, **Claude Code and Codex** and **In projects**, each with how many skills it holds. Only the ones with skills show;
 - the skills, in groups by what they are for: **Ways of working**, **Writing**, **Documents**, **Research and the web**, **Planning and decisions**, **Data and numbers**, **Design and pictures**, **Coding**, **AI models** and **This app**; then **Claude Code's own**, **Codex's own**, and a group for each project with skills of its own;
 - at the bottom, your skills you removed, to bring back.
@@ -304,6 +304,14 @@ A proposal waits in three places, and an answer in any one of them shows everywh
 - Agents can improve only skills in the app's library and a project's own skills. Claude Code's and Codex's own skills are not changed this way: change those in [Settings → Skills](/settings?s=skills).
 - Answered proposals stay on their cards in old conversations for half a year.
 
+## Skills that fit a new session
+
+When a session starts with a message, its agent also hears which skills fit that message, if any clearly do: up to three, each with what it is for, and how that agent loads one (Claude Code with its Skill tool, Codex and other agents by reading its SKILL.md, Custom with its skill tool). The agent loads the one that fits before it starts, or carries on when none does. It hears this once, in the instructions it starts with, not with every message.
+
+The skills are found the way memory finds notes (see [What an agent starts with](/guide/memory#what-an-agent-starts-with)): by their words, a skill's name counting most, then its keywords and what it is for; and, with search by meaning on in [Settings → Memory](/settings?s=memory&find=Search%20by%20meaning), by what they mean, so a request in other words, or in another language, still finds its skill. Only clear matches count: by words, at least two of yours and well ahead of the rest; by meaning, the closest skill alone, when it is alike enough. Common words of a request, such as "help", "need" or "after", don't count toward a match. Small talk, short replies and requests that no skill fits get none.
+
+It is in the **⋯** menu of [Settings → Skills](/settings?s=skills&find=Suggest%20skills%20that%20fit): **Suggest skills that fit**, ticked while it is on. It is on unless you turn it off. It doesn't come with a session that goes on, or with an app's runs.
+
 ## Bring skills in by keywords
 
 Some models rarely load a skill by themselves. For them, Custom can bring a skill in when your message uses its keywords: the skill's text comes along with your message, and the agent follows it where it fits.
@@ -351,4 +359,5 @@ Write one with **New skill**, picking **Claude Code** or **Codex** under **Who g
 - "Make my own version of the research skill that always cites page numbers."
 - "Remove my skill invoice-checks", or "Bring back the skill I removed yesterday."
 - "Turn off bringing skills in by keywords for Custom."
+- "Stop suggesting skills at the start of new sessions."
 - "List Claude Code's skills for ~/projects/shop and turn off the one called deploy."

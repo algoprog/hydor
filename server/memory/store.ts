@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { MemoryEntry, MemoryHistoryRow, MemoryKind, MemoryScope, MemorySource } from '../../shared/memory.ts';
+import { PROFILE_WORDS_DEFAULT, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, TOP_K_DEFAULT, TOP_K_MAX, isUserProfile, type MemoryEntry, type MemoryHistoryRow, type MemoryKind, type MemoryScope, type MemorySource } from '../../shared/memory.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 
@@ -112,10 +112,33 @@ export function setTidyOn(db: DB, on: boolean) {
   kvSet(db, 'memory.tidy.enabled', on ? '1' : '0');
 }
 
+/** How many notes about the user and the project agents start with (k of the top-k): 1 to TOP_K_MAX. */
+export function topK(db: DB): number {
+  const k = Number(kvGet(db, 'memory.topK'));
+  return Number.isInteger(k) && k >= 1 && k <= TOP_K_MAX ? k : TOP_K_DEFAULT;
+}
+export function setTopK(db: DB, k: number) {
+  if (!Number.isInteger(k) || k < 1 || k > TOP_K_MAX) throw new Error(`The number of notes should be from 1 to ${TOP_K_MAX}`);
+  kvSet(db, 'memory.topK', String(k));
+}
+
+/** How many words the user's profile may have: PROFILE_WORDS_MIN to PROFILE_WORDS_MAX. */
+export function profileWords(db: DB): number {
+  const n = Number(kvGet(db, 'memory.profileWords'));
+  return Number.isInteger(n) && n >= PROFILE_WORDS_MIN && n <= PROFILE_WORDS_MAX ? n : PROFILE_WORDS_DEFAULT;
+}
+export function setProfileWords(db: DB, n: number) {
+  if (!Number.isInteger(n) || n < PROFILE_WORDS_MIN || n > PROFILE_WORDS_MAX) throw new Error(`The profile's length should be from ${PROFILE_WORDS_MIN} to ${PROFILE_WORDS_MAX.toLocaleString('en')} words`);
+  kvSet(db, 'memory.profileWords', String(n));
+}
+
 export function memoryCounts(db: DB, now = Date.now()): Record<MemoryScope, number> {
   memorySchema(db);
   const counts: Record<MemoryScope, number> = { global: 0, repo: 0, session: 0 };
-  const rows = db.prepare("select scope, count(*) as n from memory_entries where status = 'active' and (expires_at is null or expires_at > ?) group by scope").all(now) as { scope: MemoryScope; n: number }[];
+  // The user's profile is not counted among the notes: Settings shows it on its own.
+  const rows = db
+    .prepare("select scope, count(*) as n from memory_entries where status = 'active' and (expires_at is null or expires_at > ?) and not (scope = 'global' and kind = 'profile') group by scope")
+    .all(now) as { scope: MemoryScope; n: number }[];
   for (const r of rows) counts[r.scope] = r.n;
   return counts;
 }
@@ -244,7 +267,25 @@ export const cleanText = (t: string, max = MAX_TEXT) => {
   return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s;
 };
 
+/** Characters the user's profile is cut at, whatever its length in words: its words are counted where it is written (profile.ts, routes.ts). */
+export const PROFILE_CHARS = 40_000;
+
+/** The user's profile as stored: its lines kept (each trimmed, at most one empty line between), at most `max` characters. */
+export function cleanProfile(t: string, max = PROFILE_CHARS): string {
+  const s = t
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => l.replace(/[^\S\n]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s;
+}
+
 const maxFor = (kind: MemoryKind) => (kind === 'note' ? MAX_TEXT : MAX_SUMMARY);
+
+/** An entry's text as stored: the user's profile keeps its lines, everything else is one paragraph. */
+const clean = (e: { scope: MemoryScope; kind: MemoryKind }, text: string) => (isUserProfile(e) ? cleanProfile(text) : cleanText(text, maxFor(e.kind)));
 
 /** Told of every change to the entries, with the place when it is one (vectors.ts keeps a copy per place). */
 type Listener = (db: DB, place?: Place) => void;
@@ -276,7 +317,7 @@ export function addEntry(db: DB, e: { scope: MemoryScope; scopeKey: string; text
   memorySchema(db);
   const at = by.at ?? Date.now();
   const kind = e.kind ?? 'note';
-  const text = cleanText(e.text, maxFor(kind));
+  const text = clean({ scope: e.scope, kind }, e.text);
   const scopeKey = e.scope === 'global' ? '' : e.scopeKey;
   const id = db.transaction(() => {
     const r = db
@@ -295,7 +336,7 @@ export function updateEntry(db: DB, id: number, text: string, by: ChangeBy): { b
   const cur = getEntry(db, id);
   if (!cur) return null;
   const at = by.at ?? Date.now();
-  const next = cleanText(text, maxFor(cur.kind));
+  const next = clean(cur, text);
   if (next === cur.text) return { before: cur.text, entry: cur };
   db.transaction(() => {
     db.prepare('update memory_entries set text = ?, updated_at = ?, session = ?, turn = ?, source = ? where id = ?').run(next, at, by.session ?? null, by.turn ?? null, by.source, id);
@@ -323,7 +364,7 @@ export function restoreEntry(db: DB, id: number, by: ChangeBy, text?: string): b
   const cur = getEntry(db, id);
   if (!cur || cur.status === 'active') return false;
   const at = by.at ?? Date.now();
-  const next = text != null ? cleanText(text, maxFor(cur.kind)) : cur.text;
+  const next = text != null ? clean(cur, text) : cur.text;
   db.transaction(() => {
     db.prepare("update memory_entries set status = 'active', text = ?, updated_at = ?, expires_at = case when expires_at <= ? then null else expires_at end where id = ?").run(next, at, at, id);
     log(db, id, 'restored', null, next, by, at);

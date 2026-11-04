@@ -1,7 +1,8 @@
 // Settings → Memory: memory on or off for all sessions; search by meaning (set up on this computer, where it
-// runs, how many notes have their vectors); the nightly tidy-up (when it ran, each change it made, undoable,
-// and running it now); and every note kept so far by place (about you, each project, then the sessions'
-// together), searchable by words and meaning. Each note says who wrote it and when, how often agents needed it
+// runs, how many notes have their vectors); how many notes agents start with; the nightly tidy-up (when it ran,
+// each change it made, undoable, and running it now); your profile (every agent gets it, agents keep it current,
+// you edit it, and how many words it may have: longer, the helper shortens it); and every note kept so far by
+// place (about you, each project, then the sessions' together), searchable by words and meaning. Each note says who wrote it and when, how often agents needed it
 // and its end date; its menu edits it, dates it, shows its history or what a summary sums up, and deletes it.
 // You can add notes of your own. The notes no agent has needed for months come up to keep or delete, deleted
 // ones stay 30 days to restore, and all of them can be exported or cleared. On a phone the menus are sheets.
@@ -36,7 +37,7 @@ import {
   X,
 } from 'lucide-react';
 import type { MemoryChange, MemoryHistoryRow, MemoryListEntry, MemoryScope, MemoryState } from '@shared/memory';
-import { changeSummary } from '@shared/memory';
+import { changeSummary, isUserProfile, PROFILE_WORDS_CHOICES, TOP_K_CHOICES, wordCount } from '@shared/memory';
 import { Badge, Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, OptionRow, Popover, Section, Segmented, SheetsOnPhone, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago, tildify } from '../../lib/format';
@@ -170,6 +171,11 @@ function Switches() {
           control={<Switch on={st.enabled} label="Memory" onChange={(on) => set({ enabled: on })} />}
         />
         <Meaning st={st} set={set} />
+        <Row
+          label="Notes each agent starts with"
+          hint="Besides your profile: the notes about you and the project that bear most on what you ask, found by their words and, with search by meaning on, by what they mean; then the latest. Agents look up the rest when they need it."
+          control={<Segmented size="sm" value={String(st.topK)} options={TOP_K_CHOICES.map((k) => ({ value: String(k), label: String(k) }))} onChange={(v) => set({ topK: Number(v) })} />}
+        />
         <Row
           label="Tidy up each night"
           hint="The helper model merges notes that say the same thing and sums related ones up. It reads notes only, never conversations."
@@ -465,10 +471,12 @@ function EntryRow({ e, view, reload, inSessions }: { e: MemoryListEntry; view: V
               <div className={cx('text-[13.5px] leading-snug break-words', deleted ? 'text-fg-3 line-through decoration-fg-3/60' : 'text-fg')}>
                 {e.kind !== 'note' && (
                   <Badge tone="info" className="mr-1.5 align-[1px]">
-                    {e.kind === 'topic' ? 'Topic' : 'Profile'}
+                    {e.kind === 'topic' ? 'Topic' : isUserProfile(e) ? 'Your profile' : 'Profile'}
                   </Badge>
                 )}
-                <span translate="no">{e.text}</span>
+                <span translate="no" className={isUserProfile(e) ? 'whitespace-pre-line' : undefined}>
+                  {e.text}
+                </span>
               </div>
               <NoteFacts e={e} inSessions={inSessions} />
             </>
@@ -644,6 +652,198 @@ function AddNote({ onDone }: { onDone: (saved?: MemoryScope) => void }) {
   );
 }
 
+/**
+ * Writes the profile: lines kept (Enter starts one; Ctrl+Enter or ⌘+Enter saves, Escape cancels), its words counted
+ * against how many it may have. Longer is saved as written, and the helper shortens it to fit.
+ */
+function ProfileEditor({ text, limit, onSave, onCancel }: { text: string; limit: number; onSave: (text: string) => Promise<unknown>; onCancel: () => void }) {
+  const [v, setV] = useState(text);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
+  // Grows with its text, up to most of the screen.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight + 2, Math.round(window.innerHeight * 0.6))}px`;
+  }, [v]);
+  const n = wordCount(v);
+  const over = n > limit;
+  const save = async () => {
+    if (busy || v.trim() === text.trim()) return;
+    setBusy(true);
+    try {
+      await onSave(v.trim());
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <textarea
+        ref={ref}
+        value={v}
+        rows={6}
+        placeholder="Who you are and what you do, what you use, how you like answers, what to avoid. Say, “Data analyst in Lisbon; works in Python and SQL. Short answers, the conclusion first.”"
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onCancel();
+          else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            void save();
+          }
+        }}
+        className={cx(inputCls, 'h-auto resize-none py-2 text-[13.5px] leading-relaxed')}
+      />
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span className={cx('tnum mr-auto min-w-0 text-[12px] leading-snug', over ? 'text-warn' : 'text-fg-3')}>
+          {over ? `${n.toLocaleString(LOCALE)} of ${limit.toLocaleString(LOCALE)} words: once saved, the helper model shortens it to fit` : `${n.toLocaleString(LOCALE)} of ${limit.toLocaleString(LOCALE)} words`}
+        </span>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button size="sm" variant="primary" disabled={busy || v.trim() === text.trim()} onClick={() => void save()}>
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Your profile: what every agent gets at the start of a session, kept current by agents and by you, and how long it may be. */
+function Profile() {
+  const st = useMemoryState();
+  const [editing, setEditing] = useState(false);
+  const [history, setHistory] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const [confirm, confirmNode] = useConfirm();
+  const running = !!st?.profileFit?.running;
+  // While the helper shortens it, look again every few seconds.
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(reloadState, 3000);
+    return () => clearInterval(t);
+  }, [running]);
+  if (!st) return null;
+  const p = st.profile;
+  const limit = st.profileWords;
+  const num = (x: number) => x.toLocaleString(LOCALE);
+  const n = p ? wordCount(p.text) : 0;
+  const fit = st.profileFit;
+  const save = (text: string) =>
+    put<{ fitting: boolean }>('/api/memory/profile', { text })
+      .then((r) => {
+        setEditing(false);
+        toast(r.fitting ? `Saved. It is longer than ${num(limit)} words, so the helper model is shortening it to fit.` : 'Profile saved');
+        reloadState();
+      })
+      .catch(toastError);
+  const clear = async () => {
+    setMenu(false);
+    if (await confirm({ title: 'Clear your profile?', body: 'Agents stop getting it. It stays under Deleted notes for 30 days, to restore.', confirm: 'Clear', danger: true }))
+      put('/api/memory/profile', { text: '' })
+        .then(() => (toast('Profile cleared'), reloadState()))
+        .catch(toastError);
+  };
+  const retry = () =>
+    post('/api/memory/profile/fit')
+      .then(reloadState)
+      .catch(toastError);
+  const who = p ? SOURCE[p.source] : '';
+  return (
+    <Section
+      title="Your profile"
+      sub="Every agent gets it at the start of a session while memory is on. Agents keep it current from what you tell them, and each change shows under their reply, with undo."
+      actions={
+        !editing && (
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="secondary" icon={<Pencil size={14} />} onClick={() => (setEditing(true), setHistory(false))}>
+              {p ? 'Edit' : 'Write it'}
+            </Button>
+            {p && (
+              <>
+                <IconButton ref={menuRef} size="sm" label="Profile menu" active={menu} onClick={() => setMenu((m) => !m)}>
+                  <MoreHorizontal size={16} />
+                </IconButton>
+                <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={240} title="Your profile">
+                  <MenuItem icon={<History size={14} />} checked={history} onClick={() => (setMenu(false), setHistory((h) => !h))}>
+                    History of changes
+                  </MenuItem>
+                  <MenuSep />
+                  <MenuItem danger icon={<Trash2 size={14} />} onClick={() => void clear()}>
+                    Clear profile
+                  </MenuItem>
+                </Popover>
+              </>
+            )}
+          </div>
+        )
+      }
+    >
+      {editing ? (
+        <ProfileEditor text={p?.text ?? ''} limit={limit} onSave={save} onCancel={() => setEditing(false)} />
+      ) : p ? (
+        <div translate="no" className="max-h-[22rem] overflow-y-auto rounded-xl bg-bg-1 px-3.5 py-2.5 text-[13.5px] leading-relaxed break-words whitespace-pre-line text-fg">
+          {p.text}
+        </div>
+      ) : (
+        <p className="text-[12.5px] leading-snug text-fg-3">No profile yet. Agents start one when they learn something lasting about you, or you can write it yourself.</p>
+      )}
+      {fit?.running ? (
+        <div className="mt-2.5">
+          <Status icon={<Throbber className="mt-0.5 shrink-0" />}>{`Shortening it to fit ${num(limit)} words…`}</Status>
+        </div>
+      ) : (
+        fit?.error &&
+        n > limit && (
+          <div className="mt-2.5">
+            <Status icon={<TriangleAlert size={14} className="mt-0.5 shrink-0" />} tone="warn">
+              {`It is longer than ${num(limit)} words, and shortening it failed: ${fit.error}`}{' '}
+              <button onClick={() => void retry()} className="inline-flex items-center gap-1 font-medium text-fg-2 underline-offset-2 hover:underline">
+                <RotateCw size={12} /> Try again
+              </button>
+            </Status>
+          </div>
+        )
+      )}
+      {history && p && (
+        <Panel title="History of changes" onClose={() => setHistory(false)}>
+          <HistoryList id={p.id} />
+        </Panel>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="min-w-[180px] flex-1 text-[12px] leading-snug text-fg-3">
+          {p && (
+            <>
+              <span className={cx('tnum', n > limit && 'text-warn')}>{`${num(n)} of ${num(limit)} words`}</span>
+              {' · '}
+              <span title={when(p.updatedAt)}>{p.updatedAt !== p.createdAt ? `Changed ${ago(p.updatedAt)} by ${who}` : `Written ${ago(p.createdAt)} by ${who}`}</span>
+              {p.session && (
+                <>
+                  {' in '}
+                  <SessionLink k={p.session} title={p.sessionTitle} />
+                </>
+              )}
+            </>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2" title="The most words your profile may have. Agents keep it within this; longer, the helper model shortens it.">
+          <span className="text-[12.5px] text-fg-2">Profile length</span>
+          <Segmented size="sm" value={String(limit)} options={PROFILE_WORDS_CHOICES.map((w) => ({ value: String(w), label: num(w) }))} onChange={(v) => put('/api/memory', { profileWords: Number(v) }).then(reloadState).catch(toastError)} />
+        </div>
+      </div>
+      {confirmNode}
+    </Section>
+  );
+}
+
 /** Notes as a readable list, or as data with each note's history. */
 function ExportMenu() {
   const ref = useRef<HTMLButtonElement>(null);
@@ -699,6 +899,8 @@ function Notes() {
   const groups = useMemo(() => {
     const m = new Map<string, Group>();
     for (const e of list?.entries ?? []) {
+      // Your profile has a section of its own (a cleared one shows among the deleted, to restore).
+      if (isUserProfile(e) && e.status === 'active') continue;
       const key = e.scope === 'repo' ? e.scopeKey : '';
       const k = `${e.scope}\u0000${key}`;
       if (!m.has(k)) m.set(k, { scope: e.scope, key, entries: [] });
@@ -890,6 +1092,7 @@ export function MemorySettings() {
     <SheetsOnPhone.Provider value>
       <div className="space-y-4">
         <Switches />
+        <Profile />
         <Notes />
       </div>
     </SheetsOnPhone.Provider>

@@ -445,6 +445,15 @@ export async function seedApi(api, home, now, s) {
   await note('Run the tests with npm test; the checkout tests need TZ=UTC.', 'repo', path.join(home, 'code/shop-api'));
   await note('Prices are integers in cents: round once, at the end of a calculation.', 'repo', path.join(home, 'code/shop-api'));
   await note('Shortlist so far: Velora Ridge E5 and Urbana Climb 2; budget $2,000.', 'session', s.ebike.key);
+  // Alex's profile: what every agent gets at the start of a session (Settings → Memory → Your profile).
+  await api('PUT', '/api/memory/profile', {
+    text: [
+      'Alex: self-employed graphic designer in Portland, Maine; files taxes in Greece, amounts in EUR.',
+      'Writing a master’s thesis on how small towns use public libraries (defense in March).',
+      'Works on a MacBook Air and an iPhone; uses Figma, Notion and Google Docs.',
+      'Answers: short, in plain English, the conclusion first; metric units.',
+    ].join('\n'),
+  });
 
   // Scheduled tasks at times well away from now, so none runs while the shots are taken.
   const hourNow = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/New_York' }).format(now));

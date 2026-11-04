@@ -1,5 +1,5 @@
 // After each turn of a session the app runs, a note under the reply lists what the agent saved to memory or
-// removed from it in that turn (its remember and forget calls), each with undo. Memory is not written by
+// removed from it in that turn (its remember and forget calls, and changes to the user's profile), each with undo. Memory is not written by
 // itself after a reply: notes come from agents (when the user asks, or they learn something lasting) and
 // from the user in Settings, and the nightly tidy-up (tidy.ts) keeps them short and current.
 import { splitRunMessage } from '../../shared/automations.ts';
@@ -84,13 +84,13 @@ export function turnsAfter(items: TimelineItem[], after?: string): { turns: Turn
   return { turns: turns.filter((t) => t.user.length || (t.reply && !t.run)).slice(-MAX_TURNS), last: items[items.length - 1]?.id };
 }
 
-/** An agent's own remember and forget calls, as changes for the note. */
+/** An agent's own remember, forget and update_user_profile calls, as changes for the note. */
 function agentChanges(db: DB, rows: MemoryHistoryRow[]): MemoryChange[] {
   const out: MemoryChange[] = [];
   for (const h of rows) {
     if (h.action === 'restored' || h.action === 'expiry') continue;
     const e = entries(db, { ids: [h.entry], status: 'all' })[0];
-    if (e) out.push({ entry: h.entry, action: h.action, scope: e.scope, scopeKey: e.scopeKey, before: h.before, after: h.after, why: h.why, source: 'agent' });
+    if (e) out.push({ entry: h.entry, action: h.action, scope: e.scope, scopeKey: e.scopeKey, kind: e.kind, before: h.before, after: h.after, why: h.why, source: 'agent' });
   }
   return out;
 }

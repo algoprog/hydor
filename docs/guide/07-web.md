@@ -74,7 +74,7 @@ A note at the bottom of the page reminds you that results and pages are outside 
 
 ### When no provider can answer
 
-If every provider that is on fails, the agent is told why each one did, and asked to tell you that Settings → Search can take a key or turn on another provider. If you turn every provider off, agents can't search the web with the app's search at all.
+If every provider that is on fails, or you turned them all off, the agent is told why each one did. Claude Code and Codex then search with their own built-in web search instead (Claude Code's WebSearch, Codex's web search), for that search and the rest of the task, and cite its pages as usual: they tell you about Settings → Search only if their own search fails too. Other agents, such as Custom, have no web search of their own: they are asked to tell you that Settings → Search can take a key or turn on another provider. In a [deep research](/guide/research) the agents' own web search is off, so that every search counts against its budget: there, too, you are told what to fix.
 
 ## See what a search found
 

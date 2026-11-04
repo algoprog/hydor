@@ -49,8 +49,9 @@ the ones you start in VS Code or a terminal show up too.
 - **Things to keep**: pages, slides, documents, spreadsheets and LaTeX, edited in the app and exported to PDF,
   Word, PowerPoint or Excel; pictures, videos, music and voice-overs made through OpenRouter. All of it waits in
   your Library, by project.
-- **Memory and know-how**: agents remember you and your projects (found by meaning, on your own computer), follow
-  your Agent Guidelines, search your documents, and use more than sixty built-in skills, your own, and plugins.
+- **Memory and know-how**: agents keep a profile of you and remember your projects, starting each session with what
+  bears on your request (found by words and by meaning, on your own computer), follow your Agent Guidelines, search
+  your documents, and use more than sixty built-in skills, your own, and plugins.
 - **Work that runs by itself**: scheduled tasks, watchers and webhooks, child sessions, and goals an agent keeps
   working on until they hold.
 - **Everything around the agents**: a terminal, files, Git (one Sync button, the history as a graph, pull requests),

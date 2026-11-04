@@ -65,17 +65,22 @@ agents that speak ACP and take MCP servers.
   video whose title names it). Each search shows its results, and each reply the sources it cites: a chip with the
   site's icon and name where it cites a page (a card of its pages on hover or tap) and a Sources line under it that
   opens to a card for each page, only those cited, by the numbers the agent gave them, its list of sources no longer
-  repeated in the text. [Search providers](search-providers.md).
+  repeated in the text. When no provider can answer, Claude Code and Codex search with their own web search instead.
+  [Search providers](search-providers.md).
 - **A browser**: agents open sites, click, type and read pages, in a Chromium of their own. You watch it live
   above the message box and take over to log in, solve a check or pay, on a computer or a phone; with a sign-in
   saved in the vault, the agent signs in itself, typing the password without seeing it, on that site only. Sites
   on your own network stay off limits unless you allow one.
 - **Memory**: agents save notes about you, the project and the session when you ask or they learn something
-  lasting, some only until a date, and a chip under the reply shows what changed (undo, edit, delete). Each
-  agent starts with the notes that bear on what you asked, found by words and, once you turn it on, by meaning,
-  with LightOn's mDenseOn model on your own computer (on a GPU, or on the CPU in about 1.5 GB, only while
-  needed). Each night the helper model tidies memory up: it merges notes that say the same thing and, when
-  there are more than fit, sums related ones up in topics and a short profile; every change can be undone.
+  lasting, one fact per note written to be found again, some only until a date, and a chip under the reply shows
+  what changed (undo, edit, delete). They also keep a profile of you (who you are, what you use, how you like
+  answers) that every agent gets once, at the start of a session, after your guidelines: agents add to it only
+  when you say something lasting, you edit it in Settings, and past its length (1,000 words unless changed) the
+  helper model shortens it. Each agent starts with the notes that bear most on what you asked, 10 unless changed: a
+  top-k by hybrid search, by words (BM25) and, once you turn it on, by meaning, with LightOn's mDenseOn model on your
+  own computer (on a GPU, or on the CPU in about 1.5 GB, only while needed), then the latest. Each night the helper
+  model tidies memory up: it merges notes that say the same thing and, when there are more than fit, sums related
+  ones up in topics and, for a project, a short profile; every change can be undone.
   Settings → Memory lists every note with when it was written, changed and last needed, lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
   Agents can also look up earlier sessions.
@@ -294,7 +299,8 @@ agents that speak ACP and take MCP servers.
   Code's and Codex's own, and each project's own. A search, a row of filters and a switch on every skill; write
   your own for every agent or for one, change a built-in one (your version takes its place), remove and bring
   back. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a project,
-  for the project alone. Other ACP agents get the list of skills to read when one fits.
+  for the project alone. Other ACP agents get the list of skills to read when one fits. A new session's agent
+  hears which skills fit its first message, found by words and by meaning, when any clearly do.
 - **Plugins** for every agent (Settings → Plugins): skills, tool servers (MCP), instructions, files of their own
   and what they need (other plugins, Python and Node packages in an environment of their own, programs, files to
   download, keys from the vault), in the open Agent Plugins 1.0 format (Claude Code's layout read too). Eight come
