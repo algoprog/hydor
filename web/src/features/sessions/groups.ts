@@ -5,6 +5,7 @@
 // for its main checkout. Folders no one picked get no group, so their sessions go by day: the home folder and the default one, and
 // what is under the app's own places (task folders, apps' runs, worktrees, the temporary folder: the server's
 // autoFolders). With grouping off, or while the list shows one space, the rest all go by day.
+import { isChatgptProjectFolder } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
 import { basename, dayGroup, dirname } from '../../lib/format';
@@ -56,8 +57,6 @@ export function unpickedFolders(home?: string, defaultCwd?: string, auto?: strin
   };
 }
 
-/** A folder the Codex app made for one of your ChatGPT projects (~/.codex/.chatgpt-projects/g-p-…): named only by an id. */
-export const isChatgptProjectFolder = (dir: string) => basename(dirname(trim(dir))) === '.chatgpt-projects';
 
 /**
  * Labels for folders' groups: a folder's own name (`names` gives some another, such as a Codex project's), and two

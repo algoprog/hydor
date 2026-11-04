@@ -10794,5 +10794,13 @@
 "Show it":"Εμφάνιση αποτελέσματος",
 "Show the code":"Εμφάνιση του κώδικα",
 "Show the diagram":"Εμφάνιση του διαγράμματος",
-"This diagram could not be drawn":"Δεν ήταν δυνατό να σχεδιαστεί αυτό το διάγραμμα"
+"This diagram could not be drawn":"Δεν ήταν δυνατό να σχεδιαστεί αυτό το διάγραμμα",
+"At most {0} folders keep a name: give one back its own first":"Το πολύ {0} φάκελοι κρατούν όνομα: δώστε πρώτα σε έναν πίσω το δικό του",
+"name: at most {0} characters":"name: έως {0} χαρακτήρες",
+"name: the name to show for the folder (\"\" for its own)":"name: το όνομα που θα δείχνεται για τον φάκελο (\"\" για το δικό του)",
+"path: the folder, as a full path (/home/you/code/app)":"path: ο φάκελος, ως πλήρης διαδρομή (/home/you/code/app)",
+"Project name":"Όνομα έργου",
+"Rename folder":"Μετονομασία φακέλου",
+"The sidebar and the folder menus show this name, on every device. Leave it empty for the folder's own.":"Η πλευρική στήλη και τα μενού φακέλων δείχνουν αυτό το όνομα, σε όλες τις συσκευές. Αφήστε το κενό για το όνομα του ίδιου του φακέλου.",
+"Use the folder's own name":"Το όνομα του ίδιου του φακέλου"
 }

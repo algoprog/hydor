@@ -7,8 +7,9 @@ import type { Space, SpaceView } from '@shared/spaces';
 import { agentMode, type Assistant } from '@shared/assistants';
 import type { Agent } from '@shared/types';
 import { post } from '../../lib/api';
-import { basename, tildify } from '../../lib/format';
+import { tildify } from '../../lib/format';
 import { useApp } from '../../lib/store';
+import { folderName, useFolderNames } from '../../lib/folderNames';
 import { FolderFinder } from '../../components/FolderPicker';
 import { Popover, SettingChip, useSheets } from '../../components/ui';
 import { SpaceMark } from '../spaces/parts';
@@ -65,7 +66,8 @@ export function WorkFolderChip({
   const phone = useSheets();
   const root = tildify(st?.taskRoot ?? `${home}/Hydor`, home);
   const extras = Children.toArray(children);
-  const nameOf = (p: string) => (p === home ? '~' : basename(p) || '/');
+  useFolderNames((x) => x.mine);
+  const nameOf = (p: string) => (p === home ? '~' : folderName(p, home));
   return (
     <>
       <SettingChip

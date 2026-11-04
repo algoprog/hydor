@@ -8,6 +8,7 @@ import { api, put } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { toastError } from '../../lib/store';
 import { ownLive } from '../../lib/ws';
+import { keepFolderNames } from '../../lib/folderNames';
 
 const KEY = 'wa.sidebar.tools';
 const PLACES_KEY = 'wa.sidebar.places';
@@ -69,9 +70,10 @@ export function setPlaceOrder(places: readonly string[]) {
 
 function heard(v: unknown) {
   if (sending) return;
-  const { tools, places } = (v ?? {}) as { tools?: unknown; places?: unknown };
+  const { tools, places, names } = (v ?? {}) as { tools?: unknown; places?: unknown; names?: unknown };
   if (Array.isArray(tools)) keep(toolOrder(tools));
   if (Array.isArray(places)) keepPlaces(placeOrder(places));
+  if (names !== undefined) keepFolderNames(names);
 }
 
 let listening = false;
@@ -84,7 +86,7 @@ export function loadToolOrder() {
     else onFeatureEvent('sidebar', (e) => heard(e.data));
   }
   const at = changes;
-  api<{ tools: SidebarTool[]; places?: string[] }>('/api/sidebar')
+  api<{ tools: SidebarTool[]; places?: string[]; names?: Record<string, string> }>('/api/sidebar')
     .then((r) => at === changes && heard(r))
     .catch(() => {});
 }

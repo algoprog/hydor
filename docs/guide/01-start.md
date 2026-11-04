@@ -32,9 +32,9 @@ Under the search field is every session, in groups:
 - **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
 - **Snoozed**: at the bottom, until their time comes.
 
-Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and a session started in a project in the project's group, whatever its folder. A folder of a Codex project shows under the project's name. The folders the Codex app makes for your ChatGPT projects are named only by an id, so unless Codex knows the project's name they get no group either, and their sessions show **ChatGPT project** as their folder. Two folders of the same name show as many of the folders above them as it takes to tell them apart ("client/app", "server/app").
+Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and a session started in a project in the project's group, whatever its folder. A folder of a Codex project shows under the project's name. The folders the Codex app makes for your ChatGPT projects are named only by an id, so unless Codex knows the project's name they get no group either, and their sessions show **ChatGPT project** as their folder. Give one a name with **Rename folder** in one of its sessions' menus, and it gets a group under that name. Two folders of the same name show as many of the folders above them as it takes to tell them apart ("client/app", "server/app").
 
-Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. The pen at the end of a heading (on a computer, when you point at the heading) starts a new session in that folder or project.
+Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. The pen at the end of a heading (on a computer, when you point at the heading) starts a new session in that folder or project, and the **⋯** beside it (or a right-click on the heading) opens its menu: **Rename**, **Use the folder's own name** for a folder you renamed, and **Open the project** or **Open in Files**. To rename a group, you can also double-click its name: type the new one and press Enter (Esc leaves it as it was). A project's new name is its name everywhere; a folder's is what the app calls it, in the sidebar, under each session and in the folder menus, on every device (the folder itself keeps its name on disk). Empty the name to give a folder its own back.
 
 To list the sessions by day only, as before, untick **Group by folder or project** in the filter button's menu, or find **Group sessions by folder or project** in the search box; it switches back the same way. While the list shows one project, its sessions go by day.
 
@@ -63,7 +63,7 @@ The browser tab shows how many sessions wait on you, as in "(2) Hydor".
 
 Sessions that an agent started for parts of its job (child sessions) sit folded under it, with a line such as "3 child sessions · 1 needs you · 2 working"; click it to see them. See [Child sessions](/guide/sessions#child-sessions).
 
-Each session has a menu in the list: point at its row and click **⋯** at the end, or right-click the row (on a phone, tap its **⋯**). It holds **Rename**, **Pin** (or **Unpin**), **Snooze**, **Settle**, **Archive** and **Delete**, which asks first. Double-click a title, or press F2 on a selected row, to rename it. All of these are explained in [Rename, pin, snooze, settle, archive or delete](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
+Each session has a menu in the list: point at its row and click **⋯** at the end, or right-click the row (on a phone, tap its **⋯**). It holds **Rename**, **Rename folder** (for a session not in a project), **Pin** (or **Unpin**), **Snooze**, **Settle**, **Archive** and **Delete**, which asks first. Double-click a title, or press F2 on a selected row, to rename it. All of these are explained in [Rename, pin, snooze, settle, archive or delete](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
 
 ### The tools at the bottom
 
@@ -173,7 +173,7 @@ On an iPhone or iPad, notifications work only in the app added to the home scree
 - Tapping a session or a tool takes you there and closes the drawer. **Close menu** (the ×) closes it too.
 - Hold a session a moment to pick it up, then drag it (to reorder Active or Pinned sessions, or to pin one).
 - Hold a tool at the bottom a moment to pick it up, then drag it to another place among them.
-- The **⋯** at the end of each row opens the session's menu: **Rename**, **Pin**, **Snooze**, **Settle**, **Archive** and **Delete**, which asks first.
+- The **⋯** at the end of each row opens the session's menu: **Rename**, **Rename folder**, **Pin**, **Snooze**, **Settle**, **Archive** and **Delete**, which asks first.
 
 ### Menus open as sheets
 

@@ -10785,5 +10785,13 @@
 "Show it":"显示效果",
 "Show the code":"显示代码",
 "Show the diagram":"显示示意图",
-"This diagram could not be drawn":"无法绘制此示意图"
+"This diagram could not be drawn":"无法绘制此示意图",
+"At most {0} folders keep a name: give one back its own first":"最多只能有 {0} 个文件夹保留名称：请先让其中一个恢复本来的名称",
+"name: at most {0} characters":"name：最多 {0} 个字符",
+"name: the name to show for the folder (\"\" for its own)":"name：要为文件夹显示的名称（\"\" 表示使用其本来的名称）",
+"path: the folder, as a full path (/home/you/code/app)":"path：文件夹的完整路径（/home/you/code/app）",
+"Project name":"项目名称",
+"Rename folder":"重命名文件夹",
+"The sidebar and the folder menus show this name, on every device. Leave it empty for the folder's own.":"侧边栏和文件夹菜单会在所有设备上显示这个名称。留空则使用文件夹本来的名称。",
+"Use the folder's own name":"使用文件夹本来的名称"
 }
