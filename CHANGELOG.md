@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.24.5 · 4 November 2026
+
+The logo fills with water while the app loads, and numbers written as maths show as maths.
+
+- **While the app loads**: in a browser, and while the Mac app starts, you see the app's logo, HYDΩR, with water rising
+  in its Ω and a wave moving gently across it, where there was a blank page and a small spinner (in the Mac app, a line
+  saying Starting Hydor). The app takes its place the moment it is ready: nothing waits for the animation.
+- **The Mac app's window** opens in the app's own colours, black or light, so nothing flashes grey or white first.
+- **Numbers in maths**: numbers between paired dollar signs in a reply (`$1$`, `$0$`) are drawn as maths, while ordinary
+  prices such as $4.70 stay money.
+
 ## 0.24.4 · 4 November 2026
 
 Agents' replies show maths, diagrams, small interactive figures and pictures, and every agent knows how to use them.
