@@ -24,7 +24,7 @@ import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
 import { Wordmark } from '../../components/Logo';
 import { LoginDialog } from '../settings/SettingsPage';
 import { shortGpu } from '../settings/ModelsSettings';
-import { TourLocal, TourOpenRouter } from './TourModels';
+import { TourLocal, TourMedia, TourOpenRouter } from './TourModels';
 import { Sea, SourcesMap, TideMark, TourProgress, WelcomeFilm, type Use } from './scenes';
 import { machineBase, machineId } from '../../lib/machine';
 import { tourDone } from '../tips/state';
@@ -59,7 +59,8 @@ interface Step {
   body: ReactNode;
   /** Something to do right in the step. */
   Extra?: () => ReactNode;
-  /** A page's picture, beside its words (under them on a phone). */
+  /** A page's picture, beside its words, in the same place on every page (on a narrow screen only the welcome's, above
+   * its words). */
   scene?: (uses: Use[]) => ReactNode;
   /** A card's icon, in the app. */
   icon?: ReactNode;
@@ -186,7 +187,7 @@ function Point({ icon, title, children }: { icon: ReactNode; title: string; chil
       <span className="tour-point-icon">{icon}</span>
       <div className="min-w-0 pt-0.5">
         <div className="text-[14.5px] font-medium text-fg">{title}</div>
-        <div className="mt-0.5 text-[13.5px] leading-snug text-fg-3">{children}</div>
+        <div className="mt-0.5 text-[13.5px] leading-snug text-balance text-fg-3">{children}</div>
       </div>
     </div>
   );
@@ -278,7 +279,7 @@ function UsesPicker() {
             <span className="tour-tile-icon">{t.icon}</span>
             <span className="min-w-0 flex-1 pt-px">
               <span className="block text-[14.5px] leading-tight font-medium text-fg">{t.title}</span>
-              <span className={cx('mt-1 block text-[12.5px] leading-snug', s ? 'text-ok' : 'text-fg-3')}>{s ?? t.sub}</span>
+              <span className={cx('mt-1 block text-[12.5px] leading-snug text-balance', s ? 'text-ok' : 'text-fg-3')}>{s ?? t.sub}</span>
             </span>
             <span className="tour-tile-check" aria-hidden>
               {on && <Check size={11} strokeWidth={3} />}
@@ -355,21 +356,24 @@ function AgentsSetup() {
   // The app installs the ones published on npm by itself.
   const installs = (d: AgentDef) => !!d.hint?.startsWith('npm install');
   const rows = [...data.agents.filter((a) => !a.builtin).map((a) => ({ a, added: true })), ...data.presets.map((a) => ({ a, added: false }))];
+  const status = (a: AgentDef, added: boolean) =>
+    a.installed ? (added ? 'Ready: sign in to it once in its own program' : 'On this computer') : added ? (installs(a) ? 'Installing…' : `Install it: ${a.hint}`) : installs(a) ? 'The app installs it' : `Install it first: ${a.hint}`;
+  // Two to a row, so all of them fit the page.
   return (
-    <div className="divide-y divide-line overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-line">
+    <div className="grid gap-2 sm:grid-cols-2">
       {rows.map(({ a, added }) => (
-        <div key={a.id} className="flex items-center gap-3.5 px-4 py-3">
-          <AgentIcon agent="acp" name={a.name} size={22} />
+        <div key={a.id} className="flex min-w-0 items-center gap-3 rounded-xl bg-panel/70 px-3.5 py-2.5 ring-1 ring-line">
+          <AgentIcon agent="acp" name={a.name} size={20} />
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-medium text-fg">{a.name}</div>
-            <div className="truncate text-[12.5px] text-fg-3">
-              {a.installed ? (added ? 'Ready: sign in to it once in its own program' : 'On this computer') : added ? (installs(a) ? 'Installing…' : `Install it: ${a.hint}`) : installs(a) ? 'The app installs it' : `Install it first: ${a.hint}`}
+            <div className="truncate text-[13.5px] font-medium text-fg">{a.name}</div>
+            <div className="truncate text-[12px] text-fg-3" title={status(a, added)}>
+              {status(a, added)}
             </div>
           </div>
           {added ? (
             <Connected label="Added" />
           ) : (
-            <Button size="sm" variant={a.installed ? 'primary' : 'secondary'} className="rounded-full" icon={<Plus size={13} />} onClick={() => add(a)}>
+            <Button size="sm" variant="secondary" className="rounded-full" icon={<Plus size={13} />} onClick={() => add(a)}>
               Add
             </Button>
           )}
@@ -396,7 +400,7 @@ function NotifySetup() {
     );
   if (st === 'unsupported' || st === 'denied')
     return (
-      <div className="text-[12.5px] text-fg-3">
+      <div className="text-[12.5px] text-balance text-fg-3">
         {st === 'denied' ? 'Notifications are blocked for this site; allow them in the browser’s settings first.' : 'This browser can’t show notifications here. On an iPhone, add the app to your Home Screen first.'}
       </div>
     );
@@ -485,7 +489,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     list.push({
       id: 'welcome',
       title: 'Welcome to Hydor',
-      body: 'Your own AI helpers, called agents, that do real work on this computer: they read and write your files, search the web, make documents and pictures, and write code. Here is how it goes:',
+      body: 'AI helpers, called agents, that do real work on this computer: they read and write files, search the web, make documents and write code.',
       scene: () => (
         <div className="flex w-full flex-col items-center gap-8">
           <span className="max-lg:hidden">
@@ -498,13 +502,13 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       Extra: () => (
         <div className="grid gap-4">
           <Point icon={<MessageSquareText size={17} />} title="Ask in your own words">
-            Like “sum up the report in my Downloads folder”, or “plan a weekend in Rome”.
+            Like “sum up this report” or “plan a weekend in Rome”.
           </Point>
           <Point icon={<ListChecks size={17} />} title="Watch it work">
             Every step shows as it happens, at your desk or on your phone.
           </Point>
           <Point icon={<ShieldCheck size={17} />} title="You stay in charge">
-            It asks before anything you haven’t allowed, and you can stop it at any time.
+            It asks before anything you haven’t allowed, and stops when you say.
           </Point>
         </div>
       ),
@@ -512,7 +516,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
   list.push({
     id: 'choose',
     title: 'What should do the work?',
-    body: 'Pick one or more. If you already pay for Claude or ChatGPT, start with that one. Not sure? Pay as you go suits everyone. You can add the others later.',
+    body: 'Pick one or more, and add others later. Already pay for Claude or ChatGPT? Start with that. Not sure? Pay as you go suits everyone.',
     scene: (u) => <SourcesMap on={u} />,
     Extra: UsesPicker,
     ready: (u) => u.length > 0,
@@ -523,24 +527,33 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       title: claude && codex ? 'Sign in to your plans' : claude ? 'Sign in to Claude' : 'Sign in to ChatGPT',
       body:
         claude && codex
-          ? 'Hydor uses the plans you already pay for, so there is nothing more to pay. Sign in once to each, and they work on every device; Settings → Accounts changes them later.'
-          : 'Hydor uses the plan you already pay for, so there is nothing more to pay. Sign in once, and it works on every device; Settings → Accounts changes it later.',
+          ? 'Hydor uses the plans you already pay for, so there is nothing more to pay. Sign in once to each, and they work on every device.'
+          : 'Hydor uses the plan you already pay for, so there is nothing more to pay. Sign in once, and it works on every device.',
       scene: (u) => <SourcesMap on={u} focus={['claude', 'codex']} />,
       Extra: AccountsSetup,
     });
   if (has('openrouter'))
-    list.push({
-      id: 'openrouter',
-      title: 'Pay as you go',
-      body: 'OpenRouter is one account for AI models from every company. You add a little credit there, and pay only for what you use: often cents a task. The app’s own agent, Custom, works with these models.',
-      scene: (u) => <SourcesMap on={u} focus="openrouter" />,
-      Extra: TourOpenRouter,
-    });
+    list.push(
+      {
+        id: 'openrouter',
+        title: 'Pay as you go',
+        body: 'OpenRouter is one account for AI models from every company. Add a little credit there, and pay only for what you use: often cents a task.',
+        scene: (u) => <SourcesMap on={u} focus="openrouter" />,
+        Extra: TourOpenRouter,
+      },
+      {
+        id: 'media',
+        title: 'Pictures, music, voices and videos',
+        body: 'The same account lets any agent make these. Ask for “a logo for my bakery” or “a calm piano tune”, and see the price before it starts.',
+        scene: (u) => <SourcesMap on={u} focus="openrouter" />,
+        Extra: TourMedia,
+      },
+    );
   if (has('local'))
     list.push({
       id: 'local',
       title: 'Free AI on this computer',
-      body: 'These models run right here, so nothing you do leaves your computer, and they cost nothing to use. Here are the ones that run well on yours: pick one to install.',
+      body: 'These run right here, so nothing you do leaves your computer, and they cost nothing to use. Pick one that runs well on yours.',
       scene: (u) => <SourcesMap on={u} focus="local" />,
       Extra: TourLocal,
     });
@@ -548,7 +561,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
     list.push({
       id: 'agents',
       title: 'Other agents',
-      body: 'Agents you already use, such as Gemini CLI or Goose, work here too. Add yours: the app installs those it knows, and each asks you to sign in once in its own program.',
+      body: 'Agents you already use, such as Gemini CLI or Goose, work here too. The app installs those it knows; each asks you to sign in once.',
       scene: (u) => <SourcesMap on={u} focus="agents" />,
       Extra: AgentsSetup,
     });
@@ -561,7 +574,7 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       route: '/',
       icon: <MessageSquareText size={16} />,
       title: 'Ask for anything',
-      body: 'Write what you want done, in plain words, and press Enter: an agent gets to work. Drop in files and pictures too. Each conversation is called a session.',
+      body: 'Write what you want done and press Enter: an agent gets to work. Drop in files and pictures too. Each conversation is called a session.',
       Extra: () => <TryThese />,
     },
     {
@@ -706,11 +719,12 @@ function holePath(b: Box): string {
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
 /**
- * A setup step: the whole screen, over the app that is not there yet. Its picture on the left (on top on a phone),
- * its words on the right, starting in the same place every step; Back, the droplets and Next stay put at the foot,
- * over the sea, whose waves rise a little with each step. A long step scrolls under them. The page goes (out) as the
- * app comes in or the tour closes; a new install's first one follows the password
- * screen with no change between them.
+ * A setup step: the whole screen, over the app that is not there yet. Its picture on the left, its words on the right,
+ * each starting in the same place on every page, and all of it fits the screen (only a window too small for a page
+ * scrolls its words); on a narrow screen the words alone, but for the welcome's picture above them. Back, where the
+ * tour stands and Next stay put at the foot, over the sea, whose waves drift slowly and rise a little with each step.
+ * The page goes (out) as the app comes in or the tour closes; a new install's first one follows the password screen
+ * with no change between them.
  */
 function TourPage(p: {
   list: Step[];
@@ -732,7 +746,7 @@ function TourPage(p: {
   const phone = useIsMobile();
   const [still] = useState(p.now);
   const scroller = useRef<HTMLDivElement>(null);
-  // The words scroll above the buttons, never under them.
+  // The words stay above the buttons, never under them.
   const foot = useRef<HTMLDivElement>(null);
   const [footH, setFootH] = useState(phone ? 132 : 104);
   useLayoutEffect(() => {
@@ -785,17 +799,17 @@ function TourPage(p: {
         <X size={18} />
       </button>
       <div ref={scroller} className="tour-scroll absolute inset-x-0 top-0 overflow-y-auto overscroll-contain" style={{ bottom: footH }}>
-        <div className="tour-stage mx-auto flex min-h-full w-full max-w-[1120px] px-5 pt-[calc(var(--safe-top)+64px)] pb-10 sm:px-10 lg:items-center lg:pt-20">
-          <div key={step.id} className="flex w-full flex-col gap-7 lg:flex-row lg:items-start lg:gap-14">
-            {step.scene && <div className="tour-scene flex shrink-0 justify-center lg:sticky lg:top-8 lg:w-[400px]">{step.scene(p.uses)}</div>}
-            <div className="min-w-0 flex-1 lg:max-w-[600px]">
-              <div className="mb-3 text-[12.5px] font-medium tracking-[0.12em] text-fg-3 uppercase">{`Step ${at + 1} of ${total}`}</div>
-              <h2 id={out ? undefined : 'tour-title'} className="text-[27px] leading-[1.12] font-semibold tracking-tight text-balance text-fg sm:text-[34px]">
+        <div className="tour-stage mx-auto w-full max-w-[1060px] px-5 pt-[calc(var(--safe-top)+64px)] pb-8 sm:px-10 lg:pt-[clamp(76px,14vh,136px)]">
+          <div key={step.id} className="flex w-full flex-col gap-6 lg:flex-row lg:items-start lg:gap-16">
+            <div className={cx('tour-figure flex shrink-0 justify-center lg:w-[380px] lg:pt-1', step.id !== 'welcome' && 'max-lg:hidden')}>{step.scene?.(p.uses)}</div>
+            <div className="min-w-0 flex-1 lg:max-w-[580px]">
+              <div className="mb-2.5 text-[12px] font-medium tracking-[0.12em] text-fg-3 uppercase">{`Step ${at + 1} of ${total}`}</div>
+              <h2 id={out ? undefined : 'tour-title'} className="text-[26px] leading-[1.15] font-semibold tracking-tight text-balance text-fg sm:text-[32px]">
                 {step.title}
               </h2>
-              <div className="mt-3 max-w-[34rem] text-[15px] leading-relaxed text-pretty text-fg-2 sm:text-[16px]">{step.body}</div>
+              <div className="mt-2.5 max-w-[34rem] text-[15px] leading-relaxed text-balance text-fg-2">{step.body}</div>
               {Extra && (
-                <div className="mt-7">
+                <div className="mt-6">
                   <Extra />
                 </div>
               )}
@@ -806,14 +820,14 @@ function TourPage(p: {
       <div ref={foot} className="tour-foot absolute inset-x-0 bottom-0 z-[1]">
         {phone ? (
           <div className="px-5 pt-3 pb-[calc(var(--safe-bottom)+18px)]">
-            <div className="mb-3 flex justify-center">{where}</div>
+            <div className="mb-3.5 flex justify-center">{where}</div>
             <div className="flex items-center gap-2">
               {back}
               {next}
             </div>
           </div>
         ) : (
-          <div className="relative mx-auto flex w-full max-w-[1120px] items-center justify-between px-10 pt-5 pb-[clamp(28px,7vh,72px)]">
+          <div className="relative mx-auto flex w-full max-w-[1060px] items-center justify-between px-10 pt-4 pb-[clamp(24px,5vh,56px)]">
             {back}
             <span className="absolute left-1/2 -translate-x-1/2">{where}</span>
             {next}
@@ -1071,7 +1085,7 @@ export function Tour() {
                           {step.title}
                         </h2>
                       </div>
-                      <div className={cx('mt-2 text-[14px] leading-relaxed text-fg-2', last && 'text-center')}>{step.body}</div>
+                      <div className={cx('mt-2 text-[14px] leading-relaxed text-balance text-fg-2', last && 'text-center')}>{step.body}</div>
                       {Extra && (
                         <div className="mt-4">
                           <Extra />

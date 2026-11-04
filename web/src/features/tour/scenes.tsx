@@ -1,31 +1,33 @@
-// The welcome tour's pictures, all water: Hydor is the Greek ὕδωρ. The sea under the tour's pages, still, rising a
-// little with each step; the progress as droplets, full once passed; the welcome's short film of a request being
-// done, played once; and the map of what can do the work (Claude, ChatGPT's Codex, OpenRouter's models, this
-// computer, other agents), a line of water from each one picked to the Ω, which fills as it gets more. Little moves,
-// and only once (styles.css, "the welcome tour"); they are hidden from screen readers: the words beside them say the
-// same.
+// The welcome tour's pictures, drawn in water: Hydor is the Greek ὕδωρ. The sea under the tour's pages, its waves
+// drifting slowly and rising a little with each step; where the tour stands, as a row of small dots; the welcome's
+// short film of a request being done, played once; and what can do the work (Claude, ChatGPT's Codex, OpenRouter's
+// models, this computer, other agents) as streams flowing into a pool around the Ω, which fills as more are picked.
+// The motion is slow and quiet (styles.css, "the welcome tour"), and still for those who ask for less motion; the
+// pictures are hidden from screen readers: the words beside them say the same.
 import { useId, type CSSProperties, type ReactNode } from 'react';
 import { Blocks, Check, Cloud, Cpu, FileText, Search } from 'lucide-react';
 import { AgentIcon } from '../../components/AgentIcon';
 import { cx } from '../../components/ui';
-import { MARK_STROKE, OMEGA, TileGradient, WaterGradient } from '../../components/Logo';
+import { MARK_BOX, MARK_STROKE, OMEGA, TileGradient, WaterGradient } from '../../components/Logo';
 
 /** What someone may use: the tour sets up those picked. */
 export type Use = 'claude' | 'codex' | 'openrouter' | 'local' | 'agents';
 
 // ---- the sea -----------------------------------------------------------------------------------------------
 
-/** One wave's surface along y = 0, 1600 wide, and the water below. Its length divides 800, so moving it by 800 loops. */
+/** One wave's surface along y = 0, 1600 wide, and the water below. Its length divides 800, so moving it by its
+ * length loops without a seam. */
 const sea = (amp: number, len: number) => {
   let d = 'M0 0';
   for (let i = 0; i < Math.round(1600 / len); i++) d += ` q${+(len / 4).toFixed(2)} ${-amp} ${+(len / 2).toFixed(2)} 0 t${+(len / 2).toFixed(2)} 0`;
   return `${d} V400 H0 Z`;
 };
-const SEA_WAVES = [sea(26, 400), sea(18, 800 / 3), sea(12, 200)];
+const SEA_WAVES = [sea(22, 400), sea(15, 800 / 3), sea(10, 200)];
 
 /**
- * The sea along the bottom of the tour's pages (and the sign-in screens): three still layers of waves, a soft light on
- * the water above them, and its level, `level` from 0 (low) to 1 (high), rising a little as the tour goes on.
+ * The sea along the bottom of the tour's pages (and the sign-in screens): three layers of waves drifting slowly, a
+ * soft light on the water above them, and its level, `level` from 0 (low) to 1 (high), rising a little as the tour
+ * goes on.
  */
 export function Sea({ level = 0, className }: { level?: number; className?: string }) {
   const id = useId();
@@ -40,7 +42,7 @@ export function Sea({ level = 0, className }: { level?: number; className?: stri
           </linearGradient>
         </defs>
         {SEA_WAVES.map((d, i) => (
-          <g key={i} transform={`translate(0 ${[90, 150, 210][i]})`}>
+          <g key={i} transform={`translate(0 ${[96, 150, 204][i]})`}>
             <g className={`tour-wave tour-wave-${i + 1}`}>
               <path d={d} fill={`url(#${id}s)`} />
             </g>
@@ -51,29 +53,14 @@ export function Sea({ level = 0, className }: { level?: number; className?: stri
   );
 }
 
-// ---- progress, as droplets ------------------------------------------------------------------------------
+// ---- where the tour stands ---------------------------------------------------------------------------------
 
-const DROP = 'M6 0.8C6 0.8 1.2 6.4 1.2 9.6A4.8 4.8 0 0 0 10.8 9.6C10.8 6.4 6 0.8 6 0.8Z';
-
-/** Where the tour stands: a droplet for each step, full once passed, filling now, empty to come. */
+/** Where the tour stands: a small dot for each step, the one now drawn out a little longer. */
 export function TourProgress({ at, total, className }: { at: number; total: number; className?: string }) {
-  const id = useId();
   return (
-    <div className={cx('flex items-center gap-[5px]', className)} role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={at + 1} aria-label={`Step ${at + 1} of ${total}`}>
+    <div className={cx('tour-progress flex items-center gap-[5px]', className)} role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={at + 1} aria-label={`Step ${at + 1} of ${total}`}>
       {Array.from({ length: total }, (_, n) => (
-        <svg key={n} viewBox="0 0 12 15" width="11" height="14" className={cx('tour-drop', n < at ? 'tour-drop-full' : n === at ? 'tour-drop-now' : 'tour-drop-empty')} aria-hidden>
-          <defs>
-            <clipPath id={`${id}${n}`}>
-              <path d={DROP} />
-            </clipPath>
-          </defs>
-          <path d={DROP} className="tour-drop-shell" />
-          {n <= at && (
-            <g clipPath={`url(#${id}${n})`}>
-              <rect className="tour-drop-water" x="-2" y="0" width="16" height="16" />
-            </g>
-          )}
-        </svg>
+        <span key={n} className={cx('tour-dot', n < at && 'tour-dot-past', n === at && 'tour-dot-now')} />
       ))}
     </div>
   );
@@ -81,28 +68,53 @@ export function TourProgress({ at, total, className }: { at: number; total: numb
 
 // ---- the Ω, filling ------------------------------------------------------------------------------------
 
-/** The app's mark on its deep blue tile, the water in its Ω at `level` (0 empty to 1 full), rising to it once. */
-export function TideMark({ size = 96, level = 1 }: { size?: number; level?: number }) {
-  const id = useId();
+/** The water's surface in the Ω: a gentle wave, 1440 wide (its length, 180, loops when moved by it). */
+const SURFACE = `M-360 0 ${'q45 -14 90 0 t90 0 '.repeat(8)}V600 H-360 Z`;
+
+/** The water in an Ω at `level` (0 empty to 1 full), rising to it once, its surface moving slowly. */
+function OmegaWater({ id, level }: { id: string; level: number }) {
   // The water's top in the mark's 512 units: 420 is empty, 84 full.
   const top = 420 - 336 * Math.max(0, Math.min(1, level));
+  return (
+    <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <g className="tour-mark-level" style={{ transform: `translateY(${top}px)` }}>
+        <path className="tour-mark-surface" d={SURFACE} fill="#fff" />
+      </g>
+    </mask>
+  );
+}
+
+/** The app's mark on its deep blue tile, the water in its Ω at `level` (0 empty to 1 full). */
+export function TideMark({ size = 96, level = 1 }: { size?: number; level?: number }) {
+  const id = useId();
   return (
     <span className="tour-mark relative inline-flex shrink-0" style={{ width: size, height: size }} aria-hidden>
       <svg width={size} height={size} viewBox="0 0 512 512" className="relative text-white">
         <defs>
           <TileGradient id={`${id}t`} />
           <WaterGradient id={`${id}w`} bright />
-          <mask id={`${id}m`} maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-            <g className="tour-mark-level" style={{ transform: `translateY(${top}px)` }}>
-              <path className="tour-mark-flow" d="M-360 0 q45 -18 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 V600 H-360 Z" fill="#fff" />
-            </g>
-          </mask>
+          <OmegaWater id={`${id}m`} level={level} />
         </defs>
         <rect x="4" y="4" width="504" height="504" rx="114" fill={`url(#${id}t)`} stroke="rgba(255,255,255,0.10)" strokeWidth="8" />
         <path d={OMEGA} fill="none" stroke="currentColor" strokeWidth={MARK_STROKE} opacity={0.22} />
         <path d={OMEGA} fill="none" stroke={`url(#${id}w)`} strokeWidth={MARK_STROKE} mask={`url(#${id}m)`} />
       </svg>
     </span>
+  );
+}
+
+/** The Ω alone, without its tile, filling with water to `level`: in the pool the streams flow into. As wide as its box. */
+function PoolMark({ level }: { level: number }) {
+  const id = useId();
+  return (
+    <svg viewBox={MARK_BOX} className="tour-pool-mark block h-auto w-full" aria-hidden>
+      <defs>
+        <WaterGradient id={`${id}w`} />
+        <OmegaWater id={`${id}m`} level={level} />
+      </defs>
+      <path d={OMEGA} fill="none" stroke="currentColor" strokeWidth={MARK_STROKE} className="tour-pool-dry" />
+      <path d={OMEGA} fill="none" stroke={`url(#${id}w)`} strokeWidth={MARK_STROKE} mask={`url(#${id}m)`} />
+    </svg>
   );
 }
 
@@ -149,52 +161,61 @@ export function WelcomeFilm() {
   );
 }
 
-// ---- the map of what does the work -------------------------------------------------------------------------
+// ---- what does the work: streams into the pool ---------------------------------------------------------------
 
-const NODES: { id: Use; label: string; icon: ReactNode; angle: number }[] = [
-  { id: 'claude', label: 'Claude', icon: <AgentIcon agent="claude" size={20} />, angle: -90 },
-  { id: 'codex', label: 'ChatGPT', icon: <AgentIcon agent="codex" size={20} />, angle: -18 },
-  { id: 'openrouter', label: 'Any model', icon: <Cloud size={19} />, angle: 54 },
-  { id: 'local', label: 'This computer', icon: <Cpu size={19} />, angle: 126 },
-  { id: 'agents', label: 'Other agents', icon: <Blocks size={19} />, angle: 198 },
+const SOURCES: { id: Use; label: string; icon: ReactNode }[] = [
+  { id: 'claude', label: 'Claude', icon: <AgentIcon agent="claude" size={16} /> },
+  { id: 'codex', label: 'ChatGPT', icon: <AgentIcon agent="codex" size={16} /> },
+  { id: 'openrouter', label: 'Any model', icon: <Cloud size={15} strokeWidth={1.75} /> },
+  { id: 'local', label: 'This computer', icon: <Cpu size={15} strokeWidth={1.75} /> },
+  { id: 'agents', label: 'Other agents', icon: <Blocks size={15} strokeWidth={1.75} /> },
 ];
 
+/** The figure's drawing, in its own units: 360 wide, 300 high. */
+const FIG = { w: 360, h: 300 };
+/** Each source's row, its circle's centre and radius, and the pool's centre and radius. */
+const rowY = (i: number) => 38 + i * 56;
+const NODE = { x: 134, r: 17 };
+const POOL = { x: 286, y: 150, r: 58 };
+
+/** A stream from a source to the pool's edge: level from the source, curving in to meet the pool head-on. */
+function stream(i: number): string {
+  const y = rowY(i);
+  const x0 = NODE.x + NODE.r + 7;
+  // Where it meets the pool: spread a little up and down its near side.
+  const ey = POOL.y + (y - POOL.y) * 0.32;
+  const ex = POOL.x - Math.sqrt(POOL.r * POOL.r - (ey - POOL.y) ** 2) - 3;
+  const k = (ex - x0) * 0.5;
+  return `M${x0} ${y} C${(x0 + k).toFixed(1)} ${y} ${(ex - k * 0.7).toFixed(1)} ${ey.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+}
+
 /**
- * What can do the work, around the Ω: each one picked lights up with a line of water to the Ω, which fills as more
- * are picked; `focus` is the one a step sets up, marked more firmly.
+ * What can do the work, as streams flowing into a pool around the Ω: each one picked runs with water and the Ω fills
+ * as more are picked; those not picked stay as faint dry channels. `focus` is the one a step sets up, marked more
+ * firmly.
  */
-export function SourcesMap({ on, focus, compact }: { on: Use[]; focus?: Use | Use[]; compact?: boolean }) {
+export function SourcesMap({ on, focus }: { on: Use[]; focus?: Use | Use[] }) {
   const focused = (u: Use) => (Array.isArray(focus) ? focus.includes(u) : focus === u);
-  const R = 37;
+  const level = on.length ? 0.3 + Math.min(1, on.length / 3) * 0.6 : 0.06;
+  const pct = (v: number, of: number) => `${(v / of) * 100}%`;
   return (
-    <div className={cx('tour-map relative aspect-square w-full', compact ? 'max-w-[220px]' : 'max-w-[360px]')} aria-hidden>
-      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full overflow-visible">
-        {NODES.map((n) => {
-          const a = (n.angle * Math.PI) / 180;
-          const x = 50 + Math.cos(a) * R;
-          const y = 50 + Math.sin(a) * R;
-          const lit = on.includes(n.id);
-          return (
-            <g key={n.id}>
-              <line x1={x} y1={y} x2={50} y2={50} className="tour-map-pipe" />
-              {lit && <line x1={x} y1={y} x2={50} y2={50} className="tour-map-flow" />}
-            </g>
-          );
-        })}
+    <div className="tour-map relative w-full max-w-[360px]" style={{ aspectRatio: `${FIG.w} / ${FIG.h}` }} aria-hidden>
+      <svg viewBox={`0 0 ${FIG.w} ${FIG.h}`} className="absolute inset-0 h-full w-full overflow-visible">
+        <circle cx={POOL.x} cy={POOL.y} r={POOL.r + 16} className="tour-pool-ripple" />
+        <circle cx={POOL.x} cy={POOL.y} r={POOL.r} className={cx('tour-pool', on.length > 0 && 'tour-pool-on')} />
+        {SOURCES.map((s, i) => (
+          <path key={s.id} d={stream(i)} className={cx('tour-stream', on.includes(s.id) && 'tour-stream-on', on.includes(s.id) && focused(s.id) && 'tour-stream-focus')} />
+        ))}
       </svg>
-      <div className="tour-map-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-        <TideMark size={compact ? 58 : 92} level={on.length ? 0.35 + Math.min(1, on.length / 3) * 0.6 : 0.08} />
+      <div className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: pct(POOL.x, FIG.w), top: pct(POOL.y, FIG.h), width: pct(POOL.r * 1.5, FIG.w) }}>
+        <PoolMark level={level} />
       </div>
-      {NODES.map((n) => {
-        const a = (n.angle * Math.PI) / 180;
-        const lit = on.includes(n.id);
-        const big = focused(n.id);
+      {SOURCES.map((s, i) => {
+        const lit = on.includes(s.id);
         return (
-          <div key={n.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${50 + Math.cos(a) * R}%`, top: `${50 + Math.sin(a) * R}%` }}>
-            <div className={cx('tour-node', lit && 'tour-node-on', big && 'tour-node-focus', compact && 'tour-node-small')}>
-              <span className="relative">{n.icon}</span>
-            </div>
-            {!compact && <div className={cx('tour-map-label mt-1.5 text-center text-[11px] font-medium whitespace-nowrap', lit ? 'text-fg' : 'text-fg-3')}>{n.label}</div>}
+          <div key={s.id} className="absolute flex -translate-y-1/2 items-center gap-2.5" style={{ right: pct(FIG.w - NODE.x - NODE.r, FIG.w), top: pct(rowY(i), FIG.h) }}>
+            <span className={cx('tour-map-label text-[12.5px] whitespace-nowrap', lit ? 'text-fg' : 'text-fg-3')}>{s.label}</span>
+            <span className={cx('tour-node', lit && 'tour-node-on', focused(s.id) && 'tour-node-focus')}>{s.icon}</span>
           </div>
         );
       })}

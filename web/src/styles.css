@@ -605,10 +605,11 @@ html {
 
 /* ---- the welcome tour -------------------------------------------------------------------------- */
 /* Hydor is the Greek ὕδωρ, water, and the tour is drawn in it (Tour.tsx, scenes.tsx), quietly: its pages stand over a
-   still sea that rises a little with each step; the steps are droplets, full once passed; the welcome's film plays
-   once; the map's water is drawn, not flowing; the Ω fills once. Icons are plain lines; things picked are edged in
-   sea-blue (actions keep the gold accent); nothing glows, loops or splashes, and nothing is blurred (blurring the
-   window again each frame made the tour stutter in the Mac app). What it says shows at once. */
+   sea whose waves drift slowly and rise a little with each step; where the tour stands is a row of small dots; the
+   welcome's film plays once; what does the work flows as streams into a pool around the Ω, whose water moves gently
+   as it fills. Every page keeps its picture and its words in the same place, and fits the screen without scrolling.
+   Icons are plain lines; things picked are edged in sea-blue (actions keep the gold accent); nothing glows or
+   splashes, and nothing is blurred (blurring the window again each frame made the tour stutter in the Mac app). */
 
 /* The sea under the pages and the sign-in screens. --level (0 to 1) raises it as the tour goes on. */
 .tour-sea {
@@ -629,21 +630,23 @@ html {
   position: absolute;
   inset: auto 0 0;
   width: 100%;
-  height: 30vh;
-  min-height: 190px;
-  transform: translateY(calc((1 - var(--level)) * 10vh));
+  height: 28vh;
+  min-height: 180px;
+  transform: translateY(calc((1 - var(--level)) * 6vh));
   transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* Each layer drifts by one wavelength, slowly, the middle one the other way; the loops have no seam. */
 .tour-wave-1 {
   opacity: 0.08;
+  animation: tour-drift-1 64s linear infinite;
 }
 .tour-wave-2 {
   opacity: 0.1;
-  transform: translateX(-140px);
+  animation: tour-drift-2 52s linear infinite;
 }
 .tour-wave-3 {
   opacity: 0.13;
-  transform: translateX(-60px);
+  animation: tour-drift-3 40s linear infinite;
 }
 .dark .tour-wave-1 {
   opacity: 0.1;
@@ -653,6 +656,30 @@ html {
 }
 .dark .tour-wave-3 {
   opacity: 0.17;
+}
+@keyframes tour-drift-1 {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-400px);
+  }
+}
+@keyframes tour-drift-2 {
+  from {
+    transform: translateX(-406.667px);
+  }
+  to {
+    transform: translateX(-140px);
+  }
+}
+@keyframes tour-drift-3 {
+  from {
+    transform: translateX(-60px);
+  }
+  to {
+    transform: translateX(-260px);
+  }
 }
 
 /* The setup pages fill the screen: the first comes in over the app (a new install's straight after the password
@@ -671,62 +698,53 @@ html {
     opacity: 0;
   }
 }
-/* The words scroll above the buttons, fading out at their edge rather than running under them. */
+/* On a screen too small for a page, its words scroll above the buttons, fading out at their edge. */
 .tour-scroll {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
 }
 @media (max-width: 1023px) {
-  .tour-scene .tour-map {
-    max-width: 250px;
-  }
-  .tour-scene .tour-film {
+  .tour-figure .tour-film {
     max-width: 320px;
-  }
-}
-@media (max-width: 640px) {
-  .tour-scene .tour-map {
-    max-width: 210px;
-  }
-  .tour-map-label {
-    display: none;
-  }
-  .tour-scene .tour-node {
-    width: 40px;
-    height: 40px;
-    border-radius: 13px;
-  }
-  .tour-scene .tour-map-center {
-    scale: 0.62;
-  }
-  .tour-scene .tour-film {
     font-size: 12px;
   }
 }
-
-/* Where the tour stands: droplets, full once passed and now, empty to come. */
-.tour-drop {
-  overflow: visible;
-}
-.tour-drop-shell {
-  fill: color-mix(in srgb, var(--bg) 55%, transparent);
-  stroke: color-mix(in srgb, var(--fg) 38%, transparent);
-  stroke-width: 1.2;
-}
-.tour-drop-full .tour-drop-shell,
-.tour-drop-now .tour-drop-shell {
-  stroke: color-mix(in srgb, var(--water-2) 70%, transparent);
-}
-.tour-drop-water {
-  fill: color-mix(in srgb, var(--water-2) 75%, var(--water-3));
-}
-.tour-drop-now .tour-drop-water {
-  fill: var(--water-2);
+@media (max-width: 640px) {
+  .tour-figure .tour-film {
+    zoom: 0.86;
+  }
 }
 
-/* The mark: the deep blue tile, and water at its level in the Ω, rising to it once. */
+/* Where the tour stands: a small dot for each step, those passed darker, the one now drawn out. */
+.tour-dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 18%, transparent);
+  transition:
+    width 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 300ms ease;
+}
+.tour-dot-past {
+  background: color-mix(in srgb, var(--fg) 42%, transparent);
+}
+.tour-dot-now {
+  width: 16px;
+  background: var(--fg);
+}
+
+/* The mark: water at its level in the Ω, rising to it, its surface moving slowly (one wavelength, 180 units). */
 .tour-mark-level {
   transition: transform 1300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tour-mark-surface {
+  animation: tour-surface 7s linear infinite;
+}
+@keyframes tour-surface {
+  to {
+    transform: translateX(-180px);
+  }
 }
 
 /* The welcome's film, once: the request is typed, the agent's steps come one by one, the result arrives, and it all
@@ -843,35 +861,66 @@ html {
   }
 }
 
-/* The map of what does the work: fine pipes to the Ω, a line of water along those picked, and the nodes edged. */
-.tour-map-pipe {
-  stroke: var(--line-2);
-  stroke-width: 0.45;
-  stroke-dasharray: 0.9 1.5;
-}
-.tour-map-flow {
-  stroke: var(--water-2);
-  stroke-width: 0.7;
+/* What does the work: a stream from each source into the pool around the Ω. Those picked run with water, the one a
+   step sets up a little stronger; the others are faint dry channels. */
+.tour-stream {
+  fill: none;
+  stroke: color-mix(in srgb, var(--fg) 11%, transparent);
+  stroke-width: 1;
   stroke-linecap: round;
-  opacity: 0.85;
+  transition:
+    stroke 400ms ease,
+    stroke-width 400ms ease;
+}
+.tour-stream-on {
+  stroke: color-mix(in srgb, var(--water-2) 70%, transparent);
+  stroke-width: 1.5;
+}
+.tour-stream-focus {
+  stroke: var(--water-2);
+  stroke-width: 2;
+}
+.tour-pool {
+  fill: color-mix(in srgb, var(--water-2) 3%, transparent);
+  stroke: color-mix(in srgb, var(--fg) 13%, transparent);
+  stroke-width: 1;
+  transition:
+    fill 400ms ease,
+    stroke 400ms ease;
+}
+.tour-pool-on {
+  fill: color-mix(in srgb, var(--water-2) 7%, transparent);
+  stroke: color-mix(in srgb, var(--water-2) 45%, transparent);
+}
+.tour-pool-ripple {
+  fill: none;
+  stroke: color-mix(in srgb, var(--water-2) 10%, transparent);
+  stroke-width: 1;
+}
+.tour-pool-mark {
+  color: var(--fg);
+}
+.tour-pool-dry {
+  opacity: 0.1;
 }
 .tour-node {
-  position: relative;
   display: flex;
-  width: 54px;
-  height: 54px;
+  width: 34px;
+  height: 34px;
+  flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 18px;
+  border-radius: 999px;
   background: var(--panel);
   box-shadow: 0 0 0 1px var(--line);
   color: var(--fg-3);
   transition:
     box-shadow 300ms ease,
+    background-color 300ms ease,
     color 300ms ease;
 }
-.tour-node > span:last-child {
-  opacity: 0.55;
+.tour-node > * {
+  opacity: 0.5;
   filter: grayscale(1);
   transition:
     opacity 300ms ease,
@@ -879,19 +928,15 @@ html {
 }
 .tour-node-on {
   color: var(--fg);
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--water-2) 80%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--water-2) 55%, transparent);
 }
-.tour-node-on > span:last-child {
+.tour-node-on > * {
   opacity: 1;
   filter: none;
 }
-.tour-node-focus {
-  box-shadow: 0 0 0 2px var(--water-2);
-}
-.tour-node-small {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+.tour-node-on.tour-node-focus {
+  background: color-mix(in srgb, var(--water-2) 9%, var(--panel));
+  box-shadow: 0 0 0 1.5px var(--water-2);
 }
 
 /* What can be picked: edged in sea-blue once picked. Icons are plain lines, with no tiles. */
@@ -900,7 +945,7 @@ html {
   align-items: flex-start;
   gap: 14px;
   border-radius: 16px;
-  padding: 14px 16px;
+  padding: 12px 15px;
   text-align: left;
   background: color-mix(in srgb, var(--panel) 82%, transparent);
   box-shadow: 0 0 0 1px var(--line);
@@ -1124,7 +1169,9 @@ html {
 }
 @media (prefers-reduced-motion: reduce) {
   .tour-film,
-  .tour-film * {
+  .tour-film *,
+  .tour-wave,
+  .tour-mark-surface {
     animation: none !important;
   }
   .tour-film-busy {
