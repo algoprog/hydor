@@ -36,6 +36,10 @@ const button = (text) => `js:[...document.querySelectorAll('button')].filter((b)
 const cardWith = (text, cls = '.rounded-2xl') =>
   `js:(() => { const el = [...document.querySelectorAll('body *')].find((e) => e.textContent.trim() === ${JSON.stringify(text)} && ![...e.children].some((c) => c.textContent.trim() === ${JSON.stringify(text)})); return el?.closest(${JSON.stringify(cls)}) ?? el; })()`;
 
+/** The card holding the first of these texts that the page shows (as cardWith). */
+const cardWithAny = (texts, cls = '.rounded-2xl') =>
+  `js:(() => { for (const t of ${JSON.stringify(texts)}) { const el = [...document.querySelectorAll('body *')].find((e) => e.textContent.trim() === t && ![...e.children].some((c) => c.textContent.trim() === t)); if (el) return el.closest(${JSON.stringify(cls)}) ?? el; } return null; })()`;
+
 /** The smallest button in `scope` whose text has `text` in it. */
 const chip = (scope, text) =>
   `js:[...document.querySelectorAll(${JSON.stringify(`${scope} button`)})].filter((b) => b.textContent.includes(${JSON.stringify(text)})).sort((a, b) => a.textContent.length - b.textContent.length)[0]`;
@@ -62,6 +66,8 @@ const settingsShot = (id, section, o = {}) => ({
   async take(p, ctx) {
     await ctx.go(`/settings?s=${section}`, { settle: 1500 });
     if (o.prepare) await o.prepare(p, ctx);
+    // The part to keep can come a moment after the page (a list it asks the server for): wait for it a while.
+    if (o.until) await p.waitFor(o.until.startsWith('js:') ? o.until.slice(3) : `document.querySelector(${JSON.stringify(o.until)})`, { timeout: 8000 }).catch(() => {});
     await p.park();
     await sleep(300);
     return p.shot(ctx.file, { clip: await main(p, o.until ? await bottomOf(p, o.until) : undefined) });
@@ -181,7 +187,8 @@ export const SHOTS = [
   settingsShot('guidelines', 'guidelines', { until: button('The garden') }),
   // The switches and the first notes fit in one picture.
   settingsShot('memory', 'memory', { height: 900 }),
-  settingsShot('tasks', 'tasks', { until: cardWith('Water the greenhouse reminder') }),
+  // The list's card, by the first of the demo's tasks there: those due within three hours are left out (demo.mjs).
+  settingsShot('tasks', 'tasks', { until: cardWithAny(['Water the greenhouse reminder', 'Weekly shop report', 'Ridge E5 price watch', 'Morning brief']) }),
   settingsShot('skills', 'skills'),
   settingsShot('plugins', 'plugins'),
   {
