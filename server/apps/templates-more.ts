@@ -2161,18 +2161,28 @@ return { picks };`,
           title: 'Word the searches',
           do: 'code',
           language: 'javascript',
-          with: { likes: '{{likes}}', platform: '{{platform}}', today: '{{today}}' },
-          code: String.raw`// What to search for: the games out now like these, and those announced and still to come, on that platform.
+          with: { likes: '{{likes}}', platform: '{{platform}}', when: '{{when}}', today: '{{today}}' },
+          code: String.raw`// What to search for: the games out now like these, and those announced and still to come, on that platform; and
+// which games to pick, as one rule (a model given the three choices to read took "Coming soon" for "Both").
 const on = input.platform && input.platform !== 'Any' ? input.platform + ' ' : '';
+const where = input.platform && input.platform !== 'Any' ? ' on ' + input.platform : '';
 const likes = String(input.likes || '').replace(/\s+/g, ' ').trim().slice(0, 160);
 const year = Number(String(input.today || '').slice(0, 4)) || new Date().getFullYear();
+const rule =
+  input.when === 'Coming soon'
+    ? 'Pick up to eight games still to come' + where + ', announced with a date, a month or a season: none that is out already, none that is only a rumour. The soonest first; fewer is better than one already out.'
+    : input.when === 'Both'
+      ? 'Pick four games already out' + where + ', then four still to come (announced, the soonest first).'
+      : 'Pick eight games already out' + where + ': none still to come.';
 return {
   now: (likes ? 'best ' + on + 'games like ' + likes : 'best ' + on + 'games to play right now').trim(),
   coming: ('upcoming ' + on + 'games ' + (likes ? likes + ' ' : '') + 'release dates ' + year + ' ' + (year + 1)).trim(),
+  rule,
 };`,
           outputs: [
             { id: 'now', label: 'Out now', type: 'text' },
             { id: 'coming', label: 'Coming soon', type: 'text' },
+            { id: 'rule', label: 'Which games', type: 'text' },
           ],
           failed: 'agent',
         },
@@ -2182,16 +2192,24 @@ return {
           id: 'pick',
           title: 'Pick the games',
           do: 'model',
-          instructions: `Pick eight games for someone who likes: {{likes}}{{^likes}}anything (they did not say: pick the best and most talked-about){{/likes}}. Where they play: {{platform}}. Budget: {{budget}}. Today is {{today}}.
+          instructions: `Games for someone who likes: {{likes}}{{^likes}}anything (they did not say: pick the best and most talked-about){{/likes}}. Where they play: {{platform}}. Budget: {{budget}}. Today is {{today}}.
 
-Which games: {{when}}. Out now: only games already out on that platform. Coming soon: only games announced for it and not out yet (none that is only a rumour), the soonest first. Both: four of each, those out now first. Good ones, not only the famous ones.
+{{ask.rule}} Good ones, not only the famous ones.
 
 {{scan.text}}
 
 {{coming.text}}
 
-- games: each its title as its makers write it, the year it came or comes out, for one not out yet when it comes (its date, or the month or season the sources give: "12 Feb 2027", "Spring 2027"; empty for one out now), whether it is still to come, its genre, the platforms it is on, about how many hours its main part takes (empty when not known), why it fits in a sentence, and whether it is free to play.
-- summary: the picks in a sentence.`,
+- games: one row each, with
+  - title: as its makers write it;
+  - year: when it came or comes out;
+  - out: for a game still to come, when it comes out, as the sources give it ("12 Nov 2026", "Feb 2027", "Spring 2027"); empty for one out now;
+  - coming: true for a game still to come, false for one out now;
+  - genre, and platforms: the ones it is on;
+  - hours: about how long its main part takes; empty when not known;
+  - why: why it fits, in a sentence;
+  - free: whether it is free to play.
+- summary: the picks in a sentence, for the person who asked (nothing on what the sources leave out).`,
           outputs: [
             {
               id: 'games',
@@ -2281,7 +2299,7 @@ const games = rows(input.games).map((g, i) => {
   const m = media[i] && typeof media[i] === 'object' ? media[i] : {};
   const coming = yes(g.coming);
   return {
-    title: String(g.title || ''), year: num(g.year), out: coming ? String(g.out || '') : '', coming, genre: String(g.genre || ''), platforms: String(g.platforms || ''), hours: num(g.hours), why: String(g.why || ''), free: yes(g.free),
+    title: String(g.title || ''), year: num(g.year), out: coming ? String(g.out || num(g.year) || '') : '', coming, genre: String(g.genre || ''), platforms: String(g.platforms || ''), hours: num(g.hours), why: String(g.why || ''), free: yes(g.free),
     price: num(d.price), lowest: num(d.lowest), store: String(d.store || ''), deal: d.deal || null, picture: m.picture || d.picture || null, video: m.video || null, at: i,
   };
 });

@@ -9666,6 +9666,7 @@
 "Which files":"web/src/features/files/SearchView.tsx",
 "Which files?":"server/zip.ts",
 "Which folder?":"server/git.ts",
+"Which games":"server/apps/templates-more.ts",
 "Which is the document’s main file (tex.main)?":"server/pages/filemodel.ts",
 "Which machine will use it?":"web/src/features/settings/MachineSettings.tsx",
 "Which model?":"server/models/manager.ts",
