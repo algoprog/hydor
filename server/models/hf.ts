@@ -38,7 +38,7 @@ async function getJson(url: string, token?: string): Promise<any> {
   return r.json();
 }
 
-interface RepoFile {
+export interface RepoFile {
   path: string;
   size: number;
 }
@@ -56,7 +56,7 @@ async function listFiles(repo: string, token?: string): Promise<RepoFile[]> {
 }
 
 /** What vLLM loads of a repository: config, tokenizer, processor, custom code and safetensors weights. */
-function vllmFiles(files: RepoFile[]): RepoFile[] {
+export function vllmFiles(files: RepoFile[]): RepoFile[] {
   const st = files.filter((f) => f.path.endsWith('.safetensors'));
   // Some repositories carry the original checkpoint beside the converted one.
   const hfFormat = st.some((f) => !/^(original\/|consolidated)/.test(f.path));
@@ -136,7 +136,7 @@ export async function inspect(input: string, o: { token?: string; machine: Machi
     const weights = want.filter((f) => f.path.endsWith('.safetensors')).reduce((a, f) => a + f.size, 0);
     out.vllm = {
       supported: o.vllmArchs ? (arch ? o.vllmArchs.has(arch) : false) : null,
-      fit: fit(o.machine, { weightBytes: weights, cacheBytes: perToken * ctx, downloadBytes: out.downloadBytes, params, cpuOk: false }),
+      fit: fit(o.machine, { weightBytes: weights, cacheBytes: perToken * ctx, downloadBytes: out.downloadBytes, params, cpuOk: false, split: true }),
     };
     if (o.vllmArchs && arch && !o.vllmArchs.has(arch)) out.vllm.reason = `This vLLM does not run ${arch} yet.`;
     // The same model as GGUF runs with Ollama, often sooner than vLLM supports a new architecture.
@@ -231,7 +231,7 @@ export async function search(o: HfQuery, x: { token?: string; machine: MachineIn
     const q4 = m.params * Q4_BYTES;
     return {
       ...rest,
-      fit: fit(x.machine, { weightBytes, cacheBytes: weightBytes * 0.1, downloadBytes: weightBytes, params: m.params, cpuOk: m.kind === 'gguf' }),
+      fit: fit(x.machine, { weightBytes, cacheBytes: weightBytes * 0.1, downloadBytes: weightBytes, params: m.params, cpuOk: m.kind === 'gguf', split: m.kind === 'safetensors' }),
       fitGguf: m.kind === 'safetensors' ? fit(x.machine, { weightBytes: q4, cacheBytes: q4 * 0.1, downloadBytes: q4, params: m.params, cpuOk: true }) : undefined,
     };
   });

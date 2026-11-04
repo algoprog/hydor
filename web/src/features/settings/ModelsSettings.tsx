@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Brain, Check, Cpu, Download, ExternalLink, Eye, HardDrive, Lock, MemoryStick, Play, Plus, Search, Square, Trash2, Wrench, X } from 'lucide-react';
 import type { HfInspect, HfModel, HfSort, LocalModel, ModelFit, ModelsState, OpenRouterModel, OpenRouterSort } from '@shared/types';
+import type { LocalPickView } from '@shared/model-picks';
 import { api, post, put } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
 import { live } from '../../lib/ws';
@@ -139,7 +140,7 @@ function LocalModels({ st }: { st: ModelsState }) {
               {m.runtime === 'ollama' ? 'Ollama' : 'vLLM'} · {size(m.sizeBytes)}
               {m.detail ? ` · ${m.detail}` : ''}
               {m.vision ? ' · sees images' : ''}
-              {m.server?.state === 'ready' && ` · running on GPU ${m.server.gpu}`}
+              {m.server?.state === 'ready' && (m.server.gpus?.length ? ` · running on GPUs ${m.server.gpus.join(', ')}` : m.server.gpu < 0 ? ' · running' : ` · running on GPU ${m.server.gpu}`)}
               {m.server?.state === 'starting' && ' · starting…'}
               {m.supported === false && m.reason ? ` · ${m.reason}` : ''}
             </div>
@@ -367,8 +368,8 @@ export function MachineCard({ st }: { st: ModelsState }) {
         <Stat
           icon={<Cpu size={12} />}
           label="Graphics"
-          value={gpus || 'No GPU'}
-          sub={m.gpus.length > 1 ? `${per} each` : m.gpus.length ? per : 'models run on the processor'}
+          value={gpus || m.apple?.chip || 'No GPU'}
+          sub={m.gpus.length > 1 ? `${per} each` : m.gpus.length ? per : m.apple ? 'shares the memory with its graphics' : 'models run on the processor'}
         />
         <Stat icon={<MemoryStick size={12} />} label="Memory" value={size(m.ramBytes)} sub={`${size(m.ramFreeBytes)} free`} />
         <Stat icon={<HardDrive size={12} />} label="Disk" value={`${size(st.storage.freeBytes)} free`} sub={st.storage.usedBytes ? `models take ${size(st.storage.usedBytes)}` : 'for downloads'} />
@@ -376,7 +377,11 @@ export function MachineCard({ st }: { st: ModelsState }) {
       <div className="mt-2 flex flex-wrap items-center gap-1.5 px-0.5">
         <RuntimePill name="Ollama" version={st.ollama.version} install="https://ollama.com/download" />
         <RuntimePill name="vLLM" version={st.vllm.path ? (st.vllm.version ?? 'found') : undefined} install="pip install vllm (NVIDIA GPUs)" />
-        {best && <span className="ml-auto text-[12px] text-fg-3">Fits about {aboutParams(best.freeBytes)}B parameters at 4-bit on one GPU</span>}
+        {best ? (
+          <span className="ml-auto text-[12px] text-fg-3">Fits about {aboutParams(best.freeBytes)}B parameters at 4-bit on one GPU</span>
+        ) : m.apple ? (
+          <span className="ml-auto text-[12px] text-fg-3">Fits about {aboutParams(m.ramBytes * 0.7)}B parameters at 4-bit</span>
+        ) : null}
       </div>
     </div>
   );
@@ -386,9 +391,114 @@ export function MachineCard({ st }: { st: ModelsState }) {
 
 function AddFromHf({ st }: { st: ModelsState }) {
   return (
-    <Section title="Add a model from Hugging Face" sub="Search, see how each would run here, and install it">
+    <Section title="Add a model from Hugging Face" sub="The ones suggested for this computer, or search, see how each would run here, and install it">
+      <SuggestedLocal st={st} />
       <HfSearch st={st} />
     </Section>
+  );
+}
+
+/** How a suggested model would run here, in a few words: where, and with what. */
+function runsWith(p: LocalPickView): string {
+  const how = p.install && 'ollama' in p.install ? 'Ollama' : 'vLLM';
+  if (p.fit.gpus?.length) return `${how}, split across ${p.fit.gpus.length} GPUs`;
+  if (p.fit.where === 'gpu' && p.fit.gpu != null) return `${how}, on GPU ${p.fit.gpu}`;
+  if (p.fit.where === 'gpu') return `${how}, on Apple silicon`;
+  return `${how}, on the processor`;
+}
+
+/** The models suggested for this computer (the tour shows them too): those that run well here, a click to install. */
+function SuggestedLocal({ st }: { st: ModelsState }) {
+  const [picks, setPicks] = useState<LocalPickView[] | null>(null);
+  const [more, setMore] = useState(false);
+  const sig = [st.local.map((m) => m.id).join(), st.downloads.map((d) => `${d.key}:${d.status}`).join(), st.vllm.path ?? '', st.ollama.version ?? ''].join('|');
+  useEffect(() => {
+    let alive = true;
+    api<{ picks: LocalPickView[] }>('/api/models/picks').then(
+      (r) => alive && setPicks(r.picks),
+      () => alive && setPicks([]),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [sig]);
+  if (!picks?.length) return null;
+  const shown = picks.filter((p) => p.runs || more);
+  const hidden = picks.length - picks.filter((p) => p.runs).length;
+  return (
+    <div className="mb-4">
+      <div className="mb-1.5 flex items-center gap-2 text-[12px] font-medium text-fg-2">
+        Suggested for this computer
+        <span className="flex-1" />
+        {hidden > 0 && (
+          <button type="button" onClick={() => setMore((x) => !x)} className="font-normal text-fg-3 hover:text-fg">
+            {more ? 'Only those that run here' : `${hidden} more for bigger computers`}
+          </button>
+        )}
+      </div>
+      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+        {shown.map((p) => {
+          const d = p.coming ? st.downloads.find((x) => x.key === p.coming) : undefined;
+          const pct = d?.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 0;
+          return (
+            <div key={p.repo} className={cx('flex items-start gap-3 px-3 py-2.5', !p.runs && 'opacity-60')}>
+              <OrgMark name={p.maker} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  <a href={`https://huggingface.co/${p.repo}`} target="_blank" rel="noreferrer" className="text-[13.5px] leading-5 font-medium text-fg hover:underline">
+                    {p.name}
+                  </a>
+                  {p.best && <Tag tone="accent">Best here</Tag>}
+                  {p.vision && (
+                    <Tag icon={<Eye size={11} />} title="Sees images">
+                      <span className="max-sm:hidden">Images</span>
+                    </Tag>
+                  )}
+                </div>
+                <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{p.blurb}</div>
+                <div className="tnum mt-0.5 text-[12px] text-fg-3">
+                  {p.runs ? (
+                    <>
+                      <span className={p.fit.verdict === 'good' ? 'text-ok' : 'text-warn'}>{p.fit.verdict === 'good' ? 'Runs well' : 'Runs slowly'}</span>
+                      {` · ${runsWith(p)} · ${size(p.sizeBytes)}`}
+                      {!p.ready && <span className="text-warn">{p.install && 'ollama' in p.install ? ' · Ollama is not running' : ' · vLLM is not set up (Runtimes, below)'}</span>}
+                    </>
+                  ) : (
+                    `Needs ${p.needs ? p.needs[0].toLowerCase() + p.needs.slice(1) : 'more than this computer has'}`
+                  )}
+                </div>
+                {d && (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-fg/10">
+                      <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct || 3}%` }} />
+                    </div>
+                    <span className="tnum text-[11.5px] text-fg-3">{d.totalBytes ? `${Math.floor(pct)}%` : size(d.doneBytes)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="shrink-0">
+                {p.have ? (
+                  <span className="flex items-center gap-1 px-1 text-[12.5px] font-medium text-ok">
+                    <Check size={14} /> Installed
+                  </span>
+                ) : d ? (
+                  <Button size="sm" variant="ghost" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
+                    Cancel
+                  </Button>
+                ) : (
+                  p.runs &&
+                  p.install && (
+                    <Button size="sm" variant={p.best ? 'primary' : 'secondary'} icon={<Download size={13} />} onClick={() => post('/api/models/install', p.install).catch(toastError)}>
+                      Install
+                    </Button>
+                  )
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -680,7 +790,7 @@ const SORTS: { id: OpenRouterSort; label: string }[] = [
 
 /** One model: its maker, name and what it can do, then context, longest reply, price and age (and, unless
  * compact, what it is and its id). */
-function OrModelRow({ m, action, compact }: { m: OpenRouterModel; action: React.ReactNode; compact?: boolean }) {
+function OrModelRow({ m, action, compact, note }: { m: OpenRouterModel; action: React.ReactNode; compact?: boolean; note?: string }) {
   const slug = m.detail ?? m.id.replace(/^openrouter\//, '');
   const latest = slug.startsWith('~');
   const free = !!m.price && m.price.input === 0 && m.price.output === 0;
@@ -692,6 +802,7 @@ function OrModelRow({ m, action, compact }: { m: OpenRouterModel; action: React.
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
             <span className="text-[13.5px] leading-5 font-medium text-fg">{m.label}</span>
+            {note && <Tag tone="accent">{note}</Tag>}
             {latest && (
               <Tag tone="accent" title="Always the maker’s latest version">
                 Latest
@@ -739,7 +850,45 @@ function OrModelRow({ m, action, compact }: { m: OpenRouterModel; action: React.
   );
 }
 
-/** The OpenRouter key, and the models it brings into the pickers: search by name, filter, order. */
+/** The OpenRouter models suggested for Custom, from fast and cheap to the best: Add puts one in the pickers. */
+function OrSuggested({ pinned, onPin }: { pinned: Set<string>; onPin: (id: string) => void }) {
+  const [list, setList] = useState<(OpenRouterModel & { note: string })[] | null>(null);
+  useEffect(() => {
+    api<{ models: (OpenRouterModel & { note: string })[] }>('/api/models/openrouter/picks').then(
+      (r) => setList(r.models),
+      () => setList([]),
+    );
+  }, []);
+  if (!list?.length) return null;
+  return (
+    <div>
+      <div className="mb-1.5 text-[12px] font-medium text-fg-2">Suggested</div>
+      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+        {list.map((m) => (
+          <OrModelRow
+            key={m.id}
+            m={m}
+            compact
+            note={m.note}
+            action={
+                pinned.has(m.id) ? (
+                  <span className="flex items-center gap-1 px-1 text-[12.5px] font-medium text-ok">
+                    <Check size={14} /> Added
+                  </span>
+                ) : (
+                <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={() => onPin(m.id)} aria-label={`Add ${m.label}`}>
+                  <span className="max-sm:hidden">Add</span>
+                </Button>
+              )
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The OpenRouter key, and the models it brings into the pickers: the suggested ones, or search by name, filter, order. */
 export function OpenRouterBody({ st }: { st: ModelsState }) {
   const [key, setKey] = useState('');
   const [q, setQ] = useState('');
@@ -829,6 +978,7 @@ export function OpenRouterBody({ st }: { st: ModelsState }) {
           </div>
         </div>
       )}
+      {!browsing && <OrSuggested pinned={pinned} onPin={(id) => void save({ pin: id })} />}
       <div>
         <SearchBox value={q} onChange={setQ} placeholder="Search OpenRouter: deepseek, qwen, claude…" busy={busy} />
         <FilterChips items={FILTERS} on={filters} toggle={toggle} />

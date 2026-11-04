@@ -8,6 +8,8 @@ import { HttpError } from '../auth.ts';
 import { keyHint, loadConfig, MODELS_DIR, saveConfig, writeAgentModels, type Endpoint, type ModelsConfig } from './config.ts';
 import * as hf from './hf.ts';
 import { machine } from './machine.ts';
+import { localPicks } from './picks.ts';
+import { OPENROUTER_PICKS } from '../../shared/model-picks.ts';
 import * as ollama from './ollama.ts';
 import * as openrouter from './openrouter.ts';
 import * as vllm from './vllm.ts';
@@ -155,7 +157,7 @@ export class ModelManager {
         vision: r.vision,
         supported: v ? (r.arch ? v.archs.has(r.arch) : false) : null,
         reason: v && r.arch && !v.archs.has(r.arch) ? `vLLM ${v.version} does not run ${r.arch} yet` : !v ? 'vLLM is not installed here' : undefined,
-        server: s ? { state: s.state, port: s.port, gpu: s.gpu, error: s.error, startedAt: s.startedAt, util: s.util, maxLen: s.maxLen } : undefined,
+        server: s ? { state: s.state, port: s.port, gpu: s.gpu, ...(s.gpus ? { gpus: s.gpus } : {}), error: s.error, startedAt: s.startedAt, util: s.util, maxLen: s.maxLen } : undefined,
         installedAt: r.downloadedAt,
       };
     });
@@ -220,9 +222,25 @@ export class ModelManager {
 
   search = (o: openrouter.OrQuery) => openrouter.search(o);
 
+  /** The OpenRouter models suggested for Custom (text), in their order, each with why: those OpenRouter still lists. */
+  async openRouterPicks() {
+    const all = await openrouter.catalog();
+    return OPENROUTER_PICKS.filter((p) => p.role === 'text').flatMap((p) => {
+      const m = all.find((x) => x.id === `openrouter/${p.id}`);
+      return m ? [{ ...m, note: p.note }] : [];
+    });
+  }
+
   /** Models on Hugging Face, each with a first guess of how it runs on this machine. */
   async searchHf(o: hf.HfQuery) {
     return hf.search(o, { token: this.cfg.hfToken, machine: await machine(MODELS_DIR) });
+  }
+
+  /** The models suggested for this computer (shared/model-picks.ts), as they are for it. */
+  async picks() {
+    const v = vllm.findVllm(this.cfg.vllm.command);
+    const st = await this.state();
+    return localPicks({ machine: await machine(MODELS_DIR), token: this.cfg.hfToken, runtimes: { vllm: v ? { archs: v.archs } : null, ollama: !!this.ollamaVersion }, local: st.local, downloads: st.downloads });
   }
 
   async inspect(input: string): Promise<HfInspect> {

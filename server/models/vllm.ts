@@ -1,6 +1,6 @@
 // vLLM (docs.vllm.ai) serving models downloaded from Hugging Face: one server per model, on its own
-// port and the GPU with room for it. Servers run detached and outlive restarts of the app; vllm.json
-// says what runs where.
+// port and the GPU with room for it, or split across 2, 4 or 8 GPUs (tensor parallelism) when no one GPU has
+// room. Servers run detached and outlive restarts of the app; vllm.json says what runs where.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -11,7 +11,7 @@ import { HttpError } from '../auth.ts';
 import { agentBaseEnv } from '../env.ts';
 import { LOG_DIR, MODELS_DIR } from './config.ts';
 import { LOCAL_CONTEXT } from './hf.ts';
-import { cachePerToken, gb } from './machine.ts';
+import { cachePerToken, gb, gpuPlan } from './machine.ts';
 
 const GiB = 1024 ** 3;
 const STATE = path.join(MODELS_DIR, 'vllm.json');
@@ -137,7 +137,8 @@ function freePort(from: number): Promise<number> {
   });
 }
 
-/** Starts a server for a downloaded model, sized to it, on the GPU with the most free memory. */
+/** Starts a server for a downloaded model, sized to it, on the GPU with the most free memory, or split across the
+ * fewest GPUs that hold it (all of them told the same share). */
 export async function startServer(
   v: VllmInfo,
   o: { repo: string; dir: string; machine: MachineInfo; weightsBytes: number; customCode?: boolean; gpu?: number; maxLen?: number },
@@ -147,11 +148,20 @@ export async function startServer(
   const maxLen = Math.min(o.maxLen ?? LOCAL_CONTEXT, max);
   // Weights, the context cache for a full-length conversation with some to spare, and vLLM's own share.
   const need = o.weightsBytes * 1.1 + cachePerToken(cfg) * maxLen * 1.25 + 1.5 * GiB;
-  const gpus = o.gpu != null ? o.machine.gpus.filter((g) => g.index === o.gpu) : [...o.machine.gpus].sort((a, b) => b.freeBytes - a.freeBytes);
-  const gpu = gpus[0];
-  if (!gpu) throw new HttpError(400, 'vLLM needs an NVIDIA GPU, and none was found');
-  if (need > gpu.freeBytes - 0.5 * GiB) throw new HttpError(400, `It needs about ${gb(need)} of GPU memory; the most free is ${gb(gpu.freeBytes)} on GPU ${gpu.index}`);
-  const util = Math.min(0.95, need / gpu.totalBytes + 0.01);
+  if (o.machine.apple) return startOnMac(v, { ...o, cfg, need, maxLen });
+  if (!o.machine.gpus.length) throw new HttpError(400, 'vLLM needs an NVIDIA GPU or a Mac with Apple silicon, and neither is here');
+  const plan = gpuPlan(o.machine, need, { split: true, only: o.gpu });
+  if (!plan) {
+    const most = [...o.machine.gpus].sort((a, b) => b.freeBytes - a.freeBytes)[0];
+    throw new HttpError(
+      400,
+      `It needs about ${gb(need)} of GPU memory; the most free is ${gb(most.freeBytes)} on GPU ${most.index}${o.machine.gpus.length > 1 && o.gpu == null ? `, and it does not fit split across the GPUs either` : ''}`,
+    );
+  }
+  const gpu = plan.gpus[0];
+  const tp = plan.gpus.length;
+  // Each card's share of its own memory: the smallest card sets it, as vLLM asks every card for the same share.
+  const util = Math.min(0.95, plan.perGpu / Math.min(...plan.gpus.map((g) => g.totalBytes)) + 0.01);
   const port = await freePort(8200);
   const parser = toolParser(cfg.text_config?.model_type ?? cfg.model_type, v.parsers);
   fs.mkdirSync(LOG_DIR, { recursive: true });
@@ -174,18 +184,51 @@ export async function startServer(
     '--enforce-eager',
     '--max-num-seqs',
     '8',
+    ...(tp > 1 ? ['--tensor-parallel-size', String(tp)] : []),
     ...(parser ? ['--enable-auto-tool-choice', '--tool-call-parser', parser] : []),
     ...(o.customCode ? ['--trust-remote-code'] : []),
   ];
   const child = spawn(v.path, args, {
     cwd: o.dir,
-    env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: String(gpu.index), HF_HUB_OFFLINE: '1', VLLM_NO_USAGE_STATS: '1', DO_NOT_TRACK: '1' },
+    env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: plan.gpus.map((g) => g.index).join(','), HF_HUB_OFFLINE: '1', VLLM_NO_USAGE_STATS: '1', DO_NOT_TRACK: '1' },
     detached: true,
     stdio: ['ignore', fd, fd],
   });
   child.unref();
   fs.closeSync(fd);
-  return { repo: o.repo, port, pid: child.pid!, gpu: gpu.index, util, maxLen, parser, startedAt: Date.now(), log, state: 'starting' };
+  return { repo: o.repo, port, pid: child.pid!, gpu: gpu.index, ...(tp > 1 ? { gpus: plan.gpus.map((g) => g.index) } : {}), util, maxLen, parser, startedAt: Date.now(), log, state: 'starting' };
+}
+
+/** On a Mac, vLLM runs on Apple silicon through its Metal plugin (vllm-metal, on MLX), in the memory the Mac's
+ * graphics share: no cards to choose and no share of one to set. */
+async function startOnMac(v: VllmInfo, o: { repo: string; dir: string; machine: MachineInfo; customCode?: boolean; cfg: any; need: number; maxLen: number }): Promise<VllmServer> {
+  const room = o.machine.ramBytes * 0.7;
+  if (o.need > room) throw new HttpError(400, `It needs about ${gb(o.need)} of memory; this Mac's graphics may use about ${gb(room)}`);
+  const port = await freePort(8200);
+  const parser = toolParser(o.cfg.text_config?.model_type ?? o.cfg.model_type, v.parsers);
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+  const log = path.join(LOG_DIR, `vllm-${o.repo.replace(/\//g, '--')}.log`);
+  const fd = fs.openSync(log, 'w');
+  const args = [
+    'serve',
+    o.dir,
+    '--served-model-name',
+    o.repo,
+    '--host',
+    '127.0.0.1',
+    '--port',
+    String(port),
+    '--max-model-len',
+    String(o.maxLen),
+    '--max-num-seqs',
+    '8',
+    ...(parser ? ['--enable-auto-tool-choice', '--tool-call-parser', parser] : []),
+    ...(o.customCode ? ['--trust-remote-code'] : []),
+  ];
+  const child = spawn(v.path, args, { cwd: o.dir, env: { ...agentBaseEnv(), HF_HUB_OFFLINE: '1', VLLM_NO_USAGE_STATS: '1', DO_NOT_TRACK: '1' }, detached: true, stdio: ['ignore', fd, fd] });
+  child.unref();
+  fs.closeSync(fd);
+  return { repo: o.repo, port, pid: child.pid!, gpu: -1, util: Math.min(0.95, o.need / o.machine.ramBytes), maxLen: o.maxLen, parser, startedAt: Date.now(), log, state: 'starting' };
 }
 
 export async function ready(s: VllmServer): Promise<boolean> {

@@ -739,6 +739,10 @@ app.get('/api/models/hf', async (req) => {
   const sort = (['downloads', 'trending', 'likes', 'new'] as const).find((s) => s === q.sort);
   return { models: await models.searchHf({ q: String(q.q ?? ''), sort, gguf: f.has('gguf'), safetensors: f.has('safetensors'), vision: f.has('vision'), fits: f.has('fits') }) };
 });
+/** The models suggested to run on this computer, as they would run here (shared/model-picks.ts). */
+app.get('/api/models/picks', async () => ({ picks: await models.picks() }));
+/** The OpenRouter models suggested for Custom, before any search: each with why (shared/model-picks.ts). */
+app.get('/api/models/openrouter/picks', async () => ({ models: await models.openRouterPicks() }));
 /** What a Hugging Face model is, and whether (and how) it would run here, before anything downloads. */
 app.post('/api/models/inspect', async (req) => models.inspect(String((req.body as { input?: string } | undefined)?.input ?? '')));
 app.post('/api/models/install', async (req) => {

@@ -102,8 +102,8 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Agents › Models
   ['models', 'Helper model', 'small model haiku memory tidy auto mode second opinion', 'The model for small jobs beside sessions'],
   ['models', 'On this machine', 'local models ollama vllm gpu download', 'Models installed here, and their downloads', 'Models on this machine'],
-  ['models', 'Add a model from Hugging Face', 'hugging face hf download install gguf vllm ollama', 'Search, see how each would run here, and install it'],
-  ['models', 'OpenRouter', 'openrouter api key models cloud', 'Models through OpenRouter, with your key'],
+  ['models', 'Add a model from Hugging Face', 'hugging face hf download install gguf vllm ollama suggested recommended for this computer lfm3 gemma flint glm', 'The ones suggested for this computer, or search, see how each would run here, and install it'],
+  ['models', 'OpenRouter', 'openrouter api key models cloud suggested gpt glm claude opus', 'Models through OpenRouter, with your key'],
   ['models', 'Runtimes and endpoints', 'ollama vllm openai compatible endpoint url', 'Ollama, vLLM and other OpenAI-compatible endpoints'],
   ['models', 'Hugging Face token', 'hf token gated private', 'Only for gated or private models'],
   // Agents › Agent Guidelines
