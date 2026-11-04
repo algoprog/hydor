@@ -1,7 +1,8 @@
-// One image or video in the Library (/media/<id>): the picture (a tap away from full size) or the video to play,
-// its title and description (written by a model, or by you: Edit), what it was made from and with, its size,
-// length and file, the session it came from, and for a video the frames the model saw. Download, write the
-// title and description again, start a new session with it in the message box, or delete it.
+// One image, video or sound in the Library (/media/<id>): the picture (a tap away from full size), the video or the
+// sound to play (a sound's shape to seek along), its title and description (written by a model, or by you: Edit),
+// what it was made from and with, its size, length and file, the session it came from, for a video the frames the
+// model saw, and for a sound its words. Download, write the title and description again, start a new session with
+// it in the message box, or delete it.
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Download, Ellipsis, FolderInput, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, Trash2, TriangleAlert } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -12,6 +13,7 @@ import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
+import { AudioPlayer } from '../../components/AudioPlayer';
 import { openLightbox } from '../../components/Lightbox';
 import { VideoPlayer } from '../../components/VideoPlayer';
 import { Button, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
@@ -25,7 +27,7 @@ import { mediaUrl, useMedia } from './state';
 export function MediaRoute() {
   const [loc] = useLocation();
   const id = /^\/media\/([a-f0-9]{10})$/.exec(loc)?.[1];
-  return id ? <MediaView id={id} /> : <Empty title="No such image or video" />;
+  return id ? <MediaView id={id} /> : <Empty title="No such image, video or sound" />;
 }
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
@@ -63,7 +65,7 @@ function MediaView({ id }: { id: string }) {
   }, [id]);
   // The list hears of changes (its title written, an edit): the newest of the two.
   const m = live && (!loaded || live.updatedAt >= loaded.updatedAt) ? live : loaded;
-  if (error) return <Empty title="No such image or video">{error}</Empty>;
+  if (error) return <Empty title="No such image, video or sound">{error}</Empty>;
   if (!m)
     return (
       <div className="flex h-full items-center justify-center text-fg-3">
@@ -102,19 +104,21 @@ function MediaView({ id }: { id: string }) {
   const size = m.width && m.height ? `${m.width} × ${m.height}` : undefined;
   const ratio = m.width && m.height ? m.width / m.height : 16 / 9;
   const shape = m.width && m.height ? `${m.width} / ${m.height}` : '16 / 9';
+  const back = m.kind === 'video' ? 'The Library’s videos' : m.kind === 'audio' ? 'The Library’s audio' : 'The Library’s pictures';
+  const what = m.kind === 'video' ? (m.duration ? `A video, ${clipLength(m.duration)}` : 'A video') : m.kind === 'audio' ? (m.duration ? `Audio, ${clipLength(m.duration)}` : 'Audio') : 'An image';
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-line bg-bg pt-[var(--safe-top)]">
         <div className="flex h-14 items-center gap-2 px-3 sm:px-6">
           {!mobile && <NavButton />}
-          <IconButton label={m.kind === 'video' ? 'The Library’s videos' : 'The Library’s pictures'} onClick={() => go(m.space ? `/library?space=${m.space}&kind=${m.kind}` : `/library?kind=${m.kind}`)}>
+          <IconButton label={back} onClick={() => go(m.space ? `/library?space=${m.space}&kind=${m.kind}` : `/library?kind=${m.kind}`)}>
             <ArrowLeft size={18} />
           </IconButton>
           <div className="min-w-0 flex-1">
             <h1 translate="no" className="truncate text-[15px] font-semibold tracking-tight">
               {m.title}
             </h1>
-            <div className="truncate text-[11.5px] text-fg-3">{m.kind === 'video' ? (m.duration ? `A video, ${clipLength(m.duration)}` : 'A video') : 'An image'}</div>
+            <div className="truncate text-[11.5px] text-fg-3">{what}</div>
           </div>
           <Button size="sm" variant="primary" icon={<MessageSquarePlus size={14} />} onClick={() => startSessionWithMedia(m)} title="Start a session with it" aria-label="Start a session with it">
             <span className="max-sm:hidden">Start a session with it</span>
@@ -173,6 +177,11 @@ function MediaView({ id }: { id: string }) {
               // As tall as the screen allows, as wide as its shape then is.
               <div className="overflow-hidden rounded-2xl border border-line bg-black" style={{ aspectRatio: shape, width: `min(100%, calc(72dvh * ${ratio}))` }}>
                 <VideoPlayer src={src} name={m.title} downloadUrl={`${src}?download=1`} poster={mu(mediaUrl(m, 'still'))} />
+              </div>
+            ) : m.kind === 'audio' ? (
+              // Its shape as kept (read from the file when there is none), on a soft wash of the accent.
+              <div className="w-full rounded-2xl border border-line bg-gradient-to-br from-accent-soft via-panel to-panel px-4 py-6 sm:px-6 sm:py-8">
+                <AudioPlayer src={src} peaks={m.peaks ?? undefined} downloadUrl={`${src}?download=1`} large />
               </div>
             ) : (
               <button type="button" className="cursor-zoom-in" onClick={() => openLightbox([{ src, name: m.title }])} aria-label="Show it full size">
@@ -265,6 +274,14 @@ function MediaView({ id }: { id: string }) {
               <Fact label="File">{bytes(m.bytes)}</Fact>
               <Fact label="Kept">{new Date(m.createdAt).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })}</Fact>
             </div>
+            {m.lyrics && (
+              <div className="rounded-2xl border border-line bg-panel p-4">
+                <div className="mb-1.5 text-[12.5px] font-medium text-fg-2">Sung or spoken</div>
+                <p translate="no" className="max-h-80 overflow-y-auto text-[13px] leading-relaxed whitespace-pre-wrap text-fg-2">
+                  {m.lyrics}
+                </p>
+              </div>
+            )}
             {m.kind === 'video' && (
               <div className="rounded-2xl border border-line bg-panel p-3">
                 <div className="mb-2 px-1 text-[12.5px] font-medium text-fg-2">The frames its description was written from</div>

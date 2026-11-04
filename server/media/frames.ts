@@ -1,7 +1,8 @@
-// What ffmpeg tells and makes of a picture or a video: its size and length (ffprobe), a still to show it by,
-// a smaller copy of a picture, and a video's frames on one picture: ten of them, evenly spread, in a grid,
-// which is what a model sees to write a video's title and description. Without ffmpeg on the computer, none
-// of these: a video then shows without a still, and is described from what it was made from.
+// What ffmpeg tells and makes of a picture, a video or a sound: its size and length (ffprobe), a still to show it
+// by, a smaller copy of a picture, a video's frames on one picture (ten of them, evenly spread, in a grid, which is
+// what a model sees to write a video's title and description), a sound's shape (how loud it is along its length,
+// to draw it by), and a voice sample cut and turned into the WAV a voice model takes. Without ffmpeg on the
+// computer, none of these: a video then shows without a still, and is described from what it was made from.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import { agentBaseEnv } from '../env.ts';
@@ -11,6 +12,16 @@ function run(bin: string, args: string[], timeout = 60_000): Promise<string> {
     execFile(bin, args, { timeout, maxBuffer: 8 << 20, env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: '' } }, (err, stdout, stderr) => {
       if (err) reject(new Error(String(stderr || err.message).trim().split('\n').pop() || 'ffmpeg failed'));
       else resolve(String(stdout));
+    });
+  });
+}
+
+/** The same, for what comes out as bytes (raw sound). */
+function runRaw(bin: string, args: string[], timeout = 60_000): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    execFile(bin, args, { timeout, maxBuffer: 64 << 20, encoding: 'buffer', env: { ...agentBaseEnv(), CUDA_VISIBLE_DEVICES: '' } }, (err, stdout, stderr) => {
+      if (err) reject(new Error(String(stderr || err.message).trim().split('\n').pop() || 'ffmpeg failed'));
+      else resolve(stdout);
     });
   });
 }
@@ -99,5 +110,48 @@ export async function frameGrid(file: string, out: string, o: { count?: number; 
     return fs.existsSync(out) && fs.statSync(out).size > 0 ? { cols, rows } : null;
   } catch {
     return null;
+  }
+}
+
+/** How loud raw 16-bit mono sound is along its length: `count` levels from 0 to 1 (the loudest part is 1). */
+export function peaksOf(pcm: Buffer, count = 64): number[] | null {
+  const n = Math.floor(pcm.length / 2);
+  if (n < count) return null;
+  const per = n / count;
+  const levels: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const a = Math.floor(i * per);
+    const b = Math.max(a + 1, Math.floor((i + 1) * per));
+    let sum = 0;
+    for (let j = a; j < b; j++) {
+      const v = pcm.readInt16LE(j * 2) / 32768;
+      sum += v * v;
+    }
+    levels.push(Math.sqrt(sum / (b - a)));
+  }
+  const top = Math.max(...levels);
+  return levels.map((v) => (top > 0 ? Math.round((v / top) * 100) / 100 : 0));
+}
+
+/** A sound's shape, to draw it by: how loud each of `count` parts of it is (peaksOf), read with ffmpeg; null without it. */
+export async function waveform(file: string, count = 64): Promise<number[] | null> {
+  if (!(await hasFfmpeg())) return null;
+  try {
+    // One channel, 2,000 samples a second: a 3-minute song is 720 KB to read.
+    const raw = await runRaw(FFMPEG, ['-v', 'error', '-i', file, '-map', '0:a:0', '-ac', '1', '-ar', '2000', '-f', 's16le', '-c:a', 'pcm_s16le', '-'], 120_000);
+    return peaksOf(raw, count);
+  } catch {
+    return null;
+  }
+}
+
+/** A voice sample as voice models take it: its first `seconds`, one channel at 24 kHz, as WAV at `out`; false without ffmpeg. */
+export async function voiceClip(file: string, out: string, seconds = 30): Promise<boolean> {
+  if (!(await hasFfmpeg())) return false;
+  try {
+    await run(FFMPEG, ['-v', 'error', '-y', '-i', file, '-map', '0:a:0', '-t', String(seconds), '-ac', '1', '-ar', '24000', '-c:a', 'pcm_s16le', out], 120_000);
+    return fs.existsSync(out) && fs.statSync(out).size > 44;
+  } catch {
+    return false;
   }
 }

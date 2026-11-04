@@ -1,16 +1,17 @@
 // The Library (/library): everything kept, by space. Pages and small tools, slide decks, documents, spreadsheets
-// and LaTeX documents (agents' and yours), and the pictures and videos you kept, each in the space it was made in
+// and LaTeX documents (agents' and yours), and the pictures, videos and sounds you kept, each in the space it was made in
 // (an agent's save goes in its session's space; you pick when you keep something yourself) or in none. On a wide
 // screen the places are a list beside it: Everything (each space's things together, under its name), each space,
 // Not in a space, and Published (the sites published from pages or a project's build); on a phone, a row of chips.
 // Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space.
-// Addresses: /library?space=<id>|none, &kind=<kind> (image and video each, media both: the old Media tab's
-// ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex opens New with that kind.
+// Addresses: /library?space=<id>|none, &kind=<kind> (image, video and audio each, media pictures and videos both:
+// the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex opens New with that kind.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import {
   AppWindow,
   ArrowDownUp,
+  AudioLines,
   ArrowRight,
   Boxes,
   Copy,
@@ -47,7 +48,7 @@ import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { Button, cx, Empty, IconButton, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
-import { downloadMedia, recaption, startSessionWithMedia, Still } from '../media/parts';
+import { downloadMedia, recaption, SoundTile, startSessionWithMedia, Still } from '../media/parts';
 import { useMedia } from '../media/state';
 import { SpaceMark } from '../spaces/parts';
 import { SpaceMenu } from '../spaces/SpacePick';
@@ -60,9 +61,9 @@ import { usePagesStore } from './state';
 
 // ---- what the Library holds ----------------------------------------------------------------------------
 
-type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'image' | 'video';
+type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'image' | 'video' | 'audio';
 /** What a place shows: everything, one kind, or pictures and videos together. */
-type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'image' | 'video' | 'media';
+type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'image' | 'video' | 'audio' | 'media';
 
 interface Item {
   key: string;
@@ -84,6 +85,7 @@ const KIND: Record<ItemKind, { label: string; icon: ReactNode }> = {
   tex: { label: 'LaTeX', icon: <Sigma size={12} /> },
   image: { label: 'Picture', icon: <ImageIcon size={12} /> },
   video: { label: 'Video', icon: <Play size={12} /> },
+  audio: { label: 'Audio', icon: <AudioLines size={12} /> },
 };
 
 const SHOWS: { value: Show; label: string; has: (k: ItemKind) => boolean }[] = [
@@ -95,6 +97,7 @@ const SHOWS: { value: Show; label: string; has: (k: ItemKind) => boolean }[] = [
   { value: 'tex', label: 'LaTeX', has: (k) => k === 'tex' },
   { value: 'image', label: 'Pictures', has: (k) => k === 'image' },
   { value: 'video', label: 'Videos', has: (k) => k === 'video' },
+  { value: 'audio', label: 'Audio', has: (k) => k === 'audio' },
 ];
 /** Pictures and videos together: the old Media tab's address (and an older link's), with no chip of its own. */
 const BOTH: (typeof SHOWS)[number] = { value: 'media', label: 'Pictures and videos', has: (k) => k === 'image' || k === 'video' };
@@ -191,16 +194,21 @@ function ItemCard({ it, showSpace }: { it: Item; showSpace?: boolean }) {
   const sub = m?.caption === 'pending' ? 'Writing its title…' : tr(`Changed ${ago(it.at)}`);
   return (
     <div className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel transition-colors hover:border-line-2">
-      <button type="button" onClick={() => open()} className="relative block text-left" aria-label={it.title}>
-        {p ? <Thumb page={p} className="aspect-[16/10] w-full border-b border-line" /> : <Still m={m!} className="aspect-[16/10] w-full border-b border-line" />}
-        {/* Its kind, on the picture: a page's is plain to see, the others are named. */}
-        {it.kind !== 'page' && it.kind !== 'video' && (
-          <span className="pointer-events-none absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
-            {KIND[it.kind].icon}
-            {KIND[it.kind].label}
-          </span>
-        )}
-      </button>
+      {/* A sound's picture is its shape, with a button to play it where it is (beside the one that opens it, not in it). */}
+      {m?.kind === 'audio' ? (
+        <SoundTile m={m} onOpen={() => open()} className="aspect-[16/10] w-full border-b border-line" />
+      ) : (
+        <button type="button" onClick={() => open()} className="relative block text-left" aria-label={it.title}>
+          {p ? <Thumb page={p} className="aspect-[16/10] w-full border-b border-line" /> : <Still m={m!} className="aspect-[16/10] w-full border-b border-line" />}
+          {/* Its kind, on the picture: a page's is plain to see, the others are named. */}
+          {it.kind !== 'page' && it.kind !== 'video' && (
+            <span className="pointer-events-none absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+              {KIND[it.kind].icon}
+              {KIND[it.kind].label}
+            </span>
+          )}
+        </button>
+      )}
       <div className="flex min-w-0 items-start gap-1 py-2 pr-1 pl-3">
         <button type="button" onClick={() => open()} className="min-w-0 flex-1 text-left">
           <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
@@ -532,8 +540,8 @@ export function Library() {
       return (
         <Empty icon={<LibraryBig size={22} />} title="Your Library is empty">
           <span className="block">
-            Pages and small tools agents make for you, slides, documents and spreadsheets, and the pictures and videos you keep land here, sorted by project. Ask an agent for a tracker, a calculator or a
-            deck, or make one here.
+            Pages and small tools agents make for you, slides, documents and spreadsheets, and the pictures, videos and sounds you keep land here, sorted by project. Ask an agent for a tracker, a
+            calculator or a deck, or make one here.
           </span>
           <span className="mt-3 inline-flex gap-2">
             <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setMaking('page')}>
@@ -578,7 +586,7 @@ export function Library() {
       <PageHeader
         title="Library"
         tip="library"
-        sub="What agents made for you and what you kept: pages, slides, documents, pictures and videos, by project"
+        sub="What agents made for you and what you kept: pages, slides, documents, pictures, videos and sounds, by project"
         actions={
           place.kind === 'published' ? (
             <Button size="sm" variant="secondary" icon={<Upload size={14} />} onClick={() => setPublish(true)}>

@@ -50,7 +50,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['computer', 'Computer use', 'Capabilities', 'Agents see your Mac’s screen and use its mouse and keyboard, in the Mac app'],
   ['memory', 'Memory', 'Capabilities', 'What agents remember about you, your projects and each session, and when it was written'],
   ['children', 'Child sessions', 'Capabilities', 'Agents handing parts of a job to other agents, and swarms for hard problems'],
-  ['images', 'Images and video', 'Capabilities', 'Pictures and videos agents make for you through OpenRouter, and who writes their captions in the Library'],
+  ['images', 'Images, video and audio', 'Capabilities', 'Pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions in the Library'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
   ['assistants', 'Assistants', 'Capabilities', 'Presets to start sessions as (Researcher, Writer, Tutor…), and where task folders go'],
   ['custom', 'Custom', 'Capabilities', 'Auto mode, a sandbox for commands, and how long goals run'],
@@ -179,12 +179,15 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Child sessions
   ['children', 'Working at once, per session', 'child sessions parallel subagents concurrency limit', 'How many child sessions one session runs at once'],
   ['children', 'Swarm size', 'swarm mode team of agents subagents parallel angles hard problems math proof', 'How many agents of a swarm work at once'],
-  // Capabilities › Images and video
+  // Capabilities › Images, video and audio
   ['images', 'Making images', 'image generation pictures openrouter', 'Let agents make images'],
-  ['images', 'Image model', 'image model flux gemini openrouter', 'The model that makes them'],
+  ['images', 'Image model', 'image model seedream flux gemini openrouter', 'The model that makes them'],
   ['images', 'Making videos', 'video generation clips movies animation openrouter', 'Let agents make videos'],
-  ['images', 'Video model', 'video model veo kling seedance wan openrouter price a second', 'The model that makes videos'],
-  ['images', 'Captions in the Library', 'caption title description vision model library media frames provider claude ollama', 'The model that writes the titles and descriptions of the images and videos you keep', 'Captions for images and videos'],
+  ['images', 'Video model', 'video model seedance veo kling wan openrouter price a second', 'The model that makes videos'],
+  ['images', 'Making audio', 'audio generation music songs jingles voice over narration speech text to speech tts sound effects ambience openrouter', 'Let agents make audio'],
+  ['images', 'Music model', 'music model lyria songs jingles openrouter price a song', 'The model that makes music'],
+  ['images', 'Voice and sound model', 'voice model speech tts narration sound effects seed audio elevenlabs gemini voice cloning copy a voice openrouter', 'The model that makes voices and sounds'],
+  ['images', 'Captions in the Library', 'caption title description vision model library media frames provider claude ollama', 'The model that writes the titles and descriptions of the images, videos and audio you keep', 'Captions for images, videos and audio'],
   // Capabilities › Connections
   // Capabilities › Voice
   ['voice', 'Dictation', 'speech to text dictate microphone voice input', 'Speak a message instead of typing it'],
@@ -226,9 +229,10 @@ const PAGES: [string, string, string, string, string][] = [
   ['new-app', 'New app', '/apps/new', 'create build make new template app apps form tool', 'An app anyone can run from a form'],
   ['spaces', 'Projects', '/spaces', 'projects spaces project workspace group sessions files documents knowledge memory guidelines instructions skills folder library overview', 'Each project’s sessions, files, documents and Library, together'],
   ['knowledge', 'Shared knowledge', '/knowledge', 'knowledge base documents folder pdf files search rag library cite sources', 'Documents every session can search and cite'],
-  ['library', 'Library', '/library', 'library saved pages html reports small tools tracker calculator checklist edit editor slides decks presentations documents spreadsheets images pictures videos media kept export pdf word powerpoint projects spaces by project move', 'What agents made for you and what you kept: pages, slides, documents, pictures and videos, by project'],
+  ['library', 'Library', '/library', 'library saved pages html reports small tools tracker calculator checklist edit editor slides decks presentations documents spreadsheets images pictures videos audio sounds music media kept export pdf word powerpoint projects spaces by project move', 'What agents made for you and what you kept: pages, slides, documents, pictures, videos and sounds, by project'],
   ['media', 'Pictures', '/library?kind=image', 'images pictures photos drawings media kept saved generated library titles descriptions captions', 'The pictures agents made that you kept, each with a title and a description'],
   ['videos', 'Videos', '/library?kind=video', 'videos clips movies films media kept saved generated library titles descriptions captions frames', 'The videos agents made that you kept, each with a title and a description'],
+  ['audio', 'Audio', '/library?kind=audio', 'audio sounds music songs jingles voices voice overs speech narration sound effects recordings media kept saved generated library titles descriptions', 'The music, voices and sounds agents made that you kept, each with a title and a description'],
   ['new-page', 'New page', '/library?new=1', 'make create new page blank notes checklist tracker write design editor', 'A page of your own: blank, notes, a checklist or a tracker, or one an agent makes'],
   ['new-slides', 'New slides', '/library?new=slides', 'make create new slides slide deck presentation powerpoint keynote google slides talk pitch present', 'Slides of your own to edit and present, or a deck an agent makes'],
   ['new-doc', 'New document', '/library?new=doc', 'make create new document doc word docx google docs write letter report cv essay notes open import', 'A document to write and edit as in Word, or one an agent writes'],

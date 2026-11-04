@@ -1262,7 +1262,8 @@ const lastOpen: Record<string, SettingsSection> = {};
 function SectionMenu({ items, current, onOpen }: { items: SectionDef[]; current: SettingsSection | null; onOpen: (id: SettingsSection) => void }) {
   return (
     // Only a window too short for all of a tab's sections scrolls them on their own.
-    <nav className="sticky top-0 max-h-[calc(100dvh-94px)] w-[200px] shrink-0 overflow-y-auto py-6" aria-label="Settings sections">
+    // Wide enough for the longest section's name ("Images, video and audio") in full.
+    <nav className="sticky top-0 max-h-[calc(100dvh-94px)] w-[216px] shrink-0 overflow-y-auto py-6" aria-label="Settings sections">
       {items.map((d) => {
         const on = d.id === current;
         return (

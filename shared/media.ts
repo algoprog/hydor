@@ -1,6 +1,6 @@
-// Videos agents make through OpenRouter, the settings image and video models take (asked for on a form before
-// anything is made), and the images and videos kept in the Library: what it keeps of each, and the model that
-// writes their titles and descriptions.
+// Videos and audio agents make through OpenRouter, the settings image and video models take (asked for on a form
+// before anything is made), and the images, videos and audio kept in the Library: what it keeps of each, and the
+// model that writes their titles and descriptions.
 
 /** A setting an image or video model takes, as OpenRouter lists it: one of some values, a number in a range, or yes or no. */
 export interface MediaParam {
@@ -49,12 +49,70 @@ export interface VideosState {
   keySet: boolean;
 }
 
-export type MediaKind = 'image' | 'video';
+/**
+ * An OpenRouter model that makes sound: music (Google's Lyria, through a chat completion that streams it), or
+ * voices and sounds (its speech API: models that read words aloud, and ones like Seed Audio that take a
+ * description of the voice, of sound effects or of ambience; OpenAI's gpt-audio voices, through a chat).
+ */
+export interface AudioModel {
+  /** OpenRouter's id, e.g. "google/lyria-3-pro-preview". */
+  id: string;
+  label: string;
+  org?: string;
+  description?: string;
+  /** Listed on OpenRouter (ms). */
+  created?: number;
+  /** What it makes: songs and music, or speech (and sounds, for a model that takes a description). */
+  kind: 'music' | 'speech';
+  /** How it is asked: OpenRouter's speech API (which answers with the sound itself), or a streamed chat completion. */
+  via: 'speech' | 'chat';
+  /** It takes a description of what to make (the voice and its delivery, sound effects, ambience) rather than reading the words aloud as they are. */
+  prompted?: boolean;
+  /** The voices it speaks in, by id (none: its own, or the one it is told about or given a sample of). */
+  voices?: string[];
+  /** It speaks in a voice copied from short samples of someone speaking, and how many it takes at once (when OpenRouter says). */
+  cloning?: boolean;
+  maxSamples?: number;
+  /** It takes directions for the delivery (tone, pace, emotion). */
+  instructions?: boolean;
+  /** It voices a conversation, each turn in its own voice. */
+  multiSpeaker?: boolean;
+  /** The files it can make (a WAV comes from its raw sound). */
+  formats: ('mp3' | 'wav')[];
+  /** The longest it makes, in seconds, when known (Lyria 3 Clip 30, Lyria 3 Pro about 180, Seed Audio 120). */
+  maxSeconds?: number;
+  /** US dollars: a song (or clip), a second of sound made, a character read, a token in and out (speech sold by the token). */
+  perSong?: number;
+  perSecond?: number;
+  perChar?: number;
+  perToken?: { input: number; output: number };
+  /** About what a minute of speech costs, whichever way it is sold (to compare voice models). */
+  perMinute?: number;
+  /** It costs nothing. */
+  free?: boolean;
+}
 
-/** Where an image or video's title and description came from, or why they could not be written. */
+export interface AudioState {
+  /** Agents get the generate_audio tool. */
+  enabled: boolean;
+  /** The music model picked, and the voice and sound model; '' for the app's choice. */
+  music: string;
+  speech: string;
+  /** The models it uses now (the ones picked, or the app's choice). */
+  usingMusic: string;
+  usingSpeech: string;
+  musicInfo?: AudioModel;
+  speechInfo?: AudioModel;
+  /** An OpenRouter key is set (Settings → Models). */
+  keySet: boolean;
+}
+
+export type MediaKind = 'image' | 'video' | 'audio';
+
+/** Where an item's title and description came from, or why they could not be written. */
 export type CaptionStatus = 'pending' | 'done' | 'failed' | 'edited';
 
-/** An image or video kept in the Library. */
+/** An image, video or audio kept in the Library. */
 export interface MediaItem {
   id: string;
   kind: MediaKind;
@@ -64,8 +122,12 @@ export interface MediaItem {
   bytes: number;
   width?: number;
   height?: number;
-  /** A video's length, in seconds. */
+  /** A video's or a sound's length, in seconds. */
   duration?: number;
+  /** A sound's shape, to draw it by: how loud each of its parts is, from 0 to 1 (with ffmpeg). */
+  peaks?: number[];
+  /** The words sung or spoken in a sound: a song's lyrics, the script read aloud. */
+  lyrics?: string;
   /** What it was made from, and with which model, when an agent made it. */
   prompt?: string;
   model?: string;
@@ -118,9 +180,9 @@ export interface CaptionSettings {
 
 export interface MediaSettings {
   captions: CaptionSettings;
-  /** ffmpeg is on this computer: videos get their frames, and pictures a small copy. */
+  /** ffmpeg is on this computer: videos get their frames, pictures a small copy, and sounds their length and shape. */
   ffmpeg: boolean;
 }
 
-/** How a video's length reads: "8 s", "1:05". */
+/** How a video's or a sound's length reads: "8 s", "1:05". */
 export const clipLength = (s?: number) => (s == null || !Number.isFinite(s) ? '' : s < 60 ? `${Math.max(1, Math.round(s))} s` : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`);

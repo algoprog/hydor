@@ -89,7 +89,7 @@ export function itemsOf(kind: Kind, d: Pick<Deps, 'db' | 'sessions' | 'scheduler
       // The Library: its pages, and the images and videos kept there.
       return [
         ...listPages(db).map((p) => ({ id: `page:${p.id}`, text: text(p.title, 'A page') })),
-        ...listMedia(db).map((m) => ({ id: `media:${m.id}`, text: text(m.title, m.kind === 'video' ? 'A video' : 'An image', m.description) })),
+        ...listMedia(db).map((m) => ({ id: `media:${m.id}`, text: text(m.title, m.kind === 'video' ? 'A video' : m.kind === 'audio' ? 'A sound' : 'An image', m.description) })),
       ];
     case 'connections':
       return connections(db).map((c) => ({ id: `conn:${c.id}`, text: text(connectionView(db, c).name, 'A connected account', c.entry.name, c.entry.description) }));
