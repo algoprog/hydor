@@ -27,7 +27,9 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   agents, commands or monitors are still running, until those end. Pinned comes next, then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable, a line per session, with a pen to
   start a new session there, and dragged by their headings into the order you like, the same on every device;
-  then the rest by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
+  a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's
+  for it, on every device, shown under sessions and in the folder menus too; Codex projects' folders, such as the
+  ones it makes for ChatGPT projects, show by the project's name); then the rest by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
   (until later), settles (done for now), archives or deletes the session, on phones too.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
   OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).

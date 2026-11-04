@@ -4,6 +4,7 @@ import type { DirEntry } from '@shared/types';
 import { api } from '../lib/api';
 import { basename, dirname, tildify } from '../lib/format';
 import { useApp } from '../lib/store';
+import { folderName, givenName, useFolderNames } from '../lib/folderNames';
 import { cx, MenuSep, Popover, useSheets } from './ui';
 
 // The folders used lately as last loaded: a menu opens with them while it asks again.
@@ -122,6 +123,8 @@ export function FolderFinder({
     if (value && value !== home) void listFolders(value, false);
   }, []);
   const recent = useRecentFolders(true) ?? [];
+  // Folders you renamed show, and are found, by their names.
+  useFolderNames((x) => x.mine);
   const text = q.trim();
   const asPath = text.startsWith('/') || text.startsWith('~') || text.includes('/');
   const full = text.startsWith('~') ? home + text.slice(1) : text.startsWith('/') ? text : `${home}/${text}`;
@@ -136,10 +139,10 @@ export function FolderFinder({
 
   // 0 the name typed, 1 a name starting so, 2 one holding it, 3 a path holding it; -1 no match.
   const byName = (p: string) => {
-    const n = basename(p).toLowerCase();
-    if (n === part) return 0;
-    if (n.startsWith(part)) return 1;
-    if (n.includes(part)) return 2;
+    const ns = [basename(p).toLowerCase(), givenName(p)?.toLowerCase()].filter((n): n is string => !!n);
+    if (ns.some((n) => n === part)) return 0;
+    if (ns.some((n) => n.startsWith(part))) return 1;
+    if (ns.some((n) => n.includes(part))) return 2;
     return !asPath && tildify(p, home).toLowerCase().includes(part) ? 3 : -1;
   };
   // A folder used lately, for a path: one inside what is typed.
@@ -167,7 +170,7 @@ export function FolderFinder({
     return {
       key: p,
       icon: p === home ? <House size={15} /> : <Folder size={15} />,
-      name: p === home ? 'Home folder' : basename(p) || '/',
+      name: folderName(p, home),
       // Where it is, unless that goes without saying: in home, or in the folder whose path is typed.
       where: p === home || p === '/' || up === home || (asPath && up === base) ? '' : tildify(up, home),
       title: tildify(p, home),
@@ -395,7 +398,8 @@ export function FolderChip({ value, onChange }: { value: string; onChange: (path
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
-  const name = value === home ? '~' : basename(value) || '/';
+  useFolderNames((x) => x.mine);
+  const name = value === home ? '~' : folderName(value, home);
   return (
     <>
       <button

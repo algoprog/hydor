@@ -79,16 +79,25 @@ test('the routes: GET reads it, PUT keeps it and tells every open page', async (
   const order = ['search', 'help', ...usual.filter((t) => t !== 'search' && t !== 'help')];
   assert.deepEqual(await handlers.get('PUT /api/sidebar')!({ body: { tools: ['search', 'help'] } }), { tools: order, places: [] });
   assert.deepEqual(sent, [{ t: 'feature', id: 'sidebar', data: { tools: order, places: [] } }]);
-  assert.deepEqual(await handlers.get('GET /api/sidebar')!({}), { tools: order, places: [] });
+  assert.deepEqual(await handlers.get('GET /api/sidebar')!({}), { tools: order, places: [], names: {} });
   // The groups' order alone: the tools stay as they were.
   const places = ['dir:/home/alex/blog', 'space:sp1'];
   assert.deepEqual(await handlers.get('PUT /api/sidebar')!({ body: { places } }), { tools: order, places });
   assert.deepEqual(sent[1], { t: 'feature', id: 'sidebar', data: { tools: order, places } });
-  assert.deepEqual(await handlers.get('GET /api/sidebar')!({}), { tools: order, places });
+  assert.deepEqual(await handlers.get('GET /api/sidebar')!({}), { tools: order, places, names: {} });
   await assert.rejects(() => handlers.get('PUT /api/sidebar')!({ body: { tools: ['inbox'] } }), /inbox/);
   await assert.rejects(() => handlers.get('PUT /api/sidebar')!({ body: { places: ['day:Today'] } }), /day:Today/);
   await assert.rejects(() => handlers.get('PUT /api/sidebar')!({}), /tools, places or both/);
   assert.equal(sent.length, 2, 'a refused change tells nobody');
+  // A folder's name: kept, told to every open page, and given back with an empty one.
+  const named = { '/home/alex/.codex/.chatgpt-projects/g-p-6a8f': 'Thesis' };
+  assert.deepEqual(await handlers.get('PUT /api/sidebar/folder-name')!({ body: { path: '/home/alex/.codex/.chatgpt-projects/g-p-6a8f/', name: '  Thesis ' } }), { names: named });
+  assert.deepEqual(sent[2], { t: 'feature', id: 'sidebar', data: { names: named } });
+  assert.deepEqual(((await handlers.get('GET /api/sidebar')!({})) as { names: unknown }).names, named);
+  await assert.rejects(() => handlers.get('PUT /api/sidebar/folder-name')!({ body: { path: 'relative', name: 'x' } }), /full path/);
+  await assert.rejects(() => handlers.get('PUT /api/sidebar/folder-name')!({ body: { path: '/a', name: 'x'.repeat(81) } }), /80/);
+  assert.deepEqual(await handlers.get('PUT /api/sidebar/folder-name')!({ body: { path: '/home/alex/blog', name: 'blog' } }), { names: named }, 'its own name is no name of yours');
+  assert.deepEqual(await handlers.get('PUT /api/sidebar/folder-name')!({ body: { path: '/home/alex/.codex/.chatgpt-projects/g-p-6a8f', name: '' } }), { names: {} });
 });
 
 test('the projects’ and folders’ groups: as dragged, repeats and other names refused or passed over, kept for every device', () => {

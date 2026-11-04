@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoute } from 'wouter';
-import { AlarmClock, Archive, CheckCheck, ChevronRight, Ellipsis, Folder, Pencil, Pin, PinOff, SquarePen, Target, Trash2 } from 'lucide-react';
+import { AlarmClock, Archive, Boxes, CheckCheck, ChevronRight, Ellipsis, Folder, FolderOpen, FolderPen, Pencil, Pin, PinOff, RotateCcw, SquarePen, Target, Trash2 } from 'lucide-react';
 import {
   closestCenter,
   DndContext,
@@ -19,19 +19,20 @@ import {
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { SearchHit, SessionSummary } from '@shared/types';
-import { api, del, enc, post } from '../../lib/api';
+import { api, del, enc, patch, post } from '../../lib/api';
 import { basename, markRuns, tildify, timeAgo } from '../../lib/format';
-import { go, openSession } from '../../lib/nav';
+import { filePath, go, openSession } from '../../lib/nav';
 import { activityOf, inBackground, isBusy, isWorking } from '../../lib/activity';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
+import { folderName, givenName, namedFolders, renameFolder, translatable, useFolderNames } from '../../lib/folderNames';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat } from '../../components/DiffView';
-import { cx, IconButton, Throbber, MenuItem, MenuSep, Popover, useConfirm, useMediaQuery } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, Throbber, MenuItem, MenuSep, Popover, useConfirm, useMediaQuery } from '../../components/ui';
 import { Elapsed } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
-import { useSpaces } from '../spaces/state';
-import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isChatgptProjectFolder, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
+import { loadSpaces, useSpaces } from '../spaces/state';
+import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
 import { setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
@@ -54,23 +55,8 @@ function pruneActive(active: Set<string>) {
   for (const k of activeSince.keys()) if (!active.has(k)) activeSince.delete(k);
 }
 
-/** What the home folder is called where a session's folder is named (translated, unlike folders' own names). */
-export const HOME_FOLDER = 'Home folder';
-
-/** What a folder the Codex app made for a ChatGPT project is called when Codex does not say the project's name. */
-export const CHATGPT_PROJECT = 'ChatGPT project';
-
-/** The folder a session works in, as a short name ("Home folder" for the home folder). */
-export function folderName(cwd: string | undefined, home?: string): string {
-  if (!cwd) return '';
-  const dir = cwd.replace(/\/+$/, '');
-  if (home && dir === home.replace(/\/+$/, '')) return HOME_FOLDER;
-  // A Codex project's folder goes by the project's name; a ChatGPT project's folder the Codex app made is named only by an id.
-  const named = useApp.getState().boot?.folderNames?.[dir];
-  if (named) return named;
-  if (isChatgptProjectFolder(dir)) return CHATGPT_PROJECT;
-  return basename(cwd) || '/';
-}
+// What folders are called (a name you gave one, its Codex project's, or its own), shared with the rest of the app.
+export { CHATGPT_PROJECT, folderName, HOME_FOLDER } from '../../lib/folderNames';
 
 /** One line on what a session is doing: "Working · 2m 10s", "Needs you", "Open in VS Code". */
 export function ActivityText({ s, className }: { s: SessionSummary; className?: string }) {
@@ -226,6 +212,8 @@ const RowBody = memo(function RowBody({
   const running = !!a;
   // A turn finished since the session was last looked at.
   const unread = !active && !!s.doneAt && s.doneAt > (s.seenAt ?? 0) && !(a && (isWorking(a) || a.status === 'waiting'));
+  // A folder renamed anywhere shows its new name at once.
+  useFolderNames((x) => x.mine);
   const where = folderName(s.cwd, home);
   // On a computer the ⋯ shows over the row's end while the pointer is on the row, or while its menu is open.
   const overlay = !!onMore && !touch && !renaming;
@@ -342,7 +330,7 @@ const RowBody = memo(function RowBody({
             <ActivityText s={s} className="min-w-0" />
           ) : (
             <>
-              <span className="min-w-0 truncate" translate={where === HOME_FOLDER || where === CHATGPT_PROJECT ? undefined : 'no'}>
+              <span className="min-w-0 truncate" translate={translatable(where) ? undefined : 'no'}>
                 {where || '—'}
               </span>
               <span className="shrink-0" aria-hidden>
@@ -497,46 +485,198 @@ interface PlaceHandle {
   attrs: HTMLAttributes<HTMLButtonElement>;
 }
 
-/** A space's or a folder's heading: it folds the group away, and drags it to another place among them; its pen starts a new session there. */
+/** A folder's name, changed from a session's menu: what the app calls the folder, here and on every device. */
+function FolderNameDialog({ dir, home, onClose }: { dir: string; home?: string; onClose: () => void }) {
+  const own = basename(dir) || '/';
+  const [v, setV] = useState(() => givenName(dir) ?? '');
+  const save = () => {
+    renameFolder(dir, v);
+    onClose();
+  };
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="Rename folder"
+      width={420}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={save}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-2">
+        <input
+          autoFocus
+          value={v}
+          maxLength={80}
+          aria-label="Folder name"
+          placeholder={own}
+          onChange={(e) => setV(e.target.value)}
+          onFocus={(e) => e.currentTarget.select()}
+          onKeyDown={(e) => e.key === 'Enter' && save()}
+          className="h-9 w-full rounded-lg border border-line bg-bg-1 px-3 text-[14px] text-fg outline-none focus:border-accent/60"
+        />
+        <p className="text-[12.5px] text-fg-3">
+          <span translate="no">{tildify(dir, home)}</span>
+          <br />
+          The sidebar and the folder menus show this name, on every device. Leave it empty for the folder's own.
+        </p>
+      </div>
+    </Dialog>
+  );
+}
+
+/** Renames a project (its name for everyone) or a folder (what the app calls it here, on every device). */
+function renamePlace(g: SessionGroup, name: string) {
+  const n = name.trim();
+  if (g.space) {
+    if (!n || n === g.space.name) return;
+    patch(`/api/spaces/${enc(g.space.id)}`, { name: n })
+      .then(() => loadSpaces())
+      .catch(toastError);
+  } else if (g.path && n !== g.label) renameFolder(g.path, n);
+}
+
+/** The heading's name being changed in place: Enter keeps it, Escape leaves it. An empty one gives a folder its own back. */
+function PlaceRename({ g, onDone }: { g: SessionGroup; onDone: () => void }) {
+  const [v, setV] = useState(g.label);
+  const done = useRef(false);
+  const finish = (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    onDone();
+    if (save) renamePlace(g, v);
+  };
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+  return (
+    <div className="flex h-7 min-w-0 flex-1 items-center gap-2.5 px-2.5 max-md:h-8">
+      <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
+      <input
+        autoFocus
+        value={v}
+        maxLength={80}
+        aria-label={g.space ? 'Project name' : 'Folder name'}
+        placeholder={g.path ? basename(g.path) : undefined}
+        onChange={(e) => setV(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={() => finish(true)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') finish(true);
+          else if (e.key === 'Escape') finish(false);
+        }}
+        onClick={stop}
+        onMouseDown={stop}
+        onTouchStart={stop}
+        onPointerDown={stop}
+        className="h-6 min-w-0 flex-1 rounded-md border border-accent/60 bg-bg-1 px-1.5 text-[13px] font-medium text-fg outline-none"
+      />
+    </div>
+  );
+}
+
+/**
+ * A space's or a folder's heading: it folds the group away, and drags it to another place among them; its pen starts
+ * a new session there, and its ⋯ (or a right-click, or a double-click on the name) renames it.
+ */
 function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGroup; folded: boolean; home?: string; onFold?: () => void; handle?: PlaceHandle; lifted?: boolean }) {
   const unread = folded && g.items.some(unreadOf);
+  const [renaming, setRenaming] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const more = useRef<HTMLButtonElement>(null);
+  // A folder you named: its own name can come back.
+  const mine = useFolderNames((x) => (g.path ? x.mine[g.path] : undefined));
+  const shown = (
+    <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
+  );
   return (
     <div data-tip="groups" className={cx('group/head flex items-center gap-0.5 py-0.5', lifted ? 'rounded-lg bg-bg-2 shadow-lg ring-1 ring-line-2' : 'sticky top-0 z-[1] bg-sidebar')}>
-      <button
-        type="button"
-        ref={handle?.ref}
-        {...handle?.attrs}
-        aria-expanded={!folded}
-        title={g.space ? `The ${g.space.name} project: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : tildify(g.path, home)}
-        onClick={(e) => {
-          // On a phone a tap on a button in the list closes the drawer (it opened a session); this one stays.
-          e.stopPropagation();
-          // A drop ends with a click on the heading under the pointer.
-          if (Date.now() - lastDragEnd < 300) return;
-          onFold?.();
-        }}
-        className="flex h-7 min-w-0 flex-1 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium text-fg-2 transition-colors select-none [-webkit-touch-callout:none] hover:bg-bg-2 hover:text-fg max-md:h-8"
-      >
-        <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="min-w-0 truncate" translate="no">
-            {g.label}
-          </span>
-          {folded && <span className="tnum shrink-0 text-[11.5px] font-normal text-fg-3">{g.items.length}</span>}
-          {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
-          <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
-        </span>
-      </button>
-      {!lifted && (
-        <IconButton
-          size="sm"
-          label={`New session in ${g.label}`}
-          onClick={() => (g.space ? startInSpace(g.space) : newSessionIn(g.path!))}
-          // On hover with a mouse; always on touch screens.
-          className="opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100"
+      {renaming ? (
+        <PlaceRename g={g} onDone={() => setRenaming(false)} />
+      ) : (
+        <button
+          type="button"
+          ref={handle?.ref}
+          {...handle?.attrs}
+          aria-expanded={!folded}
+          title={g.space ? `The ${g.space.name} project: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : tildify(g.path, home)}
+          onClick={(e) => {
+            // On a phone a tap on a button in the list closes the drawer (it opened a session); this one stays.
+            e.stopPropagation();
+            // A drop ends with a click on the heading under the pointer.
+            if (Date.now() - lastDragEnd < 300) return;
+            // The second click of a double-click renames instead (the first one folded it: it opens again).
+            if (e.detail === 2) {
+              onFold?.();
+              setRenaming(true);
+              return;
+            }
+            onFold?.();
+          }}
+          onContextMenu={(e) => {
+            if (lifted) return;
+            e.preventDefault();
+            setMenu(true);
+          }}
+          className="flex h-7 min-w-0 flex-1 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium text-fg-2 transition-colors select-none [-webkit-touch-callout:none] hover:bg-bg-2 hover:text-fg max-md:h-8"
         >
-          <SquarePen size={13} />
-        </IconButton>
+          {shown}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate" translate={translatable(g.label) ? undefined : 'no'}>
+              {g.label}
+            </span>
+            {folded && <span className="tnum shrink-0 text-[11.5px] font-normal text-fg-3">{g.items.length}</span>}
+            {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
+            <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
+          </span>
+        </button>
+      )}
+      {!lifted && !renaming && (
+        <>
+          <IconButton
+            ref={more}
+            size="sm"
+            label={`More for ${g.label}`}
+            onClick={(e) => (e.stopPropagation(), setMenu(true))}
+            // On hover with a mouse; always on touch screens.
+            className={cx('opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100', menu && 'opacity-100')}
+          >
+            <Ellipsis size={13} />
+          </IconButton>
+          <IconButton
+            size="sm"
+            label={`New session in ${g.label}`}
+            onClick={() => (g.space ? startInSpace(g.space) : newSessionIn(g.path!))}
+            className="opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100"
+          >
+            <SquarePen size={13} />
+          </IconButton>
+          <Popover anchor={more} open={menu} onClose={() => setMenu(false)} width={210} align="end">
+            <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), setRenaming(true))}>
+              Rename
+            </MenuItem>
+            {mine && (
+              <MenuItem icon={<RotateCcw size={14} />} onClick={() => (setMenu(false), renameFolder(g.path!, ''))}>
+                Use the folder's own name
+              </MenuItem>
+            )}
+            {g.space ? (
+              <MenuItem icon={<Boxes size={14} />} onClick={() => (setMenu(false), go(`/spaces/${enc(g.space!.id)}`))}>
+                Open the project
+              </MenuItem>
+            ) : (
+              <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(false), go(filePath(g.path!)))}>
+                Open in Files
+              </MenuItem>
+            )}
+          </Popover>
+        </>
       )}
     </div>
   );
@@ -570,6 +710,8 @@ export function SessionList({ query }: { query: string }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<SessionSummary | null>(null);
   const [snoozing, setSnoozing] = useState(false);
+  /** The folder whose name is being changed from a session's menu. */
+  const [namingFolder, setNamingFolder] = useState<string | null>(null);
   const menuAnchor = useRef<HTMLElement | null>(null);
   /** Opened by a row's ⋯ (it lines up with the button's end), or by a right-click on the row (under its start). */
   const [menuByButton, setMenuByButton] = useState(false);
@@ -590,7 +732,10 @@ export function SessionList({ query }: { query: string }) {
   const defaultCwd = useApp((s) => s.boot?.defaultCwd);
   const autoFolders = useApp((s) => s.boot?.autoFolders);
   const unpicked = useMemo(() => unpickedFolders(home, defaultCwd, autoFolders), [home, defaultCwd, autoFolders]);
-  const folderNames = useApp((s) => s.boot?.folderNames);
+  // Names for folders: yours (kept for every device) over Codex projects'.
+  const codexNames = useApp((s) => s.boot?.folderNames);
+  const myNames = useFolderNames((s) => s.mine);
+  const folderNames = useMemo(() => namedFolders(myNames), [myNames, codexNames]);
   const [, redraw] = useState(0);
   const [groupTime, setGroupTime] = useState(Date.now);
   // The order you dragged the spaces' and folders' groups into, the same on every device.
@@ -901,6 +1046,7 @@ export function SessionList({ query }: { query: string }) {
         {zoneAt === groups.length && <PinZone hot={overGroup === 'pinned'} />}
       </div>
       {confirmNode}
+      {namingFolder && <FolderNameDialog dir={namingFolder} home={home} onClose={() => setNamingFolder(null)} />}
       {createPortal(
         <DragOverlay dropAnimation={null} modifiers={[stayUnderPointer]}>
           {dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : draggingPlace ? <PlaceHead g={draggingPlace} folded home={home} lifted /> : null}
@@ -920,6 +1066,17 @@ export function SessionList({ query }: { query: string }) {
             >
               Rename
             </MenuItem>
+            {menu.cwd && typeof menu.extra?.space !== 'string' && (
+              <MenuItem
+                icon={<FolderPen size={14} />}
+                onClick={() => {
+                  setNamingFolder(menu.cwd!);
+                  setMenu(null);
+                }}
+              >
+                Rename folder
+              </MenuItem>
+            )}
             <MenuItem
               icon={menu.pinned ? <PinOff size={14} /> : <Pin size={14} />}
               onClick={() => {
