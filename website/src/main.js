@@ -247,6 +247,10 @@ void main() {
     btn.addEventListener('click', () => set(btn.getAttribute('aria-expanded') !== 'true'));
     sheet.addEventListener('click', (e) => e.target.closest('a') && set(false));
     addEventListener('keydown', (e) => e.key === 'Escape' && set(false));
+    // The wordmark in the bar comes in once the big one at the top of the page has gone by.
+    const mark = $('[data-hero-mark]');
+    if (mark) watch(mark, (v) => nav.classList.toggle('show-brand', !v), { rootMargin: `-${64}px 0px 0px 0px` });
+    else nav.classList.add('show-brand');
   }
 
   /* ---------- Things that come in as you scroll ---------- */
@@ -265,40 +269,23 @@ void main() {
     $$('.reveal, [data-fill-on-view]').forEach((el) => io.observe(el));
   }
 
-  /* ---------- The app's window in the hero: tilted, flattening as you scroll ---------- */
+  /* ---------- The app's window in the hero: tilted back, flattening as you scroll ---------- */
 
   function stage() {
     const el = $('[data-tilt]');
     if (!el || still()) return;
-    let sp = 0;
-    let mx = 0;
-    let my = 0;
     let raf = 0;
     const apply = () => {
       raf = 0;
-      el.style.setProperty('--rx', `${((1 - sp) * 14 - my * 3).toFixed(2)}deg`);
-      el.style.setProperty('--ry', `${(mx * 5 * (1 - sp * 0.6)).toFixed(2)}deg`);
-      el.style.setProperty('--s', (0.95 + sp * 0.05).toFixed(3));
+      const r = el.getBoundingClientRect();
+      const sp = clamp((innerHeight * 0.85 - r.top) / (innerHeight * 0.6));
+      el.style.setProperty('--rx', `${((1 - sp) * 12).toFixed(2)}deg`);
+      el.style.setProperty('--s', (0.96 + sp * 0.04).toFixed(3));
     };
     const queue = () => raf || (raf = requestAnimationFrame(apply));
-    const onScroll = () => {
-      const r = el.getBoundingClientRect();
-      sp = clamp((innerHeight * 0.8 - r.top) / (innerHeight * 0.6));
-      queue();
-    };
-    addEventListener('scroll', onScroll, { passive: true });
-    addEventListener('resize', onScroll);
-    onScroll();
-    if (matchMedia('(pointer: fine)').matches)
-      addEventListener(
-        'pointermove',
-        (e) => {
-          mx = e.clientX / innerWidth - 0.5;
-          my = e.clientY / innerHeight - 0.5;
-          queue();
-        },
-        { passive: true },
-      );
+    addEventListener('scroll', queue, { passive: true });
+    addEventListener('resize', queue);
+    apply();
   }
 
   /* ---------- The scripted demo ---------- */
@@ -678,33 +665,9 @@ void main() {
     );
   }
 
-  /* ---------- Small animations in the feature cards ---------- */
+  /* ---------- Memory, found by what it means: a question with none of a note's words still finds it ---------- */
 
-  function cards() {
-    for (const el of $$('[data-spot]'))
-      el.addEventListener('pointermove', (e) => {
-        const r = el.getBoundingClientRect();
-        el.style.setProperty('--mx', `${e.clientX - r.left}px`);
-        el.style.setProperty('--my', `${e.clientY - r.top}px`);
-      });
-
-    // The agent picker, its highlight moving down the list.
-    const rows = $$('[data-picker] .picker-row');
-    if (rows.length) {
-      let i = 0;
-      let on = false;
-      rows[0].classList.add('on');
-      watch(rows[0].parentElement, (v) => (on = v));
-      if (!still())
-        setInterval(() => {
-          if (!on || document.hidden) return;
-          rows[i].classList.remove('on');
-          i = (i + 1) % rows.length;
-          rows[i].classList.add('on');
-        }, 1900);
-    }
-
-    // Memory, found by what it means: a question with none of the note's words still finds it.
+  function memory() {
     const mem = $('[data-mem]');
     if (mem) {
       const q = $('[data-mem-q]', mem);
@@ -742,26 +705,6 @@ void main() {
         })();
       }
     }
-  }
-
-  /* ---------- How it goes: the window beside the steps follows them ---------- */
-
-  function story() {
-    const steps = $$('[data-story] .story-step');
-    const shots = $$('[data-story] .story-shots img');
-    if (!steps.length) return;
-    const set = (i) => {
-      steps.forEach((s, j) => s.classList.toggle('on', i === j));
-      shots.forEach((s, j) => s.classList.toggle('on', i === j));
-    };
-    set(0);
-    const io = new IntersectionObserver(
-      (es) => {
-        for (const e of es) if (e.isIntersecting) set(Number(e.target.dataset.step));
-      },
-      { rootMargin: '-45% 0px -45% 0px' },
-    );
-    steps.forEach((s) => io.observe(s));
   }
 
   /* ---------- The phone: a notification comes in, you answer it or open the session ---------- */
@@ -809,32 +752,6 @@ void main() {
         }
       }
     })();
-  }
-
-  /* ---------- Numbers that count up ---------- */
-
-  function counters() {
-    const io = new IntersectionObserver(
-      (es) => {
-        for (const e of es) {
-          if (!e.isIntersecting) continue;
-          io.unobserve(e.target);
-          const el = e.target;
-          const to = Number(el.dataset.count);
-          if (still() || !to) continue;
-          const t0 = performance.now();
-          const tick = (now) => {
-            const p = clamp((now - t0) / 1400);
-            el.textContent = String(Math.round(to * (1 - Math.pow(1 - p, 3))));
-            if (p < 1) requestAnimationFrame(tick);
-          };
-          el.textContent = '0';
-          requestAnimationFrame(tick);
-        }
-      },
-      { threshold: 0.6 },
-    );
-    $$('[data-count]').forEach((el) => io.observe(el));
   }
 
   /* ---------- Copy buttons ---------- */
@@ -889,10 +806,8 @@ void main() {
   reveals();
   stage();
   demo();
-  cards();
-  story();
+  memory();
   phone();
-  counters();
   copies();
   tour();
   downloads(gl);

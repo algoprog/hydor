@@ -19,6 +19,9 @@ systemd-run --user --scope -q -p MemoryMax=4G nice node scripts/guide-shots/run.
 rm /tmp/guide-shots-app/node_modules && git worktree remove --force /tmp/guide-shots-app
 ```
 
+`--shots <file>` takes another list of shots instead of the guide's, such as the website's whole windows of the app
+(`website/shots.mjs`, see `website/README.md`).
+
 To take a shot from uncommitted changes, apply them to the worktree before building. `--out <dir>` writes the
 pictures somewhere else to compare first; `--serve` starts the demo app alone until Ctrl+C, to look around (port
 8795, password "a demo password").
