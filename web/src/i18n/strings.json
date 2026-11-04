@@ -2210,6 +2210,7 @@
 "charts and graphs":"web/src/features/files/FileInEditor.tsx",
 "charts and pictures":"web/src/features/files/FileInEditor.tsx",
 "ChatGPT ({0})":"web/src/features/tour/Tour.tsx",
+"ChatGPT project":"web/src/features/sessions/SessionList.tsx",
 "Cheapest":"web/src/features/images/ImagesSettings.tsx",
 "check":"web/src/features/settings/ModelsSettings.tsx",
 "Check":"web/src/features/settings/ModelsSettings.tsx",

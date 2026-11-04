@@ -105,6 +105,8 @@ export interface Bootstrap {
   defaultCwd: string;
   /** Folders no one picks (task folders' place, apps' runs, worktrees, the temporary folder…); missing on older servers. */
   autoFolders?: string[];
+  /** Names for folders that have one besides their own (a Codex project's, such as a ChatGPT project's folder); missing on older servers. */
+  folderNames?: Record<string, string>;
   prefs: Record<string, SessionPrefs>;
   /** What the start page had picked last; missing on servers before it was kept. */
   start?: StartSettings;

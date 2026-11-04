@@ -215,6 +215,20 @@ test('two folders of the same name show the folder each is in', () => {
   );
 });
 
+test('ChatGPT projects\' folders (named by an id) get no group, unless Codex names the project; same-named folders go up until they differ', () => {
+  n = 0;
+  const gp = `${HOME}/.codex/.chatgpt-projects/g-p-6a8f480744908191a58f758776c01519`;
+  const gq = `${HOME}/.codex/.chatgpt-projects/g-p-6a8f2b6112e481`;
+  const list = [ses(gp, 1 * H), ses(gp, 2 * H), ses(gq, 3 * H), ses(gq, 4 * H), ses(`${HOME}/a/projects/readable990`, 5 * H), ses(`${HOME}/a/projects/readable990`, 6 * H), ses(`${HOME}/b/projects/readable990`, 7 * H), ses(`${HOME}/b/projects/readable990`, 8 * H)];
+  const sorted = [...list].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const gs = groupSessions(sorted, { now, byFolder: true, spaces: [], unpicked, names: { [gp]: 'Thesis notes' } });
+  assert.deepEqual(
+    gs.filter((g) => g.kind === 'folder').map((g) => g.label),
+    ['Thesis notes', 'a/projects/readable990', 'b/projects/readable990'],
+  );
+  assert.equal(gs.filter((g) => g.kind === 'day').flatMap((g) => g.items).length, 2, 'the unnamed ChatGPT project\'s sessions go by day');
+});
+
 test('with grouping off, everything but active, pinned and snoozed goes by day, as before', () => {
   n = 0;
   const gs = group([ses(`${HOME}/code/shop`, H), ses(`${HOME}/code/shop`, 2 * H, { extra: { space: 'sp1' } })], { byFolder: false, spaces: [space('sp1', 'Thesis')] });
