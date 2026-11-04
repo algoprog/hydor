@@ -6,13 +6,16 @@
 //
 // Shown inside the app's Preview page (a frame), its pages get a small helper that tells the page where
 // they are (for its address bar) and goes back, forward or reloads when asked. Where the browser cannot
-// reach the preview port (the app behind a tunnel with one hostname), Preview shows pictures of the screen
-// instead, taken here (devServerShot).
+// reach the preview port (the app behind a tunnel with one hostname), the page opens in the app's own
+// browser here instead and streams to Preview, which the user drives (livePreview); pictures of the screen
+// are taken here too (devServerShot), to save or hand to an agent.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
+import type { BrowserView } from '../shared/browser.ts';
+import { browserOf, ensureBrowser, previewKey } from './browser/session.ts';
 import { capture } from './capture/index.ts';
 import { config } from './config.ts';
 import { readLink, signLink } from './links.ts';
@@ -297,9 +300,50 @@ export function listDevServers(): Promise<DevServer[]> {
   );
 }
 
-/** A picture of a dev server's page, as a browser here sees it. */
-export async function devServerShot(port: number, at: string, device: 'desktop' | 'tablet' | 'phone'): Promise<Buffer> {
+/** A picture of a dev server's page, as a browser here sees it: as it is in its live preview when that is open, else freshly opened. */
+export async function devServerShot(port: number, at: string, device: 'desktop' | 'tablet' | 'phone', live = false): Promise<Buffer> {
+  const t = live ? browserOf(previewKey(port))?.active : undefined;
+  if (t && !t.closed) return Buffer.from(await t.screenshot({ format: 'png' }), 'base64');
   const vp = device === 'phone' ? { width: 390, height: 844, scale: 2, mobile: true } : device === 'tablet' ? { width: 820, height: 1180, scale: 1, mobile: true } : { width: 1280, height: 800, scale: 1, mobile: false };
   const shot = await capture({ url: `http://localhost:${port}${safePath(at)}`, ...vp, format: 'png', settleMs: 900 });
   return shot.data;
+}
+
+const within = (v: unknown, lo: number, hi: number, d: number) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
+};
+
+// One opening at a time for each port: two at once would each start a browser for it.
+const opening = new Map<number, Promise<unknown>>();
+function oneAtATime<T>(port: number, fn: () => Promise<T>): Promise<T> {
+  const p = (opening.get(port) ?? Promise.resolve()).then(fn, fn);
+  const tail = p.catch(() => {});
+  opening.set(port, tail);
+  void tail.then(() => opening.get(port) === tail && opening.delete(port));
+  return p;
+}
+
+/**
+ * A dev server's page in the app's own browser, for Preview where the browser can't reach the preview
+ * port: laid out at the size Preview shows it (a phone's and a tablet's as on one, touch included), the
+ * user driving. It opens at `path` (or the start when it has no page yet); coming back to Preview finds
+ * the page as it was left. Its live view streams to whoever follows its key; it reaches that port only.
+ */
+export function livePreview(port: number, o: { path?: string; device: 'desktop' | 'tablet' | 'phone'; w: unknown; h: unknown; scale?: unknown }): Promise<{ key: string; view: BrowserView }> {
+  return oneAtATime(port, async () => {
+    const key = previewKey(port);
+    const fresh = !browserOf(key);
+    const b = await ensureBrowser(key, config.defaultCwd, '');
+    const mobile = o.device !== 'desktop';
+    // Device pixels per CSS pixel: as sharp as the screen looking at it (Preview keeps frames to 1600 pixels wide).
+    const scale = Math.round(within(o.scale, 1, 3, mobile ? 2 : 1) * 100) / 100;
+    await b.layOut({ w: Math.round(within(o.w, 240, 3000, 1280)), h: Math.round(within(o.h, 240, 3000, 800)), mobile, scale });
+    const t = await b.tab();
+    if (o.path !== undefined || fresh || !/^https?:/.test(t.url)) {
+      // A server that isn't answering shows the browser's own page saying so.
+      await t.navigate(`http://localhost:${port}${safePath(o.path ?? '/')}`);
+    }
+    return { key, view: b.view() };
+  });
 }

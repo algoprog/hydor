@@ -600,12 +600,14 @@ Click a web app to show it on the right. On a computer the first one shows at on
 
 Preview shows a dev server live through the app's preview port (8791 unless your install set another), which keeps the dev server apart from the app: your sign-in never reaches it, and hot reload works. A browser previews one server at a time: showing another moves the preview port to it.
 
-When your browser can't reach the preview port (you reach the app through a tunnel or a proxy with one hostname, say), Preview shows pictures of the page instead, taken on this computer at the size you picked, and a line above says so. **Reload** takes a new picture. Click the line for how to see it live:
+When your browser can't reach the preview port (you reach the app through a tunnel or a proxy with one hostname, say), the page opens in a browser on this computer instead, at the size you picked, and streams to Preview live: click, type, scroll and paste in it as in any page, and hot reload shows there too. On a phone, tap and drag; **Type** under the page brings up the keyboard, beside keys phones lack (Tab, Enter, Esc, the arrows). The page reaches that dev server only, not the other servers on this computer. Coming back to Preview finds it where you left it; after 15 minutes with nobody looking it closes, and opens again when you do. **Save a picture of it** and **Ask an agent about this screen** take the page as it is on screen.
+
+To have the page itself in your browser rather than streamed:
 
 - on the same network, or over a VPN such as Tailscale or WireGuard, open the app at this computer's own address: the port works directly;
 - behind a tunnel or a proxy, give the preview port a hostname of its own (preview.example.com → localhost:8791) and start the app with `PREVIEW_ORIGIN` set to it.
 
-Pictures need a Chromium on this computer: the one the browser uses ([Settings → Capabilities → Browser](/settings?s=browser) can download one). "Previews are off" means the app was started with `PREVIEW_PORT=0`. Preview is there only for the machine you opened the app on, not for other machines you switch to.
+**Show it as a picture** in **More** (⋯) shows still pictures taken on this computer instead; **Reload** then takes a new one. Streaming and pictures need a Chromium on this computer: the one the browser uses ([Settings → Capabilities → Browser](/settings?s=browser) can download one). "Previews are off" means the app was started with `PREVIEW_PORT=0`. Preview is there only for the machine you opened the app on, not for other machines you switch to.
 
 ## Review an agent's changes to a web app
 

@@ -18,8 +18,8 @@ const mods = (e: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey
 /** What the phone keyboard's field holds between keys, so a backspace on "nothing" still shows up. */
 const BASE = '  ';
 
-/** `maxH` caps its height (a CSS length): it keeps the page's shape within it. */
-export const LiveView = forwardRef<LiveViewApi, { k: string; view: BrowserView; driving: boolean; small?: boolean; className?: string; maxH?: string }>(function LiveView({ k, view, driving, small, className, maxH }, ref) {
+/** `maxH` caps its height (a CSS length): it keeps the page's shape within it. `plain`: no ring while the user drives (Preview, where they always do). */
+export const LiveView = forwardRef<LiveViewApi, { k: string; view: BrowserView; driving: boolean; small?: boolean; plain?: boolean; className?: string; maxH?: string }>(function LiveView({ k, view, driving, small, plain, className, maxH }, ref) {
   const box = useRef<HTMLDivElement>(null);
   const img = useRef<HTMLImageElement>(null);
   const kb = useRef<HTMLInputElement>(null);
@@ -210,7 +210,7 @@ export const LiveView = forwardRef<LiveViewApi, { k: string; view: BrowserView; 
       onKeyDown={keyDown}
       onKeyUp={keyUp}
       onPaste={paste}
-      className={cx('relative mx-auto overflow-hidden bg-bg-2 outline-none', driving && 'ring-2 ring-accent', className)}
+      className={cx('relative mx-auto overflow-hidden bg-bg-2 outline-none', driving && !plain && 'ring-2 ring-accent', className)}
       style={{ aspectRatio: ratio, width: maxH ? `min(100%, calc(${maxH} * ${ratio}))` : undefined }}
     >
       <img

@@ -9,7 +9,7 @@ import type { Deps } from '../features/types.ts';
 import { downloadChrome, downloadState, findChromes, pickChrome, sandboxOff, forgetChromes } from './chrome.ts';
 import { hostPort, isPrivate, refusal } from './guard.ts';
 import { normalizeUrl } from './ops.ts';
-import { browserOf, emitView, ensureBrowser, openBrowsers, profileKey, viewOf } from './session.ts';
+import { browserOf, emitView, ensureBrowser, openBrowsers, outsideSessions, profileKey, viewOf } from './session.ts';
 import { addProfile, browserSettings, profiles, removeProfile, renameProfile, sessionOptions, setBrowserSettings, setSessionOptions } from './settings.ts';
 import { stepFile } from './steps.ts';
 
@@ -74,7 +74,7 @@ export function browserRoutes(d: Deps) {
   };
   const cwdOf = (k: string) => d.sessions.summary(k)?.cwd || config.defaultCwd;
 
-  app.get('/api/browser/sessions/:key', async (req) => ({ view: viewOf(key(req)), options: key(req).startsWith('browser-profile:') ? {} : sessionOptions(db, key(req)) }));
+  app.get('/api/browser/sessions/:key', async (req) => ({ view: viewOf(key(req)), options: outsideSessions(key(req)) ? {} : sessionOptions(db, key(req)) }));
   app.patch('/api/browser/sessions/:key/options', async (req) => {
     const k = key(req);
     const before = sessionOptions(db, k).profile;
@@ -127,7 +127,7 @@ export function browserRoutes(d: Deps) {
     const why = await refusal(url.href, 'Document', policy, config.port);
     if (why) {
       if (!why.endsWith('is on this machine or its network') || !(await isPrivate(url))) throw new HttpError(403, `Not opened: ${why}`);
-      if (!k.startsWith('browser-profile:')) setSessionOptions(db, k, { local: [...(sessionOptions(db, k).local ?? []), hostPort(url)] });
+      if (!outsideSessions(k)) setSessionOptions(db, k, { local: [...(sessionOptions(db, k).local ?? []), hostPort(url)] });
       else throw new HttpError(403, `Not opened: ${why}`);
     }
     const t = await b.tab();
@@ -148,8 +148,9 @@ export function browserRoutes(d: Deps) {
     const t = await b.tab();
     const what = String(B(req).do ?? '');
     if (what === 'back') await t.back();
+    else if (what === 'forward') await t.forward();
     else if (what === 'reload') await t.reload();
-    else throw new HttpError(400, 'back or reload');
+    else throw new HttpError(400, 'back, forward or reload');
     return { view: b.view() };
   });
   app.post('/api/browser/sessions/:key/tab', async (req) => {

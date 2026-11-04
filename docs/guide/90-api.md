@@ -702,8 +702,8 @@ UpdateState: `{ kind: 'git'|'app' — from git commit by commit, or the Mac app 
 
 - `GET /api/system` — the computer now and the last 10 minutes. Returns: `{ info: { hostname, os, kernel, uptime — seconds, cpuModel, cores, mounts: [{ mount, device, fstype, size, used, avail }] — bytes, processes: { byCpu, byMem, gpu }: [{ pid, name, cmd, user, cpu — %, rss — bytes, gpuMem? — bytes }] — the 12 busiest each }, history: [{ t, cpu — %, cores — % each, load: [1, 5, 15 min], mem: { total, used, available, cached, buffers }, swap: { total, used }, gpus: [{ index, name, util — %, memUtil, memUsed, memTotal, temp — °C, power, powerLimit — W, fan, clock — MHz, pstate }], net: { rx, tx, ifaces } — bytes/s, disk: { read, write } — bytes/s, temps: [{ label, value — °C }] }] }` (samples 2 s apart, newest last, up to 300; a call starts sampling for 30 s when nobody watches, so the first may take a second).
 - `GET /api/preview` — servers listening on this machine that Preview can open (ports from 1024, not the app's own). Returns: `{ servers: [{ port, program, command, cwd?, pid?, web?: boolean — it answers with a web page (Preview's Web apps), title? — that page's title, project? — its package's name, else its folder's, framework? — Vite, Next.js… when it can be told }], port: number | null — the preview port (null: previews are off), origin: string | null — the preview's own address when set }`.
-- `GET /api/preview/shot?port=&path=&device=` — a picture (PNG) of a dev server's page, taken on this computer (what Preview shows where the browser can't reach the preview port). Query: `port: number, path?: string — starts with / (default /), device?: desktop|tablet|phone`. 502 when nothing answers.
-- `POST /api/preview/shot` — the same picture kept as a file for a week, to start a session with (**Ask an agent about this screen**). Body: `{ port: number, path?: string, device?: desktop|tablet|phone }`. Returns: `{ path — the PNG's path on this computer, size }`.
+- `GET /api/preview/shot?port=&path=&device=&live=` — a picture (PNG) of a dev server's page, taken on this computer (Preview's **Show it as a picture**, and **Save a picture of it**). Query: `port: number, path?: string — starts with / (default /), device?: desktop|tablet|phone, live?: 1 — the page as its live stream in Preview shows it now (when one is open), instead of opened afresh`. 502 when nothing answers.
+- `POST /api/preview/shot` — the same picture kept as a file for a week, to start a session with (**Ask an agent about this screen**). Body: `{ port: number, path?: string, device?: desktop|tablet|phone, live?: boolean }`. Returns: `{ path — the PNG's path on this computer, size }`.
 
 ## Before and after screenshots
 
@@ -777,6 +777,7 @@ These routes serve the app’s own pages, need the user’s browser, or are the 
 - `/api/uploads` — attachments sent with messages.
 - `POST /api/access-tokens` and `POST /api/mcp/tokens` — each returns a secret token, shown once to the user (`{ id, token }`); the user makes them in Settings.
 - `POST /api/preview/link` — a one-time link (valid 2 minutes) that signs the user's browser in to the preview port.
+- `POST /api/preview/live` — opens a dev server's page in the app's own browser and streams it to the Preview page, where the user's browser can't reach the preview port: the user drives it from there (its frames and input go through the browser's live-view calls above, under the key it returns).
 - `POST /api/auth/password` and `POST /api/auth/logout` — the password, and this browser's sign-in.
 - `POST /mcp` and `POST /mcp/run/:token` — the MCP endpoints themselves (agents elsewhere with a token; each session's own tools).
 - `/g/:token` and `/guest-api/:token` — what a guest's browser reads through a read-only link.

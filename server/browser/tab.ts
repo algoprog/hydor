@@ -80,7 +80,7 @@ export class Tab {
   ) {}
 
   /** Sets the tab up before its page runs (it waits for this, attached on start). */
-  async init(viewport: { w: number; h: number }) {
+  async init(viewport: { w: number; h: number; mobile?: boolean; scale?: number }) {
     const on = (m: string, fn: (p: any) => void) => this.offs.push(this.s.on(m, fn));
     on('Page.frameStartedLoading', (p) => {
       if (p.frameId === this.targetId) {
@@ -147,7 +147,7 @@ export class Tab {
       this.s.send('Page.setInterceptFileChooserDialog', { enabled: true }).catch(() => {}),
       this.s.send('Emulation.setUserAgentOverride', { userAgent: this.userAgent }),
       this.s.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }),
-      this.setViewport(viewport.w, viewport.h, false, 1),
+      this.setViewport(viewport.w, viewport.h, viewport.mobile ?? false, viewport.scale ?? 1),
     ]);
   }
 
@@ -347,7 +347,7 @@ export class Tab {
   }
 
   /** A screenshot of what is on screen (JPEG, base64), at most `width` × `height` pixels when given. */
-  async screenshot(o: { quality?: number; width?: number; height?: number } = {}): Promise<string> {
+  async screenshot(o: { quality?: number; width?: number; height?: number; format?: 'jpeg' | 'png' } = {}): Promise<string> {
     let clip: object | undefined;
     if (o.width) {
       // Clip coordinates are the document's: the visible part is where the page is scrolled to.
@@ -357,7 +357,7 @@ export class Tab {
       const scale = Math.min(1, o.width / (v.clientWidth * dsf), o.height ? o.height / (v.clientHeight * dsf) : 1);
       clip = { x: v.pageX, y: v.pageY, width: v.clientWidth, height: v.clientHeight, scale };
     }
-    const r = await this.s.send('Page.captureScreenshot', { format: 'jpeg', quality: o.quality ?? 70, ...(clip ? { clip } : {}), captureBeyondViewport: false }, 20_000);
+    const r = await this.s.send('Page.captureScreenshot', { ...(o.format === 'png' ? { format: 'png' } : { format: 'jpeg', quality: o.quality ?? 70 }), ...(clip ? { clip } : {}), captureBeyondViewport: false }, 20_000);
     return r.data;
   }
 
@@ -632,6 +632,14 @@ export class Tab {
     const h = await this.s.send('Page.getNavigationHistory');
     if (h.currentIndex <= 0) return false;
     await this.s.send('Page.navigateToHistoryEntry', { entryId: h.entries[h.currentIndex - 1].id });
+    this.navigating = true;
+    return true;
+  }
+
+  async forward(): Promise<boolean> {
+    const h = await this.s.send('Page.getNavigationHistory');
+    if (h.currentIndex >= h.entries.length - 1) return false;
+    await this.s.send('Page.navigateToHistoryEntry', { entryId: h.entries[h.currentIndex + 1].id });
     this.navigating = true;
     return true;
   }
