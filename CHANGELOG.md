@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.24.7 · 4 November 2026
+
+Projects and folders can be renamed right from the sidebar.
+
+- **Rename from a heading**: point at a project's or a folder's heading in the sidebar and click its **⋯** (or
+  right-click the heading) for **Rename**, or double-click the name. Type the new one and press Enter. A project's
+  new name is its name everywhere.
+- **Folders keep the name you give them**: it shows in the sidebar, under each session and in the folder menus
+  on the start page, on every device. The folder on disk keeps its own name, and **Use the folder's own name** in
+  the same menu brings it back.
+- **Rename folder** in a session's menu names the folder it works in, even one with no group of its own, such as
+  a folder the Codex app made for a ChatGPT project: once named, it gets a group under that name.
+
 ## 0.24.6 · 4 November 2026
 
 Your ChatGPT projects no longer show in the sidebar as folders with long id names.
