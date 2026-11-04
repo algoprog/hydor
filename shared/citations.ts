@@ -4,6 +4,7 @@
 // list renumbers itself (Markdown counts 1, 2, 3 whatever the numbers say), so a "[10]" points at the wrong line. Here
 // the list is taken out of the text and kept by the numbers the agent wrote, so each [n] can show as a link to its
 // own page, and the list as cards under the reply. Text the agent did not write that way is left as it is.
+import { plainCodexCitations } from './file-citations.ts';
 
 export interface Cited {
   /** The number the reply cites it by. */
@@ -189,8 +190,9 @@ export function citedReply(text: string, o: { streaming?: boolean } = {}): Cited
   return { body, sources };
 }
 
-/** A reply as it is read aloud: without its list of sources, nor the numbers that cite them. */
-export function spokenReply(text: string): string {
+/** A reply as it is read aloud: without its list of sources, nor the numbers that cite them; files it cites by their names. */
+export function spokenReply(reply: string): string {
+  const text = plainCodexCitations(reply);
   const { body, sources } = citedReply(text);
   if (!sources.length) return text;
   return body

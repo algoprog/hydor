@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { describe, it } from 'node:test';
 import Database from 'better-sqlite3';
 import { citedReply, citeNumbers, shortSite, spokenReply, CITE_RUN } from '../../../shared/citations.ts';
+import { codexCitations, FILE_CITATION, plainCodexCitations } from '../../../shared/file-citations.ts';
 import { formatPage, formatSearch, parsePage, parseSearch } from '../../../shared/search.ts';
 import type { Deps, RunCtx } from '../../features/types.ts';
 import { BlockedAddress, htmlMarkdown, type FetchedPage } from '../../web/fetch.ts';
@@ -741,6 +742,32 @@ describe('find_media', () => {
     const tool = searchTools(svc).find((t) => t.name === 'find_media')!;
     assert.ok(tool, 'every agent gets it');
     assert.match(JSON.stringify(await tool.run({ items: [{}] }, run())), /isError/);
+  });
+});
+
+describe('the files Codex cites', () => {
+  const dir = '/Users/s/.codex/.chatgpt-projects/g-p-6a8f/sources';
+  const reply = `Pages 5–20 of :codex-file-citation{path="${dir}/Kreicher372&572-10-29-26-final-classroom.pdf" purpose="source"}, against :codex-file-citation{path="${dir}/annotated-PS4-Yuxuan%20Cai.pdf" purpose="source"} and :codex-file-citation{path="${dir}/Group Activity #4 -- ANSWERS.pdf" purpose="source"}. In code: \`:codex-file-citation{path="/x"}\``;
+
+  it('become links to the files, every character of their names kept, code left as it is', () => {
+    const md = codexCitations(reply);
+    const href = (name: string) => /\]\(<file:\/\/([^>]+)>/.exec(md.slice(md.indexOf(`[${name}]`)))![1];
+    assert.ok(md.startsWith(`Pages 5–20 of [Kreicher372&572-10-29-26-final-classroom.pdf](<file://`));
+    assert.ok(md.includes(`"${FILE_CITATION}")`));
+    // As the page reads the address back (Markdown.tsx): the part before "#L", decoded.
+    const back = (h: string) => decodeURIComponent(h.replace(/[?#].*$/, ''));
+    assert.equal(back(href('Group Activity #4 -- ANSWERS.pdf')), `${dir}/Group Activity #4 -- ANSWERS.pdf`);
+    assert.equal(back(href('annotated-PS4-Yuxuan%20Cai.pdf')), `${dir}/annotated-PS4-Yuxuan%20Cai.pdf`, 'a literal %20 stays one');
+    assert.equal(back(href('Kreicher372&572-10-29-26-final-classroom.pdf')), `${dir}/Kreicher372&572-10-29-26-final-classroom.pdf`);
+    assert.ok(md.endsWith('`:codex-file-citation{path="/x"}`'), 'inside code it stays');
+    assert.equal(codexCitations('no citations here'), 'no citations here');
+    // Lines of a file, by their first line.
+    assert.equal(codexCitations(':codex-file-citation{path="/repo/src/a_b.ts" line_range_start=12 line_range_end=20}'), `[a\\_b.ts (line 12)](<file:///repo/src/a_b.ts#L12> "${FILE_CITATION}")`);
+  });
+
+  it('are read aloud, and shown as plain text, by the files’ names', () => {
+    assert.ok(spokenReply(reply).startsWith('Pages 5–20 of Kreicher372&572-10-29-26-final-classroom.pdf, against annotated-PS4-Yuxuan%20Cai.pdf and Group Activity #4 -- ANSWERS.pdf.'));
+    assert.equal(plainCodexCitations('See :codex-file-citation{path="/a/b/notes.md"}.'), 'See notes.md.');
   });
 });
 
