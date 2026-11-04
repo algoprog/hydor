@@ -92,11 +92,14 @@ emulation) when a tag `v<version>` is pushed, beside the Mac app's release, and 
 
 ## The website
 
-[hydor.app](https://hydor.app) is the one-page website in `website/`: plain HTML, CSS and JavaScript, dark like the
-app's dark theme, with screenshots of the app and frames of its tour film. `node website/build.mjs --serve 4321`
-builds it into `dist/website` and shows it at http://localhost:4321; `--deploy` publishes it on Cloudflare Pages
-(project `hydor`) with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set. The page names the latest release,
-so publish it again after one. [website/README.md](../website/README.md) has the rest.
+[hydor.app](https://hydor.app) is the website in `website/`: plain HTML, CSS and JavaScript, dark like the app's
+dark theme, with screenshots of the app and frames of its tour film. Its docs (`/docs`) are made when it is built
+from the same Markdown the app and GitHub show (the guide in `docs/guide`, the documents the README lists, and
+`CHANGELOG.md`), with the app's own guide parser and Help's search, so the docs are written in one place only.
+`node website/build.mjs --serve 4321` builds it into `dist/website` and shows it at http://localhost:4321;
+`--deploy` publishes it on Cloudflare Pages (project `hydor`) with `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` set. It names the latest release and shows the docs as they were when it was built, so
+publish it again after a release or a change to the docs. [website/README.md](../website/README.md) has the rest.
 
 ## Keeping the docs current
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // The website, hydor.app: copies website/src into dist/website with the latest release's version and summary
-// written into the page and the app's tour film beside it.
+// written into the page and the app's tour film beside it, and makes the docs (/docs) from the repository's
+// Markdown (website/docs.mjs).
 //
 //   node website/build.mjs               build dist/website
 //   node website/build.mjs --serve 4321  build, then serve it on http://localhost:4321 (Ctrl+C stops)
@@ -12,6 +13,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildDocs } from './docs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'website/src');
@@ -69,7 +71,11 @@ async function build() {
   // The tour film is the app's own (docs/media), not a copy kept here.
   fs.mkdirSync(path.join(OUT, 'media'), { recursive: true });
   fs.copyFileSync(TOUR, path.join(OUT, 'media/hydor-tour.mp4'));
-  console.log(`built ${path.relative(ROOT, OUT)} for Hydor ${version}${date ? ` (${date})` : ''}`);
+  // The docs, from the Markdown in docs/ and the app's own parser and search; and every page in the sitemap.
+  const docs = await buildDocs({ root: ROOT, out: OUT, indexHtml: html });
+  const urls = ['/', '/docs/', ...docs].map((u) => `  <url><loc>https://hydor.app${u}</loc></url>`).join('\n');
+  fs.writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+  console.log(`built ${path.relative(ROOT, OUT)} for Hydor ${version}${date ? ` (${date})` : ''}, with ${docs.length} docs pages`);
 }
 
 const TYPES = {
@@ -85,6 +91,7 @@ const TYPES = {
   '.mp4': 'video/mp4',
   '.txt': 'text/plain; charset=utf-8',
   '.xml': 'application/xml',
+  '.json': 'application/json',
 };
 
 /** A small static server for looking at the site before it goes out, with byte ranges for the film. */
@@ -93,7 +100,10 @@ function serve(port) {
     .createServer((req, res) => {
       let p = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
       if (p.endsWith('/')) p += 'index.html';
-      const file = path.join(OUT, path.normalize(p));
+      let file = path.join(OUT, path.normalize(p));
+      // As Cloudflare Pages does: /docs/start is docs/start.html, /docs is docs/index.html.
+      if (!fs.existsSync(file) && fs.existsSync(`${file}.html`)) file = `${file}.html`;
+      else if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
       if (!file.startsWith(OUT + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
         res.writeHead(404, { 'content-type': TYPES['.html'] });
         return fs.createReadStream(path.join(OUT, '404.html')).pipe(res);

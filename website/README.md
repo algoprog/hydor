@@ -10,7 +10,16 @@ JavaScript with no framework, dark like the app's own dark theme, and nothing th
 - `build.mjs` copies `src/` to `dist/website`, writes in the version people download (GitHub's latest release)
   with its date and the line that sums it up in `CHANGELOG.md`, hashes the page's inline script for the
   Content-Security-Policy, and adds the app's tour film from `docs/media/hydor-intro.mp4`.
+- `docs.mjs` makes the docs (`/docs`) from the repository's Markdown: a page for each topic of the guide
+  (`docs/guide`, in Help's groups, with Help's icons and lines from `web/src/features/guide/topics.ts`), for each
+  document the README lists, and the release notes (`CHANGELOG.md`). It reads them with the app's own parser
+  (`shared/guide.ts`, so a section's address is the app's) and renders them with the app's Markdown renderer. Links
+  to places in the app show as their names; links to other topics stay on the site. Nothing of the docs is kept
+  here: change the Markdown and build again.
+- `search.ts` is the docs' search (the header's Search, Ctrl+K or "/" on any page): Help's own search
+  (`web/src/features/guide/search.ts`) over every section, bundled into `docs/search.js` when the site is built.
 - `og/og.html` is the picture shown where a link to the site is shared (`src/img/og.jpg`, 1200×630).
+- `shots.mjs` lists the site's pictures of the app (below).
 
 ## Look at it
 
@@ -31,7 +40,7 @@ CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… node website/build.mjs --depl
 ```
 
 The token needs Account · Cloudflare Pages · Edit (and Zone · DNS · Edit on hydor.app to change the domain's
-records). Publish it again after each release, so the page names the new version.
+records). Publish it again after each release, so the page names the new version, and after a change to the docs.
 
 ## Its pictures
 
