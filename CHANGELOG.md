@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.24.2 · 4 November 2026
+
+A neater Make an app card on the Apps page.
+
+- **Make an app** looks like the app cards beside it: a plus on a tile of the app's accent colour, its name and what
+  it does, instead of a grey dashed box. With no apps of your own yet, it is one row across the page.
+
 ## 0.24.1 · 4 November 2026
 
 A welcome tour that fits the screen, with a clearer picture and gentle waves.
