@@ -41,7 +41,8 @@ when you close the tab, and the ones you start in VS Code or a terminal show up 
 - OpenRouter costs and token usage appear automatically, with prices fetched from OpenRouter
 - Run Custom, the app’s own agent, with any model: OpenRouter, Ollama, or a Hugging Face model with vLLM on your
   GPU (split across several when one is too small) or your Mac's Apple silicon, with models suggested for what it has
-- Replies that read well: maths drawn from LaTeX, Mermaid diagrams in the app's colours, charts and small
+- Replies that read well: maths drawn from LaTeX (including numbers such as `$1$`, without mistaking ordinary prices
+  for equations), Mermaid diagrams in the app's colours, charts and small
   interactive tools that run right inside a reply, and pictures from the web or your files
 - Get help with anything, not just code: assistants for research, writing and planning (switch between them
   mid-session), web search (Naget Search by default, the pages a reply cites shown as links in it and cards under it) and a browser you can watch and take over (in the Mac app, your Mac itself

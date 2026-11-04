@@ -151,7 +151,7 @@ Hover over a reply for **Fork from this reply** (Claude Code and Custom), **Read
 Agents write their replies for this app, not for a terminal, so a reply can hold more than text. Every agent knows how, and uses these by itself where they make an answer clearer:
 
 - **Formatting**: headings, lists, tables, bold and code, laid out to read.
-- **Maths**: equations drawn as in a textbook, inside a sentence or set apart on a line of their own, and chemical equations (2H₂ + O₂ → 2H₂O). A dollar sign before a number stays money.
+- **Maths**: equations drawn as in a textbook, inside a sentence or set apart on a line of their own, and chemical equations (2H₂ + O₂ → 2H₂O). Numbers between paired dollar signs (`$1$`, `$0$`) are maths too; ordinary prices such as $4.70 stay money.
 - **Diagrams**: flowcharts, sequence and state diagrams, timelines, mind maps, Gantt and pie charts, drawn in the app's colours, light or dark. The bar above one has **Show the code** (what the agent wrote; the same button shows the diagram again), **Save as a picture (SVG)**, **Full screen** and a button that copies its code. A diagram that can't be drawn shows its code, with the reason.
 - **Figures and small tools**: a chart, an annotated figure, a calculator, a simulation with sliders or a short quiz runs inside the reply, sealed off from the app and your files like the pages agents show. It takes the app's look and grows to fit (**See all of it** opens a tall one); its bar has **Show the code** (**Show it** goes back), **Save as a file** and **Full screen**. Choices you click on it go to your message box. While the reply is still being written, it builds up in place, and it comes alive once it is complete.
 - **Pictures**: photos from the web (a place, a product, a plant, an artwork) and pictures on this computer, fitted to the reply; click one to see it large. Pictures from the web come through this app's server, so the site that has them never sees your browser. One that can't be loaded shows as a link to it.
@@ -414,3 +414,4 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - "Switch the session 'Data cleanup' to Accept edits and send it: carry on with the next file."
 - "What does the rotating ring on Stop mean?"
 - "Explain how a heat pump works, with a diagram of the cycle and a picture of one."
+- "Show why attention weights sum to 1, with the equations and a numerical example."

@@ -375,7 +375,8 @@ programs shows each program's version and what is out, with Check now, Update no
   to fill the screen stops at its first line as it grows, so you read it from its beginning; a short one sits
   under what came before, with no empty space below it.
 - Replies made to read: every agent knows the app shows them as rich text, with Markdown (headings, lists, tables,
-  code), maths in LaTeX drawn as in a textbook (KaTeX, chemistry included), Mermaid diagrams (flowcharts, sequences,
+  code), maths in LaTeX drawn as in a textbook (KaTeX, chemistry included; numbers such as `$1$` and `$0$` render as
+  maths, while ordinary dollar prices stay money), Mermaid diagrams (flowcharts, sequences,
   timelines, mind maps, Gantt and pie charts…) drawn in the app's colours with their code, a full-screen view and an
   SVG to save, figures and small interactive tools (a chart, a calculator, a simulation with sliders) that run in
   place in a sealed-off frame as the reply comes, and pictures from the web (fetched by the app's own server, so the
