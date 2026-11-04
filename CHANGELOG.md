@@ -3,6 +3,24 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.23.0 · 4 November 2026
+
+Agents make music, voices and sounds, new picks for pictures and videos, and the welcome tour drawn in water again,
+calmly.
+
+- **Music, voices and sounds**: ask any agent for a song, a voice-over or the sound of rain, and hear it in the
+  conversation in the app's own player, then keep it in your Library, which keeps sounds now too. Songs come from
+  Google's Lyria 3 Pro; voices, narration and sound effects from ByteDance's Seed Audio 1.0, which can also speak in
+  a voice copied from a short recording you give it. A short form shows what it costs before anything is made, as
+  for pictures and videos. Change the models in **Settings → Images, video and audio** (called Images and video
+  before).
+- **New picks for pictures and videos**: unless you picked others, pictures come from Seedream 5.0 Pro (Flash is
+  quicker and cheaper) and videos from Seedance 2.5. Each model list in Settings now opens on **Suggested**, with
+  these first.
+- **The welcome tour, in water again but calm**: its pictures are back (a short film of a request being done, a map
+  of what does the work around the Ω, droplets for the steps, a sea under the pages), but the waves are still, the
+  film plays once, nothing glows or splashes, and the icons are plain lines.
+
 ## 0.22.2 · 4 November 2026
 
 A cleaner headline for the Game finder.
