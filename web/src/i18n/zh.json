@@ -10579,5 +10579,9 @@
 "None yet. Add one here, or keep a finished test run as one.":"还没有。在这里添加一个，或把一次完成的试运行保存为示例。",
 "Not in the task yet":"还没用在任务里",
 "Parts of the app":"应用的各部分",
-"vLLM at 8-bit":"vLLM 8-bit"
+"vLLM at 8-bit":"vLLM 8-bit",
+"AI helpers, called agents, that do real work on this computer for you. Here is how it goes.":"AI 助手，叫作智能体，在这台电脑上为你做实实在在的工作。过程是这样的。",
+"An agent does the work":"智能体来完成工作",
+"It asks before anything you haven’t allowed, and stops whenever you say.":"做任何你没允许过的事之前，它都会先问你，你一说它就停下。",
+"It reads and writes files, searches the web and makes documents and code, on this computer, step by step where you can follow it.":"它在这台电脑上读写文件、搜索网络、制作文档和代码，一步一步来，你都能看着。"
 }

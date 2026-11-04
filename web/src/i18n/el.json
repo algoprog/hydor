@@ -10588,5 +10588,9 @@
 "None yet. Add one here, or keep a finished test run as one.":"Κανένα ακόμα. Προσθέστε ένα εδώ ή κρατήστε μια ολοκληρωμένη δοκιμαστική εκτέλεση ως παράδειγμα.",
 "Not in the task yet":"Δεν υπάρχει ακόμα στην εργασία",
 "Parts of the app":"Τα μέρη της εφαρμογής",
-"vLLM at 8-bit":"vLLM σε 8-bit"
+"vLLM at 8-bit":"vLLM σε 8-bit",
+"AI helpers, called agents, that do real work on this computer for you. Here is how it goes.":"Βοηθοί τεχνητής νοημοσύνης, που λέγονται πράκτορες, κάνουν πραγματική δουλειά για εσάς σε αυτόν τον υπολογιστή. Έτσι γίνεται.",
+"An agent does the work":"Ένας πράκτορας κάνει τη δουλειά",
+"It asks before anything you haven’t allowed, and stops whenever you say.":"Ρωτά πριν από οτιδήποτε δεν έχετε επιτρέψει, και σταματά όποτε το πείτε.",
+"It reads and writes files, searches the web and makes documents and code, on this computer, step by step where you can follow it.":"Διαβάζει και γράφει αρχεία, ψάχνει στο διαδίκτυο και φτιάχνει έγγραφα και κώδικα, σε αυτόν τον υπολογιστή, βήμα βήμα όπου μπορείτε να το παρακολουθείτε."
 }
