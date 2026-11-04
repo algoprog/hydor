@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.23.1 · 4 November 2026
+
+The dark themes trade colours, and both are pure black behind your sessions.
+
+- **Hydor Dark is cool blue now**: the dark theme you start with has blue-black panels and a periwinkle accent, the
+  colours Midnight had. **Midnight** takes the warm near-black and gold that Hydor Dark had, so you can still pick
+  them in **Settings → General → Theme**.
+- **Pure black behind your sessions**: in both dark themes the page behind the conversation is black; the sidebar,
+  cards, menus and fields keep their own shades so they still stand out. Pages, documents and slides shown in the
+  dark follow it.
+
 ## 0.23.0 · 4 November 2026
 
 Agents make music, voices and sounds, new picks for pictures and videos, and the welcome tour drawn in water again,
