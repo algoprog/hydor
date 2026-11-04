@@ -3,16 +3,17 @@
 // light theme with Chromium. See README.md.
 //
 //   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app [--only spaces,tasks] [--themes dark] [--out dir] [--keep]
+//   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app --shots website/shots.mjs --out website/src/img   another list
 //   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app --serve     the demo app alone, until Ctrl+C
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Browser, sleep } from './cdp.mjs';
 import { CATALOG, EMAIL, makeData, makeFiles, makeSessions, overrides, seedApi } from './demo.mjs';
-import { SHOTS } from './shots.mjs';
+import { SHOTS as GUIDE_SHOTS } from './shots.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -26,6 +27,7 @@ function args() {
     root: path.resolve(get('root', process.env.GUIDE_SHOTS_ROOT ?? '')),
     out: path.resolve(get('out', path.join(REPO, 'docs/guide/images'))),
     only: get('only', '')?.split(',').filter(Boolean) ?? [],
+    shots: get('shots', ''),
     themes: get('themes', 'dark,light').split(',').filter(Boolean),
     port: Number(get('port', 8795)),
     keep: a.includes('--keep'),
@@ -34,6 +36,8 @@ function args() {
 }
 
 const o = args();
+// Another list of shots (the website's, website/shots.mjs) instead of the guide's.
+const SHOTS = o.shots ? (await import(pathToFileURL(path.resolve(o.shots)).href)).SHOTS : GUIDE_SHOTS;
 if (!fs.existsSync(path.join(o.root, 'dist/server/index.js')) || !fs.existsSync(path.join(o.root, 'dist/web/index.html')))
   throw new Error('--root: a built copy of the app (dist/server and dist/web), made in a git worktree under /tmp (see README.md)');
 // A copy started by hand from a git checkout outside the temp folder sets itself up to start with the computer.
