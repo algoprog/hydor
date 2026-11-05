@@ -137,7 +137,7 @@ export function FindBar({
     }
   };
 
-  const status = !query ? '' : count === 0 ? 'No matches' : index >= 0 ? `${index + 1} of ${count}` : `${count} match${count === 1 ? '' : 'es'}`;
+  const status = !query ? '' : count === 0 ? 'No matches' : index >= 0 ? `${index + 1} of ${count}` : count === 1 ? '1 match' : `${count} matches`;
   const broken = !!query && o.regex && count === 0 && !validRegex(query);
 
   return (

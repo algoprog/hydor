@@ -53,7 +53,7 @@ function shown(items: MenuEntry[]): (MenuAction | '-')[] {
 /** Keeps the editor's focus (and its selection) while a menu is pressed; fields inside a menu still take it. */
 const keepFocus = (e: React.MouseEvent) => {
   const t = e.target as HTMLElement;
-  if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if (t.closest('input,textarea,select,[contenteditable="true"]')) return;
   e.preventDefault();
 };
 
@@ -266,7 +266,7 @@ export function MenuBar({ menus, compact, className }: { menus: MenuDef[]; compa
   // Alt+/ (⌥/ on a Mac, whose key gives "÷") opens Search the menus wherever the focus is in the editor.
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.code === 'Slash' || e.key === '/')) {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (/^Slash$/.test(e.code) || e.key === '/')) {
         e.preventDefault();
         setOpen(null);
         setSearching(true);
