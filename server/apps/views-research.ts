@@ -62,8 +62,8 @@ const RADAR = String.raw`<header class="hero">
 {{#groups|where:group=$state.group}}<section class="grp t{{n}}">
   <header class="gh"><h2>{{group}}</h2>{{#about}}<p>{{about}}</p>{{/about}}</header>
   <div class="list">{{#papers|where:group=$group}}
-    {{#data.marks|where:id=$key|where:mark=no}}<p class="gone">Not for you: {{title}} <button type="button" class="b quiet" data-event="undo" data-key="{{key}}">Undo</button></p>{{/data.marks}}
-    {{^data.marks|where:id=$key|where:mark=no}}<article class="pp" data-key="{{key}}">
+    {{#data.marks|where:id=$key|where:mark=aside}}<p class="gone">Not for you: {{title}} <button type="button" class="b quiet" data-event="undo" data-key="{{key}}">Undo</button></p>{{/data.marks}}
+    {{^data.marks|where:id=$key|where:mark=aside}}<article class="pp" data-key="{{key}}">
       <p class="meta"><span>{{where}}</span>{{#date}}<span>{{date|shortdate}}</span>{{/date}}{{#who}}<span class="who">You follow {{who}}</span>{{/who}}</p>
       <h3><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{title}}</a></h3>
       <p class="by">{{authors}}</p>
@@ -126,7 +126,7 @@ const PAPER_RADAR_UI: AppUi = {
     radar: { description: 'The day’s papers: the line over them, the projects and topics to show one of, and a card for each paper under the one it fits', html: RADAR, css: RADAR_CSS },
     'saved-head': {
       description: 'How many papers are saved, and their BibTeX to copy all at once',
-      html: String.raw`{{#item}}<div class="bar"><span>{{item|count}} saved, newest first</span><button type="button" class="n-btn" data-event="copy_all">Copy all as BibTeX</button></div>{{/item}}`,
+      html: String.raw`{{#item|count}}<div class="bar"><span>{{item|count}} saved, newest first</span><button type="button" class="n-btn" data-event="copy_all">Copy all as BibTeX</button></div>{{/item}}`,
       css: String.raw`.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; color: var(--n-muted); font-size: 13.5px; }`,
     },
     'saved-paper': {
@@ -161,7 +161,7 @@ const PAPER_RADAR_UI: AppUi = {
       { do: 'data', op: 'remove', collection: 'marks', id: '{{event.key}}' },
       { do: 'data', op: 'remove', collection: 'saved', id: '{{event.key}}' },
     ],
-    nope: [{ do: 'data', op: 'add', collection: 'marks', record: { id: '{{event.key}}', key: '{{event.key}}', mark: 'no', title: '{{event.title}}', abstract: '{{event.abstract}}' } }],
+    nope: [{ do: 'data', op: 'add', collection: 'marks', record: { id: '{{event.key}}', key: '{{event.key}}', mark: 'aside', title: '{{event.title}}', abstract: '{{event.abstract}}' } }],
     undo: [{ do: 'data', op: 'remove', collection: 'marks', id: '{{event.key}}' }],
     cite: [{ do: 'copy', text: '{{event.bib}}' }],
     copy_all: [{ do: 'copy', text: '{{#item}}{{bibtex}}\n\n{{/item}}' }],
@@ -194,7 +194,7 @@ const CITE_HEAD = String.raw`<header class="hero">
     <div class="stat"><b>{{total|number}}</b><span>citations in all</span></div>
     {{#hindex}}<div class="stat"><b>{{hindex}}</b><span>h-index</span></div>{{/hindex}}
   </div>
-  {{#citations}}<nav class="chips" aria-label="How they cite you">
+  {{#citations|count}}<nav class="chips" aria-label="How they cite you">
     {{#state.kind}}<button type="button" class="chip" data-event="kind" data-name="">All</button>{{/state.kind}}{{^state.kind}}<span class="chip on">All</span>{{/state.kind}}
     {{#citations|unique:kind}}<button type="button" class="chip{{#.|is:$state.kind}} on{{/.}}" data-event="kind" data-name="{{.}}">{{.}}</button>{{/citations}}
   </nav>{{/citations}}
@@ -236,7 +236,7 @@ mark { padding: 0 2px; border-radius: 3px; background: color-mix(in srgb, var(--
 
 const MY_PAPERS = String.raw`<div class="mp">{{#papers}}<a class="row" href="{{url}}" target="_blank" rel="noopener noreferrer">
   <span class="t"><b>{{title}}</b><small>{{#venue}}{{venue}} · {{/venue}}{{year}}</small></span>
-  <span class="n"><b>{{citations|number}}</b><small>citations</small></span>
+  <span class="n"><b>{{cited|number}}</b><small>citations</small></span>
   {{#new}}<span class="new">+{{new}}</span>{{/new}}
 </a>{{/papers}}</div>
 {{^papers}}<p class="empty">No papers of yours were found yet.</p>{{/papers}}`;
@@ -283,9 +283,9 @@ const NM_HEAD = String.raw`<header class="hero">
     <div class="stat"><b>{{fresh|number}}</b><span>new this time</span></div>
     <div class="stat"><b>{{models|where:state=beats|count}}</b><span>beat your best</span></div>
     <div class="stat"><b>{{models|where:state=evaluating|count}}</b><span>being evaluated</span></div>
-    {{#best}}<div class="stat"><b>{{best|number}}</b><span>your best{{#metric}}, {{metric}}{{/metric}}</span></div>{{/best}}
+    {{#best}}<div class="stat"><b>{{best}}</b><span>your best{{#metric}}, {{metric}}{{/metric}}</span></div>{{/best}}
   </div>
-  {{#models}}<nav class="chips" aria-label="Show">
+  {{#models|count}}<nav class="chips" aria-label="Show">
     {{#state.show}}<button type="button" class="chip" data-event="show" data-name="">All</button>{{/state.show}}{{^state.show}}<span class="chip on">All</span>{{/state.show}}
     {{#models|unique:state}}<button type="button" class="chip{{#.|is:$state.show}} on{{/.}}" data-event="show" data-name="{{.}}">{{.}}</button>{{/models}}
   </nav>{{/models}}
@@ -297,7 +297,7 @@ const NM_MODEL = String.raw`<article class="pp s-{{state|slug}}">
   <h3><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{model}}</a></h3>
   {{#what}}<p class="tldr">{{what}}</p>{{/what}}
   <p class="facts">{{#size}}<span>{{size|number}}M parameters</span>{{/size}}{{#licence}}<span>{{licence}}</span>{{/licence}}<span>{{downloads|number}} downloads</span>{{#likes}}<span>{{likes}} likes</span>{{/likes}}</p>
-  {{#score}}<p class="score">Score <b>{{score|number}}</b>{{#state|is:beats}} · better than your best{{/state}}</p>{{/score}}
+  {{#score}}<p class="score">Score <b>{{score}}</b>{{#state|is:beats}} · better than your best{{/state}}</p>{{/score}}
   {{#note}}<p class="by">{{note}}</p>{{/note}}
   <p class="acts"><a class="b" href="{{url}}" target="_blank" rel="noopener noreferrer">Its page</a><button type="button" class="b" data-event="copy_name" data-name="{{model}}">Copy its name</button></p>
 </article>`;
@@ -307,7 +307,6 @@ const NM_MODEL_CSS =
   BADGE_CSS +
   String.raw`
 & { height: 100%; } .pp { height: 100%; box-sizing: border-box; }
-.st { text-transform: capitalize; }
 .s-beats { border-color: color-mix(in srgb, var(--n-ok) 55%, var(--n-line)); }
 .s-beats .st { background: color-mix(in srgb, var(--n-ok) 16%, var(--n-card)); color: var(--n-ok); }
 .s-evaluating .st, .s-new .st { background: var(--n-accent-soft); color: var(--n-accent); }
@@ -350,7 +349,7 @@ const NEW_MODEL_WATCH_UI: AppUi = {
     },
   ],
   elements: {
-    'nm-head': { description: 'What is new in a line, in numbers, and the states to show one of', html: NM_HEAD, css: HERO_CSS + STATS_CSS + CHIPS_CSS + String.raw`.chips { margin-top: 14px; } .chip { text-transform: capitalize; } .note { margin: 10px 0 0; color: var(--n-muted); font-size: 12.5px; }` },
+    'nm-head': { description: 'What is new in a line, in numbers, and the states to show one of', html: NM_HEAD, css: HERO_CSS + STATS_CSS + CHIPS_CSS + String.raw`.chips { margin-top: 14px; } .note { margin: 10px 0 0; color: var(--n-muted); font-size: 12.5px; }` },
     'nm-model': { description: 'A model: where it stands, what its card says, its size, licence and downloads, and its score', html: NM_MODEL, css: NM_MODEL_CSS },
     'nm-eval': {
       description: 'What runs on each new model, and what it watches',
@@ -372,13 +371,13 @@ const NEW_MODEL_WATCH_UI: AppUi = {
 
 const DL_HEAD = String.raw`<header class="hero">
   <p class="kicker">Deadline radar · your time zone, {{zone}}</p>
-  <h1>{{headline}}</h1>
-  <p class="sub">{{ahead|number}} deadlines ahead{{#today}}, checked {{today|longdate}}{{/today}}.</p>
+  <h1>{{#deadlines|where:next=true|first}}{{venue}} {{year}}: {{label}}, {{day|longdate}}{{/deadlines}}{{^deadlines|where:next=true}}{{headline}}{{/deadlines}}</h1>
+  <p class="sub">{{#ahead|is:1}}One deadline ahead{{/ahead}}{{^ahead|is:1}}{{ahead|number}} deadlines ahead{{/ahead}}{{#today}}, checked {{today|longdate}}{{/today}}.</p>
   {{#venues|count|over:1}}<nav class="chips" aria-label="Venues">
     {{#state.venue}}<button type="button" class="chip" data-event="venue" data-name="">All</button>{{/state.venue}}{{^state.venue}}<span class="chip on">All</span>{{/state.venue}}
     {{#venues}}<button type="button" class="chip{{#venue|is:$state.venue}} on{{/venue}}" data-event="venue" data-name="{{venue}}">{{venue}}</button>{{/venues}}
   </nav>{{/venues}}
-  {{#reminded}}<div class="sent"><b>Reminders sent today</b><ul>{{#reminded}}<li>{{.}}</li>{{/reminded}}</ul></div>{{/reminded}}
+  {{#reminded|count}}<div class="sent"><b>Reminders sent today</b><ul>{{#reminded}}<li>{{.}}</li>{{/reminded}}</ul></div>{{/reminded}}
   <p class="acts"><button type="button" class="b" data-event="copy_all">Copy the deadlines</button></p>
 </header>`;
 
@@ -474,7 +473,7 @@ const DEADLINE_RADAR_UI: AppUi = {
     },
     'dl-missing': {
       description: 'The venues neither list knows, and what to try',
-      html: String.raw`{{#missing}}<p class="miss">Not in the lists: <b>{{missing|join}}</b>. Try the name the conference goes by (NeurIPS, KDD, The Web Conference), or its short name as ccfddl and ai-deadlines keep it.</p>{{/missing}}`,
+      html: String.raw`{{#missing|count}}<p class="miss">Not in the lists: <b>{{missing|join}}</b>. Try the name the conference goes by (NeurIPS, KDD, The Web Conference), or its short name as ccfddl and ai-deadlines keep it.</p>{{/missing}}`,
       css: String.raw`.miss { margin: 8px 0 0; padding: 10px 12px; border: 1px dashed var(--n-line); border-radius: var(--n-radius); color: var(--n-muted); font-size: 13.5px; line-height: 1.5; }`,
     },
   },
@@ -516,7 +515,7 @@ const LRW_TOPICS = String.raw`{{#last.result.topics|count|over:1}}<nav class="ch
 </nav>{{/last.result.topics}}
 {{#last.result.topics|where:topic=$state.topic}}<section class="topic">
   <header class="th">
-    <div><h2>{{topic}}</h2><p class="m">{{count}} papers{{#new}} · {{new}} new{{/new}}{{#themes}} · {{themes}}{{/themes}}</p></div>
+    <div><h2>{{topic}}</h2><p class="m">{{#count|is:1}}1 paper{{/count}}{{^count|is:1}}{{count}} papers{{/count}}{{#new}} · {{new}} new{{/new}}{{#themes}} · {{themes}}{{/themes}}</p></div>
     <p class="acts"><button type="button" class="n-btn" data-event="draft" data-topic="{{topic}}">Draft the related work</button><button type="button" class="b" data-event="bib" data-topic="{{topic}}">Export BibTeX</button></p>
   </header>
   {{#state.drafting|is:$topic}}<div class="out">
@@ -646,11 +645,11 @@ const GAP_IDEA_CSS =
 .idea { display: flex; flex-direction: column; gap: 8px; padding: 15px 17px; border: 1px solid var(--n-line); border-left: 3px solid var(--vc, var(--n-line)); border-radius: var(--n-radius); background: var(--n-card); }
 .v-new { --vc: var(--n-ok); } .v-partly-done { --vc: var(--n-warn); } .v-done { --vc: var(--n-err); }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; }
-.vb { background: color-mix(in srgb, var(--vc, var(--n-muted)) 16%, var(--n-card)); color: var(--vc, var(--n-muted)); text-transform: capitalize; }
+.vb { background: color-mix(in srgb, var(--vc, var(--n-muted)) 16%, var(--n-card)); color: var(--vc, var(--n-muted)); }
 .f-fits { background: color-mix(in srgb, var(--n-ok) 14%, var(--n-card)); color: var(--n-ok); }
 .f-tight { background: color-mix(in srgb, var(--n-warn) 16%, var(--n-card)); color: var(--n-warn); }
 .f-too-big { background: color-mix(in srgb, var(--n-err) 14%, var(--n-card)); color: var(--n-err); }
-.x { color: var(--n-muted); font-size: 12.5px; font-family: var(--n-mono); }
+.x { color: var(--n-muted); font-size: 12.5px; }
 .idea h3 { margin: 0; font-size: 17px; line-height: 1.3; }
 .body { margin: 0; font-size: 14.5px; line-height: 1.55; }
 .near { margin: 0; font-size: 13.5px; } .near a { color: var(--n-accent); }
@@ -677,7 +676,7 @@ const GAP_FINDER_UI: AppUi = {
     { id: 'read', title: 'What it crossed', blocks: [{ element: 'gap-read', data: 'result' }] },
   ],
   elements: {
-    'gap-head': { description: 'The area and the compute, the ideas in numbers, and their verdicts to show one of', html: GAP_HEAD, css: HERO_CSS + STATS_CSS + CHIPS_CSS + String.raw`.chips { margin-top: 14px; } .chip { text-transform: capitalize; }` },
+    'gap-head': { description: 'The area and the compute, the ideas in numbers, and their verdicts to show one of', html: GAP_HEAD, css: HERO_CSS + STATS_CSS + CHIPS_CSS + String.raw`.chips { margin-top: 14px; }` },
     'gap-idea': { description: 'An idea: whether it was done before and the closest work, what it crosses, the first experiment and what it takes', html: GAP_IDEA, css: GAP_IDEA_CSS },
     'gap-read': {
       description: 'Your papers and this month’s it crossed them with, each a link',

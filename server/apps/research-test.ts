@@ -257,7 +257,7 @@ test('Paper radar: the best for you, the people you follow first, under the proj
   // Laid out: what was written of each, the papers looked at kept (and a month-old update forgotten), the marks kept to the latest.
   const ctx = ctxOf();
   ctx.data.set('seen', [{ id: 'old', day: '2026-09-01', keys: ['x'] }]);
-  ctx.data.set('marks', Array.from({ length: 160 }, (_, i) => ({ id: `m${i}`, mark: 'no' })));
+  ctx.data.set('marks', Array.from({ length: 160 }, (_, i) => ({ id: `m${i}`, mark: 'aside' })));
   const e = await program('paper-radar', 'edition', { papers, groups: v.groups, written: [{ n: 2, tldr: 'It chunks.', why: 'For Hydor: its eval.' }], headline: 'Long documents', seen: ['a', 'b', 'c'], today: '2026-11-05', fetched: 3, window: '2026-11-02' }, ctx);
   const out = e.papers as Record<string, unknown>[];
   assert.equal(e.headline, 'Long documents');
@@ -687,8 +687,14 @@ test('Gap finder: the month’s papers in an area by its category or its words; 
   assert.equal(final.headline, '2 of 2 ideas look new');
   assert.equal((final.recent as Record<string, unknown>[])[0].url, null, 'a link that is not one is left out');
   // A verdict put with its idea: the closest paper named, P numbers in words.
-  const merged = await program('gap-finder', 'merge', { idea: { title: 'X', idea: 'Do X.', crosses: 'M1 × R2', first: 'Try it.' }, verdict: { verdict: 'Partly done', why: 'P1 does half of it.', closest: 1, cost: 'about 10 GPU hours', fits: 'It fits' }, papers: [{ n: 1, title: 'Half of X', year: 2025, url: 'https://arxiv.org/abs/9' }] });
-  assert.deepEqual([merged.verdict, merged.why, merged.closest, merged.closest_url, merged.fits], ['partly done', '“Half of X” does half of it.', 'Half of X (2025)', 'https://arxiv.org/abs/9', 'fits']);
+  const merged = await program('gap-finder', 'merge', {
+    idea: { title: 'X', idea: 'Do X.', crosses: 'M1 × R2', first: 'Try it.' },
+    verdict: { verdict: 'Partly done', why: 'P1 does half of it, as R2 hints.', closest: 1, cost: 'about 10 GPU hours', fits: 'It fits' },
+    papers: [{ n: 1, title: 'Half of X', year: 2025, url: 'https://arxiv.org/abs/9' }],
+    mine: [{ n: 1, title: 'ProCIS' }],
+    recent: [{ n: 1, title: 'R one' }, { n: 2, title: 'When to Retrieve' }],
+  });
+  assert.deepEqual([merged.verdict, merged.why, merged.crosses, merged.closest, merged.closest_url, merged.fits], ['partly done', '“Half of X” does half of it, as “When to Retrieve” hints.', '“ProCIS” × “When to Retrieve”', 'Half of X (2025)', 'https://arxiv.org/abs/9', 'fits']);
 });
 
 // ---- Paper radar through the flow runner -------------------------------------------------------------------------
