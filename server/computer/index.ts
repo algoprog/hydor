@@ -1,7 +1,8 @@
 // Computer use, in the desktop apps (Mac, Windows, Linux on X11): agents see the computer's screen and use its mouse and
 // keyboard, in any app, beside the browser (which stays the way for websites). Off at first (Settings → Capabilities
 // → Computer use, which on a Mac also asks macOS for its two permissions); each session asks the user before its agent
-// starts. While an agent acts, a glow lines the screen's edges (desktop/glow.cjs), with a note that Esc stops it; Esc,
+// starts. While an agent acts, a glow lines the screen's edges (desktop/glow.cjs), with a note that Esc stops it, and a
+// ring with an "Agent" tag circles the pointer it moves (each step's picture marks where it acted); Esc,
 // Stop in the menu bar or tray (⌘⇧Esc too on a Mac), Settings or the session's line ends it. Elsewhere than the
 // desktop apps it is not offered.
 import fs from 'node:fs';
