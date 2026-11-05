@@ -57,9 +57,10 @@ the ones you start in VS Code or a terminal show up too.
   run them for you in any chat. **Explore**, at the top right of the start page, is a magazine made for you:
   articles and recent news on what you work on and care about, picked from your profile and your sessions, and
   updated every day if you like.
-- **Things to keep**: pages, slides, documents, spreadsheets and LaTeX, edited in the app and exported to PDF,
-  Word, PowerPoint or Excel; pictures, videos, music and voice-overs made through OpenRouter. All of it waits in
-  your Library, by project.
+- **Things to keep**: pages you write in as in Notion; slides, documents, spreadsheets and LaTeX you edit as in
+  PowerPoint, Word, Excel and Airtable, and Overleaf, with menus you can search, comments agents answer, equations,
+  charts, filters and dropdowns, Morph and a visual LaTeX mode, exported to PDF, Word, PowerPoint or Excel; and
+  pictures, videos, music and voice-overs made through OpenRouter. All of it waits in your Library, by project.
 - **Memory and know-how**: agents keep a profile of you and remember your projects, starting each session with what
   bears on your request (found by words and by meaning, on your own computer), follow your Agent Guidelines, search
   your documents, and use more than sixty built-in skills, your own, and plugins, each switched on or off for every

@@ -289,35 +289,53 @@ agents that speak ACP and take MCP servers.
   back where it was uninstalled), and installed from New app or by dropping the file on the Apps page, after a card that says what they ask, give and do, in plain words, with the keys they need,
   then what they will use here (folded: their files, their view's scripts and libraries, models, packages), offering one of your models for any they ask for that is not set up here; uninstalling one deletes it.
 - **Slides**: decks kept in the Library, made by an agent (save_slides, from layouts or parts placed by position) or
-  from eight ready-made looks, and edited as in PowerPoint or Google Slides: slides to reorder, copy and skip, 15
-  layouts, text boxes with rich text, bullets and numbering, 20 shapes, pictures, lines and arrows, tables and
-  charts (column, bar, line, area, pie, doughnut), snapping guides, alignment, stacking, undo, copy and paste;
-  animations in order (on a click, with or after the one before, a paragraph at a time) and transitions; themes
-  of colours and fonts; speaker notes; a slideshow (keys, swipes, black and white screens, every slide at once)
-  and a presenter's view with notes, the next slide, a timer and an audience window that follows it. They export
-  as PowerPoint (every part still editable, native charts, notes, transitions and animations), PDF or a web page
-  that presents itself, and open as a slideshow at their own address or a published link.
+  from eight ready-made looks, and edited as in PowerPoint, Google Slides or Keynote: menus (Edit, View, Insert,
+  Format, Arrange, Slide, Tools) with Search the menus, slides to reorder, copy and skip, 15 layouts, text boxes with
+  rich text, bullets and numbering, 20 shapes, pictures (cropped, with brightness, contrast, saturation, blur, black
+  and white and see-through), lines and arrows, tables (merged cells, cell fills) and charts (column, bar, line, area,
+  pie, doughnut), about 1,900 icons and emoji, equations in LaTeX, YouTube and Vimeo videos; groups, find and replace
+  across slides and speaker notes, zoom, the format painter, a grid, rulers and guides, snapping guides and equal
+  gaps, alignment, stacking, undo, copy and paste; animations in order (on a click, with or after the one before, a
+  paragraph at a time) and transitions, Morph among them (what two slides share glides into place); slide numbers
+  and a footer; themes of colours and fonts; speaker notes; a slideshow (keys, swipes, black and white screens,
+  every slide at once, a laser pointer, a pen and live captions) and a presenter's view with notes, the next slide,
+  a timer and an audience window that follows it. They export as PowerPoint (every part still editable, native
+  charts, groups, icons, equations, notes, transitions with Morph, and animations), PDF, pictures of the slides
+  (PNG) or a web page that presents itself, and open as a slideshow at their own address or a published link.
 - **Documents, spreadsheets and LaTeX**: kept in the Library beside slides, each with versions, a picture in the list,
-  its own address and an agent that changes it on request. Documents (save_doc, written in Markdown, or opened from
-  a Word, Markdown, text or HTML file) are edited as in Word or Google Docs on a page of their paper: paragraph
-  styles, fonts, sizes, colours and highlights, links, alignment, bullets, numbers and checklists, tables, pictures
-  with captions, lines and page breaks, Markdown shortcuts as you type, paste from Word and Google Docs cleaned, an
-  outline and a word count; they export as Word (styles, lists, tables and pictures as Word's own), PDF on their
-  paper, Markdown or a web page. Spreadsheets (save_sheet, with formulas, or opened from an Excel, ODS, CSV or TSV
-  file) work as in Excel or Google Sheets: a grid that stays quick with thousands of rows, frozen rows and columns,
-  sizes to drag, about two hundred of Excel's functions worked out as you type (lookups, criteria, dates, text,
-  loans), references that move as cells are copied, filled, inserted and deleted, number formats, styles, sorting,
-  several sheets, copy and paste with Excel and Google Sheets, and the sum, average and count of what is picked;
-  they export as Excel (formulas, formats, widths and frozen panes kept), CSV or PDF. LaTeX documents (save_latex, or opened from a .tex file or a project's .zip) keep
-  their source files and pictures, typeset on this computer (pdfLaTeX, XeLaTeX or LuaLaTeX, with BibTeX) as you
-  type, beside the pages: errors and warnings at their lines, the log, an outline, snippets, completion of
-  citations, labels and pictures, and a jump between a place on a page and its line. TeX runs in a folder of its
-  own, with no shell escape and, where bubblewrap is installed, in its sandbox. They export as the PDF, the main
-  .tex file or the whole project as a .zip. Jupyter notebooks (save_notebook, from an .ipynb an agent wrote and ran,
-  or opened from one) show in the notebook page's own view, with their outputs: cells edited and run in a kernel of
-  the Python environment picked, in a folder of their own in the app's data folder, Ask on the whole notebook or a
-  cell, and versions with their outputs; they export as the .ipynb, a Python script with # %% cells, a PDF or a web
-  page.
+  its own address, menus with Search the menus, find and replace, a list of its keyboard shortcuts, and an agent that
+  changes it on request. Documents (save_doc, written in Markdown, or opened from a Word, Markdown, text or HTML file)
+  are edited as in Word or Google Docs on a page of their paper: paragraph styles, fonts, sizes, colours and
+  highlights, links, alignment, line and paragraph spacing, bullets, numbers and checklists, callouts, tables (column
+  widths dragged, merged and coloured cells), pictures with captions, equations in LaTeX, a table of contents that
+  keeps up, headers and footers with page numbers, lines and page breaks, a "/" menu and Markdown shortcuts as you
+  type, blocks dragged by their handles, the format painter, special characters and emoji, comments with replies
+  that agents read, answer and resolve, paste from Word and Google Docs cleaned, an outline, zoom, a word count and
+  printing; they export as Word (styles, lists, tables, pictures, comments, equations, the table of contents and
+  headers and footers as Word's own), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
+  formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
+  stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about two hundred of
+  Excel's functions worked out as you type (lookups, criteria, dates, text, loans, and FILTER, SORT, UNIQUE and
+  SEQUENCE that spill) with each function's arguments shown, references that move as cells are copied, filled,
+  inserted and deleted, the fill handle with its series, number formats with Excel's own codes, borders, merged
+  cells, filters, sorting by several columns, conditional formatting (rules, colour scales, data bars), dropdowns
+  with coloured chips, checkboxes, star ratings and a calendar for dates, notes, charts (seven kinds), Paste special,
+  removing duplicates, splitting text into columns, summaries as a pivot table makes them, a row opened as a card,
+  a Kanban board, several sheets, copy and paste with Excel and Google Sheets, and the sum, average and count of what
+  is picked; they export as Excel (formulas, formats, filters, conditional formatting, dropdowns and checkboxes,
+  merged cells, notes and charts kept), CSV or PDF. LaTeX documents (save_latex, from nine templates, or opened from
+  a .tex file or a project's .zip) keep their source files and pictures, typeset on this computer (pdfLaTeX, XeLaTeX
+  or LuaLaTeX, with BibTeX) as you type, beside the pages: a Visual mode that shows the source as a document while
+  you type, formulas drawn as you write them, completion of commands, environments, packages, citations, labels and
+  pictures, a symbols panel, tables made in a grid, references found by DOI, arXiv id or title, folding, spelling,
+  quick checks before TeX runs, errors and warnings at their lines, the log, an outline, snippets, a word count,
+  comments agents answer, versions compared, dark pages, the pages presented full screen, and a jump between a place
+  on a page and its line. TeX runs in a folder of its own, with no shell escape and, where bubblewrap is installed,
+  in its sandbox. They export as the PDF, the main .tex file or the whole project as a .zip. Jupyter notebooks
+  (save_notebook, from an .ipynb an agent wrote and ran, or opened from one) show in the notebook page's own view,
+  with their outputs: cells edited and run in a kernel of the Python environment picked, in a folder of their own in
+  the app's data folder, Ask on the whole notebook or a cell, and versions with their outputs; they export as the
+  .ipynb, a Python script with # %% cells, a PDF or a web page.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
   sixty that come with the app for every agent (ways of working, writing, documents, research and the web,
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
