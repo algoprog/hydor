@@ -152,8 +152,11 @@ function literals(js, shown = []) {
   return out;
 }
 
-/** Keys whose values go to an agent (a scheduled task's prompt) or a shell (its command), not to the pages. */
-const QUIET = new Set(['prompt', 'command']);
+/**
+ * Keys whose values go to an agent (a scheduled task's prompt) or a shell (its command), not to the pages, and the
+ * extra English words an editor's menu action is found by in Search the menus (`also`), which never show.
+ */
+const QUIET = new Set(['prompt', 'command', 'also']);
 
 /** Utilities that are bare words. */
 const UTILITIES = /^(flex|grid|block|inline|inline-flex|inline-block|hidden|contents|relative|absolute|fixed|sticky|static|truncate|italic|underline|uppercase|lowercase|capitalize|grow|shrink|border|rounded|shadow|ring|outline|transition|transform|group|peer|container|prose|tnum|ico|isolate|invisible|visible|antialiased|select-none|resize|break-words)$/;
