@@ -6,7 +6,7 @@
 // theme (Inspector); speaker notes under the slide; Find and replace across the slides and notes; every slide at once
 // (Grid); and Present: the slideshow, or the presenter's view with the audience's window. Changes stay unsaved until
 // Save (Ctrl+S), as a page's do; Undo and Redo go back and forth.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -206,7 +206,7 @@ export function SlidesEditor({
   doc,
   pageId,
   layout,
-  readOnly,
+  readOnly: readOnlyProp,
   onSave,
   lead,
   tail,
@@ -217,18 +217,25 @@ export function SlidesEditor({
   onScopes,
   saveNowRef,
   startPresent,
+  live: agent,
 }: ModelEditorProps<Deck> & {
   /** Opens presenting at once (the library's Present). */
   startPresent?: boolean;
 }) {
-  const [deck, setDeck] = useState<Deck | null>(doc?.model ?? null);
+  const [own, setDeck] = useState<Deck | null>(doc?.model ?? null);
   // The deck as the latest change left it (changes made one after another, before it is drawn again, build on it).
-  const live = useRef<Deck | null>(deck);
+  const live = useRef<Deck | null>(own);
   const setD = (n: Deck | null) => {
     live.current = n;
     setDeck(n);
   };
   const [saved, setSaved] = useState<Deck | null>(doc?.model ?? null);
+  // An agent's version being written shows in place of the deck (read-only, the slide being written in view), unless
+  // there are changes here not saved: those are left as they are. The deck itself stays as it is underneath.
+  const liveDeck = agent && !(!!own && own !== saved) ? agent.model : null;
+  const liveOn = !!liveDeck;
+  const deck = liveDeck ?? own;
+  const readOnly = !!readOnlyProp || liveOn;
   const [hist, setHist] = useState<History>({ past: [], future: [] });
   const [cur, setCur] = useState(0);
   const [sel, setSel] = useState<string[]>([]);
@@ -280,7 +287,7 @@ export function SlidesEditor({
   }, []);
   const wide = width >= 900 && layout !== 'sheet';
   const mid = width >= 640 && layout !== 'sheet';
-  const dirty = !!deck && deck !== saved;
+  const dirty = !!own && own !== saved;
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   useEffect(() => onDirty?.(dirty), [dirty]);
@@ -310,6 +317,24 @@ export function SlidesEditor({
 
   const index = deck ? Math.min(cur, deck.slides.length - 1) : 0;
   const slide = deck?.slides[index];
+  // The slide being written stays in view, unless a slide was picked here in the last few seconds.
+  const pickedAt = useRef(0);
+  // While an agent's version shows, the toolbar and the panel (out of use) stay as they were: nothing in them draws again.
+  const held = useRef<Record<string, ReactNode>>({});
+  const hold = (k: string, node: ReactNode) => {
+    if (!liveOn || !(k in held.current)) held.current[k] = node;
+    return held.current[k];
+  };
+  const mark = liveOn && agent?.mark?.kind === 'slides' ? agent.mark : null;
+  useEffect(() => {
+    if (!mark || performance.now() - pickedAt.current < 4000) return;
+    setCur(mark.slide);
+  }, [mark?.slide, agent?.n]);
+  useEffect(() => {
+    if (!liveOn) return;
+    canvas.current?.stopEditing();
+    setSel([]);
+  }, [liveOn]);
   // Another slide: out of any group, no cells or crop.
   useEffect(() => {
     setScope([]);
@@ -349,6 +374,7 @@ export function SlidesEditor({
   const undo = () => {
     // Words being changed in place are kept first; the next Undo takes them back.
     if (editing) return canvas.current?.stopEditing();
+    if (readOnly) return;
     const d = live.current;
     if (!hist.past.length || !d) return;
     setHist({ past: hist.past.slice(0, -1), future: [d, ...hist.future] });
@@ -357,7 +383,7 @@ export function SlidesEditor({
   };
   const redo = () => {
     const d = live.current;
-    if (!hist.future.length || !d) return;
+    if (!hist.future.length || !d || readOnly) return;
     const [next, ...rest] = hist.future;
     setHist({ past: [...hist.past, d], future: rest });
     setD(next);
@@ -365,7 +391,7 @@ export function SlidesEditor({
   };
 
   const save = async (): Promise<boolean> => {
-    if (!deck || !onSave || saving) return false;
+    if (!deck || !onSave || saving || liveOn) return false;
     // Words being changed in place go in first.
     const got = canvas.current?.readText();
     let d = live.current ?? deck;
@@ -896,6 +922,7 @@ export function SlidesEditor({
   const stripAct = {
     pick: (i: number) => {
       canvas.current?.stopEditing();
+      pickedAt.current = performance.now();
       setCur(i);
       setSel([]);
       setView('edit');
@@ -1031,7 +1058,7 @@ export function SlidesEditor({
     ask: onAsk ? () => onAsk(`On slide ${index + 1}${slideTitle(slide) ? ` (“${slideTitle(slide)}”)` : ''}: `) : undefined,
   });
 
-  const insertBar = !readOnly && (
+  const insertBar = !readOnlyProp && (
     <>
       <IconButton label={`Undo (${keyLabel('Ctrl+Z')})`} size="sm" disabled={!hist.past.length} onClick={undo}>
         <Undo2 size={15} />
@@ -1092,6 +1119,7 @@ export function SlidesEditor({
           change={change}
           fonts={fonts}
           readOnly={readOnly}
+          agent={mark ? (mark.el ?? '') : null}
           onMenu={(at) => {
             setCtxAt(at);
             setMenu('context');
@@ -1314,14 +1342,19 @@ export function SlidesEditor({
         {tail}
       </div>
       {band}
-      {!readOnly && (
-        <div className="flex h-11 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
-          {insertBar}
-          {textArgs && view === 'edit' && (
+      {!readOnlyProp && (
+        <div inert={liveOn} className={cx('flex h-11 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden', liveOn && 'opacity-45')}>
+          {hold(
+            'bar',
             <>
-              <span className="mx-1 h-5 w-px shrink-0 bg-line" />
-              <TextBar {...textArgs} />
-            </>
+              {insertBar}
+              {textArgs && view === 'edit' && (
+                <>
+                  <span className="mx-1 h-5 w-px shrink-0 bg-line" />
+                  <TextBar {...textArgs} />
+                </>
+              )}
+            </>,
           )}
         </div>
       )}
@@ -1334,7 +1367,7 @@ export function SlidesEditor({
           <>
             {wide && (
               <div className="w-[190px] shrink-0 overflow-y-auto border-r border-line bg-panel">
-                <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="side" />
+                <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="side" live={!!mark && mark.slide === index} />
                 {!readOnly && (
                   <button type="button" onClick={() => newSlide('content', deck.slides.length - 1)} className="mx-auto mb-4 flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12.5px] text-fg-3 hover:bg-bg-2 hover:text-fg">
                     <Plus size={13} />A slide
@@ -1345,20 +1378,20 @@ export function SlidesEditor({
             {canvasArea}
             {!wide && (
               <div className="shrink-0 border-t border-line bg-panel">
-                <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="bottom" />
+                <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="bottom" live={!!mark && mark.slide === index} />
               </div>
             )}
-            {!readOnly && (
-              <aside className={cx('flex min-h-0 shrink-0 flex-col bg-panel', wide ? 'w-[300px] border-l border-line' : cx('border-t border-line', drawer === 'open' ? 'h-[min(46%,420px)] min-h-[180px]' : 'pb-[var(--safe-bottom)]'))}>
+            {!readOnlyProp && (
+              <aside inert={liveOn} className={cx('flex min-h-0 shrink-0 flex-col bg-panel', liveOn && 'opacity-45', wide ? 'w-[300px] border-l border-line' : cx('border-t border-line', drawer === 'open' ? 'h-[min(46%,420px)] min-h-[180px]' : 'pb-[var(--safe-bottom)]'))}>
                 <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-1">
-                  {tabs}
+                  {hold('tabs', tabs)}
                   {!wide && (
                     <IconButton label={drawer === 'open' ? 'Fold the panel' : 'Open the panel'} size="sm" onClick={() => setDrawer(drawer === 'open' ? 'closed' : 'open')}>
                       {drawer === 'open' ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
                     </IconButton>
                   )}
                 </div>
-                {(wide || drawer === 'open') && <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{(tab as string) === 'notes' ? notesPanel : (tab as string) === 'comments' ? commentsPanel : inspector}</div>}
+                {(wide || drawer === 'open') && <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{hold('panel', (tab as string) === 'notes' ? notesPanel : (tab as string) === 'comments' ? commentsPanel : inspector)}</div>}
               </aside>
             )}
           </>

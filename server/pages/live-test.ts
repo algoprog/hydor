@@ -8,7 +8,10 @@
 import { blockText, normalizeDoc, type Doc } from '../../shared/docs.ts';
 import { applyDocEdits } from '../../shared/doc-edits.ts';
 import { draftDoc, tidyEnd } from '../../shared/draft-doc.ts';
+import { applyDeckEdits } from '../../shared/deck-edits.ts';
+import { draftDeck } from '../../shared/draft-deck.ts';
 import { DraftMemo, alike } from '../../shared/page-drafts.ts';
+import { normalizeDeck, type Deck } from '../../shared/slides.ts';
 import { readPartial } from '../../shared/partial-json.ts';
 import type { Deps } from '../features/types.ts';
 import { draftsOf, draftsOfPage, endDrafts, feedDraft, settleDraft } from './drafts.ts';
@@ -157,6 +160,71 @@ const textOf = (d: Doc) => d.blocks.map(blockText).join('\n');
   ok(throws([{ section: 'No such heading', markdown: 'x' }], /no heading “No such heading”.*its headings: “1\. section 1”/), 'a heading not there lists the headings there are');
   const both = md([{ append: 'A.' }, { find: 'A.', replace: 'B.' }]);
   ok(both.endsWith('B.'), 'edits are made in order, each on what the one before left');
+}
+
+// ---- decks: the version being written, and changes to some slides -------------------------------------------------
+{
+  const words = (i: number) => para(i, 6);
+  const raw = (n: number, from = 0) => Array.from({ length: n }, (_, i) => ({ layout: 'content', title: `Slide ${i + 1 + from}`, text: [words(i), words(i + 1)] }));
+  const base = normalizeDeck({ theme: 'midnight', slides: raw(12) });
+  const back = JSON.parse(JSON.stringify(base));
+  back.slides[2].els[0].paras = [{ runs: [{ t: 'Slide three, rewritten' }] }];
+  back.slides.push(...raw(2, 12));
+  const json = JSON.stringify({ id: '0123456789', title: 'Deck', ...back });
+  const memo = new DraftMemo();
+  let fewest = Infinity;
+  let reused = 0;
+  let draws = 0;
+  let prev: Deck | null = null;
+  let marked = 0;
+  for (let cut = 60; cut < json.length; cut += 211) {
+    const d = draftDeck(base, readPartial(json.slice(0, cut)), memo);
+    if (!d) continue;
+    draws++;
+    fewest = Math.min(fewest, d.model.slides.length);
+    if (d.mark) marked++;
+    if (prev) {
+      const was = new Set(prev.slides);
+      reused += d.model.slides.filter((x) => was.has(x)).length / d.model.slides.length;
+    }
+    prev = d.model;
+  }
+  ok(fewest >= base.slides.length, 'a deck written again never shows fewer slides than it had: the old rest follows');
+  ok(draws > 10 && reused / (draws - 1) > 0.85, 'slides that did not change between two draws are the same objects');
+  ok(marked > draws * 0.7, 'the slide being written is marked');
+  const end = draftDeck(base, readPartial(json), memo)!;
+  ok(end.model.slides.length === 14 && end.model.slides.filter((x, i) => x === base.slides[i]).length === 11, 'written whole: the slides the call says, the unchanged ones the version’s own');
+  ok(end.model.theme === base.theme, 'the theme the same object while it holds the same (no slide is drawn again for it)');
+  const mid = draftDeck(base, readPartial(json.slice(0, json.indexOf('Slide three, rewritten') + 10)), new DraftMemo())!;
+  ok(mid.mark?.kind === 'slides' && mid.mark.slide === 2 && mid.model.slides.length === 12, 'the slide being written is marked in its place, the rest after it');
+  const fresh = draftDeck(null, readPartial('{"title":"New","slides":[{"layout":"title","title":"Hello"},{"layout":"content","title":"Agen'), new DraftMemo())!;
+  ok(fresh.model.slides.length === 2 && fresh.mark?.kind === 'slides' && fresh.mark.slide === 1 && !!fresh.mark.el, 'a new deck grows slide by slide, the part being written marked');
+  ok(draftDeck(null, readPartial('{"title":"New","slides":['), new DraftMemo()) === null, 'a new deck with no slide yet shows nothing');
+  // Changes to some slides.
+  const e = applyDeckEdits(base, {
+    change: [{ slide: 2, layout: 'content', title: 'Two again' }],
+    add: [
+      { after: 3, layout: 'title', title: 'Between' },
+      { layout: 'end', title: 'Last' },
+    ],
+    remove: [12, base.slides[4].id],
+  });
+  const ids = (e.slides as { id?: string }[]).map((x) => x.id);
+  ok(e.slides.length === 12 && ids[1] === base.slides[1].id && (e.slides[1] as { title?: string }).title === 'Two again', 'a slide changed in place keeps its id (its comments stay with it)');
+  ok(e.at.get('add:0') === 3 && e.at.get('add:1') === 11 && !ids.includes(base.slides[11].id) && !ids.includes(base.slides[4].id), 'new slides go after the one named or at the end; removed ones go (by number or id)');
+  const thrown = (v: Record<string, unknown>) => {
+    try {
+      applyDeckEdits(base, v);
+      return '';
+    } catch (err) {
+      return (err as Error).message;
+    }
+  };
+  ok(/there is no slide 40 \(the deck has 12/.test(thrown({ change: [{ slide: 40, title: 'x' }] })) && /no slide with the id nope/.test(thrown({ remove: ['nope'] })), 'a slide that is not there says so');
+  const ej = JSON.stringify({ id: '0123456789', change: [{ slide: 5, layout: 'content', title: 'Slide five, being written again' }] });
+  const de = draftDeck(base, readPartial(ej.slice(0, -10)), new DraftMemo())!;
+  ok(de.model.slides.length === 12 && de.model.slides[4].id === base.slides[4].id && de.mark?.kind === 'slides' && de.mark.slide === 4, 'a slide being changed shows in its place as far as it has come');
+  ok(de.model.slides.filter((x, i) => x === base.slides[i]).length === 11, 'and the others are the version’s own');
 }
 
 // ---- the server's drafts of a save -------------------------------------------------------------------------------

@@ -43,6 +43,15 @@ export class DraftMemo {
     else this.next.set(key, [got]);
     return got;
   }
+  /** What was made last time for `key`, else what `make` makes now (made only when it is not there). */
+  make<T>(key: string, make: () => T): T {
+    const list = this.prev.get(key);
+    const got = list?.length ? (list.shift() as { v: T }) : { v: make() };
+    const now = this.next.get(key);
+    if (now) now.push(got);
+    else this.next.set(key, [got]);
+    return got.v;
+  }
   /** This draw is done: what it made is what the next one may reuse. */
   turn() {
     this.prev = this.next;

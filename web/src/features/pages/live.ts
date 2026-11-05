@@ -9,6 +9,7 @@ import type { PageDraft } from '@shared/pages';
 import { readPartial } from '@shared/partial-json';
 import { DraftMemo, DRAFT_TOOLS, type DraftKind, type DraftTool, type Drafted } from '@shared/page-drafts';
 import { draftDoc } from '@shared/draft-doc';
+import { draftDeck } from '@shared/draft-deck';
 import { normalizeDoc } from '@shared/docs';
 import { normalizeDeck } from '@shared/slides';
 import { newBook } from '@shared/sheets';
@@ -29,6 +30,7 @@ export const draftKind = (d: PageDraft | null | undefined): DraftKind | null => 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BUILD: Partial<Record<DraftKind, (base: any, p: ReturnType<typeof readPartial>, memo: DraftMemo) => Drafted<any> | null>> = {
   doc: draftDoc,
+  slides: draftDeck,
 };
 
 /** An empty one of a kind: the editor of a new one being written starts from it. */
