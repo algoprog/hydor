@@ -49,9 +49,10 @@ export function initPages(db: DB) {
       primary key (page_id, key)
     );
   `);
-  // An agent's version: the session it came from, and how many of its saves in a row it holds (folded into one).
+  // An agent's version: the turn it was saved in (its session's, and which of its user's messages it answered), and how
+  // many of its saves in a row it holds (folded into one).
   const vcols = (db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).map((c) => c.name);
-  if (!vcols.includes('session')) db.exec('alter table page_versions add column session text');
+  if (!vcols.includes('turn')) db.exec('alter table page_versions add column turn text');
   if (!vcols.includes('steps')) db.exec('alter table page_versions add column steps integer');
   // Its picture in Pages: which version and data it shows (thumbs.ts).
   const cols = (db.prepare('pragma table_info(pages)').all() as { name: string }[]).map((c) => c.name);
@@ -241,7 +242,7 @@ const safeJson = (s: string) => {
 
 const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', notebook: 'Notebook' };
 
-export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null; session?: string }): PageInfo {
+export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null; turn?: string }): PageInfo {
   const kind = p.kind ?? 'page';
   const { text: html, sources } = contentOf(db, kind, p);
   const title = cleanTitle(p.title, DEFAULT_TITLE[kind] ?? 'Page');
@@ -262,7 +263,7 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
       p.app ?? null,
       p.app ? null : (p.space ?? null),
     );
-    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, session) values (?, 1, ?, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by, p.session ?? null);
+    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn) values (?, 1, ?, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by, p.turn ?? null);
     if (kind === 'page') db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
     noteRefs(db, id, 1, sources);
   })();
@@ -273,16 +274,16 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
 export const FOLD_MS = 5 * 60_000;
 
 /**
- * A new version of a page: it becomes the current one, and its title the page's. An agent's save (`session`: its
- * session) with `fold` (`since`: the user's last message to that session) takes the place of the version before it
- * when that was the same session's save, made since then and less than FOLD_MS ago: saves in a row are one version
- * (the last), its number still the next one, so an editor holding the one before hears that a newer one is there.
- * A version the user made, kept or brought back is never folded into. `onFold` hears which version went.
+ * A new version of a page: it becomes the current one, and its title the page's. An agent's save in a turn (`turn`: its
+ * session's, answering one message of its user) takes the place of the version before it when that was saved in the
+ * same turn less than FOLD_MS ago: saves in a row are one version (the last), its number still the next one, so an
+ * editor holding the one before hears that a newer one is there. A version the user made, kept or brought back is never
+ * folded into. `onFold` hears which version went.
  */
 export function addVersion(
   db: DB,
   id: string,
-  p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; session?: string; fold?: { since: number }; onFold?: (version: number) => void },
+  p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; turn?: string; onFold?: (version: number) => void },
 ): PageInfo {
   const cur = mustPage(db, id);
   const { text: html, sources } = contentOf(db, cur.kind ?? 'page', p);
@@ -290,13 +291,12 @@ export function addVersion(
   const now = Date.now();
   let folded: number | null = null;
   db.transaction(() => {
-    const last = db.prepare('select version, by, session, created_at, steps from page_versions where page_id = ? order by version desc limit 1').get(id) as
-      | { version: number; by: PageVersion['by']; session: string | null; created_at: number; steps: number | null }
+    const last = db.prepare('select version, by, turn, created_at, steps from page_versions where page_id = ? order by version desc limit 1').get(id) as
+      | { version: number; by: PageVersion['by']; turn: string | null; created_at: number; steps: number | null }
       | undefined;
-    const fold =
-      !!last && p.by === 'agent' && !!p.session && !!p.fold && last.by === 'agent' && last.session === p.session && last.version === cur.version && last.created_at >= p.fold.since && now - last.created_at <= FOLD_MS;
+    const fold = !!last && p.by === 'agent' && !!p.turn && last.by === 'agent' && last.turn === p.turn && last.version === cur.version && now - last.created_at <= FOLD_MS;
     const next = ((db.prepare('select max(version) as v from page_versions where page_id = ?').get(id) as { v: number | null }).v ?? 0) + 1;
-    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, session, steps) values (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn, steps) values (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       next,
       title,
@@ -304,7 +304,7 @@ export function addVersion(
       Buffer.byteLength(html),
       now,
       p.by,
-      p.session ?? null,
+      p.turn ?? null,
       fold ? (last!.steps ?? 1) + 1 : null,
     );
     db.prepare('update pages set title = ?, version = ?, updated_at = ? where id = ?').run(title, next, now, id);
