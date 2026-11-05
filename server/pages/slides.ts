@@ -73,7 +73,10 @@ function lucide(): string | null {
       const barrel = fs.readFileSync(path.join(dir, 'lucide-react.mjs'), 'utf8');
       for (const m of barrel.matchAll(/export \{([^}]*)\} from '\.\/icons\/([a-z0-9-]+)\.mjs'/g))
         for (const a of m[1].matchAll(/default as (\w+)/g)) {
-          const k = a[1].replace(/^Lucide/, '').replace(/Icon$/, '').toLowerCase();
+          const k = a[1]
+            .replace(/^Lucide/, '')
+            .replace(/Icon$/, '')
+            .toLowerCase();
           if (k && !iconAliases.has(k)) iconAliases.set(k, m[2]);
         }
     }
@@ -83,7 +86,11 @@ function lucide(): string | null {
 
 /** An icon of Lucide's by its name ("rocket", "arrow-right", "Home"): its lines, or null. */
 export function lucideIcon(name: string): IconNode[] | null {
-  const kebab = name.trim().replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase().replace(/[\s_]+/g, '-');
+  const kebab = name
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-');
   if (!/^[a-z0-9][a-z0-9-]{0,59}$/.test(kebab)) return null;
   if (iconCache.has(kebab)) return iconCache.get(kebab)!;
   const dir = lucide();

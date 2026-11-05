@@ -492,17 +492,17 @@ function PictureLook({ el, theme, set, onReplace, cropping, onCrop }: { el: Imag
         </div>
       )}
       {!el.crop && (
-      <Field label="Fit">
-        <Choice
-          value={el.fit ?? 'cover'}
-          onChange={(fit) => set({ fit: fit === 'cover' ? undefined : fit })}
-          options={[
-            { value: 'cover', label: 'Fill', title: 'Fills the box, cropped' },
-            { value: 'contain', label: 'Whole', title: 'All of it, inside the box' },
-            { value: 'fill', label: 'Stretch', title: 'Stretched to the box' },
-          ]}
-        />
-      </Field>
+        <Field label="Fit">
+          <Choice
+            value={el.fit ?? 'cover'}
+            onChange={(fit) => set({ fit: fit === 'cover' ? undefined : fit })}
+            options={[
+              { value: 'cover', label: 'Fill', title: 'Fills the box, cropped' },
+              { value: 'contain', label: 'Whole', title: 'All of it, inside the box' },
+              { value: 'fill', label: 'Stretch', title: 'Stretched to the box' },
+            ]}
+          />
+        </Field>
       )}
       <Field label="Corners">
         <NumInput label="Corner radius" value={el.radius ?? 0} onChange={(radius) => set({ radius: radius || undefined }, 'radius')} min={0} max={1000} unit="px" />
@@ -568,7 +568,7 @@ function LineLook({ el, theme, set }: { el: LineEl; theme: Theme; set: (patch: P
   );
 }
 
-function TableLook({ el, theme, set, cellSel }: { el: TableEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; cellSel?: CellSel | null }) {
+function TableLook({ el, theme, set, cellSel, onCellSel }: { el: TableEl; theme: Theme; set: (patch: Partial<El>, key?: string) => void; cellSel?: CellSel | null; onCellSel?: (s: CellSel | null) => void }) {
   const cols = Math.max(1, ...el.rows.map((r) => r.length));
   const rows = el.rows;
   const cs = cellSel?.id === el.id ? cellSel : null;
@@ -583,7 +583,17 @@ function TableLook({ el, theme, set, cellSel }: { el: TableEl; theme: Theme; set
           <div className="text-[12px] text-fg-2">{many ? `${(Math.abs(cs.r1 - cs.r0) + 1) * (Math.abs(cs.c1 - cs.c0) + 1)} cells picked` : 'One cell picked'}</div>
           <div className="flex flex-wrap items-center gap-1.5">
             {many && (
-              <Button size="sm" variant="secondary" onClick={() => replace(mergeCells(el, cs.r0, cs.c0, cs.r1, cs.c1))}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  const t = mergeCells(el, cs.r0, cs.c0, cs.r1, cs.c1);
+                  replace(t);
+                  // The merged cell is what is picked now.
+                  const m = t.merges?.find((x) => x.r === Math.min(cs.r0, cs.r1) && x.c === Math.min(cs.c0, cs.c1));
+                  if (m) onCellSel?.({ id: el.id, r0: m.r, c0: m.c, r1: m.r, c1: m.c });
+                }}
+              >
                 Merge cells
               </Button>
             )}
@@ -785,7 +795,14 @@ const TEX_BITS: [string, string, string?][] = [
 function TexBit({ tex, label, shown, onPick }: { tex: string; label: string; shown?: string; onPick: () => void }) {
   const html = useTexHtml(shown ?? tex, false);
   return (
-    <button type="button" title={label} aria-label={label} onMouseDown={(e) => e.preventDefault()} onClick={onPick} className="grid h-9 min-w-9 place-items-center overflow-hidden rounded-lg border border-line px-1 text-[12px] text-fg hover:border-accent/50 hover:bg-accent-soft">
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onPick}
+      className="grid h-9 min-w-9 place-items-center overflow-hidden rounded-lg border border-line px-1 text-[12px] text-fg hover:border-accent/50 hover:bg-accent-soft"
+    >
       {html ? <span translate="no" className="pointer-events-none origin-center scale-[.8]" dangerouslySetInnerHTML={{ __html: html }} /> : label}
     </button>
   );
@@ -884,7 +901,7 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
   );
 }
 
-function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, texFocus }: Props) {
+function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus }: Props) {
   const slide = deck.slides[index];
   const els = pickedOf(slide, sel);
   const H = heightOf(deck);
@@ -917,7 +934,10 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
   const el = els[0];
   // A group sized from the panel sizes its parts with it.
   const set = (patch: Partial<El>, key?: string) =>
-    change((d) => setEls(d, index, [el.id], (e) => (e.type === 'group' && (patch.w !== undefined || patch.h !== undefined) ? ({ ...e, ...patch, els: scaleEls(e.els, (patch.w ?? e.w) / e.w, (patch.h ?? e.h) / e.h) } as El) : ({ ...e, ...patch } as El))), key ? `${key}:${el.id}` : undefined);
+    change(
+      (d) => setEls(d, index, [el.id], (e) => (e.type === 'group' && (patch.w !== undefined || patch.h !== undefined) ? ({ ...e, ...patch, els: scaleEls(e.els, (patch.w ?? e.w) / e.w, (patch.h ?? e.h) / e.h) } as El) : ({ ...e, ...patch } as El))),
+      key ? `${key}:${el.id}` : undefined,
+    );
   return (
     <>
       <div className="flex items-center gap-1.5 px-3 pt-3">
@@ -964,7 +984,7 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       {el.type === 'image' && <PictureLook el={el} theme={deck.theme} set={set} onReplace={() => onReplaceImage(el.id)} cropping={cropping === el.id} onCrop={onCrop} />}
       {el.type === 'image' && el.src && <PictureColours el={el} set={set} />}
       {el.type === 'line' && <LineLook el={el} theme={deck.theme} set={set} />}
-      {el.type === 'table' && <TableLook el={el} theme={deck.theme} set={set} cellSel={cellSel} />}
+      {el.type === 'table' && <TableLook el={el} theme={deck.theme} set={set} cellSel={cellSel} onCellSel={onCellSel} />}
       {el.type === 'chart' && <ChartLook el={el} theme={deck.theme} set={set} />}
       {el.type === 'icon' && <IconLook el={el} theme={deck.theme} set={set} onIcon={onIcon} />}
       {el.type === 'math' && <MathLook el={el} theme={deck.theme} set={set} focus={texFocus} />}
@@ -1243,7 +1263,9 @@ function SlideTab({ deck, index, change, pickPicture, onFooter }: Props) {
       </Section>
       <Section title="Footer">
         <p className="text-[12px] leading-snug text-fg-3">
-          {deck.footer ? [deck.footer.num && 'Slide numbers', deck.footer.text?.trim() && 'Footer words', deck.footer.date && 'The date'].filter(Boolean).join(' · ') + (deck.footer.skipTitle ? ' · Not on the title slide' : '') : 'No slide numbers or footer.'}
+          {deck.footer
+            ? [deck.footer.num && 'Slide numbers', deck.footer.text?.trim() && 'Footer words', deck.footer.date && 'The date'].filter(Boolean).join(' · ') + (deck.footer.skipTitle ? ' · Not on the title slide' : '')
+            : 'No slide numbers or footer.'}
         </p>
         {onFooter && (
           <Button size="sm" variant="secondary" onClick={onFooter}>

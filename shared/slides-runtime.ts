@@ -663,7 +663,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       const out: Record<string, string | number> = {};
       for (const k of allowed) {
         const v = (attrs as Record<string, unknown>)[k];
-        if (k === 'd' ? typeof v === 'string' && /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s+-]{1,4000}$/.test(v) : k === 'points' ? typeof v === 'string' && /^[0-9eE.,\s+-]{1,2000}$/.test(v) : typeof v === 'number' && Number.isFinite(v)) out[k] = v as string | number;
+        if (k === 'd' ? typeof v === 'string' && /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s+-]{1,4000}$/.test(v) : k === 'points' ? typeof v === 'string' && /^[0-9eE.,\s+-]{1,2000}$/.test(v) : typeof v === 'number' && Number.isFinite(v))
+          out[k] = v as string | number;
       }
       root.appendChild(svg(tag as keyof SVGElementTagNameMap, out));
     }
@@ -692,7 +693,13 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
   const playVideo = (box: HTMLElement, v: Extract<El, { type: 'video' }>) => {
     if (!PLAYER.test(v.src) || box.querySelector('iframe')) return;
     const yt = v.src.includes('youtube');
-    const q = new URLSearchParams({ autoplay: '1', ...(v.muted ? (yt ? { mute: '1' } : { muted: '1' }) : {}), ...(v.loop ? (yt ? { loop: '1', playlist: v.src.split('/').pop() ?? '' } : { loop: '1' }) : {}), ...(v.start ? (yt ? { start: String(v.start) } : {}) : {}), ...(yt ? { rel: '0', modestbranding: '1' } : {}) });
+    const q = new URLSearchParams({
+      autoplay: '1',
+      ...(v.muted ? (yt ? { mute: '1' } : { muted: '1' }) : {}),
+      ...(v.loop ? (yt ? { loop: '1', playlist: v.src.split('/').pop() ?? '' } : { loop: '1' }) : {}),
+      ...(v.start ? (yt ? { start: String(v.start) } : {}) : {}),
+      ...(yt ? { rel: '0', modestbranding: '1' } : {}),
+    });
     // The players cannot run in a page of its own origin (a deck's page, sandboxed): there it opens on its site.
     if (win.origin === 'null') {
       const id = v.src.split('/').pop() ?? '';
@@ -1052,7 +1059,13 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     };
     // The same part copied (a slide duplicated, a part pasted), then the same name, then the same words or picture.
     const mk = (e: El) => e.key || e.id;
-    const words2 = (e: El) => (e.type === 'text' || e.type === 'shape' ? (e.paras ?? []).map((p) => (p.runs ?? []).map((r) => r.t).join('')).join('\n').trim() : '');
+    const words2 = (e: El) =>
+      e.type === 'text' || e.type === 'shape'
+        ? (e.paras ?? [])
+            .map((p) => (p.runs ?? []).map((r) => r.t).join(''))
+            .join('\n')
+            .trim()
+        : '';
     const sig = (e: El): string =>
       e.type === 'text' || e.type === 'shape'
         ? words2(e)
@@ -1622,7 +1635,15 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
         // It moves on as the ghost: none of it stays behind on the old slide.
         na.style.visibility = 'hidden';
         made.push(ghost.animate([{ translate: '0px 0px', rotate: `${ga.r}deg`, scale: '1 1' }, as(gb, ga)], opts));
-        made.push(nb.animate([{ ...as(ga, gb), opacity: 0 }, { translate: '0px 0px', rotate: `${gb.r}deg`, scale: '1 1', opacity: own(nb) }], opts));
+        made.push(
+          nb.animate(
+            [
+              { ...as(ga, gb), opacity: 0 },
+              { translate: '0px 0px', rotate: `${gb.r}deg`, scale: '1 1', opacity: own(nb) },
+            ],
+            opts,
+          ),
+        );
       }
       for (const x of Array.from(newRoot.children) as HTMLElement[]) {
         if (x === bg || matched.has(x) || ghosts.includes(x)) continue;
@@ -1846,7 +1867,9 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       tellMarks();
     }
     function captions(on: boolean) {
-      const SR = (win as unknown as { SpeechRecognition?: new () => NonNullable<typeof rec>; webkitSpeechRecognition?: new () => NonNullable<typeof rec> }).SpeechRecognition ?? (win as unknown as { webkitSpeechRecognition?: new () => NonNullable<typeof rec> }).webkitSpeechRecognition;
+      const SR =
+        (win as unknown as { SpeechRecognition?: new () => NonNullable<typeof rec>; webkitSpeechRecognition?: new () => NonNullable<typeof rec> }).SpeechRecognition ??
+        (win as unknown as { webkitSpeechRecognition?: new () => NonNullable<typeof rec> }).webkitSpeechRecognition;
       if (!on || !SR) {
         capOn = false;
         capB.classList.remove('ns-on');
