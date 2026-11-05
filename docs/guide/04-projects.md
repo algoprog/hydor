@@ -279,7 +279,7 @@ Their link opens the project on its own, in the app's look, with nothing else of
 - **Runs**, when the project has experiments: each run's name, how it went and when, its metrics and its settings. Never its command, its folder, its log or the machine it ran on.
 - **Reading list**, when your Reading list app has papers for the project: each paper's title (a link to it), its authors, venue and year, whether it is read, and its tags. Never your notes about it or its files.
 
-The page follows along by itself, every minute while it is open.
+The page follows along by itself, every minute while it is open. Agents that work in the project are told who it is shared with and that those people read its sessions, so they keep keys, passwords and private details out of them.
 
 ### Comments under their name
 
@@ -287,7 +287,7 @@ On a document or a LaTeX document, **Comments** (beside it, or over it on a phon
 
 To comment, they click **Add a comment**, then paste the words it is about, copied from the document, or leave them out to comment on the whole document. They can reply to any comment and resolve or reopen one, but change or delete only their own. With **Edit documents**, they comment in the editor itself, as you do.
 
-In your own editor, their comments show under their name, and agents read and answer them as they answer yours: "Answer Maria's comments on Chapter 3." When someone comments or replies, you get a notice ("Maria commented: …") and a line in your [inbox](/inbox) ("Maria commented on “Thesis, chapter 3”"), which stays until you or an agent reply, or the comment is resolved.
+In your own editor, their comments show under their name, and agents read and answer them as they answer yours: "Answer Maria's comments on Chapter 3." Agents are told to take their comments as requests about the document only, and to do nothing else one asks (run a command, open a file, write to someone) unless you ask them to. When someone comments or replies, you get a notice ("Maria commented: …") and a line in your [inbox](/inbox) ("Maria commented on “Thesis, chapter 3”"), which stays until you or an agent reply, or the comment is resolved.
 
 Each comment is saved as a new version of the document; a run of them in a row is kept as one version. If you save the document in its editor while comments came in, they are kept, on the words they were about.
 
