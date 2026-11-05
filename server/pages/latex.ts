@@ -51,6 +51,7 @@ import {
 import { authorForAgent, newCommentId, peopleNote } from '../../shared/comments.ts';
 import { TEX_ASKED } from '../../shared/latex-catalog.ts';
 import { diffWords } from '../../shared/latex-diff.ts';
+import { texUses } from '../../shared/latex-files.ts';
 import { texCount, totalWords } from '../../shared/latex-count.ts';
 import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
 import { HttpError } from '../auth.ts';
@@ -1696,7 +1697,8 @@ function zipEntries(buf: Buffer, notes: string[]): Entry[] {
 const PREFERRED = ['main.tex', 'paper.tex', 'thesis.tex', 'report.tex', 'article.tex', 'document.tex', 'ms.tex', 'manuscript.tex', 'cv.tex', 'resume.tex'];
 
 /** A project from its files: the main file found (the .tex that starts a document), the rest named from its folder. */
-async function projectFrom(list: Entry[], notes: string[]): Promise<{ main: string; files: { name: string; text: string }[]; pictures: { name: string; src: string }[]; engine: TexEngine }> {
+async function projectFrom(listIn: Entry[], notes: string[]): Promise<{ main: string; files: { name: string; text: string }[]; pictures: { name: string; src: string }[]; engine: TexEngine }> {
+  let list = listIn;
   const texts = list.filter((e) => /\.(tex|ltx)$/i.test(e.name)).map((e) => ({ ...e, text: textOf(e.data) }));
   const starts = texts.filter((e) => /\\documentclass/.test(e.text) && /\\begin\s*\{document\}/.test(e.text));
   if (!starts.length) throw new Error('It holds no LaTeX document: no .tex file with \\documentclass and \\begin{document}.');
@@ -1710,6 +1712,24 @@ async function projectFrom(list: Entry[], notes: string[]): Promise<{ main: stri
   if (starts.length > 1) notes.push(`It has ${starts.length} documents; ${mainEntry.name} is the one taken as main.tex (${starts.slice(1).map((s) => s.name).join(', ')} came in as files).`);
   // TeX reads names from the main file's folder: the project starts there.
   const root = mainEntry.name.includes('/') ? mainEntry.name.slice(0, mainEntry.name.lastIndexOf('/') + 1) : '';
+  // The files its document uses first, in the order TeX reads them (shared/latex-files.ts): what does not fit a
+  // document's limits is then what it does not use.
+  const inRoot = new Map(list.filter((e) => e !== mainEntry && e.name.startsWith(root)).map((e) => [e.name.slice(root.length), e]));
+  const known = new Map(texts.map((e) => [e.name, e.text]));
+  const uses = texUses({
+    main: mainEntry.text,
+    read: (n) => {
+      const e = inRoot.get(n);
+      return e ? (known.get(e.name) ?? (/\.(sty|cls|tikz|pgf)$/i.test(n) ? textOf(e.data) : null)) : null;
+    },
+    has: (n) => inRoot.has(n),
+    names: () => inRoot.keys(),
+    alias: mainEntry.name.slice(root.length),
+  });
+  const order = new Map([...uses.used.keys()].map((n, i) => [root + n, i]));
+  const rank = (e: Entry) => order.get(e.name) ?? Infinity;
+  list = list.slice().sort((a, b) => rank(a) - rank(b));
+  let total = Buffer.byteLength(mainEntry.text);
   const files: { name: string; text: string }[] = [];
   const pictures: { name: string; src: string }[] = [];
   const stems = new Set(list.filter((e) => /\.(tex|ltx)$/i.test(e.name)).map((e) => e.name.replace(/\.[^.]+$/, '').toLowerCase()));
@@ -1738,6 +1758,11 @@ async function projectFrom(list: Entry[], notes: string[]): Promise<{ main: stri
         notes.push(`${e.name} was left out: it is over ${TEX_LIMITS.file / 1024 / 1024} MB.`);
         continue;
       }
+      if (total + e.data.length > TEX_LIMITS.total) {
+        notes.push(`${e.name} was left out: a document’s files may come to ${TEX_LIMITS.total / 1024 / 1024} MB in all.`);
+        continue;
+      }
+      total += e.data.length;
       used.add(name.toLowerCase());
       files.push({ name, text: textOf(e.data) });
       continue;
@@ -1808,6 +1833,17 @@ export async function importTex(buf: Buffer, name: string): Promise<{ doc: TexDo
   }
   if (buf.length > TEX_LIMITS.main) throw new Error(`It is over ${TEX_LIMITS.main / 1024 / 1024} MB`);
   return { doc: normalizeTex({ main: textOf(buf) }), notes };
+}
+
+/**
+ * A document from a LaTeX project's folder of this computer (Import a folder in the Library): its main file found, its
+ * files and pictures in their folders, those its document uses first when it is over a document's limits. What could
+ * not come in is said in `notes`.
+ */
+export async function texFromFolder(dir: string): Promise<{ doc: TexDoc; notes: string[] }> {
+  const notes: string[] = [];
+  const p = await projectFrom(readFolder(dir, notes), notes);
+  return { doc: normalizeTex(p), notes };
 }
 
 /** A document from a file someone opens (importTex, without its notes). */

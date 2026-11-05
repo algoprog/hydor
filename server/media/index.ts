@@ -8,7 +8,7 @@
 // Routes, signed in:
 //   GET  /api/media                      every item, newest first
 //   POST /api/media                      keeps a file: { path, prompt?, model?, lyrics?, sessionKey?, space? }
-//   GET/PATCH/DELETE /api/media/:id      one item; PATCH { title?, description?, space? }
+//   GET/PATCH/DELETE /api/media/:id      one item; PATCH { title?, description?, space?, folder? }
 //   POST /api/media/:id/caption          writes its title and description again
 //   GET  /api/media/:id/file             the file (?download=1 to save it), in parts for a video player
 //   GET  /api/media/:id/still            a still to show it by; GET /api/media/:id/frames a video's frames
@@ -29,6 +29,7 @@ import { frameGrid, hasFfmpeg, probe, still, waveform } from './frames.ts';
 import { addMedia, deleteMedia, editMedia, filesOf, initMedia, keptWithBytes, listMedia, mustMedia, savedFrom, setCaption, setMediaSpace } from './store.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { fileHash } from '../filemove.ts';
+import { putInFolder } from '../pages/folders.ts';
 
 const TYPES: Record<string, { kind: MediaKind; mime: string }> = {
   png: { kind: 'image', mime: 'image/png' },
@@ -225,8 +226,12 @@ export const media: Feature = {
     app.patch('/api/media/:id', async (req) => {
       const id = (req.params as { id: string }).id;
       const b = (req.body ?? {}) as Record<string, unknown>;
-      // Moved to a space (or out of one), and/or its own title and description.
+      // Moved to a space (or out of one), into a Library folder (or out of one), and/or its own title and description.
       let item = b.space !== undefined ? setMediaSpace(db, id, spaceChoice(db, b.space)) : mustMedia(db, id);
+      if (b.folder !== undefined) {
+        putInFolder(db, 'media', id, typeof b.folder === 'string' && b.folder ? b.folder : null);
+        item = mustMedia(db, id);
+      }
       if (b.title !== undefined || b.description !== undefined) item = editMedia(db, id, b);
       tell(d, { what: 'media', item });
       return { item };

@@ -11,6 +11,7 @@ import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { fileHash, moveWhole } from '../filemove.ts';
+import { fitFolder } from '../pages/folders.ts';
 
 export const MEDIA_DIR = path.join(config.dataDir, 'media');
 const MAX_ITEMS = 5000;
@@ -52,6 +53,8 @@ export function initMedia(db: DB) {
   // The SHA-256 of its bytes, to keep the same file once (items kept before have none until one of their size comes).
   if (!cols.includes('sha')) db.exec('alter table media add column sha text');
   db.exec('create index if not exists media_bytes on media(bytes)');
+  // The Library folder it is in (server/pages/folders.ts), or none.
+  if (!cols.includes('folder')) db.exec('alter table media add column folder text');
 }
 
 interface Row {
@@ -73,6 +76,7 @@ interface Row {
   caption_error: string | null;
   caption_by: string | null;
   space: string | null;
+  folder: string | null;
   peaks: string | null;
   lyrics: string | null;
   sha: string | null;
@@ -111,6 +115,7 @@ const toItem = (r: Row): MediaItem => ({
   ...(r.caption_error ? { captionError: r.caption_error } : {}),
   ...(r.caption_by ? { captionBy: r.caption_by } : {}),
   ...(r.space ? { space: r.space } : {}),
+  ...(r.folder ? { folder: r.folder } : {}),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   file: path.join(MEDIA_DIR, r.file),
@@ -262,6 +267,8 @@ export function editMedia(db: DB, id: string, p: { title?: unknown; description?
 export function setMediaSpace(db: DB, id: string, space: string | null): MediaItem {
   mustMedia(db, id);
   db.prepare('update media set space = ? where id = ?').run(space, id);
+  // Out of its Library folder, unless that folder is in the space too.
+  fitFolder(db, 'media', id);
   return getMedia(db, id)!;
 }
 
