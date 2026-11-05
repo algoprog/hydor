@@ -435,7 +435,7 @@ const PAPER_RADAR: Draft = {
         branches: [
           [{ id: 'me', title: 'Read your profile and projects', do: 'tool', tool: 'user_profile', with: { sessions: 60, notes: 20 }, failed: 'skip' }],
           [{ id: 'liked', title: 'The papers you saved', do: 'data', op: 'find', collection: 'saved', sort: '-createdAt', limit: 80 }],
-          [{ id: 'nope', title: 'The papers not for you', do: 'data', op: 'find', collection: 'marks', where: { mark: 'no' }, sort: '-createdAt', limit: 80 }],
+          [{ id: 'nope', title: 'The papers not for you', do: 'data', op: 'find', collection: 'marks', where: { mark: 'aside' }, sort: '-createdAt', limit: 80 }],
           [{ id: 'seen', title: 'What earlier updates looked at', do: 'data', op: 'find', collection: 'seen', sort: '-day', limit: 30 }],
         ],
       },
@@ -890,7 +890,7 @@ const MY_PAPER_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'title', label: 'Your paper', type: 'text' },
   { id: 'year', label: 'Year', type: 'number' },
   { id: 'venue', label: 'Where', type: 'text' },
-  { id: 'citations', label: 'Citations', type: 'number' },
+  { id: 'cited', label: 'Citations', type: 'number' },
   { id: 'new', label: 'New this time', type: 'number' },
   { id: 'url', label: 'Link', type: 'url' },
 ];
@@ -1171,8 +1171,8 @@ const citations = rows(input.fresh).map((c) => {
   const parts = split(best, c.first, c.myYear);
   return { key: c.key, mine: c.mine, title: c.title, authors: c.authors, venue: c.venue, year: Number(c.year) || null, date: c.date || null, url: link(c.url), kind: kind, gist: String(k.gist || '').trim(), pre: parts.pre, mark: parts.mark, post: parts.post, influential: !!c.influential };
 });
-const papers = rows(input.papers).map((p) => ({ key: p.key, title: p.title, year: Number(p.year) || null, venue: p.venue, citations: Number(p.citations) || 0, new: Number(counts[p.key]) || 0, url: link(p.url) }));
-papers.sort((a, b) => b.new - a.new || b.citations - a.citations);
+const papers = rows(input.papers).map((p) => ({ key: p.key, title: p.title, year: Number(p.year) || null, venue: p.venue, cited: Number(p.citations) || 0, new: Number(counts[p.key]) || 0, url: link(p.url) }));
+papers.sort((a, b) => b.new - a.new || b.cited - a.cited);
 for (const k of rows(input.keep)) {
   const rec = { title: k.title, citing: list(k.citing), count: Number(k.count) || 0 };
   if (k.had) await ctx.data.update('cited', { id: k.id, set: rec, title: 'Keep the citations seen' });
@@ -2732,20 +2732,25 @@ The compute there is: {{compute}}
             title: 'Put the verdict with the idea',
             do: 'code',
             language: 'javascript',
-            with: { idea: '{{idea}}', verdict: '{{verdict}}', papers: '{{prior.papers}}' },
+            with: { idea: '{{idea}}', verdict: '{{verdict}}', papers: '{{prior.papers}}', mine: '{{yours.papers}}', recent: '{{pair.recent}}' },
             code:
               LIST +
-              String.raw`// The idea as the page shows it: its verdict, the closest paper named with its link, and what the first experiment takes.
+              String.raw`// The idea as the page shows it: its verdict, the closest paper named with its link, and what the first experiment
+// takes; the papers it crosses and those its verdict names by their titles, not their numbers (M2, R5, P1).
 const idea = input.idea || {};
 const v = input.verdict || {};
 const papers = rows(input.papers);
 const near = papers[Math.round(Number(v.closest)) - 1];
 const pick = (s, all, d) => all.find((x) => String(s || '').toLowerCase().indexOf(x) >= 0) || d;
-const named = (t) => String(t || '').replace(/\bP(\d)\b/g, (m, n) => (papers[Number(n) - 1] ? '“' + papers[Number(n) - 1].title + '”' : m));
+const lists = { M: rows(input.mine), R: rows(input.recent), P: papers };
+const named = (t) => String(t || '').replace(/\b([MRP])(\d{1,2})\b/g, (m, k, n) => {
+  const p = lists[k][Number(n) - 1];
+  return p ? '“' + clip(p.title, 60) + '”' : m;
+});
 return {
   title: idea.title,
   idea: idea.idea,
-  crosses: idea.crosses,
+  crosses: named(idea.crosses),
   verdict: pick(v.verdict, ['partly done', 'done', 'new'], 'new'),
   why: named(v.why),
   closest: near ? near.title + (near.year ? ' (' + near.year + ')' : '') : '',
