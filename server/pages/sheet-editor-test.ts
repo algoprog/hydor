@@ -166,6 +166,8 @@ const sh = book.sheets[0];
   const svg = chartSvg(sh.charts![0], data, 480, 300);
   ok(svg.startsWith('<svg') && svg.includes('Hours') && (svg.match(/<rect /g)?.length ?? 0) === 2 && !svg.includes('<script'), 'and draws as SVG, its words escaped');
   ok(chartSvg({ ...sh.charts![0], title: '<img src=x>' }, data, 300, 200).includes('&#60;img'), 'a title is words, never markup');
+  const words = chartData(book, calc, 0, { ...sh.charts![0], range: 'A1:A5' });
+  ok(chartSvg(sh.charts![0], words, 300, 200).includes('No numbers to draw'), 'a chart of words only says it has no numbers to draw');
 }
 
 // ---- rows and columns put in and taken out -----------------------------------------------------------------------
