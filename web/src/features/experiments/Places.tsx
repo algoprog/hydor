@@ -177,7 +177,7 @@ export function Places({ open, onClose, adding }: { open: boolean; onClose: () =
           <p className="text-fg-2">{queue ? (queue.gpus.length ? `${queue.gpus.length} GPU${queue.gpus.length === 1 ? '' : 's'}: ${gpuNames.join(', ')}` : (queue.gpuNote ?? 'No NVIDIA GPU here')) : '…'}</p>
           <label className="flex flex-wrap items-center gap-2 text-fg-2">
             Jobs without a GPU: at most
-            <input value={slots} onChange={(e) => saveSlots(e.target.value.replace(/\D/g, '').slice(0, 2))} inputMode="numeric" className={cx(inputCls, 'tnum h-8 w-14 text-[13px]')} />
+            <input value={slots} onChange={(e) => saveSlots(e.target.value.replace(/\D/g, '').slice(0, 2))} inputMode="numeric" className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-14 text-[13px]')} />
             at once
           </label>
         </section>

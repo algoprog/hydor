@@ -26,7 +26,8 @@ function ticks(lo: number, hi: number, n = 3): number[] {
   const mag = 10 ** Math.floor(Math.log10(raw));
   const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= raw) ?? raw;
   const out: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(Number(v.toPrecision(12)));
+  if (!(step > 0) || !Number.isFinite(lo) || !Number.isFinite(hi)) return [lo];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9 && out.length < 50; v += step) out.push(Number(v.toPrecision(12)));
   return out;
 }
 
@@ -108,7 +109,7 @@ export function StepChart({ series, height = 140, className }: { series: StepSer
           ))}
           <line x1={axisW} x2={width} y1={top + plotH} y2={top + plotH} className="viz-axis" />
           {xs.map((g, i) => (
-            <text key={i} x={x(g)} y={height - 3} textAnchor="middle" className="tnum fill-[var(--fg-3)] text-[10px]">
+            <text key={i} x={x(g)} y={height - 3} textAnchor={x(g) > width - 28 ? 'end' : 'middle'} className="tnum fill-[var(--fg-3)] text-[10px]">
               {num(g)}
             </text>
           ))}
@@ -192,7 +193,7 @@ export function Scatter({ points, setting, metric, best, height = 150 }: { point
             </g>
           ))}
           {shown.map((v) => (
-            <text key={String(v)} x={xOf(v)} y={height - 4} textAnchor="middle" className="tnum fill-[var(--fg-3)] text-[10px]">
+            <text key={String(v)} x={xOf(v)} y={height - 4} textAnchor={xOf(v) > width - 28 ? 'end' : xOf(v) < axisW + 28 ? 'start' : 'middle'} className="tnum fill-[var(--fg-3)] text-[10px]">
               {typeof v === 'number' ? num(v) : v}
             </text>
           ))}

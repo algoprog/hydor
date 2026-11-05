@@ -50,12 +50,12 @@ export function SweepView({ id, onClose, onTable, onCompare }: { id: string | nu
             {data.sweep.mode === 'random' ? 'A random sample of the combinations.' : 'Every combination.'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <select value={metric} onChange={(e) => setMetric(e.target.value)} className={cx(inputCls, 'h-8 w-auto max-w-[220px] text-[13px]')} translate="no">
+            <select value={metric} onChange={(e) => setMetric(e.target.value)} className={cx(inputCls.replace('w-full', ''), 'h-8 max-w-[220px] text-[13px]')} translate="no">
               {metrics.map((m) => (
                 <option key={m}>{m}</option>
               ))}
             </select>
-            <select value={which} onChange={(e) => setWhich(e.target.value as 'best' | 'last')} className={cx(inputCls, 'h-8 w-auto text-[13px]')}>
+            <select value={which} onChange={(e) => setWhich(e.target.value as 'best' | 'last')} className={cx(inputCls.replace('w-full', ''), 'h-8 text-[13px]')}>
               <option value="best">Each run’s best</option>
               <option value="last">Each run’s last</option>
             </select>

@@ -322,7 +322,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
             <div className="text-fg-2">Settings and their values</div>
             {params.map((p, i) => (
               <div key={i} className="flex items-center gap-2">
-                <input value={p.name} onChange={(e) => setParams(params.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} placeholder="lr" spellCheck={false} className={cx(inputCls, 'w-28 shrink-0 font-mono text-[12.5px]')} />
+                <input value={p.name} onChange={(e) => setParams(params.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} placeholder="lr" spellCheck={false} className={cx(inputCls.replace('w-full', ''), 'w-28 shrink-0 font-mono text-[12.5px]')} />
                 <input
                   value={p.values}
                   onChange={(e) => setParams(params.map((x, k) => (k === i ? { ...x, values: e.target.value } : x)))}
@@ -351,14 +351,14 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
               {sampling === 'random' && (
                 <label className="flex items-center gap-2 text-fg-2">
                   at most
-                  <input value={maxRuns} onChange={(e) => setMaxRuns(e.target.value.replace(/\D/g, '').slice(0, 3))} inputMode="numeric" placeholder="20" className={cx(inputCls, 'tnum h-8 w-16 text-[13px]')} />
+                  <input value={maxRuns} onChange={(e) => setMaxRuns(e.target.value.replace(/\D/g, '').slice(0, 3))} inputMode="numeric" placeholder="20" className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-16 text-[13px]')} />
                   runs
                 </label>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-fg-2">Stop runs early on</span>
-              <input value={stopMetric} onChange={(e) => setStopMetric(e.target.value)} placeholder="val_loss (optional)" spellCheck={false} className={cx(inputCls, 'h-8 w-44 font-mono text-[12.5px]')} />
+              <input value={stopMetric} onChange={(e) => setStopMetric(e.target.value)} placeholder="val_loss (optional)" spellCheck={false} className={cx(inputCls.replace('w-full', ''), 'h-8 w-44 font-mono text-[12.5px]')} />
               {stopMetric.trim() && (
                 <Segmented
                   size="sm"
@@ -435,13 +435,13 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
               </div>
               {when.on && (
                 <div className="mt-2 flex items-center gap-2">
-                  <input value={when.metric} onChange={(e) => setWhen({ ...when, metric: e.target.value })} placeholder="val_acc" spellCheck={false} className={cx(inputCls, 'h-8 w-36 font-mono text-[12.5px]')} />
-                  <select value={when.op} onChange={(e) => setWhen({ ...when, op: e.target.value as typeof when.op })} className={cx(inputCls, 'h-8 w-16 text-[13px]')}>
+                  <input value={when.metric} onChange={(e) => setWhen({ ...when, metric: e.target.value })} placeholder="val_acc" spellCheck={false} className={cx(inputCls.replace('w-full', ''), 'h-8 w-36 font-mono text-[12.5px]')} />
+                  <select value={when.op} onChange={(e) => setWhen({ ...when, op: e.target.value as typeof when.op })} className={cx(inputCls.replace('w-full', ''), 'h-8 w-16 text-[13px]')}>
                     {['>', '>=', '<', '<='].map((o) => (
                       <option key={o}>{o}</option>
                     ))}
                   </select>
-                  <input value={when.value} onChange={(e) => setWhen({ ...when, value: e.target.value.replace(/[^\d.eE+-]/g, '') })} inputMode="decimal" placeholder="0.9" className={cx(inputCls, 'tnum h-8 w-24')} />
+                  <input value={when.value} onChange={(e) => setWhen({ ...when, value: e.target.value.replace(/[^\d.eE+-]/g, '') })} inputMode="decimal" placeholder="0.9" className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-24')} />
                 </div>
               )}
             </div>
@@ -470,7 +470,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
                   {watch.includes('stall') && (
                     <label className="flex items-center gap-2 text-fg-2">
                       A stall is no new output for
-                      <input value={stall} onChange={(e) => setStall(e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" className={cx(inputCls, 'tnum h-8 w-16 text-[13px]')} />
+                      <input value={stall} onChange={(e) => setStall(e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" className={cx(inputCls.replace('w-full', ''), 'tnum h-8 w-16 text-[13px]')} />
                       minutes
                     </label>
                   )}
