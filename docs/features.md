@@ -38,6 +38,13 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   its sessions came from after its name, and its tooltip and ⋯ say which apps, and which added account; then the rest
   by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
   (until later), settles (done for now), archives or deletes the session, on phones too.
+- While a session works, its line says how long this turn has run and, after earlier turns, how long it has worked in
+  all ("Working · 2m 10s · 47m in all"), in the session and in the sidebar.
+- **Confidential sessions** (Options → Confidential): for a submission you review, patient data or a client's code. The
+  session runs on Custom with a model on this computer or your private network; web search, the browser, connected
+  apps, apps and models elsewhere are off (an allowlist of tools, so new ones stay off too); its commands run without
+  network (bubblewrap), or ask each time where that can't be done; its title, notices and memory send nothing out; a
+  lock and a calm tint show it. Enforced on the server, not only in the page.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
   OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
@@ -116,6 +123,12 @@ agents that speak ACP and take MCP servers.
   projects, the Projects page suggests folders your sessions worked in, or changed files in, over the last 90 days that
   no project has yet (a folder in a Git repository counting as the repository), each with Make a project, or ✕ to stop
   suggesting it.
+- **Share a project with people** (a project's ⋯ → Share with people): your advisor or students get a personal link each
+  (View and comment, or Edit documents; for a week, a month, or until you stop it), shown once, as a copy or a QR code.
+  They open a portal of that project alone: its documents in the Library's own viewers and editors, its sessions
+  read-only, its experiments' runs and its reading list; they comment under their name (you get a notice and an Inbox
+  line), and edit documents if you let them. Never your agents, files, settings or other projects; confidential
+  sessions never show; wrong links count as wrong passwords.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
@@ -209,7 +222,7 @@ agents that speak ACP and take MCP servers.
   reads, reads the best pages side by side and lays them out as an edition with a cover line, a cover story and a
   section for each topic, each story with its picture, what it says and why it is there (opening one marks it read;
   Dig deeper starts a research report on it). It opens on its own page rather than in chats, with Update and its
-  settings at the top: Update every day (a scheduled task, off until you turn it on), how many sessions it reads,
+  settings at the top: Update automatically (every day, on weekdays or once a week, at a time you pick: a scheduled task, off until you turn it on), how many sessions it reads,
   what to always cover and what to leave out. An app of your own whose view has pages for its own page gets the same
   Update and settings. Beside those come sixteen small, quick apps for everyday things that get real data from free services, no key needed, and show it
   as charts, maps and cards: a weather outlook and the best time to go somewhere (Open-Meteo), a team tracker and
@@ -371,6 +384,70 @@ agents that speak ACP and take MCP servers.
 - **A second opinion, and caps**: one click has another company's model check a turn's work against what you
   asked; a spending cap stops a session, or a scheduled task's run, at its limit, checked after each model call.
 
+## For researchers
+
+- **Keep up with your field** (ready-made apps under Apps → Research, each on its own page with Update automatically):
+  **Paper radar** (each morning, new arXiv and OpenAlex papers in your fields, on your topics and by the people you
+  follow, ranked against your projects with the local embedding model, each with why it matters to you; Save, Cite as
+  BibTeX, Dig deeper, Not for me, which steer the next days), **Citation alerts** (who cited your papers, with the citing
+  sentence, and whether it builds on, compares with or disputes your work), **New-model watch** (new Hugging Face
+  models of a task, checked against your limits and run on your own evaluation through Experiments; you hear only of
+  those that beat your best), **Deadline radar** (your venues' deadlines from ccfddl and ai-deadlines, from AoE into your
+  time zone, with reminders, page limits and templates), **Living related work** (a page per topic that grows as papers
+  appear, in themes, with a LaTeX related-work draft and BibTeX) and **Gap finder** (project ideas from your papers and
+  this month's, each checked for prior work and sized to your compute).
+- **Read and organise papers**: a **Reading list** by project, kept in step with Zotero both ways (add by DOI, arXiv id,
+  link or title; import and export .bib; status, tags, notes and a page per paper); a **Literature matrix** that reads up
+  to 30 papers into a Library spreadsheet, each cell citing its page; **Reproduce a paper** (finds the code, builds a clean
+  environment, sends long runs to Experiments, and compares each number with the paper's). A paper is found however
+  it is given (DOI, arXiv id, link, title, PDF, .tex, a LaTeX project or a Library document), from open copies only.
+- **Check a paper before you submit** (LaTeX editor → Tools → Check before submitting): pick the venue (ACL Rolling
+  Review, SIGIR, CIKM, WSDM, TheWebConf, KDD, NeurIPS, ICLR, ICML, AAAI, journals, Other) and it checks every citation
+  against the bibliography and online (Crossref, arXiv, OpenAlex, Semantic Scholar: does it exist, are the authors,
+  year and venue right, has a preprint been published since), anonymity leaks, pages against the limit, Type 3 fonts,
+  template changes, TODOs and the venue's required parts, and in tables the bold on the best values and the numbers
+  Experiments put there, worked out again from their runs. Safe fixes in one click, the rest asked of the agent; findings
+  go on their lines as comments. Agents run it with latex_check. **Export → arXiv package (.zip)** strips comments
+  safely, keeps the files the paper uses, adds the .bbl and typesets the package to see it builds; **Tools → Your
+  paper** asks the agent to make it camera-ready or move it to another template.
+- **Review, answer and present**: a **Reviewer simulator** on a venue's own review form (1 to 5 reviewers, a meta-review,
+  the weaknesses ranked by how likely each sinks the paper, the baselines and ablations reviewers will ask for), a
+  **Rebuttal workbench** (points grouped across reviews and sorted, replies drafted within the limit, experiments to tick
+  off), **Paper to talk, poster and thread** (timed slides with the paper's own figures and notes, an A0 LaTeX poster,
+  posts for X, Bluesky and LinkedIn, a project page) and a **Figure doctor** (column width, the paper's font,
+  colour-blind-safe colours, embedded fonts, one style file). The LaTeX editor opens them with your paper filled in.
+- **Experiments** (System → Experiments): jobs wait for a GPU with enough free memory on any of your machines (or a
+  SLURM cluster's queue over SSH), run in tmux and are kept as records: the commit and its changes, settings, seed,
+  environment, log and metrics, drawn as charts. An agent on call wakes on NaN, out of memory, a stall, a crash or
+  divergence, and tells you or acts within your rules. Compare runs, sweep settings (every combination or a random
+  sample, losing runs stopped early), and make **results tables** (mean ± std over seeds, the best in bold, paired or
+  Welch tests with Holm's correction as daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document of the
+  Library. Agents use it with experiment_run, experiment_sweep, experiment_list, experiment_get, experiment_stop and
+  experiment_table.
+- **The lab's work** (Apps → Lab and Work): an **Annotation workbench** (you and a model label the same sample, the
+  model's label hidden until you give yours; disagreements, Cohen's κ and a confusion matrix; publish on Hugging Face
+  with a dataset card), a **Research sprint** (hypotheses, code on its own branch, runs in Experiments, an analysis
+  notebook and a report, with you approving each step), a **Sweep planner** (a sweep fitted to a budget of runs or GPU
+  hours, and how much each setting mattered), a **Weekly progress report** for your advisor, team or manager, and a
+  **Lab notebook** with a dated entry for each day you worked, kept apart from memory and searchable.
+- New skills for every agent: papers' peer review, reproducing a paper, and figures for papers.
+
+## For engineers
+
+- Scheduled tasks' examples, grouped (Everyday, Watch, Engineering), with four for engineering, each with a webhook
+  filter, switches for what it may do and a skill of its own: **CI doctor** (a failed GitHub Actions, GitLab CI,
+  Buildkite or CircleCI run: the logs read, reproduced in a worktree, flaky told from real, re-run or a draft fix PR),
+  **Issue triage** (labels, duplicates, what a report lacks, easy fixes tried as draft PRs), **Dependency gardener**
+  (weekly upgrades in groups of risk, advisories first, tests run, a PR per group or a report) and **Incident first
+  responder** (Sentry, Grafana, Datadog or Better Stack alerts: errors, deploys and the diff since the last good release
+  in one timeline, a notice at once, a rollback only after your yes).
+- **Find what broke it** (Git → History, a commit's ⋯): give the commit where it worked and what is broken; an agent
+  writes a check, runs git bisect in a worktree of its own, names the first bad commit and says why.
+- **Campaign** (Options → Swarm → Campaign): one big change in many parts, each made by a member in its own worktree
+  with its tests, on a board of parts and their status; a failed part is tried once more, and the lead merges the parts
+  in order or opens pull requests.
+- New skills for every agent: ci-doctor, issue-triage, dependency-upgrades, incident-response and git-bisect.
+
 ## Custom: any model
 
 OpenRouter session costs and token usage show above the message box without a spending cap. Charges come from OpenRouter automatically, with its generation records and catalog prices as fallbacks; its catalog also supplies Usage estimates, so no manual prices are required.
@@ -520,8 +597,8 @@ programs shows each program's version and what is out, with Check now, Update no
   and the app keeps its own link to every conversation file (no extra disk), so one that gets deleted comes back.
   Sessions nobody used for a year are deleted (Settings → General → Delete inactive sessions: on or off, and how
   long); pinned and busy ones stay, and their numbers stay in Activity.
-- System: this computer under one tool in the sidebar, a tab each for Files, Git, Terminal, Preview and
-  Monitor (CPU, memory, GPUs, disks, network and the busiest processes, live), and an overview with how it is
+- System: this computer under one tool in the sidebar, a tab each for Files, Git, Terminal, Preview,
+  Monitor (CPU, memory, GPUs, disks, network and the busiest processes, live) and Experiments, and an overview with how it is
   doing and what each tool holds now (recent files and a search, repositories with changes, the shells
   running, the web apps to preview).
 - Settings: sign the agents in and out from the browser, and manage MCP servers, skills, plugins, Agent
