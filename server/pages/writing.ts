@@ -12,8 +12,11 @@
 // tick and toggles fold in Edit too, a table of contents keeps up with the headings, a page gets an icon and a cover,
 // pictures dropped or pasted in land where they fall (the app makes them small enough to live in the page), and code
 // blocks are coloured as their code is written (shared/code-colours.ts), with a language picked by the chip at their
-// corner or Auto; the colours are taken off again in the page given back, which keeps its code as plain text. "@" (or
-// "/" → Link to a page) puts in a link to another of the Library's pages, whose list the app tells it, as a chip.
+// corner or Auto; the colours are taken off again in the page given back, which keeps its code as plain text (plain
+// <pre><code> blocks agents write are coloured too, and kept as they were written). "@" (or "/" → Link to a page) puts
+// in a link to another of the Library's pages, whose list the app tells it, as a chip. "/" → Database puts in a
+// database (shared/page-db.ts), drawn in its block and kept with the page's own data through the app: a copy of one
+// (Duplicate, a paste) becomes a database of its own, with the rows the first holds.
 //
 // What it adds to the page uses the kit's classes (shared/page-kit.ts), so it suits the page light or dark; what is
 // its own (hints in empty blocks, handles, menus) is drawn over the page or stripped before the page is given back.
@@ -23,6 +26,7 @@
 // the browser's own globals.
 
 import type { CodeColours } from '../../shared/code-colours.ts';
+import type { DbStore, PageDatabases } from '../../shared/page-db.ts';
 
 /** What a block is, for writing in it. */
 export type Kind = 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'bullet' | 'number' | 'todo' | 'quote' | 'code' | 'toggle' | 'callout';
@@ -74,6 +78,9 @@ export interface Core {
   code: CodeColours;
   /** Whether the app keeps comments for this page (a page of the Library). */
   canComment: () => boolean;
+  /** The databases (shared/page-db.ts), and the page's own data they are kept in, through the app. */
+  db: PageDatabases;
+  store: DbStore;
 }
 
 /** What the writing does for the editor. */
@@ -81,6 +88,8 @@ export interface Writing {
   draw(): void;
   /** The page is in place: what follows it (a table of contents an agent left empty) is brought up to date, not counted as a change. */
   ready(): void;
+  /** A part put in from the app (Add): a database it brings gets a name of its own in the page. */
+  prepare(node: Element): void;
   act(a: string, arg: any): boolean;
   started(h: HTMLElement): void;
   finished(h: HTMLElement): void;
@@ -1216,7 +1225,7 @@ export function writing(E: Core): Writing {
   const rectJson = (r: DOMRect | null) => (r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null);
 
   // ---- the blocks in the page, for handles, dragging and picking ---------------------------------------------------
-  const COMPONENT = '.n-callout,.n-video,.n-math,.n-toc,.n-cover,.n-icon,pre,figure';
+  const COMPONENT = '.n-callout,.n-video,.n-math,.n-toc,.n-cover,.n-icon,.n-db,pre,figure';
   /** The block a part belongs to: the item, the paragraph, the callout, the table, the card… */
   const blockOf = (t: Element | null): Element | null => {
     for (let x = t; x && x !== doc.body && x !== doc.documentElement; x = x.parentElement) {
@@ -1624,6 +1633,7 @@ export function writing(E: Core): Writing {
       ['math', 'sMath', 'Maths', 'equation formula latex katex tex math', 'math', ''],
       ['emoji', 'sEmoji', 'Emoji', 'smiley icon face symbol', 'emoji', ''],
       ['link', 'linkPage', 'Link to a page', 'mention page link reference library', 'pagelink', '@'],
+      ['database', 'sDatabase', 'Database', 'db table board kanban rows columns notion data', 'table', ''],
     ] as const
   ).map(([id, key, en, also, icon, k]) => ({ id, label: L(key, en), en, also, icon, key: k }));
   let slash: { h: HTMLElement; node: Text; at: number; items: Item[]; i: number; misses: number; rows: number } | null = null;
@@ -2043,6 +2053,13 @@ export function writing(E: Core): Writing {
         refreshToc();
         return textAfter(nav);
       }
+      case 'database': {
+        // Notion's database: drawn by its runtime, its rows kept with the page's own data from its first change.
+        const db = newDatabase();
+        put(db);
+        mountDbs();
+        return { pick: db };
+      }
       default:
         return null;
     }
@@ -2392,6 +2409,61 @@ export function writing(E: Core): Writing {
     if (!E.editing() && E.sel() !== u && E.sel() !== pre) E.select(pre);
     openMenu([u], { left: r.left, top: r.top, bottom: r.bottom }, 'lang');
   });
+
+  // ---- databases (shared/page-db.ts): drawn in their blocks, kept with the page's own data through the app --------------
+  /** A name no other database of the page has (its rows are kept under it). */
+  const dbName = () => {
+    const used = new Set([...doc.querySelectorAll('.n-db')].map((x) => x.getAttribute('data-db')));
+    let n = '';
+    do n = `db-${Math.random().toString(36).slice(2, 7)}`;
+    while (used.has(n));
+    return n;
+  };
+  /** A new database: a name, a status and a date, three empty rows, its words in the app's language. */
+  const newDatabase = () => {
+    const el = make('div', 'n-db');
+    el.setAttribute('data-db', dbName());
+    const schema = {
+      cols: [
+        { name: L('db.colName0', 'Name'), kind: 'text' },
+        { name: L('db.status', 'Status'), kind: 'select', options: [{ name: L('db.todo', 'To do'), color: 'grey' }, { name: L('db.doing', 'Doing'), color: 'blue' }, { name: L('db.done', 'Done'), color: 'green' }] },
+        { name: L('db.kDate', 'Date'), kind: 'date' },
+      ],
+      rows: [{}, {}, {}],
+    };
+    el.setAttribute('data-schema', JSON.stringify(schema));
+    return el;
+  };
+  /** The database's own words: the editor's labels of theirs (db.…), without the prefix. */
+  const dbLabels = (() => {
+    const out: Record<string, string> = {};
+    for (const k of ['untitled', 'table', 'board', 'sort', 'filter', 'newRow', 'oneRow', 'nRows', 'nOfRows', 'kText', 'kNumber', 'kSelect', 'kMulti', 'kDate', 'kCheck', 'kLink', 'colName', 'kind', 'options', 'addOption', 'newOption', 'sortAsc', 'sortDesc', 'noSort', 'filterBy', 'moveLeft', 'moveRight', 'delCol', 'addCol', 'newCol', 'delRow', 'addFilter', 'remove', 'clear', 'groupBy', 'noValue', 'needSelect', 'addSelect', 'status', 'untitledRow', 'open', 'full', 'failed', 'unread', 'inUse', 'opContains', 'opNotContains', 'opIs', 'opIsNot', 'opHas', 'opHasNot', 'opEmpty', 'opFilled', 'opBefore', 'opAfter', 'opChecked', 'opUnchecked', 'cDefault', 'cGrey', 'cBrown', 'cOrange', 'cYellow', 'cGreen', 'cBlue', 'cPurple', 'cPink', 'cRed']) {
+      const v = L(`db.${k}`, '');
+      if (v) out[k] = v;
+    }
+    return out;
+  })();
+  /**
+   * Every database of the page drawn (those already drawn stay as they are; a page put back by Undo is drawn anew). A copy
+   * of one on the page (Duplicate, a paste) is a database of its own: a name of its own, starting with what the first holds.
+   */
+  const mountDbs = () => {
+    const all = [...doc.body.querySelectorAll('.n-db')];
+    const drawn = new Map(all.filter((x) => x.shadowRoot).map((x) => [x.getAttribute('data-db'), x]));
+    const named = new Set(drawn.keys());
+    for (const el of all) {
+      if (el.shadowRoot) continue;
+      const name = el.getAttribute('data-db');
+      if (name && named.has(name)) {
+        const from = drawn.get(name);
+        const now = from ? E.db.stateOf(from) : null;
+        el.setAttribute('data-db', dbName());
+        if (now) el.setAttribute('data-schema', JSON.stringify(now));
+      }
+      named.add(el.getAttribute('data-db'));
+    }
+    for (const el of all) E.db.mount(el, { store: E.store, labels: dbLabels, edit: true });
+  };
 
   // ---- comments on blocks (kept by the app, outside the page: shared/page-comments.ts) -----------------------------------
   interface Anchor {
@@ -2816,10 +2888,12 @@ export function writing(E: Core): Writing {
 
   // ---- the page's events ---------------------------------------------------------------------------------------------
   const fromUi = (e: Event) => e.composedPath().some((x) => x instanceof Element && E.isUi(x));
+  /** A database's own cells, buttons and menus: their presses and keys are theirs. */
+  const fromDb = (e: Event) => e.composedPath().some((x) => x instanceof Element && x.hasAttribute('data-db-ui'));
   addEventListener(
     'keydown',
     (e) => {
-      if (fromUi(e)) return;
+      if (fromUi(e) || fromDb(e)) return;
       if (menu && menuKey(e)) return stop(e);
       if (slash && slashKey(e)) return stop(e);
       if (mention && mentionKey(e)) return stop(e);
@@ -3070,7 +3144,7 @@ export function writing(E: Core): Writing {
   addEventListener(
     'pointerdown',
     (e) => {
-      if (fromUi(e)) return;
+      if (fromUi(e) || fromDb(e)) return;
       if (menu) closeMenu();
       if (slash) closeSlash();
       if (mention) closeMention();
@@ -3089,7 +3163,7 @@ export function writing(E: Core): Writing {
     'click',
     (ev) => {
       const e = ev as MouseEvent;
-      if (fromUi(e)) return;
+      if (fromUi(e) || fromDb(e)) return;
       if (noClick) return stop(e);
       const t = e.target as Element;
       const w = E.editing();
@@ -3253,6 +3327,7 @@ export function writing(E: Core): Writing {
   addEventListener(
     'paste',
     (e) => {
+      if (fromDb(e)) return;
       const files = [...(e.clipboardData?.files ?? [])].filter(isPicture);
       const w = E.editing();
       if (files.length) {
@@ -3402,6 +3477,16 @@ export function writing(E: Core): Writing {
     ready() {
       refreshToc();
       paintAll();
+      mountDbs();
+    },
+    prepare(node) {
+      // A database from Add ("new"): a name of its own in the page, and its first columns in the app's words.
+      for (const el of [node, ...node.querySelectorAll('.n-db')]) {
+        if (!el.matches('.n-db') || el.getAttribute('data-db') !== 'new') continue;
+        const fresh = newDatabase();
+        el.setAttribute('data-db', fresh.getAttribute('data-db')!);
+        if (!el.hasAttribute('data-schema')) el.setAttribute('data-schema', fresh.getAttribute('data-schema')!);
+      }
     },
     act(a: string, arg: any): boolean {
       switch (a) {
@@ -3553,6 +3638,7 @@ export function writing(E: Core): Writing {
       closeSlash();
       closeMention();
       paintAll();
+      mountDbs();
       placeComments();
     },
     clean(root) {
@@ -3571,6 +3657,7 @@ export function writing(E: Core): Writing {
     changed() {
       refreshToc();
       paintAll();
+      mountDbs();
       // A comment's block changed or was made anew (Turn into): it is found again where it was, by its words.
       for (const c of comments) {
         const el = anchored.get(c.id);

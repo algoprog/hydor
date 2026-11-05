@@ -509,6 +509,7 @@ export function Studio({
               }}
               onEditing={setWordsOn}
               onMenu={setMenuOn}
+              store={doc.store}
               onComment={(c) => {
                 // Comment, in the page: a new one is written beside it, on that block (and words).
                 setCommentDraft(c);

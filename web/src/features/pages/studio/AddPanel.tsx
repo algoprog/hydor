@@ -1,5 +1,5 @@
 // The visual editor's Add: parts to put in the page (words, pictures, buttons, a to-do list, a callout), blocks to
-// lay them out (columns, cards, a table, a table of contents), and ready-made sections (an opening, features, prices,
+// lay them out (columns, cards, a table, a table of contents, a database), and ready-made sections (an opening, features, prices,
 // questions, a footer),
 // after the part picked, inside it, or at the end of the page. A template's screen also has its App parts:
 // a form for each of its flows, its answer, its runs, a conversation with its agent, a table and a count for
@@ -16,6 +16,7 @@ import {
   Columns2,
   Columns3,
   CreditCard,
+  Database,
   Heading,
   HelpCircle,
   Image,
@@ -57,6 +58,7 @@ const ICONS: Record<string, ReactNode> = {
   todo: <ListChecks size={17} />,
   callout: <Lightbulb size={17} />,
   toc: <ListTree size={17} />,
+  database: <Database size={17} />,
   quote: <Quote size={17} />,
   divider: <Minus size={17} />,
   space: <MoveVertical size={17} />,

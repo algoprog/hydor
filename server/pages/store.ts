@@ -497,9 +497,14 @@ export function storageMap(db: DB, id: string): Record<string, string> {
   return Object.fromEntries(rows(db, id).map((r) => [r.key, r.value]));
 }
 
-/** Everything a page keeps, for an agent to read (cut to `max` characters). */
+/** What a page's databases hold (shared/page-db.ts), as JSON text by key: shown by a published copy or a page saved as a file. */
+export function dbSeed(db: DB, id: string): Record<string, string> {
+  return Object.fromEntries(rows(db, id).flatMap((r) => (r.key.startsWith('n-db:') ? [[r.key, r.value]] : [])));
+}
+
+/** Everything a page keeps, for an agent to read (cut to `max` characters); its databases are shown apart (dbsForAgent). */
 export function storageText(db: DB, id: string, max = 16_000): string {
-  const list = rows(db, id);
+  const list = rows(db, id).filter((r) => !r.key.startsWith('n-db:'));
   if (!list.length) return '';
   const out = JSON.stringify(Object.fromEntries(list.map((r) => [r.key, JSON.parse(r.value)])), null, 1);
   return out.length > max ? `${out.slice(0, max)}\n… (${list.length} keys; cut here)` : out;
