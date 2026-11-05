@@ -27,7 +27,7 @@ import { putAsset } from '../pages/assets.ts';
 import { addVersion, createPage, pageInfo, pageModel, putValues, versionsOf } from '../pages/store.ts';
 import { texSetup } from '../pages/latex.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
-import { createSpace } from './index.ts';
+import { createSpace, deleteSpace } from './index.ts';
 import { sharing, shareInbox } from './share.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -351,6 +351,15 @@ ok((await req('GET', `/p-api/${fresh.token}`, undefined, from('192.0.2.50'))).st
 ok((await req('GET', `/p-api/${fresh.token}`, undefined, from('192.0.2.77'))).statusCode === 200, 'another address goes on');
 const tries = JSON.parse((db.prepare("select v from kv where k = 'auth:tries'").get() as { v: string }).v);
 ok(tries.by['192.0.2.50']?.until > Date.now() && !(tries.all ?? []).length, 'counted with the address’s wrong passwords, not over every address');
+
+// A deleted project: its links open nothing, say so, and are stopped.
+const temp = createSpace(db, { name: 'Temp', folder: tmp });
+const tl = (await req('POST', `/api/projects/${temp.id}/shares`, { name: 'Sam' })).json() as { share: ProjectShare; token: string };
+deleteSpace(db, temp.id);
+r = await req('GET', `/p-api/${tl.token}`, undefined, from('203.0.113.40'));
+ok(r.statusCode === 410 && /no longer shared/.test(r.json().error), 'a deleted project’s link says it is no longer shared');
+sharing.event!({ t: 'feature', id: 'spaces', data: { changed: true } } as never, deps);
+ok(!!(db.prepare('select stopped_at from project_shares where id = ?').get(tl.share.id) as { stopped_at: number | null }).stopped_at, 'and is stopped');
 
 console.log(`${passed} passed, ${failed} failed`);
 fs.rmSync(tmp, { recursive: true, force: true });
