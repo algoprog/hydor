@@ -38,6 +38,8 @@ import { DocEngine, type AtomClick, type SelState } from './engine';
 import { useDocFind } from './finding';
 import { docMenus, PAGE_NUMBERS, type Zoom } from './menu';
 import { fixDoc, runsBetween, sameDoc, type Pos } from './ops';
+import { GAP, Paging, type Layout } from './paging';
+import { Bands, Sheets } from './PaperSheets';
 import { Picked } from './Picture';
 import { slashAt, slashItems, slashLayout, slashMatches, SlashMenu } from './Slash';
 import { ColumnHandles, printDoc } from './TableTools';
@@ -187,7 +189,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const [slashPos, setSlashPos] = useState<{ x: number; top: number; bottom: number } | null>(null);
   const [math, setMath] = useState(0);
   const [hoverTable, setHoverTable] = useState<string | null>(null);
-  const [bands, setBands] = useState<{ y: number; x: number; kind: 'head' | 'foot'; page: number }[]>([]);
+  const [pageLayout, setPageLayout] = useState<Layout | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const find = useFind();
   const root = useRef<HTMLDivElement>(null);
@@ -195,6 +197,8 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
   const host = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const engine = useRef<DocEngine | null>(null);
+  const paging = useRef<Paging | null>(null);
+  const zoomRef = useRef(1);
   const linkRef = useRef<HTMLButtonElement>(null);
   const pageRef = useRef<HTMLButtonElement>(null);
   const outlineRef = useRef<HTMLButtonElement>(null);
@@ -286,7 +290,11 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       breakLabel: tr('Page break'),
       tocHint: tr('Headings you add show here, to go to them.'),
       math: drawMath,
-      onChange: (d) => setModel(d),
+      onChange: (d) => {
+        setModel(d);
+        paging.current?.changed(d);
+      },
+      onDrawn: (ids) => paging.current?.drawn(ids),
       onState: (s) => setSt(s),
       onKey: (e) => keys.current(e),
       onAtom: (a) => atoms.current(a),
@@ -298,9 +306,16 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       onError: toastError,
     });
     setSt(engine.current.state());
+    paging.current = new Paging(engine.current, { zoom: () => zoomRef.current, onLayout: setPageLayout });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!model]);
-  useEffect(() => () => engine.current?.destroy(), []);
+  useEffect(
+    () => () => {
+      paging.current?.destroy();
+      engine.current?.destroy();
+    },
+    [],
+  );
   useEffect(() => {
     engine.current?.setReadOnly(!!readOnly);
   }, [readOnly]);
@@ -337,6 +352,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     // The version just saved from here: it stays as it is (the caret and the history with it).
     if (sameDoc(m, e.doc)) return setSaved(e.doc);
     e.load(m);
+    paging.current?.reload();
     setModel(e.doc);
     setSaved(e.doc);
     setSt(e.state());
@@ -373,7 +389,19 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     onScopes(s);
   }, [st, model?.blocks]);
 
-  const tick = `${width}:${fonts}:${narrow}:${zoom}:${math}:${column}:${panelW}`;
+  // The words on pages of the paper (not on a phone or in a narrow window): laid out again whole when what they are
+  // laid out with changes (fonts arrive, maths is drawn, the paper, its margins, the document's font or size).
+  zoomRef.current = zoom;
+  const geometry = `${narrow}:${zoom}:${fonts}:${math}:${model?.page.size}:${model?.page.margin}:${model?.font}:${model?.size}`;
+  useLayoutEffect(() => {
+    const pg = paging.current;
+    if (!pg) return;
+    pg.setOn(!narrow);
+    if (!narrow) pg.run(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometry, !!engine.current]);
+
+  const tick = `${width}:${fonts}:${narrow}:${zoom}:${math}:${column}:${panelW}:${pageLayout?.n ?? 0}`;
 
   // The chips by the words picked (comment on them, ask the agent about them), and the bar of the link the caret is in.
   useLayoutEffect(() => {
@@ -404,7 +432,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st?.cm.join()]);
 
-  // Where each comment's words are down the page, for the column beside it; and the header and footer on each sheet.
+  // Where each comment's words are down the page, for the column beside it.
   useLayoutEffect(() => {
     const h = host.current;
     const p = paper.current;
@@ -418,23 +446,6 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
       }
       setTops((old) => (old.size === next.size && [...next].every(([k, v]) => Math.abs((old.get(k) ?? -1) - v) < 1) ? old : next));
     }
-    // The header at the top of each sheet, the footer at its bottom (a page break ends a sheet).
-    if (!narrow && (model.header || model.footer)) {
-      const pr = p.getBoundingClientRect();
-      const m = (model.page.margin * 96) / 25.4;
-      const out: { y: number; x: number; kind: 'head' | 'foot'; page: number }[] = [];
-      const x = pr.left - hr.left;
-      const breaks = [...p.querySelectorAll<HTMLElement>(':scope > .nd-pb')].map((b) => b.getBoundingClientRect());
-      const sheets = breaks.length + 1;
-      for (let k = 0; k < sheets; k++) {
-        if (model.titlePage && k === 0) continue;
-        const top = k === 0 ? pr.top - hr.top + (m * zoom) / 2 : breaks[k - 1].bottom - hr.top + (m * zoom * 0.35);
-        const bottom = k === sheets - 1 ? pr.bottom - hr.top - (m * zoom) / 2 : breaks[k].top - hr.top - (m * zoom * 0.35);
-        if (model.header) out.push({ y: top, x, kind: 'head', page: k + 1 });
-        if (model.footer) out.push({ y: bottom, x, kind: 'foot', page: k + 1 });
-      }
-      setBands(out);
-    } else setBands([]);
   }, [model, tick, column, showResolved, active]);
 
   // "/" typed at a line's start, or after a space: its menu, narrowed as more is typed.
@@ -571,6 +582,7 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     if (!(await confirm({ title: 'Discard your changes?', body: 'The document goes back to how it was saved.', confirm: 'Discard', danger: true }))) return;
     if (!e || !saved) return;
     e.load(saved);
+    paging.current?.reload();
     setModel(e.doc);
     setSaved(e.doc);
   };
@@ -635,26 +647,21 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
     }
     const w = wordCount(text);
     const plain = text.replace(/⁣/g, '');
-    // Pages: the sheets the paper takes as it is drawn (a page break starts one), else as many words as a page holds.
-    const p = paper.current;
-    const pageH = ((PAPERS[en.doc.page.size].h - 2 * en.doc.page.margin) * 96) / 25.4;
+    // Pages: as many as the words are laid out on (the layout worked out now, for the last change), else as many as
+    // a page's worth of words make (on a phone, where there are no pages); the words picked, the pages they run over.
     let pages = 1;
-    if (p && !narrow) {
-      let used = 0;
-      for (const el of Array.from(p.children) as HTMLElement[]) {
-        if (el.classList.contains('nd-pb')) {
-          pages++;
-          used = 0;
-          continue;
-        }
-        used += el.offsetHeight + 8;
-        while (used > pageH) {
-          pages++;
-          used -= pageH;
-        }
+    const pg = paging.current;
+    if (pg && !narrow) {
+      pg.run();
+      const count = pg.layout?.count ?? 1;
+      pages = count;
+      if (picked) {
+        const a = pg.pageOfBlock(s.b) ?? 0;
+        const b = pg.pageOfBlock(z.b) ?? a;
+        pages = Math.max(1, b - a + 1);
       }
     } else pages = Math.max(1, Math.ceil(docWords(en.doc) / 450));
-    if (picked) pages = Math.max(1, Math.round((w / Math.max(1, docWords(en.doc))) * pages));
+    if (picked && (!pg || narrow)) pages = Math.max(1, Math.round((w / Math.max(1, docWords(en.doc))) * pages));
     setCounts({ words: w, chars: plain.replace(/\n/g, '').length, charsNoSpaces: plain.replace(/\s/g, '').length, paragraphs, pages, picked });
     setDialog('count');
   }
@@ -947,33 +954,18 @@ export function DocEditor({ doc, layout, readOnly, onSave, lead, tail, band, sav
                 if (id !== hoverTable && (id || !(ev.target as HTMLElement).closest?.('[data-keeps-editing]'))) setHoverTable(id);
               }}
             >
-              <div ref={paper} className="nd-ed nd-doc" style={narrow ? undefined : { ...(zoom !== 1 ? { zoom } : {}), ...(column ? { marginLeft: 0 } : {}) }} />
-              {bands.map((b, k) => {
-                const band = b.kind === 'head' ? model.header : model.footer;
-                if (!band) return null;
-                const text = band.text.replace(/\{page\}/gi, String(b.page)).replace(/\{pages\}/gi, String(bands.filter((x) => x.kind === b.kind).length + (model.titlePage ? 1 : 0)));
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    data-keeps-editing
-                    title={b.kind === 'head' ? 'Header' : 'Footer'}
-                    onClick={() => !readOnly && setDialog('bands')}
-                    className="absolute -translate-y-1/2 truncate text-[#5f6368] hover:text-[#1f2328]"
-                    style={{
-                      left: b.x + (model.page.margin * 96 * zoom) / 25.4,
-                      width: ppx * zoom - (2 * model.page.margin * 96 * zoom) / 25.4,
-                      top: b.y,
-                      textAlign: band.align ?? 'left',
-                      fontSize: `${Math.round(model.size * 0.82 * zoom * 10) / 10}pt`,
-                      fontFamily: FONTS.find((f) => f.name === model.font)?.css,
-                    }}
-                    translate="no"
-                  >
-                    {text}
-                  </button>
-                );
-              })}
+              {/* The sheets behind the words, on pages; each one's header and footer over them. */}
+              {!narrow && pageLayout && <Sheets layout={pageLayout} zoom={zoom} width={ppx * zoom} />}
+              <div
+                ref={paper}
+                className="nd-ed nd-doc"
+                style={
+                  narrow
+                    ? undefined
+                    : { ...(zoom !== 1 ? { zoom } : {}), ...(column ? { marginLeft: 0 } : {}), ...(pageLayout ? { minHeight: pageLayout.count * pageLayout.pageH + (pageLayout.count - 1) * GAP } : {}) }
+                }
+              />
+              {!narrow && pageLayout && <Bands layout={pageLayout} zoom={zoom} doc={model} readOnly={readOnly} onOpen={() => setDialog('bands')} />}
               {st?.picked && e && st.picked.type !== 'math' && (
                 <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAsk={onAsk ? askPicture : undefined} />
               )}

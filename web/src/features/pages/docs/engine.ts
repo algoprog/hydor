@@ -35,6 +35,7 @@ import {
 } from '@shared/docs';
 import * as ops from './ops';
 import type { Pos, TableOp } from './ops';
+import { CUT, htmlWithoutCuts } from './paging';
 
 export interface Sel {
   a: Pos;
@@ -105,6 +106,8 @@ export interface EngineOpts {
   onAtom?: (a: AtomClick) => void;
   /** The format painter carried its look to words (and, unless it stays on, is off now). */
   onPainted?: () => void;
+  /** Blocks drawn anew (null: all of them), as soon as they are on the page: the pages' layout puts back what it gave them. */
+  onDrawn?: (ids: string[] | null) => void;
 }
 
 const HISTORY_MAX = 200;
@@ -146,6 +149,14 @@ function caretAt(x: number, y: number): { node: Node; offset: number } | null {
   }
   const r = document.caretRangeFromPoint?.(x, y);
   return r ? { node: r.startContainer, offset: r.startOffset } : null;
+}
+
+/** The layout's cut right after a text node (where a page turns), if there is one there. */
+function cutAfter(x: Node, box: Element): Element | null {
+  let n: Node | null = x;
+  while (n && n !== box && !n.nextSibling) n = n.parentNode;
+  const sib = n && n !== box ? n.nextSibling : null;
+  return sib?.nodeType === 1 && (sib as Element).hasAttribute(CUT) ? (sib as Element) : null;
 }
 
 const b64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
@@ -301,6 +312,7 @@ export class DocEngine {
       this.drawn.clear();
       this.root.replaceChildren();
     }
+    const fresh: string[] = [];
     const { labels } = listInfo(this.doc.blocks);
     // A table of contents follows the headings: drawn again when they change.
     const hasToc = this.doc.blocks.some((b) => b.type === 'toc');
@@ -312,11 +324,12 @@ export class DocEngine {
     this.doc.blocks.forEach((b, i) => {
       let el = this.els.get(b.id);
       if (!el || this.drawn.get(b.id) !== b || (tocChanged && b.type === 'toc')) {
-        const fresh = this.make(b, labels[i]);
+        const made = this.make(b, labels[i]);
         el?.remove();
-        el = fresh;
+        el = made;
         this.els.set(b.id, el);
         this.drawn.set(b.id, b);
+        fresh.push(b.id);
       } else if (b.type === 'li' && el.dataset.n !== labels[i]) el.dataset.n = labels[i];
       mine.add(el);
     });
@@ -340,6 +353,7 @@ export class DocEngine {
       if (p) p.classList.add('nd-picked');
       else this.picked = null;
     }
+    if (fresh.length) this.o.onDrawn?.(all ? null : fresh);
   }
 
   /** A block's element on the page. */
@@ -387,7 +401,12 @@ export class DocEngine {
     for (let x = walk.nextNode(); x; x = walk.nextNode()) {
       if (x.nodeType === 3) {
         const len = (x as Text).data.length;
-        if (left <= len) return { node: x, offset: left };
+        if (left < len || (left === len && !cutAfter(x, box))) return { node: x, offset: left };
+        if (left === len) {
+          // Where the page turns: the caret goes on the next page's line, after the cut.
+          const c = cutAfter(x, box)!;
+          return { node: c.parentNode!, offset: indexIn(c) + 1 };
+        }
         left -= len;
       } else if ((x as Element).hasAttribute?.('data-tex')) {
         const len = (x as Element).getAttribute('data-tex')!.length;
@@ -692,6 +711,15 @@ export class DocEngine {
         e.preventDefault();
         return this.apply(ops.deleteForward(this.doc, s));
       }
+      // Words where a page turns: the browser would take out the cut itself, so a character or a word goes here.
+      const box = this.elementOf(s.b)?.querySelector(s.c ? `[data-c="${s.c[0]},${s.c[1]}"]` : '[data-t]') ?? this.elementOf(s.b);
+      if (box?.querySelector(`[${CUT}]`) && /^delete(Content|Word)(Backward|Forward)$/.test(t)) {
+        e.preventDefault();
+        const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+        const to = t.startsWith('deleteWord') ? ops.wordStep(runs, s.o, back) : ops.charStep(runs, s.o, back);
+        if (to === s.o) return;
+        return this.apply(ops.deleteRange(this.doc, { ...s, o: Math.min(to, s.o) }, { ...s, o: Math.max(to, s.o) }), `type:${s.b}`);
+      }
       return;
     }
     const fmt: Record<string, Flag> = { formatBold: 'b', formatItalic: 'i', formatUnderline: 'u', formatStrikeThrough: 's', formatSuperscript: 'sup', formatSubscript: 'sub' };
@@ -723,13 +751,14 @@ export class DocEngine {
     this.commit(doc, null, { key: `type:${id}`, draw: false });
     this.sel = sel;
     if (this.composing) return;
-    // What the browser left is drawn as this editor draws it (its own spans and breaks gone).
+    // What the browser left is drawn as this editor draws it (its own spans and breaks gone; a page's cut is no difference).
     const t = document.createElement('template');
     t.innerHTML = this.runsHtml(runs);
-    if (t.innerHTML !== box.innerHTML) {
+    if (t.innerHTML !== htmlWithoutCuts(box)) {
       box.innerHTML = t.innerHTML;
+      this.o.onDrawn?.([id]);
       if (sel) this.place(sel, false);
-    }
+    } else if (box.querySelector(`[${CUT}]`)) this.o.onDrawn?.([id]);
   }
 
   /** The page read back whole, after the browser changed more than one block's words: its blocks, as they now are. */
