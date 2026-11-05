@@ -14,6 +14,7 @@ Click **System** in the sidebar's tools, or go to [System](/system). A row of ta
 - **Terminal** ([open it](/terminal)): shells on this computer (see [Use the terminal](#use-the-terminal)).
 - **Preview** ([open it](/preview)): the web apps running here (see [Look at a dev server with Preview](#look-at-a-dev-server-with-preview)). It shows only on this machine's own pages, not while you look at another machine.
 - **Monitor** ([open it](/system/monitor)): how busy the computer is (see [Watch this computer in Monitor](#watch-this-computer-in-monitor)).
+- **Experiments** ([open it](/system/experiments)): jobs that wait for a free GPU, run on their own and are kept as records (see [Experiments](/guide/experiments)).
 
 On a phone the tabs scroll sideways under the title. A tab's own buttons (Git's **Add**, Preview's refresh) sit at the right of the title.
 
@@ -27,6 +28,7 @@ Below, a card for each tool; its title, or **Open**, opens its tab:
 - **Git**: your repositories, those with changes or commits to send first, each with its branch and how many files changed. Click one to open it on the Git tab.
 - **Terminal**: the shells running, and **New** for another.
 - **Preview**: the web apps running here, each with its port. Click one to look at it.
+- **Experiments**: the runs going now, each with its status and metrics. Click one to open it.
 
 ## Open the Files page
 
