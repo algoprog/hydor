@@ -762,7 +762,7 @@ test('Reading list: a paper added by its arXiv id (looked up, kept with its BibT
   assert.equal(r.result!.count, 1);
   assert.match(String(r.result!.bibtex), /@misc\{vaswani2017attention/);
   assert.deepEqual(r.result!.tags, ['architecture', 'to cite']);
-  const again = await run('reading-list', { paper: '1706.03762', status: 'Read', tags: 'mine' });
+  const again = await run('reading-list', { paper: '1706.03762', status: 'Done reading', tags: 'mine' });
   assert.equal(again.result!.added, false);
   assert.equal(again.result!.status, 'To read', 'its status stays as it was');
   assert.match(String(again.result!.note), /in your list already/);

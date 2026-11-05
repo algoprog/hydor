@@ -102,7 +102,7 @@ const READING_LIST: Draft = {
     { id: 'paper', label: 'The paper', type: 'text', required: true, placeholder: 'e.g. 1706.03762, 10.1145/3397271.3401075, a link or a title', help: 'A DOI, an arXiv id, a link, its title, or a PDF on this computer' },
     { id: 'project', label: 'Project', type: 'text', placeholder: 'e.g. Dense retrieval survey' },
     { id: 'tags', label: 'Tags', type: 'text', placeholder: 'e.g. retrieval, to cite', help: 'Between commas' },
-    { id: 'status', label: 'Status', type: 'choice', options: ['To read', 'Reading', 'Read'], default: 'To read' },
+    { id: 'status', label: 'Status', type: 'choice', options: ['To read', 'Reading now', 'Done reading'], default: 'To read' },
     { id: 'notes', label: 'Notes', type: 'long' },
   ],
   prompt: '',
@@ -348,7 +348,7 @@ return { summary: String(g.summary || ''), added: n(g.added), updated: n(g.updat
   ],
   examples: [
     { id: 'by-arxiv-id', name: 'A paper by its arXiv id', inputs: { paper: '1706.03762', project: 'Transformers', tags: 'architecture, to cite' }, checks: ['{{answer.title}} contains Attention', '{{answer.bibtex}} contains @'] },
-    { id: 'by-doi', name: 'A paper by its DOI', inputs: { paper: '10.1145/3397271.3401075', status: 'Read' }, checks: ['{{answer.title}} contains ColBERT', '{{answer.count}} >= 1'] },
+    { id: 'by-doi', name: 'A paper by its DOI', inputs: { paper: '10.1145/3397271.3401075', status: 'Done reading' }, checks: ['{{answer.title}} contains ColBERT', '{{answer.count}} >= 1'] },
   ],
 };
 
@@ -361,7 +361,7 @@ const MATRIX_PAPERS: AnswerField['columns'] = [
   { id: 'year', label: 'Year', type: 'number' },
   { id: 'venue', label: 'Venue', type: 'text' },
   { id: 'link', label: 'Link', type: 'url' },
-  { id: 'read', label: 'Read', type: 'yesno' },
+  { id: 'read', label: 'Done reading', type: 'yesno' },
   { id: 'source', label: 'Read from', type: 'text' },
   { id: 'gist', label: 'In a sentence', type: 'text' },
   { id: 'note', label: 'Note', type: 'text' },
@@ -560,7 +560,7 @@ return {
             outputs: [
               { id: 'n', label: 'Number', type: 'number' },
               { id: 'title', label: 'Paper', type: 'text' },
-              { id: 'read', label: 'Read', type: 'yesno' },
+              { id: 'read', label: 'Done reading', type: 'yesno' },
               { id: 'cells', label: 'Its cells', type: 'table', columns: MATRIX_CELLS },
             ],
             failed: 'skip',
