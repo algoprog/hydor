@@ -1,6 +1,6 @@
 # Projects and knowledge
 
-A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows, skills of its own and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, and adding, searching and managing the documents agents search.
+A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows, skills of its own and the assistant its sessions start as. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
 
 ![The Projects page: a card for each project, with what it holds and New session](images/projects.webp)
 
@@ -31,7 +31,7 @@ Each project shows as a card:
 - a band of its colour with its mark: a rounded square in its colour with the first letter of its name (a group's mark has a second square behind it, and **Group** on its band);
 - its name, and under it what it is about, or its folder when it has no description. A group says "Brings together" and the names of its projects;
 - what it holds: how many sessions, how many things in the Library, documents and skills;
-- how long ago one of its sessions was last at work, and **New session**, which starts a session in it at once.
+- how long ago one of its sessions was last at work, **New session**, which starts a session in it at once, and **More** (⋯), the same menu as at the top of its page.
 
 Click a card to open the project's own page, or type the project's name in the search box (Ctrl+K) to go straight there. With no projects yet, the page says what a project is for in three short parts, with **Make a project**.
 
@@ -89,6 +89,7 @@ Click a project on the Projects page to open it. The top of its page is in the p
 
 - **Open its folder in Files**: the project's folder on the Files page.
 - **Only its sessions in the sidebar**: the session list shows only the sessions started in the project, as the sidebar's own filter does (see [Show one project's sessions in the sidebar](#show-one-projects-sessions-in-the-sidebar)). Pick it again to see every session.
+- **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
 
 Below them are six tabs: **Overview**, **Library**, **Files**, **Knowledge**, **Skills** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out to fit. Each tab shows at once.
@@ -99,6 +100,7 @@ The project at a glance, in cards:
 
 - **Sessions**: the sessions started in the project, the one at work most recently first, each with its agent's icon, its title, what it is doing while it runs (**Working**, **Needs you**, **Ready**; not on a phone) and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the project's folder, with its guidelines, documents and skills, and has **New session**.
 - **In the Library**: what the project holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there.
+- **Shared with** (beside them, under them on a phone), once you share the project with someone: each person, with their initials and what they did last ("Commented on “Chapter 3” · 2 h ago", "Not opened yet"). Click one, or **Share**, to see and change who it is shared with (see [Share a project with people](#share-a-project-with-people)).
 - **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Starts as** (its assistant) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the project are listed under its folder).
 - **The projects it brings together**, for a group: each of its projects, with how many sessions it has. Click one to open it.
 
@@ -251,6 +253,68 @@ On the project's own page, **More** (⋯) → **Only its sessions in the sidebar
 
 On a phone, open the sidebar (a drawer) first.
 
+## Share a project with people
+
+You can invite people into one project, such as an advisor and the students who work with you, each with a link of their own. Without your password, they see the project's documents, its sessions and, when it has them, its runs and its reading list. They comment on its documents under their own name, and if you let them, they change its documents too. They never reach your agents, your files, your settings or your other projects.
+
+### Invite someone
+
+1. Open the project and click **More** (⋯) at its top, or **More** on its card on the [Projects page](/projects). Click **Share with people**.
+2. Under **Invite someone**, type **Their name**. Their comments and changes show under it.
+3. Pick what they may do:
+   - **View and comment**: they read everything the project shares, and comment on its documents and LaTeX documents.
+   - **Edit documents**: they also change its documents, spreadsheets and slides, in the Library's own editors, and its LaTeX documents where this computer typesets them shut in (see [What is never shared](#what-is-never-shared)).
+4. Pick how long the link works: **A week**, **A month** or **Until you stop it**.
+5. Click **Make their link**. Copy it with the copy button and send it to them, or click the QR code button to show it as a QR code for their phone's camera. The link is shown only now: the app keeps only a fingerprint of it, so it can't show it again. You can always make them a new one.
+
+An agent can make a link too, with your OK each time: "Share my Thesis project with Maria so she can comment, for a month."
+
+### What they see
+
+Their link opens the project on its own, in the app's look, with nothing else of yours around it:
+
+- At the top, the project's mark, its name and what it is about. On the right, their own name: its menu says what they may do and until when, and who shared it with them, and has **Language** (English, 中文, Ελληνικά) and **Theme** (**Light**, **Dark** or **Like this device**) for their browser.
+- **Documents**: the project's pages, documents, slides, spreadsheets, LaTeX documents and notebooks, each with its picture. One opens to read as its own address shows it (a LaTeX document typeset into pages, its source a click away), with **Download** for its files: a PDF, a Word document, the LaTeX project and so on. With **Edit documents**, documents, spreadsheets and slides open in their editor instead.
+- **Sessions**: the project's sessions, as a [read-only link](/guide/devices#share-a-session-with-a-read-only-link) shows a session: the conversation, the steps by name, file changes and pages the agent showed, following along while an agent works. Never command output, the agent's thinking or what a step was given. A Confidential session never shows.
+- **Runs**, when the project has experiments: each run's name, how it went and when, its metrics and its settings. Never its command, its folder, its log or the machine it ran on.
+- **Reading list**, when your Reading list app has papers for the project: each paper's title (a link to it), its authors, venue and year, whether it is read, and its tags. Never your notes about it or its files.
+
+The page follows along by itself, every minute while it is open.
+
+### Comments under their name
+
+On a document or a LaTeX document, **Comments** (beside it, or over it on a phone) lists its comments and their replies, each under who wrote it: theirs as **You**, an agent's as **Agent**, and yours under your name. At the bottom of the Share dialog, **They see your comments as** says that name ("Owner" until you change it); **Change** sets another.
+
+To comment, they click **Add a comment**, then paste the words it is about, copied from the document, or leave them out to comment on the whole document. They can reply to any comment and resolve or reopen one, but change or delete only their own. With **Edit documents**, they comment in the editor itself, as you do.
+
+In your own editor, their comments show under their name, and agents read and answer them as they answer yours: "Answer Maria's comments on Chapter 3." When someone comments or replies, you get a notice ("Maria commented: …") and a line in your [inbox](/inbox) ("Maria commented on “Thesis, chapter 3”"), which stays until you or an agent reply, or the comment is resolved.
+
+Each comment is saved as a new version of the document; a run of them in a row is kept as one version. If you save the document in its editor while comments came in, they are kept, on the words they were about.
+
+### Changes under their name
+
+With **Edit documents**, what they save is a new version of the document, with their name in its **Versions** list, and agents are told who changed it last. They can't change who wrote anyone else's comments, or delete them. If the document changed since they opened it, they are asked before saving theirs on top (the other version stays among its versions).
+
+### Change or stop sharing
+
+In the Share dialog, **Shared with** lists each person, with what they may do, until when, and what they did last. Their **More** (⋯) has:
+
+- **View and comment** or **Edit documents**: what they may do, from their next click.
+- **For a week from now**, **For a month from now** or **Until you stop it**.
+- **Make a new link**: their link stops at once; send them the new one. They stay the same person, and their comments stay theirs.
+- **Stop sharing**: their link stops at once. What they wrote stays, under their name.
+
+A link that ran out, was stopped or was made again says so when opened ("This link has expired", "This link was turned off"), and they can ask you for a new one.
+
+### What is never shared
+
+- **Your agents**: people can't start or steer a session, or ask an agent anything. They read sessions and comment on documents.
+- **Your files**: not the project's folder, not any folder of yours. Only what the project holds in the Library, and its sessions as read-only links show them.
+- **Your settings, your other projects** and everything else in the app. A group's link shows the group's own things, not those of the projects it brings together.
+- **Running anything**: a page of HTML (a small app, a tracker) shows with its data as it is, and what it changes is not kept; a notebook shows its cells and outputs and never runs. LaTeX documents are changed through a link only where TeX runs shut in by bubblewrap (Linux); elsewhere people read and comment on them.
+
+Each link is a long random code that opens one project for one person. A code that opens nothing counts as a wrong password from where it came: after ten in an hour, that address can't open links or sign in for an hour (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
+
 ## Shared knowledge: documents every session can search
 
 Agents can search documents you add once: contracts, manuals, notes, papers, a whole folder. They find passages by their words or by what they mean, and cite the file and page they read. Documents are kept in **knowledge bases**: named collections of files you dropped in and folders on this computer.
@@ -368,3 +432,7 @@ The knowledge tools never bring up another project's documents, not even when an
 - "Add the folder ~/Documents/Manuals to my shared knowledge."
 - "Move the Contracts knowledge base into the Taxes 2026 project, and stop that project from searching the shared knowledge."
 - "Which knowledge bases do I have, and which documents couldn't be read?"
+- "Share my Thesis project with Maria so she can comment, for a month, and with Nikos so he can edit the documents."
+- "Who is my Thesis project shared with, and what did each of them do last?"
+- "Answer Maria's comments on Chapter 3, then resolve the ones you dealt with."
+- "Stop sharing my Thesis project with Nikos."
