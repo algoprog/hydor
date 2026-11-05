@@ -1064,7 +1064,7 @@ test('a session that cannot start fails the run with the reason', async () => {
   assert.match(after.error!, /did not start/);
 });
 
-test('an app that opens on its own page (Explore): its settings there are its form’s answers, kept; what its page keeps; Update every day is a daily task that runs it with them', async () => {
+test('an app that opens on its own page (Explore): its settings there are its form’s answers, kept; what its page keeps; Update automatically is a daily task that runs it with them', async () => {
   const ex = TEMPLATES.find((t) => t.id === 'explore')!;
   assert.equal(ex.sessions, false, 'it opens on its own page');
   assert.ok(!madeForSessions(ex), 'agents do not run it in sessions');

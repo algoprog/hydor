@@ -50,7 +50,7 @@ export interface AppDetail {
   env?: EnvView;
   /** What its own page's view keeps (an app whose view has pages for its own page). */
   view?: Record<string, unknown>;
-  /** Such an app's settings there: the answers it runs with from its page, and Update every day. */
+  /** Such an app's settings there: the answers it runs with from its page, and Update automatically. */
   home?: HomeSettings;
   /** When its latest run of its main flow ended well. */
   latest?: number;

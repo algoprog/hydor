@@ -238,7 +238,7 @@ function routes(d: Deps) {
     id: (idOrSlug) => (idOrSlug.startsWith('tpl:') ? (templateById(idOrSlug.slice(4)) ? idOrSlug : undefined) : getApp(db, idOrSlug)?.id),
     name: (id) => (id.startsWith('tpl:') ? templateById(id.slice(4))?.name : getApp(db, id)?.name),
     start: ({ app: id, inputs, test }) => {
-      // A ready-made app ("tpl:<id>"), as it is: Explore's Update every day.
+      // A ready-made app ("tpl:<id>"), as it is: Explore's Update automatically.
       if (id.startsWith('tpl:')) {
         const t = templateById(id.slice(4));
         if (!t) throw new HttpError(404, 'Its app is gone');
@@ -361,7 +361,7 @@ function routes(d: Deps) {
 
   app.get('/api/apps/:id', async (req) => {
     const { app: a, template } = recipeOf(db, P(req).id);
-    // Its own page in its view: what that page keeps, and the answers it runs with from there (with Update every day).
+    // Its own page in its view: what that page keeps, and the answers it runs with from there (with Update automatically).
     // `latest`: when its latest run of its main flow ended well (the start page's Explore shows a dot for a new one).
     const ownPage = (id: string, r: AppRecipe) => {
       if (!pagesFor(r.ui, 'app').length) return {};
