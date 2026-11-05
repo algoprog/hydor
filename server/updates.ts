@@ -6,7 +6,9 @@
 //
 // In the desktop apps (desktop.ts) it is by version instead: the newest release on GitHub says which version is
 // out and where each system's builds are (hydor-mac.json, hydor-windows.json, hydor-linux.json). The app looks a
-// minute after it starts and then every 4 hours. With updates on, it downloads a new version at once, checks it (and
+// minute after it starts and then every 4 hours. With updates on, it downloads a new version at once (a download that
+// breaks off or goes quiet, as when the computer sleeps, carries on from its last byte; one that gets nowhere keeps
+// what it has and tries again an hour later), checks it (and
 // unpacks a Mac's), says so (a notification, and a note in every open page that counts down a minute, with Restart
 // now and Later), then hands it to the app, which installs it its own way (desktop/main.cjs) and starts again: a Mac
 // app or an AppImage goes back to the version before if the new one does not start. Later puts it off for 4 hours;
@@ -15,6 +17,7 @@
 // Update now downloads, checks and installs at once.
 import { execFile, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { once } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
@@ -44,6 +47,13 @@ export const NOTICE = Number(process.env.HYDOR_UPDATE_NOTICE_MS) || 60_000;
 export const LATER = 4 * HOUR;
 /** After a download the app started by itself failed, the next one waits at least this long. */
 export const RETRY = HOUR;
+/** A download that gets nothing for this long is dropped, and the next try carries on from its last byte. */
+export const STALL = 60_000;
+/**
+ * The waits before each new try after one that got no further (the network coming back after the computer slept,
+ * say). When they run out the download stops for now, keeping what it has, and tries again after RETRY.
+ */
+export const WAITS = [3_000, 10_000, 30_000, 60_000];
 
 let check: { behind: number; latest?: string; checkedAt: number; error?: string } | null = null;
 let running: UpdateState['running'];
@@ -56,6 +66,8 @@ let ready: Waiting | null = null;
 let readyTimer: NodeJS.Timeout | null = null;
 /** When a download the app started by itself last failed. */
 let failedAt = 0;
+/** One that failed on the way tries again after RETRY (not at the next look, 4 hours on). */
+let retryTimer: NodeJS.Timeout | null = null;
 
 /**
  * A downloaded version: said at `askAt` (a notification from the Mac, the pages' note) and installed at
@@ -364,12 +376,182 @@ const feedUrl = () => process.env.HYDOR_UPDATE_FEED || `https://github.com/algop
 /** This copy's build in the feed: a Mac's by its processor, the others' by their kind and processor (appimage-x64). */
 const buildKey = () => (!desktop || desktop.platform === 'mac' ? process.arch : `${desktop.format}-${process.arch}`);
 
+/** The cause of an error on the way (no answer, the connection broken off or gone quiet): another try may get through. */
+const NET = Symbol('on the way');
+const onTheWay = (e: unknown) => (e as Error | undefined)?.cause === NET;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+};
+const userAgent = () => ({ 'user-agent': `hydor/${config.version}` });
+
+/**
+ * A request that failed on the way, in plain words (fetch says "fetch failed", "terminated" or "The operation was
+ * aborted…"), as an error on the way.
+ */
+function netError(e: unknown, url: string): Error {
+  if (onTheWay(e)) return e as Error;
+  const err = e as Error & { cause?: { code?: string; errors?: { code?: string }[] } };
+  const code = err?.cause?.code ?? err?.cause?.errors?.[0]?.code;
+  if (err?.name === 'TimeoutError' || code === 'UND_ERR_CONNECT_TIMEOUT' || code === 'ETIMEDOUT') return new Error(`${hostOf(url)} did not answer in time`, { cause: NET });
+  if (err?.message === 'terminated' || code === 'UND_ERR_SOCKET' || code === 'ECONNRESET' || code === 'EPIPE') return new Error('the connection broke off', { cause: NET });
+  if (code) return new Error(`could not reach ${hostOf(url)} (${code})`, { cause: NET });
+  if (err?.message === 'fetch failed') return new Error(`could not reach ${hostOf(url)}`, { cause: NET });
+  return new Error(err?.message || String(e), { cause: NET });
+}
+
 async function feed(): Promise<Feed> {
-  const r = await fetch(feedUrl(), { signal: AbortSignal.timeout(30_000), headers: { 'user-agent': `hydor/${config.version}` } });
+  const url = feedUrl();
+  let r: Response;
+  try {
+    r = await fetch(url, { signal: AbortSignal.timeout(30_000), headers: userAgent() });
+  } catch (e) {
+    throw netError(e, url);
+  }
+  if (r.status >= 500 || r.status === 429) throw new Error(`GitHub answered ${r.status}`, { cause: NET });
   if (!r.ok) throw new Error(r.status === 404 ? `no ${SYSTEM_NAME[desktop?.platform ?? 'mac']} release is published yet` : `GitHub answered ${r.status}`);
-  const f = (await r.json()) as Feed;
+  let f: Feed;
+  try {
+    f = (await r.json()) as Feed;
+  } catch (e) {
+    if (e instanceof SyntaxError) throw new Error('the release does not say its version');
+    throw netError(e, url);
+  }
   if (typeof f?.version !== 'string' || typeof f.files !== 'object') throw new Error('the release does not say its version');
   return f;
+}
+
+/** The feed, asked again after each of `waits` while the network fails (as just after the computer wakes). */
+async function feedTried(waits = WAITS): Promise<Feed> {
+  for (let i = 0; ; i++) {
+    try {
+      return await feed();
+    } catch (e) {
+      if (!onTheWay(e) || i >= waits.length) throw e;
+      console.log(`[updates] the release could not be read (${(e as Error).message}); trying again in ${waits[i] / 1000} s`);
+      await sleep(waits[i]);
+    }
+  }
+}
+
+const mb = (n: number) => Math.round(n / 1e6);
+
+async function sha512Of(file: string): Promise<string> {
+  const hash = createHash('sha512');
+  for await (const c of fs.createReadStream(file)) hash.update(c as Buffer);
+  return hash.digest('base64');
+}
+
+/**
+ * Downloads `url` into `dest`, checked against the size and SHA-512 the release names. It carries on where it stopped:
+ * a try that breaks off, or gets nothing for `stall` ms (a connection gone quiet, the computer asleep), is followed by
+ * one from its last byte (a range request), at once while each gets further and after each of `waits` while they
+ * don't. When those run out it throws an error on the way (NET) and leaves what it got in `dest`.part, which the next
+ * download of the same file carries on from.
+ */
+export async function download(
+  url: string,
+  dest: string,
+  want: { size: number; sha512: string },
+  o: { stall?: number; waits?: number[]; headers?: Record<string, string> } = {},
+): Promise<void> {
+  const { stall = STALL, waits = WAITS, headers = {} } = o;
+  const part = `${dest}.part`;
+  const size = () => {
+    try {
+      return fs.statSync(part).size;
+    } catch {
+      return 0;
+    }
+  };
+  if (size() > want.size) fs.rmSync(part, { force: true });
+  let best = size();
+  let misses = 0;
+  while (size() < want.size) {
+    const from = size();
+    let why = new Error('the file ended early', { cause: NET });
+    try {
+      await getFrom(url, part, from, stall, headers);
+    } catch (e) {
+      if (!onTheWay(e)) throw e;
+      why = e as Error;
+    }
+    const now = size();
+    if (now >= want.size) break;
+    if (now > best) {
+      best = now;
+      misses = 0;
+      console.log(`[updates] the download broke off at ${mb(now)} of ${mb(want.size)} MB (${why.message}); carrying on from there`);
+      continue;
+    }
+    if (misses >= waits.length) {
+      if (!now) throw why;
+      throw new Error(`the download stopped at ${mb(now)} of ${mb(want.size)} MB (${why.message}); the next try carries on from there`, { cause: NET });
+    }
+    console.log(`[updates] the download got no further than ${mb(now)} of ${mb(want.size)} MB (${why.message}); trying again in ${waits[misses] / 1000} s`);
+    await sleep(waits[misses++]);
+  }
+  if (size() !== want.size || (await sha512Of(part)) !== want.sha512) {
+    fs.rmSync(part, { force: true });
+    throw new Error('the download is not the build the release names (its checksum differs)');
+  }
+  fs.renameSync(part, dest);
+}
+
+/**
+ * One try at a download: from byte `from` on (a range request) onto the end of `part`, or the whole file over it
+ * when the server sends that. A failure on the way is an error on the way (NET); a refusal (404, say) a plain one.
+ */
+async function getFrom(url: string, part: string, from: number, stall: number, headers: Record<string, string>): Promise<void> {
+  const ac = new AbortController();
+  const quiet = setTimeout(() => ac.abort(new Error('the connection went quiet', { cause: NET })), stall);
+  try {
+    let r: Response;
+    try {
+      r = await fetch(url, { signal: ac.signal, headers: from ? { ...headers, range: `bytes=${from}-` } : headers });
+    } catch (e) {
+      throw netError(e, url);
+    }
+    quiet.refresh();
+    const drop = () => r.body?.cancel().catch(() => {});
+    if (from && r.status === 416) {
+      // Nothing after the part it has: the file is shorter than the release says.
+      await drop();
+      fs.rmSync(part, { force: true });
+      throw new Error('the download is not the build the release names (its checksum differs)');
+    }
+    if (!r.ok || !r.body) {
+      await drop();
+      // A server's trouble may pass; a refusal (404, say) does not.
+      throw new Error(`the download failed (${r.status})`, r.status >= 500 || r.status === 408 || r.status === 429 ? { cause: NET } : undefined);
+    }
+    const ranged = from > 0 && r.status === 206;
+    if (ranged && Number(/^bytes (\d+)-/.exec(r.headers.get('content-range') ?? '')?.[1]) !== from) {
+      await drop();
+      fs.rmSync(part, { force: true });
+      throw new Error('the server sent another part of the file', { cause: NET });
+    }
+    // A 200 is the whole file, from its start: it goes over the part.
+    const out = fs.createWriteStream(part, { flags: ranged ? 'a' : 'w' });
+    const body = Readable.fromWeb(r.body as import('node:stream/web').ReadableStream);
+    body.on('data', () => quiet.refresh());
+    try {
+      await pipeline(body, out);
+    } catch (e) {
+      // The disk's errors (no space left) are not the network's: another try would not help.
+      if ((e as NodeJS.ErrnoException).syscall) throw e;
+      throw netError(e, url);
+    } finally {
+      if (!out.closed) await once(out, 'close').catch(() => {});
+    }
+  } finally {
+    clearTimeout(quiet);
+  }
 }
 
 async function checkRelease(): Promise<UpdateState | null> {
@@ -425,20 +607,14 @@ async function teamOf(app: string): Promise<string | null> {
  */
 async function fetchBuild(to: string, file: Feed['files'][string]): Promise<string> {
   const dir = path.join(desktop!.cache, 'updates');
-  try {
-    fs.rmSync(dir, { recursive: true, force: true });
-  } catch {}
-  fs.mkdirSync(dir, { recursive: true });
   const mac = desktop!.platform === 'mac';
   const ext = { app: '.zip', nsis: '-setup.exe', appimage: '.AppImage', deb: '.deb', dir: '', dev: '.zip' }[desktop!.format];
-  const zip = path.join(dir, `Hydor-${to}${ext}`);
-  const r = await fetch(file.url, { signal: AbortSignal.timeout(30 * 60_000), headers: { 'user-agent': `hydor/${config.version}` } });
-  if (!r.ok || !r.body) throw new Error(`the download failed (${r.status})`);
-  const hash = createHash('sha512');
-  const body = Readable.fromWeb(r.body as import('node:stream/web').ReadableStream);
-  body.on('data', (c: Buffer) => hash.update(c));
-  await pipeline(body, fs.createWriteStream(zip));
-  if (fs.statSync(zip).size !== file.size || hash.digest('base64') !== file.sha512) throw new Error('the download is not the build the release names (its checksum differs)');
+  // Named by its checksum too, so that a part left by a download that stopped is carried on only for the same build.
+  const zip = path.join(dir, `Hydor-${to}-${file.sha512.replace(/[^A-Za-z0-9]/g, '').slice(0, 12)}${ext}`);
+  fs.mkdirSync(dir, { recursive: true });
+  // What earlier downloads left goes, but for that part.
+  for (const n of fs.readdirSync(dir)) if (n !== `${path.basename(zip)}.part`) fs.rmSync(path.join(dir, n), { recursive: true, force: true });
+  await download(file.url, zip, file, { headers: userAgent() });
   if (!mac) {
     if (desktop!.format === 'appimage') fs.chmodSync(zip, 0o755);
     return zip;
@@ -464,12 +640,20 @@ async function updateApp(db: DB, auto: boolean, then: 'install' | 'wait') {
     running = undefined;
     emit();
   };
-  const fail = (error: string, to?: string) => {
-    if (then === 'wait') failedAt = Date.now();
+  const fail = (error: string, to?: string, again = false) => {
+    console.log(`[updates] ${auto ? 'the automatic update' : 'the update'}${to ? ` to ${to}` : ''} failed: ${error}`);
+    if (then === 'wait') {
+      failedAt = Date.now();
+      // Stopped on the way (the network, not the build): it tries again in an hour, carrying on from what it has.
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = again ? setTimeout(() => void checkUpdates().catch(() => {}), RETRY) : null;
+      retryTimer?.unref?.();
+    }
     done({ ok: false, to, error });
   };
+  let to: string | undefined;
   try {
-    const f = await feed();
+    const f = await feedTried();
     const file = f.files[buildKey()];
     if (!newer(f.version, from) || !file) {
       check = { behind: 0, checkedAt: Date.now() };
@@ -479,7 +663,7 @@ async function updateApp(db: DB, auto: boolean, then: 'install' | 'wait') {
       }
       return done({ ok: true, to: from });
     }
-    const to = f.version;
+    to = f.version;
     const app = await fetchBuild(to, file);
     // A signed Mac app takes only a build signed by the same developer.
     const team = desktop!.platform === 'mac' ? await teamOf(desktop!.app) : null;
@@ -495,7 +679,7 @@ async function updateApp(db: DB, auto: boolean, then: 'install' | 'wait') {
     schedule();
     emit();
   } catch (e) {
-    fail((e as Error).message);
+    fail((e as Error).message, to, onTheWay(e));
   }
 }
 

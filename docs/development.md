@@ -58,7 +58,9 @@ version downloaded and waiting, for Restart to Update in the menus; with `notice
 the app shows a minute before it installs) and `install`. It asks the app what only the app can find out or do
 (`ask`, answered with `reply`), and hears what you picked in the app's menus (`update-now`) and, on Windows, `quit`
 (there is no SIGTERM a program can catch there). The server looks for a release a minute after it starts and every
-4 hours; with Update automatically on it downloads a new one at once, counts down a minute in every page
+4 hours; with Update automatically on it downloads a new one at once (a try that breaks off or gets nothing for a
+minute is followed by a range request from its last byte; the part stays in the cache for the next download of the
+same build), counts down a minute in every page
 (`update.ready.installIn`) and then sends `install`; Later (`POST /api/update/later`) puts it off for 4 hours.
 `server/desktop-test.ts` plays the app over the real channel, for each kind of copy; `HYDOR_UPDATE_NOTICE_MS` shortens
 the minute when trying it.
@@ -112,9 +114,14 @@ AppImage and `.deb` for x64 and ARM (on Ubuntu 22.04, so they need its C library
 checked before it is kept: its server starts from inside it, the app itself opens and starts its server (the AppImage
 from its own copy; on Windows also once installed with its installer, then uninstalled). It publishes them on the
 Releases page with the update feeds and the version's notes from `CHANGELOG.md`, and copies under names without the
-version for the README's links. Running it by hand (Actions → Desktop apps) builds without publishing. With the
-signing secrets the workflow lists, the Mac app is signed with a Developer ID and notarized; without them it is signed
-ad hoc. The Windows installer is not signed.
+version for the README's links. Running it by hand (Actions → Desktop apps) builds without publishing. The Mac app is
+signed with Hydor's own self-signed certificate (`desktop/scripts/sign.cjs`, from the secrets
+`MAC_SELF_SIGNED_CERTIFICATE` and `MAC_SELF_SIGNED_CERTIFICATE_PASSWORD`), the same for every version: macOS remembers
+the permissions people give an app by its signature's designated requirement, which is then the app's identifier and
+that certificate, so Accessibility and Screen Recording carry over when it updates. Signed ad hoc (a build without the
+secrets), the requirement is the build's own hash, and each version needs the permissions again. With the Developer ID
+secrets the workflow lists, it is signed with a Developer ID and notarized instead. The Windows installer is not
+signed.
 
 By hand, on the kind of computer the app is for (on Windows in Git's bash; on Linux with `libncurses-dev` for tmux):
 

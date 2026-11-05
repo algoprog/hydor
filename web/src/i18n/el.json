@@ -11013,5 +11013,14 @@
 "You stopped the agent using your computer. Let it go on?":"Σταματήσατε τον πράκτορα που χρησιμοποιούσε τον υπολογιστή σας. Να συνεχίσει;",
 "You stopped the agent using your PC. Let it go on?":"Σταματήσατε τον πράκτορα που χρησιμοποιούσε τον υπολογιστή σας. Να συνεχίσει;",
 "Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first":"Οι πράκτορες βλέπουν την οθόνη και χρησιμοποιούν το ποντίκι και το πληκτρολόγιο, σε οποιαδήποτε εφαρμογή (για ιστότοπους μένουν στο πρόγραμμα περιήγησης). Κάθε συνεδρία σας ρωτά πρώτα",
-"Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first.":"Οι πράκτορες βλέπουν την οθόνη και χρησιμοποιούν το ποντίκι και το πληκτρολόγιο, σε οποιαδήποτε εφαρμογή (για ιστότοπους μένουν στο πρόγραμμα περιήγησης). Κάθε συνεδρία σας ρωτά πρώτα."
+"Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first.":"Οι πράκτορες βλέπουν την οθόνη και χρησιμοποιούν το ποντίκι και το πληκτρολόγιο, σε οποιαδήποτε εφαρμογή (για ιστότοπους μένουν στο πρόγραμμα περιήγησης). Κάθε συνεδρία σας ρωτά πρώτα.",
+"{0} did not answer in time":"το {0} δεν απάντησε εγκαίρως",
+"could not reach {0}":"δεν ήταν δυνατή η σύνδεση με το {0}",
+"could not reach {0} ({1})":"δεν ήταν δυνατή η σύνδεση με το {0} ({1})",
+"GitHub answered {0}":"το GitHub απάντησε {0}",
+"the connection broke off":"η σύνδεση κόπηκε",
+"the connection went quiet":"η σύνδεση έμεινε χωρίς δεδομένα",
+"the download stopped at {0} of {1} MB ({2}); the next try carries on from there":"η λήψη σταμάτησε στα {0} από τα {1} MB ({2})· η επόμενη προσπάθεια συνεχίζει από εκεί",
+"the file ended early":"το αρχείο τελείωσε νωρίς",
+"the server sent another part of the file":"ο διακομιστής έστειλε άλλο κομμάτι του αρχείου"
 }

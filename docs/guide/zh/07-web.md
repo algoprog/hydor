@@ -282,7 +282,7 @@ PDF 也会当作文字来读。只有公开的网页能这样读：这台电脑�
 
 打开[设置 → 功能 → 电脑操控](/settings?s=computer)（“智能体能看到你的屏幕，并使用鼠标和键盘，仅限桌面应用”），开启[**允许智能体使用这台电脑**](/settings?s=computer&find=Let%20agents%20use%20this%20computer)。然后按你的系统需要：
 
-- **在 Mac 上**，给 Hydor macOS 的两项权限。在[**辅助功能**](/settings?s=computer&find=Accessibility)（macOS 允许使用鼠标和键盘的权限）旁按**允许…**。macOS 会询问是否允许 Hydor 控制这台电脑，然后它的系统设置会打开到**隐私与安全性 → 辅助功能**：在那里开启 **Hydor**。在[**屏幕录制**](/settings?s=computer&find=Screen%20Recording)（macOS 允许查看屏幕的权限）旁按**允许…**，然后在**屏幕录制**（macOS 15 上是**录屏与系统录音**）中开启 **Hydor**。如果 macOS 要求退出并重新打开 Hydor，照做即可：正在运行的智能体会继续工作。macOS 已经给出的权限会显示**已允许**。
+- **在 Mac 上**，给 Hydor macOS 的两项权限。在[**辅助功能**](/settings?s=computer&find=Accessibility)（macOS 允许使用鼠标和键盘的权限）旁按**允许…**。macOS 会询问是否允许 Hydor 控制这台电脑，然后它的系统设置会打开到**隐私与安全性 → 辅助功能**：在那里开启 **Hydor**。在[**屏幕录制**](/settings?s=computer&find=Screen%20Recording)（macOS 允许查看屏幕的权限）旁按**允许…**，然后在**屏幕录制**（macOS 15 上是**录屏与系统录音**）中开启 **Hydor**。如果 macOS 要求退出并重新打开 Hydor，照做即可：正在运行的智能体会继续工作。macOS 已经给出的权限会显示**已允许**，应用更新后也会保留。如果系统设置里 **Hydor** 是开着的，但设置里仍然显示**允许…**，那个开关属于之前的版本（0.28.1 之前，每次更新后都需要重新给出这些权限）：按**允许…**，它会清除那个开关，然后再次开启 **Hydor**。
 - **在 Windows 上**没有需要允许的。以管理员身份运行的程序智能体够不到，屏幕锁定时也一样。
 - **在 Linux 上**，它在 X11（Xorg）桌面上工作，需要 Python 3，几乎所有系统都有。Wayland 桌面（如今大多数系统上的 GNOME 和 KDE 都是）不让任何应用查看屏幕或使用其他应用的鼠标和键盘：这个部分会这样说明，并告诉你怎样改为登录 X11 会话（在 Ubuntu 上，登录屏幕上的齿轮 → **Ubuntu on Xorg**）。
 

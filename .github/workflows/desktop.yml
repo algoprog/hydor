@@ -9,8 +9,12 @@
 # artifacts. Every build is checked before it is kept: its server starts from inside it, and the app itself opens and
 # starts its server (on Windows, also once installed with its installer).
 #
-# Signing and notarizing the Mac app (optional; without them it is signed ad hoc, and people right-click → Open it the
-# first time). Repository secrets:
+# The Mac app is signed with Hydor's own self-signed certificate (desktop/scripts/sign.cjs), the same for every version,
+# so that macOS keeps the permissions people give it (Accessibility, Screen Recording) when it updates. Repository
+# secrets: MAC_SELF_SIGNED_CERTIFICATE (the .p12, base64-encoded) and MAC_SELF_SIGNED_CERTIFICATE_PASSWORD; without
+# them it is signed ad hoc, and every update needs those permissions again. It is not notarized: people right-click →
+# Open it the first time.
+# Signing and notarizing it with a Developer ID instead (optional). Repository secrets:
 #   MAC_CERTIFICATE           a Developer ID Application certificate with its key, as a .p12, base64-encoded
 #   MAC_CERTIFICATE_PASSWORD  the .p12's password
 #   APPLE_ID                  the Apple Account of your developer membership
@@ -82,9 +86,11 @@ jobs:
         run: OUTDIR=dist/dev node scripts/build-server.mjs server/platform-test.ts && DATA_DIR="$RUNNER_TEMP/hydor-test-platform" node dist/dev/platform-test.js
       - name: Gather the server, Node.js and tmux
         run: desktop/scripts/stage.sh
-      - name: Pack (the Mac app signed and notarized when the secrets are there)
+      - name: Pack (the Mac app signed with Hydor's certificate, or with a Developer ID and notarized when those secrets are there)
         working-directory: desktop
         env:
+          MAC_SELF_SIGNED_CERTIFICATE: ${{ secrets.MAC_SELF_SIGNED_CERTIFICATE }}
+          MAC_SELF_SIGNED_CERTIFICATE_PASSWORD: ${{ secrets.MAC_SELF_SIGNED_CERTIFICATE_PASSWORD }}
           CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}

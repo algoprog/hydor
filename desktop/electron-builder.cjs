@@ -3,7 +3,9 @@
 //   macOS    Hydor-<version>-<arch>-mac.dmg (what people download) and .zip (what the app's updater downloads). With a
 //            Developer ID certificate (CSC_LINK, CSC_KEY_PASSWORD) it is signed with the hardened runtime, and with
 //            Apple's notary credentials (APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID) notarized; without them it
-//            is signed ad hoc (scripts/adhoc-sign.cjs), which Apple silicon needs to run it at all.
+//            is signed with Hydor's own certificate (scripts/sign.cjs), the same for every version, so macOS keeps the
+//            permissions people give it from one version to the next; without that either, ad hoc. Apple silicon needs
+//            a signature to run it at all.
 //   Windows  Hydor-<version>-<arch>-win.exe, an installer for your own account (no administrator needed), which the
 //            app's updater also runs, without its window. It is not signed: Windows SmartScreen asks the first time.
 //   Linux    Hydor-<version>-<arch>.AppImage (one file that runs on most systems and replaces itself to update) and
@@ -42,7 +44,7 @@ module.exports = {
     },
   },
   dmg: { title: 'Hydor ${version}' },
-  afterSign: signed ? undefined : 'scripts/adhoc-sign.cjs',
+  afterSign: signed ? undefined : 'scripts/sign.cjs',
   win: {
     icon: 'resources/icon.ico',
     target: ['nsis'],
