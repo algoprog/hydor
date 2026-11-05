@@ -96,7 +96,7 @@ On a phone, tap a block to pick it, then tap its handle (⠿) on the bar beside 
 
 Keys for blocks: Ctrl+/ opens **Turn into**; Ctrl+Alt+0 turns a block into text, Ctrl+Alt+1 to 3 into a heading, Ctrl+Shift+7 into a numbered list, Ctrl+Shift+8 a bulleted list and Ctrl+Shift+9 a to-do list (the same keys again turn a list back into text); Ctrl+Shift+↑ and Ctrl+Shift+↓ move the block; Ctrl+D duplicates it; Ctrl+Enter ticks a to-do, opens or folds a toggle, and leaves a code block.
 
-To pick several blocks, Shift+click them (from the one picked to the one you click, when they sit together), or press beside the blocks (in the margin on their right, say) and drag down across them. Delete, Duplicate, Move, Copy, **Turn into** and **Colour** then act on all of them, and so do the changes on the **Part** tab.
+To pick several blocks, Shift+click them (from the one picked to the one you click, when they sit together), or drag across them as in Notion: press in the margin on either side of them, between them, beside a block's words (or on the **+**) and drag; a box shows what you pick, a list's items one by one, and the page scrolls when you reach its top or bottom. A drag that starts on a block's words picks once it leaves that block, so a click stays a click. Delete, Duplicate, Move, Copy, **Turn into** and **Colour** then act on all of them, and so do the changes on the **Part** tab.
 
 ### An icon and a cover
 

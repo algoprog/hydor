@@ -604,6 +604,41 @@ if (canCapture()) {
     ok((await d.js<string>('const v = document.querySelector("a.n-video"); return v ? v.getAttribute("data-video") : ""')) === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'a video goes in as its still, linked to it');
   });
 
+  // ---- picking blocks with a drag: from beside a block's words, from the left margin, item by item, from the + ---------------
+  await drive('<h1 id="t">Pick</h1><p id="a">Short</p><p id="b">Also short</p><ul><li id="i1">One<ul><li id="i2">Two</li></ul></li><li id="i3">Three</li></ul><p id="z">Last</p>', async (d) => {
+    const s = d.tab.s;
+    const box = (sel: string) => d.js<{ l: number; r: number; t: number; b: number; m: number }>(`const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, m: b.top + Math.min(b.height, 24) / 2 };`);
+    const drag = async (x0: number, y0: number, x1: number, y1: number) => {
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0, y: y0 });
+      await sleep(60);
+      await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y: y0, button: 'left', clickCount: 1 });
+      for (let i = 1; i <= 8; i++) await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0 + ((x1 - x0) * i) / 8, y: y0 + ((y1 - y0) * i) / 8, buttons: 1 });
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x1, y: y1, button: 'left', clickCount: 1 });
+      await sleep(100);
+    };
+    const picked = async () => (await d.msgs('wa-ed-sel')).at(-1)?.sel?.multi ?? 0;
+    const [a, b, t, i2, i3, z] = await Promise.all(['#a', '#b', '#t', '#i2', '#i3', '#z'].map(box));
+    await drag(a.r - 30, a.m, a.r - 30, b.m);
+    same(await picked(), 2, 'a drag from beside a block’s words down to the next block picks both');
+    await d.cmd('deselect');
+    await drag(t.l - 56, t.m, t.l - 56, i2.m);
+    same(await picked(), 4, 'a drag down the left margin picks the blocks beside it (a list’s item with the items under it)');
+    await d.cmd('deselect');
+    await drag(i2.r - 40, i2.m, i2.r - 40, i3.m);
+    same(await picked(), 2, 'a drag across a list picks its items one by one, nested ones too');
+    same(await d.js<string>('return document.querySelector("#i2").textContent'), 'Two', 'and changes nothing');
+    await d.cmd('deselect');
+    await drag(a.l + 4, a.m, a.l + 4, a.m + 3);
+    same(await picked(), 0, 'a press on a block’s words that hardly moves is still a click');
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: z.l + 10, y: z.m });
+    await sleep(80);
+    const plus = { x: z.l - 36, y: z.m };
+    await drag(plus.x, plus.y, plus.x, b.m);
+    ok((await picked()) >= 4 && (await shape(d)).endsWith('p:Last'), 'a drag from the + beside a block picks blocks too, and adds none');
+    await d.press('Delete');
+    same(await shape(d), 'h1:Pick|p:Short', 'the blocks picked go together with Delete');
+  });
+
   // ---- nested items keep their place: turned into text, a heading, a quote or a to-do, they stay under their parent ---------
   await drive(
     '<ul><li id="c">Clothes<ul><li id="s">Socks</li><li id="sh">Shirts<ul><li>Linen</li><li>Cotton</li></ul></li><li id="j">A jacket</li></ul></li><li>Papers</li></ul><p id="end">End</p>',
