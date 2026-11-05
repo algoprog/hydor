@@ -21,7 +21,7 @@ export function findAll(doc: Doc, query: string, o: FindOptions): ops.Found[] {
 }
 
 type HighlightsApi = { set: (k: string, h: unknown) => void; delete: (k: string) => void };
-const highlights = (): HighlightsApi | null => ((globalThis as unknown as { CSS?: { highlights?: HighlightsApi } }).CSS?.highlights ?? null);
+const highlights = (): HighlightsApi | null => (globalThis as unknown as { CSS?: { highlights?: HighlightsApi } }).CSS?.highlights ?? null;
 const HighlightCtor = (globalThis as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
 
 /** A match as a range of the page, if it is drawn. */

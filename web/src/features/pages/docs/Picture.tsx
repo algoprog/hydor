@@ -1,7 +1,7 @@
 // What is picked in a document, over the page: a picture's frame with a handle at each corner to make it wider or
 // narrower (as a share of the text's width, its proportions kept), and a bar by it for its alignment, its caption,
 // its description (for those who cannot see it), another picture in its place, asking an agent about it, and
-// taking it out. A line across or a page break picked has the bar's last button alone.
+// taking it out. A line across, a page break or a table of contents picked has the bar's last button alone.
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, Captions, FileText, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import type { Block, ImageBlock } from '@shared/docs';

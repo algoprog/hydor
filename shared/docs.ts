@@ -2818,7 +2818,8 @@ export function blockHtml(b: Block, label: string, o: DrawOpts): string {
   if (b.type === 'hr') return `<div class="nd-b nd-hr"${id}${atom}><hr></div>`;
   if (b.type === 'toc') {
     const list = o.toc ?? [];
-    const lines = list.map((h) => `<a class="nd-toc-${h.level}" href="#nd-${escHtml(h.id)}" data-h="${escHtml(h.id)}">${escHtml(h.text)}</a>`).join('');
+    // On the page, links to the headings; in the editor, lines it goes to on a click (no address of the app's changes).
+    const lines = list.map((h) => `<a class="nd-toc-${h.level}"${view ? ` href="#nd-${escHtml(h.id)}"` : ''} data-h="${escHtml(h.id)}">${escHtml(h.text)}</a>`).join('');
     return `<nav class="nd-b nd-toc"${id}${atom}>${lines || (o.tocHint ? `<span class="nd-toc-hint">${escHtml(o.tocHint)}</span>` : '')}</nav>`;
   }
   if (b.type === 'math') return `<div class="nd-b nd-math"${id}${atom}>${o.math ? o.math(b.tex, true) : `<code>${escHtml(b.tex)}</code>`}</div>`;

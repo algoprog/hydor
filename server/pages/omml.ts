@@ -8,18 +8,147 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** Commands that are one character. */
 const SYMBOLS: Record<string, string> = {
-  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ϵ', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', vartheta: 'ϑ', iota: 'ι', kappa: 'κ',
-  lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', varpi: 'ϖ', rho: 'ρ', varrho: 'ϱ', sigma: 'σ', varsigma: 'ς', tau: 'τ', upsilon: 'υ', phi: 'ϕ',
-  varphi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω', Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π', Sigma: 'Σ', Upsilon: 'Υ', Phi: 'Φ',
-  Psi: 'Ψ', Omega: 'Ω', pm: '±', mp: '∓', times: '×', div: '÷', cdot: '⋅', ast: '∗', star: '⋆', circ: '∘', bullet: '∙', le: '≤', leq: '≤', ge: '≥',
-  geq: '≥', ne: '≠', neq: '≠', approx: '≈', equiv: '≡', sim: '∼', simeq: '≃', cong: '≅', propto: '∝', ll: '≪', gg: '≫', infty: '∞', partial: '∂',
-  nabla: '∇', forall: '∀', exists: '∃', nexists: '∄', emptyset: '∅', varnothing: '∅', in: '∈', notin: '∉', ni: '∋', subset: '⊂', supset: '⊃',
-  subseteq: '⊆', supseteq: '⊇', cup: '∪', cap: '∩', setminus: '∖', wedge: '∧', land: '∧', vee: '∨', lor: '∨', neg: '¬', lnot: '¬', to: '→',
-  rightarrow: '→', leftarrow: '←', gets: '←', leftrightarrow: '↔', Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔', implies: '⟹', iff: '⟺',
-  mapsto: '↦', uparrow: '↑', downarrow: '↓', ldots: '…', cdots: '⋯', vdots: '⋮', ddots: '⋱', dots: '…', prime: '′', angle: '∠', perp: '⊥',
-  parallel: '∥', mid: '∣', hbar: 'ℏ', ell: 'ℓ', Re: 'ℜ', Im: 'ℑ', aleph: 'ℵ', degree: '°', triangle: '△', square: '□', langle: '⟨', rangle: '⟩',
-  lceil: '⌈', rceil: '⌉', lfloor: '⌊', rfloor: '⌋', vert: '|', Vert: '‖', lbrace: '{', rbrace: '}', oplus: '⊕', otimes: '⊗', odot: '⊙',
-  therefore: '∴', because: '∵', '{': '{', '}': '}', '%': '%', $: '$', '&': '&', '#': '#', _: '_', '|': '‖',
+  alpha: 'α',
+  beta: 'β',
+  gamma: 'γ',
+  delta: 'δ',
+  epsilon: 'ϵ',
+  varepsilon: 'ε',
+  zeta: 'ζ',
+  eta: 'η',
+  theta: 'θ',
+  vartheta: 'ϑ',
+  iota: 'ι',
+  kappa: 'κ',
+  lambda: 'λ',
+  mu: 'μ',
+  nu: 'ν',
+  xi: 'ξ',
+  pi: 'π',
+  varpi: 'ϖ',
+  rho: 'ρ',
+  varrho: 'ϱ',
+  sigma: 'σ',
+  varsigma: 'ς',
+  tau: 'τ',
+  upsilon: 'υ',
+  phi: 'ϕ',
+  varphi: 'φ',
+  chi: 'χ',
+  psi: 'ψ',
+  omega: 'ω',
+  Gamma: 'Γ',
+  Delta: 'Δ',
+  Theta: 'Θ',
+  Lambda: 'Λ',
+  Xi: 'Ξ',
+  Pi: 'Π',
+  Sigma: 'Σ',
+  Upsilon: 'Υ',
+  Phi: 'Φ',
+  Psi: 'Ψ',
+  Omega: 'Ω',
+  pm: '±',
+  mp: '∓',
+  times: '×',
+  div: '÷',
+  cdot: '⋅',
+  ast: '∗',
+  star: '⋆',
+  circ: '∘',
+  bullet: '∙',
+  le: '≤',
+  leq: '≤',
+  ge: '≥',
+  geq: '≥',
+  ne: '≠',
+  neq: '≠',
+  approx: '≈',
+  equiv: '≡',
+  sim: '∼',
+  simeq: '≃',
+  cong: '≅',
+  propto: '∝',
+  ll: '≪',
+  gg: '≫',
+  infty: '∞',
+  partial: '∂',
+  nabla: '∇',
+  forall: '∀',
+  exists: '∃',
+  nexists: '∄',
+  emptyset: '∅',
+  varnothing: '∅',
+  in: '∈',
+  notin: '∉',
+  ni: '∋',
+  subset: '⊂',
+  supset: '⊃',
+  subseteq: '⊆',
+  supseteq: '⊇',
+  cup: '∪',
+  cap: '∩',
+  setminus: '∖',
+  wedge: '∧',
+  land: '∧',
+  vee: '∨',
+  lor: '∨',
+  neg: '¬',
+  lnot: '¬',
+  to: '→',
+  rightarrow: '→',
+  leftarrow: '←',
+  gets: '←',
+  leftrightarrow: '↔',
+  Rightarrow: '⇒',
+  Leftarrow: '⇐',
+  Leftrightarrow: '⇔',
+  implies: '⟹',
+  iff: '⟺',
+  mapsto: '↦',
+  uparrow: '↑',
+  downarrow: '↓',
+  ldots: '…',
+  cdots: '⋯',
+  vdots: '⋮',
+  ddots: '⋱',
+  dots: '…',
+  prime: '′',
+  angle: '∠',
+  perp: '⊥',
+  parallel: '∥',
+  mid: '∣',
+  hbar: 'ℏ',
+  ell: 'ℓ',
+  Re: 'ℜ',
+  Im: 'ℑ',
+  aleph: 'ℵ',
+  degree: '°',
+  triangle: '△',
+  square: '□',
+  langle: '⟨',
+  rangle: '⟩',
+  lceil: '⌈',
+  rceil: '⌉',
+  lfloor: '⌊',
+  rfloor: '⌋',
+  vert: '|',
+  Vert: '‖',
+  lbrace: '{',
+  rbrace: '}',
+  oplus: '⊕',
+  otimes: '⊗',
+  odot: '⊙',
+  therefore: '∴',
+  because: '∵',
+  '{': '{',
+  '}': '}',
+  '%': '%',
+  $: '$',
+  '&': '&',
+  '#': '#',
+  _: '_',
+  '|': '‖',
 };
 
 /** Spaces between things. */
@@ -27,16 +156,38 @@ const SPACES: Record<string, string> = { ',': ' ', ':': ' ', ';': ' ', '!'
 
 /** Big operators, and whether their limits sit under and over them (else beside). */
 const NARY: Record<string, { chr: string; under: boolean }> = {
-  sum: { chr: '∑', under: true }, prod: { chr: '∏', under: true }, coprod: { chr: '∐', under: true }, bigcup: { chr: '⋃', under: true },
-  bigcap: { chr: '⋂', under: true }, int: { chr: '∫', under: false }, iint: { chr: '∬', under: false }, iiint: { chr: '∭', under: false },
-  oint: { chr: '∮', under: false }, bigoplus: { chr: '⨁', under: true }, bigotimes: { chr: '⨂', under: true },
+  sum: { chr: '∑', under: true },
+  prod: { chr: '∏', under: true },
+  coprod: { chr: '∐', under: true },
+  bigcup: { chr: '⋃', under: true },
+  bigcap: { chr: '⋂', under: true },
+  int: { chr: '∫', under: false },
+  iint: { chr: '∬', under: false },
+  iiint: { chr: '∭', under: false },
+  oint: { chr: '∮', under: false },
+  bigoplus: { chr: '⨁', under: true },
+  bigotimes: { chr: '⨂', under: true },
 };
 
 const FUNCS = new Set(['sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'arcsin', 'arccos', 'arctan', 'sinh', 'cosh', 'tanh', 'log', 'ln', 'lg', 'exp', 'det', 'dim', 'ker', 'deg', 'gcd', 'max', 'min', 'sup', 'inf', 'lim', 'arg', 'Pr', 'mod']);
 
 const ACCENTS: Record<string, string> = { hat: '̂', widehat: '̂', bar: '̅', vec: '⃗', dot: '̇', ddot: '̈', tilde: '̃', widetilde: '̃', check: '̌', breve: '̆', acute: '́', grave: '̀' };
 
-const MATRICES: Record<string, [string, string]> = { matrix: ['', ''], pmatrix: ['(', ')'], bmatrix: ['[', ']'], Bmatrix: ['{', '}'], vmatrix: ['|', '|'], Vmatrix: ['‖', '‖'], cases: ['{', ''], array: ['', ''], aligned: ['', ''], align: ['', ''], 'align*': ['', ''], gathered: ['', ''], split: ['', ''] };
+const MATRICES: Record<string, [string, string]> = {
+  matrix: ['', ''],
+  pmatrix: ['(', ')'],
+  bmatrix: ['[', ']'],
+  Bmatrix: ['{', '}'],
+  vmatrix: ['|', '|'],
+  Vmatrix: ['‖', '‖'],
+  cases: ['{', ''],
+  array: ['', ''],
+  aligned: ['', ''],
+  align: ['', ''],
+  'align*': ['', ''],
+  gathered: ['', ''],
+  split: ['', ''],
+};
 
 const DOUBLE: Record<string, string> = { C: 'ℂ', H: 'ℍ', N: 'ℕ', P: 'ℙ', Q: 'ℚ', R: 'ℝ', Z: 'ℤ' };
 
@@ -156,7 +307,7 @@ function parse(tex: string): Row {
       if (!fence) throw new Unknown(env);
       if (env === 'array') rawArg();
       const rows: Row[][] = [[[]]];
-      for (; i < toks.length; ) {
+      for (; i < toks.length;) {
         const x = toks[i];
         if (x === '\\end') {
           i++;
@@ -184,11 +335,14 @@ function parse(tex: string): Row {
   /** One thing and the parts raised and lowered on it. */
   const one = (): Row => {
     const t = toks[i++];
-    let base: Row = t === '{' ? (() => {
-      const r = row('}');
-      i++;
-      return r;
-    })() : (atom(t) ?? []);
+    let base: Row =
+      t === '{'
+        ? (() => {
+            const r = row('}');
+            i++;
+            return r;
+          })()
+        : (atom(t) ?? []);
     for (;;) {
       const save = i;
       skipSpace();
@@ -307,7 +461,11 @@ const BACK: Record<string, string> = Object.fromEntries(
     .map(([k, v]) => [v, `\\${k} `]),
 );
 const NARY_BACK: Record<string, string> = Object.fromEntries(Object.entries(NARY).map(([k, v]) => [v.chr, `\\${k}`]));
-const ACC_BACK: Record<string, string> = Object.fromEntries(Object.entries(ACCENTS).filter(([k]) => !k.startsWith('wide')).map(([k, v]) => [v, `\\${k}`]));
+const ACC_BACK: Record<string, string> = Object.fromEntries(
+  Object.entries(ACCENTS)
+    .filter(([k]) => !k.startsWith('wide'))
+    .map(([k, v]) => [v, `\\${k}`]),
+);
 const DELIM_BACK: Record<string, string> = { '{': '\\{', '}': '\\}', '‖': '\\|', '⟨': '\\langle', '⟩': '\\rangle', '⌈': '\\lceil', '⌉': '\\rceil', '⌊': '\\lfloor', '⌋': '\\rfloor', '': '.' };
 
 const grp = (s: string) => (s.length === 1 ? s : `{${s}}`);
@@ -357,7 +515,9 @@ function texOf(el: El): string {
       const open = valOf(pr, 'begChr') ?? '(';
       const close = valOf(pr, 'endChr') ?? ')';
       const sep = valOf(pr, 'sepChr') ?? '|';
-      const inner = kids(el, 'e').map(texOfKids).join(sep === '|' ? ' \\mid ' : sep);
+      const inner = kids(el, 'e')
+        .map(texOfKids)
+        .join(sep === '|' ? ' \\mid ' : sep);
       return `\\left${DELIM_BACK[open] ?? open}${inner}\\right${DELIM_BACK[close] ?? close}`;
     }
     case 'func':

@@ -146,11 +146,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     {
       label: 'Zoom',
       icon: <ZoomIn size={15} />,
-      items: [
-        ...ZOOMS.map((z) => ({ label: `${Math.round(z * 100)}%`, checked: c.zoom === z, run: () => c.setZoom(z) })),
-        '-' as const,
-        { label: 'Fit the width', checked: c.zoom === 'fit', run: () => c.setZoom('fit') },
-      ],
+      items: [...ZOOMS.map((z) => ({ label: `${Math.round(z * 100)}%`, checked: c.zoom === z, run: () => c.setZoom(z) })), '-' as const, { label: 'Fit the width', checked: c.zoom === 'fit', run: () => c.setZoom('fit') }],
     },
     '-',
     { label: 'Check spelling', icon: <SpellCheck size={15} />, checked: c.spell, also: 'spellcheck', run: () => c.setSpell(!c.spell) },
@@ -238,7 +234,10 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         '-',
         { label: 'Merge cells', disabled: !many, run: () => e.mergeCells() },
         { label: 'Unmerge cells', disabled: !merged, run: () => e.unmergeCell() },
-        { label: 'Cell colour', items: [{ label: 'No colour', checked: !cellOf?.fill, run: () => e.cells({ fill: undefined }) }, ...FILLS.map(([v, l]) => ({ label: l, checked: cellOf?.fill === v, also: 'fill shading', run: () => e.cells({ fill: v }) }))] },
+        {
+          label: 'Cell colour',
+          items: [{ label: 'No colour', checked: !cellOf?.fill, run: () => e.cells({ fill: undefined }) }, ...FILLS.map(([v, l]) => ({ label: l, checked: cellOf?.fill === v, also: 'fill shading', run: () => e.cells({ fill: v }) }))],
+        },
         {
           label: 'Vertical alignment',
           items: [

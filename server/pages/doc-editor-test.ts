@@ -51,7 +51,15 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
       { id: 'a1', type: 'p', style: 'title', runs: [{ t: 'Plan' }] },
       { id: 'a2', type: 'p', runs: [{ t: 'We grow ', b: true }, { t: 'beans' }] },
       { id: 'a3', type: 'li', list: 'number', runs: [{ t: 'Dig' }] },
-      { id: 'a4', type: 'table', head: true, rows: [[{ runs: [{ t: 'A' }] }, { runs: [{ t: 'B' }] }], [{ runs: [] }, { runs: [{ t: '2' }], align: 'right' }]] },
+      {
+        id: 'a4',
+        type: 'table',
+        head: true,
+        rows: [
+          [{ runs: [{ t: 'A' }] }, { runs: [{ t: 'B' }] }],
+          [{ runs: [] }, { runs: [{ t: '2' }], align: 'right' }],
+        ],
+      },
       { id: 'a5', type: 'pagebreak' },
       { id: 'a6', type: 'p', runs: [] },
     ],
@@ -63,7 +71,14 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
 
 // ---- line and paragraph spacing ------------------------------------------------------------------------------
 {
-  const d = normalizeDoc({ blocks: [{ p: 'Airy', lh: 1.5, sb: 12, sa: 0 }, { p: 'Words', line: 'double', before: '6pt', after: 3 }, { bullet: 'Item', lh: 1.15 }, { p: 'Bad', lh: 99, sb: -4 }] });
+  const d = normalizeDoc({
+    blocks: [
+      { p: 'Airy', lh: 1.5, sb: 12, sa: 0 },
+      { p: 'Words', line: 'double', before: '6pt', after: 3 },
+      { bullet: 'Item', lh: 1.15 },
+      { p: 'Bad', lh: 99, sb: -4 },
+    ],
+  });
   const [a, b, c, e] = d.blocks as ParaBlock[];
   ok(a.lh === 1.5 && a.sb === 12 && a.sa === 0, 'a paragraph keeps its line spacing and space before and after (0 too)');
   ok(b.lh === 2 && b.sb === 6 && b.sa === 3, 'spacing is read from words agents use ("double", "6pt")');
@@ -77,7 +92,13 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
 
 // ---- callouts ----------------------------------------------------------------------------------------------------
 {
-  const d = normalizeDoc({ blocks: [{ callout: 'Mind the **gap**', icon: '⚠️', tint: '#fce8e6' }, { type: 'callout', text: 'Plain' }, { callout: 'x', icon: '<b>' }] });
+  const d = normalizeDoc({
+    blocks: [
+      { callout: 'Mind the **gap**', icon: '⚠️', tint: '#fce8e6' },
+      { type: 'callout', text: 'Plain' },
+      { callout: 'x', icon: '<b>' },
+    ],
+  });
   const [a, b, c] = d.blocks as ParaBlock[];
   ok(a.style === 'callout' && a.icon === '⚠️' && a.tint === '#fce8e6' && a.runs[1]?.b, 'a callout keeps its emoji, tint and words');
   ok(b.style === 'callout' && !b.icon && !b.tint, 'one without them has the usual ones (left out)');
@@ -109,7 +130,10 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
 {
   const d = normalizeDoc({ markdown: 'Energy: $E = mc^2$, costs $5 and $10.\n\n$$\n\\int_0^1 x^2\\,dx = \\frac{1}{3}\n$$\n\n$$a+b$$\n\nPrice $$100 a day\n' });
   const p = d.blocks[0] as ParaBlock;
-  ok(p.runs.some((r) => r.math && r.t === 'E = mc^2'), 'maths among words is $…$');
+  ok(
+    p.runs.some((r) => r.math && r.t === 'E = mc^2'),
+    'maths among words is $…$',
+  );
   ok(words(p).includes('costs $5 and $10.'), 'dollars in prices stay words');
   ok(d.blocks[1].type === 'math' && d.blocks[1].tex.startsWith('\\int_0^1'), '$$ on lines of their own is an equation');
   ok(d.blocks[2].type === 'math' && d.blocks[2].tex === 'a+b', 'and $$…$$ alone on a line');
@@ -117,9 +141,21 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   ok(strip(viaMd(d)) === strip(d), 'Markdown writes equations back as they were');
   const tricky = normalizeDoc({ blocks: [{ p: [{ t: 'Pay $x$ now, or ' }, { t: 'y^2', math: true }, { t: ' later $' }] }] });
   ok(strip(viaMd(tricky)) === strip(tricky), 'words that look like maths are escaped, so they stay words');
-  const two = normalizeDoc({ blocks: [{ p: [{ t: '\\alpha', math: true }, { t: 'b', math: true }] }] });
+  const two = normalizeDoc({
+    blocks: [
+      {
+        p: [
+          { t: '\\alpha', math: true },
+          { t: 'b', math: true },
+        ],
+      },
+    ],
+  });
   ok((two.blocks[0] as ParaBlock).runs.length === 2, 'two equations side by side stay two');
-  ok(normalizeDoc({ blocks: [{ math: '$$x$$' }, { type: 'equation', tex: '\\[y\\]' }] }).blocks.every((b) => b.type === 'math' && /^[xy]$/.test(b.tex)), 'an equation written with its $$ or \\[ \\] keeps only its LaTeX');
+  ok(
+    normalizeDoc({ blocks: [{ math: '$$x$$' }, { type: 'equation', tex: '\\[y\\]' }] }).blocks.every((b) => b.type === 'math' && /^[xy]$/.test(b.tex)),
+    'an equation written with its $$ or \\[ \\] keeps only its LaTeX',
+  );
   const drawn = blockHtml(d.blocks[1], '', { src: (s) => s, math: (t, display) => `<M ${display}>${t.length}</M>` });
   ok(drawn.includes('<M true>'), 'the page draws an equation with what it is given to draw maths');
   const inline = blockHtml(p, '', { src: (s) => s, edit: true, math: () => '<K/>' });
@@ -142,7 +178,13 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const t = d.blocks[0] as TableBlock;
   const c = (r: number, k: number): Cell => t.rows[r][k];
   ok(c(0, 0).cs === 2 && c(0, 0).fill === '#e8f0fe' && c(0, 2).rs === 2 && c(0, 2).va === 'middle', 'cells keep their fill, alignment up and down, and merges');
-  ok(c(0, 1).runs.length === 0 && c(0, 0).runs.map((r) => r.t).join('') === 'Name\ngone', 'a merged cell takes the words of the cells it covers');
+  ok(
+    c(0, 1).runs.length === 0 &&
+      c(0, 0)
+        .runs.map((r) => r.t)
+        .join('') === 'Name\ngone',
+    'a merged cell takes the words of the cells it covers',
+  );
   ok(c(1, 2).runs.length === 0, 'covered cells are empty');
   ok(c(2, 1).cs === 2 && !c(2, 1).rs, 'a merge is kept within the table and off other merges');
   const md = docMarkdown(d);
@@ -183,7 +225,10 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const runs = (d.blocks[0] as ParaBlock).runs;
   ok(d.comments?.length === 2 && d.comments[0].replies?.[0].text === 'Yes.', 'a document keeps its comments and their replies');
   ok(runs[2].cm?.join() === 'c1,c2', 'words keep the comments on them, not ones it has not');
-  ok(normalizeDoc({ blocks: [{ p: [{ t: 'x', cm: ['c9'] }] }] }).blocks.every((b) => !(b as ParaBlock).runs?.some((r: Run) => r.cm)), 'marks of comments it does not have are dropped');
+  ok(
+    normalizeDoc({ blocks: [{ p: [{ t: 'x', cm: ['c9'] }] }] }).blocks.every((b) => !(b as ParaBlock).runs?.some((r: Run) => r.cm)),
+    'marks of comments it does not have are dropped',
+  );
   ok(docText(again(d)) === docText(d), 'kept as text and read back');
   ok(!docMarkdown(d).includes('data-comment'), 'Markdown for a file leaves comments out');
   const md = docMarkdown(d, { comments: true });
@@ -242,7 +287,10 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const n1 = r.doc.comments?.find((c) => c.id === 'n1');
   ok(n1?.by === 'agent' && n1.quote === 'daily', 'an agent adds a comment on the words it marks');
   ok(r.doc.comments?.find((c) => c.id === 'n2')?.quote === 'peas', 'or on the words it names');
-  ok(r.notes.some((n) => n.includes('zz')), 'a comment that is not there is said');
+  ok(
+    r.notes.some((n) => n.includes('zz')),
+    'a comment that is not there is said',
+  );
   ok(r.doc.header?.text === 'Garden' && r.doc.footer?.align === 'right', 'the header and footer stay when not said');
   const r2 = await agentDoc(db, { markdown: 'Short.', header: '', footer: 'Page {page} of {pages}', titlePage: true }, tmp, r.text);
   ok(!r2.doc.header && r2.doc.footer?.text === 'Page {page} of {pages}' && r2.doc.titlePage, 'an agent removes, changes or sets them');
@@ -256,7 +304,7 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
     return x ? texOfOmml(parseXml(`<m:oMath xmlns:m="m">${x.slice('<m:oMath>'.length, -'</m:oMath>'.length)}</m:oMath>`).root) : null;
   };
   const f = ommlOf('\\frac{a+b}{\\sqrt[3]{x}}');
-  ok(f?.includes('<m:f><m:num>') && f.includes('<m:rad><m:deg>'), 'a fraction and a root are Word\'s own');
+  ok(f?.includes('<m:f><m:num>') && f.includes('<m:rad><m:deg>'), "a fraction and a root are Word's own");
   ok(ommlOf('\\sum_{i=1}^{n} x_i^2')?.includes('<m:chr m:val="∑"/><m:limLoc m:val="undOvr"/>') ?? false, 'a sum keeps its limits under and over it');
   ok(ommlOf('\\alpha \\leq \\infty')?.includes('α') ?? false, 'Greek letters and operators are their characters');
   ok(ommlOf('\\left( \\begin{pmatrix} 1 & 0 \\\\ 0 & 1 \\end{pmatrix} \\right)')?.includes('<m:mr>') ?? false, 'matrices and growing brackets convert');
@@ -290,9 +338,7 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const energy = d.blocks.find((b) => words(b).startsWith('Energy')) as ParaBlock;
   const withCm: Doc = normalizeDoc({
     ...d,
-    blocks: d.blocks.map((b) =>
-      b === sp ? { ...sp, runs: [{ t: 'Spaced', cm: ['k1'] }, { t: ' out' }] } : b === energy ? { ...energy, runs: energy.runs.map((r) => (r.t === ' here.' ? { ...r, cm: ['k2'] } : r)) } : b,
-    ),
+    blocks: d.blocks.map((b) => (b === sp ? { ...sp, runs: [{ t: 'Spaced', cm: ['k1'] }, { t: ' out' }] } : b === energy ? { ...energy, runs: energy.runs.map((r) => (r.t === ' here.' ? { ...r, cm: ['k2'] } : r)) } : b)),
     comments: [
       { id: 'k1', by: 'user', text: 'Too airy?', at: 1_700_000_000_000, replies: [{ id: 'x', by: 'agent', text: 'Made it 2 lines on purpose.', at: 1_700_000_500_000 }] },
       { id: 'k2', by: 'agent', text: 'Cite this.', at: 1_700_000_900_000, resolved: true },
@@ -301,16 +347,16 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const file = docxOfDoc(db, withCm, 'Report');
   const zip = new Zip(file);
   const xml = zip.text('word/document.xml') ?? '';
-  ok(/<w:spacing w:before="240" w:after="0" w:line="480" w:lineRule="auto"\/>/.test(xml), 'spacing goes to Word as the paragraph\'s own');
+  ok(/<w:spacing w:before="240" w:after="0" w:line="480" w:lineRule="auto"\/>/.test(xml), "spacing goes to Word as the paragraph's own");
   ok(xml.includes('w:fill="FCE8E6"') && xml.includes('🔥'), 'a callout is a shaded paragraph with its emoji');
   ok(xml.includes('TOC \\o "1-3"') && /w:anchor="_Toc1"/.test(xml) && /<w:bookmarkStart w:id="\d+" w:name="_Toc1"\/>/.test(xml), 'a table of contents is a field Word fills in, its lines leading to bookmarks');
-  ok(xml.includes('<m:oMathPara><m:oMath><m:f>') && xml.includes('<m:oMath>'), 'equations are Word\'s own');
+  ok(xml.includes('<m:oMathPara><m:oMath><m:f>') && xml.includes('<m:oMath>'), "equations are Word's own");
   ok(xml.includes('\\weird{x}') && xml.includes('Cambria Math'), 'one that does not convert is its LaTeX in a maths font');
   ok(xml.includes('<w:gridSpan w:val="2"/>') && xml.includes('<w:vMerge w:val="restart"/>') && xml.includes('<w:vMerge/>') && xml.includes('<w:vAlign w:val="center"/>'), 'merged cells and alignment go to Word');
   ok(xml.includes('<w:headerReference w:type="default"') && xml.includes('<w:titlePg/>'), 'the header and footer are parts of it, the first page apart');
-  ok((zip.text('word/footer1.xml') ?? '').includes('w:instr=" NUMPAGES "') && (zip.text('word/header1.xml') ?? '').includes('w:instr=" PAGE "'), 'with the page\'s number and count');
+  ok((zip.text('word/footer1.xml') ?? '').includes('w:instr=" NUMPAGES "') && (zip.text('word/header1.xml') ?? '').includes('w:instr=" PAGE "'), "with the page's number and count");
   const cx = zip.text('word/comments.xml') ?? '';
-  ok(xml.includes('<w:commentRangeStart w:id="0"/>') && xml.includes('<w:commentReference w:id="1"/>') && cx.includes('w:author="Agent"') && cx.includes('Too airy?'), 'comments are Word\'s own, replies too');
+  ok(xml.includes('<w:commentRangeStart w:id="0"/>') && xml.includes('<w:commentReference w:id="1"/>') && cx.includes('w:author="Agent"') && cx.includes('Too airy?'), "comments are Word's own, replies too");
   ok((zip.text('word/commentsExtended.xml') ?? '').includes('w15:done="1"'), 'and Word knows which were resolved');
   const back = docFromFile(file, 'Report.docx');
   const bsp = back.blocks.find((b) => words(b) === 'Spaced out') as ParaBlock;
@@ -318,8 +364,14 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const call = back.blocks.find((b) => b.type === 'p' && b.style === 'callout') as ParaBlock;
   ok(call?.icon === '🔥' && call.tint === '#fce8e6' && words(call) === 'Hot topic', 'a callout comes back');
   ok(back.blocks.filter((b) => b.type === 'toc').length === 1 && !back.blocks.some((b) => words(b) === 'Costs' && (b as ParaBlock).style === undefined), 'the table of contents comes back as one, its lines not as words');
-  ok(back.blocks.some((b) => b.type === 'math' && b.tex === '\\frac{a}{b}'), 'an equation comes back as LaTeX');
-  ok((back.blocks.find((b) => words(b).startsWith('Energy')) as ParaBlock)?.runs.some((r) => r.math && r.t.replace(/\s/g, '') === 'E=mc^2'), 'and maths among words');
+  ok(
+    back.blocks.some((b) => b.type === 'math' && b.tex === '\\frac{a}{b}'),
+    'an equation comes back as LaTeX',
+  );
+  ok(
+    (back.blocks.find((b) => words(b).startsWith('Energy')) as ParaBlock)?.runs.some((r) => r.math && r.t.replace(/\s/g, '') === 'E=mc^2'),
+    'and maths among words',
+  );
   const bt = back.blocks.find((b) => b.type === 'table') as TableBlock;
   ok(bt?.rows[0][0].cs === 2 && bt.rows[0][0].fill === '#e8f0fe' && bt.rows[0][2].rs === 2 && bt.rows[0][2].va === 'middle', 'merged and filled cells come back');
   ok(back.header?.text === 'ACME — {page}' && back.header.align === 'right' && back.footer?.text === 'Page {page} of {pages}' && back.titlePage, 'the header, footer and title page come back');

@@ -443,6 +443,17 @@ export function insertBlocks(doc: Doc, at: Pos, list: Block[]): Edit {
   return { doc: splice(doc, i, 1, out), at: { b: tail.id, o: 0 } };
 }
 
+/** A block moved to stand before the block now at `to` (the end, past the last); the caret goes to its start. */
+export function moveBlock(doc: Doc, id: string, to: number): Edit {
+  const i = indexOf(doc, id);
+  if (i < 0 || to === i || to === i + 1) return { doc, at: nearPos(doc, Math.max(0, i)) };
+  const b = doc.blocks[i];
+  const rest = doc.blocks.filter((_, k) => k !== i);
+  const at = to > i ? to - 1 : to;
+  const d = fixDoc(withBlocks(doc, [...rest.slice(0, at), b, ...rest.slice(at)]));
+  return isText(b) ? { doc: d, at: { b: b.id, o: 0 } } : { doc: d, at: nearPos(d, at), pick: b.type === 'table' ? undefined : b.id };
+}
+
 /** A block taken out; the caret goes to the words after it (or before; or an empty paragraph made for it). */
 export function removeBlock(doc: Doc, id: string): Edit {
   const i = indexOf(doc, id);
