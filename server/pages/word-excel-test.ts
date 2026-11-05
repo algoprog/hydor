@@ -335,6 +335,9 @@ function misordered(xml: string): string | null {
     pPrOf(xml, 'New page'),
   );
   ok(/<w:br w:type="page"\/><\/w:r><\/w:p><w:tbl>/.test(xml), 'and before a table, a paragraph a point high breaks the page');
+  const twice = normalizeDoc({ blocks: [{ p: 'One' }, { pagebreak: true }, { pagebreak: true }, { p: 'Three' }] });
+  const tx = xmlOf(docxOfDoc(db, twice, 'T'), 'word/document.xml');
+  ok((tx.match(/<w:pageBreakBefore\/>/g) ?? []).length === 2 && docFromFile(docxOfDoc(db, twice, 'T'), 'T.docx').blocks.filter((b) => b.type === 'pagebreak').length === 2, 'two page breaks in a row keep the empty page between them, there and back');
   const sect = /<w:pgMar [^>]*\/>/.exec(xml)?.[0] ?? '';
   ok(sect.includes('w:top="1440"') && sect.includes('w:header="612" w:footer="612"'), 'the header and footer sit in the middle of the margins, as the editor draws them', sect);
   ok(
