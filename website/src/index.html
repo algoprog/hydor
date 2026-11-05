@@ -93,11 +93,15 @@
     <div class="nav-in">
       <a class="brand" href="#top" aria-label="Hydor, back to the top">
         <svg class="wordmark" viewBox="-4 -1 530 102" fill="none" stroke-width="10" aria-hidden="true">
-          <path d="M5 0V100M61 0V100M5 50H61" stroke="currentColor" />
-          <path transform="translate(104 0)" d="M-1 -6L35 52L71 -6M35 52V100" stroke="currentColor" />
-          <path transform="translate(212 0)" d="M5 0V100M5 5H30A39 45 0 0 1 30 95H5" stroke="currentColor" />
-          <path transform="translate(324 0)" d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke="#38bdf8" />
-          <path transform="translate(458 0)" d="M5 100V5H34A25 20 0 0 1 34 50H5M30 50L66 106" stroke="currentColor" />
+          <!-- Cut to the letters' height, as the big wordmark is: the Y's arms and the R's leg are drawn past it to end flat. -->
+          <defs><clipPath id="wm-clip-nav"><rect x="-10" y="0" width="542" height="100" /></clipPath></defs>
+          <g clip-path="url(#wm-clip-nav)">
+            <path d="M5 0V100M61 0V100M5 50H61" stroke="currentColor" />
+            <path transform="translate(104 0)" d="M-1 -6L35 52L71 -6M35 52V100" stroke="currentColor" />
+            <path transform="translate(212 0)" d="M5 0V100M5 5H30A39 45 0 0 1 30 95H5" stroke="currentColor" />
+            <path transform="translate(324 0)" d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke="#38bdf8" />
+            <path transform="translate(458 0)" d="M5 100V5H34A25 20 0 0 1 34 50H5M30 50L66 106" stroke="currentColor" />
+          </g>
         </svg>
       </a>
       <nav class="nav-links" aria-label="Main">
