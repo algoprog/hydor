@@ -94,7 +94,7 @@ export function AppView({
       result: run?.result ?? {},
       inputs: run?.inputs ?? {},
       run: run ? runOf(run) : {},
-      app: { name, description: description ?? '' },
+      app: { name, description: description ?? '', id: appId },
       last: last ? { result: last.result ?? {}, inputs: last.inputs, run: runOf(last) } : {},
       view: view ?? {},
       answer,
@@ -168,7 +168,8 @@ export function AppView({
         case 'open': {
           const url = text(a.url, 2000).trim();
           // A download of what this app keeps (its records as CSV or JSON lines): from here, where the sign-in goes with it.
-          if (saved && [`/api/apps/${enc(appId)}/data/`, `/api/apps/${appId}/data/`].some((p) => url.startsWith(p)) && /[?&]format=(csv|jsonl)(&|$)/.test(url)) {
+          if (/^\/api\/apps\/[^/?#]+\/data\//.test(url) && /[?&]format=(csv|jsonl)(&|$)/.test(url)) {
+            if (!saved || ![`/api/apps/${enc(appId)}/data/`, `/api/apps/${appId}/data/`].some((p) => url.startsWith(p))) throw new Error(tr('This can’t be done here.'));
             const link = Object.assign(document.createElement('a'), { href: mu(url), download: '' });
             document.body.appendChild(link);
             link.click();
