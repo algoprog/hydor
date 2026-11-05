@@ -423,8 +423,14 @@ export function shareInbox(db: DB): InboxItem[] {
   const out: InboxItem[] = [];
   const done: [string, string][] = [];
   const old = Date.now() - REMEMBER;
+  // Each document once, however many of its comments wait (the inbox is asked every few seconds while open).
+  const seen = new Map<string, ReturnType<typeof openStates>>();
+  const statesOf = (id: string) => {
+    if (!seen.has(id)) seen.set(id, openStates(db, id));
+    return seen.get(id)!;
+  };
   for (const r of rows) {
-    const s = r.at > old ? openStates(db, r.page_id) : null;
+    const s = r.at > old ? statesOf(r.page_id) : null;
     if (!s?.open.get(r.cid)) {
       done.push([r.page_id, r.cid]);
       continue;
@@ -492,6 +498,14 @@ function routes(d: Deps) {
   });
 }
 
+/** The links of a project that was deleted stop (they already open nothing): they say so for a month, then go. */
+function stopOrphans(db: DB) {
+  shareTables(db);
+  try {
+    db.prepare('update project_shares set stopped_at = ? where stopped_at is null and space not in (select id from spaces)').run(Date.now());
+  } catch {}
+}
+
 export const sharing: Feature = {
   id: 'sharing',
   routes(d) {
@@ -499,5 +513,8 @@ export const sharing: Feature = {
     portalRoutes(d);
   },
   inbox: (d) => shareInbox(d.db),
+  event(e, d) {
+    if (e.t === 'feature' && e.id === 'spaces') stopOrphans(d.db);
+  },
 };
 

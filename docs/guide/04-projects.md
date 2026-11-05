@@ -28,10 +28,10 @@ The page has two tabs:
 
 Each project shows as a card:
 
-- a band of its colour with its mark: a rounded square in its colour with the first letter of its name (a group's mark has a second square behind it, and **Group** on its band);
+- a band of its colour with its mark: a rounded square in its colour with the first letter of its name (a group's mark has a second square behind it, and **Group** on its band), and in its corner **More** (⋯), the same menu as at the top of the project's page;
 - its name, and under it what it is about, or its folder when it has no description. A group says "Brings together" and the names of its projects;
 - what it holds: how many sessions, how many things in the Library, documents and skills;
-- how long ago one of its sessions was last at work, **New session**, which starts a session in it at once, and **More** (⋯), the same menu as at the top of its page.
+- how long ago one of its sessions was last at work, and **New session**, which starts a session in it at once.
 
 Click a card to open the project's own page, or type the project's name in the search box (Ctrl+K) to go straight there. With no projects yet, the page says what a project is for in three short parts, with **Make a project**.
 
