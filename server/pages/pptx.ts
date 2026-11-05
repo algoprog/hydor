@@ -1,7 +1,8 @@
 // A slide deck as a PowerPoint file (.pptx), written from the deck itself: each part a shape of its own that
 // stays editable in PowerPoint, Keynote, Google Slides and LibreOffice. Text boxes and shapes with their words
 // (paragraphs, bullets and numbers, runs' bold, colours, fonts and links), pictures (cropped as they show, their
-// colours adjusted), lines and arrows, tables (merged cells, cells' fills), charts as real charts with their numbers,
+// colours adjusted), lines and arrows, connectors (stuck to the shapes they join, straight or elbowed, as PowerPoint's
+// own), tables (merged cells, cells' fills), charts as real charts with their numbers,
 // groups as groups, icons as pictures that stay sharp (SVG, with a PNG beside it for older programs), equations as
 // pictures (their LaTeX as words where no picture could be made), videos from a device inside the file as PowerPoint's
 // own (with their still, played on a click), YouTube's and Vimeo's as their still linked to the video; the
@@ -11,8 +12,8 @@
 // theme's colours and fonts become the file's theme.
 //
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
-import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LineEl, MathEl, Para, Run, Slide, TableEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
-import { fontName, FONTS, hexColor, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
+import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LineEl, MathEl, Para, Run, Side, Slide, Stick, TableEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
+import { everyEl, fontName, FONTS, hexColor, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
 
 /** A picture ready for the file: PNG, JPEG or GIF bytes and its size in pixels. */
@@ -298,15 +299,47 @@ function imageXml(c: Ctx, e: ImageEl, href?: string): string {
   return `<p:pic><p:nvPicPr>${cNvPr}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}">${alpha}</a:blip>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(x, y, w, h, e.rot, flip)}${geom}${e.line ? lnXml(e.line, e.lineW, undefined, c.t, op) : ''}${e.shadow ? SHADOW : ''}</p:spPr></p:pic>`;
 }
 
+/** The connection site PowerPoint knows a side's middle by, for the shapes whose sites are certain; null for others (the end then stays where it is, not stuck, in the file). */
+function siteOf(e: El | undefined, at: Side): number | null {
+  if (!e) return null;
+  // A flipped picture's sides are swapped in its own frame.
+  const side: Side = e.type === 'image' && e.flipH && (at === 'l' || at === 'r') ? (at === 'l' ? 'r' : 'l') : e.type === 'image' && e.flipV && (at === 't' || at === 'b') ? (at === 't' ? 'b' : 't') : at;
+  if (e.type === 'text' || e.type === 'image' || e.type === 'icon' || (e.type === 'shape' && (e.shape === 'rect' || e.shape === 'round' || e.shape === 'diamond'))) return { t: 0, l: 1, b: 2, r: 3 }[side];
+  if (e.type === 'shape' && e.shape === 'ellipse') return { t: 0, l: 2, b: 4, r: 6 }[side];
+  return null;
+}
+
+/**
+ * A line, or a connector: straight, or elbowed as PowerPoint's own (one bend, or two halfway: turned a quarter when it
+ * leaves up or down), its ends stuck to the parts they are on (their ids in the file are put in once the slide is
+ * written, slideXml), so PowerPoint keeps them joined as the parts move.
+ */
 function lineXml(c: Ctx, e: LineEl): string {
-  const { cNvPr } = nvPr(c, e, 'Line');
+  const connector = !!(e.from || e.to || e.route);
+  const { cNvPr } = nvPr(c, e, connector ? 'Connector' : 'Line');
   const x = Math.min(e.x, e.x + e.w);
   const y = Math.min(e.y, e.y + e.h);
-  const flip = `${e.w < 0 ? ' flipH="1"' : ''}${e.h < 0 ? ' flipV="1"' : ''}`;
+  const flips = (h: boolean, v: boolean) => `${h ? ' flipH="1"' : ''}${v ? ' flipV="1"' : ''}`;
   const cap = (k: string | undefined, tag: string) => (k === 'arrow' ? `<a:${tag} type="triangle" w="med" len="med"/>` : k === 'dot' ? `<a:${tag} type="oval" w="med" len="med"/>` : '');
   const d = e.dash === 'dash' ? '<a:prstDash val="dash"/>' : e.dash === 'dot' ? '<a:prstDash val="sysDot"/>' : '';
   const ln = `<a:ln w="${emu(e.width)}"${e.dash === 'dot' ? ' cap="rnd"' : ''}>${fillXml(e.color ?? 'fg', c.t, e.opacity ?? 1)}${d}${cap(e.start, 'headEnd')}${cap(e.end, 'tailEnd')}</a:ln>`;
-  return `<p:cxnSp><p:nvCxnSpPr>${cNvPr}<p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr>${xfrm(x, y, Math.abs(e.w), Math.abs(e.h), undefined, flip)}<a:prstGeom prst="line"><a:avLst/></a:prstGeom>${ln}</p:spPr></p:cxnSp>`;
+  let box = xfrm(x, y, Math.abs(e.w), Math.abs(e.h), undefined, flips(e.w < 0, e.h < 0));
+  let prst = connector ? 'straightConnector1' : 'line';
+  if (e.route === 'elbow') {
+    const across = (at?: Side) => at === 'l' || at === 'r';
+    const h1 = e.from ? across(e.from.at) : e.to ? across(e.to.at) : true;
+    const h2 = e.to ? across(e.to.at) : h1;
+    prst = h1 === h2 ? 'bentConnector3' : 'bentConnector2';
+    if (!h1) {
+      // Leaving up or down: PowerPoint's path (across first) turned a quarter about the middle, its box's sides swapped.
+      const cx = e.x + e.w / 2;
+      const cy = e.y + e.h / 2;
+      box = xfrm(cx - Math.abs(e.h) / 2, cy - Math.abs(e.w) / 2, Math.abs(e.h), Math.abs(e.w), 90, flips(e.h < 0, e.w > 0));
+    }
+  }
+  const glue = (tag: 'stCxn' | 'endCxn', st?: Stick) => (st ? `@@${tag}|${st.el}|${st.at}@@` : '');
+  const nv = connector ? `<p:cNvCxnSpPr>${glue('stCxn', e.from)}${glue('endCxn', e.to)}</p:cNvCxnSpPr>` : '<p:cNvCxnSpPr/>';
+  return `<p:cxnSp><p:nvCxnSpPr>${cNvPr}${nv}<p:nvPr/></p:nvCxnSpPr><p:spPr>${box}<a:prstGeom prst="${prst}"><a:avLst/></a:prstGeom>${ln}</p:spPr></p:cxnSp>`;
 }
 
 function tableXml(c: Ctx, e: TableEl): string {
@@ -775,7 +808,13 @@ function bgXml(c: Ctx, s: Slide): { bg: string; under: string } {
 
 function slideXml(c: Ctx, s: Slide): string {
   const { bg, under } = bgXml(c, s);
-  const parts = s.els.map((e) => partXml(c, e)).join('') + footerXml(c, c.n - 1);
+  // Connectors' ends: the parts they are stuck to by their ids in the file, written by now, at the sites PowerPoint knows.
+  const all = everyEl(s.els);
+  const parts = (s.els.map((e) => partXml(c, e)).join('') + footerXml(c, c.n - 1)).replace(/@@(stCxn|endCxn)\|([A-Za-z0-9_-]+)\|([trbl])@@/g, (_m, tag: string, el: string, at: Side) => {
+    const id = c.ids.get(el);
+    const site = siteOf(all.find((x) => x.id === el), at);
+    return id !== undefined && site !== null ? `<a:${tag} id="${id}" idx="${site}"/>` : '';
+  });
   const grp = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
   return `${XML_HEAD}<p:sld ${NS}${s.hidden ? ' show="0"' : ''}><p:cSld>${bg}<p:spTree>${grp}${under}${parts}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transitionXml(s)}${timingXml(c, s)}</p:sld>`;
 }

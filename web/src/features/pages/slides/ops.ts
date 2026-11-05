@@ -4,6 +4,7 @@
 // the comments on a part that goes kept on its slide.
 import {
   everyEl,
+  facingSides,
   fitGroup,
   groupOf,
   layoutSlide,
@@ -23,7 +24,9 @@ import {
   type Para,
   type ShapeEl,
   type ShapeKind,
+  sidePoint,
   type Slide,
+  type Stick,
   type TableEl,
   type TextEl,
 } from '@shared/slides';
@@ -99,20 +102,32 @@ export function onSlide(s: Slide, e: El): El {
 /** The part of the slide itself a part is in (itself, or the outermost group around it). */
 export const topOf = (s: Slide, id: string): El | undefined => pathTo(s.els, id)?.[0] ?? s.els.find((e) => e.id === id);
 
-/** A copy of a part with new ids (its group's parts' too), keeping what Morph knows it by. */
-function renew(e: El): El {
-  const c = { ...e, id: newId(), key: e.key ?? e.id } as El;
-  return c.type === 'group' ? { ...c, els: c.els.map(renew) } : c;
+/** Copies of parts with new ids (their groups' parts' too), keeping what Morph knows them by; `ids` gets each old id's copy's. */
+function renew(els: El[], ids: Map<string, string> = new Map()): El[] {
+  return els.map((e) => {
+    const c = { ...e, id: newId(), key: e.key ?? e.id } as El;
+    ids.set(e.id, c.id);
+    return c.type === 'group' ? { ...c, els: renew(c.els, ids) } : c;
+  });
 }
 
-/** Every part of the deck has a new id (copies of slides and parts), its animations following; its comments stay with the slide copied. */
+/** Connectors among copies: an end stuck to a part copied with them sticks to its copy; one stuck to a part left behind is free. */
+function restick(els: El[], ids: Map<string, string>): El[] {
+  return els.map((e) => {
+    if (e.type === 'group') return { ...e, els: restick(e.els, ids) };
+    if (e.type !== 'line' || (!e.from && !e.to)) return e;
+    const { from, to, ...rest } = e;
+    const re = (st?: Stick) => (st && ids.has(st.el) ? { ...st, el: ids.get(st.el)! } : undefined);
+    const f = re(from);
+    const t = re(to);
+    return { ...rest, ...(f ? { from: f } : {}), ...(t ? { to: t } : {}) };
+  });
+}
+
+/** Every part of the deck has a new id (copies of slides and parts), its animations and connectors following; its comments stay with the slide copied. */
 function fresh(s: Slide): Slide {
   const ids = new Map<string, string>();
-  const els = s.els.map((e) => {
-    const c = renew(e);
-    ids.set(e.id, c.id);
-    return c;
-  });
+  const els = restick(renew(s.els, ids), ids);
   const { comments: _c, ...rest } = s;
   return { ...rest, id: newId(), els, anims: s.anims?.filter((a) => ids.has(a.el)).map((a) => ({ ...a, id: newId(), el: ids.get(a.el)! })) };
 }
@@ -228,8 +243,10 @@ export function removeEls(d: Deck, i: number, ids: string[]): Deck {
     const els = dropDeep(s.els, ids);
     const left = new Set(els.map((e) => e.id));
     const anims = s.anims?.filter((a) => left.has(a.el));
-    // The comments on a part that goes stay on the slide, their mark where the part's top-right corner was.
+    // The comments on a part that goes stay on the slide, their mark where the part's top-right corner was; the
+    // connectors stuck to it are free there.
     const gone = new Set(everyEl(s.els).map((e) => e.id).filter((id) => !everyEl(els).some((e) => e.id === id)));
+    const kept = gone.size ? restick(els, new Map(everyEl(els).map((e) => [e.id, e.id]))) : els;
     const comments = s.comments?.map((c) => {
       if (!c.el || !gone.has(c.el)) return c;
       const was = findEl(s.els, c.el);
@@ -237,16 +254,28 @@ export function removeEls(d: Deck, i: number, ids: string[]): Deck {
       const { el: _e, ...rest } = c;
       return { ...rest, x: Math.round(Math.min(W, Math.max(0, b.x + b.w))), y: Math.round(Math.max(0, b.y)) };
     });
-    return { ...s, els, ...(anims ? { anims } : {}), ...(comments ? { comments } : {}) };
+    return { ...s, els: kept, ...(anims ? { anims } : {}), ...(comments ? { comments } : {}) };
   });
 }
 
-/** Copies of parts, a little down and to the right of where they were (or where `at` puts them). */
+/** Copies of parts, a little down and to the right of where they were; connectors stay stuck to what was copied with them. */
 export function copies(els: El[], shift = 24): El[] {
-  return els.map((e) => {
-    const c = renew(e);
-    return { ...c, x: c.x + shift, y: c.y + shift };
-  });
+  const ids = new Map<string, string>();
+  return restick(renew(els, ids), ids).map((c) => ({ ...c, x: c.x + shift, y: c.y + shift }));
+}
+
+/** A connector: between two parts picked (from the first to the second, by the sides that face each other), or free in the slide's middle (its ends stick to parts once dragged onto them). */
+export function connector(d: Deck, i: number, elbow: boolean, picked: El[]): LineEl {
+  const h = heightOf(d);
+  const free: LineEl = { id: newId(), type: 'line', x: 440, y: Math.round(h / 2 - (elbow ? 80 : 0)), w: 400, h: elbow ? 160 : 0, width: 3, color: 'fg', end: 'arrow', ...(elbow ? { route: 'elbow' as const } : {}) };
+  const s = d.slides[i];
+  if (!s || picked.length !== 2 || picked.some((e) => e.type === 'line')) return free;
+  const a = onSlide(s, picked[0]);
+  const b = onSlide(s, picked[1]);
+  const [fa, fb] = facingSides(a, b);
+  const p1 = sidePoint(a, fa);
+  const p2 = sidePoint(b, fb);
+  return { ...free, x: p1.x, y: p1.y, w: p2.x - p1.x, h: p2.y - p1.y, from: { el: picked[0].id, at: fa }, to: { el: picked[1].id, at: fb } };
 }
 
 /** The parts' own list that holds every one of `ids` (the slide's, or a group's), with the group it is in. */

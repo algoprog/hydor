@@ -641,22 +641,52 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     const by = ay + y2;
     const ink = color(l.color, t, color('fg', t, '#000'));
     const root = svg('svg', { class: 'ns-shape', viewBox: `0 0 ${box.w} ${box.h}` });
-    const ang = Math.atan2(by - ay, bx - ax);
+    // Its path: straight, or an elbow connector's right angles (as shared/slides.ts elbowPoints makes them).
+    let pts = [
+      [ax, ay],
+      [bx, by],
+    ];
+    if (l.route === 'elbow') {
+      const across = (at: unknown) => at === 'l' || at === 'r';
+      const h1 = l.from ? across(l.from.at) : l.to ? across(l.to.at) : true;
+      const h2 = l.to ? across(l.to.at) : h1;
+      const mx = (ax + bx) / 2;
+      const my = (ay + by) / 2;
+      pts =
+        h1 && h2
+          ? [[ax, ay], [mx, ay], [mx, by], [bx, by]]
+          : !h1 && !h2
+            ? [[ax, ay], [ax, my], [bx, my], [bx, by]]
+            : h1
+              ? [[ax, ay], [bx, ay], [bx, by]]
+              : [[ax, ay], [ax, by], [bx, by]];
+      // A bend where the path does not turn (ends level with each other) is no bend.
+      pts = pts.filter((q, i) => i === 0 || q[0] !== pts[i - 1][0] || q[1] !== pts[i - 1][1]);
+      if (pts.length < 2) pts = [
+        [ax, ay],
+        [bx, by],
+      ];
+    }
+    const last = pts.length - 1;
+    // The arrows point along the first and the last stretch.
+    const angS = Math.atan2(pts[1][1] - ay, pts[1][0] - ax);
+    const angE = Math.atan2(by - pts[last - 1][1], bx - pts[last - 1][0]);
     const head = sw * 3.2 + 4;
     const cut = (cap: string | undefined) => (cap === 'arrow' ? head * 0.8 : 0);
-    const sx = ax + Math.cos(ang) * cut(l.start);
-    const sy = ay + Math.sin(ang) * cut(l.start);
-    const ex = bx - Math.cos(ang) * cut(l.end);
-    const ey = by - Math.sin(ang) * cut(l.end);
-    root.appendChild(svg('line', { x1: sx, y1: sy, x2: ex, y2: ey, stroke: ink, 'stroke-width': sw, 'stroke-linecap': l.dash === 'dot' ? 'round' : 'butt', ...(l.dash === 'dash' ? { 'stroke-dasharray': `${sw * 3} ${sw * 2}` } : l.dash === 'dot' ? { 'stroke-dasharray': `0.1 ${sw * 2}` } : {}) }));
+    const drawn = pts.map((q) => [...q]);
+    drawn[0] = [ax + Math.cos(angS) * cut(l.start), ay + Math.sin(angS) * cut(l.start)];
+    drawn[last] = [bx - Math.cos(angE) * cut(l.end), by - Math.sin(angE) * cut(l.end)];
+    const stroke = { stroke: ink, 'stroke-width': sw, 'stroke-linecap': l.dash === 'dot' ? 'round' : 'butt', ...(l.dash === 'dash' ? { 'stroke-dasharray': `${sw * 3} ${sw * 2}` } : l.dash === 'dot' ? { 'stroke-dasharray': `0.1 ${sw * 2}` } : {}) };
+    if (drawn.length === 2) root.appendChild(svg('line', { x1: drawn[0][0], y1: drawn[0][1], x2: drawn[1][0], y2: drawn[1][1], ...stroke }));
+    else root.appendChild(svg('polyline', { points: drawn.map((q) => q.join(',')).join(' '), fill: 'none', 'stroke-linejoin': 'miter', ...stroke }));
     const cap = (kind: string | undefined, x: number, y: number, a: number) => {
       if (kind === 'arrow') {
         const p = (d: number, s: number) => `${x + Math.cos(a) * d - Math.sin(a) * s},${y + Math.sin(a) * d + Math.cos(a) * s}`;
         root.appendChild(svg('path', { d: `M${p(0, 0)}L${p(-head, head * 0.55)}L${p(-head, -head * 0.55)}Z`, fill: ink }));
       } else if (kind === 'dot') root.appendChild(svg('circle', { cx: x, cy: y, r: sw * 1.6 + 1, fill: ink }));
     };
-    cap(l.end, bx, by, ang);
-    cap(l.start, ax, ay, ang + Math.PI);
+    cap(l.end, bx, by, angE);
+    cap(l.start, ax, ay, angS + Math.PI);
     return { root, box };
   };
 

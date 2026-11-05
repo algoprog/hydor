@@ -14,7 +14,7 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { Zip } from '../documents/zip.ts';
 import { extractText } from '../documents/extract.ts';
 import { canCapture } from '../capture/index.ts';
-import { deckSources, deckText, deckVideos, fitGroup, footerOn, groupOf, isDeckText, normalizeDeck, scaleEls, turnedBox, ungroupEls, videoSrc, type Deck, type El, type GroupEl } from '../../shared/slides.ts';
+import { deckSources, deckText, deckVideos, fitGroup, footerOn, groupOf, isDeckText, normalizeDeck, reconnect, scaleEls, turnedBox, ungroupEls, videoSrc, type Deck, type El, type GroupEl } from '../../shared/slides.ts';
 import { slidesRuntime } from '../../shared/slides-runtime.ts';
 import { pptxFile, type Picture } from './pptx.ts';
 import { deckPage, lucideIcon, RUNTIME_SRC } from './slides.ts';
@@ -560,6 +560,51 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   const threaded = normalizeDeck({ slides: [{ els: [], comments: [{ id: 'q', text: 'Why?', replies: [{ by: 'agent', text: 'Because' }] }] }] });
   const cq = new Zip(pptxFile(threaded, { title: 'T', picture: () => null })).read('ppt/comments/comment1.xml')?.toString() ?? '';
   ok(/<p:cm authorId="1"[^>]*><p:pos [^>]*\/><p:text>Because<\/p:text><p:extLst><p:ext uri="\{C676402C-5697-4E1C-873F-D02D1690AC5C\}"><p15:threadingInfo [^>]*><p15:parentCm authorId="0" idx="1"\/>/.test(cq), 'a reply is threaded to its comment');
+}
+
+// ---- connectors -------------------------------------------------------------------------------------------------
+{
+  const d = normalizeDeck({
+    slides: [
+      {
+        els: [
+          { id: 'a', type: 'shape', shape: 'rect', x: 100, y: 100, w: 200, h: 100 },
+          { id: 'b', type: 'shape', shape: 'ellipse', x: 600, y: 300, w: 200, h: 100 },
+          { id: 'c', type: 'shape', shape: 'rect', x: 100, y: 500, w: 200, h: 100 },
+          { id: 'j1', type: 'connector', from: 'a', to: 'b', end: 'arrow' },
+          { id: 'j2', type: 'line', from: { el: 'a', at: 'b' }, to: { el: 'c', at: 't' }, route: 'elbow' },
+          { id: 'j3', type: 'line', from: 'ghost', to: 'j1', x: 10, y: 10, w: 50, h: 0 },
+          { id: 'j4', type: 'line', from: { el: 'a', at: 'b' }, to: { el: 'b', at: 'l' }, route: 'elbow' },
+        ],
+      },
+    ],
+  });
+  const els = d.slides[0].els;
+  const j1 = els.find((e) => e.id === 'j1') as Extract<El, { type: 'line' }>;
+  const j2 = els.find((e) => e.id === 'j2') as Extract<El, { type: 'line' }>;
+  const j3 = els.find((e) => e.id === 'j3') as Extract<El, { type: 'line' }>;
+  ok(j1.from?.at === 'r' && j1.to?.at === 'l' && j1.x === 300 && j1.y === 150 && j1.w === 300 && j1.h === 200, 'a connector between two parts sticks to the sides that face each other, its ends where they are');
+  ok(j2.route === 'elbow' && j2.x === 200 && j2.y === 200 && j2.w === 0 && j2.h === 300, 'an elbow connector keeps the sides it was given');
+  ok(!j3.from && !j3.to && j3.x === 10 && j3.w === 50, 'an end on no part (or on a line) is free');
+  // A part moved takes its connectors along.
+  const moved = { ...d.slides[0], els: d.slides[0].els.map((e) => (e.id === 'b' ? { ...e, x: 700, y: 0, rot: 90 } : e)) };
+  const again = reconnect(moved).els.find((e) => e.id === 'j1') as Extract<El, { type: 'line' }>;
+  ok(near(again.x + again.w, 800) && near(again.y + again.h, -50), 'a part moved and turned takes the end stuck to it along');
+  ok(JSON.stringify(normalizeDeck(JSON.parse(deckText(d)))) === JSON.stringify(d), 'a deck with connectors reads back the same');
+  // In PowerPoint: connectors stuck to the shapes, as its own.
+  const x = slideXml(pptxFile(d, { title: 'T', picture: () => null }), 1);
+  const idOf2 = (name: string) => new RegExp(`<p:cNvPr id="(\\d+)" name="${name}"`).exec(x)?.[1];
+  const a = /<p:cNvPr id="(\d+)" name="Shape 1"\/>/.exec(x)?.[1];
+  const b = /<p:cNvPr id="(\d+)" name="Shape 2"\/>/.exec(x)?.[1];
+  const c = /<p:cNvPr id="(\d+)" name="Shape 3"\/>/.exec(x)?.[1];
+  ok(!!idOf2('Connector \\d+') && x.includes(`<a:stCxn id="${a}" idx="3"/><a:endCxn id="${b}" idx="2"/>`) && x.includes('prst="straightConnector1"'), 'a straight connector is stuck to the right of a rectangle and the left of an oval');
+  ok(x.includes(`<a:stCxn id="${a}" idx="2"/><a:endCxn id="${c}" idx="0"/>`) && /<a:xfrm rot="5400000"[^>]*><a:off [^>]*\/><a:ext cx="2857500" cy="0"\/><\/a:xfrm><a:prstGeom prst="bentConnector3">/.test(x), 'an elbow from a bottom to a top is PowerPoint’s elbow turned a quarter');
+  ok(/<a:xfrm rot="5400000"[^>]*><a:off [^>]*\/><a:ext [^>]*\/><\/a:xfrm><a:prstGeom prst="bentConnector2">/.test(x), 'one from a bottom to a side bends once');
+  // An agent's connector.
+  const saved = await run('save_slides', { title: 'Flow', slides: [{ els: [{ id: 'p', type: 'shape', x: 100, y: 300, w: 200, h: 100, text: 'Plan' }, { id: 'q', type: 'shape', x: 700, y: 300, w: 200, h: 100, text: 'Do' }, { type: 'connector', from: 'p', to: 'q', end: 'arrow', route: 'elbow' }] }] });
+  const flow = (await req('GET', `/api/pages/${idOf(saved.text)}`)).json().model as Deck;
+  const fl = flow.slides[0].els.find((e) => e.type === 'line') as Extract<El, { type: 'line' }>;
+  ok(fl.from?.el === 'p' && fl.to?.el === 'q' && fl.x === 300 && fl.y === 350 && fl.w === 400 && fl.route === 'elbow', 'an agent joins two parts with a connector by their ids');
 }
 
 // ---- the deck's own page, and agents ------------------------------------------------------------------------------

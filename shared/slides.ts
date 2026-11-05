@@ -207,6 +207,16 @@ export interface Adjust {
 
 export type Cap = 'none' | 'arrow' | 'dot';
 
+/** A side of a part, the middle of which a connector's end sticks to: top, right, bottom, left. */
+export type Side = 't' | 'r' | 'b' | 'l';
+export const SIDES: Side[] = ['t', 'r', 'b', 'l'];
+
+/** Where a connector's end is stuck: a part of its slide (by its id, in a group too), at the middle of one of its sides. */
+export interface Stick {
+  el: string;
+  at: Side;
+}
+
 export interface LineEl extends Base {
   type: 'line';
   color?: string;
@@ -214,6 +224,11 @@ export interface LineEl extends Base {
   dash?: 'solid' | 'dash' | 'dot';
   start?: Cap;
   end?: Cap;
+  /** A connector's ends stuck to parts of the slide: they follow them as they move, size and turn (x, y, w, h say where they are now). */
+  from?: Stick;
+  to?: Stick;
+  /** Its path: elbowed (across and down at right angles, as PowerPoint's elbow connectors), else straight. */
+  route?: 'elbow';
 }
 
 export interface TableEl extends Base {
@@ -774,6 +789,95 @@ export function scaleEls(els: El[], kx: number, ky: number): El[] {
   });
 }
 
+// ---- connectors -------------------------------------------------------------------------------------------------
+
+/** A part as it shows on the slide: one in a group placed where it shows, turned with its groups; null when it is not there. */
+export function partOnSlide(els: El[], id: string): El | null {
+  for (const e of els) {
+    if (e.id === id) return e;
+    if (e.type === 'group') {
+      const inner = partOnSlide(e.els, id);
+      if (inner) return ungroupEls({ ...e, els: [inner] })[0];
+    }
+  }
+  return null;
+}
+
+/** The middle of a side of a part (its box, turned as it is): where a connector's end sticks to it. */
+export function sidePoint(e: El, at: Side): { x: number; y: number } {
+  const cx = e.x + e.w / 2;
+  const cy = e.y + e.h / 2;
+  const dx = at === 'r' ? e.w / 2 : at === 'l' ? -e.w / 2 : 0;
+  const dy = at === 'b' ? e.h / 2 : at === 't' ? -e.h / 2 : 0;
+  const a = rad(e.rot);
+  return { x: r2(cx + dx * Math.cos(a) - dy * Math.sin(a)), y: r2(cy + dx * Math.sin(a) + dy * Math.cos(a)) };
+}
+
+/** The sides of two parts (or of a part and a point) that face each other: across when they are more apart across, else up and down. */
+export function facingSides(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): [Side, Side] {
+  const dx = b.x + b.w / 2 - (a.x + a.w / 2);
+  const dy = b.y + b.h / 2 - (a.y + a.h / 2);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? ['r', 'l'] : ['l', 'r'];
+  return dy >= 0 ? ['b', 't'] : ['t', 'b'];
+}
+
+const across = (at: Side | undefined) => at === 'l' || at === 'r';
+
+/**
+ * An elbow connector's path from (x1, y1) to (x2, y2): it leaves across or up and down as the side it starts from does
+ * (across when free), and comes in as the side it ends on does; across both ways it turns halfway across, up and down
+ * both ways halfway down, else once. PowerPoint's own elbow connectors take the same paths.
+ */
+export function elbowPoints(x1: number, y1: number, x2: number, y2: number, from?: Side, to?: Side): number[][] {
+  const h1 = from ? across(from) : to ? across(to) : true;
+  const h2 = to ? across(to) : h1;
+  if (h1 && h2) return [[x1, y1], [(x1 + x2) / 2, y1], [(x1 + x2) / 2, y2], [x2, y2]];
+  if (!h1 && !h2) return [[x1, y1], [x1, (y1 + y2) / 2], [x2, (y1 + y2) / 2], [x2, y2]];
+  return h1 ? [[x1, y1], [x2, y1], [x2, y2]] : [[x1, y1], [x1, y2], [x2, y2]];
+}
+
+/**
+ * A slide's connectors with their ends where the parts they are stuck to are now (a part turned, sized or moved takes them
+ * along); those in groups move with their group. The same slide when nothing moved.
+ */
+export function reconnect(s: Slide): Slide {
+  let changed = false;
+  const els = s.els.map((e) => {
+    if (e.type !== 'line' || (!e.from && !e.to)) return e;
+    const a = e.from ? partOnSlide(s.els, e.from.el) : null;
+    const b = e.to ? partOnSlide(s.els, e.to.el) : null;
+    const p1 = a && e.from ? sidePoint(a, e.from.at) : { x: e.x, y: e.y };
+    const p2 = b && e.to ? sidePoint(b, e.to.at) : { x: e.x + e.w, y: e.y + e.h };
+    const next = { x: r2(p1.x), y: r2(p1.y), w: r2(p2.x - p1.x), h: r2(p2.y - p1.y) };
+    if (next.x === e.x && next.y === e.y && next.w === e.w && next.h === e.h) return e;
+    changed = true;
+    return { ...e, ...next };
+  });
+  return changed ? { ...s, els } : s;
+}
+
+/** A slide's connectors checked: each end on a part of the slide (not a line, nor itself), on a side (the one facing the other end when not said). */
+function checkConnectors(els: El[]): El[] {
+  const fix = (list: El[]): El[] =>
+    list.map((e) => {
+      if (e.type === 'group') return { ...e, els: fix(e.els) };
+      if (e.type !== 'line' || (!e.from && !e.to)) return e;
+      const part = (st?: Stick) => (st && st.el !== e.id ? partOnSlide(els, st.el) : null);
+      const a = part(e.from);
+      const b = part(e.to);
+      const ok = (p: El | null) => !!p && p.type !== 'line';
+      const out: LineEl = { ...e };
+      delete out.from;
+      delete out.to;
+      // The free end, as a point, for the side that faces it.
+      const free = (x: number, y: number) => ({ x, y, w: 0, h: 0 });
+      if (ok(a) && e.from) out.from = { el: a!.id, at: e.from.at ?? facingSides(a!, ok(b) ? b! : free(e.x + e.w, e.y + e.h))[0] };
+      if (ok(b) && e.to) out.to = { el: b!.id, at: e.to.at ?? facingSides(ok(a) ? a! : free(e.x, e.y), b!)[1] };
+      return out;
+    });
+  return fix(els);
+}
+
 /** What a slide is called: its title's words, else its first words. */
 export function slideTitle(s: Slide): string {
   const texts = everyEl(s.els).filter((e): e is TextEl | ShapeEl => (e.type === 'text' || e.type === 'shape') && plainText(e.paras).trim().length > 1);
@@ -1327,7 +1431,7 @@ interface Budget {
 function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, depth = 0, budget: Budget = { n: 0 }): El | null {
   if (!isObj(e)) return null;
   if (++budget.n > SLIDE_LIMITS.els * 3) return null;
-  const type = e.type === 'textbox' ? 'text' : e.type === 'picture' ? 'image' : e.type === 'arrow' ? 'line' : e.type === 'equation' ? 'math' : e.type;
+  const type = e.type === 'textbox' ? 'text' : e.type === 'picture' ? 'image' : e.type === 'arrow' || e.type === 'connector' || e.type === 'elbow' ? 'line' : e.type === 'equation' ? 'math' : e.type;
   if (type === 'text' || type === 'shape') {
     const b = base(e, used, H);
     const t: Partial<TextProps> = {};
@@ -1365,6 +1469,17 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, dep
   }
   if (type === 'line') {
     const l: LineEl = { ...base(e, used, H, true), type: 'line', width: num(e.width, 0.5, 60, 3) };
+    // A connector's ends, by a part's id (its side, else the side that faces the other end, once the slide's parts are known).
+    const stick = (v: unknown): Stick | undefined => {
+      const el = typeof v === 'string' ? v : isObj(v) && typeof v.el === 'string' ? v.el : '';
+      if (!/^[A-Za-z0-9_-]{1,24}$/.test(el)) return undefined;
+      return { el, at: (isObj(v) ? opt(v.at ?? v.side, SIDES) : undefined) as Side };
+    };
+    const from = stick(e.from);
+    const to = stick(e.to);
+    if (from) l.from = from;
+    if (to) l.to = to;
+    if (e.route === 'elbow' || e.elbow === true || e.type === 'elbow') l.route = 'elbow';
     const color = cleanColor(e.color);
     if (color) l.color = color;
     const dash = opt(e.dash, DASHES);
@@ -1638,7 +1753,7 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts, ci
     const a = isObj(raw) ? elAnim(raw.anim, el.id) : null;
     if (a) pending.push(a);
   }
-  s.els = els;
+  s.els = checkConnectors(els);
   const ids = new Set(els.map((e) => e.id));
   const anims = [...(Array.isArray(v.anims) ? v.anims : []), ...pending]
     .slice(0, SLIDE_LIMITS.anims)
@@ -1661,7 +1776,7 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts, ci
   if (v.nofooter === true) s.nofooter = true;
   const comments = slideComments(v.comments, new Set(everyEl(els).map((e) => e.id)), H, cids);
   if (comments.length) s.comments = comments;
-  return s;
+  return reconnect(s);
 }
 
 function footer(v: unknown): Footer | undefined {

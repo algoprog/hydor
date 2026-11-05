@@ -1,5 +1,5 @@
 // The slides editor's side panel, in four tabs. Format: the part picked (its place and size, its words' look, its
-// fill and border, a shape's kind, a picture's fit, crop and colours, a line's ends, a table's or a chart's look and
+// fill and border, a shape's kind, a picture's fit, crop and colours, a line's ends and path, a table's or a chart's look and
 // numbers, an icon's colour, an equation's LaTeX, a video's address and how it plays, a group's parts, a link) or the
 // parts picked lined up, spread and grouped. Animate: the slide's animations in their order, each one's effect,
 // start, timing and direction, and a new one for the part picked. Slide: its background, its transition (Morph too),
@@ -565,6 +565,19 @@ function LineLook({ el, theme, set }: { el: LineEl; theme: Theme; set: (patch: P
       <Field label="Ends with">
         <Select value={el.end ?? 'none'} onChange={(v) => set({ end: v === 'none' ? undefined : (v as 'arrow' | 'dot') })} options={caps} />
       </Field>
+      <Field label="Path">
+        <Choice
+          value={el.route ?? 'straight'}
+          onChange={(v) => set({ route: v === 'elbow' ? 'elbow' : undefined } as Partial<El>)}
+          options={[
+            { value: 'straight', label: 'Straight' },
+            { value: 'elbow', label: 'Elbow' },
+          ]}
+        />
+      </Field>
+      <p className="text-[11.5px] leading-snug text-fg-3">
+        {el.from || el.to ? 'Its ends stay on the parts they are stuck to as those move; drag an end away to free it.' : 'Drag an end onto a part to stick it to the middle of one of its sides.'}
+      </p>
     </Section>
   );
 }
