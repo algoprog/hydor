@@ -12,6 +12,9 @@ import { applyDeckEdits } from '../../shared/deck-edits.ts';
 import { draftDeck } from '../../shared/draft-deck.ts';
 import { DraftMemo, alike } from '../../shared/page-drafts.ts';
 import { normalizeDeck, type Deck } from '../../shared/slides.ts';
+import { applyBookEdits } from '../../shared/sheet-edits.ts';
+import { draftBook } from '../../shared/draft-book.ts';
+import { normalizeBook } from '../../shared/sheets.ts';
 import { readPartial } from '../../shared/partial-json.ts';
 import type { Deps } from '../features/types.ts';
 import { draftsOf, draftsOfPage, endDrafts, feedDraft, settleDraft } from './drafts.ts';
@@ -225,6 +228,64 @@ const textOf = (d: Doc) => d.blocks.map(blockText).join('\n');
   const de = draftDeck(base, readPartial(ej.slice(0, -10)), new DraftMemo())!;
   ok(de.model.slides.length === 12 && de.model.slides[4].id === base.slides[4].id && de.mark?.kind === 'slides' && de.mark.slide === 4, 'a slide being changed shows in its place as far as it has come');
   ok(de.model.slides.filter((x, i) => x === base.slides[i]).length === 11, 'and the others are the version’s own');
+}
+
+// ---- spreadsheets: the version being written, and changes to some cells ------------------------------------------
+{
+  const rowsOf = (n: number, k: number) => Array.from({ length: n }, (_, i) => [`Line ${i + 1}`, (i * 7 + k) % 100, (i * 3 + k) % 50, `=B${i + 2}+C${i + 2}`]);
+  const raw = (k: number) => ({ name: 'Budget', header: true, rows: [['Item', 'A', 'B', 'Total'], ...rowsOf(30, k)], formats: { 'B:D': 'currency' } });
+  const base = normalizeBook({ sheets: [raw(1), { name: 'Notes', rows: [['Keep me']] }] });
+  const json = JSON.stringify({ id: '0123456789', title: 'Budget', sheets: [raw(2), { name: 'Notes', rows: [['Keep me']] }] });
+  const memo = new DraftMemo();
+  const cut = json.indexOf('"Line 12"') + 4;
+  const mid = draftBook(base, readPartial(json.slice(0, cut)), memo)!;
+  const sh = mid.model.sheets[0];
+  ok(mid.mark?.kind === 'sheet' && mid.mark.cell === 'A13' && mid.mark.sheet === base.sheets[0].id, 'the cell being written is marked, on its sheet (the same sheet, by its name)');
+  ok(sh.cells.B12?.v === (10 * 7 + 2) % 100 && sh.cells.B20?.v === base.sheets[0].cells.B20?.v, 'cells written so far are the call’s, those not reached yet the version’s');
+  ok(sh.cells.B12?.s?.fmt === 'currency', 'a cell written over keeps its look until the call says how its cells look');
+  ok(mid.model.sheets.length === 2 && mid.model.sheets[1] === base.sheets[1], 'the sheets not reached yet are the version’s own');
+  const typing = JSON.stringify({
+    id: '0123456789',
+    sheets: [
+      {
+        name: 'Budget',
+        rows: [
+          ['Item', 'A', 'B', 'Total'],
+          ['Line 1', 1, 2, '=B2+C'],
+        ],
+      },
+    ],
+  }).slice(0, -6);
+  const t = draftBook(base, readPartial(typing), new DraftMemo())!;
+  ok(t.model.sheets[0].cells.D2?.v === '=B2+C', 'a formula still being typed shows as its words, not as an error');
+  const end = draftBook(base, readPartial(json), memo)!;
+  const want = normalizeBook(JSON.parse(json));
+  ok(JSON.stringify(end.model.sheets[0].cells) === JSON.stringify(want.sheets[0].cells) && end.model.sheets[1] === base.sheets[1], 'written whole: the cells the call says; an unchanged sheet is the version’s own');
+  ok(draftBook(null, readPartial('{"title":"New","sheets":[{"name":"S","rows":[[1,2],[3'), new DraftMemo())!.model.sheets[0].cells.B1?.v === 2, 'a new spreadsheet grows row by row');
+  // Changes to some cells.
+  const e = applyBookEdits(base, [{ sheet: 'budget', cells: { B3: 999, C3: null } }, { cells: { A40: 'Added' } }, { sheet: 'Totals', rows: [['Sum', '=SUM(Budget!D2:D31)']] }]);
+  const after = normalizeBook({ sheets: e.sheets });
+  ok(after.sheets[0].cells.B3?.v === 999 && !after.sheets[0].cells.C3 && after.sheets[0].cells.A40?.v === 'Added', 'an update goes on top of its sheet (named in any case, or the first): null empties a cell, two updates of one sheet both count');
+  ok(after.sheets[0].cells.B4?.v === base.sheets[0].cells.B4?.v && after.sheets[0].cells.B4?.s?.fmt === 'currency' && after.sheets[0].id === base.sheets[0].id, 'what it does not give stays as it was (values, looks, its id)');
+  ok(after.sheets.length === 3 && after.sheets[2].name === 'Totals' && e.sheets[1] === base.sheets[1], 'a sheet named that is not there is added; the others are the version’s own');
+  const uj = JSON.stringify({
+    id: '0123456789',
+    update: [
+      {
+        sheet: 'Budget',
+        start: 'B5',
+        rows: [
+          [71, 72],
+          [81, 82],
+        ],
+      },
+    ],
+  });
+  const ud = draftBook(base, readPartial(uj.slice(0, uj.indexOf('81') + 2) + ','), new DraftMemo())!;
+  ok(
+    ud.model.sheets[0].cells.B5?.v === 71 && ud.model.sheets[0].cells.B6?.v === 81 && ud.model.sheets[0].cells.B10?.v === base.sheets[0].cells.B10?.v && ud.mark?.kind === 'sheet',
+    'an update being written shows on top of its sheet, the rest as it was',
+  );
 }
 
 // ---- the server's drafts of a save -------------------------------------------------------------------------------
