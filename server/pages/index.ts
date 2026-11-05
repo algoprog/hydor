@@ -45,7 +45,7 @@ import { fontFile, fontsCss } from './fonts.ts';
 import { agentDoc, docPage, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
 import { normalizeDoc } from '../../shared/docs.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
-import { agentBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
+import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
 import { openFile, saveFile } from './filemodel.ts';
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
@@ -250,7 +250,8 @@ const SAVE_SHEET: RunTool = {
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'sheet');
     const { id: _id, title: _title, ...rest } = a;
-    const { book, notes } = await agentBook(rest, ctx.cwd);
+    // The version it changes: its comments' threads stay as they are, changed only by the comments asked for.
+    const { book, notes } = await agentBook(rest, ctx.cwd, id ? readBook(pageSource(ctx.deps.db, id)!.text) : undefined);
     const p = keepModel(ctx, id, 'sheet', a.title, book);
     const n = book.sheets.length;
     return [

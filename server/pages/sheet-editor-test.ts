@@ -12,7 +12,7 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
-import { accountingParts, adjustForDelete, adjustForInsert, bookText, chartBox, cleanBorder, codeColor, computeBook, formatValue, inputText, normalizeBook, parseInput, renameSheet, sheetSizes, type Workbook } from '../../shared/sheets.ts';
+import { accountingParts, adjustForDelete, adjustForInsert, bookOutline, bookText, chartBox, cleanBorder, codeColor, computeBook, formatValue, inputText, normalizeBook, parseInput, renameSheet, sheetSizes, type Workbook } from '../../shared/sheets.ts';
 import { allowed, CondFormats, filterHidden, hiddenRows, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, xlsxOfBook } from './sheets.ts';
@@ -36,6 +36,8 @@ const ok = (cond: unknown, what: string) => {
     console.log(`FAIL ${what}`);
   }
 };
+
+const bookOutlineOf = (b: Workbook) => bookOutline(b, computeBook(b));
 
 // ---- number formats ------------------------------------------------------------------------------------------
 {
@@ -260,6 +262,50 @@ const sh = book.sheets[0];
   ok(bookForAgent(bookText(kb)).includes('a Kanban board of the table at A1 grouped by column D, which the sheet opens on'), 'get_page says it has a board');
 }
 
+// ---- comments: threads on cells -----------------------------------------------------------------------------------
+{
+  const at = Date.UTC(2026, 10, 5, 10, 0);
+  const cm = normalizeBook({
+    sheets: [
+      {
+        name: 'C',
+        rows: [['Item', 'Cost'], ['Rent', 900], ['Food', 300]],
+        notes: { B3: 'Rough guess' },
+        comments: [
+          { id: 'k1', cell: 'B2', text: 'Is this per month?', by: 'user', at, replies: [{ id: 'k1r', by: 'agent', text: 'Yes, monthly.', at: at + 60_000 }] },
+          { id: 'k2', cell: 'b3', text: 'Too low?', at, resolved: true },
+          { id: 'k3', cell: 'B2', text: 'And the deposit?', at: at + 120_000 },
+          { cell: 'nope', text: 'x' },
+          { id: 'k4', cell: 'A9', text: '' },
+        ],
+      },
+      { name: 'D', rows: [['x']], comments: [{ id: 'k1', cell: 'A1', text: 'Same id elsewhere' }] },
+    ],
+  });
+  const [s1, s2] = cm.sheets;
+  ok(s1.comments?.length === 2 && s1.comments[0].cell === 'B2' && s1.comments[0].replies?.length === 2 && s1.comments[0].replies[1].text === 'And the deposit?' && s1.comments[1].cell === 'B3' && s1.comments[1].resolved === true, 'comments: one thread a cell (a second joins it), on cells only, with words');
+  ok(s2.comments?.[0].id !== 'k1', 'and an id not twice in the workbook');
+  const ins = adjustForInsert(cm, s1.id, 'row', 1, 1).sheets[0].comments!;
+  const del = adjustForDelete(cm, s1.id, 'row', 1, 1).sheets[0].comments!;
+  ok(ins[0].cell === 'B3' && ins[1].cell === 'B4' && del.length === 1 && del[0].cell === 'B2', 'a comment follows its cell; one whose row is taken out goes');
+  ok(bookOutlineOf(cm).includes('2 comments (1 open)'), 'the outline counts them');
+  // Excel: threaded comments, their plain copies, and a note beside a comment as one note.
+  const z = new Zip(xlsxOfBook(cm, 'C'));
+  const tc = z.text('xl/threadedComments/threadedComment1.xml') ?? '';
+  const legacy = z.text('xl/comments1.xml') ?? '';
+  ok(tc.includes('<threadedComment ref="B2" dT="2026-11-05T10:00:00.000" personId="{6F1C3A2B-0000-4000-8000-0000000000A1}"') && /parentId="\{00000001-0000-4000-8000-000000000001\}"><text>Yes, monthly.<\/text>/.test(tc) && !tc.includes('ref="B3"'), 'threaded comments with their replies, a cell with a note left to the note');
+  ok(legacy.includes('xr:uid="{00000001-0000-4000-8000-000000000001}"') && legacy.includes('<author>tc={00000001-0000-4000-8000-000000000001}</author>') && legacy.includes('[Threaded comment]') && legacy.includes('Rough guess\n\nComment:\n    Too low?'), 'their plain copies for programs that know only notes; a note and a comment on one cell as one note');
+  ok((z.text('[Content_Types].xml') ?? '').includes('threadedcomments+xml') && z.has('xl/persons/person.xml') && (z.text('xl/_rels/workbook.xml.rels') ?? '').includes('relationships/person') && (z.text('xl/worksheets/_rels/sheet1.xml.rels') ?? '').includes('relationships/threadedComment'), 'with the people who wrote them, linked as Excel links them');
+  const back = importBook(xlsxOfBook(cm, 'C'), 'C.xlsx');
+  const bc = back.book.sheets[0].comments ?? [];
+  ok(bc.length === 1 && bc[0].cell === 'B2' && bc[0].text === 'Is this per month?' && bc[0].by === 'user' && bc[0].at === at && bc[0].replies?.[0].by === 'agent' && bc[0].replies[1].text === 'And the deposit?', 'read back: the thread, who wrote each part and when');
+  ok(back.book.sheets[0].cells.B3.note?.startsWith('Rough guess') && !back.book.sheets[0].cells.B2.note && back.loses?.length === 0, 'the note with a comment comes back as a note; a thread’s plain copy is no note');
+  // A file with a threaded comment's plain copy only (no thread part): the thread comes from its words.
+  const plain = zipParts(z.names().filter((n) => !n.includes('threadedComment') && !n.includes('persons')).map((name) => ({ name, data: z.read(name)! })));
+  const pc = importBook(plain, 'P.xlsx').book.sheets[0].comments ?? [];
+  ok(pc.length === 1 && pc[0].text === 'Is this per month?' && pc[0].replies?.map((r) => r.text).join('|') === 'Yes, monthly.|And the deposit?', 'a plain copy alone comes back as its thread');
+}
+
 // ---- Excel files: written and read back ---------------------------------------------------------------------------
 {
   const calc = computeBook(book);
@@ -482,6 +528,20 @@ const sh = book.sheets[0];
   changed.sheets[0].merges = ['B8:C8'];
   const r = await req('POST', `/api/pages/${id}/versions`, { model: changed, base: 1 });
   ok(r.json().page?.version === 2 && (await req('GET', `/api/pages/${id}`)).json().model.sheets[0].merges[0] === 'B8:C8', 'the editor’s changes to them are saved as a version');
+  // Comments through the tools: an agent answers and adds them; the threads it sends back are left as they were.
+  const withComments = structuredClone(model);
+  withComments.sheets[0].comments = [{ id: 'u1', cell: 'C3', by: 'user', text: 'Why 12 hours?', at: 1_790_000_000_000 }];
+  await req('POST', `/api/pages/${id}/versions`, { model: withComments, base: 2 });
+  const listed = await tools.get_page.run({ id }, ctx);
+  const listedText = typeof listed === 'string' ? listed : listed.text;
+  ok(listedText.includes('- u1 · open · Work!C3 · the user') && listedText.includes('"reply"'), 'get_page lists the comments, and how to answer them');
+  const forged = { ...raw, sheets: raw.sheets.map((x, i) => (i ? x : { ...x, comments: [{ id: 'u1', cell: 'C3', by: 'user', text: 'Forged' }] })) };
+  const answered = await tools.save_sheet.run({ id, title: 'Work', ...forged, comments: [{ id: 'u1', reply: 'Building takes longest.', resolve: true }, { sheet: 'Lists', cell: 'A2', text: 'Is Green still sold?' }, { id: 'zz', reply: 'x' }] }, ctx);
+  const answeredText = typeof answered === 'string' ? answered : answered.text;
+  const after = (await req('GET', `/api/pages/${id}`)).json().model as Workbook;
+  const u1 = after.sheets[0].comments?.[0];
+  ok(u1?.text === 'Why 12 hours?' && u1.by === 'user' && u1.resolved === true && u1.replies?.[0].by === 'agent' && u1.replies[0].text === 'Building takes longest.', 'save_sheet answers and resolves a comment, its words as the user wrote them');
+  ok(after.sheets[1].comments?.[0].by === 'agent' && after.sheets[1].comments[0].cell === 'A2' && answeredText.includes('There is no comment zz'), 'and adds one of the agent’s, saying what it could not do');
   await app.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 }

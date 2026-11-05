@@ -4,8 +4,9 @@
 // of options or of a range's values, checkboxes as a TRUE,FALSE list, ratings as whole numbers from 0, numbers,
 // dates, lengths of words, formulas; a list Excel cannot hold in its rule, or whose chips have colours, on a hidden sheet
 // of lists the rule points at, each chip's colour its cell's fill); notes, as comments with the VML drawing Excel shows
-// them by; and charts, as a drawing of chart parts whose series point at the cells, their values cached for programs
-// that do not work them out.
+// them by, and comments as Excel's threaded comments (with their plain copies, for programs that know only notes); and
+// charts, as a drawing of chart parts whose series point at the cells, their values cached for programs that do not
+// work them out.
 import {
   chartParts,
   cleanChartRange,
@@ -17,6 +18,7 @@ import {
   dateText,
   fileFormula,
   formulaFromFile,
+  keyOf,
   numText,
   parseDate,
   parseInput,
@@ -43,11 +45,13 @@ import {
   type Sheet,
   type SheetChart,
   type SheetChartKind,
+  type SheetComment,
   type SheetFilter,
   type Validation,
   type Workbook,
 } from '../../shared/sheets.ts';
 import { chartData, CHART_COLORS, type ChartData } from '../../shared/sheet-chart.ts';
+import { newCommentId } from '../../shared/comments.ts';
 import { columnValues } from '../../shared/sheet-rules.ts';
 import { all, att, kid, kids, parseXml, textOf, type El } from '../documents/xml.ts';
 import { esc, XML_HEAD } from './ooxml.ts';
@@ -638,18 +642,59 @@ export function readValidation(xml: string, names: Map<string, string>): Validat
 
 // ---- notes ------------------------------------------------------------------------------------------------------------
 
-/** A sheet's notes as a comments part, and the VML drawing that shows them (Excel needs both). `n`: the sheet's number from 1. */
-export function notesXml(sh: Sheet, n: number): { comments: string; vml: string } | null {
-  const notes = Object.entries(sh.cells)
-    .filter(([, c]) => c.note)
-    .slice(0, 10_000);
-  if (!notes.length) return null;
+const NS_TC = 'http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments';
+const on = (v: string | undefined) => v !== undefined && v !== '0' && v !== 'false';
+/** Excel's people for threaded comments: the user and agents (their comments read back as theirs by these names). */
+const PERSONS = { user: { id: '{6F1C3A2B-0000-4000-8000-0000000000A1}', name: 'User' }, agent: { id: '{6F1C3A2B-0000-4000-8000-0000000000A2}', name: 'Agent' } };
+/** The workbook's people part, for its threaded comments. */
+export const personsXml = () =>
+  `${XML_HEAD}<personList xmlns="${NS_TC}" xmlns:x="${NS_MAIN}">${Object.values(PERSONS)
+    .map((p) => `<person displayName="${p.name}" id="${p.id}" userId="${p.name}" providerId="None"/>`)
+    .join('')}</personList>`;
+
+/** The words Excel's own files put in a threaded comment's plain copy, for programs that know only notes. */
+const THREAD_HEAD =
+  '[Threaded comment]\n\nYour version of Excel allows you to read this threaded comment; however, any edits to it will get removed if the file is opened in a newer version of Excel. Learn more: https://go.microsoft.com/fwlink/?linkid=870924\n\n';
+/** A thread as words: its comment and replies, as a plain copy has them. */
+const threadWords = (c: SheetComment) => `Comment:\n    ${c.text.replace(/\n/g, '\n    ')}${(c.replies ?? []).map((r) => `\nReply:\n    ${r.text.replace(/\n/g, '\n    ')}`).join('')}`;
+
+/**
+ * A sheet's notes and comments as Excel keeps them: the comments part (a note's words; a comment's plain copy, linked
+ * to its thread), the VML drawing that shows them (Excel needs both), and the threaded comments part (each comment and
+ * its replies, by User or Agent, resolved or not). A cell with a note and a comment too keeps both as one note, the
+ * thread's words after the note's (Excel holds one or the other on a cell). `n`: the sheet's number from 1.
+ */
+export function commentsXml(sh: Sheet, n: number): { comments: string; vml: string; threaded: string | null } | null {
+  const notes = Object.entries(sh.cells).filter(([, c]) => c.note);
+  const threads = new Map((sh.comments ?? []).map((c) => [c.cell, c] as const));
+  const cells = [...new Set([...notes.map(([k]) => k), ...threads.keys()])].sort((a, b) => keyOf(a) - keyOf(b)).slice(0, 10_000);
+  if (!cells.length) return null;
+  let g = 0;
+  const guid = () => `{${n.toString(16).padStart(8, '0').toUpperCase()}-0000-4000-8000-${(++g).toString(16).padStart(12, '0').toUpperCase()}}`;
+  const authors = ['Hydor'];
+  const list: string[] = [];
+  const tc: string[] = [];
+  const stamp = (at: number) => new Date(at).toISOString().replace(/Z$/, '');
+  for (const k of cells) {
+    const note = sh.cells[k]?.note;
+    const c = threads.get(k);
+    if (c && !note) {
+      const id = guid();
+      authors.push(`tc=${id}`);
+      list.push(`<comment ref="${k}" authorId="${authors.length - 1}" shapeId="0" xr:uid="${id}"><text><t xml:space="preserve">${esc(THREAD_HEAD + threadWords(c))}</t></text></comment>`);
+      const who = (by: 'user' | 'agent') => PERSONS[by].id;
+      tc.push(`<threadedComment ref="${k}" dT="${stamp(c.at)}" personId="${who(c.by)}" id="${id}"${c.resolved ? ' done="1"' : ''}><text>${esc(c.text)}</text></threadedComment>`);
+      for (const r of c.replies ?? []) tc.push(`<threadedComment ref="${k}" dT="${stamp(r.at)}" personId="${who(r.by)}" id="${guid()}" parentId="${id}"><text>${esc(r.text)}</text></threadedComment>`);
+    } else {
+      const words = note && c ? `${note}\n\n${threadWords(c)}` : (note ?? '');
+      list.push(`<comment ref="${k}" authorId="0"><text><r><t xml:space="preserve">${esc(words)}</t></r></text></comment>`);
+    }
+  }
   const comments =
-    `${XML_HEAD}<comments xmlns="${NS_MAIN}"><authors><author>Hydor</author></authors><commentList>` +
-    notes.map(([k, c]) => `<comment ref="${k}" authorId="0"><text><r><t xml:space="preserve">${esc(c.note)}</t></r></text></comment>`).join('') +
-    '</commentList></comments>';
-  const shapes = notes
-    .map(([k], i) => {
+    `${XML_HEAD}<comments xmlns="${NS_MAIN}"${tc.length ? ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="xr" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision"' : ''}>` +
+    `<authors>${authors.map((a) => `<author>${esc(a)}</author>`).join('')}</authors><commentList>${list.join('')}</commentList></comments>`;
+  const shapes = cells
+    .map((k, i) => {
       const p = parseRef(k)!;
       return (
         `<v:shape id="_x0000_s${n * 1024 + 1 + i}" type="#_x0000_t202" style="position:absolute;margin-left:80pt;margin-top:2pt;width:160pt;height:64pt;z-index:${i + 1};visibility:hidden" fillcolor="#ffffe1" o:insetmode="auto">` +
@@ -663,28 +708,87 @@ export function notesXml(sh: Sheet, n: number): { comments: string; vml: string 
     `<o:shapelayout v:ext="edit"><o:idmap v:ext="edit" data="${n}"/></o:shapelayout>` +
     '<v:shapetype id="_x0000_t202" coordsize="21600,21600" o:spt="202" path="m,l,21600r21600,l21600,xe"><v:stroke joinstyle="miter"/><v:path gradientshapeok="t" o:connecttype="rect"/></v:shapetype>' +
     `${shapes}</xml>`;
-  return { comments, vml };
+  const threaded = tc.length ? `${XML_HEAD}<ThreadedComments xmlns="${NS_TC}" xmlns:x="${NS_MAIN}">${tc.join('')}</ThreadedComments>` : null;
+  return { comments, vml, threaded };
 }
 
-/** A file's comments part as notes by cell name (threaded comments' plain copies too). */
-export function readNotes(xml: string | null): Map<string, string> {
+/** A file's people by id: their names (persons part). */
+export function readPersons(xml: string | null): Map<string, string> {
   const out = new Map<string, string>();
-  if (!xml) return out;
+  if (xml) for (const p of all(parseXml(xml).root, 'person')) if (att(p, 'id')) out.set(att(p, 'id')!, att(p, 'displayName') ?? '');
+  return out;
+}
+
+/**
+ * A sheet's threaded comments part as comments: each thread on its cell with its replies (by when they were written),
+ * resolved or not; Agent's are an agent's, others' the user's, with the name of whoever else wrote one before its words.
+ */
+export function readThreaded(xml: string | null, persons: Map<string, string>): SheetComment[] {
+  if (!xml) return [];
+  const all2 = all(parseXml(xml).root, 'threadedComment');
+  const at = (t: string | undefined) => {
+    const ms = t ? Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : `${t}Z`) : NaN;
+    return Number.isFinite(ms) ? ms : Date.now();
+  };
+  const who = (id: string | undefined): { by: 'user' | 'agent'; name: string } => {
+    const name = persons.get(id ?? '') ?? '';
+    return { by: name === PERSONS.agent.name ? 'agent' : 'user', name: name === PERSONS.agent.name || name === PERSONS.user.name ? '' : name };
+  };
+  const words = (el: El) => {
+    const w = who(att(el, 'personId'));
+    const t = textOf(kid(el, 'text')).trim();
+    return { by: w.by, text: w.name && t ? `${w.name}: ${t}` : t };
+  };
+  const roots = new Map<string, SheetComment>();
+  for (const el of all2) {
+    const ref = att(el, 'ref')?.replace(/\$/g, '').toUpperCase();
+    const id = att(el, 'id');
+    if (!ref || !id || att(el, 'parentId') || !parseRef(ref)) continue;
+    const w = words(el);
+    if (!w.text) continue;
+    roots.set(id, { id: newCommentId(), cell: ref, by: w.by, text: w.text.slice(0, 4000), at: at(att(el, 'dT')), ...(on(att(el, 'done')) ? { resolved: true } : {}) });
+  }
+  for (const el of all2) {
+    const root = roots.get(att(el, 'parentId') ?? '');
+    const w = root ? words(el) : null;
+    if (!root || !w?.text) continue;
+    root.replies = [...(root.replies ?? []), { id: newCommentId(), by: w.by, text: w.text.slice(0, 4000), at: at(att(el, 'dT')) }].sort((a, b) => a.at - b.at).slice(0, 50);
+  }
+  return [...roots.values()];
+}
+
+/** A threaded comment's plain copy (where a file has no thread for it) as the thread it was: its comment and replies. */
+function threadFromWords(ref: string, words: string): SheetComment | null {
+  const parts = words.split(/\n(?=(?:Comment|Reply):\s*\n)/).slice(1);
+  const texts = parts.map((p) => p.replace(/^(?:Comment|Reply):\s*\n/, '').replace(/^ {4}/gm, '').trim()).filter(Boolean);
+  if (!texts.length) return null;
+  const now = Date.now();
+  return { id: newCommentId(), cell: ref, by: 'user', text: texts[0], at: now, ...(texts.length > 1 ? { replies: texts.slice(1).map((t) => ({ id: newCommentId(), by: 'user' as const, text: t, at: now })) } : {}) };
+}
+
+/**
+ * A file's comments part: notes by cell name, and threads of comments from plain copies of threaded comments whose
+ * thread the file lacks (`threaded`: the cells whose threads it has, which their plain copies leave alone).
+ */
+export function readNotes(xml: string | null, threaded: Set<string> = new Set()): { notes: Map<string, string>; threads: SheetComment[] } {
+  const notes = new Map<string, string>();
+  const threads: SheetComment[] = [];
+  if (!xml) return { notes, threads };
   for (const c of all(parseXml(xml).root, 'comment')) {
-    const ref = att(c, 'ref');
+    const ref = att(c, 'ref')?.replace(/\$/g, '').toUpperCase();
     const t = kid(c, 'text');
-    if (!ref || !t) continue;
+    if (!ref || !t || threaded.has(ref)) continue;
     // Each run's words; Excel puts the author's name first in a bold run ("Sam:"), kept as written.
     const words = all(t, 't')
       .map((x) => textOf(x))
       .join('')
       .trim();
-    // A threaded comment's plain copy says so first; its words come after "Comment:".
-    const thread = /^\[Threaded comment\][\s\S]*?\nComment:\s*([\s\S]*)$/.exec(words);
-    const text = (thread ? thread[1] : words).trim();
-    if (text) out.set(ref.replace(/\$/g, '').toUpperCase(), text);
+    if (/^\[Threaded comment\]/.test(words)) {
+      const th = threadFromWords(ref, words);
+      if (th) threads.push(th);
+    } else if (words) notes.set(ref, words);
   }
-  return out;
+  return { notes, threads };
 }
 
 // ---- charts -----------------------------------------------------------------------------------------------------------

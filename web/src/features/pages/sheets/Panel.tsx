@@ -20,7 +20,7 @@ export function SidePanel({ title, narrow, onClose, children, footer }: { title:
   );
   if (narrow)
     return createPortal(
-      <div role="dialog" className="fixed inset-x-0 bottom-0 z-50 flex max-h-[min(72dvh,560px)] flex-col rounded-t-[20px] border border-b-0 border-line bg-elevated pb-[var(--safe-bottom)] shadow-lg">
+      <div role="dialog" data-sheet-panel className="fixed inset-x-0 bottom-0 z-50 flex max-h-[min(72dvh,560px)] flex-col rounded-t-[20px] border border-b-0 border-line bg-elevated pb-[var(--safe-bottom)] shadow-lg">
         {head}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
         {footer && <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line px-3 py-2">{footer}</div>}
