@@ -6,7 +6,7 @@
   "private": true,
   "description": "Hydor for macOS, Windows and Linux: the app, its server and the agents, in one app that keeps itself up to date.",
   "homepage": "https://github.com/algoprog/hydor",
-  "author": "Naget, Inc.",
+  "author": "Hydor Devs",
   "license": "MIT",
   "main": "main.cjs",
   "scripts": {

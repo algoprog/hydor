@@ -3,7 +3,7 @@
   "name": "transcribe",
   "version": "1.0.0",
   "description": "Speech to text on this computer with Whisper (faster-whisper): recordings, voice notes, videos and podcasts become text and subtitles, in about 100 languages, without sending the audio anywhere.",
-  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "author": { "name": "Hydor Devs", "url": "https://hydor.app" },
   "license": "MIT",
   "keywords": ["transcription", "speech to text", "whisper", "subtitles", "audio"],
   "extensions": {

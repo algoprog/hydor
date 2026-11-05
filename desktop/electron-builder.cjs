@@ -15,7 +15,7 @@ const signed = !!process.env.CSC_LINK;
 module.exports = {
   appId: 'com.hydor.app',
   productName: 'Hydor',
-  copyright: 'Copyright © Naget, Inc.',
+  copyright: 'Copyright © Hydor Devs',
   directories: { output: 'dist', buildResources: 'resources' },
   files: ['main.cjs', 'glow.cjs', 'package.json'],
   extraResources: [

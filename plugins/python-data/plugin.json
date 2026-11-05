@@ -3,7 +3,7 @@
   "name": "python-data",
   "version": "1.0.1",
   "description": "A ready Python of its own with pandas, NumPy, SciPy, Matplotlib, openpyxl and PyArrow, so agents can analyse tables and make charts at once, without installing anything into your own Python.",
-  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "author": { "name": "Hydor Devs", "url": "https://hydor.app" },
   "license": "MIT",
   "keywords": ["python", "pandas", "data", "charts", "excel", "csv"],
   "extensions": {

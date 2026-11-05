@@ -3,7 +3,7 @@
   "name": "media-tools",
   "version": "1.1.0",
   "description": "Audio and video work for every agent: convert, cut, join and compress, level a podcast's sound, make vertical clips, GIFs and subtitles with ffmpeg, and download media you have the right to with yt-dlp.",
-  "author": { "name": "Naget, Inc.", "url": "https://naget.com" },
+  "author": { "name": "Hydor Devs", "url": "https://hydor.app" },
   "license": "MIT",
   "keywords": ["ffmpeg", "video", "audio", "convert", "yt-dlp"],
   "extensions": {
