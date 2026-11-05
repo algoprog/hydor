@@ -328,6 +328,27 @@ export function audioPriceLine(m: AudioModel | undefined, id: string, tr: Tr = s
 /** The line on an audio form when the model picked cannot make what is asked: the one that makes it instead. */
 export const insteadLine = (picked: string, used: string, tr: Tr = same) => tr(`${picked} cannot make this, so it is made with ${used}.`);
 
+/** How much of what is made a form quotes: all of it, unless it is longer than a card can show (a long script). */
+const QUOTE_ROOM = 4000;
+/** What Markdown, or the app's maths, would read as marks: anywhere in a line, and at its start. */
+const MARKS = /[\\`*_[\]<>&$~|#]/g;
+const LEADING = /^([-+=])|^(\d+)([.)])/;
+const asItself = (c: string) => `&#${c.charCodeAt(0)};`;
+
+/**
+ * What is made (a picture's description, the words read aloud), quoted under the form's price line whole and as it
+ * was written: its line breaks and paragraphs kept, and a *, $, [ or # in it shown as it is rather than read as
+ * Markdown or maths (each written as a reference to itself). Only a text longer than a card can show is cut, at a
+ * word, with "…".
+ */
+export function promptQuote(text: string): string {
+  let s = text.replace(/\r\n?/g, '\n').replace(/[^\S\n]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (s.length > QUOTE_ROOM) s = `${s.slice(0, QUOTE_ROOM).replace(/\s+\S*$/, '')}…`;
+  const lines = s.split('\n').map((l) => l.replace(MARKS, asItself).replace(LEADING, (_m, lead?: string, n?: string, p?: string) => (lead ? asItself(lead) : `${n}${asItself(p!)}`)));
+  // A line break stays one (a backslash ending its line); an empty line starts another paragraph.
+  return lines.map((l, i) => (l ? `> ${l}${lines[i + 1] ? '\\' : ''}` : '>')).join('\n');
+}
+
 type Choice = ImageChoice | VideoChoice | AudioChoice;
 
 /** Settings the session picked before, by kind and model: asked once, used again. */
