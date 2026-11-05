@@ -18,7 +18,7 @@ import { addBibEntry, bibInfo, bibKeyFor, bibKeys, bibText, cleanBibEntry, parse
 import { texCheck } from '../../shared/latex-check.ts';
 import { texCount, texCountText, totalWords } from '../../shared/latex-count.ts';
 import { blankTable, cellTex, cellText, tableAt, tableTex } from '../../shared/latex-table.ts';
-import { TEX_TEMPLATES, texFromTemplate } from '../../shared/latex-templates.ts';
+import { TEMPLATE_NEEDS, TEX_TEMPLATES, texFromTemplate, texTemplate } from '../../shared/latex-templates.ts';
 import { newTex, normalizeTex, parseTexText, texText } from '../../shared/latex.ts';
 import { refQuery } from './latex-refs.ts';
 import { pages } from './index.ts';
@@ -119,6 +119,45 @@ const tex = !setup.missing && setup.engines?.pdflatex;
   const again = await run('save_latex', { id, title: 'Wave notes', template: 'poster' });
   ok(!again.error && (await req('GET', `/api/pages/${id}`)).json().model.main.includes('\\newtheorem{problem}'), 'a template is for new documents only: a saved one keeps its source');
   ok(tools.save_latex.inputSchema && JSON.stringify(tools.save_latex.inputSchema).includes('"template"') && String(tools.save_latex.description).includes('template:'), 'save_latex tells agents of its templates');
+
+  // The papers in the styles conferences ask for: one family, each with its class, its bibliography style and refs.bib.
+  const papers = TEX_TEMPLATES.filter((t) => t.family === 'paper').map((t) => t.id);
+  ok(['paper', 'ieee', 'acm', 'lncs'].every((x) => papers.includes(x as never)), 'the papers are a family: two columns, IEEE, ACM and Springer LNCS');
+  for (const [id, cls, bst] of [
+    ['ieee', '\\documentclass[conference]{IEEEtran}', '\\bibliographystyle{IEEEtran}'],
+    ['acm', '\\documentclass[sigconf]{acmart}', '\\bibliographystyle{ACM-Reference-Format}'],
+    ['lncs', '\\documentclass[runningheads]{llncs}', '\\bibliographystyle{splncs04}'],
+  ] as const) {
+    const d = texFromTemplate(id, 'Heat & light');
+    ok(d.engine === 'pdflatex' && d.main.includes(cls) && d.main.includes(bst) && d.main.includes('\\title{Heat \\& light}') && d.files.some((f) => f.name === 'refs.bib'), `the ${id} template is a paper in its class, with its bibliography style`);
+    ok(texTemplate(id)!.needs.some((n) => n.endsWith('.cls')) && texTemplate(id)!.needs.some((n) => n.endsWith('.bst')), `the ${id} template asks for its class and its bibliography style`);
+  }
+  ok(TEMPLATE_NEEDS.includes('IEEEtran.cls') && TEX_ASKED.includes('acmart.cls') && TEX_ASKED.includes('splncs04.bst'), 'the setup asks TeX for the publishers’ classes and styles');
+  const greekLncs = texFromTemplate('lncs', 'Θερμότητα');
+  ok(greekLncs.engine === 'xelatex' && !greekLncs.main.includes('fontenc') && greekLncs.main.includes('\\usepackage{fontspec}'), 'a Greek title makes an LNCS paper XeLaTeX, without the font encoding only pdfLaTeX reads');
+  const greekAcm = texFromTemplate('acm', 'Θερμότητα');
+  ok(greekAcm.engine === 'xelatex' && !greekAcm.main.includes('fontspec'), 'an ACM paper keeps acmart’s own fonts for Greek letters');
+  ok(texFromTemplate('acm', '热传导').main.includes('\\usepackage{fontspec}'), 'and gets a font for Chinese ones');
+  for (const [alias, cls] of [
+    ['ieeetran', 'IEEEtran'],
+    ['sigconf', 'acmart'],
+    ['springer', 'llncs'],
+  ]) {
+    const made = (await req('GET', `/api/pages/${idOf((await run('save_latex', { title: 'A paper', template: alias })).text)}`)).json().model;
+    ok(made?.main.includes(`{${cls}}`), `save_latex knows the ${cls} template as ${alias} too`);
+  }
+  ok(/ieee \(IEEEtran/.test(String(tools.save_latex.description)) && /texlive-publishers/.test(String(tools.save_latex.description)), 'save_latex tells agents of the papers and what they need');
+  // What the setup says to install for the templates this TeX lacks (or that MiKTeX installs them by itself).
+  if (tex && setup.installed) {
+    const lacking = TEMPLATE_NEEDS.filter((n) => !setup.installed.includes(n));
+    ok(lacking.length ? !!(setup.add?.cmd || setup.add?.auto) : !setup.add || !!setup.add.auto, `the setup says what adds what the templates lack${setup.add?.cmd ? ` (${setup.add.cmd})` : ''}`);
+    if (lacking.includes('IEEEtran.cls') && setup.add?.cmd?.startsWith('sudo apt')) ok(setup.add.cmd.includes('texlive-publishers'), 'on Debian or Ubuntu, the publishers’ classes come with texlive-publishers');
+    if (lacking.includes('IEEEtran.cls')) {
+      const c = (await req('POST', '/api/pages/tex/compile', { model: texFromTemplate('ieee', 'A test') })).json();
+      const e = c.errors.find((x: { message: string }) => /IEEEtran/.test(x.message));
+      ok(e && /texlive-publishers/.test(e.hint ?? '') && /tlmgr install ieeetran/.test(e.hint ?? ''), 'a paper whose class is missing says what to install');
+    }
+  }
 
   if (tex) {
     for (const t of TEX_TEMPLATES) {

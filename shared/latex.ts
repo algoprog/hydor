@@ -107,6 +107,12 @@ export interface TexSetup {
    * packages \usepackage offers), by their file names ("moderncv.cls", "siunitx.sty"). Missing on older servers.
    */
   installed?: string[];
+  /**
+   * For what the templates need and this TeX lacks: the command that adds it on the computer the app runs on ("sudo
+   * apt install texlive-publishers"); or `auto`, for MiKTeX, which installs what a document asks for the first time it
+   * is typeset, so every template is offered. Missing when nothing is (and on older servers).
+   */
+  add?: { cmd?: string; auto?: boolean };
 }
 
 export const TEX_LIMITS = { main: 2 * 1024 * 1024, file: 2 * 1024 * 1024, total: 4 * 1024 * 1024, files: 50, pictures: 200, name: 120, depth: 6 };
@@ -446,7 +452,7 @@ const firstFont = (names: string[]): string => names.reduceRight((rest, n) => `\
  * What a new document needs to write `text` (its title): pdfLaTeX when its default fonts have the letters, else
  * XeLaTeX and the preamble lines that load a font with them (Greek, Cyrillic, Chinese…).
  */
-export function lettersFor(text: string): { engine: TexEngine; lines: string[] } {
+export function lettersFor(text: string): { engine: TexEngine; lines: string[]; cjk?: boolean } {
   const cjk = /[぀-ヿ㐀-鿿가-힯豈-﫿]/.test(text);
   // Beyond Latin-1 and Latin Extended-A (and typographic punctuation), pdfLaTeX's default fonts have no letters.
   const wide = cjk || /[^\u0000-ſ -⁯€]/.test(text);
@@ -458,7 +464,7 @@ export function lettersFor(text: string): { engine: TexEngine; lines: string[] }
         '\\XeTeXlinebreakskip = 0pt plus 1pt',
       ]
     : [firstFont(['Noto Serif', 'DejaVu Serif', 'FreeSerif', 'Times New Roman'])];
-  return { engine: 'xelatex', lines: ['\\usepackage{fontspec}', '% A font with the letters of the title: the first of these this computer has.', ...fonts] };
+  return { engine: 'xelatex', lines: ['\\usepackage{fontspec}', '% A font with the letters of the title: the first of these this computer has.', ...fonts], cjk };
 }
 
 /**

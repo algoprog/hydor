@@ -17,7 +17,18 @@ date. [Back to the README](../README.md).
 - Optional: [TeX Live](https://tug.org/texlive/) to typeset LaTeX documents in Pages, with bubblewrap to keep it
   in a sandbox of its own (on Debian or Ubuntu `sudo apt install texlive-latex-extra texlive-xetex latexmk
   poppler-utils bubblewrap`; LuaLaTeX runs only in that sandbox). The Docker image leaves TeX out; build it with
-  `--build-arg LATEX=true` to add it (about 500 MB more; pdfLaTeX and XeLaTeX).
+  `--build-arg LATEX=true` to add it (about 560 MB more; pdfLaTeX and XeLaTeX), or `LATEX=full` for every template
+  (about 1.7 GB more). Some of New → LaTeX's templates need more of TeX than that (the editor offers only those it
+  can typeset, and says what to install for the others):
+  - **IEEE paper** (IEEEtran), **ACM paper** (acmart) and **Springer LNCS paper** (llncs): on Debian or Ubuntu
+    `sudo apt install texlive-publishers`, and `texlive-fonts-extra` too for the ACM paper's fonts; on Fedora
+    `sudo dnf install texlive-ieeetran texlive-acmart texlive-llncs`; with TeX Live from tug.org,
+    `tlmgr install ieeetran acmart llncs`.
+  - **CV or résumé** (moderncv) needs `texlive-fonts-extra` on Debian or Ubuntu for its icons; **Beamer slides**,
+    **Homework** and **Poster** come with `texlive-latex-extra`.
+  - On a Mac, [MacTeX](https://tug.org/mactex/) has them all (BasicTeX does not: New → LaTeX names the
+    `sudo tlmgr install …` that adds what it lacks). On Windows, [MiKTeX](https://miktex.org/) installs what a
+    document needs the first time it is typeset, so every template is offered; TeX Live for Windows has them all.
 - Optional: [ffmpeg](https://ffmpeg.org/) (`sudo apt install ffmpeg`), for the Library to take a video's frames,
   which its title and description are written from, and stills of videos, and a sound's length and shape; and for
   voice samples in any format (without it, WAV and MP3 only). Without it, a video's description comes from the
