@@ -59,6 +59,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends libreoffice-mat
  && rm -rf /var/lib/apt/lists/*
 ```
 
+`excel-check.ts` does the same for the sample workbooks of `excel-samples.ts` (number formats and Excel's own codes,
+fonts, sizes, colours, fills, borders of every kind, alignment, wrapped and turned words, widths and heights, merged and
+hidden cells, frozen panes, formulas, a filter, conditional formatting of every kind, lists with coloured options,
+checkboxes, ratings, every kind of chart, notes and comments, several sheets, a long sheet and a wide one), into
+`excel.html`, checking the .xlsx's parts against the schemas and Microsoft's extensions it uses:
+
+```bash
+OUTDIR=dist/dev node scripts/build-server.mjs scripts/office-check/excel-check.ts
+DATA_DIR=/tmp/office-check-data node dist/dev/excel-check.js --out /tmp/excel-check --schemas /tmp/office-check-schemas
+```
+
 What still differs, and why:
 
 - LibreOffice reads the fonts a .docx carries, so it draws the document's own; Word does too (Word 2010 and later on
@@ -74,3 +85,10 @@ What still differs, and why:
   uses others.
 - Within its line, Word puts words a point or so higher or lower than a browser, so a page's lines can sit a little
   apart; where lines break and where pages break match, but for a word or a line here and there.
+- Spreadsheets: Excel can carry no fonts, so cells are in Arial (the Office font closest to the app's Inter) at the
+  editor's 10pt. LibreOffice sets a column's width from Arial's digit at 7.4 px; Excel (and the file) at 7 px, so
+  LibreOffice's columns come out about 6% wider than Excel's, which are the editor's. The app's PDF prints charts one
+  after another under a sheet's cells; Excel and LibreOffice print them where they stand over the cells. Excel has no
+  checkboxes or stars in cells: they are TRUE or FALSE and numbers there (LibreOffice shows TRUE and FALSE as 1 and 0).
+  Words that start or end with a space keep the mark Excel's own files give them (`xml:space="preserve"`), which
+  ECMA-376's schema lacks there and Office's own has.
