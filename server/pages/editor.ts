@@ -259,6 +259,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
     colour: '<path d="M6 16 12 4l6 12"/><path d="M8.5 11h7"/><path d="M4 20h16" stroke-width="3"/>',
     chev: '<path d="m6 9 6 6 6-6"/>',
+    comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
   };
   const svg = (k: string) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
   const dark = cfg.theme === 'dark';
@@ -318,7 +319,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     .rtb{flex-wrap:wrap;max-width:calc(100vw - 8px);box-sizing:border-box}
     .cmds{flex-wrap:wrap}
     .rtb button.kind{width:auto;gap:3px;padding:0 6px 0 8px;font:500 12.5px system-ui,sans-serif;display:flex;align-items:center;white-space:nowrap}
-    .rtb button.kind[hidden],.rtb .sep[hidden]{display:none}
+    .rtb button.kind[hidden],.rtb .sep[hidden],.rtb button[hidden]{display:none}
     .pal{display:none;flex-direction:column;gap:4px;padding:3px 4px}
     .rtb.colouring .pal{display:flex}
     .rtb.colouring .cmds{display:none}
@@ -356,6 +357,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       <button data-c="link" title="${L('linkTip', 'Make it a link')}">${svg('link')}</button>
       <button data-c="unlink" title="${L('unlinkTip', 'Not a link')}">${svg('unlink')}</button>
       <button data-c="removeFormat" title="${L('clearTip', 'Plain words')}">${svg('clear')}</button>
+      <button data-c="comment" title="${attr(L('commentTip', 'Comment (Ctrl+Alt+M)'))}" hidden>${svg('comment')}</button>
       <span class="sep"></span>
       <button data-c="done" title="${L('doneTip', 'Done (Esc)')}">${svg('done')}</button>
     </span>
@@ -376,8 +378,9 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   let sel: Element | null = null;
   let hover: Element | null = null;
   let editing: HTMLElement | null = null;
-  /** Whether the app has an agent to ask about a part (the block menu's Ask the agent). */
+  /** Whether the app has an agent to ask about a part (the block menu's Ask the agent), and keeps comments for the page. */
   let canAskAgent = false;
+  let canComment = false;
   /** What the inspector's changes apply to: this part, every part of its kind or class; on hover; at a size and smaller. */
   let ctx: { scope: string; state: '' | 'hover'; media: Media } = { scope: 'self', state: '', media: '' };
 
@@ -1364,6 +1367,10 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       W.act('code', null);
       return redraw();
     }
+    if (c === 'comment') {
+      W.act('comment', null);
+      return;
+    }
     if (c === 'colour') {
       rtb.classList.add('colouring');
       return redraw();
@@ -1444,6 +1451,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     switch (a) {
       case 'caps':
         canAskAgent = !!arg?.ask;
+        canComment = !!arg?.comment;
+        (rtb.querySelector('[data-c=comment]') as HTMLElement).hidden = !canComment;
         return;
       case 'parent':
         if (el && el !== body) select(el.parentElement);
@@ -1846,6 +1855,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     },
     canAsk: () => canAskAgent,
     code: codeColours(),
+    canComment: () => canComment,
   };
   // A paste event (Ctrl+V of the part copied waits for it, below): any one, a picture's too, which writing.ts takes.
   let pasteTimer = 0;

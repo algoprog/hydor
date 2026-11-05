@@ -123,6 +123,8 @@ export type PagesEvent =
   | { what: 'request'; request: PublishRequest }
   /** A page's picture in Pages is ready. */
   | { what: 'thumb'; id: string; thumb: string }
+  /** A page's comments changed (by an agent's save_page, or in another window). */
+  | { what: 'comments'; id: string }
   /** To one session's pages: a draft grew by `text`, which goes at `from` (0 with the whole text so far starts it over). */
   | { what: 'draft'; draft: Omit<PageDraft, 'text'>; from: number; text: string }
   /** An agent answered, resolved or added comments of these files of this computer (LaTeX files opened from Files). */

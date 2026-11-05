@@ -439,6 +439,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
       tail={tail}
       initialMode={target.edit ? 'edit' : undefined}
       saveLabel={kind === 'show_html' && !loaded?.pageId ? 'Keep with changes' : 'Save'}
+      pageId={loaded?.pageId}
       savedNote="the agent sees your changes with your next message"
       onAsk={(text) => {
         composeInsert(text, key);

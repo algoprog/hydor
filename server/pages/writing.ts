@@ -72,6 +72,8 @@ export interface Core {
   canAsk: () => boolean;
   /** The code blocks' colours (shared/code-colours.ts). */
   code: CodeColours;
+  /** Whether the app keeps comments for this page (a page of the Library). */
+  canComment: () => boolean;
 }
 
 /** What the writing does for the editor. */
@@ -1092,6 +1094,7 @@ export function writing(E: Core): Writing {
     left: '<path d="m15 6-6 6 6 6"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+    comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     // a page of the Library, by its kind (for links to it)
     page: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
     pagelink: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 3v5h5V11"/><path d="M15 21l6-6"/><path d="M17 15h4v4"/>',
@@ -1140,13 +1143,17 @@ export function writing(E: Core): Writing {
     .cv button:hover{background:${hover}}
     .cl{all:unset;position:fixed;display:none;align-items:center;gap:2px;height:22px;padding:0 5px 0 8px;border-radius:6px;background:${panel};border:1px solid ${line};color:${muted};font:500 11.5px system-ui,-apple-system,sans-serif;cursor:pointer;pointer-events:auto;box-sizing:border-box;white-space:nowrap}
     .cl:hover{color:${ink};background:${hover}}
-    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.rk{display:none}.cl{height:30px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
+    .cm{all:unset;position:fixed;display:flex;align-items:center;gap:3px;height:20px;padding:0 6px;border-radius:10px;background:${dark ? '#3a3215' : '#fbefc4'};color:${dark ? '#f2c94c' : '#7a5600'};font:600 11px/1 system-ui,-apple-system,sans-serif;cursor:pointer;pointer-events:auto;box-sizing:border-box;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+    .cm:hover{filter:brightness(${dark ? 1.25 : 0.96})}
+    .cmshow{position:fixed;display:none;pointer-events:none;box-sizing:border-box;border:2px solid #e3b341;border-radius:6px;background:#e3b3411a}
+    @media (pointer:coarse){.offer button{height:32px;font-size:13px}.hb,.hd.col .hb{width:32px;height:34px}.end{width:34px;height:34px}:is(.menu,.sl) .row{height:40px}.rk{display:none}.cl,.cm{height:30px}.sw{grid-template-columns:repeat(10,28px)}.sw button{width:28px;height:28px}.offer button,.cv button{height:34px}}
   </style>
   <div class="hd"><button class="hb add" title="${esc(L('addBelow', 'Add a block below (Alt: above)'))}">${svg('plus')}</button><button class="hb grip" title="${esc(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('grip')}</button></div>
   <button class="end" title="${esc(L('addEnd', 'Add a block at the end'))}">${svg('plus', 15)}</button>
   <div class="offer"><button data-o="icon">${svg('emoji', 14)}${esc(L('addIcon', 'Add an icon'))}</button><button data-o="cover">${svg('image', 14)}${esc(L('addCover', 'Add a cover'))}</button></div>
   <div class="cv"><button data-o="cover">${esc(L('changeCover', 'Change cover'))}</button><button data-o="nocover">${esc(L('removeCover', 'Remove'))}</button></div>
   <button class="cl" title="${esc(L('language', 'Language'))}"></button>
+  <div class="cms"></div>
   <div class="boxes"></div><div class="band"></div><div class="dl"></div>
   <div class="menu" role="menu"></div>
   <div class="sl" role="listbox"></div>`;
@@ -1157,6 +1164,7 @@ export function writing(E: Core): Writing {
   const offer = $('.offer');
   const cv = $('.cv');
   const langChip = $('.cl');
+  const cmMarks = $('.cms');
   const boxes = $('.boxes');
   const bandEl = $('.band');
   const dl = $('.dl');
@@ -1164,7 +1172,7 @@ export function writing(E: Core): Writing {
   const slEl = $('.sl');
   // The parts drawn over the page keep the words' selection: they take no focus. The page takes the keys, though
   // (a menu opened from a handle answers the arrows).
-  for (const el of [hd, endBtn, offer, cv, langChip, menuEl, slEl])
+  for (const el of [hd, endBtn, offer, cv, langChip, cmMarks, menuEl, slEl])
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (!E.editing()) window.focus();
@@ -1464,6 +1472,7 @@ export function writing(E: Core): Writing {
       { head: n > 1 ? L('nBlocks', '{n} blocks').replace('{n}', String(n)) : E.nameOf(list[0]) },
       ...(texty ? [{ icon: svg('turn'), label: L('turnInto', 'Turn into'), to: 'turn' as const, keys: 'Ctrl+/' }] : []),
       ...(n === 1 && codeOf(list[0]) ? [{ icon: svg('code'), label: L('language', 'Language'), to: 'lang' as const }] : []),
+      ...(n === 1 && E.canComment() ? [{ icon: svg('comment'), label: L('comment', 'Comment'), keys: 'Ctrl+Alt+M', run: () => (closeMenu(), askComment()) }] : []),
       { icon: svg('colour'), label: L('colour', 'Colour'), to: 'colour' },
       '-',
       ...(n === 1 ? [{ icon: svg('plus'), label: L('addBelowShort', 'Add a block below'), run: () => (closeMenu(), addBlock(list[0], false)) }] : []),
@@ -2380,6 +2389,122 @@ export function writing(E: Core): Writing {
     openMenu([u], { left: r.left, top: r.top, bottom: r.bottom }, 'lang');
   });
 
+  // ---- comments on blocks (kept by the app, outside the page: shared/page-comments.ts) -----------------------------------
+  interface Anchor {
+    path?: number[];
+    tag?: string;
+    words?: string;
+  }
+  interface CommentMark {
+    id: string;
+    on?: Anchor;
+    resolved?: boolean;
+    /** How many messages its thread has (the comment and its replies). */
+    n: number;
+  }
+  let comments: CommentMark[] = [];
+  /** The block each comment is on, found again in the page as it is now. */
+  let anchored = new Map<string, Element>();
+  /** The comment the app shows now: its block is outlined. */
+  let shownComment: string | null = null;
+  /** A block's words, as a comment remembers them to find it again: the start of what it says, in one line. */
+  const blockWords = (el: Element) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  const anchorOf = (el: Element): Anchor => ({ path: E.pathOf(el), tag: el.tagName.toLowerCase(), words: blockWords(el) });
+  /** A comment's block: where it was, when it still is the same block; else the block with its words, the nearest to where it was. */
+  const findAnchor = (on: Anchor | undefined): Element | null => {
+    if (!on) return null;
+    const at = on.path ? E.byPath(on.path) : null;
+    const lead = (on.words ?? '').slice(0, 60);
+    if (at && at !== doc.body && (!on.tag || at.tagName.toLowerCase() === on.tag) && (!lead || blockWords(at).startsWith(lead))) return at;
+    if (lead) {
+      const all = [...doc.body.querySelectorAll(on.tag && /^[a-z][a-z0-9-]*$/.test(on.tag) ? on.tag : 'p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,div,figure,table')].filter((x) => !E.isUi(x) && blockWords(x).startsWith(lead));
+      if (all.length) {
+        const near = (x: Element) => {
+          const p = E.pathOf(x);
+          let i = 0;
+          while (on.path && i < p.length && p[i] === on.path[i]) i++;
+          return i;
+        };
+        return all.reduce((a, b) => (near(b) > near(a) ? b : a));
+      }
+      // Words a comment was given by an agent: the first block that has them.
+      const loose = [...doc.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td,figcaption,.n-callout-text,summary')].find((x) => !E.isUi(x) && blockWords(x).includes(lead));
+      if (loose) return unitOf(loose);
+    }
+    return at && at !== doc.body && (!on.tag || at.tagName.toLowerCase() === on.tag) ? at : null;
+  };
+  const placeComments = () => {
+    anchored = new Map();
+    for (const c of comments) {
+      const el = findAnchor(c.on);
+      if (el) anchored.set(c.id, el);
+    }
+    E.redraw();
+  };
+  const setComments = (v: unknown) => {
+    comments = (Array.isArray(v) ? v : [])
+      .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && typeof c.id === 'string' && /^[\w-]{1,40}$/.test(c.id))
+      .slice(0, 500)
+      .map((c) => ({ id: c.id as string, on: c.on && typeof c.on === 'object' ? (c.on as Anchor) : undefined, resolved: c.resolved === true, n: Math.max(1, Math.min(99, Number(c.n) || 1)) }));
+    placeComments();
+  };
+  /** Comment (the block menu, the bar over words, Ctrl+Alt+M): the app opens a new comment on the block picked, or written in, and on the words picked there. */
+  const askComment = () => {
+    const w = E.editing();
+    const s = getSelection();
+    const quote = w && s && s.rangeCount && !s.isCollapsed && w.contains(s.getRangeAt(0).commonAncestorContainer) ? s.toString().replace(/\s+/g, ' ').trim() : '';
+    const b = w ? unitOf(w) : (blocksNow()[0] ?? null);
+    if (!b || b === doc.body) return;
+    E.send({ type: 'wa-ed-comment', on: anchorOf(b), quote: (quote || blockWords(b)).slice(0, 500), rect: rectJson(b.getBoundingClientRect()) });
+    // The comment is written beside the page: writing here stops (a phone's drawer opens for it), the block stays picked.
+    if (w) {
+      E.finish();
+      E.select(b);
+    }
+  };
+  const cmBox = make('div', 'cmshow');
+  const drawComments = () => {
+    // A mark beside each block with open comments (their count), in the margin on its right where there is room.
+    const by = new Map<Element, CommentMark[]>();
+    for (const c of comments) {
+      const el = anchored.get(c.id);
+      if (c.resolved || !el?.isConnected) continue;
+      by.set(el, [...(by.get(el) ?? []), c]);
+    }
+    const live = [...by].filter(([el]) => {
+      const r = el.getBoundingClientRect();
+      return r.height > 0 && r.bottom > 0 && r.top < innerHeight;
+    });
+    while (cmMarks.children.length < live.length) cmMarks.append(make('button', 'cm'));
+    while (cmMarks.children.length > live.length) cmMarks.lastElementChild!.remove();
+    live.forEach(([el, list], i) => {
+      const b = cmMarks.children[i] as HTMLElement;
+      const r = el.getBoundingClientRect();
+      const n = list.reduce((a, c) => a + c.n, 0);
+      b.dataset.id = list[0].id;
+      b.title = L('comments', 'Comments');
+      b.innerHTML = `${svg('comment', 13)}<span>${n}</span>`;
+      const w = 40;
+      // (beside a code block's language, when it is the block)
+      const inside = innerWidth - r.right < w + 6;
+      b.style.left = `${inside ? r.right - w - (isCode(codeOf(el)) ? 120 : 4) : r.right + 6}px`;
+      b.style.top = `${Math.max(2, firstLineBox(el).top + (inside ? 2 : -2))}px`;
+    });
+    const shown = shownComment ? anchored.get(shownComment) : null;
+    if (shown?.isConnected) {
+      const r = shown.getBoundingClientRect();
+      Object.assign(cmBox.style, { display: 'block', left: `${r.left - 4}px`, top: `${r.top - 3}px`, width: `${r.width + 8}px`, height: `${r.height + 6}px` });
+    } else cmBox.style.display = 'none';
+  };
+  cmMarks.addEventListener('click', (e) => {
+    const b = ((e.composedPath()[0] as HTMLElement).closest?.('.cm') as HTMLElement | null) ?? null;
+    if (!b?.dataset.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    E.send({ type: 'wa-ed-comment-open', id: b.dataset.id });
+  });
+  cmMarks.after(cmBox);
+
   // ---- handles beside the block under the pointer, and dragging it ---------------------------------------------------
   let hoverBlock: Element | null = null;
   let handleBlock: Element | null = null;
@@ -2679,6 +2804,7 @@ export function writing(E: Core): Writing {
     drawEnd();
     drawPicked();
     drawLang();
+    drawComments();
     if (menu) {
       if (menu.blocks.some((b) => !b.isConnected)) closeMenu();
     }
@@ -2708,6 +2834,10 @@ export function writing(E: Core): Writing {
         if (!list.length || !list.every((b) => kindOf(b))) return stop(e);
         const r = (h ? caretBox() : null) ?? list[0].getBoundingClientRect();
         openMenu(list, { left: r.left, top: r.top, bottom: r.top + (r.height || 20) }, 'turn');
+        return stop(e);
+      }
+      if (mod && e.altKey && !e.shiftKey && e.code === 'KeyM') {
+        if (E.canComment()) askComment();
         return stop(e);
       }
       if (mod && (e.key === '?' || (e.key === '/' && e.shiftKey))) {
@@ -3297,6 +3427,24 @@ export function writing(E: Core): Writing {
         case 'pages':
           setPages(arg);
           return true;
+        case 'comments':
+          setComments(arg);
+          return true;
+        case 'comment':
+          askComment();
+          return true;
+        case 'commentShow': {
+          // A comment picked in the app: its block outlined and in sight.
+          shownComment = typeof arg === 'string' ? arg : null;
+          const el = shownComment ? anchored.get(shownComment) : null;
+          if (el?.isConnected) (el as HTMLElement).scrollIntoView({ block: 'nearest' });
+          E.redraw();
+          return true;
+        }
+        case 'anchors':
+          // Where the comments' blocks are now, for the app to keep with them once the page is saved.
+          E.send({ type: 'wa-ed-anchors', id: arg?.id, list: comments.filter((c) => anchored.get(c.id)?.isConnected).map((c) => ({ id: c.id, on: anchorOf(anchored.get(c.id)!) })) });
+          return true;
         case 'codeLang': {
           // A code block's language, from the Part tab ('' for Auto).
           const id = CC.langId(typeof arg === 'string' ? arg : '');
@@ -3398,6 +3546,7 @@ export function writing(E: Core): Writing {
       closeSlash();
       closeMention();
       paintAll();
+      placeComments();
     },
     clean(root) {
       // Code is kept as plain text: its colours are put on as it shows.
@@ -3414,6 +3563,16 @@ export function writing(E: Core): Writing {
     changed() {
       refreshToc();
       paintAll();
+      // A comment's block changed or was made anew (Turn into): it is found again where it was, by its words.
+      for (const c of comments) {
+        const el = anchored.get(c.id);
+        if (el?.isConnected) c.on = anchorOf(el);
+        else {
+          const f = findAnchor(c.on);
+          if (f) anchored.set(c.id, f);
+          else anchored.delete(c.id);
+        }
+      }
     },
     info(el) {
       const u = unitOf(el);

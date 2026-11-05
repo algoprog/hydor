@@ -652,6 +652,40 @@ if (canCapture()) {
     same(await d.js<string>('return document.querySelector("#c").hasAttribute("data-lang")'), false, 'Auto takes the language off');
   });
 
+  // ---- comments: Comment on a block, marks beside the blocks, their places kept as blocks change -----------------------------
+  await drive('<h2 id="h">Prices</h2><p id="p">Ten euros a day.</p><p id="q">Paid at the door.</p>', async (d) => {
+    await d.cmd('caps', { comment: true });
+    await d.cmd('comments', [
+      { id: 'c1', on: { path: [1, 0], tag: 'h2', words: 'Prices' }, n: 2 },
+      { id: 'c2', on: { path: [1, 9], tag: 'p', words: 'Paid at the door.' }, n: 1 },
+      { id: 'c3', on: { words: 'nowhere at all' }, n: 1 },
+    ]);
+    await d.write('#p');
+    for (let i = 0; i < 5; i++) await d.press('ArrowLeft', { shift: true });
+    await d.press('m', { ctrl: true, alt: true });
+    const asked = (await d.msgs('wa-ed-comment')).at(-1);
+    ok(asked?.on?.tag === 'p' && asked?.on?.words === 'Ten euros a day.' && asked?.quote === 'day.', 'Ctrl+Alt+M asks the app for a comment on the block written in, and on the words picked there');
+    await d.click('#h');
+    await d.press('Escape');
+    await d.click('#h');
+    await d.cmd('comment');
+    same((await d.msgs('wa-ed-comment')).at(-1)?.quote, 'Prices', 'Comment on a block picked: its words');
+    await d.cmd('anchors', { id: 7 });
+    same(
+      JSON.stringify((await d.msgs('wa-ed-anchors')).at(-1)?.list?.map((x: { id: string; on: { tag: string } }) => `${x.id}:${x.on.tag}`)),
+      JSON.stringify(['c1:h2', 'c2:p']),
+      'each comment is found on its block: where it was, or by its words where the page changed (none for words no block has)',
+    );
+    await d.write('#q');
+    await d.cmd('turn', 'h3');
+    await d.press('Escape');
+    await d.cmd('anchors', { id: 8 });
+    const moved = (await d.msgs('wa-ed-anchors')).at(-1)?.list?.find((x: { id: string }) => x.id === 'c2');
+    same(moved?.on?.tag, 'h3', 'a commented block turned into another kind keeps its comment, which the app keeps once saved');
+    const out = await d.html();
+    same(/c1|c2|cmshow|n-cm/.test(out), false, 'nothing of the comments is in the page given back');
+  });
+
   // ---- links to other pages: "@" or "/" → Link to a page, a chip with the page's icon -----------------------------------------
   await drive('<p id="a">See</p><p id="b">Also</p>', async (d) => {
     await d.cmd('pages', [
@@ -843,6 +877,40 @@ if (canCapture()) {
   ok(id, 'a page of Notion-like blocks is saved as it is');
   const listed = (JSON.parse((await req('GET', '/api/pages')).body).pages as { id: string; icon?: string }[]).find((p) => p.id === id);
   same(listed?.icon, '🧭', 'the Library knows a page’s icon (its .n-icon), for links to it from other pages');
+
+  // ---- comments on its blocks: kept outside the page, changed by a list of changes, answered by agents -------------------
+  {
+    const ops = (body: unknown) => req('POST', `/api/pages/${id}/comments`, body).then((r) => ({ status: r.statusCode, ...JSON.parse(r.body) }));
+    const r1 = await ops({ ops: [{ text: 'Bigger, please', on: { path: [1, 2], tag: 'h1', words: 'Plan' }, quote: 'Plan' }, { text: 'Is this the date?', on: { path: [1, 4], tag: 'details', words: 'Packing list' } }] });
+    same(r1.comments?.length, 2, 'comments go on a page’s blocks');
+    ok(r1.added?.length === 2 && r1.comments[0].by === 'user' && r1.comments[0].on.tag === 'h1', 'each the user’s, on its block (where it is, its tag and words)');
+    const before = (await req('GET', `/api/pages/${id}/export?format=html`)).body;
+    ok(!before.includes('Bigger, please'), 'and they are not in the page');
+    same(JSON.parse((await req('GET', `/api/pages/${id}`)).body).page.version, 1, 'nor a new version of it');
+    const c1 = r1.added[0];
+    const c2 = r1.added[1];
+    await ops({ ops: [{ id: c2, reply: 'It is.' }, { id: c2, resolve: true }] });
+    const got = JSON.parse((await req('GET', `/api/pages/${id}/comments`)).body).comments;
+    ok(got.find((c: { id: string }) => c.id === c2)?.resolved && got.find((c: { id: string }) => c.id === c2)?.replies?.[0]?.text === 'It is.', 'they are answered and resolved');
+    const bad = await ops({ ops: [{ text: '<script>x</script>', on: { path: ['x'], tag: 'H1 bad', words: 7 } }] });
+    ok(bad.status === 200 && !bad.comments.at(-1).on, 'an anchor that is not one is left out');
+    await ops({ ops: [{ id: bad.added[0], delete: true }] });
+    const read = (await tools.get_page.run({ id }, ctx)) as string;
+    ok(read.includes(`- ${c1} · open · on the <h1> “Plan”`) && read.includes('Bigger, please') && read.includes('save_page with this id and comments'), 'an agent reads them in get_page, and how to answer');
+    const answered = (await tools.save_page.run({ id, title: 'Plan', comments: [{ id: c1, reply: 'Made it bigger.', resolve: true }, { text: 'Check the dates', on: 'Packing list' }] }, ctx)) as string;
+    ok(/Answered the comments/.test(answered) && /0 open/.test(answered) === false, `save_page answers them without the page (${answered})`);
+    const after = JSON.parse((await req('GET', `/api/pages/${id}/comments`)).body).comments;
+    ok(after.find((c: { id: string }) => c.id === c1)?.replies?.[0]?.by === 'agent' && after.find((c: { id: string }) => c.id === c1)?.resolved, 'as the agent');
+    ok(after.some((c: { by: string; on?: { words?: string } }) => c.by === 'agent' && c.on?.words === 'Packing list'), 'and adds its own, on the words of its block');
+    same(JSON.parse((await req('GET', `/api/pages/${id}`)).body).page.version, 1, 'the page itself stays as it was');
+    let refused = '';
+    try {
+      await tools.save_page.run({ title: 'New' }, ctx);
+    } catch (e) {
+      refused = (e as Error).message;
+    }
+    ok(/html/.test(refused), 'a new page still needs its html');
+  }
   const web = await req('GET', `/api/pages/${id}/export?format=html`);
   ok(web.statusCode === 200 && web.body.includes('id="n-kit"') && web.body.includes('.n-todo{') && web.body.includes('<input type="checkbox" checked>'), 'as a web page it keeps its blocks, with the kit’s look for them');
   if (canCapture()) {

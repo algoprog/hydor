@@ -15,6 +15,7 @@
 //   GET/POST /api/pages, GET/PATCH/DELETE /api/pages/:id, GET /api/pages/kept?key=, GET /api/pages/drafts?key=
 //   POST /api/pages/:id/versions, GET /api/pages/:id/versions/:v, POST …/restore, POST /api/pages/:id/copy
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
+//   GET/POST /api/pages/:id/comments (comments on a page's blocks: shared/page-comments.ts)
 //   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/docs/print, POST /api/pages/assets, GET /api/pages/assets/:sha
 //   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
 //   GET/POST /api/pages/:id/notebook (where a notebook of the Library runs: notebooks.ts)
@@ -44,6 +45,7 @@ import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
 import { fontFile, fontsCss } from './fonts.ts';
 import { agentDoc, docPage, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
 import { normalizeDoc } from '../../shared/docs.ts';
+import { commentsForAgent } from '../../shared/page-comments.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
@@ -69,6 +71,8 @@ import {
   pageSource,
   pageToken,
   putValues,
+  pageComments,
+  changeComments,
   renamePage,
   resetPageLink,
   setPageSpace,
@@ -137,25 +141,46 @@ const SAVE_PAGE: RunTool = {
     'await hydor.storage.get(key) (the value, or null), set(key, value) (any JSON), remove(key), keys(); about 2 MB per page. localStorage keeps nothing.',
     'Leave out id to make a new page; give the id of a saved page (get_page lists them) to replace it with a new version:',
     'older versions stay restorable, and its stored data stays.',
+    'The user can leave comments on a page’s blocks in its editor; get_page shows them, and comments answers, resolves or adds them (with id; leave html out to only answer them).',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'A saved page’s id, to save a new version of it.' },
       title: { type: 'string', description: 'The page’s name in the Library and on a home screen: "Workout log".' },
-      html: { type: 'string', description: 'The whole page, <!doctype html> included.' },
+      html: { type: 'string', description: 'The whole page, <!doctype html> included. With id and comments, leave it out to only answer the comments.' },
+      comments: {
+        type: 'array',
+        description:
+          'Changes to the comments on the page’s blocks (get_page lists them with their ids): {"id": "c1", "reply": "what you did"}, adding "resolve": true once one is dealt with ("reopen": true opens it again); a comment of your own: {"text": "…", "on": "words of the block it is about"}.',
+        items: { type: 'object' },
+      },
     },
-    required: ['title', 'html'],
+    required: ['title'],
   },
   async run(a, ctx) {
     const db = ctx.deps.db;
     const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
     const other = id ? kindOf(mustPage(db, id).kind) : null;
     if (other) throw new Error(`Page ${id} is a ${other.noun}: change it with ${other.tool}.`);
+    const answering = a.comments !== undefined && a.comments !== null;
+    if ((a.html === undefined || a.html === null || a.html === '') && !(id && answering)) throw new Error('html: give the whole page (only answering comments, with id and comments, leaves it out).');
+    // Its comments: answered, resolved or added (shared/page-comments.ts), after the new version if there is one.
+    const comment = (pid: string) => {
+      if (!answering) return '';
+      const r = changeComments(db, pid, a.comments, 'agent');
+      tell(ctx.deps, { what: 'comments', id: pid });
+      const open = r.list.filter((c) => !c.resolved).length;
+      return [` Its comments: ${open} open, ${r.list.length - open} resolved.`, ...r.notes].join(' ');
+    };
+    if (a.html === undefined || a.html === null || a.html === '') {
+      const page = mustPage(db, id!);
+      return `Answered the comments of "${page.title}" (page ${page.id}); the page itself is as it was.${comment(page.id)}`;
+    }
     const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', sessionKey: ctx.key, space: sessionSpace(db, ctx.key) });
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
-    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.`;
+    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${comment(p.id)}`;
   },
 };
 
@@ -163,7 +188,7 @@ const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
   description:
-    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML and the data it stores (to change it with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
+    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML, the data it stores and the comments on its blocks (to change it, or answer them, with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -195,7 +220,8 @@ const GET_PAGE: RunTool = {
     const by = p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
     // Agents' tool output is cut further on anyway: say so here rather than lose the end unnoticed.
     const cut = html.length > 100_000 ? `${html.slice(0, 100_000)}\n… (cut: the page is ${Math.round(html.length / 1024)} KB; write the whole page anew to change it)` : html;
-    return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}HTML:\n${cut}`;
+    const notes = commentsForAgent(pageComments(db, id));
+    return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}${notes ? `${notes}\n\n` : ''}HTML:\n${cut}`;
   },
 };
 
@@ -626,6 +652,16 @@ function routes(d: Deps) {
     clearStorage(db, P(req).id);
     tell(d, { what: 'pages' });
     return { ok: true };
+  });
+  /** Comments on a page's blocks, as its editor shows them; changes to them as a list (see PageCommentOp), made by the user. */
+  app.get('/api/pages/:id/comments', async (req) => {
+    mustPage(db, P(req).id);
+    return { comments: pageComments(db, P(req).id) };
+  });
+  app.post('/api/pages/:id/comments', async (req) => {
+    const r = changeComments(db, P(req).id, B(req).ops, 'user');
+    tell(d, { what: 'comments', id: P(req).id });
+    return { comments: r.list, added: r.added };
   });
   /** Its picture in Pages (404 until it is taken; the pages hear { what: 'thumb' } when it is). */
   app.get('/api/pages/:id/thumb', async (req, reply) => {

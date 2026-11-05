@@ -10,6 +10,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { KIT_CSS } from '@shared/page-kit';
 import { codeColoursScript } from '@shared/code-colours';
+import { cleanAnchor, type PageAnchor } from '@shared/page-comments';
 import { STORAGE_LIMITS } from '@shared/pages';
 import type { AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
@@ -739,6 +740,8 @@ export interface EditHandle {
   saved(): void;
   /** The frame, to place what the app shows over the page. */
   frame(): HTMLIFrameElement | null;
+  /** Where the blocks the page's comments are on are now (to keep with the comments once the page is saved). */
+  anchors(): Promise<{ id: string; on: PageAnchor }[]>;
 }
 
 /** The page in the visual editor (its scripts held back), and the channel to it. */
@@ -763,6 +766,10 @@ export const EditFrame = forwardRef<
     onEditing?: (on: boolean) => void;
     /** A block's menu is open in the page (on a phone, the drawer under it makes room). */
     onMenu?: (on: boolean) => void;
+    /** Comment, on a block (and on words of it): a new comment's block and words, and where it is in the frame. */
+    onComment?: (c: { on: PageAnchor; quote: string }) => void;
+    /** A comment's mark beside its block, clicked. */
+    onCommentOpen?: (id: string) => void;
     /** The editor asks for something chosen in the app: an emoji, an icon, a cover, a picture, a video, maths. */
     onAsk?: (a: EdAsk) => void;
     /** A picture dropped or pasted in the page, to make small enough to live in it (and answer with `fill`). */
@@ -773,11 +780,11 @@ export const EditFrame = forwardRef<
     onKeys?: () => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onAsk, onFile, onAgent, onKeys, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, onAsk, onFile, onAgent, onKeys, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onAsk, onFile, onAgent, onKeys });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onAsk, onFile, onAgent, onKeys };
-  const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>() });
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, onAsk, onFile, onAgent, onKeys });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, onAsk, onFile, onAgent, onKeys };
+  const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>(), anchorWaits: new Map<number, (list: { id: string; on: PageAnchor }[]) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
   useImperativeHandle(handle, () => ({
@@ -797,6 +804,17 @@ export const EditFrame = forwardRef<
       }),
     saved: () => send({ cmd: 'saved' }),
     frame: () => ref.current,
+    anchors: () =>
+      new Promise((resolve) => {
+        const id = ++ch.current.seq;
+        // Not told within a moment (an editor of before): the comments stay where they were.
+        const t = window.setTimeout(() => (ch.current.anchorWaits.delete(id), resolve([])), 3000);
+        ch.current.anchorWaits.set(id, (list) => {
+          window.clearTimeout(t);
+          resolve(list);
+        });
+        send({ cmd: 'anchors', arg: { id } });
+      }),
   }));
   useLayoutEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -825,6 +843,13 @@ export const EditFrame = forwardRef<
       else if (d.type === 'wa-ed-copied' && typeof d.html === 'string' && d.html.length < 2_000_000) c.onCopied?.({ html: d.html, name: typeof d.name === 'string' ? d.name : '' });
       else if (d.type === 'wa-ed-editing') c.onEditing?.(!!d.on);
       else if (d.type === 'wa-ed-menu') c.onMenu?.(!!d.on);
+      else if (d.type === 'wa-ed-comment' && d.on && typeof d.on === 'object' && isStr(d.quote, 500)) c.onComment?.({ on: cleanAnchor(d.on) ?? {}, quote: d.quote });
+      else if (d.type === 'wa-ed-comment-open' && isStr(d.id, 40)) c.onCommentOpen?.(d.id);
+      else if (d.type === 'wa-ed-anchors' && Array.isArray(d.list)) {
+        const done = ch.current.anchorWaits.get(d.id);
+        ch.current.anchorWaits.delete(d.id);
+        done?.(d.list.flatMap((x: { id?: unknown; on?: unknown }) => (isStr(x?.id, 40) && cleanAnchor(x.on) ? [{ id: x.id, on: cleanAnchor(x.on)! }] : [])).slice(0, 500));
+      }
       else if (d.type === 'wa-ed-save') c.onSave?.();
       else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined });
       else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File && d.file.size <= 40_000_000 && /^image\//.test(d.file.type)) c.onFile?.(d.id, d.file);
