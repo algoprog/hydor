@@ -1100,7 +1100,7 @@ async function start() {
 }
 
 app.whenReady().then(async () => {
-  app.setAboutPanelOptions({ applicationName: 'Hydor', applicationVersion: app.getVersion(), copyright: 'Naget, Inc.', ...(MAC ? {} : { iconPath: resource('icon-256.png') }) });
+  app.setAboutPanelOptions({ applicationName: 'Hydor', applicationVersion: app.getVersion(), copyright: 'Hydor Devs', ...(MAC ? {} : { iconPath: resource('icon-256.png') }) });
   // Opened from the disk image or Downloads, it offers to move to Applications, where it can update itself.
   if (MAC && PACKAGED && !HIDDEN && !app.isInApplicationsFolder()) {
     const { response } = await dialog.showMessageBox({
