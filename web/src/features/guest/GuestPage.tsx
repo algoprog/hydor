@@ -31,6 +31,8 @@ export default function GuestPage({ token }: { token: string }) {
   const [v, setV] = useState<GuestView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const items = useRef<TimelineItem[]>([]);
+  // How many items the whole timeline had at the last pull (thinking included).
+  const seen = useRef(0);
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,13 +41,17 @@ export default function GuestPage({ token }: { token: string }) {
     let timer = 0;
     const pull = async (first: boolean) => {
       // The last few items can still change (a step finishing): fetch them again with anything new.
-      const from = first ? 0 : Math.max(0, items.current.length - 30);
+      // From a place in the whole timeline (the last 30 of it again): the items here leave thinking out, so their count is not it.
+      const from = first ? 0 : Math.max(0, seen.current - 30);
       try {
         const r = await fetch(mu(`/guest-api/${encodeURIComponent(token)}?from=${from}${first ? '&visit=1' : ''}`));
         const body = await r.json();
         if (!r.ok) throw new Error(body.error || 'This link does not work');
         if (stop) return;
-        items.current = [...items.current.slice(0, body.from), ...body.items];
+        // Those before the place stay; the rest come again (an item without its place, from an older server: by count).
+        const at = (x: TimelineItem, i: number) => (x as TimelineItem & { pos?: number }).pos ?? i;
+        items.current = [...items.current.filter((x, i) => at(x, i) < body.from), ...body.items];
+        seen.current = typeof body.total === 'number' ? body.total : items.current.length;
         setV({ ...body, items: items.current });
         setErr(null);
         const busy = ['working', 'waiting', 'starting'].includes(body.status);

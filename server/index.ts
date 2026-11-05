@@ -1680,9 +1680,13 @@ app.get('/guest-api/:token', async (req, reply) => {
   if (!s) return reply.code(404).send({ error: 'The session is gone' });
   const tl = await sessions.timeline(key);
   const from = Math.max(0, Math.min(Number(q.from) || 0, tl.parser.items.length));
+  // Each with its place in the whole timeline (`pos`): the page asks again from a place, and thinking is left out here.
   const items = tl.parser.items
     .slice(from)
-    .map((it) => guestItem(previewItem(it)))
+    .map((it, i) => {
+      const g = guestItem(previewItem(it));
+      return g ? { ...g, pos: from + i } : null;
+    })
     .filter(Boolean);
   reply.header('Cache-Control', 'no-store').header('X-Robots-Tag', 'noindex');
   return { title: s.title, agent: s.agent, acpName: s.acpName, status: s.live?.status ?? 'idle', from, total: tl.parser.items.length, items };
