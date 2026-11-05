@@ -137,6 +137,32 @@ export interface AppRecipe {
    * yes, unless it is a block. false: an app made to be used on its own page (its screens, a view of what it keeps).
    */
   sessions?: boolean;
+  /** An app that opens on its own page: when Update automatically runs it until you pick another time (HH:MM) and days (0 is Sunday; unset: every day). */
+  home?: HomeStart;
+}
+
+export interface HomeStart {
+  time?: string;
+  days?: number[];
+}
+
+/** A time of day, as 07:00. */
+export const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Days of the week as a schedule keeps them: each of 0 (Sunday) to 6 once, in order; undefined for every day. */
+export function cleanDays(raw: unknown): number[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const days = [...new Set(raw.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b);
+  return days.length && days.length < 7 ? days : undefined;
+}
+
+/** When an app on its own page starts updating, from anything: a time of day and days of the week, each only when it is one. */
+export function cleanHomeStart(raw: unknown): HomeStart | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const time = typeof r.time === 'string' && TIME_OF_DAY.test(r.time.trim()) ? r.time.trim() : undefined;
+  const days = cleanDays(r.days);
+  return time || days ? { ...(time ? { time } : {}), ...(days ? { days } : {}) } : undefined;
 }
 
 /** The graph's layout, which the editor keeps and agents may leave out. */
@@ -351,7 +377,7 @@ export const APP_ICONS = [
   'app-window', 'pen-line', 'lightbulb', 'calendar', 'chart', 'code', 'globe', 'book-open', 'briefcase', 'heart',
   'shopping-cart', 'utensils', 'dumbbell', 'music', 'camera', 'map', 'message-square', 'languages', 'calculator', 'home', 'wrench', 'bot',
   'cloud-sun', 'sun', 'trophy', 'chef-hat', 'gift', 'clapperboard', 'tv', 'gamepad', 'ticket', 'piggy-bank', 'trending-up', 'map-pin', 'history',
-  'compass',
+  'compass', 'tags', 'flask', 'sliders', 'calendar-check', 'notebook',
 ] as const;
 
 /** The colours of an app's tile, readable in light and dark. */
@@ -812,6 +838,7 @@ export function cleanRecipe(raw: any): AppRecipe {
   const ui = cleanUi(r.ui).ui;
   const secrets = cleanSecrets(r.secrets).secrets;
   const assets = cleanAssets(r.assets);
+  const home = cleanHomeStart(r.home);
   return {
     name: str(r.name, 60) || 'Untitled app',
     icon: (APP_ICONS as readonly string[]).includes(r.icon) ? r.icon : 'sparkles',
@@ -843,6 +870,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(graph ? { graph } : {}),
     ...(r.block === true ? { block: true } : {}),
     ...(typeof r.sessions === 'boolean' ? { sessions: r.sessions } : {}),
+    ...(home ? { home } : {}),
   };
 }
 
