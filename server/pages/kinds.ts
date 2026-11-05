@@ -12,6 +12,7 @@ import { assetDataUrl } from './assets.ts';
 import { docForAgent, docFromFile, docPage, docxOfDoc, keepDoc, MAX_DOC, readDoc } from './docs.ts';
 import { importTex, keepTex, MAX_TEX, readTex, TEX_OPENS, texForAgent, texPage, texPdf, texSource, texZip } from './latex.ts';
 import { pptxFile, type Picture } from './pptx.ts';
+import { deckFontFiles } from './pptx-fonts.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, keepBook, MAX_BOOK, readBook, xlsxOfBook } from './sheets.ts';
 import { deckForAgent, deckPage, keepDeck, MAX_DECK, readDeck } from './slides.ts';
 import { videoFileFor } from './videos.ts';
@@ -85,11 +86,14 @@ KINDS.set('slides', {
   sources: (text) => deckSources(readDeck(text), true),
   files: {
     // Its videos from a device go into the PowerPoint file, and into the web page (a file on its own) where small enough.
-    pptx: (db, text, title, help) => {
+    pptx: async (db, text, title, help) => {
       // Each video read once, however many slides show it.
       const read = new Map<string, ReturnType<typeof videoFileFor>>();
       const video = (src: string) => (read.has(src) ? read.get(src)! : (read.set(src, videoFileFor(db, src)), read.get(src)!));
-      return pptxFile(readDeck(text), { title, picture: help.picture, scales: help.scales, renders: help.renders, video });
+      const deck = readDeck(text);
+      // The faces of the app's fonts it shows go inside it (no Office computer has them; none offline).
+      const fonts = await deckFontFiles(deck);
+      return pptxFile(deck, { title, picture: help.picture, scales: help.scales, renders: help.renders, video, fonts });
     },
     html: (db, text, title) => deckPage(db, readDeck(text), title, 'viewer', { videosInside: true }),
   },
