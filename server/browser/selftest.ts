@@ -1,6 +1,7 @@
 // A check of the browser against a small local test site: outline numbers, steps, dialogs, files in
 // and out, the private-network guard (WebSockets too), extract (with a stand-in helper), find, payments,
-// tabs, asking the user, taking over, and the live view's frames. Build it and run it with a scratch data folder:
+// tabs, asking the user, taking over (clicks landing where they were made), the live view's frames, and
+// the agent's pointer in it (gliding while someone watches) with the marks on the steps' pictures. Build it and run it with a scratch data folder:
 //
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/browser/selftest.ts
 //   DATA_DIR=/tmp/hydor-browser-test node dist/dev/selftest.js
@@ -11,14 +12,16 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import type { AgentPointer } from '../../shared/pointer.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { openDb } from '../db.ts';
 import { registerFeatures } from '../features/registry.ts';
 import { act, askUser, open, read, tabs, upload, type OpCtx } from './ops.ts';
-import { browserOf, closeAll, setBrowserDeps } from './session.ts';
+import { browserOf, closeAll, GLIDE_MS, setBrowserDeps } from './session.ts';
 import { setSessionOptions, setBrowserSettings } from './settings.ts';
 import { pickChrome } from './chrome.ts';
 import { browserTools } from './tools.ts';
+import { readMarks, stepFile } from './steps.ts';
 
 if (!process.env.DATA_DIR) throw new Error('Set DATA_DIR to a scratch folder');
 const KEY = 'claude:selftest';
@@ -78,6 +81,8 @@ const site = http.createServer((req, res) => {
       return html('Checkout', `<h1>Checkout</h1><form action="/paid"><input autocomplete="cc-number" name="card" aria-label="Card number"><input name="cvc" aria-label="CVC"><button type=submit>Place order</button></form>`);
     case '/paid':
       return html('Paid', '<h1>Paid!</h1>');
+    case '/clicks':
+      return html('Clicks', `<p>Where a click lands.</p>${'<p>Filler text, a paragraph of it.</p>'.repeat(80)}<script>addEventListener('click', (e) => history.replaceState(null, '', '#' + e.clientX + ',' + e.clientY))</script>`);
     case '/article':
       return html('Article', `<h1>The answer</h1><p>The meaning of life is 42, says the book.</p><table><tr><th>Item</th><th>Price</th></tr><tr><td>Tea</td><td>3 EUR</td></tr></table>`);
     default:
@@ -417,6 +422,70 @@ async function main() {
     const frames = events.filter((e) => e.type === 'frame').length;
     assert.ok(frames >= 2, `only ${frames} frames`);
     assert.ok(events.some((e) => e.type === 'state'));
+  });
+
+  await check('the agent’s pointer shows where it acts: a glide first while someone watches (the click waits for it), then what it did', async () => {
+    const b = browserOf(KEY)!;
+    let r = await open(ctx, `${base}/form`, false, false);
+    events.length = 0;
+    await b.watch(800, 500);
+    const box = idOf(r.text, /checkbox "Send me news"/);
+    const t0 = Date.now();
+    r = await act(ctx, [{ action: 'click', id: box }, { action: 'type', id: idOf(r.text, /textbox "Email"/), text: 'seen@example.com' }, { action: 'keys', keys: 'Tab' }], false);
+    const took = Date.now() - t0;
+    const shown = events.filter((e) => e.type === 'pointer').map((e) => (e as unknown as { pointer: AgentPointer }).pointer);
+    assert.deepEqual(shown.map((p) => p.act), ['click', 'type', 'key']);
+    assert.equal(shown[0].glide, GLIDE_MS, 'it glides to the checkbox first');
+    assert.ok(took >= 2 * GLIDE_MS, `the actions waited for their glides (${took} ms)`);
+    assert.ok(shown[1].box && shown[1].box.w > 0.05 && shown[1].box.h > 0.01, 'the field typed into is outlined');
+    assert.equal(shown[2].keys, 'Tab');
+    assert.equal(shown[2].glide, undefined, 'a key is pressed where it rests');
+    // In fractions of the frame the live view shows: where the checkbox is on the page.
+    const t = b.active!;
+    const p = await t.point(b.refs.get(box)!);
+    const f = await t.frameSize();
+    if ('error' in p) throw new Error(p.error);
+    assert.ok(Math.abs(shown[0].x - p.x / f.w) < 0.002 && Math.abs(shown[0].y - p.y / f.h) < 0.002, JSON.stringify({ shown: shown[0], p, f }));
+    assert.deepEqual(b.view().pointer, { x: shown[1].x, y: shown[1].y }, 'it rests where it last pointed');
+    // The step's picture is marked where the click landed and the field it typed into.
+    const n = Number(/Browser step (\d+)/.exec(r.text)![1]);
+    const marks = readMarks(stepFile(KEY, n, 'json'));
+    assert.deepEqual(marks.map((m) => m.act), ['click', 'type']);
+    assert.deepEqual([marks[0].x, marks[0].y], [shown[0].x, shown[0].y]);
+    assert.ok(marks[1].box, 'with the field');
+    // Nobody watching: nothing glides, nothing waits.
+    b.watchUntil = 0;
+    events.length = 0;
+    const t1 = Date.now();
+    await act(ctx, [{ action: 'click', id: box }], false);
+    const quiet = events.find((e) => e.type === 'pointer') as unknown as { pointer: AgentPointer } | undefined;
+    assert.ok(quiet && quiet.pointer.act === 'click' && quiet.pointer.glide === undefined, 'shown, without a glide');
+    assert.ok(Date.now() - t1 < 2500);
+  });
+
+  await check('a click made while driving lands where it was made, the page’s scrollbar or not', async () => {
+    const b = browserOf(KEY)!;
+    await open(ctx, `${base}/clicks`, false, false);
+    await b.takeOver(true);
+    try {
+      for (const [fx, fy] of [
+        [0.9, 0.5],
+        [0.25, 0.75],
+      ]) {
+        await b.input([
+          { t: 'mouse', type: 'down', x: fx, y: fy },
+          { t: 'mouse', type: 'up', x: fx, y: fy },
+        ]);
+        await new Promise((x) => setTimeout(x, 300));
+        const [x, y] = (new URL(b.active!.url).hash.slice(1) || '0,0').split(',').map(Number);
+        const { w, h } = b.active!.viewport;
+        assert.ok(Math.abs(x - fx * w) <= 1 && Math.abs(y - fy * h) <= 1, `at ${fx},${fy} of ${w}×${h} it landed at ${x},${y}`);
+      }
+    } finally {
+      await b.takeOver(false);
+      // The form again, for the checks after.
+      await open(ctx, `${base}/form`, false, false);
+    }
   });
 
   await check('the tools take small models’ step formats', async () => {

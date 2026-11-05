@@ -1,5 +1,7 @@
 // The web browser agents drive (server/browser), as the pages see it: a session's browser and its live
-// view, the user's input when they take over, the cards it adds to a conversation, and Settings → Browser.
+// view (with the agent's pointer in it), the user's input when they take over, the cards it adds to a
+// conversation, and Settings → Browser.
+import type { AgentPointer } from './pointer.ts';
 
 /** One tab of a session's browser. */
 export interface BrowserTab {
@@ -51,12 +53,16 @@ export interface BrowserView {
   viewport: { w: number; h: number; mobile?: boolean };
   /** Files the browser saved lately, into the session's folder. */
   downloads: { name: string; path: string; done: boolean; failed?: boolean; at: number }[];
+  /** Where the agent's pointer rests, as fractions of the page: the live view shows it there until the agent acts again. */
+  pointer?: { x: number; y: number };
 }
 
 /** News from the server ({ t: 'feature', id: 'browser', key, data }); `download` goes to every page. */
 export type BrowserEvent =
   | { type: 'state'; view: BrowserView }
   | { type: 'frame'; tab: string; data: string; w: number; h: number }
+  /** The agent's pointer moves or acts (shared/pointer.ts), for the live view to draw. */
+  | { type: 'pointer'; tab: string; pointer: AgentPointer }
   | { type: 'download'; download: ChromeDownload };
 
 /** Shift, Control, Alt and Meta, as CDP counts them. */
