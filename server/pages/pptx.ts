@@ -3,14 +3,15 @@
 // (paragraphs, bullets and numbers, runs' bold, colours, fonts and links), pictures (cropped as they show, their
 // colours adjusted), lines and arrows, tables (merged cells, cells' fills), charts as real charts with their numbers,
 // groups as groups, icons as pictures that stay sharp (SVG, with a PNG beside it for older programs), equations as
-// pictures (their LaTeX as words where no picture could be made), videos as their still linked to the video; the
+// pictures (their LaTeX as words where no picture could be made), videos from a device inside the file as PowerPoint's
+// own (with their still, played on a click), YouTube's and Vimeo's as their still linked to the video; the
 // slide's background, its title as the slide's title, the footer and slide number as fields, speaker notes, the
 // transition (Morph as PowerPoint's own, a fade where it has none) and the animations in their order (on a click,
 // with or after the one before, a paragraph at a time). The theme's colours and fonts become the file's theme.
 //
 // A slide is 1280 px wide: 1 px is 9525 EMU (12192000 across, PowerPoint's widescreen) and a font's px is 0.75 pt.
 import type { Anim, ChartEl, Deck, El, GroupEl, IconEl, ImageEl, LineEl, MathEl, Para, Run, Slide, TableEl, TextProps, Theme, VideoEl } from '../../shared/slides.ts';
-import { fontName, FONTS, hexColor, mixColor, plainText, slideH, videoStill } from '../../shared/slides.ts';
+import { fontName, FONTS, hexColor, mixColor, plainText, slideH, VIDEO, videoStill } from '../../shared/slides.ts';
 import { coreXml, esc, relsXml, XML_HEAD, zipParts, type ZipPart } from './ooxml.ts';
 
 /** A picture ready for the file: PNG, JPEG or GIF bytes and its size in pixels. */
@@ -29,7 +30,12 @@ export interface PptxOpts {
   scales?: Map<string, number>;
   /** Pictures made of parts in a browser: "icon:<id>" (its PNG beside its SVG), "math:<id>" (an equation). */
   renders?: Map<string, Picture>;
+  /** A video the app keeps ("naget-video:<sha>"): its bytes and kind, to go inside the file; null when it is not there. */
+  video?: (src: string) => { data: Buffer; ext: string; mime: string } | null;
 }
+
+/** A dark 1×1 PNG: the still of a video that has none (PowerPoint shows its first frame once it plays). */
+const DARK_PNG: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGMQFBQEAABqADS54vDNAAAAAElFTkSuQmCC', 'base64'), ext: 'png', w: 1, h: 1 };
 
 /** A 1×1 clear PNG: what an icon falls back on where no PNG of it could be made (programs that read SVG show that). */
 const CLEAR_PNG: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==', 'base64'), ext: 'png', w: 1, h: 1 };
@@ -117,6 +123,10 @@ interface Ctx {
   rels: Rels;
   media: { add(p: { data: Buffer; ext: string }): string };
   charts: { add(xml: string): string };
+  /** The deck's videos in the file: each one's name in ppt/media. */
+  movies: { add(v: { data: Buffer; ext: string }): string };
+  /** The videos of the slide being written that PowerPoint plays (their shapes' ids), for its timing. */
+  played: { id: number; muted: boolean; loop: boolean }[];
   /** Slide files by the deck's slide number, for links between slides. */
   slideFile: (n: number) => string | null;
   ids: Map<string, number>;
@@ -377,8 +387,33 @@ function mathXml(c: Ctx, e: MathEl): string {
   return `<p:sp><p:nvSpPr>${cNvPr}<p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr>${txBody(c, words, e.opacity ?? 1)}</p:sp>`;
 }
 
-/** A video: its still (or a dark box), a play button on it, both linked to the video's page. */
+/**
+ * A video from a device, inside the file as PowerPoint's own video: its still on the slide (PowerPoint draws its
+ * controls), the file both linked and embedded as PowerPoint links them, played on a click (its timing), from where it
+ * starts, without sound or again and again as the deck says.
+ */
+function movieXml(c: Ctx, e: VideoEl, file: { data: Buffer; ext: string }): string {
+  const name = c.movies.add(file);
+  const link = c.rels.add('video', `../media/${name}`);
+  const media = c.rels.add('http://schemas.microsoft.com/office/2007/relationships/media', `../media/${name}`);
+  const still = (e.poster ? c.o.picture(e.poster) : null) ?? DARK_PNG;
+  const pic = c.media.add(still);
+  const id = c.next++;
+  c.ids.set(e.id, id);
+  c.played.push({ id, muted: !!e.muted, loop: !!e.loop });
+  const op = e.opacity ?? 1;
+  const alpha = op < 1 ? `<a:alphaModFix amt="${Math.round(op * 100000)}"/>` : '';
+  const trim = e.start ? `<p14:trim st="${Math.round(e.start * 1000)}"/>` : '';
+  const geom = e.radius ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.round(Math.min(50000, (e.radius / Math.max(1, Math.min(e.w, e.h))) * 100000))}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+  return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="${esc(c.morph.get(e.id) ?? e.name ?? 'Video')}"><a:hlinkClick r:id="" action="ppaction://media"/></p:cNvPr><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr><a:videoFile r:link="${link}"/><p:extLst><p:ext uri="{DAA4B4D4-6D71-4841-9C94-3DE7FCFB9230}"><p14:media xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" r:embed="${media}">${trim}</p14:media></p:ext></p:extLst></p:nvPr></p:nvPicPr><p:blipFill><a:blip r:embed="${pic}">${alpha}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(e.x, e.y, e.w, e.h, e.rot)}${geom}</p:spPr></p:pic>`;
+}
+
+/** A video: from a device, inside the file; else its still (or a dark box), a play button on it, both linked to the video's page. */
 function videoXml(c: Ctx, e: VideoEl): string {
+  const file = e.src.startsWith(VIDEO) ? c.o.video?.(e.src) : null;
+  if (file) return movieXml(c, e, file);
+  // A kept video the file cannot have: its still alone.
+  if (e.src.startsWith(VIDEO)) return e.poster ? imageXml(c, { id: e.id, type: 'image', src: e.poster, x: e.x, y: e.y, w: e.w, h: e.h, rot: e.rot, opacity: e.opacity, fit: 'cover', radius: e.radius, alt: 'Video', name: e.name } as ImageEl) : '';
   const href = videoPage(e.src);
   const still = e.poster ?? videoStill(e.src);
   const pic = still ? c.o.picture(still) : null;
@@ -548,7 +583,7 @@ const PRESET: Record<string, { id: number; sub?: (dir?: string) => number }> = {
 
 function timingXml(c: Ctx, s: Slide): string {
   const anims = (s.anims ?? []).filter((a) => c.ids.has(a.el));
-  if (!anims.length) return '';
+  if (!anims.length && !c.played.length) return '';
   let cid = 2;
   const nextId = () => ++cid;
   // Each animation (or each paragraph of one), with its click group and trigger time, as the player plays them.
@@ -561,7 +596,7 @@ function timingXml(c: Ctx, s: Slide): string {
     end: number;
   }
   const items: Item[] = [];
-  const auto = anims[0].on !== 'click';
+  const auto = anims.length > 0 && anims[0].on !== 'click';
   let group = 0;
   let prev: Item | null = null;
   for (const a of anims) {
@@ -675,7 +710,17 @@ function timingXml(c: Ctx, s: Slide): string {
       return `<p:par><p:cTn id="${outerId}" fill="hold"><p:stCondLst>${start}</p:stCondLst><p:childTnLst>${inner}</p:childTnLst></p:cTn></p:par>`;
     })
     .join('');
-  const tree = `<p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst><p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>${pars}</p:childTnLst></p:cTn><p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst><p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst></p:seq></p:childTnLst></p:cTn></p:par></p:tnLst>`;
+  const seq = anims.length
+    ? `<p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>${pars}</p:childTnLst></p:cTn><p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst><p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst></p:seq>`
+    : '';
+  // Each video in the file, played on a click on it (its sound off, or again and again, as the deck says).
+  const media = c.played
+    .map(
+      (m) =>
+        `<p:video><p:cMediaNode vol="80000"${m.muted ? ' mute="1"' : ''}><p:cTn id="${nextId()}"${m.loop ? ' repeatCount="indefinite"' : ''} fill="hold" display="0"><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst></p:cTn><p:tgtEl><p:spTgt spid="${m.id}"/></p:tgtEl></p:cMediaNode></p:video>`,
+    )
+    .join('');
+  const tree = `<p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>${seq}${media}</p:childTnLst></p:cTn></p:par></p:tnLst>`;
   return `<p:timing>${tree}${builds.length ? `<p:bldLst>${builds.join('')}</p:bldLst>` : ''}</p:timing>`;
 }
 
@@ -806,6 +851,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   const H = slideH(deck.ratio);
   const parts: ZipPart[] = [];
   const media: { name: string; key: Buffer }[] = [];
+  const movies: { name: string; key: Buffer }[] = [];
   let chartN = 0;
   const charts: { name: string; xml: string }[] = [];
   const hasNotes = deck.slides.some((s) => s.notes);
@@ -835,6 +881,18 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
           return rels.add('chart', `../charts/${name}`);
         },
       },
+      movies: {
+        // Once each, however many slides show it.
+        add(v) {
+          let m = movies.find((x) => x.key.equals(v.data));
+          if (!m) {
+            m = { name: `media${movies.length + 1}.${v.ext}`, key: v.data };
+            movies.push(m);
+          }
+          return m.name;
+        },
+      },
+      played: [],
       slideFile: (n) => (n >= 1 && n <= deck.slides.length ? `slide${n}.xml` : null),
       ids: new Map(),
       next: 2,
@@ -856,6 +914,9 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
     '<Default Extension="gif" ContentType="image/gif"/>',
     '<Default Extension="webp" ContentType="image/webp"/>',
     '<Default Extension="svg" ContentType="image/svg+xml"/>',
+    '<Default Extension="mp4" ContentType="video/mp4"/>',
+    '<Default Extension="mov" ContentType="video/quicktime"/>',
+    '<Default Extension="webm" ContentType="video/webm"/>',
     '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>',
     '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>',
     '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>',
@@ -939,6 +1000,7 @@ export function pptxFile(deck: Deck, o: PptxOpts): Buffer {
   }
   for (const c of charts) parts.push({ name: `ppt/charts/${c.name}`, data: c.xml });
   for (const m of media) parts.push({ name: `ppt/media/${m.name}`, data: m.key });
+  for (const m of movies) parts.push({ name: `ppt/media/${m.name}`, data: m.key });
   return zipParts(parts);
 }
 

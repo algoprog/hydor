@@ -32,6 +32,8 @@ export interface DrawOpts {
   asset?: (sha: string) => string;
   /** Where a picture on the web is fetched from (the app's own pages may not load the web's). */
   web?: (url: string) => string;
+  /** Where a video the app keeps is ("naget-video:<sha>" → its address). */
+  video?: (sha: string) => string;
   /** The editor's hints in the user's language ("Click to add a title"). */
   hint?: (s: string) => string;
   /** The slide as its build leaves it after `step` clicks (Infinity: all of it, as printed). */
@@ -201,6 +203,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     '.ns-tex{font:400 28px/1.3 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;opacity:.8}',
     '.ns-video{position:absolute;inset:0;overflow:hidden;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center}',
     '.ns-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}',
+    '.ns-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;outline:none}',
     '.ns-play{width:96px;height:96px;border-radius:50%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 24px rgba(0,0,0,.35);pointer-events:none}',
     '.ns-play svg{width:44px;height:44px;margin-left:6px;fill:#fff}',
     '.ns-from{position:absolute;left:14px;bottom:10px;font:600 18px/1 system-ui,sans-serif;color:#fff;opacity:.85;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}',
@@ -694,9 +697,36 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     inner.classList.add('ns-tex');
   };
   const PLAYER = /^https:\/\/(www\.youtube-nocookie\.com\/embed\/[\w-]{6,20}|player\.vimeo\.com\/video\/\d{4,12})$/;
+  /** Where a video the app keeps plays from: the app's address of it, its signed one (a page without the app's sign-in), or itself inside a page; '' for none. */
+  const keptUrl = (s: unknown, o: DrawOpts): string => {
+    if (typeof s !== 'string') return '';
+    const k = /^naget-video:([a-f0-9]{16,64})$/.exec(s);
+    if (k) return o.video ? o.video(k[1]) : '';
+    if (/^\/pg\/video\/[a-f0-9]{16,64}\/[A-Za-z0-9_-]{16,64}$/.test(s)) return s;
+    if (/^data:video\/(mp4|webm|quicktime);base64,[A-Za-z0-9+/=]+$/.test(s)) return s;
+    return '';
+  };
+  /** A video the app keeps, playing in its box from its start, with the browser's own controls. */
+  const playKept = (box: HTMLElement, v: Extract<El, { type: 'video' }>, url: string) => {
+    if (!url || box.querySelector('video')) return;
+    const f = el('video');
+    f.src = url;
+    f.controls = true;
+    f.autoplay = true;
+    f.playsInline = true;
+    f.preload = 'auto';
+    if (v.muted) f.muted = true;
+    if (v.loop) f.loop = true;
+    const start = n(v.start, 0);
+    if (start > 0) f.addEventListener('loadedmetadata', () => (f.currentTime = start), { once: true });
+    box.textContent = '';
+    box.appendChild(f);
+    void f.play?.()?.catch(() => {});
+  };
   /** A video's player, playing from its start. */
-  const playVideo = (box: HTMLElement, v: Extract<El, { type: 'video' }>) => {
-    if (!PLAYER.test(v.src) || box.querySelector('iframe')) return;
+  const playVideo = (box: HTMLElement, v: Extract<El, { type: 'video' }>, o: DrawOpts = {}) => {
+    if (!PLAYER.test(v.src)) return playKept(box, v, keptUrl(v.src, o));
+    if (box.querySelector('iframe')) return;
     const yt = v.src.includes('youtube');
     const q = new URLSearchParams({
       autoplay: '1',
@@ -903,6 +933,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       d.appendChild(box);
     } else if (e.type === 'video') {
       const box = el('div', 'ns-video');
+      const online = PLAYER.test(e.src);
       const still = e.poster ? src(e.poster, o) : /youtube-nocookie\.com\/embed\/([\w-]{6,20})$/.test(e.src) ? src(`https://i.ytimg.com/vi/${e.src.split('/').pop()}/hqdefault.jpg`, o) : '';
       if (still) box.style.backgroundImage = `url("${still}")`;
       if (e.radius) box.style.borderRadius = px(n(e.radius, 0));
@@ -910,15 +941,19 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       const ic = svg('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
       ic.appendChild(svg('path', { d: 'M7 4.5v15l13-7.5z' }));
       play.appendChild(ic);
-      const from = el('span', 'ns-from');
-      from.textContent = e.src.includes('vimeo') ? 'Vimeo' : 'YouTube';
-      box.append(play, from);
-      if (o.play && PLAYER.test(e.src)) {
+      box.append(play);
+      // Where an online video comes from; one the app keeps is the deck's own.
+      if (online) {
+        const from = el('span', 'ns-from');
+        from.textContent = e.src.includes('vimeo') ? 'Vimeo' : 'YouTube';
+        box.append(from);
+      }
+      if (o.play && (online || keptUrl(e.src, o))) {
         box.dataset.video = '1';
         if (e.autoplay) box.dataset.autoplay = '1';
         box.addEventListener('click', (ev) => {
           ev.stopPropagation();
-          playVideo(box, e);
+          playVideo(box, e, o);
         });
       }
       d.appendChild(box);
@@ -1414,7 +1449,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       ...(o.words ?? {}),
     };
     // What every slide is drawn with here: videos play when clicked.
-    const pass: DrawOpts = { asset: o.asset, web: o.web, hint: o.hint, katex: o.katex, locale: o.locale, play: true };
+    const pass: DrawOpts = { asset: o.asset, web: o.web, video: o.video, hint: o.hint, katex: o.katex, locale: o.locale, play: true };
     const order = deck.slides.map((s, i) => ({ s, i })).filter((x) => o.withHidden || !x.s.hidden);
     const list = order.length ? order : deck.slides.map((s, i) => ({ s, i }));
     const root = el('div', `ns-show ${o.mode === 'full' ? 'ns-full' : 'ns-viewer'}`);
@@ -1600,9 +1635,10 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       const walk = (els: El[]) => {
         for (const e of els ?? []) {
           if (e.type === 'group') walk(e.els);
-          else if (e.type === 'video' && e.autoplay && win.origin !== 'null') {
+          // An online player cannot run in a page of its own origin (a deck's page): there, only the app's own videos start.
+          else if (e.type === 'video' && e.autoplay && (win.origin !== 'null' || !PLAYER.test(e.src))) {
             const box = root.querySelector<HTMLElement>(`.ns-el[data-id="${CSS.escape(e.id)}"] > .ns-video`);
-            if (box) playVideo(box, e);
+            if (box) playVideo(box, e, pass);
           }
         }
       };
@@ -1785,7 +1821,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
           const th = el('div', 'ns-thumb');
           th.dataset.i = String(x.i);
           th.style.aspectRatio = `${W} / ${SH}`;
-          const sl = slide(deck, x.i, { asset: o.asset, web: o.web, katex: o.katex, locale: o.locale });
+          const sl = slide(deck, x.i, { asset: o.asset, web: o.web, video: o.video, katex: o.katex, locale: o.locale });
           sl.style.transformOrigin = '0 0';
           sl.style.position = 'absolute';
           th.appendChild(sl);
@@ -2036,6 +2072,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
       const k = e.key;
+      // Space on a video that was clicked plays or pauses it (its own controls'), and the slideshow stays.
+      if (tag === 'VIDEO' && k === ' ') return;
       let hit = true;
       if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown' || k === ' ' || k === 'n' || k === 'N') {
         if (typed) {

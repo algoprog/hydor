@@ -7,13 +7,14 @@ import { HttpError } from '../auth.ts';
 import { ASSET, docMarkdown, docSources, mapDocSources, newDoc } from '../../shared/docs.ts';
 import { newTex, texSources } from '../../shared/latex.ts';
 import { newBook } from '../../shared/sheets.ts';
-import { deckSources, newDeck } from '../../shared/slides.ts';
+import { deckSources, deckVideos, newDeck } from '../../shared/slides.ts';
 import { assetDataUrl } from './assets.ts';
 import { docForAgent, docFromFile, docPage, docxOfDoc, keepDoc, MAX_DOC, readDoc } from './docs.ts';
 import { importTex, keepTex, MAX_TEX, readTex, TEX_OPENS, texForAgent, texPage, texPdf, texSource, texZip } from './latex.ts';
 import { pptxFile, type Picture } from './pptx.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, keepBook, MAX_BOOK, readBook, xlsxOfBook } from './sheets.ts';
 import { deckForAgent, deckPage, keepDeck, MAX_DECK, readDeck } from './slides.ts';
+import { videoFileFor } from './videos.ts';
 import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFromFile, notebookPage, notebookScript, readNotebook } from './notebooks.ts';
 
 export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
@@ -71,14 +72,24 @@ KINDS.set('slides', {
   max: MAX_DECK,
   keep: (db, input) => {
     const { deck, text } = keepDeck(db, input);
-    return { text, sources: deckSources(deck) };
+    // Its kept videos stay while a version shows them, as its pictures do.
+    return { text, sources: [...deckSources(deck), ...deckVideos(deck)] };
   },
   read: readDeck,
   page: (db, text, title, mode) => deckPage(db, readDeck(text), title, mode),
   forAgent: deckForAgent,
   // With YouTube's own stills of videos, for the PowerPoint file.
   sources: (text) => deckSources(readDeck(text), true),
-  files: { pptx: (_db, text, title, help) => pptxFile(readDeck(text), { title, picture: help.picture, scales: help.scales, renders: help.renders }) },
+  files: {
+    // Its videos from a device go into the PowerPoint file, and into the web page (a file on its own) where small enough.
+    pptx: (db, text, title, help) => {
+      // Each video read once, however many slides show it.
+      const read = new Map<string, ReturnType<typeof videoFileFor>>();
+      const video = (src: string) => (read.has(src) ? read.get(src)! : (read.set(src, videoFileFor(db, src)), read.get(src)!));
+      return pptxFile(readDeck(text), { title, picture: help.picture, scales: help.scales, renders: help.renders, video });
+    },
+    html: (db, text, title) => deckPage(db, readDeck(text), title, 'viewer', { videosInside: true }),
+  },
   still: (text) => ({ width: 1280, height: /"ratio":"4:3"/.test(text.slice(0, 200)) ? 960 : 720 }),
   fresh: (title) => newDeck(title),
 });

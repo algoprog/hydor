@@ -868,29 +868,35 @@ function MathLook({ el, theme, set, focus }: { el: MathEl; theme: Theme; set: (p
 }
 
 function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: string) => void }) {
-  const [url, setUrl] = useState(el.src.includes('vimeo') ? `https://vimeo.com/${el.src.split('/').pop()}` : `https://www.youtube.com/watch?v=${el.src.split('/').pop()}`);
-  const bad = !videoSrc(url);
+  // A video the app keeps (from a device) has no address to change; an online one is changed by its address.
+  const kept = !videoSrc(el.src);
+  const [url, setUrl] = useState(kept ? '' : el.src.includes('vimeo') ? `https://vimeo.com/${el.src.split('/').pop()}` : `https://www.youtube.com/watch?v=${el.src.split('/').pop()}`);
+  const bad = !kept && !videoSrc(url);
   // Another video, another still: the old one goes at once, the new one comes when the server has it (the last asked wins).
   const asked = useRef('');
   return (
     <Section title="Video">
-      <input
-        value={url}
-        onChange={(e) => {
-          const address = e.target.value;
-          setUrl(address);
-          const src = videoSrc(address);
-          if (!src || src === el.src) return;
-          set({ src, poster: undefined, ...(videoStart(address) ? { start: videoStart(address) } : {}) } as Partial<El>, 'video');
-          asked.current = src;
-          void fetchVideoStill(address).then((poster) => poster && asked.current === src && set({ poster } as Partial<El>, 'video'));
-        }}
-        onKeyDown={(e) => e.stopPropagation()}
-        aria-label="The video’s address"
-        placeholder="https://www.youtube.com/watch?v=…"
-        translate="no"
-        className={cx('h-8 w-full rounded-lg border bg-bg-1 px-2 text-[12.5px] outline-none focus:border-accent/60', bad ? 'border-err' : 'border-line')}
-      />
+      {kept ? (
+        <p className="text-[12px] leading-snug text-fg-3">A video from a device, kept with the deck.</p>
+      ) : (
+        <input
+          value={url}
+          onChange={(e) => {
+            const address = e.target.value;
+            setUrl(address);
+            const src = videoSrc(address);
+            if (!src || src === el.src) return;
+            set({ src, poster: undefined, ...(videoStart(address) ? { start: videoStart(address) } : {}) } as Partial<El>, 'video');
+            asked.current = src;
+            void fetchVideoStill(address).then((poster) => poster && asked.current === src && set({ poster } as Partial<El>, 'video'));
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          aria-label="The video’s address"
+          placeholder="https://www.youtube.com/watch?v=…"
+          translate="no"
+          className={cx('h-8 w-full rounded-lg border bg-bg-1 px-2 text-[12.5px] outline-none focus:border-accent/60', bad ? 'border-err' : 'border-line')}
+        />
+      )}
       {bad && <p className="text-[11.5px] text-err">A YouTube or Vimeo address.</p>}
       <Field label="Starts at">
         <NumInput label="Seconds into the video" value={el.start ?? 0} onChange={(start) => set({ start: Math.round(start) || undefined } as Partial<El>, 'start')} min={0} max={86400} unit="s" />
@@ -907,7 +913,9 @@ function VideoLook({ el, set }: { el: VideoEl; set: (patch: Partial<El>, key?: s
           <Switch label={label} on={!!el[k]} onChange={(v) => set({ [k]: v || undefined } as Partial<El>)} />
         </label>
       ))}
-      <p className="text-[11.5px] leading-snug text-fg-3">It plays in the slideshow when clicked; in PowerPoint it is its picture, linked to the video.</p>
+      <p className="text-[11.5px] leading-snug text-fg-3">
+        {kept ? 'It plays in the slideshow when clicked, and goes into PowerPoint as its own video.' : 'It plays in the slideshow when clicked; in PowerPoint it is its picture, linked to the video.'}
+      </p>
     </Section>
   );
 }
