@@ -12,6 +12,8 @@ import { changesOf, compareDocs, suggestionColor } from '../../shared/doc-change
 import {
   ASSET,
   blockHtml,
+  blockText,
+  cleanIcon,
   CALLOUT,
   leadingIcon,
   withComments,
@@ -22,7 +24,6 @@ import {
   fontCss,
   tocEntries,
   type Band,
-  type Spacing,
   type TableBlock,
   carryIds,
   docCss,
@@ -59,11 +60,13 @@ import { rels } from '../documents/ooxml.ts';
 import { all, att, isEl, kid, kids, parseXml, patt, path as xpath, type El } from '../documents/xml.ts';
 import { Zip } from '../documents/zip.ts';
 import { assetDataUrl, getAsset, pictureType, putAsset, takeIn } from './assets.ts';
-import { authorOf, docxFile, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
+import { authorOf, docxFile, MONO_DOC, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
 import { katexStyle, texToHtml } from './math.ts';
 import { texOfOmml } from './omml.ts';
 import { imageSize } from './ooxml.ts';
 import type { Picture } from './pptx.ts';
+import { wordLine, type EmbeddedFont, type FontFace } from './word-fonts.ts';
+import { grows, ownLine, wordLineOf, wordPlaces } from './word-layout.ts';
 
 /** The longest a document's text may be (its pictures are kept apart). */
 export const MAX_DOC = 3 * 1024 * 1024;
@@ -551,10 +554,6 @@ const wordRun = (r: Run, sgs: Map<string, Suggestion> = new Map()): WordRun => {
   return w;
 };
 
-/** A paragraph's own spacing for Word. */
-const wordSpace = (b: Spacing): DocSpace | undefined =>
-  b.lh === undefined && b.sb === undefined && b.sa === undefined ? undefined : { ...(b.lh !== undefined ? { line: b.lh } : {}), ...(b.sb !== undefined ? { before: b.sb } : {}), ...(b.sa !== undefined ? { after: b.sa } : {}) };
-
 /** A table's rows for Word: a cell merged across columns spans them, one merged down starts a run of cells Word joins. */
 function wordRows(t: TableBlock, sgs: Map<string, Suggestion>): { cells: DocCell[] }[] {
   const under = fixMerges(t.rows.map((r) => r.map((c) => ({ ...c }))));
@@ -595,56 +594,103 @@ function keptPicture(db: DB, src: string): Picture | null {
   return data && size && size.type !== 'webp' ? { data, ext: size.type, w: size.w, h: size.h } : null;
 }
 
+/** Whether words are Chinese, Japanese or Korean. */
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
+
+/** The faces of fonts a document's Word file uses: its font's, its words' own, and its code's, each bold or italic as they are shown. */
+export function docFaces(doc: Doc): FontFace[] {
+  const out = new Map<string, FontFace>();
+  const add = (name: string, b: boolean, i: boolean) => out.set(`${name}|${b}|${i}`, { name, b, i });
+  add(doc.font, false, false);
+  const words = (runs: Run[], b: boolean, i: boolean) => {
+    for (const r of runs) if (!r.math) add(r.code ? MONO_DOC : (r.font ?? doc.font), b || !!r.b, i || !!r.i);
+  };
+  for (const blk of doc.blocks) {
+    if (blk.type === 'p') {
+      const st = blk.style ?? 'normal';
+      if (st === 'code') add(MONO_DOC, false, false);
+      else words(blk.runs, !!STYLES[st].bold, !!STYLES[st].italic);
+    } else if (blk.type === 'li') words(blk.runs, false, false);
+    else if (blk.type === 'table') blk.rows.forEach((r, ri) => r.forEach((c) => words(c.runs, !!blk.head && ri === 0, false)));
+    else if (blk.type === 'toc' && tocEntries(doc).some((e) => e.level === 1)) add(doc.font, true, false);
+  }
+  return [...out.values()];
+}
+
 /**
- * The document as a Word file: its paper and margins, font and sizes, headings, lists (checklists with boxes Word
- * ticks), tables, pictures (from the kept ones, or `picture`: made ready for Office, an SVG drawn as PNG) and page
- * breaks.
+ * Word's spacing for each of a document's blocks, as the editor lays them out (word-layout.ts): space before and after
+ * in points, and lines in points (at least, or exactly) or, where lines must grow with what they hold, as a multiple
+ * of Word's line; `sep`, for a table right after another, the gap between them.
  */
-export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: string) => Picture | null): Buffer {
+export function wordSpaces(doc: Doc, blocks: Block[] = doc.blocks): (DocSpace & { sep?: number })[] {
+  const places = wordPlaces(doc, blocks);
+  return blocks.map((b, i) => {
+    const p = places[i];
+    const sp: DocSpace & { sep?: number } = { before: p.before, after: p.after };
+    if (p.sep !== undefined) sp.sep = p.sep;
+    if (b.type === 'p' || b.type === 'li') {
+      const code = b.type === 'p' && b.style === 'code';
+      const font = code ? MONO_DOC : doc.font;
+      const l = wordLineOf(p.box.line, ownLine(b.runs, font, MONO_DOC, p.box.size), !code && grows(b.runs, p.box.size), wordLine(font) * p.box.size);
+      sp.line = l.line;
+      if (l.rule) sp.rule = l.rule;
+    } else if (b.type === 'math') sp.line = 1;
+    return sp;
+  });
+}
+
+/**
+ * The document as a Word file, laid out as the editor lays it out (its pages break where the editor's do, as near as
+ * Word allows): its paper and margins, font and sizes, headings, lists (checklists with boxes Word ticks), tables,
+ * pictures (from the kept ones, or `picture`: made ready for Office, an SVG drawn as PNG), page breaks, and the faces
+ * of its fonts (`fonts`, wordFonts of docFaces) inside it.
+ */
+export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: string) => Picture | null, fonts?: Map<string, EmbeddedFont>): Buffer {
   const { groups } = listInfo(doc.blocks);
   const blocks: WordBlock[] = [];
   const pictures: Buffer[] = [];
-  const textPx = PX_PER_TEXT(doc);
+  const spaces = wordSpaces(doc);
   // The headings a table of contents lists, each with a bookmark its line leads to.
   const toc = doc.blocks.some((b) => b.type === 'toc') ? tocEntries(doc) : [];
   const anchors = new Map(toc.map((e, k) => [e.id, `_Toc${k + 1}`]));
   // Suggested changes as tracked changes: a paragraph's new (or removed) break is the paragraph before's mark.
   const sgs = new Map((doc.suggestions ?? []).map((x) => [x.id, x]));
   let lastPara = -1;
+  let cjk = false;
   doc.blocks.forEach((b, i) => {
     if (b.type === 'p' || b.type === 'li') {
       const mark = revOf(sgs, b.del, 'del') ?? revOf(sgs, b.ins, 'ins');
       const prev = blocks[lastPara];
       if (mark && prev && (prev.k === 'p' || prev.k === 'h' || prev.k === 'li')) prev.mark = mark;
     }
+    if (!cjk && CJK.test(blockText(b))) cjk = true;
     const pushed = blocks.length;
     blockOf(b, i);
     if ((b.type === 'p' || b.type === 'li') && blocks.length > pushed && ['p', 'h', 'li'].includes(blocks[blocks.length - 1].k)) lastPara = blocks.length - 1;
   });
   function blockOf(b: (typeof doc.blocks)[number], i: number) {
+    const { sep, ...space } = spaces[i];
     if (b.type === 'p') {
       const runs = b.runs.map((r) => wordRun(r, sgs));
       const align = b.align ? JC[b.align] : undefined;
       const style = b.style ?? 'normal';
       const lvl = headingLevel(style);
-      const space = wordSpace(b);
-      if (lvl) blocks.push({ k: 'h', lvl: lvl as 1 | 2 | 3 | 4, runs, keep: true, ...(align ? { align } : {}), ...(space ? { space } : {}), ...(anchors.has(b.id) ? { anchor: anchors.get(b.id) } : {}) });
-      else if (style === 'code') blocks.push({ k: 'pre', text: b.runs.map((r) => r.t).join('') || ' ' });
+      if (lvl) blocks.push({ k: 'h', lvl: lvl as 1 | 2 | 3 | 4, runs, keep: true, space, ...(align ? { align } : {}), ...(anchors.has(b.id) ? { anchor: anchors.get(b.id) } : {}) });
+      else if (style === 'code') blocks.push({ k: 'pre', text: b.runs.map((r) => r.t).join('') || ' ', space });
       else
         blocks.push({
           k: 'p',
           runs,
           keep: true,
+          space,
           ...(align ? { align } : {}),
           ...(style === 'quote' ? { quote: true } : {}),
           ...(style === 'title' || style === 'subtitle' ? { style } : {}),
           ...(style === 'callout' ? { shade: b.tint ?? CALLOUT.tint, icon: b.icon ?? CALLOUT.icon } : {}),
           ...(b.lvl ? { indent: b.lvl } : {}),
-          ...(space ? { space } : {}),
         });
     } else if (b.type === 'li') {
       const align = b.align ? JC[b.align] : undefined;
-      const space = wordSpace(b);
       blocks.push({
         k: 'li',
         ordered: b.list === 'number',
@@ -652,28 +698,28 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
         list: groups[i],
         runs: b.runs.map((r) => wordRun(r, sgs)),
         keep: true,
+        space,
         ...(b.list === 'check' ? { check: true, ...(b.checked ? { checked: true } : {}) } : {}),
         ...(align ? { align } : {}),
-        ...(space ? { space } : {}),
       });
     } else if (b.type === 'table') {
       const rev = revOf(sgs, b.del, 'del') ?? revOf(sgs, b.ins, 'ins');
-      blocks.push({ k: 'table', rows: wordRows(b, sgs), ...(b.cols ? { cols: b.cols } : {}), ...(rev ? { rev } : {}) });
+      blocks.push({ k: 'table', rows: wordRows(b, sgs), ...(b.cols ? { cols: b.cols } : {}), ...(rev ? { rev } : {}), ...(sep !== undefined ? { sep } : {}) });
     } else if (b.type === 'toc') {
-      blocks.push({ k: 'toc', entries: toc.map((e) => ({ lvl: e.level, text: e.text, anchor: anchors.get(e.id)! })) });
+      blocks.push({ k: 'toc', entries: toc.map((e) => ({ lvl: e.level, text: e.text, anchor: anchors.get(e.id)! })), space });
     } else if (b.type === 'math') {
-      blocks.push({ k: 'math', tex: b.tex });
+      blocks.push({ k: 'math', tex: b.tex, space });
     } else if (b.type === 'image') {
       const pic = picture?.(b.src) ?? keptPicture(db, b.src);
       if (!pic || pic.ext === 'webp') {
-        if (b.alt || b.caption) blocks.push({ k: 'p', runs: [{ t: b.caption || b.alt || '', i: true }] });
+        if (b.alt || b.caption) blocks.push({ k: 'p', runs: [{ t: b.caption || b.alt || '', i: true }], space });
         return;
       }
-      const w = Math.max(16, Math.round(textPx * b.w));
+      const w = Math.max(16, Math.round(PX_PER_TEXT(doc) * b.w));
       pictures.push(pic.data);
       const rev = revOf(sgs, b.del, 'del') ?? revOf(sgs, b.ins, 'ins');
-      blocks.push({ k: 'img', shot: pictures.length - 1, w, h: Math.round((w * pic.h) / Math.max(1, pic.w)), align: b.align ?? 'center', ...(b.alt ? { alt: b.alt } : {}), ...(b.caption ? { caption: b.caption } : {}), ...(rev ? { rev } : {}) });
-    } else if (b.type === 'hr') blocks.push({ k: 'hr' });
+      blocks.push({ k: 'img', shot: pictures.length - 1, w, h: Math.round((w * pic.h) / Math.max(1, pic.w)), share: b.w, align: b.align ?? 'center', space, ...(b.alt ? { alt: b.alt } : {}), ...(b.caption ? { caption: b.caption } : {}), ...(rev ? { rev } : {}) });
+    } else if (b.type === 'hr') blocks.push({ k: 'hr', space });
     else blocks.push({ k: 'pb' });
   }
   const look: DocLook = {
@@ -682,9 +728,7 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     title: Math.round(doc.size * STYLES.title.k * 2) / 2,
     subtitle: Math.round(doc.size * STYLES.subtitle.k * 2) / 2,
     heads: (['h1', 'h2', 'h3', 'h4', 'h4', 'h4'] as ParaStyle[]).map((s) => Math.round(doc.size * STYLES[s].k * 2) / 2),
-    // Word's line spacing counts from the font's own line (about 1.15 of its size), CSS's from its size.
-    line: Math.round((STYLES.normal.lh / 1.15) * 100) / 100,
-    after: Math.round(doc.size * STYLES.normal.after * 2) / 2,
+    editor: { cjk },
   };
   return docxFile({ title, lang: '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) }, pictures, {
     title,
@@ -696,6 +740,7 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     footer: doc.footer,
     titlePage: doc.titlePage,
     comments: doc.comments?.map((c) => ({ id: c.id, by: c.by, author: c.author, text: c.text, at: c.at, resolved: c.resolved, replies: c.replies?.map((r) => ({ by: r.by, author: r.author, text: r.text, at: r.at })) })),
+    fonts,
   });
 }
 
@@ -856,13 +901,14 @@ function rLook(ctx: WCtx, rPr: El | undefined, into: Look) {
   if (sz > 0) into.size = Math.round(sz) / 2;
   const font = fontOf(ctx, kid(rPr, 'rFonts'));
   if (font) {
-    if (MONO_FONTS.test(font)) into.code = true;
+    // A monospaced font marks code, but one the app offers (JetBrains Mono, Courier New) is the words' font.
+    if (MONO_FONTS.test(font) && !FONTS.some((f) => f.name.toLowerCase() === font.toLowerCase())) into.code = true;
     else into.font = font;
   }
 }
 
 /** What a paragraph is: its style (a heading, the title…), list, alignment and indent. */
-function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kind: 'bullet' | 'number' | 'check'; lvl: number }; align?: Align; lvl: number; left: number; caption: boolean } {
+function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kind: 'bullet' | 'number' | 'check'; lvl: number }; align?: Align; lvl: number; left: number; hanging: number; caption: boolean } {
   const id = att(kid(pPr, 'pStyle'), 'val');
   const styles = chain(ctx, id);
   let style: ParaStyle = 'normal';
@@ -899,8 +945,9 @@ function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kin
   }
   const jc = att(kid(pPr, 'jc'), 'val');
   const align: Align | undefined = jc === 'center' ? 'center' : jc === 'right' || jc === 'end' ? 'right' : jc === 'both' || jc === 'distribute' ? 'justify' : undefined;
-  const left = Number(att(kid(pPr, 'ind'), 'left') ?? att(kid(pPr, 'ind'), 'start') ?? 0);
-  return { style, list, align, lvl: list ? 0 : Math.min(4, Math.max(0, Math.round(left / 720))), left, caption };
+  const left = Number(att(kid(pPr, 'ind'), 'left') ?? att(kid(pPr, 'ind'), 'start') ?? 0) || 0;
+  const hanging = Number(att(kid(pPr, 'ind'), 'hanging') ?? 0) || 0;
+  return { style, list, align, lvl: list ? 0 : Math.min(4, Math.max(0, Math.round(left / 720))), left, hanging, caption };
 }
 
 /** A picture of a drawing, from the file's media, as a picture block (its width as a share of the text's). */
@@ -922,7 +969,8 @@ function drawingImage(ctx: WCtx, x: El, align: Align | undefined): Record<string
     src: `data:${mime};base64,${data.toString('base64')}`,
     w: cx && ctx.textEmu ? Math.min(1, cx / ctx.textEmu) : 1,
     ...(alt ? { alt } : {}),
-    ...(align === 'left' || align === 'right' ? { align } : {}),
+    // Word puts a picture whose paragraph says nothing on the left (this app's files say each one's).
+    ...(!align || align === 'left' || align === 'right' ? { align: align ?? 'left' } : {}),
   };
 }
 
@@ -1022,10 +1070,11 @@ function inline(ctx: WCtx, el: El, c: PCollect, align: Align | undefined) {
       case 'r': {
         const rPr = kid(x, 'rPr');
         const look: Look = {};
-        // Its character style's look, then its own.
+        // Its character style's look, then its own. Code's look (its font, size, shading) is code's, a link's (blue,
+        // underlined) the link's, and a ticked checklist item's (struck, grey) the item's: not the words' own.
         for (const s of chain(ctx, att(kid(rPr, 'rStyle'), 'val')).reverse()) {
           if (/code/i.test(s.name)) look.code = true;
-          rLook(ctx, s.rPr, look);
+          else if (s.name !== 'Done item' && !/^(hyperlink|followedhyperlink)$/i.test(s.name.replace(/\s+/g, ''))) rLook(ctx, s.rPr, look);
         }
         rLook(ctx, rPr, look);
         if (look.size === ctx.size) delete look.size;
@@ -1113,19 +1162,54 @@ function inline(ctx: WCtx, el: El, c: PCollect, align: Align | undefined) {
 /** How deep in fields a paragraph leaves Word's reader (fields it opens, less those it closes). */
 const fieldDepth = (p: El) => all(p, 'fldChar').reduce((n, f) => n + (att(f, 'fldCharType') === 'begin' ? 1 : att(f, 'fldCharType') === 'end' ? -1 : 0), 0);
 
-/** A paragraph's own spacing as a document keeps it (lines, and points before and after). */
-function wordSpacing(pPr: El | undefined): Spacing {
+/** A paragraph's own spacing as Word says it (points before and after; lines in points with their rule, or as a multiple), kept on its block until ownSpacing decides what of it is the paragraph's own. */
+type RawSpace = { before?: number; after?: number; line?: number; rule?: 'atLeast' | 'exact' };
+const RAW = '__space';
+
+function wordSpacing(pPr: El | undefined): RawSpace | undefined {
   const sp = kid(pPr, 'spacing');
-  const out: Spacing = {};
-  if (!sp) return out;
+  if (!sp) return undefined;
+  const out: RawSpace = {};
   const before = att(sp, 'before');
   const after = att(sp, 'after');
   const line = att(sp, 'line');
   const rule = att(sp, 'lineRule') ?? 'auto';
-  if (before !== undefined && /^\d+$/.test(before) && att(sp, 'beforeAutospacing') !== '1') out.sb = Math.min(200, Math.round((Number(before) / 20) * 2) / 2);
-  if (after !== undefined && /^\d+$/.test(after) && att(sp, 'afterAutospacing') !== '1') out.sa = Math.min(200, Math.round((Number(after) / 20) * 2) / 2);
-  if (line !== undefined && /^\d+$/.test(line) && rule === 'auto') out.lh = Math.min(5, Math.max(0.5, Math.round((Number(line) / 240) * 100) / 100));
-  return out;
+  if (before !== undefined && /^\d+$/.test(before) && att(sp, 'beforeAutospacing') !== '1') out.before = Math.min(400, Number(before) / 20);
+  if (after !== undefined && /^\d+$/.test(after) && att(sp, 'afterAutospacing') !== '1') out.after = Math.min(400, Number(after) / 20);
+  if (line !== undefined && /^\d+$/.test(line) && Number(line) > 0) {
+    if (rule === 'auto') out.line = Number(line) / 240;
+    else if (rule === 'exact' || rule === 'atLeast') {
+      out.line = Number(line) / 20;
+      out.rule = rule;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * A Word file's paragraphs' own spacing, as a document keeps it: what Word says of a paragraph beyond what the
+ * editor's layout gives it there anyway (word-layout.ts, the same that writes a document's files, so one written here
+ * comes back as it was). Lines come back as the document's lines (1 is the editor's single line): Word's in points as
+ * they are, and a multiple of Word's own line by the font's Word line.
+ */
+function ownSpacing(out: Record<string, unknown>[], font: string, size: number) {
+  const doc = { v: 1, page: { size: 'a4', margin: 25.4 }, font, size, blocks: [] } as Doc;
+  out.forEach((b, i) => {
+    const sp = b[RAW] as RawSpace | undefined;
+    delete b[RAW];
+    if (!sp || (b.type !== 'p' && b.type !== 'li')) return;
+    const win = (i === 0 ? [b, out[i + 1]] : [out[i - 1], b, out[i + 1]]).filter(Boolean) as unknown as Block[];
+    const at = i === 0 ? 0 : 1;
+    const p = wordPlaces(doc, win)[at];
+    const near = (a: number, x: number) => Math.abs(a - x) < 0.06;
+    const pt = (x: number) => Math.min(200, Math.round(x * 2) / 2);
+    if (sp.after !== undefined && !near(sp.after, p.after)) b.sa = pt(sp.after - p.box.pb);
+    if (sp.before !== undefined && !near(sp.before, p.before)) b.sb = pt(sp.before - p.box.pt);
+    if (sp.line !== undefined) {
+      const h = sp.rule ? sp.line : sp.line * wordLine(b.type === 'p' && b.style === 'code' ? MONO_DOC : font) * p.box.size;
+      if (Math.abs(h - p.box.line) > 0.3) b.lh = Math.min(5, Math.max(0.5, Math.round((h / (1.15 * p.box.size)) * 100) / 100));
+    }
+  });
 }
 
 function wordParagraph(ctx: WCtx, p: El, out: Record<string, unknown>[], depth: number) {
@@ -1165,6 +1249,8 @@ function wordParagraphBody(ctx: WCtx, p: El, pPr: El | undefined, out: Record<st
   const c: PCollect = { runs: [], after: [], breaks: [] };
   inline(ctx, p, c, k.align);
   let runs = mergeRuns(c.runs);
+  // A box Word ticks, then the tab to the item's words.
+  if (c.check && /^[\t ]/.test(runs[0]?.t ?? '')) runs = mergeRuns([{ ...runs[0], t: runs[0].t.replace(/^[\t ]+/, '') }, ...runs.slice(1)].filter((r) => r.t));
   // A box drawn as a character starts a checklist's item.
   const glyph = /^\s*([☐☑☒])\s*/.exec(runs[0]?.t ?? '');
   if (glyph && (k.list || runs.length)) {
@@ -1179,15 +1265,19 @@ function wordParagraphBody(ctx: WCtx, p: El, pPr: El | undefined, out: Record<st
     prevImg.caption = text.replace(/\s+/g, ' ').trim();
     return;
   }
-  // A checklist's item is indented by its level (as docx.ts writes them: half an inch, and a quarter more a level).
-  const checkLvl = Math.min(4, Math.max(0, Math.round((k.left - 720) / 360)));
-  const space = wordSpacing(pPr);
-  // A shaded paragraph that starts with an emoji is a callout (as this app writes one).
+  // A checklist's item is a step (half an inch) further in a level, its box where its first line starts (left less hanging).
+  const checkLvl = Math.min(4, Math.max(0, Math.floor((k.left - k.hanging + 180) / 720)));
+  const raw = wordSpacing(pPr);
+  const space = raw ? { [RAW]: raw } : {};
+  // A shaded paragraph that starts with an emoji is a callout (as this app writes one: the emoji in a run of its own, then a tab).
   const shade = att(kid(pPr, 'shd'), 'fill');
-  const lead = shade && /^[0-9a-f]{6}$/i.test(shade) && !/^ffffff$/i.test(shade) ? leadingIcon(runs[0]?.t ?? '') : null;
+  const shaded = !!shade && /^[0-9a-f]{6}$/i.test(shade) && !/^ffffff$/i.test(shade);
+  const own = shaded && runs.length > 1 && cleanIcon(runs[0].t.trim()) && /^[\t ]/.test(runs[1].t) ? cleanIcon(runs[0].t.trim()) : undefined;
+  if (own) runs = mergeRuns([{ ...runs[1], t: runs[1].t.replace(/^[\t ]+/, '') }, ...runs.slice(2)].filter((r) => r.t));
+  const lead = own ? { icon: own, rest: runs[0]?.t ?? '' } : shaded ? leadingIcon(runs[0]?.t ?? '') : null;
   const block = (rs: Run[]): Record<string, unknown> => {
     if (c.check || k.list) return { type: 'li', list: c.check ? 'check' : k.list!.kind, lvl: k.list?.lvl ?? checkLvl, ...(c.checked ? { checked: true } : {}), ...(k.align ? { align: k.align } : {}), ...space, runs: rs };
-    if (lead && k.style === 'normal') return { type: 'p', style: 'callout', icon: lead.icon, tint: `#${shade!.toLowerCase()}`, ...(k.align ? { align: k.align } : {}), runs: mergeRuns([{ ...rs[0], t: lead.rest }, ...rs.slice(1)]) };
+    if (lead && k.style === 'normal') return { type: 'p', style: 'callout', icon: lead.icon, tint: `#${shade!.toLowerCase()}`, ...(k.align ? { align: k.align } : {}), ...space, runs: rs.length ? mergeRuns([{ ...rs[0], t: lead.rest }, ...rs.slice(1)]) : [] };
     const b: Record<string, unknown> = { type: 'p', runs: k.style === 'code' ? [{ t: rs.map((r) => r.t).join('') }] : rs, ...space };
     if (k.style !== 'normal') b.style = k.style;
     if (k.align) b.align = k.align;
@@ -1209,7 +1299,7 @@ function wordParagraphBody(ctx: WCtx, p: El, pPr: El | undefined, out: Record<st
     }
     const rest = mergeRuns(flat.slice(at));
     if (rest.some((r) => r.t.trim())) out.push(block(rest));
-  } else if (text || !c.after.length) out.push(block(runs));
+  } else if ((text || !c.after.length) && !(raw?.rule === 'exact' && (raw.line ?? 99) <= 1.5 && !text.trim() && depth === 0)) out.push(block(runs));
   out.push(...c.after);
   // A section that starts on a new page.
   const sect = kid(pPr, 'sectPr');
@@ -1224,10 +1314,14 @@ function wordTable(ctx: WCtx, tbl: El, out: Record<string, unknown>[], depth: nu
   let head = false;
   // Each column's cell merged down that is still open (by where it is), for the cells under it.
   const down = new Map<number, WCell>();
+  // Its rows added or taken out as tracked changes (every row so: the table is a suggestion).
+  const revs: El[] = [];
   rowsOf(tbl)
     .slice(0, DOC_LIMITS.rows)
     .forEach((tr, ri) => {
       if (ri === 0 && on(xpath(tr, 'trPr', 'tblHeader'))) head = true;
+      const rev = xpath(tr, 'trPr', 'ins') ?? xpath(tr, 'trPr', 'del');
+      if (rev) revs.push(rev);
       const row: WCell[] = [];
       for (const tc of cellsOf(tr)) {
         if (row.length >= DOC_LIMITS.cols) break;
@@ -1263,14 +1357,18 @@ function wordTable(ctx: WCtx, tbl: El, out: Record<string, unknown>[], depth: nu
       if (row.length) rows.push(row);
     });
   if (!rows.length) return;
-  // A first row all in bold is a header (its bold the header's own).
-  if (!head && rows.length > 1 && rows[0].every((c) => c.runs.every((r) => r.b || !r.t.trim())) && rows[0].some((c) => c.runs.some((r) => r.t.trim()))) {
+  // A first row all in bold is a header (its bold the header's own); a header row's bold, and the shading this app
+  // gives one, are the header's own too.
+  const bold = rows[0].every((c) => c.runs.every((r) => r.b || !r.t.trim())) && rows[0].some((c) => c.runs.some((r) => r.t.trim()));
+  if ((head || rows.length > 1) && bold) {
     head = true;
     rows[0] = rows[0].map((c) => ({ ...c, runs: mergeRuns(c.runs.map(({ b: _b, ...r }) => r)) }));
   }
+  if (head) rows[0] = rows[0].map(({ fill, ...c }) => (fill && /^#f3f(4f6|5f7)$/.test(fill) ? c : { ...c, ...(fill ? { fill } : {}) }));
   const grid = kids(kid(tbl, 'tblGrid'), 'gridCol').map((g) => Number(att(g, 'w')) || 0);
   const width = Math.max(...rows.map((r) => r.length));
-  out.push({ type: 'table', rows, ...(head ? { head: true } : {}), ...(grid.length === width && grid.every((g) => g > 0) ? { cols: grid } : {}) });
+  const kind = revs.length === rows.length && revs.every((r) => r.n === revs[0].n) ? (revs[0].n === 'ins' ? 'ins' : 'del') : null;
+  out.push({ type: 'table', rows, ...(head ? { head: true } : {}), ...(grid.length === width && grid.every((g) => g > 0) ? { cols: grid } : {}), ...(kind ? { [kind]: revSuggestion(ctx, revs[0]) } : {}) });
 }
 
 function wordBody(ctx: WCtx, el: El, out: Record<string, unknown>[], depth: number) {
@@ -1408,6 +1506,7 @@ function wordDoc(buf: Buffer): Doc {
 
   const out: Record<string, unknown>[] = [];
   wordBody(ctx, body, out, 0);
+  ownSpacing(out, font, ctx.size);
   // A document's last empty paragraphs are left out.
   while (out.length > 1 && out[out.length - 1].type === 'p' && !(out[out.length - 1].runs as Run[]).some((x) => x.t.trim())) out.pop();
   if (out[out.length - 1]?.type === 'pagebreak') out.pop();

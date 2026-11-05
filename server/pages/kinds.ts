@@ -15,6 +15,7 @@ import { pptxFile, type Picture } from './pptx.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, keepBook, MAX_BOOK, readBook, xlsxOfBook } from './sheets.ts';
 import { deckForAgent, deckPage, keepDeck, MAX_DECK, readDeck } from './slides.ts';
 import { videoFileFor } from './videos.ts';
+import type { EmbeddedFont } from './word-fonts.ts';
 import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFromFile, notebookPage, notebookScript, readNotebook } from './notebooks.ts';
 
 export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
@@ -33,6 +34,8 @@ export interface ExportHelp {
   scales?: Map<string, number>;
   /** Parts made into pictures in a browser (a deck's icons and equations). */
   renders?: Map<string, Picture>;
+  /** A document's fonts for its Word file, the faces it uses (word-fonts.ts). */
+  wordFonts?: Map<string, EmbeddedFont>;
 }
 
 export interface KindDef {
@@ -107,7 +110,7 @@ KINDS.set('doc', {
   forAgent: docForAgent,
   sources: (text) => docSources(readDoc(text)),
   files: {
-    docx: (db, text, title, help) => docxOfDoc(db, readDoc(text), title, help.picture),
+    docx: (db, text, title, help) => docxOfDoc(db, readDoc(text), title, help.picture, help.wordFonts),
     // A file on its own: its pictures go inside it; Markdown has no way to show suggested changes, so they are made.
     md: (db, text) => docMarkdown(mapDocSources(asAccepted(readDoc(text)), (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? src) : src)), { tocLinks: true }),
   },
