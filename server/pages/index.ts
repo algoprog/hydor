@@ -215,7 +215,7 @@ const SAVE_SLIDES: RunTool = {
   inputSchema: SAVE_SLIDES_SCHEMA,
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
-    const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides }, ctx.cwd);
+    const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides }, ctx.cwd);
     const p = keepModel(ctx, id, 'slides', a.title, deck);
     const n = deck.slides.length;
     return [

@@ -1,9 +1,12 @@
 // Slides: a deck of slides kept in Pages (a page of the kind "slides"), as the server, the editor and the player
 // share it. A slide is 1280 pixels wide (720 high at 16:9, 960 at 4:3) and holds parts placed on it, as in
-// PowerPoint or Google Slides: text boxes, shapes (which may hold text too), pictures, lines and arrows, tables
-// and charts. Each slide has its background, its order of animations (a part comes in, is stressed or goes out:
-// on a click, with the one before or after it), its transition from the slide before, and speaker notes. The
-// deck's theme names the colours and fonts parts refer to ("accent", "head"), so a new theme recolours it all.
+// PowerPoint or Google Slides: text boxes, shapes (which may hold text too), pictures (cropped, their colours
+// adjusted), lines and arrows, tables, charts, icons, equations (LaTeX), videos, and groups of parts that move as
+// one. Each slide has its background, its order of animations (a part comes in, is stressed or goes out: on a
+// click, with the one before or after it), its transition from the slide before (Morph glides the parts two slides
+// share into place), and speaker notes. The deck's theme names the colours and fonts parts refer to ("accent",
+// "head"), so a new theme recolours it all; the deck may number its slides and give them a footer, and keeps the
+// guides its slides are lined up on.
 //
 // normalizeDeck takes what an agent or the editor sends, lenient about shorthand (a slide made from a layout
 // with its title and bullets, text as a string with "- " bullets and **bold**), and returns the full model,
@@ -14,7 +17,7 @@ export const SLIDE_W = 1280;
 export type Ratio = '16:9' | '4:3';
 export const slideH = (r: Ratio | undefined) => (r === '4:3' ? 960 : 720);
 
-export const SLIDE_LIMITS = { slides: 300, els: 150, anims: 120, paras: 200, run: 6000, notes: 20000, rows: 40, cols: 12, series: 12, labels: 80 };
+export const SLIDE_LIMITS = { slides: 300, els: 150, anims: 120, paras: 200, run: 6000, notes: 20000, rows: 40, cols: 12, series: 12, labels: 80, nodes: 60, tex: 4000, depth: 4, guides: 40 };
 
 /** A picture kept by the app (server/pages/assets.ts), by its content's hash: "naget-asset:<sha>". */
 export const ASSET = 'naget-asset:';
@@ -81,6 +84,11 @@ export interface Base {
   /** Its name in the editor and in the animations' list. */
   name?: string;
   lock?: boolean;
+  /**
+   * What its copies share with it (a slide duplicated, a part pasted): the id of the part it was first copied from.
+   * Morph glides a part into the one of the next slide with the same key (or id).
+   */
+  key?: string;
 }
 
 export type ShapeKind =
@@ -164,6 +172,30 @@ export interface ImageEl extends Base {
   alt?: string;
   flipH?: boolean;
   flipV?: boolean;
+  /** How much of the picture is cut off at each side, as a share of its width or height: what is left fills the box (fit no longer applies). */
+  crop?: Crop;
+  /** Its colours changed. */
+  adjust?: Adjust;
+}
+
+/** The shares cut off a picture's left, top, right and bottom (0–0.95; left and right together at most 0.95). */
+export interface Crop {
+  l: number;
+  t: number;
+  r: number;
+  b: number;
+}
+
+export interface Adjust {
+  /** −100 to 100. */
+  bright?: number;
+  /** −100 to 100. */
+  contrast?: number;
+  /** 0 (grey) to 200; 100 is the picture's own. */
+  sat?: number;
+  gray?: boolean;
+  /** Pixels. */
+  blur?: number;
 }
 
 export type Cap = 'none' | 'arrow' | 'dot';
@@ -195,6 +227,17 @@ export interface TableEl extends Base {
   cols?: number[];
   /** Each column's alignment. */
   aligns?: Align[];
+  /** Cells merged into one: from row r and column c, rs rows down and cs columns across. */
+  merges?: Merge[];
+  /** Cells' own fills, by "row,column" ("2,0"). */
+  fills?: Record<string, string>;
+}
+
+export interface Merge {
+  r: number;
+  c: number;
+  rs: number;
+  cs: number;
 }
 
 export type ChartKind = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'doughnut';
@@ -222,7 +265,50 @@ export interface ChartEl extends Base {
   font?: string;
 }
 
-export type El = TextEl | ShapeEl | ImageEl | LineEl | TableEl | ChartEl;
+/** One of an icon's lines, as an SVG element on a 24×24 grid: its tag and attributes. */
+export type IconNode = [tag: IconTag, attrs: Record<string, string | number>];
+export type IconTag = 'path' | 'circle' | 'ellipse' | 'rect' | 'line' | 'polyline' | 'polygon';
+
+/** An icon of Lucide's library (its name, and its lines, so it draws anywhere), in a colour and a line width. */
+export interface IconEl extends Base {
+  type: 'icon';
+  icon: string;
+  paths: IconNode[];
+  color?: string;
+  /** The width of its lines on its 24-unit grid (Lucide's own is 2). */
+  lineW?: number;
+}
+
+/** An equation in LaTeX, drawn with KaTeX as large as its box allows. */
+export interface MathEl extends Base {
+  type: 'math';
+  tex: string;
+  color?: string;
+  align?: 'left' | 'center' | 'right';
+}
+
+/** A video from YouTube or Vimeo: its player's address, and the still that shows until it plays. */
+export interface VideoEl extends Base {
+  type: 'video';
+  src: string;
+  /** A picture's source; YouTube's own still when not given. */
+  poster?: string;
+  /** Seconds into the video it starts at. */
+  start?: number;
+  /** Plays by itself when its slide shows in the slideshow. */
+  autoplay?: boolean;
+  muted?: boolean;
+  loop?: boolean;
+  radius?: number;
+}
+
+/** Parts that are picked, moved, sized, turned, copied and animated as one: placed from the group's top-left corner. */
+export interface GroupEl extends Base {
+  type: 'group';
+  els: El[];
+}
+
+export type El = TextEl | ShapeEl | ImageEl | LineEl | TableEl | ChartEl | IconEl | MathEl | VideoEl | GroupEl;
 export type ElType = El['type'];
 
 export type AnimFx = 'appear' | 'fade' | 'fly' | 'float' | 'zoom' | 'wipe' | 'bounce' | 'pulse' | 'spin' | 'grow' | 'shake';
@@ -253,8 +339,9 @@ export interface Anim {
   byPara?: boolean;
 }
 
-export type TransitionFx = 'none' | 'fade' | 'push' | 'wipe' | 'cover' | 'zoom' | 'split';
-export const TRANSITIONS: TransitionFx[] = ['none', 'fade', 'push', 'wipe', 'cover', 'zoom', 'split'];
+/** Morph: the parts this slide shares with the one before glide from where they were; the rest fade. */
+export type TransitionFx = 'none' | 'fade' | 'push' | 'wipe' | 'cover' | 'zoom' | 'split' | 'morph';
+export const TRANSITIONS: TransitionFx[] = ['none', 'fade', 'push', 'wipe', 'cover', 'zoom', 'split', 'morph'];
 
 export interface Transition {
   fx: TransitionFx;
@@ -286,6 +373,26 @@ export interface Slide {
   hidden?: boolean;
   /** The layout it was made from. */
   layout?: LayoutId;
+  /** The deck's footer and slide number left off this slide. */
+  nofooter?: boolean;
+}
+
+/** What the foot of every slide shows. */
+export interface Footer {
+  /** The slide's number. */
+  num?: boolean;
+  /** Words, in the middle. */
+  text?: string;
+  /** "today": the day it is shown, as the viewer's language writes it; else a date as written. */
+  date?: string;
+  /** Not on the title slide: the first, and any made from the Title layout. */
+  skipTitle?: boolean;
+}
+
+/** Lines across (y) and down (x) the slides that parts snap to, as the rulers place them. */
+export interface Guides {
+  x?: number[];
+  y?: number[];
 }
 
 export interface Deck {
@@ -293,6 +400,8 @@ export interface Deck {
   ratio: Ratio;
   theme: Theme;
   slides: Slide[];
+  footer?: Footer;
+  guides?: Guides;
 }
 
 // ---- themes and fonts ------------------------------------------------------------------------------------
@@ -563,9 +672,95 @@ export const newId = () => Math.random().toString(36).slice(2, 10).padEnd(8, '0'
 /** A part's words, as plain text (paragraphs on lines of their own). */
 export const plainText = (paras: Para[] | undefined) => (paras ?? []).map((p) => p.runs.map((r) => r.t).join('')).join('\n');
 
+/** Every part of a slide, those in groups too (a group before its parts). */
+export function everyEl(els: El[], out: El[] = []): El[] {
+  for (const e of els) {
+    out.push(e);
+    if (e.type === 'group') everyEl(e.els, out);
+  }
+  return out;
+}
+
+const r2 = (v: number) => Math.round(v * 100) / 100;
+const rad = (deg: number | undefined) => ((deg ?? 0) * Math.PI) / 180;
+
+/** The box around a part as it shows: around its turned corners (a line's from its two ends). */
+export function turnedBox(e: El): { x: number; y: number; w: number; h: number } {
+  if (e.type === 'line') return { x: Math.min(e.x, e.x + e.w), y: Math.min(e.y, e.y + e.h), w: Math.abs(e.w), h: Math.abs(e.h) };
+  const a = rad(e.rot);
+  if (!a) return { x: e.x, y: e.y, w: e.w, h: e.h };
+  const c = Math.abs(Math.cos(a));
+  const sn = Math.abs(Math.sin(a));
+  const w = e.w * c + e.h * sn;
+  const h = e.w * sn + e.h * c;
+  return { x: e.x + e.w / 2 - w / 2, y: e.y + e.h / 2 - h / 2, w, h };
+}
+
+/** A part moved by dx, dy (a group's parts stay where they are in it). */
+export const shiftEl = <T extends El>(e: T, dx: number, dy: number): T => ({ ...e, x: r2(e.x + dx), y: r2(e.y + dy) });
+
+/**
+ * A group fitted around its parts: they start at its top-left corner and it is as large as they need, placed so
+ * that nothing moves on the slide (a turned group's centre moves by its turn of what its parts' box moved).
+ */
+export function fitGroup(g: GroupEl): GroupEl {
+  if (!g.els.length) return g;
+  const boxes = g.els.map(turnedBox);
+  const minX = Math.min(...boxes.map((b) => b.x));
+  const minY = Math.min(...boxes.map((b) => b.y));
+  const w = Math.max(1, Math.max(...boxes.map((b) => b.x + b.w)) - minX);
+  const h = Math.max(1, Math.max(...boxes.map((b) => b.y + b.h)) - minY);
+  if (Math.abs(minX) < 0.005 && Math.abs(minY) < 0.005 && Math.abs(w - g.w) < 0.005 && Math.abs(h - g.h) < 0.005) return g;
+  const a = rad(g.rot);
+  const dx = minX + w / 2 - g.w / 2;
+  const dy = minY + h / 2 - g.h / 2;
+  const cx = g.x + g.w / 2 + dx * Math.cos(a) - dy * Math.sin(a);
+  const cy = g.y + g.h / 2 + dx * Math.sin(a) + dy * Math.cos(a);
+  return { ...g, x: r2(cx - w / 2), y: r2(cy - h / 2), w: r2(w), h: r2(h), els: g.els.map((e) => shiftEl(e, -minX, -minY)) };
+}
+
+/** Parts made into a group (in their order), its box around them. */
+export function groupOf(els: El[], id: string): GroupEl {
+  return fitGroup({ id, type: 'group', x: 0, y: 0, w: 0, h: 0, els });
+}
+
+/** A group's parts back on the slide (or in the group around it) where they show, turned with it, as see-through as it made them. */
+export function ungroupEls(g: GroupEl): El[] {
+  const a = rad(g.rot);
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const gx = g.x + g.w / 2;
+  const gy = g.y + g.h / 2;
+  const op = (o: number | undefined) => {
+    const v = (o ?? 1) * (g.opacity ?? 1);
+    return v < 1 ? r2(v) : undefined;
+  };
+  return g.els.map((e) => {
+    const lx = e.x + e.w / 2 - g.w / 2;
+    const ly = e.y + e.h / 2 - g.h / 2;
+    const cx = gx + lx * cos - ly * sin;
+    const cy = gy + lx * sin + ly * cos;
+    if (e.type === 'line') {
+      const w = e.w * cos - e.h * sin;
+      const h = e.w * sin + e.h * cos;
+      return { ...e, x: r2(cx - w / 2), y: r2(cy - h / 2), w: r2(w), h: r2(h), opacity: op(e.opacity) };
+    }
+    const rot = (((e.rot ?? 0) + (g.rot ?? 0)) % 360 + 360) % 360;
+    return { ...e, x: r2(cx - e.w / 2), y: r2(cy - e.h / 2), rot: rot ? r2(rot) : undefined, opacity: op(e.opacity) } as El;
+  });
+}
+
+/** A group's parts sized with it: by kx across and ky down (their words keep their size). */
+export function scaleEls(els: El[], kx: number, ky: number): El[] {
+  return els.map((e) => {
+    const s = { ...e, x: r2(e.x * kx), y: r2(e.y * ky), w: r2(e.w * kx), h: r2(e.h * ky) } as El;
+    return s.type === 'group' ? { ...s, els: scaleEls(s.els, kx, ky) } : s;
+  });
+}
+
 /** What a slide is called: its title's words, else its first words. */
 export function slideTitle(s: Slide): string {
-  const texts = s.els.filter((e): e is TextEl | ShapeEl => (e.type === 'text' || e.type === 'shape') && plainText(e.paras).trim().length > 1);
+  const texts = everyEl(s.els).filter((e): e is TextEl | ShapeEl => (e.type === 'text' || e.type === 'shape') && plainText(e.paras).trim().length > 1);
   // Its title, else its words in the largest type.
   const t = texts.find((e) => e.role === 'title') ?? texts.slice().sort((a, b) => b.size - a.size)[0];
   return t ? plainText(t.paras).replace(/\s+/g, ' ').trim().slice(0, 100) : '';
@@ -645,6 +840,40 @@ export function cleanSrc(v: unknown): string | null {
   if (/^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(s)) return s;
   if (/^https?:\/\/[^\s<>"'()\\]+$/i.test(s) && s.length <= 2000) return s;
   return null;
+}
+
+/** A YouTube or Vimeo address (a watch page, a short link, a player's) as its player's address, or null. */
+export function videoSrc(v: unknown): string | null {
+  if (typeof v !== 'string' || v.length > 2000) return null;
+  let u: URL;
+  try {
+    u = new URL(v.trim());
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  const host = u.hostname.replace(/^(www\.|m\.)/, '');
+  let id = '';
+  if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') id = u.searchParams.get('v') ?? /^\/(?:embed|shorts|live|v)\/([\w-]{6,20})/.exec(u.pathname)?.[1] ?? '';
+  if (id && /^[\w-]{6,20}$/.test(id)) return `https://www.youtube-nocookie.com/embed/${id}`;
+  const vm = host === 'vimeo.com' ? /^\/(?:video\/)?(\d{4,12})/.exec(u.pathname)?.[1] : host === 'player.vimeo.com' ? /^\/video\/(\d{4,12})/.exec(u.pathname)?.[1] : undefined;
+  return vm ? `https://player.vimeo.com/video/${vm}` : null;
+}
+
+/** Where a video address says to start, in seconds ("t=90", "t=1m30s", "start=90"), or 0. */
+export function videoStart(v: unknown): number {
+  if (typeof v !== 'string') return 0;
+  const m = /[?&#](?:t|start)=([\dhms]+)/.exec(v);
+  if (!m) return 0;
+  const p = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(m[1]);
+  return p ? Math.min(86400, Number(p[1] ?? 0) * 3600 + Number(p[2] ?? 0) * 60 + Number(p[3] ?? 0)) : 0;
+}
+
+/** A YouTube video's still picture, or null for another. */
+export function videoStill(src: string): string | null {
+  const id = /^https:\/\/www\.youtube-nocookie\.com\/embed\/([\w-]{6,20})$/.exec(src)?.[1];
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
 }
 
 /** A font as a deck keeps it: the theme's ("head", "body") or a name. */
@@ -872,6 +1101,8 @@ export type SrcHook = (src: string) => string | null;
 export interface NormalizeOpts {
   /** Sources that are not of a kept form yet (a file of the agent's): what they become. */
   src?: SrcHook;
+  /** An icon given by its name alone (an agent's): its lines from the library, or null when it has none of that name. */
+  icon?: (name: string) => IconNode[] | null;
 }
 
 const ALIGNS = ['left', 'center', 'right', 'justify'] as const;
@@ -979,13 +1210,13 @@ function textProps(e: Obj, into: Partial<TextProps>, defRole: TextProps['role'])
   if (typeof e.ph === 'string' && e.ph) into.ph = str(e.ph, 80);
 }
 
-function base(e: Obj, used: Set<string>, H: number, line = false): Base {
+function base(e: Obj, used: Set<string>, H: number, line = false, def: { w: number; h: number } = { w: 400, h: Math.min(200, H) }): Base {
   const b: Base = {
     id: cleanId(e.id, used),
     x: num(e.x, -4000, 6000, 80),
     y: num(e.y, -4000, 6000, 80),
-    w: line ? num(e.w, -6000, 6000, 200) : num(e.w, 1, 8000, 400),
-    h: line ? num(e.h, -6000, 6000, 0) : num(e.h, 1, 8000, Math.min(200, H)),
+    w: line ? num(e.w, -6000, 6000, 200) : num(e.w, 1, 8000, def.w),
+    h: line ? num(e.h, -6000, 6000, 0) : num(e.h, 1, 8000, def.h),
   };
   // A line given by its two ends.
   if (line && (e.x2 !== undefined || e.y2 !== undefined)) {
@@ -998,12 +1229,84 @@ function base(e: Obj, used: Set<string>, H: number, line = false): Base {
   if (link) b.link = link;
   if (typeof e.name === 'string' && e.name.trim()) b.name = str(e.name.trim(), 60);
   if (e.lock === true) b.lock = true;
+  if (typeof e.key === 'string' && /^[A-Za-z0-9_-]{1,24}$/.test(e.key) && e.key !== b.id) b.key = e.key;
   return b;
 }
 
-function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts): El | null {
+const ICON_ATTRS: Record<IconTag, string[]> = {
+  path: ['d'],
+  circle: ['cx', 'cy', 'r'],
+  ellipse: ['cx', 'cy', 'rx', 'ry'],
+  rect: ['x', 'y', 'width', 'height', 'rx', 'ry'],
+  line: ['x1', 'y1', 'x2', 'y2'],
+  polyline: ['points'],
+  polygon: ['points'],
+};
+/** The attributes each of an icon's elements must have to draw. */
+const ICON_NEEDS: Record<IconTag, string[]> = { path: ['d'], circle: ['r'], ellipse: ['rx', 'ry'], rect: ['width', 'height'], line: [], polyline: ['points'], polygon: ['points'] };
+
+/** An icon's lines, checked: known SVG elements, each with its own attributes only, numbers and path data alone. */
+export function iconNodes(v: unknown): IconNode[] {
+  if (!Array.isArray(v)) return [];
+  const out: IconNode[] = [];
+  for (const n of v.slice(0, SLIDE_LIMITS.nodes)) {
+    const tag = (Array.isArray(n) ? n[0] : isObj(n) ? n.tag : undefined) as IconTag;
+    const attrs = Array.isArray(n) ? n[1] : n;
+    if (typeof tag !== 'string' || !(tag in ICON_ATTRS) || !isObj(attrs)) continue;
+    const a: Record<string, string | number> = {};
+    for (const k of ICON_ATTRS[tag]) {
+      const x = attrs[k];
+      if (k === 'd') {
+        if (typeof x === 'string' && x.length <= 4000 && /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s+-]+$/.test(x)) a.d = x.replace(/\s+/g, ' ').trim();
+      } else if (k === 'points') {
+        if (typeof x === 'string' && x.length <= 2000 && /^[0-9eE.,\s+-]+$/.test(x)) a.points = x.replace(/\s+/g, ' ').trim();
+      } else {
+        const v2 = typeof x === 'number' ? x : typeof x === 'string' && x.trim() ? Number(x) : NaN;
+        if (Number.isFinite(v2) && Math.abs(v2) <= 1000) a[k] = Math.round(v2 * 1000) / 1000;
+      }
+    }
+    if (ICON_NEEDS[tag].every((k) => a[k] !== undefined && a[k] !== '')) out.push([tag, a]);
+  }
+  return out;
+}
+
+/** A picture's crop: each side's share, in bounds; none when nothing is cut. */
+export function cleanCrop(v: unknown): Crop | undefined {
+  if (!isObj(v)) return undefined;
+  const c = { l: num(v.l ?? v.left, 0, 0.95, 0), t: num(v.t ?? v.top, 0, 0.95, 0), r: num(v.r ?? v.right, 0, 0.95, 0), b: num(v.b ?? v.bottom, 0, 0.95, 0) };
+  const fit = (a: number, b: number) => (a + b > 0.95 ? 0.95 / (a + b) : 1);
+  const kx = fit(c.l, c.r);
+  const ky = fit(c.t, c.b);
+  const out = { l: r3(c.l * kx), t: r3(c.t * ky), r: r3(c.r * kx), b: r3(c.b * ky) };
+  return out.l || out.t || out.r || out.b ? out : undefined;
+}
+const r3 = (v: number) => Math.round(v * 10000) / 10000;
+
+/** A picture's colour changes, in bounds; none when it is as it was. */
+export function cleanAdjust(v: unknown): Adjust | undefined {
+  if (!isObj(v)) return undefined;
+  const a: Adjust = {};
+  const bright = num(v.bright ?? v.brightness, -100, 100, 0);
+  if (bright) a.bright = Math.round(bright);
+  const contrast = num(v.contrast, -100, 100, 0);
+  if (contrast) a.contrast = Math.round(contrast);
+  const sat = num(v.sat ?? v.saturation, 0, 200, 100);
+  if (sat !== 100) a.sat = Math.round(sat);
+  if (v.gray === true || v.grey === true || v.grayscale === true) a.gray = true;
+  const blur = num(v.blur, 0, 40, 0);
+  if (blur) a.blur = blur;
+  return Object.keys(a).length ? a : undefined;
+}
+
+/** What a part may hold at most: parts in all, groups within groups. */
+interface Budget {
+  n: number;
+}
+
+function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts, depth = 0, budget: Budget = { n: 0 }): El | null {
   if (!isObj(e)) return null;
-  const type = e.type === 'textbox' ? 'text' : e.type === 'picture' ? 'image' : e.type === 'arrow' ? 'line' : e.type;
+  if (++budget.n > SLIDE_LIMITS.els * 3) return null;
+  const type = e.type === 'textbox' ? 'text' : e.type === 'picture' ? 'image' : e.type === 'arrow' ? 'line' : e.type === 'equation' ? 'math' : e.type;
   if (type === 'text' || type === 'shape') {
     const b = base(e, used, H);
     const t: Partial<TextProps> = {};
@@ -1033,6 +1336,10 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts): El
     if (typeof e.alt === 'string' && e.alt) img.alt = str(e.alt, 300);
     if (e.flipH === true) img.flipH = true;
     if (e.flipV === true) img.flipV = true;
+    const crop = cleanCrop(e.crop);
+    if (crop) img.crop = crop;
+    const adjust = cleanAdjust(e.adjust);
+    if (adjust) img.adjust = adjust;
     return img;
   }
   if (type === 'line') {
@@ -1073,6 +1380,17 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts): El
       const a = e.aligns.slice(0, cols).map((x) => pick(x, ALIGNS, 'left'));
       if (a.some((x) => x !== 'left')) t.aligns = a;
     }
+    const merges = cleanMerges(e.merges, t.rows.length, cols);
+    if (merges.length) t.merges = merges;
+    if (isObj(e.fills)) {
+      const fills: Record<string, string> = {};
+      for (const [k, v] of Object.entries(e.fills).slice(0, SLIDE_LIMITS.rows * SLIDE_LIMITS.cols)) {
+        const m = /^(\d{1,2}),(\d{1,2})$/.exec(k);
+        const c = cleanColor(v);
+        if (m && c && Number(m[1]) < t.rows.length && Number(m[2]) < cols) fills[`${Number(m[1])},${Number(m[2])}`] = c;
+      }
+      if (Object.keys(fills).length) t.fills = fills;
+    }
     return t;
   }
   if (type === 'chart') {
@@ -1101,7 +1419,87 @@ function element(e: unknown, used: Set<string>, H: number, o: NormalizeOpts): El
     if (font) c.font = font;
     return c;
   }
+  if (type === 'icon') {
+    const name = typeof e.icon === 'string' ? e.icon.trim().replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase().replace(/[\s_]+/g, '-') : '';
+    const icon = /^[a-z0-9][a-z0-9-]{0,59}$/.test(name) ? name : '';
+    let paths = iconNodes(e.paths);
+    if (!paths.length && icon && o.icon) paths = iconNodes(o.icon(icon) ?? []);
+    if (!paths.length) return null;
+    const ic: IconEl = { ...base(e, used, H, false, { w: 120, h: 120 }), type: 'icon', icon: icon || 'icon', paths };
+    const color = cleanColor(e.color);
+    if (color) ic.color = color;
+    const lw = num(e.lineW ?? e.width, 0.25, 6, 2);
+    if (lw !== 2) ic.lineW = lw;
+    return ic;
+  }
+  if (type === 'math') {
+    const tex = str(e.tex ?? e.latex ?? e.text, SLIDE_LIMITS.tex).trim();
+    if (!tex) return null;
+    const m: MathEl = { ...base(e, used, H, false, { w: 640, h: 140 }), type: 'math', tex };
+    const color = cleanColor(e.color);
+    if (color) m.color = color;
+    const align = opt(e.align, ['left', 'right'] as const);
+    if (align) m.align = align;
+    return m;
+  }
+  if (type === 'video') {
+    const raw = e.src ?? e.url;
+    const src = videoSrc(raw);
+    if (!src) return null;
+    const v: VideoEl = { ...base(e, used, H, false, { w: 800, h: 450 }), type: 'video', src };
+    const rawPoster = typeof e.poster === 'string' ? e.poster.trim() : '';
+    const poster = cleanSrc(rawPoster) ?? (rawPoster && o.src ? o.src(rawPoster) : null);
+    if (poster) v.poster = poster;
+    const start = e.start !== undefined ? Math.round(num(e.start, 0, 86400, 0)) : videoStart(raw);
+    if (start) v.start = start;
+    if (e.autoplay === true) v.autoplay = true;
+    if (e.muted === true) v.muted = true;
+    if (e.loop === true) v.loop = true;
+    if (e.radius !== undefined) v.radius = num(e.radius, 0, 2000, 0);
+    return v;
+  }
+  if (type === 'group') {
+    const list = Array.isArray(e.els) ? e.els : Array.isArray(e.parts) ? e.parts : [];
+    let els = list
+      .slice(0, SLIDE_LIMITS.els)
+      .map((x) => element(x, used, H, o, depth + 1, budget))
+      .filter((x): x is El => !!x);
+    // Groups go so deep: a group deeper gives its parts to the one around it.
+    if (depth + 1 >= SLIDE_LIMITS.depth) {
+      const flat = (x: El): El[] => (x.type === 'group' ? ungroupEls(x).flatMap(flat) : [x]);
+      els = els.flatMap(flat);
+    }
+    if (!els.length) return null;
+    // Placed (x and y given): its parts are from its top-left corner; else they are on the slide, and it goes round them.
+    const placed = e.x !== undefined && e.y !== undefined;
+    const b = base(e, used, H);
+    if (placed) return fitGroup({ ...b, type: 'group', els });
+    const g = groupOf(els, b.id);
+    return { ...b, x: g.x, y: g.y, w: g.w, h: g.h, type: 'group', els: g.els };
+  }
   return null;
+}
+
+/** A table's merged cells, in bounds, each covering two cells or more and none another's. */
+function cleanMerges(v: unknown, rows: number, cols: number): Merge[] {
+  if (!Array.isArray(v)) return [];
+  const taken = new Set<string>();
+  const out: Merge[] = [];
+  for (const m of v.slice(0, 200)) {
+    if (!isObj(m)) continue;
+    const r = Math.round(num(m.r ?? m.row, 0, rows - 1, -1));
+    const c = Math.round(num(m.c ?? m.col, 0, cols - 1, -1));
+    if (r < 0 || c < 0) continue;
+    const rs = Math.round(num(m.rs ?? m.rows, 1, rows - r, 1));
+    const cs = Math.round(num(m.cs ?? m.cols, 1, cols - c, 1));
+    if (rs * cs < 2) continue;
+    const cells: string[] = [];
+    for (let i = r; i < r + rs; i++) for (let j = c; j < c + cs; j++) cells.push(`${i},${j}`);
+    if (cells.some((k) => taken.has(k))) continue;
+    for (const k of cells) taken.add(k);
+    out.push({ r, c, rs, cs });
+  }
+  return out;
 }
 
 function anim(a: unknown, used: Set<string>, ids: Set<string>): Anim | null {
@@ -1156,7 +1554,7 @@ function transition(v: unknown): Transition | undefined {
   if (fx === 'none' && !auto) return undefined;
   const t: Transition = { fx };
   if (fx === 'push' || fx === 'wipe' || fx === 'cover') t.dir = pick(v.dir, DIRS, 'right');
-  if (fx !== 'none') t.dur = num(v.dur, 100, 5000, 600);
+  if (fx !== 'none') t.dur = num(v.dur, 100, 5000, fx === 'morph' ? 1000 : 600);
   if (auto) t.auto = auto;
   return t;
 }
@@ -1180,8 +1578,9 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts): S
   s.id = cleanId(v.id, used);
   const els: El[] = [];
   const pending: Obj[] = [];
+  const budget: Budget = { n: 0 };
   for (const raw of s.els.slice(0, SLIDE_LIMITS.els)) {
-    const el = element(raw, used, H, o);
+    const el = element(raw, used, H, o, 0, budget);
     if (!el) continue;
     els.push(el);
     const a = isObj(raw) ? elAnim(raw.anim, el.id) : null;
@@ -1207,7 +1606,33 @@ function slide(v: unknown, used: Set<string>, ratio: Ratio, o: NormalizeOpts): S
   const notes = str(v.notes, SLIDE_LIMITS.notes).trim();
   if (notes) s.notes = notes;
   if (v.hidden === true) s.hidden = true;
+  if (v.nofooter === true) s.nofooter = true;
   return s;
+}
+
+function footer(v: unknown): Footer | undefined {
+  if (!isObj(v)) return undefined;
+  const f: Footer = {};
+  if (v.num === true || v.number === true || v.numbers === true) f.num = true;
+  const text = str(v.text, 200).trim();
+  if (text) f.text = text;
+  const date = v.date === true ? 'today' : str(v.date, 60).trim();
+  if (date) f.date = date;
+  if (!f.num && !f.text && !f.date) return undefined;
+  if (v.skipTitle === true) f.skipTitle = true;
+  return f;
+}
+
+function guides(v: unknown, H: number): Guides | undefined {
+  if (!isObj(v)) return undefined;
+  const list = (a: unknown, max: number) =>
+    [...new Set((Array.isArray(a) ? a : []).slice(0, SLIDE_LIMITS.guides).filter((x): x is number => typeof x === 'number' && Number.isFinite(x) && x >= -max && x <= max * 2).map((x) => Math.round(x)))].sort((p, q) => p - q);
+  const g: Guides = {};
+  const x = list(v.x, SLIDE_W);
+  const y = list(v.y, H);
+  if (x.length) g.x = x;
+  if (y.length) g.y = y;
+  return x.length || y.length ? g : undefined;
 }
 
 /** A theme of its own (a preset's, without its label). */
@@ -1250,17 +1675,38 @@ export function normalizeDeck(input: unknown, o: NormalizeOpts = {}): Deck {
     .map((s) => slide(s, used, ratio, o))
     .filter((s): s is Slide => !!s);
   if (!slides.length) slides.push({ ...layoutSlide('title', {}, ratio) });
-  return { v: 1, ratio, theme: theme(v.theme, THEMES[0]), slides };
+  const d: Deck = { v: 1, ratio, theme: theme(v.theme, THEMES[0]), slides };
+  const f = footer(v.footer);
+  if (f) d.footer = f;
+  const g = guides(v.guides, slideH(ratio));
+  if (g) d.guides = g;
+  return d;
 }
 
-/** The pictures a deck shows (parts and backgrounds). */
-export function deckSources(d: Deck): string[] {
+/** Whether a slide is a title slide, which the footer may leave out: the first, or one made from the Title layout. */
+export const isTitleSlide = (d: Deck, i: number) => i === 0 || d.slides[i]?.layout === 'title';
+
+/** Whether the deck's footer (or slide number) shows on a slide. */
+export const footerOn = (d: Deck, i: number) => !!d.footer && (d.footer.num || !!d.footer.text || !!d.footer.date) && !d.slides[i]?.nofooter && !(d.footer.skipTitle && isTitleSlide(d, i));
+
+/** The pictures a deck shows (parts, those in groups too, videos' stills and backgrounds); `stills`: YouTube's own stills too. */
+export function deckSources(d: Deck, stills = false): string[] {
   const out: string[] = [];
   for (const s of d.slides) {
     if (s.bg?.image) out.push(s.bg.image);
-    for (const e of s.els) if (e.type === 'image' && e.src) out.push(e.src);
+    for (const e of everyEl(s.els)) {
+      if (e.type === 'image' && e.src) out.push(e.src);
+      if (e.type === 'video') {
+        if (e.poster) out.push(e.poster);
+        else if (stills && videoStill(e.src)) out.push(videoStill(e.src)!);
+      }
+    }
   }
   return out;
+}
+
+function mapEls(els: El[], f: (src: string) => string): El[] {
+  return els.map((e) => (e.type === 'image' && e.src ? { ...e, src: f(e.src) } : e.type === 'video' && e.poster ? { ...e, poster: f(e.poster) } : e.type === 'group' ? { ...e, els: mapEls(e.els, f) } : e));
 }
 
 /** The deck with each picture's source changed by `f` (to put pictures inside it, say). */
@@ -1270,7 +1716,7 @@ export function mapSources(d: Deck, f: (src: string) => string): Deck {
     slides: d.slides.map((s) => ({
       ...s,
       ...(s.bg?.image ? { bg: { ...s.bg, image: f(s.bg.image) } } : {}),
-      els: s.els.map((e) => (e.type === 'image' && e.src ? { ...e, src: f(e.src) } : e)),
+      els: mapEls(s.els, f),
     })),
   };
 }
@@ -1280,7 +1726,8 @@ export function mapSources(d: Deck, f: (src: string) => string): Deck {
  * versions read as a diff of lines.
  */
 export function deckText(d: Deck): string {
-  const out: string[] = [`{"v":1,"ratio":${JSON.stringify(d.ratio)},"theme":${JSON.stringify(d.theme)},"slides":[`];
+  const extra = `${d.footer ? `,"footer":${JSON.stringify(d.footer)}` : ''}${d.guides ? `,"guides":${JSON.stringify(d.guides)}` : ''}`;
+  const out: string[] = [`{"v":1,"ratio":${JSON.stringify(d.ratio)},"theme":${JSON.stringify(d.theme)}${extra},"slides":[`];
   d.slides.forEach((s, i) => {
     const { els, anims, ...rest } = s;
     out.push(` ${JSON.stringify(rest).slice(0, -1)},"els":[`);
@@ -1299,7 +1746,7 @@ export function deckText(d: Deck): string {
 export function deckOutline(d: Deck): string {
   return d.slides
     .map((s, i) => {
-      const kinds = s.els.map((e) => (e.type === 'shape' ? `shape:${e.shape}` : e.type));
+      const kinds = s.els.map((e) => (e.type === 'shape' ? `shape:${e.shape}` : e.type === 'group' ? `group of ${e.els.length}` : e.type));
       const what = [...new Set(kinds)].map((k) => `${kinds.filter((x) => x === k).length}× ${k}`).join(', ');
       return `${i + 1}. ${slideTitle(s) || '(no title)'} [${s.id}]${s.hidden ? ' (hidden)' : ''}: ${what || 'empty'}${s.anims?.length ? `, ${s.anims.length} animation${s.anims.length === 1 ? '' : 's'}` : ''}${s.notes ? ', notes' : ''}`;
     })
@@ -1315,7 +1762,7 @@ export function newDeck(title: string, themeId = 'paper', ratio: Ratio = '16:9')
 export function deckFonts(d: Deck): string[] {
   const names = new Set<string>([d.theme.font, d.theme.headFont]);
   for (const s of d.slides)
-    for (const e of s.els) {
+    for (const e of everyEl(s.els)) {
       if ('font' in e && typeof e.font === 'string' && e.font !== 'head' && e.font !== 'body') names.add(e.font);
       if (e.type === 'text' || e.type === 'shape') for (const p of e.paras) for (const r of p.runs) if (r.font && r.font !== 'head' && r.font !== 'body') names.add(r.font);
     }

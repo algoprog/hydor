@@ -30,6 +30,8 @@ export interface FromFile {
 export interface ExportHelp {
   picture: (src: string) => Picture | null;
   scales?: Map<string, number>;
+  /** Parts made into pictures in a browser (a deck's icons and equations). */
+  renders?: Map<string, Picture>;
 }
 
 export interface KindDef {
@@ -74,8 +76,9 @@ KINDS.set('slides', {
   read: readDeck,
   page: (db, text, title, mode) => deckPage(db, readDeck(text), title, mode),
   forAgent: deckForAgent,
-  sources: (text) => deckSources(readDeck(text)),
-  files: { pptx: (_db, text, title, help) => pptxFile(readDeck(text), { title, picture: help.picture, scales: help.scales }) },
+  // With YouTube's own stills of videos, for the PowerPoint file.
+  sources: (text) => deckSources(readDeck(text), true),
+  files: { pptx: (_db, text, title, help) => pptxFile(readDeck(text), { title, picture: help.picture, scales: help.scales, renders: help.renders }) },
   still: (text) => ({ width: 1280, height: /"ratio":"4:3"/.test(text.slice(0, 200)) ? 960 : 720 }),
   fresh: (title) => newDeck(title),
 });

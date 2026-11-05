@@ -838,7 +838,7 @@ function AnimateTab({ deck, index, sel, change, onSel, onPreview }: Props) {
 
 // ---- Slide ----------------------------------------------------------------------------------------------------
 
-const TR_NAMES: Record<TransitionFx, string> = { none: 'None', fade: 'Fade', push: 'Push in', wipe: 'Wipe', cover: 'Cover', zoom: 'Zoom', split: 'Split' };
+const TR_NAMES: Record<TransitionFx, string> = { none: 'None', fade: 'Fade', push: 'Push in', wipe: 'Wipe', cover: 'Cover', zoom: 'Zoom', split: 'Split', morph: 'Morph' };
 
 function SlideTab({ deck, index, change, pickPicture }: Props) {
   const slide = deck.slides[index];
