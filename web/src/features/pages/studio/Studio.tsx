@@ -187,6 +187,7 @@ export function Studio({
   const [page, setPage] = useState<EdPage | null>(null);
   const [clip, setClip] = useState(clipboard);
   const [wordsOn, setWordsOn] = useState(false);
+  const [menuOn, setMenuOn] = useState(false);
   // The drawer under the page (where there is no room beside it): folded at first, open once a part is picked, until folded again.
   const [drawer, setDrawer] = useState<'open' | 'closed' | null>(null);
   const [shell, shellWidth] = useWidthOf<HTMLDivElement>();
@@ -212,6 +213,13 @@ export function Studio({
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   useEffect(() => onDirty?.(dirty), [dirty]);
+  // Closing the browser's tab or reloading it with changes not saved: the browser asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const before = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', before);
+    return () => window.removeEventListener('beforeunload', before);
+  }, [dirty]);
 
   // Another page (or the agent saved a new version while nothing was changed): start from it.
   const docKey = doc?.key;
@@ -265,6 +273,7 @@ export function Studio({
       setSel(null);
       setPage(null);
       setLayers(null);
+      setMenuOn(false);
       setMode(m);
     } catch (e) {
       toastError(e);
@@ -306,6 +315,7 @@ export function Studio({
     setSel(null);
     setPage(null);
     setLayers(null);
+    setMenuOn(false);
     setEpoch((e) => e + 1);
   };
 
@@ -385,8 +395,8 @@ export function Studio({
           Click a part of the page to change it, and click it again to write in it: Enter makes the next block, and / in an empty one lists the blocks to add. Drag a block by the ⋮⋮ beside it to move it, or click the ⋮⋮ for its menu.
         </p>
       );
-    // Folded, only the tabs show; a tab opens it. While words are changed in the page, it makes room.
-    const folded = !beside && (drawer !== 'open' || wordsOn);
+    // Folded, only the tabs show; a tab opens it. While words are changed in the page, or a block's menu is open there, it makes room.
+    const folded = !beside && (drawer !== 'open' || wordsOn || menuOn);
     body = (
       <div className={cx('flex h-full min-h-0', beside ? 'flex-row' : 'flex-col')}>
         <div className="relative min-h-0 min-w-0 flex-1">
@@ -416,6 +426,7 @@ export function Studio({
                 toast(c.name ? `${c.name} copied` : 'Copied', 'ok');
               }}
               onEditing={setWordsOn}
+              onMenu={setMenuOn}
               onAsk={setAsking}
               onFile={(id, f) => pictureData(f).then((src) => cmd('fill', { id, src }), toastError)}
               onAgent={() => void ask()}

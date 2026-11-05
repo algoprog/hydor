@@ -3,7 +3,8 @@
 // that frame, carrying that number, of a known shape and size: the page's height, a choice or a form
 // to put in the message box, and calls of window.hydor.storage, which a store answers. A template's
 // screen also gets window.hydor.app: its calls are answered here, for that template only (its runs,
-// its data), and what changes in them is passed on to it. A video's still in a page plays over it here.
+// its data), and what changes in them is passed on to it. A video's still in a page plays over it here, and a link to
+// another of the Library's pages opens that page in the app.
 // In Edit, the frame holds the visual editor (editor.ts): what it picks and changes comes back here, and
 // what it asks for (an emoji, a picture, maths…) is chosen in the app and sent back to it.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -13,6 +14,7 @@ import type { AppRun } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
+import { go } from '../../lib/nav';
 import { tr } from '../../i18n/runtime';
 import { cx } from '../../components/ui';
 import { openVideo } from '../../components/Lightbox';
@@ -449,6 +451,7 @@ export function PageFrame({
     let busy = 0;
     let appBusy = 0;
     let picks: number[] = [];
+    let opened = 0;
     const onMessage = (e: MessageEvent) => {
       const w = ref.current?.contentWindow;
       // Only this frame: a sandboxed page's origin is opaque ("null").
@@ -462,7 +465,7 @@ export function PageFrame({
         const v = cb.current.ui;
         const uiInfo = v ? { def: v.def, ctx: v.ctx, can: v.can, labels: uiLabels(), lang: v.lang ?? 'en', ...(v.start ? { start: v.start } : {}), ...(v.libs ? { libs: v.libs } : {}) } : undefined;
         if (v) sentCtx.current = v.ctx;
-        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, play: true, app: appInfo, ui: uiInfo }, '*');
+        w.postMessage({ type: 'wa-html-page', html: cb.current.html, n, theme: themeNow(), css: themeCss(), max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, fill: !!cb.current.fill, play: true, open: true, app: appInfo, ui: uiInfo }, '*');
         return;
       }
       const { store, onHeight, onPick } = cb.current;
@@ -520,6 +523,14 @@ export function PageFrame({
       } else if (d.type === 'wa-video') {
         // A video's still in the page (the page editor's): its player cannot run in the sandbox, so it plays over the page.
         if (isStr(d.src, 300)) openVideo(d.src, isStr(d.title, 200) ? d.title : '');
+      } else if (d.type === 'wa-open-page') {
+        // A link to another of the Library's pages (the page editor's a.n-pagelink), clicked: that page, in the app. Once a
+        // second at most, so a page cannot move the app about by itself.
+        const now = Date.now();
+        if (isStr(d.id, 40) && /^[\w-]+$/.test(d.id) && now - opened > 1000) {
+          opened = now;
+          go(`/pages/${d.id}`);
+        }
       } else if (d.type === 'wa-ui-top') {
         // A view went to another page: its top comes into sight when it was scrolled past.
         const r = ref.current?.getBoundingClientRect();
@@ -746,6 +757,8 @@ export const EditFrame = forwardRef<
     onCopied?: (c: { html: string; name: string }) => void;
     /** Words are being changed in the page (a phone's keyboard is up). */
     onEditing?: (on: boolean) => void;
+    /** A block's menu is open in the page (on a phone, the drawer under it makes room). */
+    onMenu?: (on: boolean) => void;
     /** The editor asks for something chosen in the app: an emoji, an icon, a cover, a picture, a video, maths. */
     onAsk?: (a: EdAsk) => void;
     /** A picture dropped or pasted in the page, to make small enough to live in it (and answer with `fill`). */
@@ -756,10 +769,10 @@ export const EditFrame = forwardRef<
     onKeys?: () => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onAsk, onFile, onAgent, onKeys, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onAsk, onFile, onAgent, onKeys };
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onAsk, onFile, onAgent, onKeys });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onAsk, onFile, onAgent, onKeys };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
@@ -807,6 +820,7 @@ export const EditFrame = forwardRef<
       } else if (d.type === 'wa-ed-layers' && d.tree && typeof d.tree === 'object') c.onLayers?.(d.tree as EdLayer);
       else if (d.type === 'wa-ed-copied' && typeof d.html === 'string' && d.html.length < 2_000_000) c.onCopied?.({ html: d.html, name: typeof d.name === 'string' ? d.name : '' });
       else if (d.type === 'wa-ed-editing') c.onEditing?.(!!d.on);
+      else if (d.type === 'wa-ed-menu') c.onMenu?.(!!d.on);
       else if (d.type === 'wa-ed-save') c.onSave?.();
       else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined });
       else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File && d.file.size <= 40_000_000 && /^image\//.test(d.file.type)) c.onFile?.(d.id, d.file);
