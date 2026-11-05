@@ -8,7 +8,9 @@
 //   DATA_DIR=/tmp/hydor-test-lab node dist/dev/lab-test.js
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
+import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import type { RunRecord } from '../../shared/experiments.ts';
@@ -18,8 +20,25 @@ import { allSteps, checkFlow, cleanFlow, type CodeStep } from '../../shared/app-
 import { checkUi, cleanUi } from '../../shared/app-ui.ts';
 import { TEMPLATES } from './templates.ts';
 import { AGREE } from './templates-lab.ts';
+import Fastify from 'fastify';
+import cookie from '@fastify/cookie';
+import { isActive } from '../../shared/apps.ts';
+import type { ScheduledTask } from '../../shared/automations.ts';
+import { HttpError } from '../auth.ts';
+import { automations } from '../automations/index.ts';
 import { migrateRuns } from '../automations/runs.ts';
 import { kvSet, openDb } from '../db.ts';
+import { vaultTables } from '../connections/vault.ts';
+import { documents } from '../documents/index.ts';
+import { registerFeatures } from '../features/registry.ts';
+import type { Deps, Feature, RunCtx } from '../features/types.ts';
+import { setHelperModel } from '../helper.ts';
+import { AGENT_FILE } from '../models/config.ts';
+import { Scheduler } from '../scheduler.ts';
+import type { SessionManager } from '../sessions.ts';
+import { apps } from './index.ts';
+import { saveResult, startRun, startRuns, waitFor } from './runs.ts';
+import { keysOfFlow } from './secrets.ts';
 import { initMedia } from '../media/store.ts';
 import { createPage, initPages } from '../pages/store.ts';
 import { allSpaces } from '../spaces/index.ts';
@@ -39,6 +58,7 @@ initPages(db);
 initMedia(db);
 ensureDataTables(db);
 migrateRuns(db);
+vaultTables(db);
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
 const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
@@ -468,6 +488,312 @@ test('Weekly progress report: the week’s dates (across a month and a year), it
   assert.match(e.text, /^## Thursday 5 November 2026: Hard negatives help\n\nRetrained\.\n\n### Tried\n- BM25 negatives\n\n### Found\n- 0\.412 MRR@10\n\n### Open questions\n- Long queries\?\n\n### Links\n- /);
   const said = await runCode(codeOf(n, 'say'), { day: { date: '2026-11-05', name: 'Thursday 5 November 2026' }, entry: '', kept: '' });
   assert.deepEqual([said.kept, said.title], [false, 'Nothing on Thursday 5 November 2026']);
+});
+
+// ---- whole runs, with stand-ins: agent sessions, a model, Experiments' tools ------------------------------------------
+
+/** The session manager: sessions start at once and work until a test ends their turn. */
+class FakeSessions extends EventEmitter {
+  made: { key: string; o: any }[] = [];
+  status = new Map<string, string>();
+  replies = new Map<string, string[]>();
+  archived = new Set<string>();
+  async create(o: any) {
+    const key = `acp:fake-${this.made.length + 1}-${Math.random().toString(36).slice(2, 8)}`;
+    this.made.push({ key, o });
+    this.status.set(key, 'working');
+    return key;
+  }
+  setFlags(key: string, f: { archived?: boolean }) {
+    if (f.archived) this.archived.add(key);
+  }
+  summary(key: string) {
+    const st = this.status.get(key);
+    return st ? ({ key, agent: 'acp', stats: { tokensIn: 0, tokensOut: 0, tokensCached: 0 }, live: { status: st } } as any) : null;
+  }
+  async timeline(key: string) {
+    const said = this.replies.get(key) ?? [];
+    return { parser: { items: said.map((text, i) => ({ kind: 'assistant', id: `a${i}`, seq: i, text })) }, readMore: async () => {} } as any;
+  }
+  liveSnapshot() {
+    return { live: null, overlay: { items: [], patches: {}, approvals: [] } };
+  }
+  async interrupt(key: string) {
+    this.status.set(key, 'idle');
+    this.emit('live', key);
+  }
+  async deliverOrQueue(key: string) {
+    this.status.set(key, 'working');
+  }
+  end(key: string, reply = 'Done.') {
+    this.replies.set(key, [...(this.replies.get(key) ?? []), reply]);
+    this.status.set(key, 'idle');
+    this.emit('live', key);
+  }
+}
+
+/** A model server as Custom's models speak to theirs: answers from `model.answer` (the step's instructions come as the user's message). */
+const model = { calls: [] as string[], answer: (_user: string): unknown => ({}) };
+const srv = createServer((req, res) => {
+  let body = '';
+  req.on('data', (c) => (body += c));
+  req.on('end', () => {
+    const b = JSON.parse(body || '{}');
+    const user = String(b.messages?.findLast?.((m: any) => m.role === 'user')?.content ?? '');
+    model.calls.push(user);
+    const said = model.answer(user);
+    res.writeHead(200, { 'content-type': 'text/event-stream' });
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: typeof said === 'string' ? said : JSON.stringify(said) }, finish_reason: 'stop' }] })}\n\n`);
+    res.write(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 } })}\n\n`);
+    res.end('data: [DONE]\n\n');
+  });
+});
+await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+fs.mkdirSync(path.dirname(AGENT_FILE), { recursive: true });
+fs.writeFileSync(AGENT_FILE, JSON.stringify({ models: [{ id: 'fake', label: 'Fake', provider: 'endpoint', baseUrl: `http://127.0.0.1:${(srv.address() as { port: number }).port}/v1`, model: 'fake-1', tools: 'native' }] }));
+
+/** Experiments' tools and save_doc, as their contracts say (their own parts are not in this branch): runs that end at once, with a metric. */
+const exp = { runs: [] as RunRecord[], calls: [] as [string, any][] };
+const lossOf = (p: Record<string, unknown>) => Math.round((Math.abs(Math.log10(Number(p.lr) || 1e-3) + 3.5) + Number(p.batch_size ?? 32) / 1000) * 1000) / 1000;
+const tool = (name: string, run: (a: any) => unknown) => ({ name, description: name, inputSchema: { type: 'object' }, run: async (a: any) => (exp.calls.push([name, a]), typeof run(a) === 'string' ? (run(a) as string) : JSON.stringify(run(a))) });
+const newRun = (o: Partial<RunRecord>): RunRecord => {
+  const r: RunRecord = { id: `x${exp.runs.length + 1}`, command: '', cwd: '/', status: 'done', createdAt: Date.now() - HOUR, startedAt: Date.now() - HOUR, endedAt: Date.now(), ...o };
+  exp.runs.push(r);
+  return r;
+};
+const fakes: Feature = {
+  id: 'fake-experiments',
+  tools: () => [
+    tool('experiment_run', (a) => {
+      const r = newRun({ name: a.name, command: a.command, cwd: a.cwd, group: a.group, tags: a.tags, params: a.params, gpus: a.gpus, metrics: { last: { mrr10: a.params?.condition === 'baseline' ? 0.31 : 0.34 } } });
+      return { id: r.id, status: 'queued' };
+    }),
+    tool('experiment_sweep', (a) => {
+      const keys = Object.keys(a.params ?? {});
+      let combos: Record<string, unknown>[] = [{}];
+      for (const k of keys) combos = combos.flatMap((c) => (a.params[k] as unknown[]).map((v) => ({ ...c, [k]: v })));
+      const runs = combos.slice(0, Number(a.maxRuns) || combos.length).map((p) => newRun({ name: keys.map((k) => `${k}=${p[k]}`).join(' '), command: a.command, cwd: a.cwd, group: a.group, params: p as Record<string, string | number>, metrics: { last: { val_loss: lossOf(p) } } }));
+      return { sweep: 'sw1', runs: runs.map((r) => r.id) };
+    }),
+    tool('experiment_wait', (a) => ({ runs: exp.runs.filter((r) => (a.ids ?? []).includes(r.id)) })),
+    tool('experiment_table', () => ({ id: 't1', markdown: '| Condition | mrr10 |\n|---|---|\n| baseline | 0.310 |\n| curriculum | 0.340* |', latex: '', csv: '' })),
+    tool('save_doc', (a) => `Saved "${a.title}" (page pg123, version 1). It shows in the conversation and in the Library (http://test.local/pages/pg123).`),
+  ],
+};
+
+const sessions = new FakeSessions();
+const http = Fastify();
+await http.register(cookie);
+http.setErrorHandler((err: Error, _req, reply) => {
+  reply.code(err instanceof HttpError ? err.status : 500).send({ ...(err instanceof HttpError ? err.extra : undefined), error: err.message });
+});
+const scheduler = new Scheduler(db, sessions as unknown as SessionManager);
+const deps = { app: http, db, sessions: sessions as any, scheduler, models: null as any, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'https://lab.example' } as Deps;
+registerFeatures([apps, documents, fakes, automations], deps);
+startRuns(deps);
+await http.ready();
+setHelperModel(db, 'fake');
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function ended(id: string, ms = 60_000) {
+  const r = await waitFor(id, ms);
+  assert.ok(r && !isActive(r.status), `run ${id} ended (it is ${r?.status})`);
+  return r!;
+}
+/** An agent step's run, once its session is there: it hands in `result` and ends its turn. */
+async function agentAnswers(parent: string, step: string, result: Record<string, unknown>) {
+  let child: store.RunRecord | undefined;
+  for (let i = 0; i < 400 && !(child = store.listRuns(db, { parent }).find((r) => r.step === step && r.key)); i++) await sleep(25);
+  assert.ok(child, `the step ${step} started its run`);
+  saveResult(child.id, result);
+  sessions.end(child.key!);
+  return child;
+}
+const stepsOf = (id: string) => Object.fromEntries(store.listSteps(db, id).map((x) => [x.path, x.status]));
+
+test('Annotation workbench, a whole run: pasted texts labelled by the model in batches and kept as records; you label through its routes; a download as CSV and JSON lines; Publish asks for the Hugging Face token; a set removed', async () => {
+  model.answer = (user) => {
+    if (!user.includes('Label each text below')) return {};
+    const labels = [...user.matchAll(/^\[(\d+)\] (.*)$/gm)].map((m) => ({ n: Number(m[1]), label: /loved|great|best/i.test(m[2]) ? 'Positive' : 'negative', reason: 'Its tone' }));
+    return { labels };
+  };
+  const res = await http.inject({ method: 'POST', url: '/api/apps/tpl:annotation-workbench/runs', payload: { inputs: { labels: 'positive, negative', texts: 'I loved it\nDull and long\nGreat cast\nA mess\nThe best film\nNot for me', guidelines: 'Would they recommend it?' } } });
+  assert.equal(res.statusCode, 200, res.body);
+  const run = await ended(res.json().run.id);
+  assert.equal(run.status, 'done', run.error);
+  const r = run.result as any;
+  assert.equal(r.count, 6);
+  assert.deepEqual(r.labels, ['positive', 'negative']);
+  assert.deepEqual(r.model_counts, [{ label: 'positive', count: 3 }, { label: 'negative', count: 3 }]);
+  assert.equal(r.name, '6 texts from texts pasted');
+  assert.match(model.calls.find((c) => c.includes('Label each text below'))!, /The guidelines:\nWould they recommend it\?/);
+  // Its records, through the routes a view uses (a ready-made app keeps them under its own id).
+  const where = encodeURIComponent(JSON.stringify({ sample: run.id }));
+  const items = (await http.inject({ method: 'GET', url: `/api/apps/tpl:annotation-workbench/data/items?where=${where}&sort=n` })).json().records;
+  assert.equal(items.length, 6);
+  assert.deepEqual(items.map((x: any) => [x.n, x.order, x.done]).slice(0, 2), [[1, 1, false], [2, 2, false]]);
+  assert.ok(items.every((x: any) => ['positive', 'negative'].includes(x.model) && x.reason === 'Its tone' && x.sample === run.id));
+  const one = items.find((x: any) => x.text === 'I loved it');
+  const lab = await http.inject({ method: 'PATCH', url: `/api/apps/tpl:annotation-workbench/data/items/${one.id}`, payload: { set: { label: 'positive', done: true, agree: true, notes: 'clear' } } });
+  assert.equal(lab.statusCode, 200, lab.body);
+  const two = items.find((x: any) => x.text === 'A mess');
+  await http.inject({ method: 'PATCH', url: `/api/apps/tpl:annotation-workbench/data/items/${two.id}`, payload: { set: { label: 'positive', done: true, agree: false } } });
+  const done = encodeURIComponent(JSON.stringify({ sample: run.id, done: true }));
+  const csv = await http.inject({ method: 'GET', url: `/api/apps/tpl:annotation-workbench/data/items?where=${done}&sort=n&format=csv&fields=n,text,label,model,agree,notes&name=labels-${run.id}` });
+  assert.equal(csv.statusCode, 200);
+  assert.match(String(csv.headers['content-type']), /^text\/csv/);
+  assert.equal(csv.headers['content-disposition'], `attachment; filename="labels-${run.id}.csv"`);
+  const rowsOf = csv.body.trim().split('\r\n');
+  assert.equal(rowsOf[0], 'n,text,label,model,agree,notes');
+  assert.equal(rowsOf.length, 3);
+  assert.ok(rowsOf.includes(`${one.n},I loved it,positive,positive,Yes,clear`), csv.body);
+  const jsonl = await http.inject({ method: 'GET', url: `/api/apps/tpl:annotation-workbench/data/items?where=${done}&sort=n&format=jsonl&fields=text,label` });
+  assert.deepEqual(jsonl.body.trim().split('\n').map((l) => JSON.parse(l)).sort((a, b) => a.text.localeCompare(b.text)), [{ text: 'A mess', label: 'positive' }, { text: 'I loved it', label: 'positive' }]);
+  assert.equal((await http.inject({ method: 'GET', url: '/api/apps/tpl:annotation-workbench/data' })).json().collections[0].name, 'items');
+  assert.equal((await http.inject({ method: 'GET', url: '/api/apps/tpl:deep-research/data/items' })).statusCode, 404, 'a ready-made app that keeps nothing');
+  // Publish needs the Hugging Face token, which the rest of the app does without: asked for when it runs.
+  assert.deepEqual(keysOfFlow(tpl('annotation-workbench'), 'publish'), ['HF_TOKEN']);
+  assert.deepEqual(keysOfFlow(tpl('annotation-workbench')), []);
+  const pub = await http.inject({ method: 'POST', url: '/api/apps/tpl:annotation-workbench/runs', payload: { flow: 'publish', source: 'screen', inputs: { sample: run.id, repo: 'ada/x' } } });
+  assert.equal(pub.statusCode, 409);
+  assert.match(pub.json().error, /needs a key first: Hugging Face token/);
+  assert.deepEqual(pub.json().secrets.map((k: any) => k.name), ['HF_TOKEN']);
+  // A set removed: its texts go, the others stay.
+  const clear = await http.inject({ method: 'POST', url: '/api/apps/tpl:annotation-workbench/runs', payload: { flow: 'clear', source: 'screen', inputs: { sample: run.id } } });
+  assert.equal(clear.statusCode, 200, clear.body);
+  assert.equal((await ended(clear.json().run.id)).result?.removed, 6);
+  assert.equal((await http.inject({ method: 'GET', url: `/api/apps/tpl:annotation-workbench/data/items?where=${where}` })).json().count, 0);
+});
+
+test('Research sprint and Sweep planner, whole runs with Experiments’ tools as steps: hypotheses to runs to verdicts; a sweep to what mattered', async () => {
+  model.answer = (user) => {
+    if (user.includes('plan a short research sprint'))
+      return { hypotheses: [{ id: 'H1', hypothesis: 'A curriculum helps long queries', why: 'Hard ones last', confirm: '+2 MRR@10', refute: 'No gain', test: 'Curriculum against baseline, 2 seeds', hours: 2 }, { id: 'H2', hypothesis: 'Long-only training helps', hours: 2 }, { id: 'H3', hypothesis: 'Extra' }], metric: 'mrr10', better: 'higher' };
+    if (user.includes('A hyperparameter sweep of')) return { summary: 'The learning rate mattered most.', next: ['Try 3e-5', 'More seeds'] };
+    return {};
+  };
+  const s = startRun({ app: 'tpl:research-sprint', slug: 'research-sprint', recipe: tpl('research-sprint'), source: 'api', inputs: { question: 'Does a curriculum help long queries?', repo: '~/code/retriever', budget: '6', count: '2', gates: 'Yes' } });
+  const build = await agentAnswers(s.id, 'build', {
+    branch: 'sprint/curriculum',
+    worktree: '/w/retriever-sprint',
+    plan: 'SPRINT.md: baseline against a curriculum.',
+    metric: 'mrr10',
+    better: 'max',
+    baseline: 'baseline',
+    runs: [
+      { name: 'base-s1', hypothesis: 'baseline', condition: 'baseline', command: 'python train.py --seed 1', gpus: 1, hours: 1, seed: 1 },
+      { name: 'cur-s1', hypothesis: 'H1', condition: 'curriculum', command: 'python train.py --curriculum --seed 1', gpus: 1, hours: 1, seed: 1 },
+      { name: 'long-s1', hypothesis: 'H2', condition: 'long-only', command: 'python train.py --long --seed 1', gpus: 1, hours: 5, seed: 1 },
+    ],
+  });
+  assert.match(sessions.made.find((m) => m.key === build.key)!.o.prompt, /H1\. A curriculum helps long queries\n {4}Supported if: \+2 MRR@10/);
+  const analyse = await agentAnswers(s.id, 'analyse', { verdicts: [{ id: 'H1', verdict: 'supported', evidence: '0.34 against 0.31' }, { id: 'H2', verdict: 'Not tested: over the budget' }], report: '## What we found\nThe curriculum helps.', notebook: 'https://lab.example/pages/nb1', next: ['Three seeds'] });
+  assert.match(sessions.made.find((m) => m.key === analyse.key)!.o.prompt, /\| curriculum \| 0\.340\* \|/, 'it reads the results table');
+  const sprint = await ended(s.id);
+  assert.equal(sprint.status, 'done', sprint.error);
+  const sr = sprint.result as any;
+  assert.equal(stepsOf(s.id).check, 'skipped', 'from the API nobody is there to ask');
+  assert.deepEqual(exp.calls.filter(([n]) => n === 'experiment_run').map(([, a]) => [a.name, a.cwd, a.group, a.tags, a.params.condition]), [
+    ['base-s1', '/w/retriever-sprint', `sprint-${s.id.slice(-10)}`, [`sprint:${s.id.slice(-10)}`, 'baseline'], 'baseline'],
+    ['cur-s1', '/w/retriever-sprint', `sprint-${s.id.slice(-10)}`, [`sprint:${s.id.slice(-10)}`, 'H1'], 'curriculum'],
+  ]);
+  const table = exp.calls.find(([n]) => n === 'experiment_table')![1];
+  assert.deepEqual([table.rows, table.columns, table.baseline, table.test], ['param:condition', [{ metric: 'mrr10', better: 'max' }], 'baseline', 'welch']);
+  assert.deepEqual(sr.hypotheses.map((h: any) => [h.id, h.mark]), [['H1', 'supported'], ['H2', 'unclear']]);
+  assert.deepEqual(sr.runs.map((r: any) => [r.condition, r.value]), [['baseline', 0.31], ['curriculum', 0.34]]);
+  assert.equal(sr.status, 'Done: 2 of 2 runs finished');
+  assert.match(sr.results, /curriculum \| 0\.340\*/);
+  assert.equal(sr.branch, 'sprint/curriculum');
+  // The sweep: the researcher's settings kept, the budget's runs, bad trials stopped early, what mattered worked out.
+  exp.calls.length = 0;
+  const w = startRun({ app: 'tpl:sweep-planner', slug: 'sweep-planner', recipe: tpl('sweep-planner'), source: 'api', inputs: { command: 'python train.py', folder: '/w/model', metric: 'val_loss', better: 'Lower', settings: 'lr: 1e-4, 3e-4, 1e-3\nbatch_size: 16, 32', budget: '4 runs', early: 'Yes', check: 'Yes' } });
+  await agentAnswers(w.id, 'read', { command: 'python train.py --lr {lr} --batch-size {batch_size}', settings: [{ name: 'lr', values: '1e-4, 3e-4, 1e-3' }, { name: 'batch_size', values: '16, 32' }], mode: 'grid', hours: 0.5, gpus: 1, steps: 100, notes: 'It logs val_loss each epoch.' });
+  const sweep = await ended(w.id);
+  assert.equal(sweep.status, 'done', sweep.error);
+  const call = exp.calls.find(([n]) => n === 'experiment_sweep')![1];
+  assert.deepEqual([call.command, call.cwd, call.mode, call.maxRuns, call.earlyStop], ['python train.py --lr {lr} --batch-size {batch_size}', '/w/model', 'random', 4, { metric: 'val_loss', better: 'min', afterSteps: 100 }]);
+  assert.deepEqual(call.params, { lr: [0.0001, 0.0003, 0.001], batch_size: [16, 32] });
+  const wr = sweep.result as any;
+  assert.equal(wr.count, 4);
+  assert.equal(wr.best, 'lr=0.0003, batch_size=16', 'the lowest loss of the four');
+  assert.deepEqual(wr.mattered.map((m: any) => m.setting), ['lr', 'batch_size']);
+  assert.equal(wr.summary, 'The learning rate mattered most.');
+  assert.ok(wr.points.length >= 8, 'a point for each run and setting');
+});
+
+test('Weekly progress report and Lab notebook, whole runs: the week written from work_log, saved as a document; a day’s entry kept under its date, written again in its place, found by a search', async () => {
+  model.answer = (user) => {
+    if (user.includes("weekly progress report")) return { title: 'Hard negatives help', summary: 'Retrained with hard negatives; MRR@10 up.', done: ['Mined hard negatives'], results: ['MRR@10 0.412, up from 0.387'], problems: [], next: ['Long queries'], questions: ['Should we try a curriculum?'] };
+    if (user.includes("lab notebook's entry")) return { title: 'Hard negatives help on short queries', summary: 'Retrained the small model.', tried: ['BM25 hard negatives'], found: ['0.412 MRR@10'], decided: ['Keep them'], open: [] };
+    return {};
+  };
+  const wk = startRun({ app: 'tpl:weekly-report', slug: 'weekly-report', recipe: tpl('weekly-report'), source: 'task', inputs: { audience: 'Your advisor', projects: '', include: '' } });
+  const week = await ended(wk.id);
+  assert.equal(week.status, 'done', week.error);
+  const wr = week.result as any;
+  assert.equal(wr.title, 'Hard negatives help');
+  assert.equal(wr.audience, 'Your advisor');
+  assert.equal(wr.to, dayOf(Date.now()));
+  assert.match(wr.markdown, /^## Hard negatives help\n\n\*Week of .+\*\n\nRetrained/);
+  assert.match(wr.email, /^Hi,\n/);
+  assert.ok(wr.stats.some((x: any) => x.what === 'Sessions' && x.count >= 3), JSON.stringify(wr.stats));
+  const asked = model.calls.find((c) => c.includes('weekly progress report'))!;
+  assert.match(asked, /for their advisor/);
+  assert.match(asked, /Hard negatives for the retriever/, 'what it was told comes from work_log');
+  assert.doesNotMatch(asked, /Grant review|Private thing/, 'never a Confidential or private session');
+  const saved = startRun({ app: 'tpl:weekly-report', slug: 'weekly-report', recipe: tpl('weekly-report'), source: 'screen', flow: 'save', inputs: { title: wr.title, markdown: wr.markdown } });
+  assert.equal((await ended(saved.id)).result?.page, '/pages/pg123');
+  assert.deepEqual(exp.calls.find(([n]) => n === 'save_doc')![1], { title: 'Hard negatives help', markdown: wr.markdown });
+  // The notebook: an earlier day written, kept under its date; written again, it takes the old one's place.
+  const day = dayOf(now - 2 * DAY);
+  const first = await ended(startRun({ app: 'tpl:lab-notebook', slug: 'lab-notebook', recipe: tpl('lab-notebook'), source: 'screen', flow: 'earlier', inputs: { date: day } }).id);
+  assert.equal(first.status, 'done', first.error);
+  assert.equal(first.result?.kept, true);
+  assert.equal(first.result?.title, 'Hard negatives help on short queries');
+  assert.equal(first.result?.link, `https://lab.example/apps/runs/${first.id}`);
+  let entries = (await http.inject({ method: 'GET', url: '/api/apps/tpl:lab-notebook/data/entries' })).json().records;
+  assert.deepEqual(entries.map((e: any) => [e.id, e.date, e.run]), [[day, day, first.id]]);
+  assert.ok(entries[0].links.some((l: any) => l.kind === 'session' && l.url === '/s/claude%3Avscode1'));
+  const second = await ended(startRun({ app: 'tpl:lab-notebook', slug: 'lab-notebook', recipe: tpl('lab-notebook'), source: 'screen', flow: 'earlier', inputs: { date: day } }).id);
+  entries = (await http.inject({ method: 'GET', url: '/api/apps/tpl:lab-notebook/data/entries' })).json().records;
+  assert.deepEqual(entries.map((e: any) => [e.id, e.run]), [[day, second.id]], 'one entry for the day, the new one');
+  // A day with nothing done: no entry.
+  const quiet = await ended(startRun({ app: 'tpl:lab-notebook', slug: 'lab-notebook', recipe: tpl('lab-notebook'), source: 'screen', flow: 'earlier', inputs: { date: dayOf(now - 40 * DAY) } }).id);
+  assert.equal(quiet.result?.kept, false);
+  assert.equal(stepsOf(quiet.id).write, 'skipped', 'no model asked');
+  const found = await ended(startRun({ app: 'tpl:lab-notebook', slug: 'lab-notebook', recipe: tpl('lab-notebook'), source: 'screen', flow: 'search', inputs: { question: 'hard negatives' } }).id);
+  assert.deepEqual((found.result?.entries as any[]).map((e) => e.id), [day]);
+});
+
+test('updates on chosen days: a ready-made app’s own start (the weekly report on Fridays at 16:00); on weekdays or once a week, the scheduled task follows; days checked', async () => {
+  const tasks = () => scheduler.list().filter((t: ScheduledTask) => t.origin === 'daily:tpl:weekly-report');
+  let h = (await http.inject({ method: 'GET', url: '/api/apps/tpl:weekly-report' })).json().home;
+  assert.deepEqual(h, { inputs: { audience: 'Your advisor', projects: '', include: '' }, daily: { on: false, time: '16:00', days: [5] } }, 'off, ready to start on Fridays at 16:00');
+  h = (await http.inject({ method: 'PUT', url: '/api/apps/tpl:weekly-report/home', payload: { daily: { on: true } } })).json().home;
+  assert.deepEqual(h.daily, { on: true, time: '16:00', days: [5] });
+  assert.deepEqual(tasks().map((t) => t.schedule), [{ kind: 'daily', time: '16:00', days: [5] }]);
+  h = (await http.inject({ method: 'PUT', url: '/api/apps/tpl:weekly-report/home', payload: { daily: { days: [1, 2, 3, 4, 5], time: '09:30' } } })).json().home;
+  assert.deepEqual(h.daily, { on: true, time: '09:30', days: [1, 2, 3, 4, 5] });
+  assert.deepEqual(tasks().map((t) => t.schedule), [{ kind: 'daily', time: '09:30', days: [1, 2, 3, 4, 5] }], 'the same task, on weekdays');
+  h = (await http.inject({ method: 'PUT', url: '/api/apps/tpl:weekly-report/home', payload: { daily: { days: null } } })).json().home;
+  assert.deepEqual(h.daily, { on: true, time: '09:30' }, 'every day');
+  assert.deepEqual(tasks().map((t) => t.schedule), [{ kind: 'daily', time: '09:30' }]);
+  for (const days of [[7], [], 'Friday', [1.5]]) assert.equal((await http.inject({ method: 'PUT', url: '/api/apps/tpl:weekly-report/home', payload: { daily: { days } } })).statusCode, 400, JSON.stringify(days));
+  h = (await http.inject({ method: 'PUT', url: '/api/apps/tpl:weekly-report/home', payload: { daily: { days: [3], on: false } } })).json().home;
+  assert.equal(tasks().length, 0, 'off removes it');
+  assert.deepEqual(h.daily, { on: false, time: '09:30', days: [3] }, 'what was picked is kept for next time');
+  assert.deepEqual((await http.inject({ method: 'GET', url: '/api/apps/tpl:lab-notebook' })).json().home.daily, { on: false, time: '21:00' }, 'the notebook: every evening');
+});
+
+test('read_document: a text file (JSON lines) as it is, numbered, so a step can read an upload', async () => {
+  const f = path.join(tmp, 'labels.jsonl');
+  fs.writeFileSync(f, '{"text": "one"}\n{"text": "two"}\n');
+  const ctx = { runId: 'r', key: 'acp:flow-x', agent: 'acp', cwd: tmp, deps, step: true } as RunCtx;
+  const read = documents.tools!(ctx).find((t) => t.name === 'read_document')!;
+  const out = String(await read.run({ path: f }, ctx));
+  assert.match(out, /^labels\.jsonl · JSONL · lines 1–3 of 3\n\n {5}1\t\{"text": "one"\}\n {5}2\t\{"text": "two"\}/);
+  fs.writeFileSync(path.join(tmp, 'x.bin'), 'x');
+  await assert.rejects(read.run({ path: path.join(tmp, 'x.bin') }, ctx), /not a kind of document this reads/);
 });
 
 for (const [name, fn] of tests) {
