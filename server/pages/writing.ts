@@ -7,7 +7,8 @@
 // Notion keeps a block under its parent. Markdown works as you type ("# ", "- ", "1. ", "[] ", "> ", "```", "---", **bold**,
 // *italic*, `code`, ~~struck~~). "/" lists the blocks to add, filtered as you type. Beside the block under the
 // pointer sit a + (adds a block under it) and a ⋮⋮ (drag it elsewhere, or click it for its menu: Turn into, Colour,
-// Duplicate, Move, Copy, Delete, Ask the agent). Shift+click or a drag down the margin picks several blocks. To-dos
+// Duplicate, Move, Copy, Delete, Ask the agent). Shift+click, or a drag from beside the blocks (either margin, a gap,
+// beside a block's words, the +) as Notion's drag-select, picks several blocks, a list's items one by one. To-dos
 // tick and toggles fold in Edit too, a table of contents keeps up with the headings, a page gets an icon and a cover,
 // and pictures dropped or pasted in land where they fall (the app makes them small enough to live in the page).
 //
@@ -2283,7 +2284,13 @@ export function writing(E: Core): Writing {
   hd.querySelector('.add')!.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (noClick) return;
     addBlock(handleBlock, (e as MouseEvent).altKey);
+  });
+  // A drag from the + picks blocks, as from the margin it sits in (a page's narrow margin is mostly handles).
+  hd.querySelector('.add')!.addEventListener('pointerdown', (e) => {
+    const p = e as PointerEvent;
+    if (p.button === 0 && p.pointerType !== 'touch') bandFrom(p, true, null);
   });
   endBtn.addEventListener('click', (e) => {
     e.preventDefault();
@@ -2514,47 +2521,118 @@ export function writing(E: Core): Writing {
     },
     true,
   );
+  // ---- picking blocks with a drag, as Notion's drag-select does -----------------------------------------------------
+  /** Whether a point is on a block's words (a press there and a short drag is still a click on them). */
+  const overWords = (b: Element | null, x: number, y: number) => {
+    const h = b ? hostOf(b) : null;
+    return !!h && lineBoxes(h).some((q) => x >= q.left - 2 && x <= q.right + 2 && y >= q.top - 2 && y <= q.bottom + 2);
+  };
+  /**
+   * The blocks a dragged rectangle touches, top to bottom: a list's items one by one (an item's own line, else the items
+   * under it), the blocks of one column when it stays inside that column; blocks whole otherwise.
+   */
+  const bandBlocks = (r: { left: number; right: number; top: number; bottom: number }): Element[] => {
+    const out: Element[] = [];
+    const hits = (q: DOMRect) => q.height > 0 && q.bottom >= r.top && q.top <= r.bottom;
+    const items = (list: Element) => {
+      for (const li of list.children) {
+        if (li.tagName !== 'LI' || !hits(li.getBoundingClientRect())) continue;
+        if (hits(firstLineBox(li))) out.push(li);
+        else for (const s of subLists(li)) items(s);
+      }
+    };
+    const visit = (c: Element) => {
+      for (const k of c.children) {
+        if (skip(k) || !hits(k.getBoundingClientRect())) continue;
+        if (isList(k)) items(k);
+        else if (k.classList.contains('n-cols')) {
+          const col = [...k.children].find((x) => {
+            const q = x.getBoundingClientRect();
+            return r.left >= q.left - 12 && r.right <= q.right + 12;
+          });
+          if (col) visit(col);
+          else out.push(k);
+        } else out.push(k);
+      }
+    };
+    visit(flow());
+    return out;
+  };
+  /**
+   * A press that may become a drag-select: from empty space (a margin, a gap between blocks, beside a block's words, the
+   * + beside a block) it starts once the pointer has moved a little; from a block's words, once the pointer leaves that
+   * block (a click with a shake of the hand stays a click). The rectangle picks the blocks it touches; the page scrolls
+   * when it reaches the top or the bottom.
+   */
+  const bandFrom = (e: PointerEvent, fromSpace: boolean, start: Element | null) => {
+    const x0 = e.clientX;
+    const y0 = e.clientY + scrollY;
+    let band = false;
+    let last = { x: e.clientX, y: e.clientY };
+    let roll = 0;
+    const draw = () => {
+      const { x, y } = last;
+      const top = Math.min(y0 - scrollY, y);
+      const bottom = Math.max(y0 - scrollY, y);
+      const left = Math.min(x0, x);
+      const right = Math.max(x0, x);
+      Object.assign(bandEl.style, { display: 'block', left: `${left}px`, width: `${Math.max(1, right - left)}px`, top: `${top}px`, height: `${bottom - top}px` });
+      picked = bandBlocks({ left, right, top, bottom });
+      drawPicked();
+    };
+    const move = (m: PointerEvent) => {
+      last = { x: m.clientX, y: m.clientY };
+      if (!band) {
+        if (Math.hypot(m.clientX - x0, m.clientY + scrollY - y0) < 6) return;
+        const r = !fromSpace && start ? start.getBoundingClientRect() : null;
+        if (r && m.clientY >= r.top && m.clientY <= r.bottom) return;
+        band = true;
+        E.finish();
+        hoverBlock = null;
+        dragging = true;
+        E.redraw();
+      }
+      // Near the window's top or bottom, the page scrolls on by itself while the pointer stays there.
+      const edge = m.clientY < 28 ? m.clientY - 28 : m.clientY > innerHeight - 28 ? m.clientY - innerHeight + 28 : 0;
+      clearInterval(roll);
+      if (edge)
+        roll = window.setInterval(() => {
+          scrollBy(0, Math.max(-24, Math.min(24, edge)));
+          draw();
+        }, 30);
+      draw();
+    };
+    const up = () => {
+      removeEventListener('pointermove', move, true);
+      removeEventListener('pointerup', up, true);
+      removeEventListener('pointercancel', up, true);
+      clearInterval(roll);
+      bandEl.style.display = 'none';
+      if (!band) return;
+      dragging = false;
+      // The click that ends the drag is not one on the page (nor on the + it may have started from).
+      noClick = true;
+      setTimeout(() => (noClick = false), 0);
+      const list = picked;
+      pickMany(list, list[0] ?? null);
+    };
+    addEventListener('pointermove', move, true);
+    addEventListener('pointerup', up, true);
+    addEventListener('pointercancel', up, true);
+  };
   addEventListener(
     'pointerdown',
     (e) => {
       if (fromUi(e)) return;
       if (menu) closeMenu();
       if (slash) closeSlash();
-      // A drag down the margin, from beside the blocks: picks the blocks it passes.
+      // Words being written keep the browser's own selection by dragging; touch scrolls the page.
       if (e.button !== 0 || e.pointerType === 'touch' || E.editing()?.contains(e.target as Node)) return;
       const t = e.target as Element;
       const f = flow();
-      if (!(t === doc.body || t === doc.documentElement || t === f)) return;
-      const y0 = e.clientY;
-      let band = false;
-      const move = (m: PointerEvent) => {
-        if (!band && Math.abs(m.clientY - y0) < 6) return;
-        band = true;
-        const top = Math.min(y0, m.clientY);
-        const bottom = Math.max(y0, m.clientY);
-        const fr = f.getBoundingClientRect();
-        Object.assign(bandEl.style, { display: 'block', left: `${fr.left}px`, width: `${fr.width}px`, top: `${top}px`, height: `${bottom - top}px` });
-        picked = [...f.children].filter((k) => {
-          if (skip(k)) return false;
-          const r = k.getBoundingClientRect();
-          return r.height > 0 && r.bottom >= top && r.top <= bottom;
-        });
-        drawPicked();
-      };
-      const up = () => {
-        removeEventListener('pointermove', move, true);
-        removeEventListener('pointerup', up, true);
-        removeEventListener('pointercancel', up, true);
-        bandEl.style.display = 'none';
-        if (!band) return;
-        noClick = true;
-        setTimeout(() => (noClick = false), 0);
-        const list = picked;
-        pickMany(list, list[0] ?? null);
-      };
-      addEventListener('pointermove', move, true);
-      addEventListener('pointerup', up, true);
-      addEventListener('pointercancel', up, true);
+      const space = t === doc.body || t === doc.documentElement || t === f;
+      const b = space ? null : blockOf(t);
+      bandFrom(e, space || !overWords(b, e.clientX, e.clientY), b);
     },
     true,
   );
