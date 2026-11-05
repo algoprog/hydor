@@ -1,12 +1,13 @@
 // What the page editor asks the app for while you write (writing.ts asks, the frame passes it on): an emoji, a
 // page's icon or a callout's, a cover (a gradient, or a picture from this device or the web), a picture, a video from
-// YouTube or Vimeo, maths in LaTeX (drawn with KaTeX, whose look the page then loads from jsDelivr). Each opens beside
-// where it was asked in the page (a sheet from the bottom on a phone) and its answer goes back to its place. Also the
-// covers the Page tab offers, and the editor's keyboard shortcuts.
+// YouTube or Vimeo (Vimeo's still asked of the server), maths in LaTeX (drawn with KaTeX, whose look the page then
+// loads from jsDelivr). Each opens beside where it was asked in the page (a sheet from the bottom on a phone) and its
+// answer goes back to its place. Also the covers the Page tab offers, and the editor's keyboard shortcuts.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageUp, Trash2 } from 'lucide-react';
 import { videoEmbed } from '@shared/app-media';
+import { post } from '../../../lib/api';
 import { Button, cx, Popover, SheetsOnPhone } from '../../../components/ui';
 import type { EdAsk } from '../frame';
 import { CharPicker } from '../common/CharPicker';
@@ -27,6 +28,20 @@ export const COVER_GRADIENTS: { css: string; name: string }[] = [
 ];
 
 const fieldCls = 'h-8 w-full min-w-0 rounded-lg border border-line bg-bg-1 px-2.5 text-[13px] text-fg outline-none placeholder:text-fg-3 focus:border-accent/60';
+
+/**
+ * A Vimeo video's still, from the app's server (POST /api/pages/video-still, which the slides editor's Video uses too): a
+ * picture's address the page can show (https, or a data: picture), or nothing when the server can't tell (or is older and
+ * has no such route) within a few seconds.
+ */
+export function videoStill(url: string): Promise<string | undefined> {
+  const late = new Promise<undefined>((r) => setTimeout(() => r(undefined), 8000));
+  const asked = post<{ src?: unknown }>('/api/pages/video-still', { url }).then(
+    (r) => (typeof r.src === 'string' && /^(https:\/\/|data:image\/)/.test(r.src) ? r.src : undefined),
+    () => undefined,
+  );
+  return Promise.race([asked, late]);
+}
 
 /** A picture from this device, as a big button: made small enough to live in the page. */
 function DeviceButton({ onPicture, onError, children }: { onPicture: (src: string) => void; onError: (e: unknown) => void; children: ReactNode }) {
@@ -240,7 +255,9 @@ export function InsertPopover({
           onSend={(url) => {
             const play = videoEmbed(url)!;
             const yt = /\/embed\/([\w-]{6,20})/.exec(play)?.[1];
-            done({ href: url, play, thumb: yt ? `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` : undefined });
+            if (yt) return done({ href: url, play, thumb: `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` });
+            // Vimeo's still is asked of the app's server; without one, the video goes in on a plain dark still.
+            void videoStill(url).then((thumb) => done({ href: url, play, thumb }));
           }}
         />
         <p className="text-[11.5px] leading-snug text-fg-3">The page shows its still; a click plays it.</p>
