@@ -89,7 +89,7 @@ function SweepCard({ item, sessionKey }: { item: ToolItem; sessionKey: string })
     <ToolCard icon={<Waypoints size={15} />}>
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-[13.5px]">
-          A sweep of {out.runs.length} runs:{' '}
+          {`A sweep of ${out.runs.length} runs:`}{' '}
           <span translate="no" className="font-medium">
             {out.group}
           </span>
@@ -110,7 +110,7 @@ function TableCard({ item, sessionKey }: { item: ToolItem; sessionKey: string })
     <ToolCard icon={<Table2 size={15} />}>
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
-          A results table: {t.rows.length} rows, {t.spec.columns.length} {t.spec.columns.length === 1 ? 'metric' : 'metrics'}
+          {`A results table: ${t.rows.length} rows, ${t.spec.columns.length} metric${t.spec.columns.length === 1 ? '' : 's'}`}
         </span>
         <Button size="sm" variant="ghost" className="-my-1" onClick={async () => toast((await copy(t.latex)) ? 'Copied the LaTeX' : 'Could not copy')}>
           Copy LaTeX

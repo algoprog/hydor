@@ -248,7 +248,7 @@ function RequestDialog({ open, kind, onClose, start, onAsk }: { open: boolean; k
         )}
         <div>
           <div className="mb-1 text-[12px] font-medium text-fg-3">The agent beside the editor is asked</div>
-          <p className="rounded-xl bg-bg-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-fg-2">{text}</p>
+          <p translate="no" className="rounded-xl bg-bg-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-fg-2">{text}</p>
         </div>
         {!onAsk && <p className="text-[12.5px] text-fg-3">There is no agent beside this editor to ask: open the document from the Library.</p>}
         {v.id !== 'other' && !more && v.call && (

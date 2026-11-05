@@ -103,8 +103,7 @@ export function ArxivDialog({ page, version }: { page: string; version?: number 
               {made.name}
             </span>
             <span className="text-fg-3">
-              {size(made.bytes)} · {made.files.length} file{made.files.length === 1 ? '' : 's'} ·{' '}
-              {made.compiled.missing ? 'not typeset here' : made.compiled.pages ? `typesets to ${made.compiled.pages} page${made.compiled.pages === 1 ? '' : 's'}` : 'does not typeset'}
+              {[size(made.bytes), `${made.files.length} file${made.files.length === 1 ? '' : 's'}`, made.compiled.missing ? 'not typeset here' : made.compiled.pages ? `typesets to ${made.compiled.pages} page${made.compiled.pages === 1 ? '' : 's'}` : 'does not typeset'].join(' · ')}
             </span>
           </div>
           {made.compiled.errors.length > 0 && (

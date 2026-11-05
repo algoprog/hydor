@@ -97,7 +97,7 @@ function RunRow({ r, where, picked, onPick, onOpen, open }: { r: RunRecord; wher
               {m}
             </span>
           )}
-          <span className="tnum w-9 shrink-0 text-right text-[11.5px] text-fg-3">{timeAgo(r.startedAt ?? r.createdAt)}</span>
+          <span className="tnum min-w-9 shrink-0 text-right text-[11.5px] whitespace-nowrap text-fg-3">{timeAgo(r.startedAt ?? r.createdAt)}</span>
         </div>
         <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-fg-3">
           <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', statusTone(r.status))} />
@@ -179,7 +179,8 @@ export function ExperimentsPage() {
     if (r.machine) return r.machine.name;
     if (r.where?.startsWith('c:')) return clusterName(r.where.slice(2));
     if (r.where?.startsWith('m:')) return r.where.slice(2);
-    return `${r.host ?? 'this computer'}${r.gpuIds?.length ? `, GPU ${r.gpuIds.join(', ')}` : ''}`;
+    // This computer by those words (its host name tells you nothing here), in whole lines so each translates as one.
+    return r.gpuIds?.length ? `This computer, GPU ${r.gpuIds.join(', ')}` : 'This computer';
   };
   const placeOf = (r: RunRecord) => (r.machine ? `m:${r.machine.id}` : (r.where ?? 'local'));
 
