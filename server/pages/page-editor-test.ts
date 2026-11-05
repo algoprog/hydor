@@ -387,6 +387,69 @@ if (canCapture()) {
     ok(/<input type="checkbox" checked="">/.test(out) && /<details class="n-toggle">/.test(out), 'the to-do’s tick and the folded toggle are in the page given back');
   });
 
+  // ---- toggles, nested lists, pasted lines, what "/" and Backspace leave alone ---------------------------------------------------
+  await drive(
+    '<details class="n-toggle" open><summary id="s">Packing</summary><p>Socks</p></details><ul><li id="p1">Parent<ul><li id="kid">Kid</li></ul></li></ul><hr><p id="after">After the line</p><table><tr><td id="cell">A cell</td></tr></table>',
+    async (d) => {
+      await d.write('#s');
+      await d.press('Enter');
+      await d.type('Hat');
+      same(await d.js<string>('return [...document.querySelector("details").children].map(c => c.tagName + ":" + c.textContent).join("|")'), 'SUMMARY:Packing|P:Hat|P:Socks', 'Enter in a toggle’s title makes the first block inside it');
+      await d.write('#kid', 'start');
+      await d.press('Home');
+      await d.press('Backspace');
+      same(await shape(d, 'ul'), 'li:Parent|li:Kid', 'Backspace at a nested item’s start takes it up a level');
+      await d.write('#after', 'start');
+      await d.press('Home');
+      await d.press('Backspace');
+      same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.tag, 'hr', 'Backspace at a block’s start after a line across picks the line, as Notion does');
+      // (its words' start: a small part's resize handle sits over its end)
+      await d.write('#cell', 'start');
+      await d.press('End');
+      await d.type(' /');
+      same(await d.js<string>('return document.querySelector("#cell").textContent'), 'A cell /', '"/" in a table’s cell is only a slash');
+      await d.press('Escape');
+      await d.write('#after');
+      await d.js(
+        'const dt = new DataTransfer(); dt.setData("text/plain", " and more\\n- a point\\n## A title\\nPlain words"); document.activeElement.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));',
+      );
+      await sleep(100);
+      same((await shape(d)).split('|').slice(-5).join('|'), 'p:After the line and more|ul>li:a point|h2:A title|p:Plain words|table:A cell /', 'lines pasted become blocks, Markdown and all');
+    },
+  );
+
+  // ---- dragging a block by its handle, into a column; a page with no blocks left ----------------------------------------------
+  await drive('<h1 id="t">Columns</h1><p id="m">Move me</p><div class="n-cols"><div><p>Left</p></div><div></div></div>', async (d) => {
+    const r = await d.js<{ x: number; y: number }>('const b = document.querySelector("#m").getBoundingClientRect(); return { x: b.left, y: b.top };');
+    await d.clickAt(r.x + 20, r.y + 5);
+    await d.press('Escape');
+    await d.press('Escape');
+    const s = d.tab.s;
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x + 30, y: r.y + 8 });
+    await sleep(80);
+    // The handle sits left of the block (+ then ⋮⋮), centred on its first line.
+    const gx = r.x - 16;
+    const gy = r.y + 11;
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: gx, y: gy });
+    await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: gx, y: gy, button: 'left', clickCount: 1 });
+    const col = await d.js<{ x: number; y: number }>('const b = document.querySelector(".n-cols > div:nth-child(2)").getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + 4 };');
+    for (let i = 1; i <= 6; i++) await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: gx + ((col.x - gx) * i) / 6, y: gy + ((col.y - gy) * i) / 6, buttons: 1 });
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: col.x, y: col.y, button: 'left', clickCount: 1 });
+    await sleep(80);
+    same(await d.js<string>('return document.querySelector(".n-cols > div:nth-child(2)").innerHTML'), '<p id="m">Move me</p>', 'a block dragged by its ⋮⋮ goes into an empty column');
+    await d.press('z', { ctrl: true });
+    same(await shape(d), 'h1:Columns|p:Move me|div.n-cols:Left', 'and Ctrl+Z takes the move back');
+    for (const sel of ['#t', '#m', '.n-cols']) {
+      await d.cmd('deselect');
+      await d.click(sel);
+      await d.press('Delete');
+    }
+    same(await shape(d), '', 'every block can go');
+    await d.clickAt(400, 300);
+    await d.type('A fresh start');
+    same(await shape(d), 'p:A fresh start', 'and a click in an empty page starts a paragraph');
+  });
+
   // ---- an icon, a cover, a picture, maths, a video ------------------------------------------------------------------------------
   await drive('<h1 id="t">Garden</h1><p id="a">Notes</p>', async (d) => {
     await d.cmd('icon', '🌱');
