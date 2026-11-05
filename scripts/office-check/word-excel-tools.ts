@@ -351,7 +351,8 @@ export function validateParts(o: CheckOpts, file: Buffer, label: string): { part
 
 // Microsoft's extensions the exports write, checked by hand against [MS-DOCX] and [MS-XLSX] (no schema of the standard has
 // them): each element's attributes and values as Office writes them.
-const LIGATURES = /^(none|standard|contextual|historical|discretional|standardContextual|standardHistorical|contextualHistorical|standardDiscretional|contextualDiscretional|historicalDiscretional|standardContextualHistorical|standardContextualDiscretional|standardHistoricalDiscretional|contextualHistoricalDiscretional|all)$/;
+const LIGATURES =
+  /^(none|standard|contextual|historical|discretional|standardContextual|standardHistorical|contextualHistorical|standardDiscretional|contextualDiscretional|historicalDiscretional|standardContextualHistorical|standardContextualDiscretional|standardHistoricalDiscretional|contextualHistoricalDiscretional|all)$/;
 const LONG_HEX = (v: string) => /^[0-9A-F]{8}$/.test(v) && parseInt(v, 16) < 0x80000000;
 
 /** What Microsoft's extensions in a part get wrong: their attributes, values and where they are. */
