@@ -132,7 +132,7 @@ export function takeEdits(db: DB, key: string): string | null {
   }
   if (!parts.length) return null;
   return [
-    'The user changed a page in Hydor’s page editor since your last turn. Keep their changes when you change it again: for a saved page start from it as it is now (get_page) and save with its id (save_page, or its kind’s own: save_slides, save_doc, save_sheet or save_latex), which adds a version; a file, read it first.',
+    'The user changed a page in Hydor’s page editor since your last turn. Keep their changes when you change it again: for a saved page start from it as it is now (get_page) and save with its id (save_page, or its kind’s own: save_slides, save_doc, save_sheet, save_latex or save_notebook), which adds a version; a file, read it first.',
     ...parts,
   ].join('\n');
 }

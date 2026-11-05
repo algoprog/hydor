@@ -1,11 +1,11 @@
 // The Library (/library): everything kept, by space. Pages and small tools, slide decks, documents, spreadsheets
-// and LaTeX documents (agents' and yours), and the pictures, videos and sounds you kept, each in the space it was made in
+// LaTeX documents and Jupyter notebooks (agents' and yours), and the pictures, videos and sounds you kept, each in the space it was made in
 // (an agent's save goes in its session's space; you pick when you keep something yourself) or in none. On a wide
 // screen the places are a list beside it: Everything (each space's things together, under its name), each space,
 // Not in a space, and Published (the sites published from pages or a project's build); on a phone, a row of chips.
 // Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space.
 // Addresses: /library?project=<id>|none, &kind=<kind> (image, video and audio each, media pictures and videos both:
-// the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex opens New with that kind.
+// the old Media tab's ?tab=media too), ?tab=published; ?new=page|slides|doc|sheet|tex|notebook opens New with that kind.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import {
@@ -25,6 +25,7 @@ import {
   Layers,
   LibraryBig,
   MessageSquarePlus,
+  NotebookText,
   PenLine,
   Pencil,
   Play,
@@ -61,9 +62,9 @@ import { usePagesStore } from './state';
 
 // ---- what the Library holds ----------------------------------------------------------------------------
 
-type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'image' | 'video' | 'audio';
+type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'image' | 'video' | 'audio';
 /** What a place shows: everything, one kind, or pictures and videos together. */
-type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'image' | 'video' | 'audio' | 'media';
+type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'image' | 'video' | 'audio' | 'media';
 
 interface Item {
   key: string;
@@ -83,6 +84,7 @@ const KIND: Record<ItemKind, { label: string; icon: ReactNode }> = {
   doc: { label: 'Document', icon: <FileText size={12} /> },
   sheet: { label: 'Spreadsheet', icon: <Sheet size={12} /> },
   tex: { label: 'LaTeX', icon: <Sigma size={12} /> },
+  notebook: { label: 'Notebook', icon: <NotebookText size={12} /> },
   image: { label: 'Picture', icon: <ImageIcon size={12} /> },
   video: { label: 'Video', icon: <Play size={12} /> },
   audio: { label: 'Audio', icon: <AudioLines size={12} /> },
@@ -95,6 +97,7 @@ const SHOWS: { value: Show; label: string; has: (k: ItemKind) => boolean }[] = [
   { value: 'doc', label: 'Documents', has: (k) => k === 'doc' },
   { value: 'sheet', label: 'Spreadsheets', has: (k) => k === 'sheet' },
   { value: 'tex', label: 'LaTeX', has: (k) => k === 'tex' },
+  { value: 'notebook', label: 'Notebooks', has: (k) => k === 'notebook' },
   { value: 'image', label: 'Pictures', has: (k) => k === 'image' },
   { value: 'video', label: 'Videos', has: (k) => k === 'video' },
   { value: 'audio', label: 'Audio', has: (k) => k === 'audio' },
@@ -488,7 +491,7 @@ export function Library() {
   const newAsked = q.get('new');
   useEffect(() => {
     if (!newAsked) return;
-    setMaking(newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' ? newAsked : 'page');
+    setMaking(newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' ? newAsked : 'page');
     go('/library', true);
   }, [newAsked]);
   // A space that is gone: everything again.

@@ -241,7 +241,7 @@ Click **Ask** in the editor's bar (✨ on a phone) and say what should change ("
 - Unsaved changes are saved first, so the agent works on them.
 - The agent starts in the file's folder, knows which file you mean, and changes that file itself. You watch each change arrive in the editor as soon as it is written, the changed lines tinted for a moment, with your place in the file kept.
 - The conversation goes on in the panel: write back to ask for more. **A new request** starts again, and **Open as a session** opens it in full; it is in your sessions too. On a phone, **See the file** folds the panel away to watch the file, and the bar at the bottom brings it back.
-- The panel stays open as you switch between files' tabs, each with its own conversation. It works the same in the Word, Excel, CSV and LaTeX editors. As with [asking from the Library](/guide/library#change-it-by-asking-an-agent), the agent's remembered model and permissions stay as they were.
+- The panel stays open as you switch between files' tabs, each with its own conversation. It works the same in the Word, Excel, CSV and LaTeX editors, and in notebooks, where the agent changes cells and keeps the outputs of the others. As with [asking from the Library](/guide/library#change-it-by-asking-an-agent), the agent's remembered model and permissions stay as they were.
 
 ### When the file changes while you have it open
 
@@ -336,7 +336,7 @@ The search is in the page's address, so Back and a reload keep it. It skips file
 
 ## Run a Jupyter notebook
 
-A notebook (`.ipynb`) opens as a notebook: its cells, each with its output. The bar at the top holds the kernel button, **Run all cells**, **Interrupt (I, I)**, **Restart the kernel (0, 0)**, **Clear all outputs**, **View the notebook file (JSON)**, **Download** and **Save**. On a phone, the less used ones are under **More**: **Restart the kernel**, **Restart and run all**, **Clear all outputs**, **View the file (JSON)** and **Download**.
+A notebook (`.ipynb`) opens as a notebook: its cells, each with its output. The bar at the top holds the kernel button, **Run all cells**, **Interrupt (I, I)**, **Restart the kernel (0, 0)**, **Clear all outputs**, **View the notebook file (JSON)**, **Download**, **Ask** (see [Ask an agent about the file](#ask-an-agent-about-the-file)) and **Save**. On a phone, the less used ones are under **More**: **Restart the kernel**, **Restart and run all**, **Clear all outputs**, **View the file (JSON)** and **Download**.
 
 Make one with **New** → **New notebook** in a folder (see [Make a file or folder](/guide/files-git#make-a-file-or-folder)), or ask an agent for one: it writes the notebook, runs it from the top so its outputs are there, sets up an environment to run it in when none fits, and hands it over as a card that opens it here.
 

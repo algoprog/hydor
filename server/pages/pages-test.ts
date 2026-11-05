@@ -582,6 +582,82 @@ let privPath = '';
   ok(spawn.instructions?.some((x) => x.includes(`saved page ${id}`) && x.includes('save_latex')), 'an agent asked from a LaTeX document knows it and how to change it');
 }
 
+// ---- Jupyter notebooks ----------------------------------------------------------------------------------------
+{
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  // A notebook as a file an agent wrote and ran: two cells, an output with a picture, ids as nbformat 4.5 has them.
+  const file = path.join(tmp, 'squares.ipynb');
+  const nbFile = {
+    cells: [
+      { cell_type: 'markdown', id: 'intro', metadata: {}, source: ['# Squares\n', '\n', 'The first five.'] },
+      {
+        cell_type: 'code',
+        id: 'sq',
+        execution_count: 1,
+        metadata: {},
+        source: 'for i in range(5):\n    print(i * i)',
+        outputs: [
+          { output_type: 'stream', name: 'stdout', text: ['0\n', '1\n', '4\n'] },
+          { output_type: 'stream', name: 'stdout', text: '\r 50%\r100%\n' },
+          { output_type: 'display_data', data: { 'image/png': png, 'text/plain': '<Figure>' }, metadata: { 'image/png': { width: 10, height: 10 } } },
+        ],
+      },
+    ],
+    metadata: { kernelspec: { display_name: 'Python 3 (ipykernel)', language: 'python', name: 'python3' }, language_info: { name: 'python' } },
+    nbformat: 4,
+    nbformat_minor: 4,
+  };
+  fs.writeFileSync(file, JSON.stringify(nbFile));
+  const made = await run('save_notebook', { title: 'Squares', path: 'squares.ipynb' });
+  const id = idOf(made.text);
+  ok(id && made.text?.includes('Saved "Squares"') && made.text.includes('2 cells, 1 with outputs'), 'save_notebook keeps an .ipynb file an agent wrote, outputs and all');
+  const info = (await req('GET', `/api/pages/${id}`)).json();
+  ok(info.page.kind === 'notebook' && info.model?.cells?.[1]?.outputs?.length === 3 && info.model.nbformat_minor === 5, 'it reads back as the notebook (nbformat 4.5)');
+  const ipynb = await req('GET', `/api/pages/${id}/export?format=ipynb`);
+  const back = JSON.parse(ipynb.body);
+  ok(
+    ipynb.statusCode === 200 && /Squares\.ipynb/.test(String(ipynb.headers['content-disposition'])) && Array.isArray(back.cells[0].source) && back.cells[0].source[0] === '# Squares\n' && back.cells[1].id === 'sq',
+    'it exports as an .ipynb, in nbformat’s own layout (lines as lists, its ids)',
+  );
+  ok(ipynb.body.startsWith('{\n "cells": [') && ipynb.body.endsWith('}\n'), 'written as nbformat writes it, a space for each level');
+  const py = await req('GET', `/api/pages/${id}/export?format=py`);
+  ok(py.statusCode === 200 && py.body.includes('# %% [markdown]\n# # Squares') && py.body.includes('# %%\nfor i in range(5):'), 'and as a Python script with # %% cells');
+  const html = await req('GET', `/api/pages/${id}/export?format=html`);
+  ok(
+    html.statusCode === 200 && html.body.includes("script-src 'none'") && html.body.includes('print(i * i)') && html.body.includes('100%') && !html.body.includes(' 50%') && html.body.includes('data:image/png;base64,'),
+    'its web page shows the code, its outputs as Jupyter does (a redrawn line at its end), its pictures, and runs no script',
+  );
+  ok(html.body.includes('<h1'), 'its text cells as headings and paragraphs');
+  const got = (await run('get_page', { id })).text ?? '';
+  ok(got.includes('--- cell 2 · code · id sq · run [1]') && got.includes('[a picture, image/png, 10×10]') && got.includes('save_notebook'), 'get_page gives each cell, its id, what it showed, and how to change it');
+  ok((await run('get_page', {})).text?.includes(`${id} · Squares · notebook`), 'the list says which are notebooks');
+  ok((await run('save_doc', { id, title: 'x', markdown: 'Hi' })).error?.includes('not a document'), 'save_doc refuses a notebook');
+  ok((await run('save_notebook', { id: idOf((await run('save_doc', { title: 'D', markdown: 'Hi' })).text), title: 'x', cells: [] })).error?.includes('not a notebook'), 'save_notebook refuses another kind');
+  ok((await run('save_notebook', { title: 'Two', cells: [{ source: 'x' }], path: 'squares.ipynb' })).error?.includes('Give one of'), 'it takes one of path, notebook or cells');
+  // Changed with its id: a new version; cells given as a list, with ids made where missing or taken twice.
+  const v2 = await run('save_notebook', { id, title: 'Squares', cells: [{ type: 'markdown', source: '# Squares' }, { type: 'code', source: 'print(1)', id: 'x' }, { source: 'print(2)', id: 'x' }] });
+  const m2 = (await req('GET', `/api/pages/${id}`)).json();
+  ok(v2.text?.includes('version 2') && m2.model.cells.length === 3 && new Set(m2.model.cells.map((c: { id: string }) => c.id)).size === 3, 'with its id it is a new version, every cell with an id of its own');
+  ok((await run('save_notebook', { title: 'Old', notebook: { cells: [], nbformat: 3 } })).error?.includes('only format 4'), 'an nbformat 3 notebook is refused, with how to convert it');
+  // The editor's save, a file opened in the Library, and a new one.
+  const r = await req('POST', `/api/pages/${id}/versions`, { model: { ...m2.model, cells: m2.model.cells.slice(0, 2) }, base: 2 });
+  ok(r.json().page?.version === 3 && r.json().page.by === 'edit', 'a changed notebook is saved as a version');
+  const imp = await req('POST', '/api/pages/import', { name: 'squares.ipynb', data: fs.readFileSync(file).toString('base64') });
+  ok(imp.statusCode === 200 && imp.json().page?.kind === 'notebook' && imp.json().page.title === 'squares', 'an .ipynb file opens as a notebook');
+  const fresh = (await req('POST', '/api/pages', { title: 'Scratch', kind: 'notebook' })).json();
+  const fm = (await req('GET', `/api/pages/${fresh.page.id}`)).json().model;
+  ok(fm.cells.length === 2 && [fm.cells[0].source].flat().join('') === '# Scratch' && fm.cells[1].cell_type === 'code' && fm.metadata.kernelspec.name === 'python3', 'New makes one with its title and a code cell');
+  // Where it runs: a folder of its own in the app's data folder, gone with it.
+  const where = (await req('GET', `/api/pages/${id}/notebook`)).json();
+  ok(where.path.endsWith(path.join('notebooks', id, 'notebook.ipynb')) && !fs.existsSync(where.path) && typeof where.savedAt === 'number', 'it runs from a file of its own, made only when a kernel starts');
+  ok((await req('POST', `/api/pages/${id}/notebook`)).json().path === where.path && JSON.parse(fs.readFileSync(where.path, 'utf8')).cells.length === 2, 'which holds it as it is kept');
+  ok((await req('GET', `/api/pages/${idOf((await run('save_doc', { title: 'E', markdown: 'Hi' })).text)}/notebook`)).statusCode === 400, 'only a notebook has one');
+  const spawn = (await pages.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { page: id } }, deps)) ?? {};
+  ok(spawn.instructions?.some((x) => x.includes(`saved page ${id}`) && x.includes('save_notebook') && x.includes('cell 3')), 'an agent asked from a notebook knows it and how to change it');
+  await req('DELETE', `/api/pages/${id}`);
+  ok(!fs.existsSync(path.dirname(where.path)), 'its folder goes with it');
+}
+
 // ---- files of this computer in the editors (Files), saved back to them -----------------------------------------
 {
   const dir = path.join(tmp, 'files');

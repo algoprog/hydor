@@ -1,7 +1,7 @@
 // Pages as files to keep or send: a page of HTML as a PDF (Chromium prints it as it shows, with its data) or a Word
 // document (docx.ts reads what it shows into paragraphs, lists, tables and pictures); the other kinds (kinds.ts)
 // as their own files, made from the model itself (a deck as PowerPoint, a document as Word or Markdown, a
-// spreadsheet as Excel or CSV), and as a PDF printed from their own page; any of them as a web page that works on
+// spreadsheet as Excel or CSV, a notebook as its .ipynb or a Python script), and as a PDF printed from their own page; any of them as a web page that works on
 // its own. PDFs, and a page's Word document, need the browser pictures are taken with (Settings → Browser).
 import { STORAGE_LIMITS } from '../../shared/pages.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
@@ -30,6 +30,8 @@ export const EXPORT_TYPES: Record<ExportFormat, string> = {
   tex: 'application/x-tex; charset=utf-8',
   zip: 'application/zip',
   html: 'text/html; charset=utf-8',
+  ipynb: 'application/x-ipynb+json',
+  py: 'text/x-python; charset=utf-8',
 };
 
 export type Paper = 'a4' | 'letter';

@@ -44,13 +44,14 @@ export function openPageAsk(o: { draft?: string; scope?: string } = {}) {
 }
 export const closePageAsk = () => usePageAsk.setState({ open: false });
 
-type AskKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex';
+type AskKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
 const EXAMPLES: Record<AskKind, string[]> = {
   slides: ['Make the titles shorter and clearer', 'Add a slide with a chart of these numbers', 'Use a darker theme', 'Write speaker notes for every slide', 'Add simple animations to the bullets'],
   page: ['Make it more colourful', 'Add a chart of the numbers', 'Make it easier to use on a phone', 'Fix any mistakes in the words'],
   doc: ['Fix the spelling and grammar', 'Make this section shorter and clearer', 'Add a summary at the top', 'Turn the list into a table', 'Write it in a friendlier tone'],
   sheet: ['Add a total row under the numbers', 'Add a column with each row’s share of the total', 'Sort by the date, newest first', 'Format the money columns as currency', 'Find any mistakes in the formulas'],
   tex: ['Fix the errors so it compiles', 'Add a table of the results', 'Make the abstract shorter', 'Number the equations and refer to them in the text', 'Add a bibliography with these sources'],
+  notebook: ['Explain what this cell does', 'Fix the error in this cell', 'Add a chart of the results', 'Add a text cell before each section saying what it does', 'Make it run faster'],
 };
 const WHAT_CHANGES: Record<AskKind, string> = {
   slides: 'Say what to change, and an agent changes the slides. You see each change here as soon as it is saved.',
@@ -58,6 +59,7 @@ const WHAT_CHANGES: Record<AskKind, string> = {
   doc: 'Say what to change, and an agent changes the document. You see each change here as soon as it is saved.',
   sheet: 'Say what to change, and an agent changes the spreadsheet. You see each change here as soon as it is saved.',
   tex: 'Say what to change, and an agent changes the LaTeX. You see each change here as soon as it is saved.',
+  notebook: 'Ask about the notebook, or say what to change, and an agent answers or changes it. You see each change here as soon as it is saved.',
 };
 const PLACEHOLDER: Record<AskKind, string> = {
   slides: 'What should change on the slides?',
@@ -65,6 +67,7 @@ const PLACEHOLDER: Record<AskKind, string> = {
   doc: 'What should change in the document?',
   sheet: 'What should change in the spreadsheet?',
   tex: 'What should change in the document?',
+  notebook: 'What should change, or what do you want to know?',
 };
 
 function Start({ page, scopes, beforeSend }: { page: PageInfo; scopes: AskScope[]; beforeSend: () => Promise<boolean> }) {

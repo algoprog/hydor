@@ -1,6 +1,6 @@
 # Library: pages, images, videos and sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets and LaTeX documents you edit as in PowerPoint, Word, Excel or Overleaf. What you keep goes in your Library, sorted by project, with the pictures, videos and sounds you saved, each with a title and a description. This topic covers watching a page as it is written, changing it, keeping it (with its versions, its data and an address for your phone), keeping images, videos and sounds, making your own pages, exporting files, asking an agent to change what you have open, and publishing at a link.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets, LaTeX documents and notebooks you edit as in PowerPoint, Word, Excel, Overleaf or Jupyter. What you keep goes in your Library, by project, with the pictures, videos and sounds you saved, each with a title and a description. This topic covers watching a page as it is written, changing it, keeping it (versions, data and an address for your phone), keeping images, videos and sounds, making your own pages, exporting files, asking an agent to change what you have open, and publishing at a link.
 
 ![The Library: everything kept, each project's things together, with its places beside them](images/library.webp)
 
@@ -209,12 +209,12 @@ Below, the picture (click it for full size), or the video or the sound, to play 
 
 ## Make a page
 
-**New**, at the top right of the Library (or **New page** [from the search box](/library?new=1)), makes a page of your own. At the top, pick what to make: **A page**, **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet** or **LaTeX** (see [Documents](#documents), [Spreadsheets](#spreadsheets) and [LaTeX documents](#latex-documents)). For a page:
+**New**, at the top right of the Library (or **New page** [from the search box](/library?new=1)), makes a page of your own. At the top, pick what to make: **A page**, **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet**, **LaTeX** or **Notebook** (see [Documents](#documents), [Spreadsheets](#spreadsheets), [LaTeX documents](#latex-documents) and [Notebooks](#notebooks)). For a page:
 
 1. Pick where it starts: **Blank page** (a heading and some words, to build on), **Notes** (a page to write in, kept as you type), **Checklist** (things to do, ticked off as you go) or **Tracker** (a number a day, with the last 30 days drawn).
 2. Change **Its name** if you like. With projects, **In a project** beside it says where it goes (the project you are looking at, or **No project**): click it to pick another. Click **Make it**. A blank page opens in **Edit**; the others open ready to use.
 
-A document, a spreadsheet or a LaTeX document starts empty but for its name (a LaTeX document with a short article to build on), or from a file of yours: **Open a Word or text file** (.docx, .md, .txt or .html), **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv) or **Open a .tex or .zip file** (one LaTeX file, or a whole project in a .zip). The file becomes a page of its kind; the file itself stays as it was. To change the file itself, open it in Files: it opens in the same editor and saves back to the file (see [Edit Word, Excel, CSV and LaTeX files](/guide/files-git#edit-word-excel-csv-and-latex-files)).
+A document, a spreadsheet or a LaTeX document starts empty but for its name (a LaTeX document with a short article to build on), or from a file of yours: **Open a Word or text file** (.docx, .md, .txt or .html), **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv) or **Open a .tex or .zip file** (one LaTeX file, or a whole project in a .zip). A notebook starts with its name as a heading and an empty code cell, or from **Open a notebook (.ipynb)**. The file becomes a page of its kind; the file itself stays as it was. To change the file itself, open it in Files: it opens in the same editor and saves back to the file (see [Edit Word, Excel, CSV and LaTeX files](/guide/files-git#edit-word-excel-csv-and-latex-files)).
 
 Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking", "a monthly budget for two") and click **Ask**: the start page opens with your words, for an agent to make it and keep it in your Library (with a project picked under **In a project**, the start page has that project picked too, so it lands there).
 
@@ -233,19 +233,20 @@ A page opens full screen inside the app, at its own place in the Library. The ba
 
 On a phone, **Use**, **Edit** and **Code** are icons, **Share** is the share icon, **Ask** is the sparkles icon, **Export** is under **More** (⋯) as **Download as**, and the sizes are left out (the phone is the size).
 
-Slides, documents, spreadsheets and LaTeX documents open in their own editors instead, with the same bar (see [Edit slides](#edit-slides), [Documents](#documents), [Spreadsheets](#spreadsheets) and [LaTeX documents](#latex-documents)).
+Slides, documents, spreadsheets, LaTeX documents and notebooks open in their own editors instead, with the same bar (see [Edit slides](#edit-slides), [Documents](#documents), [Spreadsheets](#spreadsheets), [LaTeX documents](#latex-documents) and [Notebooks](#notebooks)).
 
 Pages made with the app's ready-made look follow the app's light or dark theme.
 
 ## Export to a file
 
-**Export** at the top of an open page, slides, document, spreadsheet or LaTeX document (on a phone, **More** (⋯) → **Download as**), or **Download as** in a card's **More** (⋯) in the list, saves it as a file in your downloads:
+**Export** at the top of an open page, slides, document, spreadsheet, LaTeX document or notebook (on a phone, **More** (⋯) → **Download as**), or **Download as** in a card's **More** (⋯) in the list, saves it as a file in your downloads:
 
 - a page: **PDF** (as it shows, on A4 paper, or Letter where that is the usual size, with its data and its backgrounds), **Word document (.docx)** (its headings, paragraphs, lists, tables and links as Word's own, its charts and pictures as pictures, the values in its fields as text) or **Web page (.html)** (a file any browser opens, with its ready-made look);
 - slides: **PowerPoint (.pptx)** (every slide with its text boxes, shapes, pictures, tables and charts still editable, the theme's colours and fonts, speaker notes, transitions and animations, ready for PowerPoint, Keynote or Google Slides), **PDF** (a slide a page) or **Web page (.html)** (the slideshow in one file, to present from any browser);
 - a document: **Word document (.docx)** (its styles, lists, tables, pictures and links as Word's own, for Word, Google Docs or LibreOffice), **PDF** (on its own paper size and margins, with its page breaks), **Markdown (.md)** (its words, headings, lists, tables and links as plain text) or **Web page (.html)**;
 - a spreadsheet: **Excel (.xlsx)** (every sheet, with its formulas, formats, column widths and frozen rows, for Excel, Google Sheets or LibreOffice), **CSV (.csv)** (the first sheet's values as they show) or **PDF** (every sheet as a table);
-- a LaTeX document: **PDF** (typeset by LaTeX, as the preview shows it), **LaTeX source (.tex)** (the main file) or **LaTeX project (.zip)** (every file and picture, to typeset elsewhere, in Overleaf say).
+- a LaTeX document: **PDF** (typeset by LaTeX, as the preview shows it), **LaTeX source (.tex)** (the main file) or **LaTeX project (.zip)** (every file and picture, to typeset elsewhere, in Overleaf say);
+- a notebook: **Jupyter notebook (.ipynb)** (its cells with their outputs, for Jupyter, VS Code or Colab), **Python script (.py)** (its code, its text as comments, each cell marked `# %%`), **PDF** (its cells and outputs as they show) or **Web page (.html)**.
 
 An older version on view exports as it is. The PDF and Word files of pages, and the PDFs of slides, documents and spreadsheets, are made by the browser the app takes pictures with; without one, the app says so and **Settings → Browser** can download one ([Browser settings](/settings?s=browser)). Slides then still print as a PDF from your own browser: pick **Save as PDF** in its print window. A LaTeX document's PDF is made by LaTeX on the computer the app runs on (see [LaTeX documents](#latex-documents)).
 
@@ -336,17 +337,27 @@ On a phone, **Code** and **Preview** are two tabs. Changes stay unsaved until **
 
 LaTeX has to be installed on the computer the app runs on (TeX Live). Without it a LaTeX document is still kept and edited, not typeset, and the editor says what to install. TeX works in a folder of its own: a document cannot read or change other files or run programs, and where bubblewrap is installed, TeX runs in its sandbox too (LuaLaTeX only runs there).
 
+## Notebooks
+
+A notebook is a Jupyter notebook kept in the Library: text cells and code cells, each code cell with what its last run showed (text, tables, charts, pictures, errors). It opens in the same view as a notebook in Files (see [Run a Jupyter notebook](/guide/files-git#run-a-jupyter-notebook)), with versions, a picture in the list and an address of its own, and saves as an .ipynb file, a Python script, a PDF or a web page.
+
+- **Make one**: ask an agent ("make me a notebook that charts my monthly spending from this CSV, and keep it in my Library"), or **New page** in the Library, then **Notebook** ([or New notebook from the search box](/library?new=notebook)): its name as a heading and an empty code cell, or your own with **Open a notebook (.ipynb)**. A notebook an agent wrote and ran as a file comes into the Library with its outputs.
+- **Run it**: the kernel button at the top (**No kernel** until one runs) picks the Python environment its code runs in, from those on this computer, with **Run all cells**, **Interrupt**, **Restart the kernel** and **Clear all outputs** beside it (on a phone, in a row under the bar). A notebook of the Library runs in a folder of its own in the app's data folder: what its code writes there (data it downloads, models it saves) stays with it, and goes when you delete it.
+- **Cells**: as in Files, click a code cell to edit it, double-click a text cell, run one with Shift+Enter or Ctrl+Enter, and move, add or delete cells with their tools; a cell's tools also have **Ask an agent about this cell**.
+
+What a run shows comes at once but stays unsaved until **Save** (Ctrl+S) in the bar at the bottom; **Discard** goes back to the version kept. Each save is a version, outputs and all. An older version on view shows as it was, with nothing to edit or run.
+
 ## Change it by asking an agent
 
-**Ask** at the top of an open page, slides, document, spreadsheet or LaTeX document opens a panel beside it (over it on a phone) where an agent changes it for you:
+**Ask** at the top of an open page, slides, document, spreadsheet, LaTeX document or notebook opens a panel beside it (over it on a phone) where an agent changes it for you:
 
-1. Pick what it is about: for slides, **This slide**, **Every slide** or **What's picked** (the parts picked on the slide); for a document, **The whole document**, **This section** (the one you are in), **The words picked** or **The picture picked**; for a spreadsheet, **The whole workbook**, **This sheet** or the cells picked; for a LaTeX document, **The whole document**, **This file**, **This section** or the lines picked; for a page, **The whole page** or **The part picked** (after **Ask the agent** on a part in **Edit**).
+1. Pick what it is about: for slides, **This slide**, **Every slide** or **What's picked** (the parts picked on the slide); for a document, **The whole document**, **This section** (the one you are in), **The words picked** or **The picture picked**; for a spreadsheet, **The whole workbook**, **This sheet** or the cells picked; for a LaTeX document, **The whole document**, **This file**, **This section** or the lines picked; for a notebook, **The whole notebook** or the cell picked (**Cell 3**); for a page, **The whole page** or **The part picked** (after **Ask the agent** on a part in **Edit**).
 2. Say what should change ("make the titles shorter", "add a slide with a chart of these numbers", "make this section friendlier", "add a total row under the numbers", "fix the errors so it typesets") and send it. Changes not saved yet are saved first, so the agent works on them.
 3. The agent starts with the agent and model you picked last on the start page; the panel shows its work and its answer, and what you have open changes in front of you as soon as it saves it. Each change is a version, so you can go back ([Go back to an earlier version](#go-back-to-an-earlier-version)).
 
 Say more in the panel's message box; the buttons above it put which slide or part you mean in your message. **A new request** starts over, and **Open as a session** opens the conversation on its own page (it stays among your sessions). On a phone, **See the page** folds the panel away while the agent works; the button at the bottom brings it back.
 
-**Ask the agent about it** opens the panel with what you picked: a part of a slide, a page's part in **Edit**, words or a picture in a document, cells in a spreadsheet (in their right-click menu), or lines in a LaTeX document (**Ask the agent** in its toolbar). **Ask the agent to fix them**, under a LaTeX document's errors, asks for them all to be fixed.
+**Ask the agent about it** opens the panel with what you picked: a part of a slide, a page's part in **Edit**, words or a picture in a document, cells in a spreadsheet (in their right-click menu), lines in a LaTeX document (**Ask the agent** in its toolbar), or a notebook's cell (**Ask an agent about this cell** in its tools). A notebook's agent can also just answer: "what does cell 4 do?". **Ask the agent to fix them**, under a LaTeX document's errors, asks for them all to be fixed.
 
 ## Rename a page
 
@@ -490,6 +501,8 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "In my 'Household budget' spreadsheet, add a column with each item's share of the total."
 - "Turn these notes into a short paper in LaTeX, with the equations numbered."
 - "Send me the 'Household budget' spreadsheet as an Excel file."
+- "Make me a notebook that charts my monthly spending from this CSV, run it, and keep it in my Library."
+- "In my 'Image classifier' notebook, explain what the training cell does, then make it train for 20 epochs."
 - "Which images did I keep in my Library this month? List their titles."
 - "Rename the boat video in my Library to 'Lake test', and write its description again."
 - "Make a birthday card with the tram picture from my Library."

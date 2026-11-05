@@ -20,8 +20,9 @@ shows, and hand it over.
   predictions → saving; for an analysis, question → data → checks → findings → caveats.
 - What it needs: packages, data (where from, how big), hardware and time. Aim for a run of minutes on a laptop's
   CPU; make longer work a choice (a constant to turn up), not the default.
-- Where it lives: the project's or the session's folder, with what it reads and writes in folders beside it
-  (`data/`, `outputs/`).
+- Where it lives: in the user's Library (to read, run and come back to, with versions and Ask; it runs in a folder
+  of its own there), or as a file in the project's or the session's folder when it belongs with code or data there,
+  with what it reads and writes in folders beside it (`data/`, `outputs/`). Write and run it as a file either way.
 
 ## 2. Write it
 
@@ -68,6 +69,10 @@ environments, the system Python and registered Jupyter kernels, and suggests the
 - Ask before installing into an environment that exists already (it is the person's), before downloads of more
   than a gigabyte or two, and before anything for the whole system. In a git repository, keep `.venv/`, data and
   model files out of commits.
+- A notebook in the Library has no folder beside it to find a `.venv` in: it is offered the conda environments,
+  the system Python and registered kernels. Register the environment you made, with the user's OK
+  (`.venv/bin/python -m ipykernel install --user --name <name> --display-name "<Name>"`), and set the notebook's
+  `metadata.kernelspec` to that name and display name: the notebook page then suggests it.
 
 ## 4. Run it through, then look
 
@@ -94,15 +99,22 @@ environment given with `--python`.
 
 ## 5. Hand it over
 
-- Call present_files with the notebook: its card opens it in Hydor's notebook page, outputs and all, where the
-  person can pick the environment and run the cells again.
+- For the Library: `save_notebook` with `path`, the .ipynb you ran (its outputs come along), and a title. It
+  opens in the Library's notebook view, where the person reads it, runs it, asks an agent about a cell, and exports
+  it. Then remove the file you ran unless they want it too.
+- For a file in a folder: call present_files with the notebook: its card opens it in Hydor's notebook page,
+  outputs and all, where the person can pick the environment and run the cells again.
 - Say what it does, the main result, how long it takes to run and on what, the environment it runs in (the
   `.venv` beside it is picked by itself), and what running it writes (downloaded data, saved models).
 - Remove what you made only to check it (draft scripts, test copies); keep what running it needs.
 
 ## Changing a notebook someone has
 
-- Read it first, outputs too. Keep their cells, ids, metadata and style; change only what was asked.
+- Read it first, outputs too (a Library notebook: get_page with its id). Keep their cells, ids, metadata and style;
+  change only what was asked.
+- A Library notebook changes with `save_notebook` and its id: to keep outputs that match the code, export it
+  (`export_page`, format `ipynb`) into your folder, change and run it there with the runner, and save it back with
+  `path`.
 - Run it again after changing code, so outputs match the code; if it is too slow to rerun, say which outputs are
   out of date.
 - If they have it open in the notebook page with unsaved changes, the page asks whether to reload it or keep

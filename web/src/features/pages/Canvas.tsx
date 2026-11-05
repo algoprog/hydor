@@ -198,7 +198,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
               },
             }
           : {}),
-        sub: `${page.info.kind === 'slides' ? 'Slides in the Library' : page.info.kind === 'doc' ? 'A document in the Library' : page.info.kind === 'sheet' ? 'A spreadsheet in the Library' : page.info.kind === 'tex' ? 'LaTeX in the Library' : 'In the Library'} · version ${page.info.version}`,
+        sub: `${page.info.kind === 'slides' ? 'Slides in the Library' : page.info.kind === 'doc' ? 'A document in the Library' : page.info.kind === 'sheet' ? 'A spreadsheet in the Library' : page.info.kind === 'tex' ? 'LaTeX in the Library' : page.info.kind === 'notebook' ? 'A notebook in the Library' : 'In the Library'} · version ${page.info.version}`,
         save: async (html, force) => {
           await post(`/api/pages/${enc(id)}/versions`, { html, base: page.info.version, sessionKey: key, force: !!force });
           toast('Saved. The agent sees your changes with your next message.', 'ok');

@@ -90,7 +90,7 @@ function FileBody({
           </div>
         }
       >
-        <NotebookView path={path} onSource={() => setSource(true)} embedded={embedded} onDirty={onDirty} />
+        <NotebookView path={path} onSource={() => setSource(true)} embedded={embedded} onDirty={onDirty} fileActions={askButton} saveFirst={saveFirst} />
       </Suspense>
     );
   }

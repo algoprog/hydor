@@ -2,8 +2,8 @@
 // input, so it lives in the agent's transcript); the user's clicks on its choices come back to the
 // message box. save_page keeps one in the Pages library, with versions and storage of its own, and an
 // address of its own for a phone's home screen. save_slides keeps a slide deck there (slides.ts), to edit,
-// present and export; save_doc, save_sheet and save_latex keep documents, spreadsheets and LaTeX documents
-// (docs.ts, sheets.ts, latex.ts; kinds.ts says what each kind does). export_page makes a file of any of them (a
+// present and export; save_doc, save_sheet, save_latex and save_notebook keep documents, spreadsheets, LaTeX documents
+// and Jupyter notebooks (docs.ts, sheets.ts, latex.ts, notebooks.ts; kinds.ts says what each kind does). export_page makes a file of any of them (a
 // PDF, a Word document, a PowerPoint deck, an Excel file…) for the agent to hand over. publish_site asks the user to put a folder (a project's build) or a saved page at a
 // link; nothing is published until they confirm on the card.
 //
@@ -17,6 +17,7 @@
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
 //   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/assets, GET /api/pages/assets/:sha
 //   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
+//   GET/POST /api/pages/:id/notebook (where a notebook of the Library runs: notebooks.ts)
 //   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
 //   GET/POST /api/sites, DELETE /api/sites/:id, GET/POST /api/sites/requests/:id
 // Routes whose token is the permission (no sign-in, never the app's cookies at work):
@@ -36,6 +37,7 @@ import { setCaptureDb } from '../capture/index.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { draftsOf, endDrafts, feedDraft, type ToolStream } from './drafts.ts';
+import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK_SCHEMA, workFile, writeWorkFile } from './notebooks.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
@@ -159,7 +161,7 @@ const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
   description:
-    'The user’s saved pages, slide decks, documents, spreadsheets and LaTeX documents (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML and the data it stores (to change it with save_page), or a deck’s slides, a document, a spreadsheet or a LaTeX project as it is kept (to change it with save_slides, save_doc, save_sheet or save_latex), or to answer questions about it.',
+    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML and the data it stores (to change it with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it.',
   inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'A saved page’s id.' } } },
   async run(a, ctx) {
     const db = ctx.deps.db;
@@ -279,19 +281,33 @@ const SAVE_LATEX: RunTool = {
   },
 };
 
+const SAVE_NOTEBOOK: RunTool = {
+  name: 'save_notebook',
+  description: SAVE_NOTEBOOK_DESCRIPTION,
+  inputSchema: SAVE_NOTEBOOK_SCHEMA,
+  async run(a, ctx) {
+    const id = changing(ctx.deps.db, a, 'notebook');
+    const nb = agentNotebook(a, (p) => fromSession(ctx.cwd, p));
+    const p = keepModel(ctx, id, 'notebook', a.title, nb);
+    const cells = Array.isArray(nb.cells) ? nb.cells : [];
+    const outs = cells.filter((c: { outputs?: unknown[] }) => c.outputs?.length).length;
+    return `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${cells.length} cell${cells.length === 1 ? '' : 's'}, ${outs ? `${outs} with outputs` : 'no outputs yet'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can read it, edit and run its cells, ask an agent about it, and export it as an .ipynb file, a Python script, a PDF or a web page.`;
+  },
+};
+
 const EXPORT_PAGE: RunTool = {
   name: 'export_page',
   description: [
-    'Save a page, slide deck, document, spreadsheet or LaTeX document of the user’s Library as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
+    'Save a page, slide deck, document, spreadsheet, LaTeX document or notebook of the user’s Library as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
     'a deck as PowerPoint (pptx) or a PDF (a slide a page), a document as Word (docx), PDF or Markdown (md), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
-    'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip); any of them as a web page (html) that works on its own.',
+    'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip), a notebook as its .ipynb file (ipynb), a Python script of its cells (py) or a PDF; any of them as a web page (html) that works on its own.',
     'The file goes in this session’s folder unless you give a path.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'The page’s or deck’s id (get_page lists them).' },
-      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html'] },
+      format: { type: 'string', enum: ['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'md', 'tex', 'zip', 'html', 'ipynb', 'py'] },
       path: { type: 'string', description: 'Where to write it: a file name or a path, from the session’s folder or absolute.' },
     },
     required: ['id', 'format'],
@@ -359,7 +375,7 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 const INSTRUCTIONS =
-  'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, and anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, unless they ask for a file made another way. get_page lists all of these, to change one. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown or LaTeX). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
+  'Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, and a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one. export_page saves one as a file to hand over (PDF, Word, PowerPoint, Excel, CSV, Markdown, LaTeX, a notebook or a Python script). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how.';
 
 /** A request made from a page or deck open in Pages (`extra.page`: its id): the session is about changing it. */
 function askInstructions(db: Deps['db'], v: unknown): string | null {
@@ -372,6 +388,7 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
     doc: 'Read it with get_page, change what they ask (a section is a heading and what follows it, up to the next heading of its level), and save the whole document with save_doc and that id.',
     sheet: 'Read it with get_page, change what they ask (cells and ranges as A1 or B2:D9, on the sheet they name), and save the whole workbook with save_sheet and that id; keep formulas as formulas.',
     tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (what you leave out stays); it is typeset again, and you hear of any errors: fix them.',
+    notebook: 'Read it with get_page (its cells in order, numbered from 1, each with its id and what its last run showed), change what they ask ("cell 3" is the third, as the notebook shows them), and save the whole notebook with save_notebook and that id, keeping the cells, ids and outputs you do not change. To run code and keep real outputs, export it (export_page, ipynb) into your folder, run it there, and save it back with save_notebook and path. To answer a question about it, read it and answer.',
   };
   return [
     `The user is asking from their ${k?.noun ?? 'page'} "${p.title}" (saved page ${p.id}), open in front of them in the Library: their messages are about changing it.`,
@@ -473,7 +490,7 @@ function routes(d: Deps) {
     const name = typeof b.name === 'string' ? b.name.slice(0, 300) : '';
     const kind = kindForFile(name);
     if (!kind || typeof b.data !== 'string') {
-      throw new HttpError(400, 'Send a file’s name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, or a .tex file or a LaTeX project’s .zip.');
+      throw new HttpError(400, 'Send a file’s name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
     }
     const k = mustKind(kind);
     let got: Awaited<ReturnType<NonNullable<typeof k.fromFile>>>;
@@ -510,6 +527,7 @@ function routes(d: Deps) {
     deletePage(db, id);
     dropEdits(db, id);
     dropThumbs(id);
+    dropWorkFolder(id);
     tell(d, { what: 'pages' });
     return { ok: true };
   });
@@ -541,6 +559,20 @@ function routes(d: Deps) {
     const page = restoreVersion(db, P(req).id, Number(P(req).v));
     changed(page.id);
     return { page };
+  });
+  /**
+   * Where a notebook of the Library runs: GET says the file its kernel is known by (to find one already running);
+   * POST writes the notebook there as it is kept now (a kernel starts from a notebook's file, in its folder).
+   */
+  app.get('/api/pages/:id/notebook', async (req) => {
+    const p = mustPage(db, P(req).id);
+    if (p.kind !== 'notebook') throw new HttpError(400, 'This page is not a notebook');
+    return { path: workFile(p.id), savedAt: p.updatedAt };
+  });
+  app.post('/api/pages/:id/notebook', async (req) => {
+    const p = mustPage(db, P(req).id);
+    if (p.kind !== 'notebook') throw new HttpError(400, 'This page is not a notebook');
+    return { path: writeWorkFile(p.id, pageSource(db, p.id)!.text) };
   });
   /** A file of this computer in one of the editors (Files opens Word, Excel, CSV and LaTeX files so), and saved back to it. */
   app.get('/api/pages/file', async (req) => openFile(db, String((req.query as { path?: string }).path ?? '')));
@@ -722,7 +754,7 @@ function routes(d: Deps) {
 export const pages: Feature = {
   id: 'pages',
   routes,
-  tools: () => [SHOW_HTML, SAVE_PAGE, SAVE_SLIDES, SAVE_DOC, SAVE_SHEET, SAVE_LATEX, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE],
+  tools: () => [SHOW_HTML, SAVE_PAGE, SAVE_SLIDES, SAVE_DOC, SAVE_SHEET, SAVE_LATEX, SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE],
   spawn: (s, d) => {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
     return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };
