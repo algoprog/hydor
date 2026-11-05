@@ -66,6 +66,7 @@ Reports, letters, CVs, memos, contracts, forms, handouts and notes, to open in W
 - A table of contents (Word fills it in when the file opens), page numbers ("Page 1 of 3"), links and shaded table cells.
 - A4 or US Letter, and fonts that look the same on any computer (Calibri, Arial, Cambria, Times New Roman).
 - Your own documents changed in place, keeping their styles, headers and layout; text replaced without losing its formatting; comments added.
+- Signed with your saved signature: in place of {{signature}}, right after words such as "Signature:", in a table's cell or at the end, once you allow it on a card ([Signatures](/guide/library#signatures)).
 - A PDF of it too, through LibreOffice.
 
 ### Spreadsheets
@@ -96,6 +97,7 @@ Reports, invoices, certificates, flyers, letters and forms.
 - Laid out exactly (invoices, certificates, tickets, forms): it draws the PDF directly.
 - Slides or a sheet as a PDF: made with their skill, then turned into a PDF.
 - Everyday jobs on PDFs you have: merge several into one, keep some pages in an order, split one into a PDF per page, rotate pages, list a form's fields and fill them in, stamp big faint words such as DRAFT across every page, and make a copy without its password (you give the password).
+- Signed with your saved signature, beside words on a page or at a spot it shows you first, once you allow it on a card; added to the PDF without changing what was in it ([Signatures](/guide/library#signatures)).
 - Office files turned into PDFs.
 
 ### What the computer needs
