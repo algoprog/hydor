@@ -10,7 +10,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { blockHtml, docMarkdown, docText, mdBlocks, normalizeDoc, tocEntries, type Block, type Cell, type Doc, type ParaBlock, type Run, type TableBlock } from '../../shared/docs.ts';
 import { openDb } from '../db.ts';
-import { docPage } from './docs.ts';
+import { parseXml } from '../documents/xml.ts';
+import { Zip } from '../documents/zip.ts';
+import { agentDoc, docForAgent, docFromFile, docPage, docxOfDoc, wordLosses } from './docs.ts';
+import { ommlOf, texOfOmml } from './omml.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -204,6 +207,127 @@ const strip = (d: Doc) => JSON.stringify(d.blocks.map(({ id: _id, ...b }) => b))
   const raw = mdBlocks('<table>\n<tr><td rowspan="2">A</td><td>B</td></tr>\n<tr><td>C</td></tr>\n</table>\n');
   const t = normalizeDoc({ blocks: raw }).blocks[0] as TableBlock;
   ok(t.type === 'table' && t.rows[0][0].rs === 2 && t.rows[1].length === 2 && t.rows[1][1].runs[0]?.t === 'C', 'an HTML table in Markdown keeps its merged cells in their places');
+}
+
+// ---- agents: comments, header and footer ------------------------------------------------------------------------------
+{
+  const prev = normalizeDoc({
+    blocks: [{ p: [{ t: 'We grow ' }, { t: 'beans', cm: ['c1'] }, { t: ' and peas.' }] }, { p: 'Water daily.' }],
+    header: 'Garden',
+    footer: { text: 'Page {page}', align: 'right' },
+    comments: [{ id: 'c1', by: 'user', text: 'Which beans?', at: 1_700_000_000_000, quote: 'beans' }],
+  });
+  const got = docForAgent(docText(prev));
+  ok(got.includes('<span data-comment="c1">beans</span>') && got.includes('- c1 · open · on “beans” · the user') && got.includes('"reply"'), 'get_page shows the comments, their words marked, and how to answer');
+  ok(got.includes('Header: “Garden”') && got.includes('Footer: “Page {page}” (right)'), 'and the header and footer');
+  const md = docMarkdown(prev, { comments: true }).replace('beans</span>', 'runner beans</span>').replace('Water daily.', 'Water <span data-comment="n1">daily</span>.');
+  const r = await agentDoc(
+    db,
+    {
+      markdown: md,
+      comments: [
+        { id: 'c1', reply: 'Runner beans: changed.', resolve: true },
+        { id: 'n1', text: 'Twice in August?' },
+        { id: 'n2', text: 'Check the soil.', on: 'peas' },
+        { id: 'zz', reply: 'x' },
+      ],
+    },
+    tmp,
+    docText(prev),
+  );
+  const c1 = r.doc.comments?.find((c) => c.id === 'c1');
+  ok(c1?.resolved && c1.replies?.[0]?.by === 'agent' && c1.replies[0].text === 'Runner beans: changed.', 'an agent answers and resolves a comment');
+  ok(c1?.quote === 'runner beans', 'its quote follows the words it is on');
+  const n1 = r.doc.comments?.find((c) => c.id === 'n1');
+  ok(n1?.by === 'agent' && n1.quote === 'daily', 'an agent adds a comment on the words it marks');
+  ok(r.doc.comments?.find((c) => c.id === 'n2')?.quote === 'peas', 'or on the words it names');
+  ok(r.notes.some((n) => n.includes('zz')), 'a comment that is not there is said');
+  ok(r.doc.header?.text === 'Garden' && r.doc.footer?.align === 'right', 'the header and footer stay when not said');
+  const r2 = await agentDoc(db, { markdown: 'Short.', header: '', footer: 'Page {page} of {pages}', titlePage: true }, tmp, r.text);
+  ok(!r2.doc.header && r2.doc.footer?.text === 'Page {page} of {pages}' && r2.doc.titlePage, 'an agent removes, changes or sets them');
+  ok(r2.doc.comments?.length === 3 && !r2.doc.blocks.some((b) => (b as ParaBlock).runs?.some((x) => x.cm)), 'comments whose words are gone stay, with their quotes');
+}
+
+// ---- Word's equations ------------------------------------------------------------------------------------------------
+{
+  const back = (tex: string) => {
+    const x = ommlOf(tex);
+    return x ? texOfOmml(parseXml(`<m:oMath xmlns:m="m">${x.slice('<m:oMath>'.length, -'</m:oMath>'.length)}</m:oMath>`).root) : null;
+  };
+  const f = ommlOf('\\frac{a+b}{\\sqrt[3]{x}}');
+  ok(f?.includes('<m:f><m:num>') && f.includes('<m:rad><m:deg>'), 'a fraction and a root are Word\'s own');
+  ok(ommlOf('\\sum_{i=1}^{n} x_i^2')?.includes('<m:chr m:val="∑"/><m:limLoc m:val="undOvr"/>') ?? false, 'a sum keeps its limits under and over it');
+  ok(ommlOf('\\alpha \\leq \\infty')?.includes('α') ?? false, 'Greek letters and operators are their characters');
+  ok(ommlOf('\\left( \\begin{pmatrix} 1 & 0 \\\\ 0 & 1 \\end{pmatrix} \\right)')?.includes('<m:mr>') ?? false, 'matrices and growing brackets convert');
+  ok(ommlOf('\\unknowncommand{x}') === null, 'what it does not know is said, so the LaTeX is written instead');
+  ok(back('\\frac{1}{2}') === '\\frac{1}{2}' && back('x^{2}') === 'x^2' && back('\\sqrt{x}') === '\\sqrt{x}', 'and they read back as LaTeX');
+  ok(back('\\alpha+\\beta')?.replace(/\s/g, '') === '\\alpha+\\beta', 'Greek letters read back as their commands');
+}
+
+// ---- Word, out and back in ------------------------------------------------------------------------------------------
+{
+  const d = normalizeDoc({
+    markdown: [
+      '# Report {.title}',
+      '[TOC]',
+      '# Costs',
+      'Spaced out {line=2 before=12 after=0}',
+      '> 🔥 Hot topic {.callout tint=#fce8e6}',
+      'Energy is $E=mc^2$ here.',
+      '$$\n\\frac{a}{b}\n$$',
+      '$$\n\\weird{x}\n$$',
+      '## Details',
+      '<table><tr><td colspan="2" style="background-color:#e8f0fe">Wide</td><td rowspan="2" style="vertical-align:middle">Tall</td></tr><tr><td>a</td><td>b</td></tr></table>',
+    ].join('\n\n'),
+    header: { text: 'ACME — {page}', align: 'right' },
+    footer: 'Page {page} of {pages}',
+    titlePage: true,
+  });
+  // A comment on "Spaced out", with a reply; another, resolved, on "here".
+  const spaced = d.blocks.findIndex((b) => words(b).startsWith('Spaced'));
+  const sp = d.blocks[spaced] as ParaBlock;
+  const energy = d.blocks.find((b) => words(b).startsWith('Energy')) as ParaBlock;
+  const withCm: Doc = normalizeDoc({
+    ...d,
+    blocks: d.blocks.map((b) =>
+      b === sp ? { ...sp, runs: [{ t: 'Spaced', cm: ['k1'] }, { t: ' out' }] } : b === energy ? { ...energy, runs: energy.runs.map((r) => (r.t === ' here.' ? { ...r, cm: ['k2'] } : r)) } : b,
+    ),
+    comments: [
+      { id: 'k1', by: 'user', text: 'Too airy?', at: 1_700_000_000_000, replies: [{ id: 'x', by: 'agent', text: 'Made it 2 lines on purpose.', at: 1_700_000_500_000 }] },
+      { id: 'k2', by: 'agent', text: 'Cite this.', at: 1_700_000_900_000, resolved: true },
+    ],
+  });
+  const file = docxOfDoc(db, withCm, 'Report');
+  const zip = new Zip(file);
+  const xml = zip.text('word/document.xml') ?? '';
+  ok(/<w:spacing w:before="240" w:after="0" w:line="480" w:lineRule="auto"\/>/.test(xml), 'spacing goes to Word as the paragraph\'s own');
+  ok(xml.includes('w:fill="FCE8E6"') && xml.includes('🔥'), 'a callout is a shaded paragraph with its emoji');
+  ok(xml.includes('TOC \\o "1-3"') && /w:anchor="_Toc1"/.test(xml) && /<w:bookmarkStart w:id="\d+" w:name="_Toc1"\/>/.test(xml), 'a table of contents is a field Word fills in, its lines leading to bookmarks');
+  ok(xml.includes('<m:oMathPara><m:oMath><m:f>') && xml.includes('<m:oMath>'), 'equations are Word\'s own');
+  ok(xml.includes('\\weird{x}') && xml.includes('Cambria Math'), 'one that does not convert is its LaTeX in a maths font');
+  ok(xml.includes('<w:gridSpan w:val="2"/>') && xml.includes('<w:vMerge w:val="restart"/>') && xml.includes('<w:vMerge/>') && xml.includes('<w:vAlign w:val="center"/>'), 'merged cells and alignment go to Word');
+  ok(xml.includes('<w:headerReference w:type="default"') && xml.includes('<w:titlePg/>'), 'the header and footer are parts of it, the first page apart');
+  ok((zip.text('word/footer1.xml') ?? '').includes('w:instr=" NUMPAGES "') && (zip.text('word/header1.xml') ?? '').includes('w:instr=" PAGE "'), 'with the page\'s number and count');
+  const cx = zip.text('word/comments.xml') ?? '';
+  ok(xml.includes('<w:commentRangeStart w:id="0"/>') && xml.includes('<w:commentReference w:id="1"/>') && cx.includes('w:author="Agent"') && cx.includes('Too airy?'), 'comments are Word\'s own, replies too');
+  ok((zip.text('word/commentsExtended.xml') ?? '').includes('w15:done="1"'), 'and Word knows which were resolved');
+  const back = docFromFile(file, 'Report.docx');
+  const bsp = back.blocks.find((b) => words(b) === 'Spaced out') as ParaBlock;
+  ok(bsp?.lh === 2 && bsp.sb === 12 && bsp.sa === 0, 'spacing comes back from Word');
+  const call = back.blocks.find((b) => b.type === 'p' && b.style === 'callout') as ParaBlock;
+  ok(call?.icon === '🔥' && call.tint === '#fce8e6' && words(call) === 'Hot topic', 'a callout comes back');
+  ok(back.blocks.filter((b) => b.type === 'toc').length === 1 && !back.blocks.some((b) => words(b) === 'Costs' && (b as ParaBlock).style === undefined), 'the table of contents comes back as one, its lines not as words');
+  ok(back.blocks.some((b) => b.type === 'math' && b.tex === '\\frac{a}{b}'), 'an equation comes back as LaTeX');
+  ok((back.blocks.find((b) => words(b).startsWith('Energy')) as ParaBlock)?.runs.some((r) => r.math && r.t.replace(/\s/g, '') === 'E=mc^2'), 'and maths among words');
+  const bt = back.blocks.find((b) => b.type === 'table') as TableBlock;
+  ok(bt?.rows[0][0].cs === 2 && bt.rows[0][0].fill === '#e8f0fe' && bt.rows[0][2].rs === 2 && bt.rows[0][2].va === 'middle', 'merged and filled cells come back');
+  ok(back.header?.text === 'ACME — {page}' && back.header.align === 'right' && back.footer?.text === 'Page {page} of {pages}' && back.titlePage, 'the header, footer and title page come back');
+  const k1 = back.comments?.find((c) => c.text === 'Too airy?');
+  ok(k1?.replies?.[0]?.text === 'Made it 2 lines on purpose.' && k1.replies[0].by === 'agent' && k1.quote === 'Spaced', 'comments come back with their replies and what they were on');
+  ok(back.comments?.find((c) => c.text === 'Cite this.')?.resolved === true, 'and whether they were resolved');
+  ok((back.blocks.find((b) => words(b) === 'Spaced out') as ParaBlock).runs[0].cm?.[0] === k1?.id, 'the words keep their comment');
+  const losses = wordLosses(file, back);
+  ok(!losses.loses.length && !losses.cut, 'a file written here loses nothing coming back');
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });
