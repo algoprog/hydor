@@ -63,7 +63,12 @@ export function pdfSpot(
   let spot: PlaceSpot;
   if (a.near) {
     const hits = t.findWords(pdf, a.near, a.page);
-    if (!hits.length) throw new Error(`“${a.near}” was not found on ${a.page ? `page ${a.page}` : 'any page'}. A PDF’s words are read as well as they can be, and scanned pages have none: look at the page (look: true) and give x and y instead.`);
+    if (!hits.length)
+      throw new Error(
+        a.page
+          ? `“${a.near}” was not found on page ${a.page}. A PDF’s words are read as well as they can be, and scanned pages have none: look at the page (look: true) and give x and y instead.`
+          : `“${a.near}” was not found on any page. A PDF’s words are read as well as they can be, and scanned pages have none: look at the page (look: true) and give x and y instead.`,
+      );
     const k = Math.trunc(Number(a.occurrence) || 1);
     const hit = hits[k < 0 ? hits.length + k : k - 1];
     if (!hit) throw new Error(`Those words are on the pages ${hits.length} times: occurrence is from 1 to ${hits.length} (or -1 for the last)`);
