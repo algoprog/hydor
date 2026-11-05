@@ -15,7 +15,16 @@ import { openDb } from '../db.ts';
 import { ruleFor } from '../guide/api.ts';
 import { boxPicture, composite, hasAlpha, isPng, pngSize, readPng, resize, writePng, type Rgba } from './png.ts';
 import { addSignature, changeSignature, cleanPicture, deleteSignature, findSignature, listSignatures, signatureImage, signatureTables } from './store.ts';
-import { signatureTools } from './tools.ts';
+import { previewPicture, signatureTools } from './tools.ts';
+import { normalizeDoc, type ImageBlock } from '../../shared/docs.ts';
+import { Zip } from '../documents/zip.ts';
+import { docFromFile, docxOfDoc } from '../pages/docs.ts';
+import { zipParts } from '../pages/ooxml.ts';
+import { createPage, initPages, pageSource } from '../pages/store.ts';
+import { placeInDoc } from './doc.ts';
+import { placeInDocx, xmlProblem } from './docx.ts';
+import { PDF_NOT_READY, pdfHooks, type PdfSpot } from './pdf.ts';
+import { pictureView, signPicture } from './picture.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
 import type { RunCtx, ToolOutput } from '../features/types.ts';
@@ -248,12 +257,13 @@ const wave = (w = 300, h = 100) =>
 function runWith(user: ((card: ApprovalRequest, check?: (a: ApprovalAnswer) => string | null) => ApprovalAnswer | null) | null, key = 'claude:sig-test'): { ctx: RunCtx; cards: ApprovalRequest[] } {
   const cards: ApprovalRequest[] = [];
   const adapter = user && {
+    state: { mode: 'default' },
     ask: async (card: ApprovalRequest, o: { check?: (a: ApprovalAnswer) => string | null }) => {
       cards.push(card);
       return user(card, o.check);
     },
   };
-  const ctx = { runId: 'run-1', key, agent: 'claude', cwd: tmp, deps: { db, sessions: { adapterByRun: () => adapter ?? undefined } } } as unknown as RunCtx;
+  const ctx = { runId: 'run-1', key, agent: 'claude', cwd: tmp, deps: { db, broadcast: () => {}, sessions: { adapterByRun: () => adapter ?? undefined } } } as unknown as RunCtx;
   return { ctx, cards };
 }
 const tool = (name: string) => signatureTools({} as RunCtx).find((t) => t.name === name)!;
@@ -297,6 +307,263 @@ const text = (r: string | ToolOutput) => (typeof r === 'string' ? r : r.text);
   ok(typeof r5 !== 'string' && r5.isError && /Settings → App → Signatures/.test(r5.text), 'with nobody to answer, the agent is told where the user can draw one', r5);
 }
 
+// ---- placing one into a Word file --------------------------------------------------------------------------------
+
+/** Every part of a zip read back, each checked against its CRC: the zip is whole. */
+function zipWhole(buf: Buffer): string | null {
+  const z = new Zip(buf);
+  for (const n of z.names()) {
+    const e = z.packed(n);
+    const data = z.read(n, 64 << 20);
+    if (!e || !data || zlib.crc32(data) >>> 0 !== e.crc >>> 0) return n;
+  }
+  return null;
+}
+const plain = (xml: string) => [...xml.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('');
+{
+  const sig = writePng(wave(300, 100));
+  const agreement = normalizeDoc({
+    markdown: '# Lease\n\nThe tenant agrees to the terms.\n\nSignature: ______________________\n\nName: Alex Rivera\n\n{{signature}}\n\n| Who | Signature |\n| --- | --- |\n| Tenant | |\n| Landlord | |',
+  });
+  const file = docxOfDoc(db, agreement, 'Lease');
+  const before = new Zip(file);
+
+  // Right after "Signature:", in front of the text.
+  const a = placeInDocx(file, sig, { width: 300, height: 100 }, { after: 'signature:' }, { widthMm: 50 });
+  const z = new Zip(a.docx);
+  const doc = z.text('word/document.xml')!;
+  ok(xmlProblem(doc) === null && xmlProblem(z.text('[Content_Types].xml')!) === null && xmlProblem(z.text('word/_rels/document.xml.rels')!) === null, 'the Word file’s changed parts are well-formed XML', xmlProblem(doc));
+  ok(zipWhole(a.docx) === null, 'every part of the signed zip reads back whole');
+  ok(/<Default Extension="png" ContentType="image\/png"\/>/.test(z.text('[Content_Types].xml')!), 'PNG pictures are a content type of the file');
+  const rel = /<Relationship Id="(rIdSignature\d+)" Type="http:\/\/schemas.openxmlformats.org\/officeDocument\/2006\/relationships\/image" Target="media\/signature1.png"\/>/.exec(z.text('word/_rels/document.xml.rels')!);
+  ok(!!rel, 'the picture has its relationship', z.text('word/_rels/document.xml.rels'));
+  ok(z.read('word/media/signature1.png')?.equals(sig), 'the picture is the signature, as it is');
+  ok(
+    doc.includes(`r:embed="${rel?.[1]}"`) && /<wp:anchor [^>]*behindDoc="0"/.test(doc) && /<wp:positionH relativeFrom="character">/.test(doc) && /<wp:positionV relativeFrom="paragraph">/.test(doc) && /<wp:wrapNone\/>/.test(doc),
+    'after words it floats in front of the text, from the words’ end',
+  );
+  ok(doc.includes(`<wp:extent cx="${50 * 36000}" cy="${Math.round((50 * 36000 * 100) / 300)}"/>`), 'it is 50 mm wide, its proportions kept');
+  ok(
+    /Signature: <\/w:t><\/w:r><w:r><w:rPr><w:noProof\/><\/w:rPr><w:drawing>|Signature:<\/w:t><\/w:r><w:r><w:rPr><w:noProof\/><\/w:rPr><w:drawing>/.test(doc),
+    'it goes right after the words',
+    doc.slice(doc.indexOf('Signature:') - 40, doc.indexOf('Signature:') + 120),
+  );
+  ok(plain(doc).replace(/\s+/g, '') === plain(before.text('word/document.xml')!).replace(/\s+/g, ''), 'the words are all as they were');
+  ok(a.where.startsWith('right after “signature:”') && a.float && a.before.endsWith('Signature:') && a.after.includes('____'), 'it says where it went, and the words around it', a);
+  ok(JSON.stringify(a.spot) === JSON.stringify({ kind: 'words', words: 'signature:', how: 'after' }), 'and where, for the card', a.spot);
+  for (const n of before.names().filter((n) => !/document\.xml|Content_Types|\.rels$/.test(n))) ok(z.packed(n)?.data.equals(before.packed(n)!.data), `the part ${n} is copied byte for byte`);
+  const read = docFromFile(a.docx, 'lease.docx');
+  ok(
+    read.blocks.some((b) => b.type === 'image' && b.src === `data:image/png;base64,${sig.toString('base64')}`),
+    'the app’s own Word reader finds the signature in it',
+  );
+
+  // In place of {{signature}}, in the line; a placeholder Word split across runs, too.
+  const b = placeInDocx(file, sig, { width: 300, height: 100 }, { placeholder: '{{signature}}' }, { widthMm: 40 });
+  const bd = new Zip(b.docx).text('word/document.xml')!;
+  ok(xmlProblem(bd) === null && !plain(bd).includes('{{signature}}') && /<wp:inline /.test(bd) && !/<wp:anchor /.test(bd), 'a placeholder is replaced by it, in the line', b.where);
+  const split = (inner: string) =>
+    zipParts([
+      {
+        name: '[Content_Types].xml',
+        data: '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+      },
+      {
+        name: '_rels/.rels',
+        data: '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+      },
+      { name: 'word/document.xml', data: `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${inner}<w:sectPr/></w:body></w:document>` },
+    ]);
+  const pieces = split('<w:p><w:r><w:t xml:space="preserve">Signed: {{sig</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>nature}} on 5 May</w:t></w:r></w:p><w:p><w:r><w:t>{{signature}}</w:t></w:r></w:p>');
+  const c = placeInDocx(pieces, sig, { width: 300, height: 100 }, { placeholder: '{{signature}}', occurrence: 1 }, { widthMm: 40 });
+  const cd = new Zip(c.docx).text('word/document.xml')!;
+  ok(
+    xmlProblem(cd) === null && plain(cd) === 'Signed:  on 5 May{{signature}}' && /Signed: <\/w:t><\/w:r><w:r><w:rPr><w:noProof\/>/.test(cd) && /<w:rPr><w:b\/><\/w:rPr><w:t xml:space="preserve"> on 5 May<\/w:t>/.test(cd),
+    'words split across runs: their pieces go, the bold run stays bold',
+    cd,
+  );
+  ok(!!new Zip(c.docx).text('word/_rels/document.xml.rels') && /Relationship Id="rIdSignature1"/.test(new Zip(c.docx).text('word/_rels/document.xml.rels')!), 'a file without relationships for its document gets them');
+  ok(new Zip(c.docx).text('[Content_Types].xml')!.includes('<Default Extension="png" ContentType="image/png"/>'), 'and the PNG type');
+  const last = placeInDocx(pieces, sig, { width: 300, height: 100 }, { placeholder: '{{signature}}', occurrence: -1 }, { widthMm: 40 });
+  ok(plain(new Zip(last.docx).text('word/document.xml')!) === 'Signed: {{signature}} on 5 May' && /second of 2/.test(last.where), 'occurrence -1 takes the last place', last.where);
+
+  // In a table's cell, and at the end.
+  const d = placeInDocx(file, sig, { width: 300, height: 100 }, { cell: { table: 1, row: 2, column: 2 } }, { widthMm: 30 });
+  const dd = new Zip(d.docx).text('word/document.xml')!;
+  const row2 = dd.slice(dd.indexOf('Tenant'), dd.indexOf('Landlord'));
+  ok(xmlProblem(dd) === null && row2.includes('<w:drawing>') && d.where === 'in table 1, row 2, column 2', 'in a table’s cell: the tenant’s row, the second column', d.where);
+  const e = placeInDocx(file, sig, { width: 300, height: 100 }, {}, { widthMm: 50 });
+  const ed = new Zip(e.docx).text('word/document.xml')!;
+  ok(xmlProblem(ed) === null && /<w:p><w:r><w:rPr><w:noProof\/><\/w:rPr><w:drawing>[\s\S]*<\/w:p><w:sectPr/.test(ed) && e.where === 'at the end of the document', 'at the end: a paragraph of its own before the section’s settings');
+  // A second signature gets the next names and ids.
+  const twice = placeInDocx(a.docx, sig, { width: 300, height: 100 }, { placeholder: '{{signature}}' }, { widthMm: 50 });
+  const tz = new Zip(twice.docx);
+  ok(
+    !!tz.read('word/media/signature2.png') &&
+      /rIdSignature2/.test(tz.text('word/_rels/document.xml.rels')!) &&
+      (tz.text('word/document.xml')!.match(/<wp:docPr id="(\d+)"/g) ?? []).length === 2 &&
+      new Set(tz.text('word/document.xml')!.match(/<wp:docPr id="(\d+)"/g)).size === 2,
+    'a second one gets its own part, relationship and picture id',
+  );
+  throws(() => placeInDocx(file, sig, { width: 300, height: 100 }, { after: 'Witness:' }, { widthMm: 50 }), /not in the document/, 'words that are not there: a plain answer');
+  throws(() => placeInDocx(file, sig, { width: 300, height: 100 }, { cell: { table: 2, row: 1, column: 1 } }, { widthMm: 50 }), /1 table/, 'a table that is not there');
+  throws(() => placeInDocx(Buffer.from('not a zip'), sig, { width: 300, height: 100 }, {}, { widthMm: 50 }), /not a Word file/, 'what is not a Word file');
+  ok(
+    xmlProblem('<a><b></a>') !== null && xmlProblem('<a x="1" x="2"/>') !== null && xmlProblem('<p:a/>') !== null && xmlProblem('<a>&nope;</a>') !== null && xmlProblem('<a xmlns:p="u"><p:b/></a>') === null,
+    'the XML check finds what Word would refuse',
+  );
+}
+
+// ---- into a document of the Library, and a picture -------------------------------------------------------------------
+{
+  const d = normalizeDoc({ markdown: 'Dear Sam,\n\nThank you.\n\nKind regards,\n\n{{signature}}\n\n| Signed | |\n| --- | --- |\n| Tenant: | |' });
+  const src = `naget-asset:${'a'.repeat(40)}`;
+  const r = placeInDoc(d, src, { after: 'kind regards,' }, { widthMm: 50, alt: 'Signature' });
+  const i = r.doc.blocks.findIndex((b) => b.type === 'image');
+  const img = r.doc.blocks[i] as ImageBlock;
+  ok(
+    i > 0 && (r.doc.blocks[i - 1] as { runs?: { t: string }[] }).runs?.[0]?.t === 'Kind regards,' && img.align === 'left' && img.alt === 'Signature' && Math.abs(img.w - 50 / (210 - 2 * r.doc.page.margin)) < 0.002,
+    'in a document: a picture after the words, on the left, 50 mm of the text’s width',
+    img,
+  );
+  const p = placeInDoc(d, src, { placeholder: '{{signature}}' }, { widthMm: 50, alt: 'Signature' });
+  ok(!JSON.stringify(p.doc.blocks).includes('{{signature}}') && p.doc.blocks.length === d.blocks.length && p.spot.kind === 'words', 'a placeholder alone in its paragraph: the picture takes its place');
+  const t = placeInDoc(d, src, { after: 'tenant:' }, { widthMm: 50, alt: 'Signature' });
+  const ti = t.doc.blocks.findIndex((b) => b.type === 'image');
+  ok(t.doc.blocks[ti - 1]?.type === 'table' && /table with/.test(t.where), 'words in a table’s cell: after the table', t.where);
+  const end = placeInDoc(d, src, {}, { widthMm: 50, alt: 'Signature' });
+  ok(end.doc.blocks[end.doc.blocks.length - 1].type === 'image' && end.where === 'at the end of the document', 'at the end');
+  throws(() => placeInDoc(d, src, { cell: { table: 1, row: 1, column: 1 } }, { widthMm: 50, alt: 'Signature' }), /words alone/, 'a cell of a document: a plain answer');
+  throws(() => placeInDoc(d, src, { after: 'Witness' }, { widthMm: 50, alt: 'Signature' }), /not in the document/, 'words that are not there');
+
+  // A PNG picture: RGB stays RGB, only the spot changes.
+  const form = picture(400, 200, (x, y) => (y === 150 && x > 100 && x < 350 ? [0, 0, 0, 255] : [250, 250, 245, 255]));
+  const signed = readPng(signPicture(form, wave(300, 100), { x: 0.3, y: 0.75, width: 0.4 }));
+  const outside = [0, 0, 399, 0, 0, 199, 399, 199, 50, 50].every((v, k, arr) => k % 2 === 1 || signed.data[(arr[k + 1] * 400 + v) * 4] === 250);
+  ok(signed.width === 400 && !hasAlpha(signed) && outside, 'a picture signed keeps its size and colours outside the spot');
+  ok(
+    inkBox(
+      signed.data.map((v, k) => (k % 4 === 3 ? 255 - Math.min(255, signed.data[k - 1]) : v)),
+      400,
+      200,
+    ) !== null,
+    'the signature is on it',
+  );
+  ok(isPng(pictureView(form, wave(300, 100), { x: 0.3, y: 0.75, width: 0.4 }, { box: true })), 'an agent’s look is a picture too');
+}
+
+// ---- place_signature --------------------------------------------------------------------------------------------
+{
+  for (const x of listSignatures(db)) deleteSignature(db, x.id);
+  initPages(db);
+  const sig = addSignature(db, { name: 'Signature', png: writePng(wave(300, 100)) });
+  const folder = fs.mkdtempSync(path.join(tmp, 'files-'));
+  const lease = path.join(folder, 'lease.docx');
+  fs.writeFileSync(lease, docxOfDoc(db, normalizeDoc({ markdown: '# Lease\n\nSignature: ____________\n\nDate: 5 May' }), 'Lease'));
+  const allowWith = (decision: string, key = 'claude:place-test') => runWith(() => ({ decision }), key);
+
+  // Looking first: nothing written, nobody asked.
+  const l = allowWith('accept');
+  const looked = text(await tool('place_signature').run({ signature: 'signature', file: 'lease.docx', after: 'Signature:', look: true }, { ...l.ctx, cwd: folder } as RunCtx));
+  ok(!l.cards.length && /⟦signature here⟧/.test(looked) && fs.readdirSync(folder).length === 1, 'look: the words around the spot, no card, nothing written', looked);
+  // Denied: nothing written.
+  const no = allowWith('deny');
+  const denied = text(await tool('place_signature').run({ signature: 'Signature', file: lease, after: 'Signature:' }, no.ctx));
+  const place = no.cards[0]?.signature?.place;
+  ok(
+    place?.signature.id === sig.id && place.target.kind === 'docx' && place.target.path === lease && place.spot.kind === 'words' && place.text?.before.endsWith('Signature:') && place.out === path.join(folder, 'lease (signed).docx'),
+    'the card shows the file, the spot, the words around it and the copy it writes',
+    place,
+  );
+  ok(no.cards[0].options.map((o) => o.id).join() === 'accept,session,deny' && /did not allow/.test(denied) && fs.readdirSync(folder).length === 1, 'Allow, Allow for this session, Deny: denied, nothing is written', denied);
+  // Allowed: a signed copy beside it.
+  const yes = allowWith('accept');
+  const placed = text(await tool('place_signature').run({ signature: 'Signature', file: lease, after: 'Signature:' }, yes.ctx));
+  const copy = path.join(folder, 'lease (signed).docx');
+  ok(
+    fs.existsSync(copy) && fs.readFileSync(lease).equals(fs.readFileSync(lease)) && /Placed “Signature” right after/.test(placed) && /not a cryptographic digital signature/.test(placed) && !placed.includes('iVBOR'),
+    'allowed: a signed copy beside the file; the agent hears where, and never the picture',
+    placed,
+  );
+  ok(!!new Zip(fs.readFileSync(copy)).read('word/media/signature1.png') && !new Zip(fs.readFileSync(lease)).read('word/media/signature1.png'), 'the copy is signed, the file itself untouched');
+  ok(!!findSignature(db, sig.id)?.usedAt, 'the signature notes it was placed');
+  // Allowed for the session: the next one goes without a card; another session still asks.
+  const sess = allowWith('session');
+  await tool('place_signature').run({ signature: 'Signature', file: lease, placeholder: 'Date:' }, sess.ctx);
+  const again = runWith(() => ({ decision: 'deny' }), 'claude:place-test');
+  const r2 = text(await tool('place_signature').run({ signature: 'Signature', file: lease, after: 'Signature:', replace: true }, again.ctx));
+  ok(sess.cards.length === 1 && !again.cards.length && /Placed/.test(r2) && !!new Zip(fs.readFileSync(lease)).read('word/media/signature1.png'), 'allowed for the session: the next placement asks no more (replace writes over the file)', r2);
+  const other = runWith(() => ({ decision: 'deny' }), 'claude:other-session');
+  await tool('place_signature').run({ signature: 'Signature', file: lease, after: 'Signature:' }, other.ctx);
+  ok(other.cards.length === 1, 'another session still asks');
+  // Plan mode only looks.
+  const planCtx = { ...yes.ctx, deps: { ...yes.ctx.deps, sessions: { adapterByRun: () => ({ state: { mode: 'plan' }, ask: async () => null }) } } } as unknown as RunCtx;
+  const planned = await tool('place_signature').run({ signature: 'Signature', file: lease, after: 'Signature:' }, planCtx);
+  ok(typeof planned !== 'string' && planned.isError && /Plan mode/.test(planned.text), 'Plan mode: only looking', planned);
+  // What cannot be signed, and names that are not there.
+  const errs = [
+    await tool('place_signature').run({ signature: 'Nobody', file: lease }, yes.ctx),
+    await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'nothing.docx') }, yes.ctx),
+    await tool('place_signature').run({ signature: 'Signature' }, yes.ctx),
+  ].map(text);
+  ok(/no saved signature named “Nobody”.*Saved: “Signature” \(signature\)/.test(errs[0]) && /No such file/.test(errs[1]) && /Give file/.test(errs[2]), 'plain answers for a name, a file or a target that is not there', errs);
+  fs.writeFileSync(path.join(folder, 'notes.txt'), 'hello');
+  ok(/not a kind of file this signs/.test(text(await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'notes.txt') }, yes.ctx))), 'a file of another kind: a plain answer');
+
+  // A PDF, before the PDF code is merged: not ready yet.
+  fs.writeFileSync(path.join(folder, 'form.pdf'), '%PDF-1.7\n%%EOF\n');
+  const notYet = await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'form.pdf'), near: 'Signature' }, yes.ctx);
+  ok(typeof notYet !== 'string' && notYet.isError && notYet.text === PDF_NOT_READY, 'a PDF answers that PDFs are not ready yet', notYet);
+  // With PDF code (a stand-in here): beside the words found, the card with the page as it will be, the copy written.
+  const stamped: PdfSpot[] = [];
+  pdfHooks.tools = {
+    pages: () => [
+      { w: 612, h: 792 },
+      { w: 612, h: 792 },
+    ],
+    findWords: (_pdf, words) => (/signature/i.test(words) ? [{ page: 2, x: 72, y: 600, w: 60, h: 12 }] : []),
+    stampImage: (pdf, at) => (stamped.push(at), Buffer.concat([pdf, Buffer.from(`% signed at ${JSON.stringify(at)}\n`)])),
+    pagePicture: async () => writePng(picture(612, 792, () => [255, 255, 255, 255])),
+  };
+  const pdfCard = allowWith('accept', 'claude:pdf-test');
+  const pdfDone = text(await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'form.pdf'), near: 'Signature:' }, pdfCard.ctx));
+  const pc = pdfCard.cards[0]?.signature?.place;
+  const at = stamped[stamped.length - 1];
+  ok(pc?.target.kind === 'pdf' && pc.page === 2 && pc.pages === 2 && pc.spot.kind === 'words' && /^\/api\/signatures\/previews\//.test(pc.picture ?? ''), 'a PDF’s card: the page, the spot and a picture of it signed', pc);
+  ok(!!previewPicture(pc!.picture!.split('/').pop()!) && isPng(previewPicture(pc!.picture!.split('/').pop()!)!), 'the card’s picture is kept for it');
+  const w50 = (50 * 72) / 25.4;
+  ok(at.page === 2 && Math.abs(at.x - (72 + 60 + 6)) < 0.01 && Math.abs(at.w - w50) < 0.01 && Math.abs(at.y + at.h * 0.85 - (600 + 12 * 0.8)) < 0.01, 'right after the words, 50 mm wide, standing on their line', at);
+  ok(fs.readFileSync(path.join(folder, 'form (signed).pdf')).toString().includes('% signed at') && /page 2 of 2, right after “Signature:”/.test(pdfDone), 'the signed copy is written beside it', pdfDone);
+  const missing = await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'form.pdf'), near: 'Witness' }, pdfCard.ctx);
+  ok(typeof missing !== 'string' && missing.isError && /was not found on any page/.test(missing.text), 'words not on the page: a plain answer', missing);
+  const lookPdf = await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'form.pdf'), x: 0.6, y: 0.85, page: 1, look: true }, pdfCard.ctx);
+  ok(typeof lookPdf !== 'string' && lookPdf.images?.length === 1 && /blue box/.test(lookPdf.text), 'look: the page as a picture, with a box where it would go', lookPdf);
+  const lookPage = await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'form.pdf'), page: 2, look: true }, pdfCard.ctx);
+  ok(typeof lookPage !== 'string' && lookPage.images?.length === 1 && /612 × 792 points/.test(lookPage.text), 'look with a page alone: the page, to choose a spot', lookPage);
+  pdfHooks.tools = undefined;
+
+  // A PNG picture, and a document of the Library.
+  fs.writeFileSync(
+    path.join(folder, 'form.png'),
+    writePng(
+      picture(400, 200, () => [255, 255, 255, 255]),
+      { alpha: false },
+    ),
+  );
+  const pngRun = allowWith('accept', 'claude:png-test');
+  await tool('place_signature').run({ signature: 'Signature', file: path.join(folder, 'form.png'), x: 0.2, y: 0.7 }, pngRun.ctx);
+  ok(pngRun.cards[0]?.signature?.place?.picture && fs.existsSync(path.join(folder, 'form (signed).png')) && readPng(fs.readFileSync(path.join(folder, 'form (signed).png'))).width === 400, 'a picture: a card with it signed, then a signed copy');
+  const page = createPage(db, { title: 'Letter', kind: 'doc', model: { markdown: 'Dear Sam,\n\nKind regards,' }, by: 'agent' });
+  const docRun = allowWith('accept', 'claude:doc-test');
+  const docDone = text(await tool('place_signature').run({ signature: 'Signature', page_id: page.id, after: 'Kind regards,' }, docRun.ctx));
+  const model = normalizeDoc(JSON.parse(pageSource(db, page.id)!.text));
+  ok(
+    docRun.cards[0]?.signature?.place?.target.page?.title === 'Letter' && model.blocks.some((b) => b.type === 'image' && b.src.startsWith('naget-asset:')) && /version 2/.test(docDone),
+    'a document of the Library: a new version with the signature as a picture',
+    docDone,
+  );
+}
+
 // ---- agents' app_api ------------------------------------------------------------------------------------------
 {
   ok(ruleFor('GET', '/api/signatures').level === 'free', 'agents may list the signatures by name');
@@ -306,6 +573,7 @@ const text = (r: string | ToolOutput) => (typeof r === 'string' ? r : r.text);
     ['PATCH', '/api/signatures/sg_1'],
     ['DELETE', '/api/signatures/sg_1'],
     ['POST', '/api/signatures/sg_1/asset'],
+    ['GET', '/api/signatures/previews/abc'],
   ])
     ok(ruleFor(m, p).level === 'refuse', `agents' app_api is refused ${m} ${p}`, ruleFor(m, p));
 }

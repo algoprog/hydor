@@ -246,25 +246,33 @@ export interface SignatureAskCard {
   why?: string;
 }
 
+/** Where a signature goes, for a card to say in the user's language: by words (in their place, right after them, or
+ * beside them on a PDF's page), at a point (shares of the page or picture from its top-left), in a table's cell, or at
+ * the end. `nth` of `of`: which of the places with those words. */
+export type PlaceSpot =
+  | { kind: 'words'; words: string; how: 'replace' | 'after' | 'right' | 'left' | 'above' | 'below'; nth?: number; of?: number; table?: boolean }
+  | { kind: 'point'; x: number; y: number }
+  | { kind: 'cell'; table: number; row: number; column: number }
+  | { kind: 'end' };
+
 /** Where an agent would place a signature, for the user to see before allowing it. */
 export interface SignaturePlaceCard {
   signature: { id: string; name: string; kind: SignatureKind };
   /** What is signed: a file (its path) or a document of the Library. */
   target: { kind: 'docx' | 'pdf' | 'png' | 'doc'; path?: string; page?: { id: string; title: string } };
-  /** The file it writes: a signed copy beside it, or the file itself. */
-  out?: string;
-  replace?: boolean;
-  /** Its width on paper, in millimetres (a picture's: its share of the picture's width). */
-  widthMm?: number;
-  /** A Word file or a document: the words around the spot, and where that is in plain words. */
-  text?: { before: string; after: string; where: string; float?: boolean };
-  /** A PDF: a picture of the page as it will be, signature and all (its address, for the app's own pages). */
-  picture?: string;
-  /** A PDF: the page, and how many there are. */
+  /** Where it goes; on a PDF, the page and how many there are. */
+  spot: PlaceSpot;
   page?: number;
   pages?: number;
-  /** A picture: the spot, as shares of the picture's width and height from its top left. */
-  spot?: { x: number; y: number; w: number; h: number };
+  /** The file it writes: a signed copy beside the file, or the file itself (`replace`). */
+  out?: string;
+  replace?: boolean;
+  /** Its width on paper, in millimetres. */
+  widthMm?: number;
+  /** A Word file or a document: the words just before and after the spot, and whether it floats in front of the text. */
+  text?: { before: string; after: string; float?: boolean };
+  /** A PDF or a picture: the page as it will be, signature and all (its address, for the app's own pages alone). */
+  picture?: string;
 }
 
 /** A card of the conversation's that is about a signature: one or the other. */

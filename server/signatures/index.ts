@@ -8,13 +8,14 @@
 //   GET /api/signatures/:id/image       one's picture (PNG, see-through), for the app's own pages
 //   POST /api/signatures                keeps a new one; PATCH /api/signatures/:id changes one; DELETE removes it
 //   POST /api/signatures/:id/asset      one put into a document of the Library: kept as one of its pictures
+//   GET /api/signatures/previews/:token a page as an agent would sign it, for the card that asks
 import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { ASSET } from '../../shared/docs.ts';
 import { putAsset } from '../pages/assets.ts';
 import { addSignature, changeSignature, deleteSignature, findSignature, listSignatures, pictureBytes, signatureImage, signatureTables, touchSignature } from './store.ts';
 import { SIGNATURE_FOR_NOW_MS } from '../../shared/signatures.ts';
-import { signatureTools } from './tools.ts';
+import { previewPicture, signatureTools } from './tools.ts';
 
 /** Pictures come as base64 in JSON: a little over 4 MB of PNG. */
 const BODY = 6 * 1024 * 1024;
@@ -64,6 +65,16 @@ function routes(d: Deps) {
     changed();
     return { src, width: pic.width, height: pic.height };
   });
+  // A page as an agent would sign it, for the card that asks the user.
+  app.get('/api/signatures/previews/:token', async (req, reply) => {
+    const png = previewPicture(P(req).token);
+    if (!png) throw new HttpError(404, 'That picture is no longer kept');
+    reply.header('Content-Type', 'image/png');
+    reply.header('Cache-Control', 'private, no-store');
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('Content-Security-Policy', "default-src 'none'");
+    return reply.send(png);
+  });
   app.delete('/api/signatures/:id', async (req) => {
     deleteSignature(db, own(P(req).id).id);
     changed();
@@ -75,4 +86,9 @@ export const signatures: Feature = {
   id: 'signatures',
   routes,
   tools: signatureTools,
+  spawn: () => ({
+    instructions: [
+      'Signatures: the user can keep their signature (a picture of it, drawn once) to sign documents and files with. To sign one for them, use place_signature with a saved signature by name (look first with look: true; the user allows each placement on a card); if none is saved, ask_signature has them draw one. A placed signature is a picture of their signature, not a cryptographic digital signature.',
+    ],
+  }),
 };
