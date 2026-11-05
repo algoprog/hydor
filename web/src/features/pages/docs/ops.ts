@@ -318,6 +318,9 @@ function like(doc: Doc, b: TextBlock, atEnd: boolean): TextBlock {
 /** A list item made a paragraph (its indent kept). */
 const toPara = (b: ItemBlock): ParaBlock => tidy({ id: b.id, type: 'p', align: b.align, lvl: b.lvl, runs: b.runs } as ParaBlock);
 
+/** A quote, code or callout made normal text (a callout's emoji and tint go with its style). */
+const plainPara = (b: ParaBlock): ParaBlock => tidy({ ...b, style: undefined, icon: undefined, tint: undefined });
+
 /** Enter: the block split at the caret (a list's empty item ends the list; code takes a line break instead). */
 export function enter(doc: Doc, at: Pos): Edit {
   if (at.c) return insertText(doc, at, '\n');
@@ -335,7 +338,8 @@ export function enter(doc: Doc, at: Pos): Edit {
   }
   if (!text) {
     if (B.type === 'li') return { doc: withBlock(doc, i, B.lvl ? tidy({ ...B, lvl: B.lvl - 1 }) : toPara(B)), at };
-    if (B.style === 'quote') return { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at };
+    // An empty quote or callout ends it: what is typed next is normal text (else each Enter made another one).
+    if (B.style === 'quote' || B.style === 'callout') return { doc: withBlock(doc, i, plainPara(B)), at };
   }
   if (at.o === 0 && text) {
     // At its start: an empty block before it, its words where they are.
@@ -354,7 +358,7 @@ export function backspace(doc: Doc, at: Pos): Edit {
   if (!isText(B)) return { doc, at };
   if (B.type === 'li') return { doc: withBlock(doc, i, toPara(B)), at };
   if (B.lvl) return { doc: withBlock(doc, i, tidy({ ...B, lvl: B.lvl - 1 })), at };
-  if (B.style === 'quote' || B.style === 'code') return { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at };
+  if (B.style === 'quote' || B.style === 'code' || B.style === 'callout') return { doc: withBlock(doc, i, plainPara(B)), at };
   const P = doc.blocks[i - 1];
   if (!P) return B.style ? { doc: withBlock(doc, i, tidy({ ...B, style: undefined })), at } : { doc, at };
   if (isText(P)) return { doc: splice(doc, i - 1, 2, [{ ...P, runs: mergeRuns([...P.runs, ...B.runs]) }]), at: { b: P.id, o: lenOf(P.runs) } };
