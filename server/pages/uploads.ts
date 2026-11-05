@@ -177,6 +177,8 @@ async function intoProject(db: DB, file: string, space: string, rel: string): Pr
   const want = path.resolve(root, rel);
   if (!want.startsWith(root + path.sep)) throw new HttpError(400, 'rel: a place inside the folder it was dropped in');
   await fs.promises.mkdir(path.dirname(want), { recursive: true });
+  // Nor through a link in the project's folder to a folder elsewhere.
+  if (!within(real(root), real(path.dirname(want)))) throw new HttpError(400, 'That place in the project’s folder is a link to a folder outside it');
   const to = await claimName(path.dirname(want), path.basename(want));
   await moveWhole(file, to);
   invalidateGit(to);

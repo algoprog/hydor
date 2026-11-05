@@ -219,6 +219,11 @@ const pptxImports = kindForFile('a.pptx') === 'slides';
   const p2 = await upload('June.pdf', pdf, { space: thesis.id, rel: 'Receipts/June.pdf' });
   ok(p1.body.done?.as === 'file' && p1.body.done.path === path.join(thesisDir, 'Receipts', 'June.pdf') && p1.body.done.space === thesis.id, 'a PDF dropped on a project goes in its folder');
   ok(p2.body.done?.path === path.join(thesisDir, 'Receipts', 'June copy.pdf') && fs.readFileSync(p1.body.done.path).equals(pdf), 'a second one of the same name gets a name of its own, the first stays as it was');
+  // A link in the project's folder to a folder elsewhere is not written through.
+  const elsewhere = fs.mkdtempSync(path.join(tmp, 'elsewhere-'));
+  fs.symlinkSync(elsewhere, path.join(thesisDir, 'Linked'));
+  const linked = await upload('x.pdf', pdf, { space: thesis.id, rel: 'Linked/x.pdf' });
+  ok(linked.status === 400 && !fs.readdirSync(elsewhere).length, 'a file is not put through a link in the project’s folder to a folder outside it');
   const empty = await upload('.gitkeep', Buffer.alloc(0), { space: thesis.id });
   ok(empty.body.done?.as === 'file' && fs.statSync(empty.body.done.path).size === 0, 'an empty file arrives with one empty piece');
   const pptx = await upload('Launch.pptx', Buffer.from('PK\u0003\u0004 not really a deck'), { space: thesis.id });
