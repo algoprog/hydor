@@ -2,13 +2,15 @@
 // around: click a part to pick it (Shift adds to the pick, a drag across empty space picks what it touches), drag it
 // to move it (it snaps to the slide's middle and edges, to other parts, to the guides and the grid, with lines that
 // show where, and to gaps as wide as those between other parts, marked; Alt does not snap, Shift keeps it straight),
-// its handles to size or turn it, a line's ends to move them. A group is picked, moved, sized and turned as one;
+// its handles to size or turn it, a line's ends to move them (near a part, an end sticks to the middle of one of its
+// sides: a connector, which follows its parts as they are dragged). A group is picked, moved, sized and turned as one;
 // double-click it to pick a part inside, Esc or a click outside to leave it. Double-click words to change them in
 // place, a table's cell to type in it (Shift-click another to pick the cells between), a picture to crop it (drag the
 // frame's edges and corners over the whole picture, drag the picture under it; Enter keeps it, Esc does not). The
-// rulers give guides: drag one out of a ruler, drag it back to take it away. The slide itself is drawn by the runtime
-// as it shows anywhere; this draws what is picked over it, and moves parts while they are dragged without drawing the
-// slide again. The marks of the slide's comments sit over it, at their parts' corners (the editor's alone).
+// rulers give guides: drag one out of a ruler, drag it back to take it away; zoomed in, they stay at the view's edges.
+// The slide itself is drawn by the runtime as it shows anywhere; this draws what is picked over it, and moves parts
+// while they are dragged without drawing the slide again. The marks of the slide's comments sit over it, at their
+// parts' corners (the editor's alone).
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Stick, type TableEl, type TextProps } from '@shared/slides';
 import { MessageSquare } from 'lucide-react';
@@ -342,6 +344,9 @@ export const SlideCanvas = forwardRef<
   editingRef.current = editing;
   const anchor = useRef<{ p: P; cx: number; cy: number } | null>(null);
   const touches = useRef(new Map<number, P>());
+  const rulerX = useRef<SVGSVGElement>(null);
+  const rulerY = useRef<SVGSVGElement>(null);
+  const corner = useRef<HTMLDivElement>(null);
   const pinch = useRef<{ dist: number; k: number; mid: P } | null>(null);
 
   useLayoutEffect(() => {
@@ -1426,6 +1431,26 @@ export const SlideCanvas = forwardRef<
     );
   };
 
+  /**
+   * The rulers stay at the edges of the view while a zoomed slide is scrolled: the top one at its top (lined up with the
+   * slide across), the left one at its left, a corner where they meet. Placed as the view scrolls, without drawing again.
+   */
+  const pinRulers = () => {
+    const el = wrap.current;
+    if (!el) return;
+    const top = Math.max(stage.top - RULER - 4, el.scrollTop);
+    const left = Math.max(stage.left - RULER - 4, el.scrollLeft);
+    if (rulerX.current) rulerX.current.style.top = `${top}px`;
+    if (rulerY.current) rulerY.current.style.left = `${left}px`;
+    if (corner.current) {
+      corner.current.style.top = `${top}px`;
+      corner.current.style.left = `${left}px`;
+      // Only when they meet at the view's corner, over the slide.
+      corner.current.style.display = top > stage.top - RULER - 4 && left > stage.left - RULER - 4 ? 'block' : 'none';
+    }
+  };
+  useLayoutEffect(pinRulers);
+
   /** A ruler's ticks: every so many pixels of the slide, numbered every hundred or so. */
   const ruler = (axis: 'x' | 'y') => {
     const len = axis === 'x' ? W : H;
@@ -1451,7 +1476,8 @@ export const SlideCanvas = forwardRef<
     }
     return (
       <svg
-        className={cx('absolute bg-bg-2 stroke-fg-3/60 select-none', axis === 'x' ? 'cursor-s-resize' : 'cursor-e-resize')}
+        ref={axis === 'x' ? rulerX : rulerY}
+        className={cx('absolute z-[6] bg-bg-2 stroke-fg-3/60 select-none', axis === 'x' ? 'cursor-s-resize' : 'cursor-e-resize')}
         style={axis === 'x' ? { left: stage.left, top: stage.top - RULER - 4, width: stage.w, height: RULER } : { left: stage.left - RULER - 4, top: stage.top, width: RULER, height: stage.h }}
         onPointerDown={(ev) => {
           // A guide out of the ruler: across from the top one, down from the left one.
@@ -1478,6 +1504,7 @@ export const SlideCanvas = forwardRef<
       data-slide-canvas
       data-k={k}
       className={cx('relative h-full w-full touch-none bg-bg-2 outline-none select-none', zoomed ? 'overflow-auto' : 'overflow-hidden', painting && 'cursor-copy')}
+      onScroll={pinRulers}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
@@ -1495,6 +1522,7 @@ export const SlideCanvas = forwardRef<
       <div className="relative" style={{ width: sheet.w, height: sheet.h }}>
         {showRulers && ruler('x')}
         {showRulers && ruler('y')}
+        {showRulers && <div ref={corner} className="absolute z-[7] hidden bg-bg-2" style={{ width: RULER, height: RULER }} />}
         <div ref={stageRef} className="absolute shadow-[0_0_0_1px_var(--line-2),0_10px_30px_rgba(0,0,0,.18)]" style={{ left: stage.left, top: stage.top, width: stage.w, height: stage.h }}>
           <div ref={content} className="absolute top-0 left-0 origin-top-left" style={{ width: W, height: H, transform: `scale(${k})` }} />
           {grid.show && (
