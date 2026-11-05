@@ -3,6 +3,14 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.29.1 · 5 November 2026
+
+The Mac and Windows apps of 0.29.0, with everything it brought.
+
+- 0.29.0's Mac and Windows apps could not be built: two of the LaTeX editor's files had names that differ only in
+  their capitals, which those computers' disks take for one name. They are named apart now, so the desktop apps
+  update straight from 0.28.1 to this version, with all of 0.29.0's changes below.
+
 ## 0.29.0 · 5 November 2026
 
 The Library's editors on par with the apps they are compared with: documents as in Word and Google Docs, spreadsheets as
