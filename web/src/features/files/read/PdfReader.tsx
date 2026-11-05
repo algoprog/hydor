@@ -453,7 +453,7 @@ export function PdfReader({ path, mtime, canAsk, onClose, onFileSaved }: { path:
           setBox(null);
           clearSelection();
         }
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && picked) {
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && picked && (t === document.body || root.current?.contains(t))) {
         e.preventDefault();
         remove(picked);
       } else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) {
@@ -478,7 +478,7 @@ export function PdfReader({ path, mtime, canAsk, onClose, onFileSaved }: { path:
 
   // ---- an area dragged ------------------------------------------------------------------------------------------------
 
-  const drag = useRef<{ page: number; x0: number; y0: number; k: number; size: { width: number; height: number } } | null>(null);
+  const drag = useRef<{ page: number; x0: number; y0: number; k: number; size: { width: number; height: number }; box?: PdfRect } | null>(null);
   const dragEnded = useRef(0);
   const onPagePointerDown = (e: React.PointerEvent<HTMLDivElement>, n: number, k: number, size: { width: number; height: number }) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest('[data-bar]')) return;
@@ -501,7 +501,8 @@ export function PdfReader({ path, mtime, canAsk, onClose, onFileSaved }: { path:
     if (d && d.page === n) {
       const cx2 = Math.max(0, Math.min(d.size.width, x));
       const cy2 = Math.max(0, Math.min(d.size.height, y));
-      setBox({ page: n, rect: { x: Math.min(d.x0, cx2), y: Math.min(d.y0, cy2), w: Math.abs(cx2 - d.x0), h: Math.abs(cy2 - d.y0) } });
+      d.box = { x: Math.min(d.x0, cx2), y: Math.min(d.y0, cy2), w: Math.abs(cx2 - d.x0), h: Math.abs(cy2 - d.y0) };
+      setBox({ page: n, rect: d.box });
       return;
     }
     if (e.pointerType !== 'mouse' || mouseDown.current) return;
@@ -514,13 +515,12 @@ export function PdfReader({ path, mtime, canAsk, onClose, onFileSaved }: { path:
     if (!d) return;
     drag.current = null;
     dragEnded.current = Date.now();
-    setBox((b) => {
-      if (b && b.rect.w > 4 && b.rect.h > 4) {
-        setPick({ kind: 'area', page: b.page, rect: b.rect });
-        setAreaMode(false);
-      }
-      return null;
-    });
+    setBox(null);
+    // A box big enough to be meant: the bar for it, and the tool lets go (one area a press).
+    if (d.box && d.box.w > 4 && d.box.h > 4) {
+      setPick({ kind: 'area', page: d.page, rect: d.box });
+      setAreaMode(false);
+    }
   };
   const onPageClick = (e: React.MouseEvent<HTMLDivElement>, n: number, k: number) => {
     if (Date.now() - dragEnded.current < 300 || (e.target as HTMLElement).closest('[data-bar]')) return;
@@ -716,7 +716,13 @@ export function PdfReader({ path, mtime, canAsk, onClose, onFileSaved }: { path:
           {editingH && <NoteEditor key={editingH.id} h={editingH} onChange={(v) => change(editingH, { note: v }, true)} onDone={() => setEditing(null)} />}
         </Popover>
         {zoom > 1.01 && (
-          <button type="button" onClick={() => zoomTo(1)} className="absolute right-4 bottom-[max(16px,var(--safe-bottom))] z-10 rounded-full border border-line bg-elevated px-3 py-1.5 text-[12.5px] text-fg-2 shadow-lg hover:text-fg">
+          <button
+            type="button"
+            onClick={() => zoomTo(1)}
+            // Beside the Notes when they are a column, over the pages.
+            style={{ right: !mobile && notesOpen && wideReader ? 336 : 16 }}
+            className="absolute bottom-[max(16px,var(--safe-bottom))] z-10 rounded-full border border-line bg-elevated px-3 py-1.5 text-[12.5px] text-fg-2 shadow-lg hover:text-fg"
+          >
             Fit width
           </button>
         )}
