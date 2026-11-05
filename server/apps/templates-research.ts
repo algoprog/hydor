@@ -2127,7 +2127,7 @@ const LIVING_RELATED_WORK: Draft = {
       description: 'The papers of each topic, with what each says and how it relates',
     },
     seeds: { fields: fieldsOf({ line: 'text', title: 'text', s2: 'text', oa: 'text', year: 'number' }), description: 'The seed papers, found once' },
-    topics: { fields: fieldsOf({ topic: 'text', themes: 'list', updated: 'date' }), description: 'Each topic’s themes, in order' },
+    topics: { fields: fieldsOf({ topic: 'text', themes: 'list', updated: 'date', seen: 'list' }), description: 'Each topic’s themes, in order, and the papers weighed for it' },
   },
   secrets: [S2_KEY, OPENALEX_KEY],
   flow: {
@@ -2157,7 +2157,7 @@ const LIVING_RELATED_WORK: Draft = {
           S2 +
           String.raw`// For each topic, the papers to weigh: the first time, arXiv's best on it and its latest of the past year, and OpenAlex's
 // most cited (with its key, or for the first topics); after that, what came out since the last update. The papers citing
-// your seed papers come in for every topic (Semantic Scholar's, or OpenAlex's). Papers a topic has already are left out.
+// your seed papers come in for every topic (Semantic Scholar's, or OpenAlex's). Papers a topic has, or weighed before, are left out.
 const today = String(input.today || '').slice(0, 10);
 const day = 86400000;
 const slug = (t) => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'topic';
@@ -2165,6 +2165,7 @@ const topics = lines(input.topics).slice(0, 6);
 const most = Math.max(10, Math.min(150, Number(input.most) || 80));
 const known = rows(input.known);
 const themes = new Map(rows(input.themed).map((t) => [String(t.topic), list(t.themes).map(String)]));
+const weighed = new Map(rows(input.themed).map((t) => [String(t.topic), new Set(list(t.seen).map(String))]));
 const notes = [];
 // The seed papers: found once, then kept.
 const seeds = [];
@@ -2201,7 +2202,7 @@ const out = [];
 let oaAsked = 0;
 for (const topic of topics) {
   const mine = known.filter((k) => String(k.topic) === topic);
-  const have = new Set(mine.map((k) => String(k.key)));
+  const have = new Set(mine.map((k) => String(k.key)).concat(Array.from(weighed.get(topic) || [])));
   const first = !mine.length;
   const last = mine.map((k) => String(k.added || '')).sort().pop() || today;
   const since = new Date(Date.parse(last) - 3 * day).toISOString().slice(0, 10).replace(/-/g, '');
@@ -2371,8 +2372,10 @@ for (const [i, t] of rows(input.topics).entries()) {
   added += n;
   const themes = list(round.themes).length ? list(round.themes).map(String) : list(t.themes).map(String);
   const had = themed.get(t.topic);
-  if (had) await ctx.data.update('topics', { id: had.id, set: { themes: themes, updated: today }, title: 'Keep the themes of “' + clip(t.topic, 40) + '”' });
-  else await ctx.data.add('topics', { id: 'tp-' + t.slug, topic: t.topic, themes: themes, updated: today }, { title: 'Keep the themes of “' + clip(t.topic, 40) + '”' });
+  // What it weighed this time, with what it had: none of them is weighed again.
+  const seen = list(had && had.seen).map(String).concat(rows(t.pool).map((p) => String(p.key))).filter((k, i, a) => a.indexOf(k) === i).slice(-3000);
+  if (had) await ctx.data.update('topics', { id: had.id, set: { themes: themes, updated: today, seen: seen }, title: 'Keep the themes of “' + clip(t.topic, 40) + '”' });
+  else await ctx.data.add('topics', { id: 'tp-' + t.slug, topic: t.topic, themes: themes, updated: today, seen: seen }, { title: 'Keep the themes of “' + clip(t.topic, 40) + '”' });
   topics.push({ topic: t.topic, slug: t.slug, count: mine.filter((k) => !k.hidden).length + n, new: n, themes: themes.join(' · ') });
 }
 return { updated: today, topics: topics, fresh: added, headline: added ? added + (added === 1 ? ' new paper' : ' new papers') + ' on your topics' : 'Nothing new on your topics', note: String(input.notes || '') };`,
@@ -2546,7 +2549,9 @@ if (!out.length)
     const ax = (/(\d{4}\.\d{4,5})/.exec(l) || [])[1];
     try {
       const found = ax ? atomEntries(bodyText(await get('https://export.arxiv.org/api/query?id_list=' + ax, { title: 'Read arXiv’s ' + ax }))) : await arxiv('ti:' + phrase(l), 3, 'Find “' + clip(l, 40) + '” on arXiv', 'relevance');
-      const p = ax ? found[0] : found.find((x) => plain(x.title) === plain(l)) || found[0];
+      const words = plain(l).split(' ').filter((w) => w.length > 2);
+      const share = (x) => words.filter((w) => (' ' + plain(x.title) + ' ').indexOf(' ' + w + ' ') >= 0).length;
+      const p = ax ? found[0] : found.slice().sort((a, b) => share(b) - share(a))[0];
       if (p) out.push(p);
     } catch (e) {}
   }
@@ -2645,7 +2650,6 @@ Ideas that are concrete and testable, each clearly different from the others; no
         title: 'Check each one for prior work',
         do: 'repeat',
         over: '{{propose.ideas}}',
-        atOnce: 3,
         as: 'idea',
         collect: 'merge',
         steps: [

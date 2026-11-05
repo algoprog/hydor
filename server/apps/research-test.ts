@@ -609,7 +609,7 @@ test('Living related work: each topic’s papers to weigh (the first time its be
     most: '40',
     known: [{ topic: 'query performance prediction', key: 'ax2611_06914', added: '2026-11-01' }],
     seeded: [{ line: 'ColBERT: Efficient and Effective Passage Search', title: 'ColBERT', s2: 'sSeed', year: 2020 }],
-    themed: [{ topic: 'query performance prediction', themes: ['Predictors'] }],
+    themed: [{ topic: 'query performance prediction', themes: ['Predictors'], seen: ['ax2611_06856'] }],
     today: '2026-11-05',
   });
   const topics = v.topics as Record<string, unknown>[];
@@ -623,6 +623,8 @@ test('Living related work: each topic’s papers to weigh (the first time its be
   const pool = topics[0].pool as Record<string, unknown>[];
   assert.ok(pool.some((p) => String(p.seed) === 'ColBERT'), 'the seed’s citing papers come in');
   assert.ok(!(topics[1].pool as Record<string, unknown>[]).some((p) => p.key === 'ax2611_06914'), 'what a topic has is left out');
+  assert.ok(!(topics[1].pool as Record<string, unknown>[]).some((p) => p.key === 'ax2611_06856'), 'and what it weighed before');
+  assert.ok((topics[0].pool as Record<string, unknown>[]).some((p) => p.key === 'ax2611_06856'), 'another topic still weighs it');
   assert.deepEqual(topics[0].interests, ['dense retrieval', 'ColBERT']);
   const choose = await program('living-related-work', 'choose', { pool, ranked: [{ id: pool[1].key, score: 0.9 }, { id: pool[0].key, score: 0.05 }], first: true, room: 40 });
   assert.equal(choose.count, 1, 'what fits the topic too little is left out');
@@ -651,6 +653,7 @@ test('Living related work: each topic’s papers to weigh (the first time its be
   );
   assert.equal(saved.headline, '2 new papers on your topics');
   assert.deepEqual(ctx.data.get('topics')!.map((t) => t.id), ['tp-dense-retrieval'], 'a new topic’s themes added; the one there changed');
+  assert.equal((ctx.data.get('topics')![0].seen as string[]).length, pool.length, 'what it weighed kept with the topic');
   const draft = await program('living-related-work', 'prep', { papers: [...papers, { ...papers[0], hidden: true, citekey: 'gone' }] });
   assert.equal(draft.count, 2);
   assert.match(String(draft.lines), /^## Late interaction\n- \\cite\{\w+\} /);
@@ -735,9 +738,20 @@ fs.mkdirSync(path.dirname(AGENT_FILE), { recursive: true });
 fs.writeFileSync(AGENT_FILE, JSON.stringify({ models: [{ id: 'fake', label: 'Fake', provider: 'endpoint', baseUrl: `http://127.0.0.1:${(srv.address() as { port: number }).port}/v1`, model: 'fake-1', tools: 'native' }] }));
 
 const stepTool = (name: string, run: RunTool['run']): RunTool => ({ name, description: name, inputSchema: { type: 'object' }, run });
+const notified: Record<string, unknown>[] = [];
 const services: Feature = {
   id: 'research-services',
-  tools: (ctx) => (ctx.step ? [stepTool('http_request', (a) => fakeHttp(a)), RANK_BY_INTEREST, USER_PROFILE] : []),
+  tools: (ctx) =>
+    ctx.step
+      ? [
+          stepTool('http_request', (a) => fakeHttp(a)),
+          stepTool('web_search', (a) => JSON.stringify({ results: [{ title: `${String(a.query)}`, url: 'https://sigir2027.org/calls/full-papers', snippet: 'Call for full papers' }] })),
+          stepTool('read_page', (a) => `The call for full papers at ${String(a.url)}: papers are up to 9 pages, references not counted. Use the ACM template: https://www.acm.org/publications/proceedings-template`),
+          stepTool('notify_user', (a) => (notified.push(a), 'Sent.')),
+          RANK_BY_INTEREST,
+          USER_PROFILE,
+        ]
+      : [],
 };
 const http = Fastify();
 await http.register(cookie);
@@ -799,6 +813,64 @@ test('Paper radar, as it comes: you read, the papers found and ranked against yo
   // What you saved leans the next ranking toward it: the saved paper is liked.
   const steps = store.listSteps(db, r2.id);
   assert.ok(steps.some((s) => s.id === 'liked' && s.status === 'done'));
+});
+
+test('Citation alerts, Deadline radar, Living related work and Gap finder, as they come: each runs whole, its answer fits its fields, what it keeps is kept', async () => {
+  const run = async (app: string, inputs: Record<string, string>, flow?: string) => {
+    const t = templateById(app)!;
+    const r = (await waitFor(startRun({ app: `tpl:${app}`, slug: app, recipe: t, source: 'web', inputs, ...(flow ? { flow } : {}) }).id, 180_000))!;
+    assert.equal(r.status, 'done', `${app}${flow ? ` (${flow})` : ''}: ${r.error}`);
+    return { r, res: r.result as Record<string, any>, t };
+  };
+  // Citation alerts: you found, your papers, who cited each (none new the first time: the fixture's are August's), kept.
+  routes = [(u) => (u.host === 'api.semanticscholar.org' && /\/citations$/.test(u.pathname) ? fixture('s2-citations.json') : s2Route(u))];
+  reply = (user) => (user.includes('cite the reader') ? { kinds: [] } : {});
+  const ca = await run('citation-alerts', { me: 'Chris Samarinas', papers: '' });
+  assert.equal(ca.res.name, 'Chris Samarinas');
+  assert.equal(ca.res.papers.length, 6);
+  assert.equal(ca.res.headline, 'No new citations');
+  const cited = findRecords(db, 'tpl:citation-alerts', ca.t.data, 'cited').records;
+  assert.equal(cited.length, 6);
+  assert.ok(cited.every((c) => (c.citing as string[]).length === 4));
+  // Deadline radar: SIGIR and ACL found, their calls read for the page limit and the template.
+  routes = deadlineRoutes;
+  reply = (user) => (user.includes("call for papers") ? { pages: '9 pages, references not counted', template: 'https://www.acm.org/publications/proceedings-template' } : {});
+  const dl = await run('deadline-radar', { venues: 'SIGIR, ACL', reminders: '14, 3, 1' });
+  assert.deepEqual(dl.res.venues.map((v: any) => v.venue), ['SIGIR', 'ACL']);
+  assert.deepEqual(dl.res.missing, []);
+  assert.ok(dl.res.deadlines.every((d: any) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(d.utc)));
+  const calls = findRecords(db, 'tpl:deadline-radar', dl.t.data, 'calls').records;
+  for (const c of calls) assert.equal(c.pages, '9 pages, references not counted');
+  // Living related work: a topic grown from arXiv's and OpenAlex's papers, the model's verdicts kept; its BibTeX flow.
+  routes = [arxivRoute, openAlexRoute, s2Route];
+  reply = (user) => {
+    const n = [...user.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
+    return user.includes('living related-work') ? { papers: n.map((i) => ({ n: i, keep: i % 2 === 1, summary: `Paper ${i} does a thing.`, relation: 'near the topic', theme: i < 3 ? 'Embeddings' : 'Agents' })), themes: ['Embeddings', 'Agents'] } : {};
+  };
+  const lrw = await run('living-related-work', { topics: 'text embeddings', seeds: '', most: '20' });
+  assert.equal(lrw.res.topics.length, 1);
+  assert.ok(lrw.res.fresh > 0, 'papers were added');
+  const kept = findRecords(db, 'tpl:living-related-work', lrw.t.data, 'papers').records;
+  assert.equal(kept.length, lrw.res.fresh);
+  assert.ok(kept.every((p) => p.topic === 'text embeddings' && p.summary && p.citekey && String(p.bibtex).startsWith('@')));
+  const bib = await run('living-related-work', { topic: 'text embeddings' }, 'bib');
+  assert.equal(bib.res.count, kept.length);
+  assert.match(bib.res.bib, /^@\w+\{/);
+  // A second update: the papers it has are not weighed again.
+  const again = await run('living-related-work', { topics: 'text embeddings', seeds: '', most: '20' });
+  assert.equal(again.res.fresh, 0);
+  // Gap finder: your paper and the month's, ideas proposed, each checked for prior work.
+  routes = [arxivRoute, (u) => (u.host === 'api.semanticscholar.org' && u.pathname.endsWith('/paper/search') ? JSON.stringify({ data: [] }) : null)];
+  reply = (user) =>
+    user.includes('Propose')
+      ? { ideas: [1, 2, 3].map((i) => ({ title: `Idea ${i}`, idea: `Do thing ${i}.`, crosses: 'M1 × R2', queries: 'text embeddings quantization | hierarchical embeddings', first: `Try ${i}.`, needs: 'a 400M model' })) }
+      : user.includes('Judge it')
+        ? { verdict: user.includes('Idea 2') ? 'done' : 'new', why: 'P1 is near it.', closest: 1, first: 'Try it.', cost: 'about 5 GPU hours', fits: 'fits' }
+        : {};
+  const gap = await run('gap-finder', { papers: 'Balancing hierarchical representation and quantization', area: 'cs.IR', compute: 'one 24 GB GPU', ideas: '2' });
+  assert.deepEqual(gap.res.ideas.map((i: any) => [i.title, i.verdict]), [['Idea 1', 'new'], ['Idea 3', 'new']]);
+  assert.match(gap.res.ideas[0].crosses, /^“Balancing hierarchical/);
+  assert.equal(gap.res.headline, '2 of 2 ideas look new');
 });
 
 // ---- the real services (LIVE=1) ----------------------------------------------------------------------------------
