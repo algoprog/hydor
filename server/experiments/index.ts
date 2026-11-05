@@ -46,11 +46,7 @@ function routes(d: Deps) {
   app.get('/api/experiments/runs/:id', async (req) => runView(d, runId(req), Q(req).log === '0' ? 0 : Math.min(Number(Q(req).lines ?? 300) || 0, 5000)));
   app.get('/api/experiments/runs/:id/log', async (req) => logAfter(d, runId(req), Number(Q(req).from) || 0));
   app.get('/api/experiments/runs/:id/patch', async (req) => ({ patch: await patchOf(d, runId(req)) }));
-  app.post('/api/experiments/jobs', async (req) => {
-    const b = B(req);
-    const spec = await cleanJob(d.db, b);
-    return { run: await submit(d, spec, { startedBy: b.startedBy && typeof b.startedBy === 'object' ? b.startedBy : { page: true } }) };
-  });
+  app.post('/api/experiments/jobs', async (req) => ({ run: await submit(d, await cleanJob(d.db, B(req)), { startedBy: { page: true } }) }));
   app.post('/api/experiments/runs/:id/stop', async (req) => ({ run: await stopRun(d, runId(req), typeof B(req).why === 'string' && B(req).why.trim() ? B(req).why.trim().slice(0, 200) : undefined) }));
   app.post('/api/experiments/runs/:id/again', async (req) => ({ run: await runAgain(d, runId(req), B(req), { page: true }) }));
   app.delete('/api/experiments/runs/:id', async (req) => {

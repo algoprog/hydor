@@ -272,6 +272,8 @@ interface Live {
   oomLine?: string;
   nanLine?: string;
   dirty: boolean;
+  /** New metrics the pages have not heard of. */
+  fresh: boolean;
   savedAt: number;
   toldAt: number;
   when: boolean;
@@ -353,6 +355,7 @@ function liveOf(d: Deps, r: RunRecord): Live {
       stalls: 0,
       stalled: false,
       dirty: false,
+      fresh: false,
       savedAt: Date.now(),
       toldAt: 0,
       when: eventsOf(d.db, r.id).some((e) => e.kind === 'note' && e.text.startsWith('Crossed')),
@@ -375,7 +378,7 @@ function consume(L: Live, text: string, which: 'log' | 'file') {
   else L.fileCarry = rest;
   for (const line of lines) {
     const r = parseLine(line);
-    if (r && L.tracker.add(r)) L.dirty = true;
+    if (r && L.tracker.add(r)) L.dirty = L.fresh = true;
     if (which === 'log') {
       if (!L.oomLine && oomText(line)) L.oomLine = line.trim().slice(0, 300);
       if (!L.nanLine && nanText(line)) L.nanLine = line.trim().slice(0, 300);
@@ -416,8 +419,9 @@ function save(d: Deps, r: RunRecord, L: Live, now = false) {
     updateRun(d.db, r.id, { logOffset: L.log, fileOffset: L.file, info: { outputAt: L.outputAt } });
     L.savedAt = t;
   }
-  if (t - L.toldAt > TELL_MS) {
+  if (L.fresh && t - L.toldAt > TELL_MS) {
     L.toldAt = t;
+    L.fresh = false;
     tellRuns(d, [r.id]);
   }
 }
@@ -731,7 +735,7 @@ async function finish(d: Deps, r: RunRecord, L: Live, code: number | null, o: { 
   // What it leaves in its folder: its metrics, and the per-example scores it wrote.
   let scores = false;
   if (cur.scoresFile && placeOf(r.where).kind === 'local') {
-    const from = path.resolve(cur.cwd, fillCommand(cur.scoresFile, { ...(cur.params ?? {}), ...(cur.seed !== undefined ? { seed: cur.seed } : {}) }).replace(/^'|'$/g, ''));
+    const from = path.resolve(cur.cwd, fillCommand(cur.scoresFile, { ...(cur.params ?? {}), ...(cur.seed !== undefined ? { seed: cur.seed } : {}) }, false));
     try {
       if (fs.statSync(from).size <= 50 * 1024 * 1024) {
         fs.copyFileSync(from, path.join(folder, 'scores.jsonl'));
@@ -1049,12 +1053,24 @@ async function followCluster(d: Deps, r: RunRecord) {
     if (state.status === 'running') await watch(d, getRun(d.db, r.id)!, L);
     return save(d, r, L);
   }
+  if (r.scoresFile && state.code === 0) await fetchScores(c.host, r);
   if (state.slurm && state.code === null) {
     const s = state.slurm;
     if (s.status === 'stopped' && !getRun(d.db, r.id)?.stopping) updateRun(d.db, r.id, { info: { stopping: s.why ?? 'Cancelled' } });
     return finish(d, getRun(d.db, r.id)!, L, s.status === 'done' ? 0 : 1, { why: s.why, oom: /memory/.test(s.why ?? '') });
   }
   return finish(d, getRun(d.db, r.id)!, L, state.code, state.code === null ? { missing: `It is no longer in ${c.name}’s queue and left no exit code` } : {});
+}
+
+/** A cluster run's per-example scores, copied into its folder here when it ends (50 MB at most). */
+async function fetchScores(host: string, r: RunRecord) {
+  const file = fillCommand(r.scoresFile!, { ...(r.params ?? {}), ...(r.seed !== undefined ? { seed: r.seed } : {}) }, false);
+  const got = await runSsh(host, `cd ${rq(r.cwd || r.remoteDir || '~')} && head -c 52428800 ${rq(file)}`, { timeoutMs: 120_000 });
+  if (got.code !== 0 || !got.out.trim()) return;
+  try {
+    fs.writeFileSync(path.join(r.folder ?? runFolder(r.id), 'scores.jsonl'), got.out);
+    updateRun(deps!.db, r.id, { info: { scores: true } });
+  } catch {}
 }
 
 function setWhy(d: Deps, r: RunRecord, why: string) {

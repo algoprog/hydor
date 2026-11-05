@@ -22,9 +22,9 @@ export function placeholders(command: string): string[] {
   return [...new Set([...command.matchAll(/(?<!\$)\{([A-Za-z_][\w.-]*)\}/g)].map((m) => m[1]))];
 }
 
-/** The command with its {name} placeholders filled from `values` (the others left as they are). */
-export function fillCommand(command: string, values: Record<string, Value>): string {
-  return command.replace(/(?<!\$)\{([A-Za-z_][\w.-]*)\}/g, (all, k: string) => (values[k] === undefined ? all : shellValue(values[k])));
+/** The command with its {name} placeholders filled from `values` (the others left as they are); quoted for a shell unless `quote` is false (a file's path). */
+export function fillCommand(command: string, values: Record<string, Value>, quote = true): string {
+  return command.replace(/(?<!\$)\{([A-Za-z_][\w.-]*)\}/g, (all, k: string) => (values[k] === undefined ? all : quote ? shellValue(values[k]) : String(values[k])));
 }
 
 /**

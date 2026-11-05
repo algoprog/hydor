@@ -493,6 +493,31 @@ test('tests pick themselves: paired over seeds when the rows share seeds, over e
   assert.match(e.notes?.join(' ') ?? '', /^$/, 'nothing left out');
 });
 
+test('per-example scores a run writes are kept with it and pair its table; a metric crossing a value is told', async () => {
+  notices.length = 0;
+  forgetNotices();
+  const write = (group: string, base: number, seed: number) =>
+    cleanJob(db, {
+      command: `for q in 1 2 3 4 5 6; do echo "{\\"id\\": \\"q$q\\", \\"ndcg\\": $(echo "${base} + $q / 100" | bc -l)}"; done > scores-${group}-{seed}.jsonl; echo "ndcg=${base}"`,
+      cwd: tmp,
+      gpus: 0,
+      group,
+      seed,
+      scoresFile: `scores-${group}-{seed}.jsonl`,
+      notify: { when: { metric: 'ndcg', op: '>', value: 0.6 } },
+    }).then((sp) => submit(deps, sp));
+  const a = await write('bm25', 0.5, 1);
+  const b = await write('dense', 0.7, 1);
+  await until(() => ended(a.id)() && ended(b.id)(), 20_000, 'both runs');
+  assert.equal(getRun(db, a.id)!.scores, true, getRun(db, a.id)!.why);
+  assert.ok(fs.readFileSync(path.join(runFolder(a.id), 'scores.jsonl'), 'utf8').includes('"q6"'));
+  const t = workOut(db, { runs: [a.id, b.id], columns: [{ metric: 'ndcg', better: 'max' }] }, 'tscores1');
+  assert.deepEqual(t.tests, ['paired t-test over 6 examples']);
+  assert.ok(getRunWithEvents(db, b.id)!.events!.some((e) => e.kind === 'note' && e.text.startsWith('Crossed: ndcg > 0.6')));
+  assert.ok(notices.some((n) => n.kind === 'waiting' && n.body === 'ndcg is 0.7, over 0.6'));
+  assert.ok(!getRunWithEvents(db, a.id)!.events!.some((e) => e.text.startsWith('Crossed')), 'one under the value is not told');
+});
+
 test('rows by a setting, labels, runs not ended left out; recompute after a run changes', () => {
   doneRun('tlr1aaaa', 'lr', 1, { acc: 0.7 }, { params: { lr: 0.001 } });
   doneRun('tlr2aaaa', 'lr', 2, { acc: 0.72 }, { params: { lr: 0.001 } });

@@ -81,7 +81,10 @@ export function metricsOf(runs: RunRecord[]): string[] {
   return [...seen];
 }
 
-/** The runs, this machine's and (with `everywhere`) every connected machine's, reloaded as they change. */
+/**
+ * The runs, this machine's and (with `everywhere`) every connected machine's. A change here reloads this machine's
+ * own (a burst of them, once); the other machines' are asked again every 20 seconds.
+ */
 export function useRuns(everywhere = true): { runs: RunRecord[] | null; reload: () => void; error: string | null } {
   const [runs, setRuns] = useState<RunRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,13 +97,17 @@ export function useRuns(everywhere = true): { runs: RunRecord[] | null; reload: 
       })
       .catch((e) => setError((e as Error).message));
   }, [everywhere]);
+  const loadOwn = useCallback(() => {
+    api<{ runs: RunRecord[] }>('/api/experiments/runs?limit=500')
+      .then((r) => setRuns((prev) => [...r.runs, ...(prev ?? []).filter((x) => x.machine)].sort((a, b) => b.createdAt - a.createdAt)))
+      .catch(() => {});
+  }, []);
   useEffect(load, [load]);
-  // A burst of changes is one reload.
   useFeatureEvent('experiments', () => {
     if (timer.current) return;
     timer.current = window.setTimeout(() => {
       timer.current = null;
-      load();
+      loadOwn();
     }, 400);
   });
   // Other machines' runs and the times in the rows: a slower look as well.
@@ -111,7 +118,7 @@ export function useRuns(everywhere = true): { runs: RunRecord[] | null; reload: 
   return { runs, reload: load, error };
 }
 
-/** The queue now (running, waiting, this computer's GPUs), looked at every few seconds while shown. */
+/** The queue now (running, waiting, this computer's GPUs), looked at every five seconds while shown. */
 export function useQueue(): QueueNow | null {
   const [q, setQ] = useState<QueueNow | null>(null);
   useEffect(() => {
@@ -127,11 +134,6 @@ export function useQueue(): QueueNow | null {
       window.clearInterval(t);
     };
   }, []);
-  useFeatureEvent('experiments', () => {
-    api<QueueNow>('/api/experiments/queue')
-      .then(setQ)
-      .catch(() => {});
-  });
   return q;
 }
 

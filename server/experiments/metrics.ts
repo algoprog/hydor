@@ -108,6 +108,16 @@ class Loose {
   }
 }
 
+/** An object written as JSON or as Python prints a dict, read leniently; null when it is not one. */
+export function looseObject(text: string): Record<string, unknown> | null {
+  try {
+    const v = new Loose(text.trim()).value();
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The numbers of an object, nested ones as "outer/inner". */
 function flatten(o: Record<string, unknown>, prefix = '', out: Record<string, number> = {}): Record<string, number> {
   for (const [k, v] of Object.entries(o)) {
