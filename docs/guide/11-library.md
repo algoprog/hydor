@@ -295,7 +295,7 @@ A small tray at the bottom right shows each file as it goes: how much of it has 
 
 ### In the desktop apps, a drop moves the file
 
-In the desktop apps (Mac, Windows and Linux), a file dragged in from Finder, Explorer or your file manager moves into the Library, as moving it between folders does, rather than being copied; the line says "Drop to move them into Thesis".
+In the desktop apps (Mac, Windows and Linux), a file dragged in from Finder, Explorer or your file manager moves into the Library, as moving it between folders does, rather than being copied; the line says "Drop to move them into “Thesis”".
 
 - A picture, a video or a sound moves into the Library's own folder, and another file dropped on a project into the project's folder.
 - A Word, Excel, PowerPoint, LaTeX or notebook file the Library made a page of is no longer needed where it was: it goes to the app's Trash, where **Put back** brings it back (see [Delete and put back](/guide/files-git#delete-and-put-back)). When the page could not keep all of it (a Word file's footnotes, an Excel file's charts, a LaTeX file that reads others of its folder, a Markdown file that shows pictures of its folder), the file stays where it was, and the tray says what the page lacks.
