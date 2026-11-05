@@ -71,6 +71,20 @@ The apps for everyday things are smaller and quicker: they get real data from fr
 - **A topic as a timeline**: any topic as a timeline, read from Wikipedia: its key moments with dates (up to thirty **In depth**), its eras and the story in short. Its view has **The timeline** (show one strand; **Quiz me on it** starts a quiz on the topic) and **On a chart** (the moments by year, the turning points bigger, and the eras).
 - **Explore a place**: what is around any place, on a map: sights, museums, parks and landmarks with a picture and a line each, the best for you picked out and put in walking order. Its view has **The walk** (the stops numbered and joined on the map, each to mark seen; **The weather there**) and **Everything around** (show one kind).
 
+<!-- Lead: a line introducing the apps for research and the lab. -->
+
+<!-- B1: one bullet per app (Paper radar, Citation alerts, New-model watch, Deadline radar, Living related work, Gap finder), as the bullets above. -->
+
+<!-- end: apps-b1 -->
+
+<!-- B2: one bullet per app (Reading list, Literature matrix, Reproduce a paper, Reviewer simulator, Rebuttal workbench, Paper to talk, poster and thread, Figure doctor). -->
+
+<!-- end: apps-b2 -->
+
+<!-- D: one bullet per app (Annotation workbench, Research sprint, Sweep planner, Weekly progress report, Lab notebook). -->
+
+<!-- end: apps-d -->
+
 You can't change a ready-made app itself. To adjust one, open it and press **Make it mine** (on a phone, **Edit**): the builder opens with a copy that becomes your own app when you create it.
 
 ### Explore
