@@ -35,19 +35,23 @@ import {
   normalizeBook,
   parseDate,
   parseDelimited,
+  pack,
   parseRange,
   parseRef,
   quoteSheet,
+  rangeName,
   refName,
   ROW_H,
   SHEET_LIMITS,
   shiftFormula,
+  spills,
   textOn,
   unpackC,
   unpackR,
   type Calc,
   type Cell,
   type CellStyle,
+  type Rect,
   type Scalar,
   type Sheet,
   type Workbook,
@@ -237,7 +241,7 @@ export function bookForAgent(text: string): string {
 const SHEET_HELP = [
   'Make or change a spreadsheet, kept in the user’s Library, where they edit it as in Excel or Google Sheets (formulas, formats, sorting, several sheets) and export it to Excel (.xlsx), CSV or PDF. Use it whenever the user wants a spreadsheet, a budget, a tracker, a schedule, an invoice, a plan or any table of numbers they will work with, rather than writing an .xlsx or .csv file (unless they ask for a file, or work on one they have). It shows in the conversation as a table.',
   'The workbook: { title, sheets: [{ name, rows: [[…], …] }] }. rows fill the sheet from A1 (or from start: "B2"), an array per row; a value is a number, words, true or false, null for an empty cell, or a formula: "=SUM(B2:B9)". Words are read as a person types them: "12%" is a percent, "$1,200" an amount, "2026-01-31" a date, "007" stays words; start with \' to keep words as they are. Cells by name, instead or as well: cells: { "B2": 12, "C2": "=B2*2", "D2": { "v": "Paid", "s": { "b": true } } } (as an object, v is taken as it is and f holds a formula, without "=").',
-  'Formulas work as in Excel: + - * / ^ & = <> < > <= >=, 50%, references (A1, $A$1, A1:B5, A:A, Sheet2!A1, \'My sheet\'!A1:B2) and functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, COUNTIF(S), SUMIF(S), AVERAGEIF(S), MAXIFS, MINIFS, SUMPRODUCT, PRODUCT, MEDIAN, STDEV, LARGE, SMALL, RANK, ROUND, ROUNDUP, ROUNDDOWN, INT, ABS, SQRT, POWER, MOD, IF, IFS, IFERROR, IFNA, AND, OR, NOT, SWITCH, CHOOSE, VLOOKUP, HLOOKUP, XLOOKUP, INDEX, MATCH, XMATCH, OFFSET, INDIRECT, CONCAT, TEXTJOIN, LEFT, RIGHT, MID, LEN, UPPER, LOWER, PROPER, TRIM, SUBSTITUTE, FIND, SEARCH, TEXT, VALUE, TODAY, NOW, DATE, YEAR, MONTH, DAY, WEEKDAY, EOMONTH, EDATE, DATEDIF, NETWORKDAYS, WORKDAY, PMT, FV, PV, NPER, RATE, NPV, IRR and more. Dates are Excel’s day numbers.',
+  "Formulas work as in Excel: + - * / ^ & = <> < > <= >=, 50%, references (A1, $A$1, A1:B5, A:A, Sheet2!A1, 'My sheet'!A1:B2) and functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, COUNTIF(S), SUMIF(S), AVERAGEIF(S), MAXIFS, MINIFS, SUMPRODUCT, PRODUCT, MEDIAN, STDEV, LARGE, SMALL, RANK, ROUND, ROUNDUP, ROUNDDOWN, INT, ABS, SQRT, POWER, MOD, IF, IFS, IFERROR, IFNA, AND, OR, NOT, SWITCH, CHOOSE, VLOOKUP, HLOOKUP, XLOOKUP, INDEX, MATCH, XMATCH, OFFSET, INDIRECT, CONCAT, TEXTJOIN, LEFT, RIGHT, MID, LEN, UPPER, LOWER, PROPER, TRIM, SUBSTITUTE, FIND, SEARCH, TEXT, VALUE, TODAY, NOW, DATE, YEAR, MONTH, DAY, WEEKDAY, EOMONTH, EDATE, DATEDIF, NETWORKDAYS, WORKDAY, PMT, FV, PV, NPER, RATE, NPV, IRR and more. Dates are Excel’s day numbers. FILTER, SORT, SORTBY, UNIQUE and SEQUENCE spill their results into the cells below and beside them, which must be empty (else #SPILL!).",
   'How it looks: header: true makes the first row bold and keeps it in view as the sheet scrolls; formats per column: { "B": "currency", "C:D": "percent", "E": "date", "F": { "fmt": "number", "dp": 1 }, "G": "dd/mm/yyyy" } (general, number, percent, currency with cur: "€", accounting, scientific, date, time, datetime, duration, text, or an Excel code: "#,##0.0;[Red]-#,##0.0", "d mmm yyyy", "h:mm AM/PM"; dp: decimals); widths: { "A": 180 } in px (100 otherwise); heights: { "1": 32 } by row number; freeze: { rows: 1, cols: 1 }; styles over ranges: { "A10:D10": { "b": true, "fill": "#fff3cd", "border": "thin" }, "A1:D10": { "outline": "medium" } } (outline: a border round the range). A style: b, i, u, s (struck through), color and fill (#hex), align (left, center, right), valign (top, middle, bottom), wrap, fmt, dp, cur, size (pt), font (Arial, Calibri, Cambria, Courier New, Georgia, Times New Roman, Trebuchet MS, Verdana), rot (degrees, -90 to 90), border on all four sides or bt, br, bb, bl for one ("thin", "medium", "thick", "dashed", "dotted" or "double", a colour after it: "thin #999999").',
   'More a sheet may have: merges: ["A1:D1"] (cells merged into one; its first cell holds what it shows); hidden: { rows: [5, "8:9"], cols: ["C"] }; notes: { "B2": "Checked by Sam" } (or note on a cell object); filter: { range: "A1:D40", cols: { "C": { when: { op: "gt", a: "100" } }, "D": { hide: ["Done"] } } } (buttons on the header row; the rows it hides are hidden, not removed, and formulas still count them); conditional: [{ range: "C2:C40", when: { op: "gt", a: "100" }, style: { fill: "#fce8e6", color: "#c5221f", b: true } }, { range: "D2:D40", scale: ["#f8696b", "#ffeb84", "#63be7b"] }, { range: "E2:E40", bar: "#638ec6" }] (a condition’s op: empty, notEmpty, contains, notContains, starts, ends, is, eq, neq, gt, gte, lt, lte, between and notBetween with a and b, dateIs, before and after with a date or today, tomorrow, yesterday, week, month, year, formula with a: "=$C2>100" written for the range’s first cell; for conditional formatting also dup, unique, top and bottom with a: how many (b: "%" for a share), above and below the average; rules in order, the first that holds gives its look); validation: [{ range: "D2:D40", list: ["Open", { "v": "Done", "color": "#d9ead3" }] }, { range: "E2:E40", checkbox: true }, { range: "F2:F40", rating: 5 }, { range: "G2:G40", type: "number", when: { op: "between", a: "0", b: "100" }, reject: true }, { range: "H2:H40", source: "Lists!A1:A9" }] (lists show coloured chips and a dropdown, checkboxes hold TRUE or FALSE, ratings 0 to 5 stars; type also date, length and formula; reject refuses other input, else it is kept with a warning); charts: [{ kind: "line", range: "A1:C13", title: "Sales", at: "E2", w: 480, h: 300 }] (kind: column, bar, line, area, pie, doughnut or scatter; series down the columns, or by: "rows"; the first column as labels and the first row as names when they hold words, or labels and names: true or false; legend: bottom, right, top or none; xTitle, yTitle, colors, stacked; at a cell, or x and y in px from A1’s corner).',
   'A sheet may come from a file of this session instead: file: "data.csv" (CSV, TSV, .xlsx or .ods; from the session’s folder, ~ or absolute; sheet: which of an Excel file’s sheets), with rows, cells and formats given too going on top. file beside title (no sheets) makes the whole workbook from an .xlsx or .ods file.',
@@ -264,14 +268,16 @@ export const SAVE_SHEET_SCHEMA = {
 export function csvOfBook(book: Workbook, sheet = 0, calc: Calc = computeBook(book)): string {
   const si = book.sheets[sheet] ? sheet : 0;
   const sh = book.sheets[si];
-  const e = calc.extent(si);
+  const e = calc.shownExtent(si);
   const field = (s: string) => (/[",\r\n]/.test(s) || /^\s|\s$/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
   const lines: string[] = [];
   for (let r = 0; r < e.rows; r++) {
     const row: string[] = [];
     for (let c = 0; c < e.cols; c++) {
       const cell = sh.cells[refName(r, c)];
-      row.push(cell ? field(formatValue(calc.value(si, r, c), cell.s)) : '');
+      // A cell's value, or what a formula spilled into it.
+      const v = calc.value(si, r, c);
+      row.push(cell || v !== null ? field(formatValue(v, cell?.s)) : '');
     }
     lines.push(row.join(','));
   }
@@ -291,7 +297,7 @@ const xlHeight = (px: number) => Math.round(px * 0.75 * 100) / 100;
 const argb = (hex: string) => `FF${hex.slice(1).toUpperCase()}`;
 const xnum = (n: number) => (Object.is(n, -0) ? '0' : String(n));
 /** Excel knows only its own errors: a formula that needs itself is written as #REF!. */
-const xlError = (e: CellError) => (e.code === '#CIRC!' ? '#REF!' : e.code === '#ERROR!' ? '#VALUE!' : e.code);
+const xlError = (e: CellError) => (e.code === '#CIRC!' ? '#REF!' : e.code === '#ERROR!' || e.code === '#SPILL!' ? '#VALUE!' : e.code);
 
 /** Excel's own number formats by their codes: a code that is one of them is written by its id. */
 const BUILTIN_IDS = new Map<string, number>([
@@ -416,10 +422,18 @@ interface SheetLinks {
 }
 
 function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings, names: Set<string>, links: SheetLinks = {}): string {
-  const e = calc.extent(si);
+  const e = calc.shownExtent(si);
   // Rows hidden by hand, or by the filter (Excel writes those hidden too, and its filter says why).
   const hidden = hiddenRows(sh, si, calc);
+  // Formulas that spilled: written as array formulas over the cells they fill, with the values they spilled there.
+  const spilt = new Map<number, string>();
+  const ghosts: [number, number, Scalar, CellStyle | undefined][] = [];
+  for (const { r, c, sp } of calc.spillsOf(si)) {
+    spilt.set(pack(r, c), rangeName({ r1: r, c1: c, r2: r + sp.h - 1, c2: c + sp.w - 1 }));
+    for (let i = 0; i < sp.h; i++) for (let j = 0; j < sp.w; j++) if ((i || j) && !sh.cells[refName(r + i, c + j)]) ghosts.push([r + i, c + j, sp.d[i * sp.w + j], sh.cells[refName(r, c)]?.s]);
+  }
   const rows = new Map<number, string[]>();
+  const order = new Map<string, number>();
   for (const k of calc.keys(si)) {
     const r = unpackR(k);
     const c = unpackC(k);
@@ -431,7 +445,8 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
       const v = calc.value(si, r, c);
       const s = st.index(cell.s, v);
       const a = `r="${ref}"${s ? ` s="${s}"` : ''}`;
-      const f = `<f>${xesc(fileFormula(cell.f, names))}</f>`;
+      const arrayRef = spilt.get(k);
+      const f = arrayRef ? `<f t="array" ref="${arrayRef}">${xesc(fileFormula(cell.f, names))}</f>` : `<f>${xesc(fileFormula(cell.f, names))}</f>`;
       if (typeof v === 'number') xml = `<c ${a}>${f}<v>${xnum(v)}</v></c>`;
       else if (typeof v === 'string') xml = `<c ${a} t="str">${f}<v>${xesc(v)}</v></c>`;
       else if (typeof v === 'boolean') xml = `<c ${a} t="b">${f}<v>${v ? 1 : 0}</v></c>`;
@@ -451,7 +466,29 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     let list = rows.get(r);
     if (!list) rows.set(r, (list = []));
     list.push(xml);
+    order.set(xml, c);
   }
+  for (const [r, c, v, style] of ghosts) {
+    const s = st.index(style, v);
+    const a = `r="${refName(r, c)}"${s ? ` s="${s}"` : ''}`;
+    const xml =
+      typeof v === 'number'
+        ? `<c ${a}><v>${xnum(v)}</v></c>`
+        : typeof v === 'string'
+          ? `<c ${a} t="str"><v>${xesc(v)}</v></c>`
+          : typeof v === 'boolean'
+            ? `<c ${a} t="b"><v>${v ? 1 : 0}</v></c>`
+            : v instanceof CellError
+              ? `<c ${a} t="e"><v>${xlError(v)}</v></c>`
+              : '';
+    if (!xml) continue;
+    let list = rows.get(r);
+    if (!list) rows.set(r, (list = []));
+    list.push(xml);
+    order.set(xml, c);
+  }
+  // Each row's cells left to right (what spilled went in after the cells of their own).
+  for (const list of rows.values()) if (ghosts.length) list.sort((x, y) => (order.get(x) ?? 0) - (order.get(y) ?? 0));
   for (const k of Object.keys(sh.rows ?? {})) if (!rows.has(Number(k))) rows.set(Number(k), []);
   for (const r of hidden) if (!rows.has(r)) rows.set(r, []);
   const body = [...rows.keys()]
@@ -883,6 +920,8 @@ function readWorksheet(xml: string, name: string, shared: string[], styles: { s?
   const cols: Record<number, { w?: number; hidden?: boolean }> = {};
   const rows: Record<number, { h?: number; hidden?: boolean }> = {};
   const merges: string[] = [];
+  // Array formulas of the functions that spill here, by the cells they fill.
+  const arrays: Rect[] = [];
   // What formulas gave when the file was saved, to know what a filter's rows show.
   const cached = new Map<string, string | number | boolean>();
   let freeze: { rows?: number; cols?: number } | undefined;
@@ -900,12 +939,18 @@ function readWorksheet(xml: string, name: string, shared: string[], styles: { s?
   const finish = () => {
     const { r, c, s, t } = cur!;
     if (r >= SHEET_LIMITS.rows || c >= SHEET_LIMITS.cols) return void (state.cutRows = true);
+    // A cell an array formula that spills here fills: its value is the formula's again, not the cell's own.
+    if (!f && arrays.some((x) => r >= x.r1 && r <= x.r2 && c >= x.c1 && c <= x.c2 && !(r === x.r1 && c === x.c1))) return;
     let formula: string | undefined;
     if (fa && fa.t === 'shared' && fa.si !== undefined) {
       if (f) masters.set(fa.si, { f, r, c });
       const m = masters.get(fa.si);
       if (m) formula = f || shiftFormula(m.f, r - m.r, c - m.c);
-    } else if (fa && fa.t !== 'dataTable' && f) formula = f;
+    } else if (fa && fa.t !== 'dataTable' && f) {
+      formula = f;
+      const x = fa.t === 'array' && fa.ref ? parseRange(fa.ref) : null;
+      if (x && (x.r1 !== x.r2 || x.c1 !== x.c2) && spills(replaceNames(formulaFromFile(f), names))) arrays.push(x);
+    }
     const st = styles[s];
     let value: string | number | boolean | undefined;
     if (t === 's') value = shared[Number(v)] ?? '';
@@ -1376,6 +1421,15 @@ function tableHtml(sh: Sheet, si: number, calc: Calc, o: TableOpts, cls: CssClas
   const merges = new Merges(sh.merges);
   const cf = new CondFormats(sh, si, calc);
   const rules = new Rules(sh);
+  // What formulas spilled into cells that hold nothing, in their formula's number format.
+  const ghosts = new Map<string, Cell>();
+  for (const { r, c, sp } of calc.spillsOf(si))
+    for (let i = 0; i < Math.min(sp.h, o.rows - r); i++)
+      for (let j = 0; j < Math.min(sp.w, o.cols - c); j++) {
+        const k = refName(r + i, c + j);
+        const v = sp.d[i * sp.w + j];
+        if ((i || j) && !sh.cells[k]?.v && sh.cells[k]?.f === undefined && v !== null && typeof v !== 'object') ghosts.set(k, { v, ...(sh.cells[refName(r, c)]?.s ? { s: sh.cells[refName(r, c)]!.s } : {}) });
+      }
   // As wide as its columns (wider when there is room: the last column takes it), never squeezed narrower.
   let total = numW;
   for (const c of colsShown) total += w(c);
@@ -1406,7 +1460,7 @@ function tableHtml(sh: Sheet, si: number, calc: Calc, o: TableOpts, cls: CssClas
         const firstShown = rowsShown.find((x) => x >= m.r1 && x <= m.r2) === r && colsShown.find((x) => x >= m.c1 && x <= m.c2) === c;
         if (!firstShown) continue;
       }
-      const cell = sh.cells[refName(m ? m.r1 : r, m ? m.c1 : c)];
+      const cell = ghosts.get(refName(m ? m.r1 : r, m ? m.c1 : c)) ?? sh.cells[refName(m ? m.r1 : r, m ? m.c1 : c)];
       const sticky: string[] = [];
       if (frozenRow) sticky.push(`top:${top[r]}px`);
       if (c < fc) sticky.push(`left:${left[c]}px`);
@@ -1435,7 +1489,7 @@ function tableHtml(sh: Sheet, si: number, calc: Calc, o: TableOpts, cls: CssClas
         row.push(`<td${attrs()}></td>`);
         continue;
       }
-      const v = cell.v === undefined && cell.f === undefined ? null : calc.value(si, rr, cc);
+      const v = cell.v === undefined && cell.f === undefined ? null : ghosts.has(refName(rr, cc)) ? cell.v! : calc.value(si, rr, cc);
       const text = formatValue(v, s);
       if (isError(v)) classes.push('e');
       else if (typeof v === 'number') classes.push('n');
@@ -1539,7 +1593,7 @@ export function bookPage(book: Workbook, title: string, mode: 'viewer' | 'print'
     `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><meta name="generator" content="Hydor sheets"><style>${css}`;
   if (mode === 'still') {
     const sh = book.sheets[0];
-    const e = calc.extent(0);
+    const e = calc.shownExtent(0);
     const k = 1.25;
     let cols = 0;
     for (let x = Math.round(NUM_W * k); x < 1280 && cols < SHEET_LIMITS.cols; cols++) x += sh.cols?.[cols]?.hidden ? 0 : Math.round((sh.cols?.[cols]?.w ?? COL_W) * k);
@@ -1553,7 +1607,7 @@ export function bookPage(book: Workbook, title: string, mode: 'viewer' | 'print'
   if (mode === 'print') {
     const parts: string[] = [];
     book.sheets.forEach((sh, si) => {
-      const e = calc.extent(si);
+      const e = calc.shownExtent(si);
       if (!e.rows && book.sheets.length > 1) return;
       const rows = Math.min(e.rows, PRINT_ROWS);
       const width = Array.from({ length: e.cols }, (_, c) => sh.cols?.[c]?.w ?? COL_W).reduce((a, b) => a + b, 0);
@@ -1569,7 +1623,7 @@ export function bookPage(book: Workbook, title: string, mode: 'viewer' | 'print'
   }
   const sections: string[] = [];
   book.sheets.forEach((sh, si) => {
-    const e = calc.extent(si);
+    const e = calc.shownExtent(si);
     const rows = Math.min(e.rows, VIEW_ROWS);
     const cols = Math.min(e.cols, VIEW_COLS);
     // At least a screen's worth of empty grid, so a short sheet still looks like one.

@@ -15,7 +15,7 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { accountingParts, adjustForDelete, adjustForInsert, bookText, cleanBorder, codeColor, computeBook, formatValue, inputText, normalizeBook, parseInput, renameSheet, type Workbook } from '../../shared/sheets.ts';
 import { allowed, CondFormats, filterHidden, hiddenRows, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { chartData, chartSvg } from '../../shared/sheet-chart.ts';
-import { bookForAgent, bookPage, importBook, xlsxOfBook } from './sheets.ts';
+import { bookForAgent, bookPage, csvOfBook, importBook, xlsxOfBook } from './sheets.ts';
 import { Zip } from '../documents/zip.ts';
 import { pages } from './index.ts';
 
@@ -229,6 +229,58 @@ const sh = book.sheets[0];
   ok(sb.A1.s?.code === '#,##0;[Red]-#,##0' && sb.A1.s.bt === 'thick #ff0000' && sb.A1.s.font === 'Verdana' && sb.A1.s.rot === -30, 'a code, borders, a font and turned words come back from Excel');
   ok(sb.A2.s?.fmt === 'datetime' && sb.A3.s?.fmt === 'accounting' && sb.A3.s.cur === '€', 'and the new formats too');
   void calc;
+}
+
+// ---- arrays that spill ----------------------------------------------------------------------------------------------
+{
+  const b = normalizeBook({
+    sheets: [
+      {
+        name: 'A',
+        rows: [
+          ['Name', 'Team', 'Score'],
+          ['Ann', 'Red', 7],
+          ['Bo', 'Blue', 3],
+          ['Cy', 'Red', 9],
+          ['Di', 'Blue', 5],
+        ],
+        cells: {
+          E1: '=SEQUENCE(3,2,10,5)',
+          H1: '=SORT(A2:C5,3,-1)',
+          L1: '=FILTER(A2:A5,C2:C5>4)',
+          M1: '=UNIQUE(B2:B5)',
+          N1: '=SUM(L1:L5)',
+          O1: '=COUNTA(L1:L5)',
+          P1: '=SORTBY(A2:A5,B2:B5,1,C2:C5,-1)',
+          Q1: '=FILTER(A2:A5,C2:C5>100,"none")',
+          R1: '=SEQUENCE(3)',
+          R2: 'in the way',
+          S1: '=M2&"!"',
+        },
+      },
+    ],
+  });
+  const calc = computeBook(b);
+  const id = b.sheets[0].id;
+  const g = (k: string) => calc.get(id, k);
+  ok(g('E1') === 10 && g('F1') === 15 && g('E2') === 20 && g('F3') === 35, 'SEQUENCE spills rows and columns from its cell');
+  ok(g('H1') === 'Cy' && g('J1') === 9 && g('H4') === 'Bo' && g('J4') === 3, 'SORT spills the rows by a column, highest first');
+  ok(g('L1') === 'Ann' && g('L2') === 'Cy' && g('L3') === 'Di' && g('L4') === null, 'FILTER keeps the rows whose test holds');
+  ok(g('M1') === 'Red' && g('M2') === 'Blue' && g('M3') === null, 'UNIQUE gives each value once');
+  ok(g('N1') === 0 && g('O1') === 3, 'what spilled counts in other formulas');
+  ok(g('P1') === 'Di' && g('P2') === 'Bo' && g('P3') === 'Cy' && g('P4') === 'Ann', 'SORTBY sorts by other ranges in turn');
+  ok(g('Q1') === 'none', 'FILTER with nothing left gives what it is told to');
+  ok((g('R1') as { code?: string })?.code === '#SPILL!' && g('R3') === null, 'an array with no room to spill is #SPILL!');
+  ok(g('S1') === 'Blue!', 'a spilled cell is read like any other');
+  ok(calc.spillsOf(0).length === 5 && calc.shownExtent(0).rows === 5 && calc.extent(0).rows === 5, 'the arrays spilled are known, each with its cells');
+  const x = new Zip(xlsxOfBook(b, 'A')).text('xl/worksheets/sheet1.xml') ?? '';
+  ok(x.includes('<f t="array" ref="E1:F3">SEQUENCE(3,2,10,5)</f>') || x.includes('<f t="array" ref="E1:F3">_xlfn.SEQUENCE(3,2,10,5)</f>'), 'in Excel, a spilling formula is an array formula over the cells it fills');
+  ok(x.includes('_xlfn._xlws.SORT(') && /<c r="F3"[^>]*><v>35<\/v><\/c>/.test(x), 'with its prefix, and the values it spilled cached in their cells');
+  const back = importBook(xlsxOfBook(b, 'A'), 'A.xlsx').book.sheets[0];
+  ok(back.cells.E1?.f === 'SEQUENCE(3,2,10,5)' && !back.cells.F3 && back.cells.H1?.f === 'SORT(A2:C5,3,-1)' && !back.cells.I2, 'read back, the formulas spill again (their cells left empty for them)');
+  const csv = csvOfBook(b);
+  ok(csv.split('\r\n')[0].includes('10,15') && csv.includes('Cy,Red,9'), 'a CSV has what spilled');
+  ok(bookPage(b, 'A', 'viewer').includes('>35<'), 'and so does the workbook’s page');
 }
 
 // ---- the workbook's own page --------------------------------------------------------------------------------------

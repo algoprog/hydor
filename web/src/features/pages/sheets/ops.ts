@@ -247,10 +247,13 @@ export function copyOf(sh: Sheet, calc: Calc, si: number, x0: Rect): { clip: Cli
     const texts: string[] = [];
     const tds: string[] = [];
     for (let c = x.c1; c <= x.c2; c++) {
-      const cell = sh.cells[refName(r, c)] ?? null;
+      // What a formula spilled here is copied as the value it is.
+      const v = calc.value(si, r, c);
+      const own = sh.cells[refName(r, c)] ?? null;
+      const cell = own && holds(own) ? own : v !== null && typeof v !== 'object' && v !== '' ? { ...(own ?? {}), v } : own;
       row.push(cell);
-      vrow.push(cell && holds(cell) ? calc.value(si, r, c) : null);
-      const t = cell && holds(cell) ? formatValue(calc.value(si, r, c), cell.s) : '';
+      vrow.push(cell && holds(cell) ? v : null);
+      const t = cell && holds(cell) ? formatValue(v, cell.s) : '';
       texts.push(/[\t\n"]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t);
       const s = cell?.s;
       const css = [
@@ -494,7 +497,7 @@ export function indexAt(off: Float64Array, pos: number): number {
 
 /** How many rows and columns the grid shows: what the sheet holds and more to go on with, within its limits. */
 export function gridSize(calc: Calc, si: number): { rows: number; cols: number } {
-  const e = calc.extent(si);
+  const e = calc.shownExtent(si);
   return { rows: Math.min(SHEET_LIMITS.rows, Math.max(1000, e.rows + 200)), cols: Math.min(SHEET_LIMITS.cols, Math.max(26, e.cols + 10)) };
 }
 

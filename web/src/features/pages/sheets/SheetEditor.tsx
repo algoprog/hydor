@@ -1698,6 +1698,13 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         return [{ r1: Math.min(ra, rb), c1: Math.min(ca, cb), r2: Math.max(ra, rb), c2: Math.max(ca, cb), color: REF_COLORS[i % REF_COLORS.length] }];
       })
     : [];
+  // The array the active cell's formula spilled, or that spilled into it, outlined as spreadsheets outline it.
+  let spillFormula: string | undefined;
+  for (const { r, c, sp } of calc.spillsOf(sheetIx))
+    if (sel.r >= r && sel.r < r + sp.h && sel.c >= c && sel.c < c + sp.w) {
+      refs.push({ r1: r, c1: c, r2: r + sp.h - 1, c2: c + sp.w - 1, color: '#1a73e8' });
+      if (!active) spillFormula = inputText(sheet.cells[refName(r, c)]);
+    }
   // What find found on this sheet, marked (the current one most).
   if (find.open && matches.length)
     for (let i = 0; i < Math.min(matches.length, 400); i++) {
@@ -1924,6 +1931,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         onKey={onKey}
         onSuggest={suggest}
         barRef={barRef}
+        ghost={spillFormula}
       />
       <div className="relative flex min-h-0 flex-1">
         <Grid
