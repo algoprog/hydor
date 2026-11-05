@@ -278,7 +278,7 @@ export const PAGE_SHORTCUTS: ShortcutGroup[] = [
       ['Enter', 'A new block after this one (in a list, the next item)'],
       ['Shift+Enter', 'A line break in the block'],
       ['Backspace', 'At a block’s start: join it to the block before'],
-      ['Tab / Shift+Tab', 'Nest or un-nest a list’s item'],
+      ['Tab / Shift+Tab', 'Nest or un-nest a list’s item, or a block after a list'],
       ['↑ / ↓', 'From the first or last line: into the block above or below'],
       ['/', 'The blocks to add (in an empty block, or after a space)'],
       ['Esc', 'Stop writing, and pick the block'],

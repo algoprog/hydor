@@ -1,8 +1,9 @@
 // Script tests for the page editor (a page's Edit mode, editor.ts with writing.ts): writing as in Notion in a real
 // browser (Enter makes the next block, Backspace joins, Tab nests, Markdown as you type, "/" for blocks, Turn into,
 // colours, to-dos that tick, toggles, a table of contents, an icon and a cover, pictures dropped or pasted in, blocks
-// dragged into a column, several blocks picked, undo by the block), that nothing of the editor's own reaches the page it
-// gives back, the kit's styles for the blocks, and that a page made of them survives its exports (a web page, a PDF and
+// dragged into a column, several blocks picked, undo by the block, nested items that keep their place, Save from the
+// first letter), that nothing of the editor's own reaches the page it gives back, the kit's styles for the blocks, a page
+// in Use (links, a table of contents left empty), and that a page made of them survives its exports (a web page, a PDF and
 // a Word document when a browser is here). The browser parts run when this computer has a Chromium (Settings → Browser,
 // or Playwright's); ONLY=word runs those whose page has that word. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/page-editor-test.ts
@@ -383,7 +384,7 @@ if (canCapture()) {
     async (d) => {
       await d.write('#b', 'start');
       await d.cmd('turn', 'p');
-      same((await shape(d)).split('|').slice(0, 3).join('|'), 'ul>li:A|p:B|ul>li:C', 'a nested item turned into text keeps the items after it');
+      same((await shape(d)).split('|').slice(0, 3).join('|'), 'ul>li:A|ul>li>ul>li:B|ul>li>ul>li:C', 'a nested item turned into text keeps its place, and the items after it theirs');
       await d.write('#pa');
       await d.press('Enter');
       same(await d.js<boolean>('return !!document.getElementById("anchor")'), true, 'Enter leaves an empty anchor of the page’s where it was');
@@ -602,6 +603,51 @@ if (canCapture()) {
     await d.cmd('fill', { id: askV.id, href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', play: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', thumb: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', title: 'A song' });
     ok((await d.js<string>('const v = document.querySelector("a.n-video"); return v ? v.getAttribute("data-video") : ""')) === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'a video goes in as its still, linked to it');
   });
+
+  // ---- nested items keep their place: turned into text, a heading, a quote or a to-do, they stay under their parent ---------
+  await drive(
+    '<ul><li id="c">Clothes<ul><li id="s">Socks</li><li id="sh">Shirts<ul><li>Linen</li><li>Cotton</li></ul></li><li id="j">A jacket</li></ul></li><li>Papers</li></ul><p id="end">End</p>',
+    async (d) => {
+      const held = () => d.js<string>('return [...document.querySelectorAll("li.n-block")].map(li => li.firstElementChild.tagName + ":" + li.firstElementChild.textContent).join(",")');
+      await d.write('#sh', 'start');
+      await d.cmd('turn', 'p');
+      same(
+        await shape(d),
+        'ul>li:Clothes|ul>li>ul>li:Socks|ul>li>ul>li:Shirts|ul>li>ul>li>ul>li:Linen|ul>li>ul>li>ul>li:Cotton|ul>li>ul>li:A jacket|ul>li:Papers|p:End',
+        'an item under another turned into text stays where it was, with the items under it',
+      );
+      same(await held(), 'P:Shirts', 'its item holds the paragraph (li.n-block, no marker of its own)');
+      await d.type('!');
+      same(await held(), 'P:!Shirts', 'and writing goes on in it');
+      await d.press('End');
+      await d.press('Enter');
+      await d.type('Ties');
+      same(await held(), 'P:!Shirts,P:Ties', 'Enter at its end makes the next block at the same level');
+      same(await d.js<string>('const li = document.querySelectorAll("li.n-block")[1]; return [...li.querySelectorAll("li")].map(x => x.textContent).join(",")'), 'Linen,Cotton', 'which the items under it go with');
+      await d.cmd('turn', 'h3');
+      same(await held(), 'P:!Shirts,H3:Ties', 'a held block turned into a heading stays held');
+      await d.cmd('turn', 'bullet');
+      same(await held(), 'P:!Shirts', 'and into a bulleted list it is an item there again');
+      ok((await shape(d)).includes('ul>li>ul>li:Ties|ul>li>ul>li>ul>li:Linen'), 'with the items under it');
+      await d.write('#j', 'start');
+      await d.cmd('turn', 'quote');
+      same(await held(), 'P:!Shirts,BLOCKQUOTE:A jacket', 'an item turned into a quote stays in place too');
+      await d.press('Home');
+      await d.press('Backspace');
+      same(await held(), 'P:!Shirts,P:A jacket', 'Backspace at a held quote’s start makes it text, as anywhere');
+      await d.press('Backspace');
+      ok((await shape(d)).includes('ul>li:Clothes') && (await shape(d)).includes('|p:A jacket|ul>li:Papers'), `then takes it up a level: out of the list, where it was, from the list’s top (${await shape(d)})`);
+      await d.press('Tab');
+      same(await held(), 'P:!Shirts,P:A jacket', 'Tab puts a block under the list item before it');
+      await d.press('Tab', { shift: true });
+      ok((await shape(d)).includes('|p:A jacket|ul>li:Papers'), 'and Shift+Tab takes it back out');
+      await d.write('#s', 'start');
+      await d.cmd('turn', 'todo');
+      same(await d.js<string>('const li = document.querySelector("#c ul.n-todo > li"); return li ? li.textContent : "none"'), 'Socks', 'an item under another turned into a to-do stays under it too');
+      const out = await d.html();
+      ok(/<li id="sh" class="n-block"><p>!Shirts<\/p><\/li>/.test(out), 'the page given back keeps held blocks as the kit draws them');
+    },
+  );
 
   // ---- what the second round found: an empty table of contents, Save from the first letter, code from an empty block -------
   await drive('<h1 id="t">Plan</h1><nav class="n-toc"></nav><h2>Days</h2><p id="a">Words</p>', async (d) => {

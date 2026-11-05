@@ -68,7 +68,7 @@ Once you write in a paragraph, a heading or a list, the words flow from block to
 
 - **Enter** at the end of a block makes the next one and puts the caret in it: a paragraph after a heading, the next item in a list. Enter in the middle splits the block in two; Enter in an empty item leaves the list. **Shift+Enter** is a line break in the same block.
 - **Backspace** at the start of a block joins it to the block before (an empty block goes). At the start of a list's item it first takes the item up a level, or out of the list; at the start of a quote, a callout, a toggle or code it turns it into a paragraph; at the start of a block after a picture or a line across, it picks that part, so another Backspace deletes it.
-- **↑** and **↓** on the first or last line go on into the block above or below; **Tab** and **Shift+Tab** nest a list's item under the one before it and take it back out.
+- **↑** and **↓** on the first or last line go on into the block above or below; **Tab** and **Shift+Tab** nest a list's item under the one before it and take it back out. Tab in a paragraph (or any block) right after a list puts it under the list's last item, as in Notion; Shift+Tab takes it back out.
 - An empty block shows a quiet hint ("Type ‘/’ for commands", "Heading 1", "To-do", "List") that is never part of the page.
 - Click below the last block to start a new paragraph at the end; the **+** under the last block does the same and lists the blocks to add.
 - To-dos tick in **Edit** too (a click on the box), and the page keeps the tick; a toggle's triangle opens or folds it. In **Use**, to-dos tick and toggles open and fold as anywhere.
@@ -90,7 +90,7 @@ Drop a picture from your computer onto the page, or paste one, and it lands wher
 Point at a block and two buttons show in the margin on its left:
 
 - **+** adds a block under it and opens the list of blocks (Alt-click adds it above).
-- **⋮⋮** moves it: drag it up or down, and a line shows where it lands, between blocks or into an empty column. Click it for the block's menu: **Turn into** (any kind of block, keeping its words), **Colour** (a colour for its words, or one behind the whole block, from a palette that suits light and dark pages), **Add a block below**, **Duplicate**, **Move up**, **Move down**, **Copy**, **Delete** and, in a conversation, **Ask the agent** (it puts a note in your message box saying which block you mean).
+- **⋮⋮** moves it: drag it up or down, and a line shows where it lands, between blocks or into an empty column. Click it for the block's menu: **Turn into** (any kind of block, keeping its words; an item of a nested list turned into text, a heading, a quote or a to-do stays where it was, under its parent item, and the items under it stay under it), **Colour** (a colour for its words, or one behind the whole block, from a palette that suits light and dark pages), **Add a block below**, **Duplicate**, **Move up**, **Move down**, **Copy**, **Delete** and, in a conversation, **Ask the agent** (it puts a note in your message box saying which block you mean).
 
 On a phone, tap a block to pick it, then tap its handle (⠿) on the bar beside it for the same menu.
 

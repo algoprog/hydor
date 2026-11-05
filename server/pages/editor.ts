@@ -186,6 +186,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing) {
     if (c?.contains('n-icon')) return L('icon', 'Icon');
     if (c?.contains('n-video')) return L('video', 'Video');
     if (c?.contains('n-math')) return L('sMath', 'Maths');
+    // An item that holds a block under its parent item (writing.ts) is named by that block: "Heading 3", "Text".
+    if (el.tagName === 'LI' && c?.contains('n-block') && el.firstElementChild && !/^(UL|OL)$/.test(el.firstElementChild.tagName)) return nameOf(el.firstElementChild);
     if (el.tagName === 'LI' && el.parentElement?.classList.contains('n-todo')) return L('phTodo', 'To-do');
     if (c?.contains('n-todo')) return L('sTodo', 'To-do list');
     return NAMES[el.tagName.toUpperCase()] ?? L('box', 'Block');
