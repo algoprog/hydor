@@ -29,11 +29,15 @@ export interface CanvasHandle {
   endCrop(keep: boolean): void;
 }
 
-/** A match of Find to mark: in a part's paragraph, or a table's cell, [s, e) of its text. */
+/** A match of Find to mark: in a part's paragraph, a table's cell or a chart's words ([s, e) of their text), or an equation's LaTeX (the equation). */
 export interface FindMark {
   id: string;
   para?: number;
   cell?: [number, number];
+  /** A chart's words the match is in (its title, a label, a series' name). */
+  chart?: string;
+  /** In an equation's LaTeX: the equation is marked whole. */
+  tex?: boolean;
   s: number;
   e: number;
   current: boolean;
@@ -410,10 +414,26 @@ export const SlideCanvas = forwardRef<
     const out: typeof hl = [];
     for (const m of marks) {
       const part = nodeOf(m.id);
+      const put = (b: DOMRect) => out.push({ x: b.left - st.left, y: b.top - st.top, w: b.width, h: b.height, current: m.current });
+      // An equation: what KaTeX drew of it (its LaTeX is not on the slide).
+      if (m.tex) {
+        const drawn = part?.querySelector('.ns-mi') ?? part;
+        if (drawn) put(drawn.getBoundingClientRect());
+        continue;
+      }
+      // A chart's words, where it draws them (a series' name is in the legend; without one, the chart is marked).
+      if (m.chart !== undefined) {
+        const t = Array.from(part?.querySelectorAll('text') ?? []).find((x) => x.textContent === m.chart);
+        const rr = t ? textRange(t, m.s, m.e) : null;
+        const rects = rr ? Array.from(rr.getClientRects()) : [];
+        if (rects.length) rects.forEach(put);
+        else if (t ?? part) put((t ?? part)!.getBoundingClientRect());
+        continue;
+      }
       const root = m.cell ? part?.querySelector(`td[data-r="${m.cell[0]}"][data-c="${m.cell[1]}"]`) : part?.querySelectorAll(':scope > .ns-txt > .ns-p')[m.para ?? 0];
       const r = root ? textRange(root, m.s, m.e) : null;
       if (!r) continue;
-      for (const b of Array.from(r.getClientRects())) out.push({ x: b.left - st.left, y: b.top - st.top, w: b.width, h: b.height, current: m.current });
+      for (const b of Array.from(r.getClientRects())) put(b);
     }
     setHl(out);
   }, [marks, slide, k, size.w, size.h, fonts]);

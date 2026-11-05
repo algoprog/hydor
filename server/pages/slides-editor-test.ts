@@ -21,6 +21,7 @@ import { deckPage, lucideIcon, RUNTIME_SRC } from './slides.ts';
 import { pages } from './index.ts';
 import { sweepAssets } from './assets.ts';
 import { getVideo } from './videos.ts';
+import { findInDeck, replaceAllInDeck, replaceHit } from '../../web/src/features/pages/slides/find.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -605,6 +606,33 @@ const dot: Picture = { data: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
   const flow = (await req('GET', `/api/pages/${idOf(saved.text)}`)).json().model as Deck;
   const fl = flow.slides[0].els.find((e) => e.type === 'line') as Extract<El, { type: 'line' }>;
   ok(fl.from?.el === 'p' && fl.to?.el === 'q' && fl.x === 300 && fl.y === 350 && fl.w === 400 && fl.route === 'elbow', 'an agent joins two parts with a connector by their ids');
+}
+
+// ---- find and replace in charts and equations -----------------------------------------------------------------
+{
+  const d = normalizeDeck({
+    slides: [
+      {
+        els: [
+          { id: 'ch', type: 'chart', title: 'Sales North', labels: ['North', 'South'], series: [{ name: 'North shops', values: [1, 2] }] },
+          { id: 'eq', type: 'math', tex: '\\frac{north}{2}' },
+        ],
+      },
+    ],
+  });
+  const o = { matchCase: false, wholeWord: false, regex: false };
+  const hits = findInDeck(d, 'north', o);
+  ok(
+    hits.length === 4 && hits.some((h) => h.where === 'chart' && h.field === 'title') && hits.some((h) => h.field === 'label' && h.n === 0) && hits.some((h) => h.field === 'series' && h.n === 0) && hits.some((h) => h.where === 'tex' && h.id === 'eq'),
+    'Find sees a chart’s title, labels and series’ names, and an equation’s LaTeX',
+  );
+  const one = replaceHit(d, hits.find((h) => h.field === 'label')!, 'north', 'Nord', o);
+  const ch1 = one.slides[0].els[0] as Extract<El, { type: 'chart' }>;
+  ok(ch1.labels[0] === 'Nord' && ch1.title === 'Sales North', 'Replace changes the one match, in a chart’s label');
+  const all = replaceAllInDeck(d, 'north', 'Nord', o);
+  const ch2 = all.deck.slides[0].els[0] as Extract<El, { type: 'chart' }>;
+  const eq2 = all.deck.slides[0].els[1] as Extract<El, { type: 'math' }>;
+  ok(all.count === 4 && ch2.title === 'Sales Nord' && ch2.labels[0] === 'Nord' && ch2.series[0].name === 'Nord shops' && eq2.tex === '\\frac{Nord}{2}', 'Replace all changes them everywhere, the LaTeX too');
 }
 
 // ---- the deck's own page, and agents ------------------------------------------------------------------------------
