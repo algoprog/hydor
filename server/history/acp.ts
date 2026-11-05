@@ -260,6 +260,7 @@ export class AcpParser {
         this.turn = null;
         this.stats.turns++;
         this.act?.bump(ts, 'turns');
+        if (t && ts && ts > t.start) this.stats.workMs = (this.stats.workMs ?? 0) + (ts - t.start);
         const status = m.stopReason === 'cancelled' ? 'interrupted' : m.stopReason === 'end_turn' || m.stopReason === 'max_turn_requests' ? 'completed' : m.error ? 'failed' : 'completed';
         if (m.error) this.upsert({ kind: 'system', id: `err:${t?.id ?? this.seq++}`, seq: 0, ts, level: 'error', text: firstLine(String(m.error), 300), detail: String(m.error) });
         else if (m.stopReason && !['end_turn', 'cancelled'].includes(m.stopReason))

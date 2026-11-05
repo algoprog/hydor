@@ -268,6 +268,7 @@ export class ClaudeParser {
     if (!t) return;
     this.turn = null;
     if (!t.last || t.last <= t.start) return;
+    this.stats.workMs = (this.stats.workMs ?? 0) + (t.last - t.start);
     this.upsert({
       kind: 'turn',
       id: `turn:${t.id}`,

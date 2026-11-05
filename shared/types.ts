@@ -223,6 +223,8 @@ export interface SessionStats {
   costUsd?: number;
   /** Active generation time (ms): summed TTFT+decode per assistant reply, excluding tool runs and idle. Output throughput = tokensOut / genMs. */
   genMs?: number;
+  /** Time spent working (ms): the finished turns' lengths added up, each from its message to the agent's last step. */
+  workMs?: number;
 }
 
 export interface BackgroundTask {

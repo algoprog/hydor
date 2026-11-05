@@ -51,6 +51,7 @@ create table if not exists sessions (
   tokens_cached integer not null default 0,
   cost_usd real,
   gen_ms integer not null default 0,
+  work_ms integer not null default 0,
   parent_key text,
   hidden integer not null default 0,
   bg_tasks text
@@ -146,6 +147,11 @@ export function openDb(file = paths.db): DB {
   if (!cols.has('gen_ms')) {
     try {
       db.exec('alter table sessions add column gen_ms integer not null default 0');
+    } catch {} // the indexer's connection got there first
+  }
+  if (!cols.has('work_ms')) {
+    try {
+      db.exec('alter table sessions add column work_ms integer not null default 0');
     } catch {} // the indexer's connection got there first
   }
   const appCols = new Set((db.prepare('pragma table_info(app_sessions)').all() as { name: string }[]).map((c) => c.name));

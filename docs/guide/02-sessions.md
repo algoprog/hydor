@@ -135,7 +135,7 @@ At the top of a session:
 The conversation reads like a chat. Each turn is your message, the agent's work, and the reply it ended on:
 
 - **Your message** shows on the right, with its pictures and attached files. A long one folds to its first lines; **Show more** opens it.
-- **The work** sits under a line that sums it up: "Worked for 2m 10s · 3 commands", "Thought", "Stopped after 40s" or "Failed after 5s", with the tokens used on the right. While the turn runs, the line says "Working · 1m 2s" (or "Waiting for you") and the work shows as it happens. A finished turn folds its work away; click the line to open it.
+- **The work** sits under a line that sums it up: "Worked for 2m 10s · 3 commands", "Thought", "Stopped after 40s" or "Failed after 5s", with the tokens used on the right. While the turn runs, the line says "Working · 1m 2s" (or "Waiting for you") and the work shows as it happens; after earlier turns it adds how long the session has worked in all, all its turns together: "Working · 1m 2s · 47m in all". A finished turn folds its work away; click the line to open it.
 - **Steps** are named in plain words: "Run the tests", "Read index.ts", "Searched the web", with the command itself in quieter type. Steps in a row fold into one box that says what was done ("Ran 3 commands, made 2 edits, read 4 files"), showing the step under way while one is. A long turn shows its latest steps; **Show earlier work** shows the rest.
 - **Thoughts** show as "Thought for 12s" with their first heading; click to read them.
 - **The reply** is what the agent wrote after its last step. Pages the agent showed sit with it.

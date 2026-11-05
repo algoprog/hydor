@@ -292,6 +292,7 @@ export class CodexParser {
     this.turnId = undefined;
     this.turnItems = false;
     const dur = durationMs ?? (ts && this.turnStart ? ts - this.turnStart : undefined);
+    if (dur && dur > 0) this.stats.workMs = (this.stats.workMs ?? 0) + dur;
     // Codex gives per-turn wall time only, so throughput here is output over the whole turn (includes tool runs).
     if (dur && this.turnTokens.out > 0) {
       const g = Math.min(dur, GEN_MS_CAP);

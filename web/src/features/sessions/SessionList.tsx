@@ -29,7 +29,7 @@ import type { FolderSource } from '../../lib/origin';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat } from '../../components/DiffView';
 import { Button, cx, Dialog, IconButton, Throbber, MenuItem, MenuLabel, MenuSep, Popover, useConfirm, useMediaQuery } from '../../components/ui';
-import { Elapsed } from '../session/items';
+import { WorkTime } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
 import { loadSpaces, useSpaces } from '../spaces/state';
@@ -69,11 +69,7 @@ export function ActivityText({ s, className }: { s: SessionSummary; className?: 
     return (
       <span className={cx('flex min-w-0 items-center gap-1 text-busy', className)}>
         <span className="truncate">{a.status === 'starting' ? 'Starting' : `Working${where}`}</span>
-        {since ? (
-          <span className="tnum shrink-0">
-            · <Elapsed since={since} />
-          </span>
-        ) : null}
+        <WorkTime since={since} before={s.stats?.workMs} />
       </span>
     );
   }

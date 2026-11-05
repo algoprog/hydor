@@ -92,6 +92,7 @@ interface Row {
   tokens_cached: number;
   cost_usd: number | null;
   gen_ms: number;
+  work_ms: number;
   bg_tasks: string | null;
   parent_key: string | null;
   // app_sessions
@@ -124,7 +125,7 @@ interface Row {
 const SELECT = `
   select s.key, s.agent, s.id, s.path, s.size, s.cwd, s.git_branch, s.title, s.first_prompt, s.last_prompt, s.model, s.source,
     s.created_at, s.updated_at, s.user_msgs, s.assistant_msgs, s.tool_calls, s.commands, s.bg_commands, s.files_changed,
-    s.lines_added, s.lines_removed, s.turns, s.tokens_in, s.tokens_out, s.tokens_cached, s.cost_usd, s.gen_ms, s.bg_tasks, s.parent_key,
+    s.lines_added, s.lines_removed, s.turns, s.tokens_in, s.tokens_out, s.tokens_cached, s.cost_usd, s.gen_ms, s.work_ms, s.bg_tasks, s.parent_key,
     a.title as app_title, a.cwd as app_cwd, a.agent as app_agent, a.first_prompt as app_first_prompt, a.archived, a.pinned,
     a.created_by_app, a.model as pref_model, a.effort as pref_effort, a.mode as pref_mode, a.created_at as app_created,
     a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent, a.extra
@@ -135,7 +136,7 @@ const SELECT_APP_ONLY = `
     null as title, a.first_prompt, null as last_prompt, a.model, 'web' as source, a.created_at, a.updated_at,
     0 as user_msgs, 0 as assistant_msgs, 0 as tool_calls, 0 as commands, 0 as bg_commands, 0 as files_changed,
     0 as lines_added, 0 as lines_removed, 0 as turns, 0 as tokens_in, 0 as tokens_out, 0 as tokens_cached, null as cost_usd,
-    0 as gen_ms, null as bg_tasks, null as parent_key, a.title as app_title, a.cwd as app_cwd, a.agent as app_agent, a.first_prompt as app_first_prompt, a.archived, a.pinned,
+    0 as gen_ms, 0 as work_ms, null as bg_tasks, null as parent_key, a.title as app_title, a.cwd as app_cwd, a.agent as app_agent, a.first_prompt as app_first_prompt, a.archived, a.pinned,
     a.created_by_app, a.model as pref_model, a.effort as pref_effort, a.mode as pref_mode, a.created_at as app_created,
     a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent, a.extra
   from app_sessions a where not exists (select 1 from sessions s where s.key = a.key)`;
@@ -384,6 +385,7 @@ export class SessionManager extends EventEmitter {
         tokensCached: r.tokens_cached,
         costUsd: r.cost_usd ?? undefined,
         genMs: r.gen_ms || undefined,
+        workMs: r.work_ms || undefined,
       },
       live: live ? { ...live.adapter.state } : null,
       external: live ? null : this.externalState(r),

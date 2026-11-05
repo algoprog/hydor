@@ -11,7 +11,7 @@ import { Button, cx, Throbber } from '../../components/ui';
 import { ApprovalCard } from './Approval';
 import { AgentIcon } from '../../components/AgentIcon';
 import { QuoteSelection } from './QuoteSelection';
-import { AssistantBlock, Elapsed, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UserBubble } from './items';
+import { AssistantBlock, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UserBubble, WorkTime } from './items';
 import { toolView } from '../registry';
 import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
 import type { SessionNote } from '@shared/features';
@@ -45,11 +45,7 @@ export function LiveHead({ agent, name, live }: { agent: Agent; name?: string; l
         {waiting ? 'Waiting for you' : live.status === 'starting' ? 'Starting' : 'Working'}
         {live.where ? ` in ${live.where}` : ''}
       </span>
-      {live.since && (
-        <span className="tnum text-fg-3">
-          · <Elapsed since={live.since} />
-        </span>
-      )}
+      <WorkTime since={live.since} before={live.worked} className="text-fg-3" />
     </>
   );
 }
@@ -383,6 +379,8 @@ function tailShowsStatus(items: TimelineItem[]): boolean {
 export interface LiveInfo {
   status: string;
   since?: number;
+  /** The turns before this one, their lengths added up (ms). */
+  worked?: number;
   where?: string;
   note?: string;
 }
@@ -695,6 +693,7 @@ export function Timeline({
   external?: ExternalState | null;
 }) {
   const tl = useTimeline((s) => s.byKey[sessionKey]);
+  const worked = useSessions((s) => s.byKey[sessionKey]?.stats?.workMs);
   const loadEarlier = useTimeline((s) => s.loadEarlier);
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -861,8 +860,8 @@ export function Timeline({
   const liveInfo: LiveInfo | null = !working
     ? null
     : ext
-      ? { status: ext.status, since: ext.since, where: ext.client, note: ext.detail === 'input needed' ? undefined : ext.detail }
-      : { status: live!.status, since: live!.turnStartedAt };
+      ? { status: ext.status, since: ext.since, worked, where: ext.client, note: ext.detail === 'input needed' ? undefined : ext.detail }
+      : { status: live!.status, since: live!.turnStartedAt, worked };
 
   // Only what arrives after the first load animates in; opening a session does not replay it all.
   const known = useRef<Set<string> | null>(null);

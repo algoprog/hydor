@@ -1,7 +1,7 @@
 import type { ActivityCounters, FileChange, SessionStats, TimelineItem, ToolInfo } from '../../shared/types.ts';
 
-/** Raising an agent's version re-reads all of its transcripts from the start (Claude 6: background tasks). */
-export const PARSE_VERSION = { claude: 12, codex: 7, acp: 1 } as const;
+/** Raising an agent's version re-reads all of its transcripts from the start (Claude 6: background tasks; 13, Codex 8, ACP 2: the time each session worked). */
+export const PARSE_VERSION = { claude: 13, codex: 8, acp: 2 } as const;
 
 export function emptyCounters(): ActivityCounters {
   return {
@@ -63,6 +63,7 @@ export function emptyStats(): SessionStats {
     tokensOut: 0,
     tokensCached: 0,
     genMs: 0,
+    workMs: 0,
   };
 }
 

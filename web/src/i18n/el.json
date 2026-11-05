@@ -12620,5 +12620,7 @@
 "UPPERCASE":"ΚΕΦΑΛΑΙΑ",
 "lowercase":"πεζά",
 "library saved pages html reports small tools tracker calculator checklist edit editor notion blocks slash slides decks presentations documents spreadsheets notebooks jupyter images pictures videos audio sounds music media kept export pdf word powerpoint projects spaces by project move":"βιβλιοθήκη αποθηκευμένες σελίδες html αναφορές μικρά εργαλεία καταγραφέας αριθμομηχανή λίστα επεξεργασία notion μπλοκ κάθετος διαφάνειες παρουσιάσεις έγγραφα υπολογιστικά φύλλα σημειωματάρια jupyter εικόνες βίντεο ήχος ήχοι μουσική πολυμέσα εξαγωγή pdf word powerpoint έργα χώροι ανά έργο μετακίνηση",
-"Saved to the Library: “{0}”":"Αποθηκεύτηκε στη Βιβλιοθήκη: «{0}»"
+"Saved to the Library: “{0}”":"Αποθηκεύτηκε στη Βιβλιοθήκη: «{0}»",
+"{0} in all":"{0} συνολικά",
+"The time it has worked in this session, all its turns together":"Πόσο έχει δουλέψει σε αυτή τη συνεδρία, όλοι οι γύροι της μαζί"
 }

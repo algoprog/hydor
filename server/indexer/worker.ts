@@ -149,11 +149,11 @@ const upsert = db.prepare(`
   insert into sessions (key, agent, id, path, size, mtime, offset, head, parse_version, state, cwd, git_branch, title,
     first_prompt, last_prompt, model, source, cli_version, created_at, updated_at, user_msgs, assistant_msgs, tool_calls,
     commands, bg_commands, files_changed, lines_added, lines_removed, turns, tokens_in, tokens_out, tokens_cached,
-    cost_usd, gen_ms, parent_key, hidden, bg_tasks)
+    cost_usd, gen_ms, work_ms, parent_key, hidden, bg_tasks)
   values (@key, @agent, @id, @path, @size, @mtime, @offset, @head, @parse_version, @state, @cwd, @git_branch, @title,
     @first_prompt, @last_prompt, @model, @source, @cli_version, @created_at, @updated_at, @user_msgs, @assistant_msgs,
     @tool_calls, @commands, @bg_commands, @files_changed, @lines_added, @lines_removed, @turns, @tokens_in, @tokens_out,
-    @tokens_cached, @cost_usd, @gen_ms, @parent_key, @hidden, @bg_tasks)
+    @tokens_cached, @cost_usd, @gen_ms, @work_ms, @parent_key, @hidden, @bg_tasks)
   on conflict(key) do update set
     agent = excluded.agent, id = excluded.id, path = excluded.path, size = excluded.size, mtime = excluded.mtime,
     offset = excluded.offset, head = excluded.head, parse_version = excluded.parse_version, state = excluded.state,
@@ -163,7 +163,7 @@ const upsert = db.prepare(`
     assistant_msgs = excluded.assistant_msgs, tool_calls = excluded.tool_calls, commands = excluded.commands,
     bg_commands = excluded.bg_commands, files_changed = excluded.files_changed, lines_added = excluded.lines_added,
     lines_removed = excluded.lines_removed, turns = excluded.turns, tokens_in = excluded.tokens_in,
-    tokens_out = excluded.tokens_out, tokens_cached = excluded.tokens_cached, cost_usd = excluded.cost_usd, gen_ms = excluded.gen_ms,
+    tokens_out = excluded.tokens_out, tokens_cached = excluded.tokens_cached, cost_usd = excluded.cost_usd, gen_ms = excluded.gen_ms, work_ms = excluded.work_ms,
     parent_key = excluded.parent_key, hidden = excluded.hidden, bg_tasks = excluded.bg_tasks`);
 const delChunks = db.prepare('delete from chunk_text where key = ?');
 const addChunk = db.prepare('insert into chunk_text (key, kind, ts, text) values (?, ?, ?, ?)');
@@ -278,6 +278,7 @@ async function indexFile(f: FileRef): Promise<string | null> {
       tokens_cached: st.tokensCached,
       cost_usd: st.costUsd ?? null,
       gen_ms: st.genMs ?? 0,
+      work_ms: Math.round(st.workMs ?? 0),
       parent_key: parentKey ?? null,
       hidden: parentKey || st.userMessages === 0 ? 1 : 0,
       bg_tasks: parser instanceof ClaudeParser && parser.bg.size ? JSON.stringify([...parser.bg.values()]) : null,
