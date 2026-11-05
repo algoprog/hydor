@@ -42,6 +42,7 @@ import {
   Search,
   SeparatorHorizontal,
   Sigma,
+  Signature,
   SpellCheck,
   Strikethrough,
   Subscript,
@@ -101,6 +102,8 @@ export interface DocMenuCtx {
   comment: () => void;
   picture: () => void;
   pictureUrl: () => void;
+  /** Insert → Signature: a saved one, or one drawn there. */
+  signature: () => void;
   link: () => void;
   equation: (inline: boolean) => void;
   chars: () => void;
@@ -195,6 +198,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         { label: 'A picture from the web', icon: <Link2 size={15} />, run: c.pictureUrl },
       ],
     },
+    { label: 'Signature', icon: <Signature size={15} />, also: 'sign signing initials autograph handwriting', disabled: c.readOnly, run: c.signature },
     { label: 'Table', icon: <Table2 size={15} />, also: 'grid', items: tableSizes },
     { label: 'Link', icon: <Link2 size={15} />, keys: 'Ctrl+K', run: c.link },
     { label: 'Comment', icon: <MessageSquarePlus size={15} />, keys: 'Ctrl+Alt+M', disabled: !st.text.trim(), run: c.comment },

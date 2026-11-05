@@ -10,7 +10,7 @@
 // their preview. The page around is told what an agent asked now would be about (the whole document, the section
 // the caret is in, the words picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins,
 // font and size are under Page setup.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
 import { docHeadings, docWords, FONTS, MARGINS, PAPERS, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
@@ -23,6 +23,7 @@ import { LOCALE } from '../../../i18n/locale';
 import { Button, cx, IconButton, Popover, Segmented, useConfirm, useMediaQuery } from '../../../components/ui';
 import { loadModelVersion, type AskScope, type ModelEditorProps } from '../kinds';
 import type { PageVersion } from '@shared/pages';
+import { SIGNATURE_WIDTH_MM } from '@shared/signatures';
 import { choosePicture, pictureFromUrl, uploadPicture } from '../pictures';
 import { NumInput } from '../slides/controls';
 import { Select } from '../studio/fields';
@@ -48,6 +49,9 @@ import { SuggestionCard } from './Suggestions';
 import { slashAt, slashItems, slashLayout, slashMatches, SlashMenu } from './Slash';
 import { ColumnHandles, printDoc } from './TableTools';
 import { Toolbar } from './Toolbar';
+
+// Insert → Signature: the saved signatures and the pad, loaded when first opened.
+const InsertSignature = lazy(() => import('../../signatures/InsertSignature').then((m) => ({ default: m.InsertSignature })));
 
 const OUTLINE_KEY = 'wa.docs.outline';
 const VIEW_KEY = 'wa.docs.view';
@@ -180,7 +184,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [width, setWidth] = useState(1200);
   const [words, setWords] = useState(0);
   const [float, setFloat] = useState<{ ask?: { x: number; y: number }; link?: { x: number; y: number } } | null>(null);
-  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | null>(null);
+  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | 'signature' | null>(null);
   const [counts, setCounts] = useState<Counts & { picked: boolean }>({ words: 0, chars: 0, charsNoSpaces: 0, paragraphs: 0, pages: 1, picked: false });
   const [panel, setPanel] = useState(false);
   const [active, setActive] = useState<string | null>(null);
@@ -528,7 +532,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   if (!model) return <div className="flex h-full items-center justify-center text-fg-3">…</div>;
 
   const e = engine.current;
-  const slashList = e && slash ? slashMatches(slashItems(e, { picture: () => void pickPicture(), equation: () => openEquation(false), today: () => today() }), slash.query) : [];
+  const slashList = e && slash ? slashMatches(slashItems(e, { picture: () => void pickPicture(), signature: () => setDialog('signature'), equation: () => openEquation(false), today: () => today() }), slash.query) : [];
   const slashOpen = !!slash && slashList.length > 0 && !!slashPos;
   const slashBox = slashLayout(slashList.length, (host.current?.clientWidth ?? width) - 8);
 
@@ -825,6 +829,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           comment: startComment,
           picture: () => void pickPicture(),
           pictureUrl: () => setMenu('url'),
+          signature: () => setDialog('signature'),
           link: () => setLinking({ url: st.link ?? '', text: '' }),
           equation: openEquation,
           chars: () => {
@@ -1304,6 +1309,20 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       <BandsDialog open={dialog === 'bands'} onClose={() => (setDialog(null), e?.refocusSoon())} header={model.header} footer={model.footer} titlePage={model.titlePage} onApply={(v) => e?.setBands(v)} />
       <VersionsDialog open={versions} pageId={pageId} onClose={() => (setVersions(false), e?.refocusSoon())} onPick={(v) => void compareWith(v)} />
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => (setDialog(null), e?.refocusSoon())} groups={SHORTCUTS} />
+      {dialog === 'signature' && (
+        <Suspense fallback={null}>
+          <InsertSignature
+            open
+            onClose={() => (setDialog(null), e?.refocusSoon())}
+            onInsert={(p) => {
+              if (!e) return;
+              // Sized for a signature line (initials smaller), on the left as a signature is; its handles size it after.
+              const b = e.picture(p.src, (SIGNATURE_WIDTH_MM[p.kind] * 96) / 25.4);
+              e.insert([{ ...b, align: 'left', alt: tr(p.kind === 'initials' ? 'Initials' : 'Signature') }]);
+            }}
+          />
+        </Suspense>
+      )}
       {confirmNode}
     </div>
   );
