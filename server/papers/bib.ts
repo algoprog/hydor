@@ -25,7 +25,10 @@ export interface Paper {
   /** To read, Reading or Read. */
   status?: string;
   notes?: string;
+  /** Its project: one of the user's projects by its id, or the words given when they name none of them. */
   project?: string;
+  /** The project's name, as the list shows it (the words given, for a project that is none of the user's). */
+  project_name?: string;
   /** When it was added, and when it was read (YYYY-MM-DD). */
   added?: string | null;
   read_on?: string | null;
@@ -176,7 +179,7 @@ export function tidyPaper(p: Partial<Paper> & Record<string, unknown>): Paper {
   if (authors) out.authors = authors;
   const year = Number(String(p.year ?? '').slice(0, 4));
   if (year > 1000 && year < 3000) out.year = year;
-  for (const k of ['venue', 'abstract', 'notes', 'project', 'key'] as const) {
+  for (const k of ['venue', 'abstract', 'notes', 'project', 'project_name', 'key'] as const) {
     const v = str(p[k], k === 'abstract' ? 4000 : k === 'notes' ? 20_000 : 300);
     if (v) out[k] = v;
   }
@@ -213,8 +216,9 @@ export function mergePaper(kept: Paper, incoming: Paper, o: { metadata?: boolean
     if (empty(v)) continue;
     if (empty(kept[k]) || (o.metadata && k !== 'pdf' && k !== 'key' && String(kept[k]) !== String(v))) (set as Record<string, unknown>)[k] = v;
   }
-  // What you said of it stays yours: its status, notes and project only where it has none.
+  // What you said of it stays yours: its status, notes and project only where it has none (the project with its name).
   for (const k of ['status', 'notes', 'project', 'added', 'read_on'] as const) if (empty(kept[k]) && !empty(incoming[k])) (set as Record<string, unknown>)[k] = incoming[k];
+  if (set.project) set.project_name = incoming.project_name || set.project;
   const tags = tagsOf([...(kept.tags ?? []), ...(incoming.tags ?? [])]);
   if (tags.length !== (kept.tags ?? []).length) set.tags = tags;
   if (incoming.zotero_key && incoming.zotero_key !== kept.zotero_key) set.zotero_key = incoming.zotero_key;

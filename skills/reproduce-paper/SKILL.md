@@ -68,10 +68,15 @@ match is a finding too, when you can say why. The report's outline is in `refere
 
 ## 6. The real run
 
-- A run that needs a GPU or takes more than a few minutes goes through Experiments
-  (`experiment_run`): it waits for a free GPU, keeps the run's record, its log and its metrics, and
-  the user sees it under System → Experiments. Give it a name and the paper's id as a tag; follow it
-  with `experiment_get`. Never take a GPU another run is using, and never stop someone else's run.
+- A run that needs a GPU or takes more than a few minutes goes through Experiments when you have
+  it: `experiment_run` with the `command`, its folder as `cwd`, a `name`, `gpus` and `hours` within
+  your limits, and the paper's id in `tags`. It waits for free GPUs, runs on its own, keeps the
+  run's record, its log and its metrics, and the user sees it under System → Experiments. It
+  answers at once with the run's id: read how it goes with `experiment_get` (its status, metrics and
+  the end of its log). In the Reproduce a paper app, hand in the ids instead of waiting: the app
+  waits for the runs to end, then an agent finishes from your notes. Without Experiments, run it in
+  the background with its output in a log. Never take a GPU another run is using, and never stop
+  someone else's run.
 - Keep within the limits you were given (hours, disk, GPUs). When a limit would be passed, stop,
   and report what you have and what the rest would need.
 - Several seeds when the paper averages them and it is cheap; report the mean and the spread.

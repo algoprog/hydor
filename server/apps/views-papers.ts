@@ -96,7 +96,7 @@ const READING_LIST: AppUi = {
     'rl-head': {
       description: 'Your reading list in numbers: papers to read, being read and read (each a filter), and projects',
       html: String.raw`<header class="hero">
-  <p class="kicker">Reading list{{#state.project}} · {{state.project}}{{/state.project}}</p>
+  <p class="kicker">Reading list{{#state.project}} · {{state.project_name|or:$state.project}}{{/state.project}}</p>
   <h1>{{#.|count|is:1}}One paper{{/.}}{{^.|count|is:1}}{{.|count|number}} papers{{/.}}</h1>
   <p class="sub">{{^.}}Add a paper by its DOI, arXiv id, link or title, import a .bib, or sync with Zotero.{{/.}}{{#.}}Search them, mark what you have read, and pick some for a literature matrix.{{/.}}</p>
   <div class="stats">
@@ -135,7 +135,7 @@ button.stat:hover { border-color: var(--n-accent); }
     <button type="button" class="chip{{#state.status|is:Reading}} on{{/state.status}}" data-event="status" data-status="Reading">Reading</button>
     <button type="button" class="chip{{#state.status|is:Read}} on{{/state.status}}" data-event="status" data-status="Read">Read</button>
     {{#state.tag}}<span class="chip on">#{{state.tag}}<button type="button" class="off" data-event="tag" data-tag="" aria-label="Every tag">✕</button></span>{{/state.tag}}
-    {{#state.project}}<span class="chip on">{{state.project}}<button type="button" class="off" data-event="project" data-project="" aria-label="Every project">✕</button></span>{{/state.project}}
+    {{#state.project}}<span class="chip on">{{state.project_name|or:$state.project}}<button type="button" class="off" data-event="project" data-project="" data-name="" aria-label="Every project">✕</button></span>{{/state.project}}
   </div>
   <div class="acts">
     <button type="button" class="n-btn n-primary" data-event="panel" data-panel="add">+ Add</button>
@@ -171,7 +171,7 @@ button.stat:hover { border-color: var(--n-accent); }
       html: String.raw`<form class="panel" data-event="add">
   <div class="head"><h3>Add a paper</h3><button type="button" class="x" data-event="panel" data-panel="" aria-label="Close">✕</button></div>
   <label class="wide"><span>The paper</span><input name="paper" required placeholder="A DOI, an arXiv id, a link or its title"></label>
-  <label><span>Project</span><input name="project" value="{{state.project}}" placeholder="e.g. Dense retrieval survey"></label>
+  <label><span>Project</span><input name="project" value="{{state.project_name}}" placeholder="e.g. Dense retrieval survey"></label>
   <label><span>Tags</span><input name="tags" value="{{state.tag}}" placeholder="Between commas"></label>
   <label><span>Status</span><select name="status"><option>To read</option><option>Reading</option><option>Read</option></select></label>
   <div class="foot">
@@ -187,7 +187,7 @@ button.stat:hover { border-color: var(--n-accent); }
   <div class="head"><h3>Import a .bib</h3><button type="button" class="x" data-event="panel" data-panel="" aria-label="Close">✕</button></div>
   <label class="wide"><span>Paste it</span><textarea name="bibtex" rows="6" placeholder="@inproceedings{…}"></textarea></label>
   <label class="wide"><span>Or a .bib file on this computer</span><input name="path" placeholder="~/papers/refs.bib"></label>
-  <label><span>Project</span><input name="project" value="{{state.project}}"></label>
+  <label><span>Project</span><input name="project" value="{{state.project_name}}"></label>
   <label><span>Tags</span><input name="tags" placeholder="Between commas"></label>
   <p class="hint">Papers you have already are completed with what they lack; your notes, tags and status stay as they are.</p>
   <div class="foot">
@@ -201,7 +201,7 @@ button.stat:hover { border-color: var(--n-accent); }
       description: 'Export the papers shown, or all of them, as a .bib to download or copy',
       html: String.raw`<div class="panel">
   <div class="head"><h3>Export a .bib</h3><button type="button" class="x" data-event="panel" data-panel="" aria-label="Close">✕</button></div>
-  <p class="hint">Every paper with its BibTeX, each under a key of its own: those shown now{{#state.status}}, {{state.status}}{{/state.status}}{{#state.tag}}, #{{state.tag}}{{/state.tag}}{{#state.project}}, {{state.project}}{{/state.project}}{{#state.q}}, with “{{state.q}}”{{/state.q}}, or all of them.</p>
+  <p class="hint">Every paper with its BibTeX, each under a key of its own: those shown now{{#state.status}}, {{state.status}}{{/state.status}}{{#state.tag}}, #{{state.tag}}{{/state.tag}}{{#state.project}}, {{state.project_name|or:$state.project}}{{/state.project}}{{#state.q}}, with “{{state.q}}”{{/state.q}}, or all of them.</p>
   <div class="foot">
     <span class="said">{{#state.exported.working}}<span class="busy">Writing it…</span>{{/state.exported.working}}{{^state.exported.working}}{{#state.exported.result.file}}<a class="n-btn n-primary" href="{{state.exported.result.file}}" target="_blank" rel="noopener noreferrer" download>↓ {{state.exported.result.name}}</a> <span class="ok">{{state.exported.result.count}} papers</span> <button type="button" class="n-btn" data-event="copy_export">Copy it</button>{{/state.exported.result.file}}{{#state.exported.error}}<span class="err">{{state.exported.error}}</span>{{/state.exported.error}}{{/state.exported.working}}</span>
     <button type="button" class="n-btn" data-event="export_all">All of them</button>
@@ -237,7 +237,7 @@ button.stat:hover { border-color: var(--n-accent); }
   <div class="body">
     <button type="button" class="t" data-event="open_paper">{{title}}</button>
     <p class="meta">{{authors|short:110}}{{#venue}} · {{venue}}{{/venue}}{{#year}} · {{year}}{{/year}}</p>
-    <p class="tags">{{#project}}<button type="button" class="proj" data-event="project" data-project="{{project}}">{{project}}</button>{{/project}}{{#tags}}<button type="button" class="tag" data-event="tag" data-tag="{{.}}">#{{.}}</button>{{/tags}}</p>
+    <p class="tags">{{#project}}<button type="button" class="proj" data-event="project" data-project="{{project}}" data-name="{{project_name|or:$project}}">{{project_name|or:$project}}</button>{{/project}}{{#tags}}<button type="button" class="tag" data-event="tag" data-tag="{{.}}">#{{.}}</button>{{/tags}}</p>
   </div>
   <div class="seg" role="group" aria-label="Status">
     <button type="button" class="{{#status|is:To read}}on{{/status}}" data-event="to_read">To read</button>
@@ -286,7 +286,7 @@ button.stat:hover { border-color: var(--n-accent); }
   {{#abstract}}<section><h3>Abstract</h3><p class="abs">{{abstract}}</p></section>{{/abstract}}
   <section>
     <h3>Project and tags</h3>
-    <form class="line" data-event="save_project"><input name="project" value="{{project}}" placeholder="Its project" aria-label="Project"><button type="submit" class="n-btn">Save</button></form>
+    <form class="line" data-event="save_project"><input name="project" value="{{project_name|or:$project}}" placeholder="Its project" aria-label="Project"><button type="submit" class="n-btn">Save</button></form>
     <form class="line" data-event="save_tags"><input name="tags" value="{{tags|join:, }}" placeholder="Tags, between commas" aria-label="Tags"><button type="submit" class="n-btn">Save</button></form>
   </section>
   <section>
@@ -319,7 +319,7 @@ pre { margin: 0 0 8px; padding: 10px 12px; border-radius: 10px; background: var(
     },
     'rl-projects': {
       description: 'Your projects, each with how many papers it has and how many are read; each shows its papers',
-      html: String.raw`<div class="projects">{{#.|unique:project}}<button type="button" class="pr" data-event="project_go" data-project="{{.}}"><b>{{.}}</b><span>{{item|where:project=$.|count}} papers · {{item|where:project=$.|where:status=Read|count}} read</span></button>{{/.}}</div>
+      html: String.raw`<div class="projects">{{#.|unique:project}}<button type="button" class="pr" data-event="project_go" data-project="{{.}}" data-name="{{#item|where:project=$.|first}}{{project_name|or:$project}}{{/item}}"><b>{{#item|where:project=$.|first}}{{project_name|or:$project}}{{/item}}</b><span>{{#item|where:project=$.|count|is:1}}One paper{{/item}}{{^item|where:project=$.|count|is:1}}{{item|where:project=$.|count}} papers{{/item}} · {{item|where:project=$.|where:status=Read|count}} read</span></button>{{/.}}</div>
 {{^.|unique:project}}<p class="none">No projects yet: give a paper a project when you add it, or on its own page.</p>{{/.}}`,
       css: String.raw`
 .projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; }
@@ -367,9 +367,13 @@ pre { margin: 0 0 8px; padding: 12px 14px; border: 1px solid var(--n-line); bord
     find: [{ do: 'set', name: 'q', value: '{{event.value}}' }],
     status: [{ do: 'set', name: 'status', value: '{{event.status}}' }],
     tag: [{ do: 'set', name: 'tag', value: '{{event.tag}}' }],
-    project: [{ do: 'set', name: 'project', value: '{{event.project}}' }],
+    project: [
+      { do: 'set', name: 'project', value: '{{event.project}}' },
+      { do: 'set', name: 'project_name', value: '{{event.name}}' },
+    ],
     project_go: [
       { do: 'set', name: 'project', value: '{{event.project}}' },
+      { do: 'set', name: 'project_name', value: '{{event.name}}' },
       { do: 'page', page: 'list' },
     ],
     panel: [{ do: 'set', name: 'panel', value: '{{event.panel}}' }],
@@ -387,13 +391,13 @@ pre { margin: 0 0 8px; padding: 12px 14px; border: 1px solid var(--n-line); bord
         do: 'start',
         confirm: 'Make a literature matrix of the {{state.picked|count}} papers you picked? It reads each one and fills in a spreadsheet: a run of a few minutes.',
         app: 'tpl:literature-matrix',
-        inputs: { papers: 'reading list: {{state.picked|json}}', project: '{{state.project}}' },
+        inputs: { papers: 'reading list: {{state.picked|json}}', project: '{{state.project_name}}' },
       },
     ],
     to_read: [{ do: 'data', op: 'update', collection: 'papers', id: '{{item.id}}', record: { status: 'To read', read_on: null } }],
     reading: [{ do: 'data', op: 'update', collection: 'papers', id: '{{item.id}}', record: { status: 'Reading', read_on: null } }],
     read: [{ do: 'data', op: 'update', collection: 'papers', id: '{{item.id}}', record: { status: 'Read', read_on: '{{today}}' } }],
-    save_project: [{ do: 'data', op: 'update', collection: 'papers', id: '{{item.id}}', record: { project: '{{event.project}}' } }],
+    save_project: [{ do: 'data', op: 'update', collection: 'papers', id: '{{item.id}}', record: { project: '{{event.project}}', project_name: '{{event.project}}' } }],
     save_tags: [{ do: 'data', op: 'update', collection: 'papers', id: '{{item.id}}', record: { tags: '{{event.tags|split:,}}' } }],
     save_notes: [{ do: 'data', op: 'update', collection: 'papers', id: '{{item.id}}', record: { notes: '{{event.notes}}' } }],
     remove: [{ do: 'data', op: 'remove', collection: 'papers', id: '{{item.id}}', confirm: 'Remove “{{item.title}}” from your reading list?' }, { do: 'back' }],
@@ -554,7 +558,7 @@ const REPRODUCE: AppUi = {
   ],
   elements: {
     'rp-hero': {
-      description: 'Whether it reproduced, in a word and in numbers, with its code and where the work is',
+      description: 'Whether it reproduced, in a word and in numbers, with its code, where the work is and its runs in Experiments',
       html: String.raw`<header class="hero {{#result.matched}}yes{{/result.matched}}{{^result.matched}}no{{/result.matched}}">
   <p class="kicker">Reproduction{{#result.paper}} · {{result.paper|short:90}}{{/result.paper}}</p>
   <h1><span class="mark" aria-hidden="true">{{#result.matched}}✓{{/result.matched}}{{^result.matched}}≈{{/result.matched}}</span>{{result.verdict}}</h1>
@@ -565,6 +569,7 @@ const REPRODUCE: AppUi = {
     <div class="stat"><b>{{result.fixes|count}}</b><span>changes and fixes</span></div>
   </div>
   <p class="where">{{#result.repo}}<a href="{{result.repo}}" target="_blank" rel="noopener noreferrer">{{result.repo|host}} ↗</a>{{/result.repo}}{{#result.folder}}<span>{{result.folder}}</span><button type="button" class="n-btn" data-event="open_folder">Open the folder</button>{{/result.folder}}</p>
+  {{#result.runs|first}}<p class="where">{{#result.runs|count|is:1}}<button type="button" class="n-btn" data-event="open_run" data-run="{{result.runs|first}}">Open its run in Experiments</button>{{/result.runs}}{{^result.runs|count|is:1}}<span>Its runs in Experiments</span>{{#result.runs}}<button type="button" class="n-btn" data-event="open_run" data-run="{{.}}">Run {{@number}}</button>{{/result.runs}}{{/result.runs}}</p>{{/result.runs}}
   {{^result.matched}}<div class="n-row"><button type="button" class="n-btn" data-event="again">Try again</button></div>{{/result.matched}}
 </header>`,
       css:
@@ -630,6 +635,7 @@ tbody tr:last-child td { border-bottom: 0; }
   events: {
     copy_report: [{ do: 'copy', text: '{{result.report}}' }],
     open_folder: [{ do: 'open', url: '/files?dir={{result.folder|url}}' }],
+    open_run: [{ do: 'open', url: '/system/experiments/{{event.run|url}}' }],
     again: [{ do: 'again', confirm: 'Try it again with the same answers? It is a new run, which starts from the work folder as it is.' }],
   },
 };

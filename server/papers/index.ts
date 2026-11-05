@@ -16,9 +16,11 @@ import { putMediaBuffer, mediaPath, refMedia } from '../apps/media.ts';
 import { WORK_DIR } from '../apps/runs.ts';
 import { getApp, getRun, type RunRecord } from '../apps/store.ts';
 import { templateById } from '../apps/templates.ts';
+import type { DB } from '../db.ts';
+import { allSpaces } from '../spaces/index.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { readBib, tagsOf, writeBib } from './bib.ts';
-import { appList, findPapers, keepPapers, READING_LIST, type PaperList } from './list.ts';
+import { appList, findPapers, keepPapers, READING_LIST, tidyProjects, type PaperList, type ProjectOf } from './list.ts';
 import { readPaper } from './resolve.ts';
 import { syncZotero, vaultSender, type ZoteroSend } from './zotero.ts';
 
@@ -50,6 +52,17 @@ function listFor(ctx: RunCtx, read = false): PaperList {
   }
   if (!read) throw new Error('This app keeps no list of papers: give it a "papers" collection, or use the Reading list.');
   return appList(db, READING_LIST, templateById('reading-list')?.data, { changed: changed(READING_LIST) });
+}
+
+/** The user's projects by their id or name (the id first), as papers keep them. */
+export function projectsOf(db: DB): ProjectOf {
+  const all = allSpaces(db);
+  return (given) => {
+    const s = given.trim().toLowerCase();
+    if (!s) return null;
+    const hit = all.find((x) => x.id.toLowerCase() === s) ?? all.find((x) => x.name.trim().toLowerCase() === s);
+    return hit ? { id: hit.id, name: hit.name } : null;
+  };
 }
 
 const today = (ctx: RunCtx) => momentOf(userTimezone(ctx.deps.db)).today;
@@ -90,7 +103,7 @@ export const READ_PAPER: RunTool = {
 const FIND_PROPS = {
   status: { type: 'string', description: 'To read, Reading or Read.' },
   tag: { type: 'string' },
-  project: { type: 'string' },
+  project: { type: 'string', description: 'One of the user’s projects, by its name or id (kept as its id, its name in project_name), or any name.' },
   search: { type: 'string', description: 'Words anywhere in a paper: its title, authors, venue, notes, tags.' },
   ids: { type: 'array', items: { type: 'string' }, description: 'Papers by their record ids.' },
 };
@@ -100,7 +113,7 @@ export const READING_LIST_TOOL: RunTool = {
   description: [
     'The papers of a reading list, for an app’s step: its app’s own (its "papers" records), or for finding only, the Reading list’s when its app keeps none.',
     'op "find" (the default): those that match status, tag, project, search (words) or ids, newest first: { papers, count }.',
-    'op "keep": papers ({ title, authors, year, venue, doi, arxiv, url, pdf, abstract, bibtex, tags, status, notes, project }) added, or the ones it has (the same DOI, arXiv id or title) completed with what they lack; new ones take project, tags and status (To read unless set): { added, updated, unchanged, papers, count }.',
+    'op "keep": papers ({ title, authors, year, venue, doi, arxiv, url, pdf, abstract, bibtex, tags, status, notes, project }) added, or the ones it has (the same DOI, arXiv id or title) completed with what they lack; new ones take project, tags and status (To read unless set): { added, updated, unchanged, papers, count }. A project that is one of the user’s is kept as its id, with its name in project_name.',
     'op "import": a .bib (bibtex, its text; or path, its file) kept the same way: { added, updated, unchanged, skipped, count }.',
     'op "export": the papers that match as a .bib: { bibtex, file (its address, to download), name, count }.',
   ].join(' '),
@@ -119,13 +132,17 @@ export const READING_LIST_TOOL: RunTool = {
   async run(a, ctx) {
     const op = str(a.op, 20) || 'find';
     const q = { status: str(a.status, 40), tag: str(a.tag, 60), project: str(a.project, 300), search: str(a.search, 300), ids: Array.isArray(a.ids) ? a.ids.map(String) : undefined, limit: Number(a.limit) || undefined };
+    const projectOf = projectsOf(ctx.deps.db);
     if (op === 'find') {
       const list = listFor(ctx, true);
-      const found = findPapers(list, q);
+      tidyProjects(list, projectOf);
+      const found = findPapers(list, q, projectOf);
       return JSON.stringify({ papers: found.map((p) => brief(p, a.full === true)), count: found.length, list: list.app === READING_LIST ? 'Reading list' : 'this app' });
     }
     const list = listFor(ctx);
-    const keepOpts = { today: today(ctx), status: str(a.status, 40) || undefined, project: str(a.project, 300) || undefined, tags: tagsOf(a.tags) };
+    // Projects named by their words (a paper's page, an agent) become the projects' ids, and names follow renamed ones.
+    tidyProjects(list, projectOf);
+    const keepOpts = { today: today(ctx), status: str(a.status, 40) || undefined, project: str(a.project, 300) || undefined, tags: tagsOf(a.tags), projectOf };
     if (op === 'keep') {
       const incoming = (Array.isArray(a.papers) ? a.papers : a.papers && typeof a.papers === 'object' ? [a.papers] : []).filter((x: unknown) => x && typeof x === 'object');
       if (!incoming.length) throw new Error('keep: give the papers ({ title, … } each).');
@@ -147,10 +164,10 @@ export const READING_LIST_TOOL: RunTool = {
       return JSON.stringify({ added: k.added, updated: k.updated, unchanged: k.unchanged, skipped, count: k.count, entries: papers.length });
     }
     if (op === 'export') {
-      const found = findPapers(list, q).reverse();
+      const found = findPapers(list, q, projectOf).reverse();
       if (!found.length) throw new Error('No paper matches, so there is nothing to export.');
       const bibtex = writeBib(found);
-      const name = `${['reading-list', q.project, q.tag, q.status].filter(Boolean).join('-').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}.bib`;
+      const name = `${['reading-list', q.project ? (projectOf(q.project)?.name ?? q.project) : '', q.tag, q.status].filter(Boolean).join('-').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}.bib`;
       const m = putMediaBuffer(ctx.deps.db, Buffer.from(bibtex, 'utf8'), name, 'text/x-bibtex');
       const file = mediaPath(m);
       const r = runOfStep(ctx);

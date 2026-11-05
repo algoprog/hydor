@@ -37,10 +37,10 @@ import * as store from '../apps/store.ts';
 import { TEMPLATES } from '../apps/templates.ts';
 import { pages } from '../pages/index.ts';
 import { initPages, pageInfo, pageSource } from '../pages/store.ts';
-import { createSpace } from '../spaces/index.ts';
+import { createSpace, updateSpace } from '../spaces/index.ts';
 import { findSame, mergePaper, readBib, samePaper, splitBib, statusOf, tagsOf, tidyPaper, writeBib, type Paper } from './bib.ts';
-import { papers, READ_PAPER, useZoteroForTests } from './index.ts';
-import { appList, findPapers, keepPapers, READING_LIST } from './list.ts';
+import { papers, projectsOf, READ_PAPER, useZoteroForTests } from './index.ts';
+import { appList, findPapers, keepPapers, READING_LIST, tidyProjects } from './list.ts';
 import { arxivIn, arxivRecords, bibOfRecord, doiIn, expandTex, invertedAbstract, mainTexOf, metaTags, paperQuery, partsOf, readLatexSource, readPaper, recordOfBib, sectionsOf, texPlain, titleFromFirstPage, titleLike } from './resolve.ts';
 import { libraryOf, paperOfZotero, summaryOf, syncZotero, zoteroOfPaper, type ZoteroSend } from './zotero.ts';
 
@@ -390,6 +390,36 @@ test('a list: papers kept (new ones added with today’s date, the rest complete
   assert.equal(findPapers(list, { status: 'Read' }).length, 0);
 });
 
+test('a list’s projects: one of yours kept by its id with its name beside it, other words as given; found by either; ids once a project is made, names that follow a rename', () => {
+  const list = appList(db, 'project-list', LIST_DATA);
+  const mine = createSpace(db, { name: 'Sparse retrieval', folder: tmp });
+  let projectOf = projectsOf(db);
+  const k = keepPapers(list, [{ title: 'SPLADE', arxiv: '2107.05720' }, { title: 'uniCOIL', project: 'Learned sparse' }], { today: '2026-11-05', project: 'sparse RETRIEVAL', projectOf });
+  assert.deepEqual([k.papers[0].project, k.papers[0].project_name], [mine.id, 'Sparse retrieval'], 'one of yours: its id, and its name to show');
+  assert.deepEqual([k.papers[1].project, k.papers[1].project_name], ['Learned sparse', 'Learned sparse'], 'other words: as given');
+  assert.equal(findPapers(list, { project: 'Sparse retrieval' }, projectOf).length, 1, 'by its name');
+  assert.equal(findPapers(list, { project: mine.id }, projectOf).length, 1, 'by its id');
+  assert.equal(findPapers(list, { project: 'learned sparse' }, projectOf).length, 1);
+  // A project made later with those words takes their papers; a rename is followed; a paper's page writes words.
+  const later = createSpace(db, { name: 'Learned sparse', folder: tmp });
+  updateSpace(db, mine.id, { name: 'Sparse retrieval (SIGIR)' });
+  list.update(k.papers[0].id, { project: 'learned SPARSE', project_name: 'learned SPARSE' });
+  projectOf = projectsOf(db);
+  assert.equal(tidyProjects(list, projectOf), 2);
+  const now = list.all();
+  assert.deepEqual(now.map((p) => [p.project, p.project_name]), [
+    [later.id, 'Learned sparse'],
+    [later.id, 'Learned sparse'],
+  ]);
+  list.update(now[0].id, { project: mine.id, project_name: 'Sparse retrieval' });
+  assert.equal(tidyProjects(list, projectOf), 1);
+  assert.equal(list.all()[0].project_name, 'Sparse retrieval (SIGIR)', 'its name follows the rename');
+  assert.equal(tidyProjects(list, projectOf), 0, 'nothing left to change');
+  // A list made before names were kept (no project_name field) keeps the words given.
+  const old = appList(db, 'old-list', { papers: { fields: (LIST_DATA!.papers.fields ?? []).filter((f) => f.id !== 'project_name') } });
+  assert.equal(keepPapers(old, [{ title: 'DeepImpact' }], { today: '2026-11-05', project: 'Learned sparse', projectOf }).papers[0].project, 'Learned sparse');
+});
+
 // ---- Zotero, with canned answers -----------------------------------------------------------------------------------------
 
 /** Zotero as its API answers, kept in memory: items with versions, a library version, deletions; and what it was asked. */
@@ -593,6 +623,39 @@ test('reproduce a paper: its code found in it (near "code" first), the repositor
   assert.equal(cmp.matched, false);
   assert.equal(cmp.summary, '1 of 3 numbers within reach of the paper’s.');
   assert.deepEqual(cmp.steps.map((s: any) => [s.n, s.minutes, s.ok]), [[1, 2, true], [2, 30, false]]);
+  assert.equal(cmp.verdict, 'Not reproduced');
+  // Its runs went on in Experiments: the numbers, the verdict and the report are those of the agent that finished it,
+  // the runs' time counts, and the steps run on from the setup through the runs to the end.
+  const h = 3_600_000;
+  const later = await program('reproduce-paper', 'compare', {
+    results: [],
+    after: [{ metric: 'MRR@10', setting: 'dev', paper: 36.0, ours: 36.2 }],
+    verdict: '',
+    final: 'Reproduced: within 0.2 points',
+    steps: [{ step: 'Set it up', minutes: 30 }],
+    later: [{ step: 'Read the numbers', minutes: 6 }],
+    fixes: ['Pinned faiss-cpu 1.7.4'],
+    more: ['Pinned faiss-cpu 1.7.4', 'Fixed the qrels path'],
+    hours: 0.5,
+    report: 'Started',
+    finished: '# Reproduction\nDone.',
+    runs: ['r1', 'r2'],
+    waited: { ended: true, runs: [{ id: 'r1', name: 'index', status: 'done', startedAt: 10 * h, endedAt: 11 * h }, { id: 'r2', name: 'eval', status: 'done', startedAt: 11 * h, endedAt: 12 * h }] },
+  });
+  assert.equal(later.matched, true);
+  assert.equal(later.verdict, 'Reproduced: within 0.2 points');
+  assert.equal(later.report, '# Reproduction\nDone.');
+  assert.deepEqual(later.runs, ['r1', 'r2']);
+  assert.deepEqual(later.fixes, ['Pinned faiss-cpu 1.7.4', 'Fixed the qrels path']);
+  assert.deepEqual(later.steps.map((s: any) => [s.step, s.minutes]), [['Set it up', 30], ['Ran in Experiments (2 runs)', 120], ['Read the numbers', 6]]);
+  assert.equal(later.hours, 2.6);
+  // The flow: the runs waited for (by the ids handed in) only when there are some, then an agent finishes it.
+  const later_ = allSteps(tpl('reproduce-paper').flow!.steps);
+  const wait = later_.find((x) => x.id === 'waited') as any;
+  assert.equal(wait.tool, 'experiment_wait');
+  assert.equal(wait.with.ids, '{{work.runs}}');
+  assert.equal((later_.find((x) => x.id === 'later') as any).rule, '{{work.runs}} is not empty');
+  assert.equal(later_.find((x) => x.id === 'finish')!.do, 'agent');
 });
 
 test('reviewer simulator: the venue’s form and the reviewers seated; the reviews laid side by side with their scores; the weaknesses ranked by how likely each sinks it', async () => {

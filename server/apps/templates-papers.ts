@@ -66,7 +66,8 @@ const PAPER_FIELDS: AnswerField[] = [
   { id: 'tags', label: 'Tags', type: 'list' },
   { id: 'status', label: 'Status', type: 'text', description: 'To read, Reading or Read' },
   { id: 'notes', label: 'Notes', type: 'markdown' },
-  { id: 'project', label: 'Project', type: 'text' },
+  { id: 'project', label: 'Project', type: 'text', description: 'One of your projects by its id, or the words given when they name none of them' },
+  { id: 'project_name', label: 'Project’s name', type: 'text' },
   { id: 'added', label: 'Added', type: 'date' },
   { id: 'read_on', label: 'Read on', type: 'date' },
   { id: 'zotero_key', label: 'Zotero key', type: 'text' },
@@ -190,7 +191,7 @@ return {
   bibtex: String(p.bibtex || ''),
   status: String(p.status || 'To read'),
   tags: list(p.tags),
-  project: String(p.project || ''),
+  project: String(p.project_name || p.project || ''),
   added: Number(k.added) > 0,
   count: Number(k.count) || 0,
   note: Number(k.added) > 0 ? String(input.note || '') : 'It was in your list already: what it lacked is filled in, and your notes, tags and status stay as they were.',
@@ -815,9 +816,9 @@ ${paperParts('paper_read')}`,
       },
       {
         id: 'work',
-        title: 'Reproduce it',
+        title: 'Set it up and run it',
         do: 'agent',
-        instructions: `Reproduce a result of a paper, following the reproduce-paper skill: find the code and the exact setting, make a clean environment as the repository says (venv, conda or Docker), get the data and the checkpoints, run a smoke test on a small slice first, then the real run, and compare the numbers with the paper's. Send runs that need a GPU or take long through experiment_run (Experiments: it waits for a free GPU and keeps the run's record); never use a GPU another run holds. Write down every change you make to their code or settings, and why.
+        instructions: `Reproduce a result of a paper, following the reproduce-paper skill: find the code and the exact setting, make a clean environment as the repository says (venv, conda or Docker), get the data and the checkpoints, run it on a small slice first, then the real run. Never use a GPU another run holds. Write down every change you make to their code or settings, and why.
 
 The paper: {{hints.title}}{{#paper_read.data.url}} ({{paper_read.data.url}}){{/paper_read.data.url}}{{#paper_read.data.pdf}}
 Its PDF: {{paper_read.data.pdf}}{{/paper_read.data.pdf}}
@@ -834,16 +835,61 @@ The exact setting, as the paper gives it:
 The numbers to match:
 {{plan.expected}}
 
-When you are done (or a limit stops you), write REPRODUCTION.md in the work folder: what you ran, the numbers side by side with the paper's, every change and fix, the time it took, and what is still different and why. Hand in the numbers you got for each one above, in the same order, the steps you took with their minutes, the fixes, the hours in all, the report's text, the folder and the repository.`,
+The real run: when it needs no GPU and ends within about half an hour, run it here and hand in its numbers. Otherwise, when you have experiment_run (Experiments), start it there and do not wait for it: experiment_run with command, cwd (the work folder), name, gpus (within the limits), hours (the most it may take) and tags (["reproduce", the paper's arXiv id or a short name]); it answers at once with the run's id. Hand in those ids as runs, with wait_hours (how long to wait for them at most, within the limits) and read (where their numbers will be: a file, or the lines of the log that have them). The app then waits for them to end, and an agent finishes from there with your notes. Without experiment_run, run it yourself in the background (nohup, its output to a log in the work folder), look at it every few minutes (sleep between) until it ends, and hand in its numbers.
+
+Before you hand in, write REPRODUCTION.md in the work folder: what you ran, the numbers side by side with the paper's, every change and fix, the time it took, and what is still different and why (with runs still going: what you have so far, the runs' ids, and what is left to do). Hand in the numbers you got for each one above, in the same order (none while its runs go on), the steps you took with their minutes, the fixes, the hours so far, the report's text, the folder and the repository.`,
         outputs: [
-          { id: 'verdict', label: 'Verdict', type: 'text', required: true, description: 'Reproduced, Close, Not reproduced, or Could not run, with the reason in a sentence' },
-          { id: 'results', label: 'Numbers', type: 'table', required: true, columns: [{ id: 'metric', label: 'Metric', type: 'text' }, { id: 'setting', label: 'Row and column', type: 'text' }, { id: 'paper', label: 'The paper’s', type: 'number' }, { id: 'ours', label: 'Ours', type: 'number' }, { id: 'note', label: 'Note', type: 'text' }] },
+          { id: 'verdict', label: 'Verdict', type: 'text', description: 'Reproduced, Close, Not reproduced, or Could not run, with the reason in a sentence; empty while its runs go on in Experiments' },
+          { id: 'results', label: 'Numbers', type: 'table', columns: [{ id: 'metric', label: 'Metric', type: 'text' }, { id: 'setting', label: 'Row and column', type: 'text' }, { id: 'paper', label: 'The paper’s', type: 'number' }, { id: 'ours', label: 'Ours', type: 'number' }, { id: 'note', label: 'Note', type: 'text' }] },
+          { id: 'runs', label: 'Runs still going', type: 'list', description: 'The ids experiment_run gave, for the runs still going in Experiments; empty when it ran here' },
+          { id: 'wait_hours', label: 'Hours to wait for them', type: 'number' },
+          { id: 'read', label: 'Where their numbers will be', type: 'text' },
           { id: 'steps', label: 'What it took', type: 'table', columns: [{ id: 'step', label: 'What', type: 'text' }, { id: 'minutes', label: 'Minutes', type: 'number' }, { id: 'ok', label: 'Went well', type: 'yesno' }, { id: 'note', label: 'Note', type: 'text' }] },
           { id: 'fixes', label: 'Changes and fixes', type: 'list' },
-          { id: 'hours', label: 'Hours in all', type: 'number' },
+          { id: 'hours', label: 'Hours so far', type: 'number' },
           { id: 'report', label: 'REPRODUCTION.md', type: 'markdown', required: true },
           { id: 'folder', label: 'Work folder', type: 'text' },
           { id: 'repo', label: 'Repository', type: 'url' },
+        ],
+      },
+      {
+        id: 'later',
+        title: 'Runs still going?',
+        do: 'decide',
+        rule: '{{work.runs}} is not empty',
+        then: [
+          { id: 'waited', title: 'Wait for its runs', do: 'tool', tool: 'experiment_wait', with: { ids: '{{work.runs}}', hours: '{{work.wait_hours}}' }, failed: 'skip' },
+          {
+            id: 'finish',
+            title: 'Finish it',
+            do: 'agent',
+            instructions: `Finish reproducing a result of a paper, following the reproduce-paper skill: another agent set it up and started its runs in Experiments, and the app waited for them to end (or for the time it may take to run out). Read each run with experiment_get (its status, its metrics and the end of its log); if one has not ended, look again every ten minutes (sleep between), within the limits. Take the numbers from where the notes say, compare them with the paper's, and finish REPRODUCTION.md in the work folder.
+
+The paper: {{hints.title}}
+What to reproduce: {{target}}
+Limits: {{limits}}
+The work folder: {{work.folder}}
+Its runs: {{work.runs}}
+{{#waited.data}}How they ended:
+{{waited.data}}
+{{/waited.data}}Where their numbers will be: {{work.read}}
+
+The numbers to match:
+{{plan.expected}}
+
+The notes so far (REPRODUCTION.md):
+{{work.report}}
+
+Hand in the numbers you got for each one above, in the same order, the verdict, the steps you took after the runs (with their minutes), the fixes you made, and the whole report as it now stands in REPRODUCTION.md.`,
+            outputs: [
+              { id: 'verdict', label: 'Verdict', type: 'text', required: true, description: 'Reproduced, Close, Not reproduced, or Could not run, with the reason in a sentence' },
+              { id: 'results', label: 'Numbers', type: 'table', required: true, columns: [{ id: 'metric', label: 'Metric', type: 'text' }, { id: 'setting', label: 'Row and column', type: 'text' }, { id: 'paper', label: 'The paper’s', type: 'number' }, { id: 'ours', label: 'Ours', type: 'number' }, { id: 'note', label: 'Note', type: 'text' }] },
+              { id: 'steps', label: 'What it took after the runs', type: 'table', columns: [{ id: 'step', label: 'What', type: 'text' }, { id: 'minutes', label: 'Minutes', type: 'number' }, { id: 'ok', label: 'Went well', type: 'yesno' }, { id: 'note', label: 'Note', type: 'text' }] },
+              { id: 'fixes', label: 'Changes and fixes', type: 'list' },
+              { id: 'report', label: 'REPRODUCTION.md', type: 'markdown', required: true },
+            ],
+            failed: 'skip',
+          },
         ],
       },
       {
@@ -851,12 +897,28 @@ When you are done (or a limit stops you), write REPRODUCTION.md in the work fold
         title: 'Compare the numbers',
         do: 'code',
         language: 'javascript',
-        with: { results: '{{work.results}}', verdict: '{{work.verdict}}', steps: '{{work.steps}}' },
+        with: {
+          results: '{{work.results}}',
+          after: '{{finish.results}}',
+          verdict: '{{work.verdict}}',
+          final: '{{finish.verdict}}',
+          steps: '{{work.steps}}',
+          later: '{{finish.steps}}',
+          fixes: '{{work.fixes}}',
+          more: '{{finish.fixes}}',
+          hours: '{{work.hours}}',
+          report: '{{work.report}}',
+          finished: '{{finish.report}}',
+          runs: '{{work.runs}}',
+          waited: '{{waited.data}}',
+        },
         code:
           LIST +
           String.raw`// Each number beside the paper's, the difference, and whether it is close enough: within half a point on a 0-100 scale
-// (0.005 on a 0-1 scale), within 2% for larger numbers (times, counts); reproduced when all are.
-const results = rows(input.results).map((x) => {
+// (0.005 on a 0-1 scale), within 2% for larger numbers (times, counts); reproduced when all are. With runs that went on in
+// Experiments, the numbers and the report are those of the agent that finished it, and the runs' time counts in the hours.
+const later = rows(input.after).length > 0;
+const results = rows(later ? input.after : input.results).map((x) => {
   const paper = typeof x.paper === 'number' ? x.paper : Number(x.paper);
   const ours = typeof x.ours === 'number' ? x.ours : Number(x.ours);
   const both = isFinite(paper) && isFinite(ours) && x.paper !== null && x.ours !== null;
@@ -866,15 +928,29 @@ const results = rows(input.results).map((x) => {
 });
 const close = results.filter((x) => x.close).length;
 const matched = results.length > 0 && close === results.length;
-const steps = rows(input.steps).map((s, i) => ({ n: i + 1, step: String(s.step || ''), minutes: Number(s.minutes) || null, ok: s.ok !== false, note: String(s.note || '') }));
+// The runs in Experiments: from the first start to the last end.
+const ran = rows(obj(input.waited).runs);
+const starts = ran.map((r) => Number(r.startedAt)).filter((t) => t > 0);
+const ends = ran.map((r) => Number(r.endedAt)).filter((t) => t > 0);
+const runMinutes = starts.length && ends.length ? Math.max(0, Math.round((Math.max.apply(null, ends) - Math.min.apply(null, starts)) / 60000)) : null;
+const ids = list(input.runs).map(String).filter(Boolean);
+const all = rows(input.steps).concat(ids.length ? [{ step: 'Ran in Experiments (' + ids.length + (ids.length === 1 ? ' run' : ' runs') + ')', minutes: runMinutes, ok: ran.length ? ran.every((r) => r.status === 'done') : true, note: ran.map((r) => (r.name || r.id) + ': ' + r.status).join(', ') }] : []).concat(rows(input.later));
+const steps = all.map((s, i) => ({ n: i + 1, step: String(s.step || ''), minutes: Number(s.minutes) || null, ok: s.ok !== false, note: String(s.note || '') }));
+const hours = Math.round(((Number(input.hours) || 0) + (runMinutes || 0) / 60 + rows(input.later).reduce((t, s) => t + (Number(s.minutes) || 0), 0) / 60) * 10) / 10;
+const fixes = list(input.fixes).concat(list(input.more)).map(String).filter((f, i, a) => f && a.indexOf(f) === i);
+const verdict = String(input.final || input.verdict || (matched ? 'Reproduced' : results.length ? 'Not reproduced' : 'Could not run'));
 const summary = results.length ? close + ' of ' + results.length + ' numbers within reach of the paper’s' + (matched ? ': reproduced.' : '.') : 'No numbers came out to compare.';
-return { results, matched, summary, steps, verdict: String(input.verdict || (matched ? 'Reproduced' : 'Not reproduced')) };`,
+return { results, matched, summary, steps, verdict, fixes, hours: hours || null, report: String(input.finished || input.report || ''), runs: ids };`,
         outputs: [
           { id: 'results', label: 'Numbers', type: 'table', columns: REPRO_RESULTS },
           { id: 'matched', label: 'Reproduced', type: 'yesno' },
           { id: 'summary', label: 'In short', type: 'text' },
           { id: 'steps', label: 'What it took', type: 'table', columns: REPRO_STEPS },
           { id: 'verdict', label: 'Verdict', type: 'text' },
+          { id: 'fixes', label: 'Changes and fixes', type: 'list' },
+          { id: 'hours', label: 'Hours in all', type: 'number' },
+          { id: 'report', label: 'Report', type: 'markdown' },
+          { id: 'runs', label: 'Its runs in Experiments', type: 'list' },
         ],
         failed: 'agent',
       },
@@ -887,11 +963,12 @@ return { results, matched, summary, steps, verdict: String(input.verdict || (mat
       results: '{{compare.results}}',
       setting: '{{plan.setting}}',
       steps: '{{compare.steps}}',
-      fixes: '{{work.fixes}}',
-      hours: '{{work.hours}}',
-      report: '{{work.report}}',
+      fixes: '{{compare.fixes}}',
+      hours: '{{compare.hours}}',
+      report: '{{compare.report}}',
       folder: '{{work.folder}}',
       repo: '{{work.repo}}',
+      runs: '{{compare.runs}}',
     },
   },
   answer: [
@@ -907,6 +984,7 @@ return { results, matched, summary, steps, verdict: String(input.verdict || (mat
     { id: 'report', label: 'Report', type: 'markdown', required: true },
     { id: 'folder', label: 'Work folder', type: 'text' },
     { id: 'repo', label: 'Repository', type: 'url' },
+    { id: 'runs', label: 'Its runs in Experiments', type: 'list' },
   ],
   examples: [
     { id: 'dpr-nq', name: 'BM25 on BEIR’s SciFact', inputs: { paper: '2104.08663', target: 'Table 2: BM25 nDCG@10 on SciFact', limits: 'At most 1 hour, 20 GB of disk, no GPU' }, checks: ['{{answer.results}} is not empty', '{{answer.report}} is not empty'] },
