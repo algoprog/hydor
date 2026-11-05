@@ -47,7 +47,7 @@ import { normalizeDoc } from '../../shared/docs.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
-import { openFile, saveFile } from './filemodel.ts';
+import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
 import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage } from './sites.ts';
@@ -163,10 +163,17 @@ const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
   description:
-    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML and the data it stores (to change it with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it.',
-  inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'A saved page’s id.' } } },
+    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML and the data it stores (to change it with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'A saved page’s id.' },
+      path: { type: 'string', description: 'Instead of id: a .tex file of this computer, for the comments kept on its project.' },
+    },
+  },
   async run(a, ctx) {
     const db = ctx.deps.db;
+    if (typeof a.path === 'string' && a.path.trim() && !(typeof a.id === 'string' && a.id.trim())) return texFileForAgent(db, fromSession(ctx.cwd, a.path.trim()));
     const id = typeof a.id === 'string' ? a.id.trim() : '';
     if (!id) {
       const list = listPages(db);
@@ -267,6 +274,12 @@ const SAVE_LATEX: RunTool = {
   inputSchema: SAVE_LATEX_SCHEMA,
   async run(a, ctx) {
     const db = ctx.deps.db;
+    // A file of this computer's: its comments only (the app keeps them); the file the agent changes itself.
+    if (typeof a.path === 'string' && a.path.trim() && !(typeof a.id === 'string' && a.id.trim())) {
+      const r = await agentFileComments(db, fromSession(ctx.cwd, a.path.trim()), a.comments);
+      tell(ctx.deps, { what: 'file-comments', paths: r.paths });
+      return r.text;
+    }
     const id = changing(db, a, 'tex');
     const { id: _id, ...rest } = a;
     // The version it changes: the files and pictures the agent leaves out stay. (The title goes in a template's text.)
@@ -590,6 +603,7 @@ function routes(d: Deps) {
   });
   /** A file of this computer in one of the editors (Files opens Word, Excel, CSV and LaTeX files so), and saved back to it. */
   app.get('/api/pages/file', async (req) => openFile(db, String((req.query as { path?: string }).path ?? '')));
+  app.get('/api/pages/file/comments', async (req) => openFileComments(db, String((req.query as { path?: string }).path ?? '')));
   app.put('/api/pages/file', { bodyLimit: 40 * 1024 * 1024 }, async (req) => saveFile(db, B(req)));
   /** The user changed an HTML file in the page editor beside a conversation: its agent hears of it with their next message. */
   app.post('/api/pages/file-edit', { bodyLimit: 12 * 1024 * 1024 }, async (req) => {

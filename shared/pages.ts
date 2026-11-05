@@ -122,7 +122,9 @@ export type PagesEvent =
   /** A page's picture in Pages is ready. */
   | { what: 'thumb'; id: string; thumb: string }
   /** To one session's pages: a draft grew by `text`, which goes at `from` (0 with the whole text so far starts it over). */
-  | { what: 'draft'; draft: Omit<PageDraft, 'text'>; from: number; text: string };
+  | { what: 'draft'; draft: Omit<PageDraft, 'text'>; from: number; text: string }
+  /** An agent answered, resolved or added comments of these files of this computer (LaTeX files opened from Files). */
+  | { what: 'file-comments'; paths: string[] };
 
 /** What a page-edit note in the conversation holds: the user changed a page, and whether the agent heard of it yet. */
 export interface PageEditNote {
