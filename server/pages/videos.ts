@@ -8,10 +8,11 @@
 // windows), and at an address that is its own permission, signed by this server, for what opens without the app's
 // sign-in (a deck's own page, its published copies, the conversation's frame).
 import crypto from 'node:crypto';
+import { once } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Transform, type Readable } from 'node:stream';
+import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { VIDEO } from '../../shared/slides.ts';
@@ -111,6 +112,24 @@ async function keep(db: DB, file: string, bytes: number, move: boolean): Promise
   return { src: VIDEO + sha, mime: type.mime, bytes };
 }
 
+/** How far past what a piece may carry its bytes are still read (and let go) before it is refused; much more, and it is cut. */
+const LET_GO = 8 * 1024 * 1024;
+
+/**
+ * A piece refused before its bytes were read: they are read and let go first, so the refusal reaches the page. A browser
+ * still sending a piece the server stopped reading sees only a broken connection, never the answer.
+ */
+async function refuse(body: Readable, e: HttpError): Promise<never> {
+  let n = 0;
+  try {
+    for await (const chunk of body as AsyncIterable<Buffer>) {
+      n += chunk.length;
+      if (n > VIDEO_CHUNK + LET_GO) break;
+    }
+  } catch {}
+  throw e;
+}
+
 /**
  * A piece of a video sent from a browser, at `offset` of `total` bytes, under the upload's own id: added to what came
  * before; the last gives the kept video's source. Pieces come in order, each at most VIDEO_CHUNK.
@@ -119,29 +138,40 @@ export async function takeVideoPiece(db: DB, body: Readable, q: { upload?: unkno
   const id = typeof q.upload === 'string' && /^[a-z0-9]{8,40}$/.test(q.upload) ? q.upload : null;
   const offset = Number(q.offset);
   const total = Number(q.total);
-  if (!id || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(total) || total <= 0 || offset >= total) throw new HttpError(400, 'Send upload (its id), offset and total with each piece');
-  if (total > MAX_VIDEO) throw new HttpError(413, `That video is over ${MAX_VIDEO / 1024 / 1024} MB`);
+  if (!id || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(total) || total <= 0 || offset >= total) return refuse(body, new HttpError(400, 'Send upload (its id), offset and total with each piece'));
+  if (total > MAX_VIDEO) return refuse(body, new HttpError(413, `That video is over ${MAX_VIDEO / 1024 / 1024} MB`));
   await fs.promises.mkdir(dir(), { recursive: true });
   const part = path.join(dir(), `${id}.part`);
   if (offset === 0) await fs.promises.writeFile(part, '');
   else {
     const have = (await fs.promises.stat(part).catch(() => null))?.size;
-    if (have !== offset) throw new HttpError(409, `The upload is out of step (${have ?? 0} bytes came before this piece)`);
+    if (have !== offset) return refuse(body, new HttpError(409, `The upload is out of step (${have ?? 0} bytes came before this piece)`));
   }
-  // Counted as it comes: a piece no larger than a piece, the whole no larger than it said.
+  // Counted as it comes: a piece no larger than a piece, the whole no larger than it said. What comes past that is read
+  // and let go a little way, so the refusal reaches the page rather than a broken connection; much more, and it is cut.
   let got = offset;
   const limit = Math.min(total, offset + VIDEO_CHUNK);
-  const count = new Transform({
-    transform(chunk: Buffer, _enc, done) {
-      got += chunk.length;
-      done(got > limit ? new HttpError(413, 'That piece is larger than the upload said') : null, chunk);
-    },
-  });
+  const out = fs.createWriteStream(part, { flags: 'a' });
+  let failed: Error | null = null;
+  out.on('error', (e) => void (failed ??= e));
   try {
-    await pipeline(body, count, fs.createWriteStream(part, { flags: 'a' }));
+    for await (const chunk of body as AsyncIterable<Buffer>) {
+      got += chunk.length;
+      if (got > limit) {
+        if (got > limit + LET_GO) break;
+        continue;
+      }
+      if (failed) break;
+      if (!out.write(chunk)) await once(out, 'drain');
+    }
   } catch (e) {
+    failed ??= e as Error;
+  }
+  await new Promise<void>((r) => (failed ? (out.destroy(), r()) : out.end((e?: Error | null) => (e && (failed ??= e), r()))));
+  if (failed || got > limit) {
     await fs.promises.rm(part, { force: true });
-    throw e instanceof HttpError ? e : new HttpError(499, `The upload was cut: ${(e as Error).message}`);
+    if (failed) throw failed instanceof HttpError ? failed : new HttpError(499, `The upload was cut: ${(failed as Error).message}`);
+    throw new HttpError(413, 'That piece is larger than the upload said');
   }
   if (got < total) return { received: got };
   return keep(db, part, total, true);
