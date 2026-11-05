@@ -272,6 +272,12 @@ ok(r.statusCode === 200, `Edit documents saves: ${r.body}`);
 doc = pageModel(db, chapter.id) as Doc;
 ok(JSON.stringify(doc.blocks).includes('long, rare queries'), 'their change is kept');
 ok(versionsOf(db, chapter.id)[0].who === 'Nikos' && versionsOf(db, chapter.id)[0].by === 'edit', 'the version says who changed it');
+{
+  // A picture at a web address can't come in through a link: drawing the document would fetch it from this computer.
+  const now = pageInfo(db, chapter.id)!;
+  const web = await req('POST', `${N}/items/${chapter.id}/versions`, { model: { markdown: 'With a picture\n\n![x](https://example.com/x.png)', blocks: [{ type: 'image', src: 'https://example.com/x.png' }] }, base: now.version });
+  ok(web.statusCode === 400 && pageInfo(db, chapter.id)!.version === now.version, 'a save that adds a picture at a web address is refused');
+}
 const byId = new Map(doc.comments!.map((c) => [c.id, c]));
 ok(byId.get('cnik1')?.by === 'person' && byId.get('cnik1')?.name === 'Nikos', 'their new comment is theirs');
 ok(byId.get('cnik2')?.name === 'Nikos', 'a comment they write is theirs whatever it claims');
