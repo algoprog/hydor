@@ -207,7 +207,7 @@ export function cleanExtra(x: unknown): TaskExtra | undefined {
 }
 
 // Request headers a webhook prompt may quote: never credentials.
-const SECRET_HEADERS = /^(authorization|cookie|proxy-authorization|x-api-key|cf-access-.*|x-hub-signature.*|x-gitea-signature|x-gogs-signature|x-gitlab-token|x-webhook-token|x-signature.*)$/i;
+const SECRET_HEADERS = /^(authorization|cookie|proxy-authorization|x-api-key|cf-access-.*|x-hub-signature.*|x-gitea-signature|x-gogs-signature|x-gitlab-token|x-webhook-token|x-signature.*|x-buildkite-token|x-buildkite-signature|circleci-signature|sentry-hook-signature)$/i;
 
 /**
  * A webhook prompt with its placeholders filled from the call. Each value is wrapped as outside data so

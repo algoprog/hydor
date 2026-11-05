@@ -1,6 +1,7 @@
 // Checks for the automations, run as a script (no test framework): schedule math in time zones, each
 // watcher kind against a local fixture server, run history and the pause rule, webhooks that wait,
-// and the confirm card's round trip, all with a stand-in for the session manager.
+// the confirm card's round trip, and the engineering examples (each a valid task whose webhook filter lets
+// only what it is for start a run, with where its address goes), all with a stand-in for the session manager.
 //
 //   OUTDIR=/tmp/hydor-auto-tests node scripts/build-server.mjs server/automations/tests.ts
 //   DATA_DIR=/tmp/hydor-auto-tests/data node /tmp/hydor-auto-tests/tests.js
@@ -26,6 +27,8 @@ import { selectText } from './select.ts';
 import { draftFromSession } from './draft.ts';
 import { automationTools, decide, getProposal, noteSpawn } from './tools.ts';
 import { checkWatch, validWatch } from './watch.ts';
+import { ALERT_SOURCES, ALERTS, CI, CI_SERVICES, ciDoctorTask, dependencyTask, hookHelp, incidentTask, issueTriageTask, PR_REVIEW_WHERE, type ExampleTask } from '../../shared/engineering.ts';
+import { validSchedule } from '../scheduler.ts';
 
 let passed = 0;
 const failures: string[] = [];
@@ -812,6 +815,191 @@ await test('list_tasks speaks in the user’s time zone', async () => {
   assert.match(text, new RegExp(`- ${t.id} · Morning · Daily at 07:00 · next \\w{3} \\d+ \\w{3}, 07:00 · not run yet · Claude Code · new session in`));
   assert.match(text, /Times are in Europe\/Athens\.$/);
   scheduler.remove(t.id);
+});
+
+// ---- the engineering examples ---------------------------------------------------------------------------------
+
+console.log('Engineering examples');
+/** Saves an example's task as the examples' form does. */
+const saveExample = (x: ExampleTask) => scheduler.save({ ...base, ...x, cwd: root }, { origin: x.origin });
+/** Calls a webhook task, as a service would; the burst rule is cleared first. */
+const hit = (t: { id: string; hookPath?: string }, body: object, headers: Record<string, string> = {}) => {
+  db.prepare('update tasks set last_at = null where id = ?').run(t.id);
+  return app.inject({ method: 'POST', url: t.hookPath!, payload: JSON.stringify(body), headers: { 'content-type': 'application/json', ...headers } });
+};
+const quoted = (from: string, value: string) => `<webhook-data from="${from}">\n${value}\n</webhook-data>`;
+
+// What each CI sends for a failed run, and for one that passed.
+const ciCalls: Record<string, { failed: object; passed: object; shows: [string, string] }> = {
+  github: {
+    failed: { action: 'completed', workflow_run: { name: 'Tests', html_url: 'https://github.com/acme/shop/actions/runs/42', id: 42, run_attempt: 1, head_branch: 'main', head_sha: 'a1b2c3d', event: 'push', conclusion: 'failure', head_commit: { message: 'Speed up checkout' }, pull_requests: [] }, repository: { full_name: 'acme/shop' } },
+    passed: { action: 'completed', workflow_run: { name: 'Tests', conclusion: 'success' }, repository: { full_name: 'acme/shop' } },
+    shows: ['body.workflow_run.html_url', 'https://github.com/acme/shop/actions/runs/42'],
+  },
+  gitlab: {
+    failed: { object_kind: 'pipeline', object_attributes: { id: 7, ref: 'main', sha: 'a1b2c3d', status: 'failed', source: 'push', url: 'https://gitlab.com/acme/shop/-/pipelines/7' }, project: { path_with_namespace: 'acme/shop' }, commit: { message: 'Speed up checkout' }, builds: [{ id: 70, name: 'test', status: 'failed' }] },
+    passed: { object_kind: 'pipeline', object_attributes: { id: 8, status: 'success' } },
+    shows: ['body.object_attributes.url', 'https://gitlab.com/acme/shop/-/pipelines/7'],
+  },
+  buildkite: {
+    failed: { event: 'build.finished', build: { web_url: 'https://buildkite.com/acme/shop/builds/12', url: 'https://api.buildkite.com/v2/organizations/acme/pipelines/shop/builds/12', number: 12, state: 'failed', branch: 'main', commit: 'a1b2c3d', message: 'Speed up checkout' }, pipeline: { slug: 'shop' } },
+    passed: { event: 'build.finished', build: { state: 'passed' }, pipeline: { slug: 'shop' } },
+    shows: ['body.build.web_url', 'https://buildkite.com/acme/shop/builds/12'],
+  },
+  circleci: {
+    failed: { type: 'workflow-completed', workflow: { id: 'w-1', name: 'build-and-test', status: 'failed', url: 'https://app.circleci.com/pipelines/gh/acme/shop/3/workflows/w-1' }, pipeline: { number: 3, vcs: { branch: 'main', revision: 'a1b2c3d', commit: { subject: 'Speed up checkout' } } }, project: { slug: 'gh/acme/shop' } },
+    passed: { type: 'workflow-completed', workflow: { status: 'success' } },
+    shows: ['body.workflow.url', 'https://app.circleci.com/pipelines/gh/acme/shop/3/workflows/w-1'],
+  },
+};
+
+await test('every example is a task the app takes as it is, named for what it does', () => {
+  const drafts = [
+    ...CI_SERVICES.map((ci) => ciDoctorTask({ folder: root, ci, rerun: 'yes', pr: 'yes' })),
+    issueTriageTask({ folder: root, label: 'yes', comment: 'yes', fix: 'yes' }),
+    dependencyTask({ folder: root, day: '1', time: '08:30', pr: 'yes' }),
+    ...ALERT_SOURCES.map((source) => incidentTask({ folder: root, source })),
+  ];
+  for (const x of drafts) {
+    assert.deepEqual(validSchedule(x.schedule), x.schedule, `${x.name}: its schedule passes as it is`);
+    assert.ok(x.origin?.startsWith('template:'), `${x.name}: says which example it came from`);
+    assert.ok(x.prompt.length < 50_000);
+    const t = saveExample(x);
+    assert.equal(t.origin, x.origin);
+    assert.equal(t.cwd, root);
+    scheduler.remove(t.id);
+  }
+  assert.deepEqual(
+    drafts.map((x) => x.name),
+    [
+      'CI doctor · GitHub Actions',
+      'CI doctor · GitLab CI',
+      'CI doctor · Buildkite',
+      'CI doctor · CircleCI',
+      'Issue triage',
+      'Dependency gardener',
+      'Incident first responder · Sentry',
+      'Incident first responder · Grafana',
+      'Incident first responder · Datadog',
+      'Incident first responder · Better Stack',
+      'Incident first responder · Another service',
+    ],
+  );
+});
+
+await test('CI doctor: only a failed run starts one, with its essentials quoted, the skill named and what it may do', async () => {
+  for (const ci of CI_SERVICES) {
+    const t = saveExample(ciDoctorTask({ folder: root, ci, rerun: 'yes', pr: 'yes', comment: '' }));
+    const c = ciCalls[ci];
+    const skipped = await hit(t, c.passed);
+    assert.equal(skipped.json().status, 'skipped', `${ci}: a run that passed starts nothing`);
+    const before = sessions.created.length;
+    const r = await hit(t, c.failed);
+    assert.equal(r.statusCode, 202, `${ci}: a failed run starts one`);
+    assert.equal(sessions.created.length, before + 1);
+    const prompt = sessions.created.at(-1).prompt as string;
+    assert.ok(prompt.includes(quoted(...c.shows)), `${ci}: the run’s address is in the prompt`);
+    assert.match(prompt, new RegExp(`A ${CI[ci].label} run failed .* the ci-doctor skill says: load it first`));
+    assert.match(prompt, /You may: re-run the failed jobs, once, when the failure looks flaky; and fix a real failure on a branch of your own and open a draft pull request/);
+    assert.match(prompt, /You may not: comment on the commit or pull request with what you found\./);
+    assert.match(prompt, /Never push to the default branch, force-push or merge anything\./);
+    await sessions.endTurn(scheduler, lastRun(t.id).key!, 'Flaky: a timeout in the payment test; re-ran it, green now.');
+    scheduler.remove(t.id);
+  }
+  // Nothing allowed: it says what it would have done instead.
+  const quiet = ciDoctorTask({ folder: root, ci: 'github' }).prompt;
+  assert.doesNotMatch(quiet, /You may:/);
+  assert.match(quiet, /You may not: re-run .*; fix .*; and comment .*\. Say in your report what you would have done instead\./);
+});
+
+await test('Issue triage: a newly opened issue runs it, with the issue quoted; anything else is skipped', async () => {
+  const t = saveExample(issueTriageTask({ folder: root, label: 'yes', comment: 'yes', fix: '' }));
+  assert.equal((await hit(t, { action: 'edited', issue: { number: 5 } })).json().status, 'skipped');
+  await hit(t, { action: 'opened', issue: { number: 5, title: 'Checkout fails with a coupon', html_url: 'https://github.com/acme/shop/issues/5', body: 'Steps: add a coupon, pay.', user: { login: 'kim' } }, repository: { full_name: 'acme/shop' } });
+  const prompt = sessions.created.at(-1).prompt as string;
+  assert.ok(prompt.includes(quoted('body.issue.title', 'Checkout fails with a coupon')));
+  assert.ok(prompt.includes(quoted('body.issue.body', 'Steps: add a coupon, pay.')));
+  assert.match(prompt, /the issue-triage skill says/);
+  assert.match(prompt, /You may: label it, with labels the repository already has; and comment on it/);
+  assert.match(prompt, /You may not: when the fix is small and clear, try it/);
+  assert.match(prompt, /Never close, lock, transfer or delete issues/);
+  await sessions.endTurn(scheduler, lastRun(t.id).key!, 'Labelled bug.');
+  scheduler.remove(t.id);
+});
+
+await test('Dependency gardener: once a week on the day and at the time picked, pull requests or a report', () => {
+  const x = dependencyTask({ folder: root, day: '1', time: '08:30', pr: 'yes' });
+  assert.deepEqual(x.schedule, { kind: 'daily', time: '08:30', days: [1] });
+  // From Thursday 5 November 2026, the next Monday at 08:30 in Athens.
+  assert.equal(iso(nextRun(x.schedule, Date.parse('2026-11-05T12:00:00Z'), 'Europe/Athens')), '2026-11-09T06:30Z');
+  assert.match(x.prompt, /the dependency-upgrades skill says/);
+  assert.match(x.prompt, /security fixes first, then patch, minor and major upgrades, each group apart; never mix majors with the rest/);
+  assert.match(x.prompt, /Open one draft pull request per group/);
+  const report = dependencyTask({ folder: root, day: '9', time: '' });
+  assert.deepEqual(report.schedule, { kind: 'daily', time: '09:00', days: [1] }, 'a day that is no day: Monday; no time: 09:00');
+  assert.match(report.prompt, /Push nothing and open no pull requests/);
+  assert.match(report.prompt, /silent when everything is up to date/);
+});
+
+await test('Incident first responder: an alert runs it with the whole alert; resolved notices start nothing; the rollback waits for a yes', async () => {
+  const resolved: Record<string, object> = { sentry: { action: 'resolved' }, grafana: { status: 'resolved' }, datadog: { transition: 'Recovered' } };
+  const firing: Record<string, object> = {
+    sentry: { action: 'critical', data: { metric_alert: { title: 'Error rate over 5%' } } },
+    grafana: { status: 'firing', title: '[FIRING:1] HighLatency checkout', alerts: [{ labels: { alertname: 'HighLatency' } }] },
+    datadog: { transition: 'Triggered', title: '[Triggered] 5xx on checkout' },
+    betterstack: { data: { id: '1', type: 'incident', attributes: { name: 'shop.example down', status: 'Started' } } },
+    other: { alert: 'disk full on db-1' },
+  };
+  for (const source of ALERT_SOURCES) {
+    const t = saveExample(incidentTask({ folder: root, source, rollback: source === 'grafana' ? 'kubectl rollout undo deployment/checkout' : '' }));
+    if (resolved[source]) assert.equal((await hit(t, resolved[source])).json().status, 'skipped', `${source}: a resolved notice starts nothing`);
+    assert.equal((await hit(t, firing[source])).statusCode, 202, `${source}: an alert starts a run`);
+    const prompt = sessions.created.at(-1).prompt as string;
+    assert.ok(prompt.includes(quoted('body', JSON.stringify(firing[source], null, 2))), `${source}: the whole alert is quoted`);
+    assert.match(prompt, new RegExp(`An alert came in from ${ALERTS[source].label} .* the incident-response skill says`));
+    assert.match(prompt, /notify_user/);
+    assert.match(prompt, /Never roll back, restart, deploy or change anything in production without the user’s yes on a card/);
+    if (source === 'grafana') assert.match(prompt, /How to roll back: kubectl rollout undo deployment\/checkout\. Run it only after the user said yes to it on a card \(ask_form\)/);
+    else assert.match(prompt, /There is no rollback command: .* ask the user how and whether to do it, with ask_form/);
+    await sessions.endTurn(scheduler, lastRun(t.id).key!, 'Bad deploy at 14:02; rollback proposed.');
+    scheduler.remove(t.id);
+  }
+});
+
+await test('the card says where a webhook example’s address goes, for the service its form picked', () => {
+  const hook = (x: ExampleTask) => hookHelp(x.origin, x.schedule);
+  assert.match(hook(ciDoctorTask({ ci: 'github' }))!, /Settings → Webhooks → Add webhook.*tick only Workflow runs/);
+  assert.match(hook(ciDoctorTask({ ci: 'gitlab' }))!, /tick only Pipeline events/);
+  assert.match(hook(ciDoctorTask({ ci: 'buildkite' }))!, /Notification Services.*build\.finished/);
+  assert.match(hook(ciDoctorTask({ ci: 'circleci' }))!, /Project Settings → Webhooks → Add Webhook.*Workflow Completed/);
+  assert.match(hook(issueTriageTask({}))!, /tick only Issues/);
+  assert.match(hook(incidentTask({ source: 'grafana' }))!, /Contact points/);
+  assert.match(hook(incidentTask({ source: 'betterstack' }))!, /Outgoing webhooks/);
+  assert.match(hook(incidentTask({ source: 'other' }))!, /a POST with the alert as JSON/);
+  assert.equal(hookHelp('template:pr-review', { kind: 'webhook', filter: { path: 'body.action', value: 'opened' } }), PR_REVIEW_WHERE);
+  // A task saved before its origin named the service: told by its filter.
+  assert.match(hookHelp('template:ci-doctor', { kind: 'webhook', filter: { path: 'body.workflow.status', value: 'failed' } })!, /CircleCI/);
+  assert.equal(hookHelp('template:ci-doctor', { kind: 'daily', time: '09:00' }), null, 'only a webhook has an address');
+  assert.equal(hookHelp('chat', { kind: 'webhook' }), null);
+  assert.equal(hookHelp(undefined, { kind: 'webhook' }), null);
+});
+
+await test('signed calls the way CircleCI, Sentry and Buildkite sign them; their tokens never reach a prompt', async () => {
+  const signed = scheduler.save({ ...base, name: 'Signed', prompt: 'Token: {{headers.x-buildkite-token}} Sig: {{headers.circleci-signature}}', schedule: { kind: 'webhook', secret: 'sh-h' } });
+  const body = JSON.stringify({ ok: 1 });
+  const hex = crypto.createHmac('sha256', 'sh-h').update(body).digest('hex');
+  const send = (headers: Record<string, string>) => {
+    db.prepare('update tasks set last_at = null where id = ?').run(signed.id);
+    return app.inject({ method: 'POST', url: signed.hookPath!, payload: body, headers: { 'content-type': 'application/json', ...headers } });
+  };
+  assert.equal((await send({ 'circleci-signature': `v1=${hex}` })).statusCode, 202, 'CircleCI: v1=<hex>');
+  assert.equal((await send({ 'circleci-signature': `v1=${'0'.repeat(64)},v1=${hex}` })).statusCode, 202, 'one of several');
+  assert.equal((await send({ 'sentry-hook-signature': hex })).statusCode, 202, 'Sentry: the hex digest');
+  assert.equal((await send({ 'x-buildkite-token': 'sh-h' })).statusCode, 202, 'Buildkite: the token itself');
+  assert.match(sessions.created.at(-1).prompt, /Token:  Sig: /, 'no token or signature fills the prompt');
+  assert.equal((await send({ 'circleci-signature': `v1=${'0'.repeat(64)}` })).statusCode, 401);
+  assert.equal((await send({ 'x-buildkite-token': 'nope' })).statusCode, 401);
+  scheduler.remove(signed.id);
 });
 
 srv.close();
