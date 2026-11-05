@@ -74,6 +74,8 @@ import type { TexReference } from '@shared/latex-bib';
 import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Segmented, Throbber, useConfirm } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { toast, toastError } from '../../../lib/store';
+import { findIn, replaceAllIn, replacementOf, type Match } from '../common/find';
+import { FindBar, useFind } from '../common/FindBar';
 import { MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
@@ -130,7 +132,9 @@ const SHORTCUTS: ShortcutGroup[] = [
     items: [
       ['Ctrl+Z', 'Undo'],
       ['Ctrl+Shift+Z / Ctrl+Y', 'Redo'],
-      ['Ctrl+F', 'Find and replace'],
+      ['Ctrl+F', 'Find'],
+      ['Ctrl+H', 'Find and replace'],
+      ['Enter / Shift+Enter', 'In the find bar: the next match, or the one before'],
       ['Ctrl+D', 'Pick the next of the same words too'],
       ['Alt+↑ / Alt+↓', 'Move the lines up or down'],
       ['Ctrl+Shift+K', 'Delete the line'],
@@ -262,6 +266,13 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   const [dark, setDark] = useState(isDark);
   const [presentAsk, setPresentAsk] = useState(0);
   const [dialog, setDialog] = useState<'refs' | 'count' | 'compare' | 'keys' | null>(null);
+  // Find and replace (Ctrl+F, Ctrl+H): the shared bar, over the file in view.
+  const find = useFind();
+  const findRef = useRef(find);
+  findRef.current = find;
+  const [found, setFound] = useState<{ list: Match[]; current: number }>({ list: [], current: -1 });
+  /** Where the next match is looked for after a replace (just after what went in). */
+  const findFrom = useRef<number | null>(null);
   /** The table editor: the table, and where it was read from when it is one of the document's. */
   const [tableAsk, setTableAsk] = useState<{ table: TexTable; at: { file: string; from: number; to: number } | null } | null>(null);
   const [naming, setNaming] = useState<{ kind: 'new' | 'rename-file' | 'rename-picture'; from?: string } | null>(null);
@@ -425,6 +436,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
           installed: () => installedRef.current,
           macros: macrosOf,
           picture: pictureOf,
+          onFind: (replace) => findRef.current.show(replace && !readOnly),
         },
         visual: modeRef.current === 'visual',
         spell: spellRef.current,
@@ -574,6 +586,9 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
         void saveRef.current();
+      } else if (mod && (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'h')) {
+        e.preventDefault();
+        findRef.current.show(e.key.toLowerCase() === 'h');
       } else if (mod && e.key === 'Enter') {
         e.preventDefault();
         void runRef.current(true);
@@ -582,6 +597,69 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
   }, []);
+
+  // ---- find and replace ---------------------------------------------------------------------------------------------------
+  const codeInView = () => (file === PICTURES ? null : (codes.current.get(file) ?? null));
+  // The words, the switches or the file changed: the matches again, and the first one from the cursor on is gone to.
+  useEffect(() => {
+    const c = codeInView();
+    if (!find.open || !c) {
+      for (const x of codes.current.values()) x.markFound([], -1);
+      setFound({ list: [], current: -1 });
+      return;
+    }
+    const list = findIn(c.text(), find.query, find.options, 5000);
+    const from = c.picked().from;
+    let current = list.findIndex((m) => m.s >= from);
+    if (current < 0 && list.length) current = 0;
+    setFound({ list, current });
+    c.markFound(list, current);
+    if (current >= 0) c.select(list[current].s, list[current].e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [find.open, find.query, find.options, file]);
+  // The text changed (typed, or replaced from the bar): the matches again, the current one kept by its place.
+  useEffect(() => {
+    const c = codeInView();
+    if (!find.open || !c) return;
+    const list = findIn(c.text(), find.query, find.options, 5000);
+    const after = findFrom.current;
+    findFrom.current = null;
+    const from = after ?? c.picked().from;
+    let current = list.findIndex((m) => m.s >= from);
+    if (current < 0 && list.length) current = after === null ? list.length - 1 : 0;
+    setFound({ list, current });
+    c.markFound(list, current);
+    if (after !== null && current >= 0) c.select(list[current].s, list[current].e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model]);
+  useEffect(() => {
+    if (!find.open) codeInView()?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [find.open]);
+  const findGo = (d: number) => {
+    const c = codeInView();
+    const n = found.list.length;
+    if (!c || !n) return;
+    const current = found.current < 0 ? (d > 0 ? 0 : n - 1) : (found.current + d + n) % n;
+    setFound((f) => ({ ...f, current }));
+    c.markFound(found.list, current);
+    c.select(found.list[current].s, found.list[current].e);
+  };
+  const replaceOne = () => {
+    const c = codeInView();
+    const m = found.list[found.current];
+    if (!c || !m || readOnly) return;
+    const rep = replacementOf(c.text(), m, find.query, find.replacement, find.options);
+    findFrom.current = m.s + rep.length;
+    c.replaceQuiet(m.s, m.e, rep);
+  };
+  const replaceAll = () => {
+    if (!codeInView() || readOnly) return;
+    const r = replaceAllIn(codeInView()!.text(), find.query, find.replacement, find.options);
+    if (!r.count) return;
+    editFile(file, () => r.text);
+    toast(`Replaced ${r.count} time${r.count === 1 ? '' : 's'}`, 'ok');
+  };
 
   // ---- what an agent is asked about ------------------------------------------------------------------------------------
   const settled = useDeferredValue(model);
@@ -667,7 +745,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     withCode(name, (c) => {
       if (id === 'bold') return c.toggle('textbf', 'bold');
       if (id === 'italic') return c.toggle('textit', 'italic');
-      const p = c.picked();
+      const p = c.pickedLines();
       const made = makeSnippet(id, p.empty ? '' : p.text, { picture, key, labels: docWords(live.current ?? model!).labels });
       if (made.needs) editFile(TEX_MAIN, (t) => withPackages(t, made.needs!));
       if (made.block && !p.empty && (id === 'itemize' || id === 'enumerate' || id === 'description' || id === 'align')) {
@@ -929,7 +1007,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
   /** The lines picked put in an environment (center, flushleft…), or an empty one at the cursor. */
   const inEnv = (env: string) =>
     onCode((c) => {
-      const p = c.picked();
+      const p = c.pickedLines();
       if (p.empty) return c.insert(`\\begin{${env}}\n  \${}\n\\end{${env}}`, true);
       const d = c.view.state.doc;
       const lines = Array.from({ length: p.to - p.from + 1 }, (_, i) => d.line(p.from + i).text).join('\n');
@@ -945,7 +1023,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         { label: 'Undo', icon: <Undo2 size={14} />, keys: 'Ctrl+Z', disabled: !code || readOnly, run: () => code?.undo() },
         { label: 'Redo', icon: <Redo2 size={14} />, keys: 'Ctrl+Shift+Z', disabled: !code || readOnly, run: () => code?.redo() },
         '-',
-        { label: 'Find and replace', icon: <Search size={14} />, keys: 'Ctrl+F', also: 'search', disabled: !code, run: () => code?.handle.find() },
+        { label: 'Find and replace', icon: <Search size={14} />, keys: 'Ctrl+H', also: 'search find', disabled: !code, run: () => find.show(!readOnly) },
         { label: 'Go to line', keys: 'Ctrl+Alt+G', disabled: !code, run: () => code?.gotoLine() },
         { label: 'Select all', keys: 'Ctrl+A', disabled: !code, run: () => code?.selectAll() },
         '-',
@@ -1139,7 +1217,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       >
         <ListTree size={15} />
       </IconButton>
-      <IconButton label="Find and replace (Ctrl+F)" size="sm" disabled={!code} onClick={() => code?.handle.find()}>
+      <IconButton label="Find and replace (Ctrl+F)" size="sm" disabled={!code} active={find.open} onClick={() => (find.open ? find.close() : find.show())}>
         <Search size={15} />
       </IconButton>
       {setup?.sync !== false && (
@@ -1283,6 +1361,11 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
           />
         ))}
         {file === PICTURES && <div className="absolute inset-0 flex flex-col bg-bg">{pictures}</div>}
+        {find.open && file !== PICTURES && (
+          <div className="absolute top-2 right-3 z-20 w-[min(440px,calc(100%-24px))]">
+            <FindBar find={find} count={found.list.length} index={found.current} onNext={() => findGo(1)} onPrev={() => findGo(-1)} onReplace={readOnly ? undefined : replaceOne} onReplaceAll={readOnly ? undefined : replaceAll} />
+          </div>
+        )}
       </div>
       <Problems
         result={result}

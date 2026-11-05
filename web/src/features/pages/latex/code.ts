@@ -12,8 +12,8 @@ import { redo, selectAll, toggleComment, undo } from '@codemirror/commands';
 import { foldAll, indentUnit, unfoldAll } from '@codemirror/language';
 import { gotoLine } from '@codemirror/search';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
-import { Compartment, EditorSelection, EditorState, Prec, StateEffect } from '@codemirror/state';
-import { EditorView, keymap } from '@codemirror/view';
+import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
+import { Decoration, EditorView, keymap, type DecorationSet } from '@codemirror/view';
 import { texCheck } from '@shared/latex-check';
 import { tr } from '../../../i18n/runtime';
 import { createEditor, type EditorHandle } from '../../../lib/codemirror';
@@ -47,6 +47,8 @@ export interface CodeHooks {
   macros: () => Record<string, string>;
   /** A picture's address by the name \includegraphics gives it, or null. */
   picture: (name: string) => string | null;
+  /** Ctrl+F (and Ctrl+H, to replace): the editor's find bar. */
+  onFind: (replace: boolean) => void;
 }
 
 export interface Issue {
@@ -69,7 +71,7 @@ export interface Code {
   /** The formatting commands (\textbf, \emph…) taken out of what is picked, their words kept. */
   clearFormat: () => void;
   /** The lines picked, from and to (1-based), and their text. */
-  picked: () => { from: number; to: number; text: string; empty: boolean };
+  pickedLines: () => { from: number; to: number; text: string; empty: boolean };
   /** Text put in place of what is picked (a list of the lines picked, say), the cursor after it. */
   replacePicked: (text: string) => void;
   /** Plain text in place of what is picked, the cursor after it. */
@@ -85,11 +87,18 @@ export interface Code {
   selectAll: () => void;
   /** Whether the cursor is in maths. */
   inMath: () => boolean;
-  /** The text, and where the cursor is in it. */
+  /** The text, and where the cursor is in it (or what is picked: from, to). */
   text: () => string;
   cursor: () => number;
+  picked: () => { from: number; to: number; text: string; empty: boolean };
   /** A part of the text changed (undone as one), the cursor after it. */
   replaceRange: (from: number, to: number, text: string) => void;
+  /** The find bar's matches marked, the current one apart. */
+  markFound: (ranges: { s: number; e: number }[], current: number) => void;
+  /** A part of the text picked and scrolled to, the focus left where it is. */
+  select: (from: number, to: number) => void;
+  /** A part of the text changed, the focus left where it is (the find bar's Replace). */
+  replaceQuiet: (from: number, to: number, text: string) => void;
   setVisual: (on: boolean) => void;
   setSpell: (on: boolean) => void;
   foldAll: () => void;
@@ -127,6 +136,27 @@ function completer(words: () => Words) {
     return { from, options: [...new Set(list)].map((label) => ({ label, type: /cite/i.test(cmd) ? 'text' : 'constant' })), validFor: /^[^,{}\s]*$/ };
   };
 }
+
+// What the find bar found: marked as CodeMirror's own search marks them.
+const found = StateEffect.define<{ ranges: { s: number; e: number }[]; current: number }>();
+const foundMark = Decoration.mark({ class: 'cm-searchMatch' });
+const currentMark = Decoration.mark({ class: 'cm-searchMatch cm-searchMatch-selected' });
+const foundField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    let d = deco.map(tr.changes);
+    for (const e of tr.effects)
+      if (e.is(found)) {
+        const len = tr.state.doc.length;
+        d = Decoration.set(
+          e.value.ranges.filter((r) => r.e > r.s && r.e <= len).map((r, i) => (i === e.value.current ? currentMark : foundMark).range(r.s, r.e)),
+          true,
+        );
+      }
+    return d;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
 
 /** The commands Clear formatting takes away. */
 const FORMATS = /\\(textbf|textit|textsl|emph|underline|uline|texttt|textsc|textsf|textrm|textsuperscript|textsubscript|textnormal)\s*\{/g;
@@ -284,12 +314,17 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
         { key: 'Mod-Enter', preventDefault: true, run: () => (hooks.onCompile(), true) },
         { key: 'Mod-b', preventDefault: true, run: () => (toggle('textbf', 'bold'), true) },
         { key: 'Mod-i', preventDefault: true, run: () => (toggle('textit', 'italic'), true) },
+        { key: 'Mod-f', preventDefault: true, run: () => (hooks.onFind(false), true) },
+        { key: 'Mod-h', preventDefault: true, run: () => (hooks.onFind(true), true) },
+        { key: 'Mod-g', preventDefault: true, run: () => (hooks.onFind(false), true) },
+        { key: 'F3', preventDefault: true, run: () => (hooks.onFind(false), true) },
         ...(tex ? [{ key: 'Enter', run: autoEnd }] : []),
       ]),
     ),
     // Made once: completions are told apart by their source, so a new one each time would never show.
     EditorState.languageData.of(() => languageData),
     lintGutter(),
+    foundField,
     tex ? [texFolding, mathPreview(hooks.macros)] : [],
     visualC.of(o.visual && tex ? visualExt() : []),
     spellC.of(o.spell ? spellCheck : []),
@@ -333,7 +368,16 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
     wrap,
     toggle,
     clearFormat,
-    picked,
+    pickedLines: picked,
+    picked: () => {
+      const r = view.state.selection.main;
+      return { from: r.from, to: r.to, text: view.state.sliceDoc(r.from, r.to), empty: r.empty };
+    },
+    markFound: (ranges, current) => view.dispatch({ effects: found.of({ ranges, current }) }),
+    select: (from, to) => view.dispatch({ selection: EditorSelection.range(from, to), effects: EditorView.scrollIntoView(from, { y: 'center' }) }),
+    replaceQuiet: (from, to, text) => {
+      if (!o.readOnly) view.dispatch({ changes: { from, to, insert: text }, userEvent: 'input.replace' });
+    },
     replacePicked: (text) => {
       if (o.readOnly) return;
       const r = view.state.selection.main;
