@@ -1,14 +1,17 @@
 // Comments on what the editors hold (a document's words, a slide, a cell, a LaTeX line), as Google Docs and Word have
-// them: who wrote it (you or an agent), when, what it says, the replies under it, and whether it was resolved. Agents
+// them: who wrote it (you or an agent, or someone named, as a Word file's comments are), when, what it says, the
+// replies under it, and whether it was resolved. Agents
 // read them with get_page and answer or resolve them when they save, so a comment is a way to ask for a change where
 // it is needed. Each editor keeps its comments in its own model and says what each is about in its own way; this file
 // is the comment itself and its checking: plain text only, with limits.
 
-export const COMMENT_LIMITS = { comments: 500, replies: 50, text: 4000, quote: 500 };
+export const COMMENT_LIMITS = { comments: 500, replies: 50, text: 4000, quote: 500, author: 80 };
 
 export interface CommentReply {
   id: string;
   by: 'user' | 'agent';
+  /** Who wrote it, by name, when it is someone other than you or an agent (Maria Lopez, in a Word file sent back). */
+  author?: string;
   text: string;
   /** When it was written: ms since 1970. */
   at: number;
@@ -17,6 +20,8 @@ export interface CommentReply {
 export interface Comment {
   id: string;
   by: 'user' | 'agent';
+  /** Who wrote it, by name, when it is someone other than you or an agent (as a reply's). */
+  author?: string;
   text: string;
   /** When it was written: ms since 1970. */
   at: number;
@@ -44,6 +49,15 @@ const cleanAt = (v: unknown, fallback: number) => (typeof v === 'number' && Numb
 
 const cleanBy = (v: unknown): 'user' | 'agent' => (v === 'agent' ? 'agent' : 'user');
 
+/** A name, on one line; none for the names that stand for you and an agent (as Word files written here carry them). */
+export function cleanAuthor(v: unknown): string | undefined {
+  const name = cleanText(v, COMMENT_LIMITS.author * 2)
+    .replace(/\s+/g, ' ')
+    .slice(0, COMMENT_LIMITS.author)
+    .trim();
+  return name && !/^(you|agent)$/i.test(name) ? name : undefined;
+}
+
 /** One comment, checked; null when it says nothing. */
 export function cleanComment(v: unknown, now = Date.now()): Comment | null {
   if (!v || typeof v !== 'object') return null;
@@ -51,6 +65,8 @@ export function cleanComment(v: unknown, now = Date.now()): Comment | null {
   const text = cleanText(o.text, COMMENT_LIMITS.text);
   if (!text) return null;
   const c: Comment = { id: typeof o.id === 'string' && ID.test(o.id) ? o.id : newCommentId(), by: cleanBy(o.by), text, at: cleanAt(o.at, now) };
+  const author = cleanAuthor(o.author);
+  if (author) c.author = author;
   if (o.resolved === true) c.resolved = true;
   const quote = cleanText(o.quote, COMMENT_LIMITS.quote);
   if (quote) c.quote = quote;
@@ -61,7 +77,8 @@ export function cleanComment(v: unknown, now = Date.now()): Comment | null {
       const ro = r as Record<string, unknown>;
       const t = cleanText(ro.text, COMMENT_LIMITS.text);
       if (!t) continue;
-      replies.push({ id: typeof ro.id === 'string' && ID.test(ro.id) ? ro.id : newCommentId(), by: cleanBy(ro.by), text: t, at: cleanAt(ro.at, now) });
+      const author = cleanAuthor(ro.author);
+      replies.push({ id: typeof ro.id === 'string' && ID.test(ro.id) ? ro.id : newCommentId(), by: cleanBy(ro.by), ...(author ? { author } : {}), text: t, at: cleanAt(ro.at, now) });
     }
     if (replies.length) c.replies = replies;
   }
