@@ -652,6 +652,34 @@ if (canCapture()) {
     same(await d.js<string>('return document.querySelector("#c").hasAttribute("data-lang")'), false, 'Auto takes the language off');
   });
 
+  // ---- links to other pages: "@" or "/" → Link to a page, a chip with the page's icon -----------------------------------------
+  await drive('<p id="a">See</p><p id="b">Also</p>', async (d) => {
+    await d.cmd('pages', [
+      { id: 'abc1234567', title: 'Trip notes', kind: 'page', icon: '🧭' },
+      { id: 'def1234567', title: 'Budget', kind: 'sheet', icon: '' },
+      { id: 'bad"<x', title: 'Not a page' },
+    ]);
+    await d.write('#a');
+    await d.type(' @tri');
+    await d.press('Enter');
+    await d.type('now');
+    const a = await d.js<string>('return document.querySelector("#a").innerHTML');
+    ok(/See @?<a class="n-pagelink" href="\/pages\/abc1234567" data-page="abc1234567"[^>]*><span class="n-pagelink-icon" aria-hidden="true">🧭<\/span>Trip notes<\/a>(&nbsp;| )now/.test(a), `"@" and a page's name put a link to it in, with its icon, the caret after it (${a})`);
+    same(a.includes('@'), false, 'the "@…" typed goes');
+    same(await d.js<string>('return document.querySelector("#a a").getAttribute("contenteditable")'), 'false', 'while words are written, the link is one piece');
+    await d.write('#b');
+    await d.type(' /link');
+    await d.press('Enter');
+    await d.type('bud');
+    await d.press('Enter');
+    same(await d.js<string>('const l = document.querySelector("#b a.n-pagelink"); return l ? l.getAttribute("data-page") + " " + l.querySelector(".n-pagelink-icon").getAttribute("data-kind") : "none"'), 'def1234567 sheet', '"/" → Link to a page does the same; a page with no icon shows its kind’s');
+    await d.press('Escape');
+    const out = await d.html();
+    ok(out.includes('<a class="n-pagelink" href="/pages/abc1234567" data-page="abc1234567"><span class="n-pagelink-icon" aria-hidden="true">🧭</span>Trip notes</a>'), 'the page given back has the link as the kit draws it, and nothing of the editor’s');
+    await d.cmd('pages', [{ id: 'abc1234567', title: 'Trip notes, Lisbon', kind: 'page', icon: '🗺️' }]);
+    same(await d.js<string>('return document.querySelector("#a a.n-pagelink").textContent'), '🗺️Trip notes, Lisbon', 'a link takes its page’s new title and icon');
+  });
+
   // ---- picking blocks with a drag: from beside a block's words, from the left margin, item by item, from the + ---------------
   await drive('<h1 id="t">Pick</h1><p id="a">Short</p><p id="b">Also short</p><ul><li id="i1">One<ul><li id="i2">Two</li></ul></li><li id="i3">Three</li></ul><p id="z">Last</p>', async (d) => {
     const s = d.tab.s;
@@ -813,6 +841,8 @@ if (canCapture()) {
   const r = (await tools.save_page.run({ title: 'Plan', html }, ctx)) as string;
   const id = /\(page ([a-f0-9]{10})/.exec(r)?.[1] ?? '';
   ok(id, 'a page of Notion-like blocks is saved as it is');
+  const listed = (JSON.parse((await req('GET', '/api/pages')).body).pages as { id: string; icon?: string }[]).find((p) => p.id === id);
+  same(listed?.icon, '🧭', 'the Library knows a page’s icon (its .n-icon), for links to it from other pages');
   const web = await req('GET', `/api/pages/${id}/export?format=html`);
   ok(web.statusCode === 200 && web.body.includes('id="n-kit"') && web.body.includes('.n-todo{') && web.body.includes('<input type="checkbox" checked>'), 'as a web page it keeps its blocks, with the kit’s look for them');
   if (canCapture()) {
