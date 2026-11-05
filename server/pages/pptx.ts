@@ -1123,7 +1123,10 @@ function transitionXml(s: Slide): string {
     zoom: '<p:zoom/>',
     split: '<p:split orient="vert" dir="out"/>',
   };
-  return `<p:transition spd="${spd}"${adv}>${fx[t.fx] ?? ''}</p:transition>`;
+  const plainOne = `<p:transition spd="${spd}"${adv}>${fx[t.fx] ?? ''}</p:transition>`;
+  if (t.fx === 'none') return plainOne;
+  // Its length exactly, as PowerPoint 2010 and later read it (others take the nearest of slow, medium and fast).
+  return `<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" Requires="p14"><p:transition spd="${spd}" p14:dur="${Math.round(dur)}"${adv}>${fx[t.fx] ?? ''}</p:transition></mc:Choice><mc:Fallback>${plainOne}</mc:Fallback></mc:AlternateContent>`;
 }
 
 // ---- the slide ------------------------------------------------------------------------------------------
