@@ -177,7 +177,10 @@ function startTool(d: Deps, max: number): RunTool {
       if (parentOf(d.db, ctx.key)) throw new Error(ONE_LEVEL);
       const target = pickAgent(d, ctx, a.agent, a.model);
       // A swarm's members take on hard problems: they run with the lead's own model and effort unless it names others.
-      const lead = roleOf(d.db, ctx)?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
+      const role = roleOf(d.db, ctx);
+      const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
+      // A campaign's members each change their part on a branch of their own.
+      const worktree = !!a.worktree || (role?.role === 'lead' && role.mode === 'campaign');
       const same = !!lead && target.agent === ctx.agent && target.agent !== 'acp' && !String(a.model ?? '').trim();
       if (same && lead?.prefs?.model) {
         target.model = lead.prefs.model;
@@ -202,7 +205,7 @@ function startTool(d: Deps, max: number): RunTool {
           model: target.model,
           effort,
           mode,
-          worktree: !!a.worktree,
+          worktree,
           title,
           remember: false,
           account: target.agent === ctx.agent && target.agent !== 'acp' ? d.sessions.accountOf(ctx.key) : undefined,
