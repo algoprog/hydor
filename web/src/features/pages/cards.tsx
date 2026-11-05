@@ -15,7 +15,7 @@ import { editPage, SmallPageCard, useOpensBeside, usePicks } from '../session/Ht
 import { StepLine, ToolDetail } from '../session/items';
 import { PageFrame, pageStore, StreamFrame, usePreviewMax } from './frame';
 import { PageOverlay } from './overlay';
-import { absolute, CANVAS_MEDIA, requestRef, savedRef, useCanvas, useDrafts, usePagesStore } from './state';
+import { absolute, CANVAS_MEDIA, onScreen, requestRef, savedRef, useCanvas, useDrafts, usePagesStore } from './state';
 import { openOver, showBeside } from './Canvas';
 
 /** A line under a card while a call runs, or when it failed. */
@@ -181,8 +181,8 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   if (writing && deck) {
     const label = kind === 'slides' ? 'Making the slides…' : kind === 'doc' ? 'Writing the document…' : kind === 'tex' ? 'Writing and typesetting the LaTeX…' : kind === 'notebook' ? 'Keeping the notebook…' : 'Making the spreadsheet…';
     // Where there is no room beside the conversation (a phone, a narrow window): a tap opens it over everything, to
-    // watch it being written as the panel shows it.
-    if (draft && kind !== 'notebook')
+    // watch it being written as the panel shows it. (Beside a page in the Library, that page is the one in view.)
+    if (draft && kind !== 'notebook' && onScreen(sessionKey))
       return (
         <button
           type="button"
