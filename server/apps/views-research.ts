@@ -436,7 +436,7 @@ const DEADLINE_RADAR_UI: AppUi = {
         { element: 'dl-past', data: 'last.result' },
       ],
     },
-    { id: 'venues', title: 'Venues', on: 'app', blocks: [{ element: 'dl-venue', data: 'last.result.venues', each: true, layout: 'grid', empty: 'No venue found yet.' }, { element: 'dl-missing', data: 'last.result' }] },
+    { id: 'venues', title: 'Conferences', on: 'app', blocks: [{ element: 'dl-venue', data: 'last.result.venues', each: true, layout: 'grid', empty: 'No venue found yet.' }, { element: 'dl-missing', data: 'last.result' }] },
     {
       id: 'deadlines',
       title: 'Timeline',
@@ -446,7 +446,7 @@ const DEADLINE_RADAR_UI: AppUi = {
         { element: 'dl-past', data: 'result' },
       ],
     },
-    { id: 'found', title: 'Venues', blocks: [{ element: 'dl-venue', data: 'result.venues', each: true, layout: 'grid', empty: 'No venue found.' }, { element: 'dl-missing', data: 'result' }] },
+    { id: 'found', title: 'Conferences', blocks: [{ element: 'dl-venue', data: 'result.venues', each: true, layout: 'grid', empty: 'No venue found.' }, { element: 'dl-missing', data: 'result' }] },
   ],
   elements: {
     'dl-head': {
@@ -667,7 +667,7 @@ const GAP_FINDER_UI: AppUi = {
   pages: [
     {
       id: 'ideas',
-      title: 'Ideas',
+      title: 'Research ideas',
       blocks: [
         { element: 'gap-head', data: 'result' },
         { element: 'gap-idea', data: 'result.ideas', where: { verdict: '{{state.verdict}}' }, each: true, empty: 'No idea of that kind.' },
