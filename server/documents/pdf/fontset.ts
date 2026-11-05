@@ -218,7 +218,9 @@ export async function fontsFor(text: string): Promise<TrueType[]> {
   }
   if (missing.size) {
     const list = [...missing].slice(0, 12).map((c) => String.fromCodePoint(c));
-    throw new MissingGlyphs(`No font on this computer has ${list.map((c) => `"${c}"`).join(', ')}${missing.size > 12 ? ' and others' : ''}, and none could be fetched (Google Fonts needs the internet).`);
+    throw new MissingGlyphs(
+      `No font on this computer has ${list.map((c) => `"${c}"`).join(', ')}${missing.size > 12 ? ' and others' : ''}, and none could be fetched (Google Fonts needs the internet). A TrueType font with them would do: on Debian or Ubuntu, sudo apt install fonts-wqy-zenhei for Chinese, Japanese and Korean.`,
+    );
   }
   return fonts;
 }
