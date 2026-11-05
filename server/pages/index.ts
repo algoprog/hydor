@@ -555,7 +555,9 @@ function routes(d: Deps) {
     if (from) {
       const st = await fs.promises.stat(from).catch(() => null);
       if (!st?.isFile()) throw new HttpError(404, `Not found: ${from}`);
-      if (st.size > 30 * 1024 * 1024) throw new HttpError(413, 'It is over 30 MB, too large to keep in the Library');
+      // A PowerPoint file may be larger than other files: its videos come along (as large as the slides editor takes).
+      const max = kind === 'slides' ? 200 : 30;
+      if (st.size > max * 1024 * 1024) throw new HttpError(413, `It is over ${max} MB, too large to keep in the Library`);
       data = await fs.promises.readFile(from);
     } else data = Buffer.from(String(b.data), 'base64');
     const k = mustKind(kind);

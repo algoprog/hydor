@@ -46,8 +46,12 @@ import { pageSource } from './store.ts';
 const MB = 1024 * 1024;
 /** The most a piece of an upload carries: well under the 100 MB a proxy such as Cloudflare's lets through. */
 export const PIECE = 32 * MB;
-/** The largest file the import makes a page of (what POST /api/pages/import reads). */
+/** The largest file the import makes a page of (what POST /api/pages/import reads by its path). */
 export const IMPORT_MAX = 30 * MB;
+/** A PowerPoint file may be larger: its videos come along into the video store (as large as the slides editor takes). */
+export const IMPORT_MAX_SLIDES = 200 * MB;
+/** The largest file of a kind the import makes a page of. */
+export const importMax = (kind: string) => (kind === 'slides' ? IMPORT_MAX_SLIDES : IMPORT_MAX);
 /** Uploads open at once, across every page and device. */
 const MAX_OPEN = 200;
 /** An upload no piece came to for this long is dropped (the page was closed meanwhile). */
@@ -106,12 +110,12 @@ const refused = (status: number, message: string, why: FileRefused) => new HttpE
  */
 function planFor(name: string, size: number, space: string | null): Plan {
   const kind = kindForFile(name) ?? (isPptx(name) ? 'slides' : null);
-  if (kind && size <= IMPORT_MAX) return { as: 'page', kind };
+  if (kind && size <= importMax(kind)) return { as: 'page', kind };
   const media = mediaTypeOf(name);
   if (media && size <= MAX_MEDIA) return { as: media.kind };
   if (space) return { as: 'file' };
   const elsewhere = 'Drop it on a project to keep it in the project’s folder.';
-  if (kind) throw refused(413, `It is over ${IMPORT_MAX / MB} MB, more than the Library takes to make a ${kindOf(kind)?.noun ?? 'page'} of. ${elsewhere}`, 'size');
+  if (kind) throw refused(413, `It is over ${importMax(kind) / MB} MB, more than the Library takes to make a ${kindOf(kind)?.noun ?? 'page'} of. ${elsewhere}`, 'size');
   if (media) throw refused(413, `It is over ${MAX_MEDIA / MB / 1024} GB, more than the Library keeps of a picture, a video or a sound. ${elsewhere}`, 'size');
   throw refused(415, `${keptKinds()}. To keep another kind of file, drop it on a project: it goes in the project’s folder.`, 'kind');
 }
