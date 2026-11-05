@@ -162,8 +162,8 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
       icon: <FilePenLine size={15} />,
       also: 'mode track changes review',
       items: [
-        { label: 'Editing', icon: <PencilLine size={15} />, checked: c.mode === 'edit', disabled: c.readOnly, also: 'edit directly', run: () => c.setMode('edit') },
-        { label: 'Suggesting', icon: <FilePenLine size={15} />, keys: 'Ctrl+Alt+Shift+X', checked: c.mode === 'suggest', disabled: c.readOnly, also: 'suggest track changes', run: () => c.setMode('suggest') },
+        { label: 'Edit directly', icon: <PencilLine size={15} />, checked: c.mode === 'edit', disabled: c.readOnly, also: 'editing mode', run: () => c.setMode('edit') },
+        { label: 'Suggest changes', icon: <FilePenLine size={15} />, keys: 'Ctrl+Alt+Shift+X', checked: c.mode === 'suggest', disabled: c.readOnly, also: 'suggesting mode track changes', run: () => c.setMode('suggest') },
       ],
     },
     '-',
