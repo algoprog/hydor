@@ -121,6 +121,18 @@ ecma-international.org the first time); `--image NAME` and `--prefix NAME` name 
 `--no-office` checks the schemas alone; `--decks DIR` checks decks already exported there. It needs xmllint (`XMLLINT`
 says where), Docker with the image above, and Playwright's Chromium headless shell to compare the pictures.
 
+The other way round, PowerPoint files opened as slides:
+
+```bash
+# Each sample's own .pptx opened again (beside the deck it came from, with what changed part by part), and a copy
+# LibreOffice saves itself (beside LibreOffice's pictures of it); --reuse takes the samples exported before.
+node scripts/office-check/pptx-check.mjs --url http://127.0.0.1:8795 --out /tmp/pptx-check --roundtrip
+# Other files, beside LibreOffice's pictures of them (a deck PowerPoint made, say).
+node scripts/office-check/pptx-check.mjs --url http://127.0.0.1:8795 --out /tmp/pptx-check --files a.pptx,b.pptx
+```
+
+Both write `import.html`: the notes each file came in with, what came back otherwise, and the slides side by side.
+
 What still differs, and why:
 
 - LibreOffice fits words that are made smaller to fit its own way (it fits them again); PowerPoint draws the file's
