@@ -92,10 +92,10 @@ export function AnswerCard({ runId, q }: { runId: string; q: NonNullable<RunDeta
   );
 }
 
-/** What a run's view may ask of its app, on its owner's pages: everything that fits the run. */
+/** What a run's view may ask of its app, on its owner's pages: everything that fits the run (a ready-made app's records too: an earlier Paper radar's Save). */
 export function viewCan(d: RunDetail): ViewCan[] {
   const r = d.run;
-  const own = !r.app.startsWith('tpl:') && r.app !== 'test';
+  const own = r.app !== 'test';
   return [
     'keep',
     'run',
