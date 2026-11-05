@@ -127,6 +127,8 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
     case 'start': {
       const task = (plan.text || text).trim();
       const st = startSettings(d.db);
+      // New sessions start confidential (the start page's pick): what is said aloud here is not for one.
+      if (st.confidential) return { say: 'New sessions start confidential, so start this one on the screen: what you say here goes to the helper model.', did: 'answer' };
       const agentKey = st.agent ?? 'claude';
       const agent: Agent = agentKey.startsWith('acp:') ? 'acp' : (agentKey as Agent);
       const run = st.runs?.[agentKey] ?? {};
