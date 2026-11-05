@@ -72,6 +72,7 @@ import { checkExtraChange, confidentialKey, privateHelper, privateNotice } from 
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
 import { codexFolderNames } from './codex-projects.ts';
 import { folderOrigins } from './sidebar/origins.ts';
+import { useMachines } from './experiments/remote.ts';
 
 ensureDirs();
 ensureProbeDir();
@@ -88,6 +89,8 @@ const system = new SystemMonitor();
 const kernels = new Kernels();
 const push = new Push(db, config.dataDir);
 const machines = new Machines(db);
+// Experiments sends jobs to other machines and lists their runs.
+useMachines(machines);
 const SYSTEM_CHANNEL = '@system';
 
 agentBaseEnv(); // capture the login environment once, up front
