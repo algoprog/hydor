@@ -3,10 +3,12 @@
 // Tools on each session's own MCP server:
 //   read_document   a document's text for any agent (extract.ts reads it)
 //   present_files   the files an agent made, shown with its reply as cards to open and download
+//   pdf_look, pdf_form, pdf_fill, pdf_write, pdf_pages   PDFs seen, filled, written on and changed (pdf/tools.ts)
 // Routes for the file viewer:
 //   GET  /api/documents/preview?path=   the document read into blocks, sheets and slides (DocPreview)
 //   POST /api/documents/pages {path}    laid out as PDF pages by LibreOffice (when it is here), cached
 //   GET  /api/documents/pages.pdf?path= that PDF
+//   /api/pdf/info, /api/pdf/page, /api/pdf/save   Files' Fill & sign (pdf/routes.ts)
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -17,6 +19,8 @@ import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
 import { canRead, extractText, readDocument } from './extract.ts';
+import { pdfRoutes } from './pdf/routes.ts';
+import { PDF_INSTRUCTIONS, PDF_TOOLS } from './pdf/tools.ts';
 import { convert, soffice } from './tools.ts';
 
 const PREVIEWS = path.join(config.dataDir, 'previews');
@@ -193,7 +197,7 @@ const READ: RunTool = {
 
 export const documents: Feature = {
   id: 'documents',
-  routes({ app }) {
+  routes({ app, db }) {
     app.get('/api/documents/preview', async (req): Promise<DocPreview> => {
       const file = resolvePath((req.query as Record<string, string>).path);
       const st = await fs.promises.stat(file).catch(() => null);
@@ -212,6 +216,8 @@ export const documents: Feature = {
       const { v } = await pagesPdf(file);
       return { url: `/api/documents/pages.pdf?path=${encodeURIComponent(file)}&v=${v}` };
     });
+    // Files' Fill & sign (pdf/routes.ts).
+    pdfRoutes(app, db);
     app.get('/api/documents/pages.pdf', async (req, reply) => {
       const file = resolvePath((req.query as Record<string, string>).path);
       const { pdf } = await pagesPdf(file);
@@ -223,10 +229,11 @@ export const documents: Feature = {
       return reply.send(fs.createReadStream(pdf));
     });
   },
-  tools: (_ctx: RunCtx) => [READ, PRESENT],
+  tools: (_ctx: RunCtx) => [READ, PRESENT, ...PDF_TOOLS],
   spawn: () => ({
     instructions: [
       'Documents: read PDF, Word, Excel, PowerPoint and other documents with read_document. When you have made files for the user (a document, spreadsheet, slides, a PDF, a notebook, images), finish by calling present_files with them: they show as cards the user can open and download (a notebook opens in the notebook page, to run).',
+      PDF_INSTRUCTIONS,
     ],
     // Where the office skills' helper scripts keep their Python environment.
     env: { HYDOR_DATA_DIR: config.dataDir },

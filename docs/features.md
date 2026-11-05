@@ -82,7 +82,8 @@ agents that speak ACP and take MCP servers.
   repeated in the text. When no provider can answer, Claude Code and Codex search with their own web search instead.
   [Search providers](search-providers.md).
 - **A browser**: agents open sites, click, type and read pages, in a Chromium of their own. You watch it live
-  above the message box and take over to log in, solve a check or pay, on a computer or a phone; with a sign-in
+  above the message box, the agent's pointer gliding to each place it acts (a ring where it clicks, the field it types
+  into outlined, scrolls and keys beside it, each step's picture marked where it clicked), and take over to log in, solve a check or pay, on a computer or a phone; with a sign-in
   saved in the vault, the agent signs in itself, typing the password without seeing it, on that site only. Sites
   on your own network stay off limits unless you allow one.
 - **Memory**: agents save notes about you, the project and the session when you ask or they learn something
@@ -140,7 +141,14 @@ agents that speak ACP and take MCP servers.
   Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
   over, an environment beside it to run it in): kept in the Library with save_notebook, or handed over as a file
   whose card opens it in the notebook page. A card's Save to Library keeps a copy of a notebook, a document, a
-  spreadsheet or a LaTeX file in the Library, in the project you pick.
+  spreadsheet or a LaTeX file in the Library, in the project you pick. Agents fill in PDF forms (every kind of field,
+  drawn so every viewer shows the values, Greek and Chinese too; a form already signed digitally keeps its signature
+  valid), write on PDF pages beside the words printed there (text, ticks, pictures, white-out, highlights, comments)
+  and rotate, reorder, merge and split their pages, saving a copy unless asked to replace the file. Signatures: draw
+  yours (mouse, finger or pen), type it in a handwriting or upload a photo of it, kept encrypted (Settings →
+  Signatures); agents ask for one on a card and place it, by name and never seeing it, into Word files, PDFs, pictures
+  and Library documents, each time after your OK on a card that shows where (a picture of a signature, not a
+  cryptographic digital signature).
 - **Images, videos and audio**: agents make pictures (or change yours), short videos (from words, from a picture
   to start or end on, or by changing a video) and sound with OpenRouter's image, video and audio models, the ones
   picked in Settings → Images, video and audio or one you name. The app's choices are ByteDance's Seedream 5.0 for
@@ -180,13 +188,23 @@ agents that speak ACP and take MCP servers.
   ask which project when there are projects (the session's first), New makes it in the project you look at, and More →
   Move to a project moves anything; its places (Everything, each project's things under its name, Not in a project,
   Published) sit beside the cards, with Find by name, sorting and kind chips (Pages, Slides, Documents,
-  Spreadsheets, LaTeX, Pictures, Videos, Audio). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
+  Spreadsheets, LaTeX, Pictures, Videos, Audio). Drop files or whole folders on the Library, on a project in its list
+  or on a project's card, and each becomes what it is (Word, Markdown, text or HTML a document; Excel, OpenDocument or
+  CSV a spreadsheet; PowerPoint slides; LaTeX a LaTeX document; a notebook a notebook; pictures, videos and sounds the
+  Library's media, kept once; anything else a file in the project's folder), sent in pieces up to 1 GB with a tray of
+  each file's progress (Upload files in New does the same on a phone); in the desktop apps a drop moves the file (an
+  original that became a page goes to the trash, unless the page could not keep all of it). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too, written in as in Notion:
   Enter makes the next block, "/" adds headings, lists, to-dos, toggles, callouts, quotes, code, tables, pictures,
   videos, columns, cards, maths, a table of contents or a button, Markdown turns into blocks as you type, a ⋮⋮ beside
-  each block drags it or turns it into another kind and colours it, several blocks are picked at once, and a page gets
-  an icon and a cover; click or tap a part to rewrite its words (bold, italic, code, links, colours), restyle it (this part, every part of its kind or class, on hover, or for tablets and
+  each block drags it or turns it into another kind and colours it, several blocks are picked at once (with a drag from
+  either margin, as in Notion), an item of a nested list turned into another block keeps its place under its parent,
+  code blocks are coloured in about twenty languages (a language picker, or Auto; agents' plain code blocks too), "@"
+  links to another page of the Library, databases as in Notion (a table of typed columns: text, number, select,
+  multi-select, date, checkbox and link, sorted and filtered, or a board of cards dragged between lanes, its rows kept
+  with the page's own data on every device and changed in Use and Edit, by agents too), blocks and words take comments with replies that agents answer (kept beside the page, not in it), and a
+  page gets an icon and a cover; click or tap a part to rewrite its words (bold, italic, code, links, colours), restyle it (this part, every part of its kind or class, on hover, or for tablets and
   phones only), move, size, copy, wrap or delete it, pick it from its layers, add parts and ready-made sections,
   set the whole page's colours, fonts, width and the look of its headings, links and buttons, ask the agent about
   a part, or edit its HTML with the page beside it; the agent hears of your changes with your next message.
@@ -310,43 +328,59 @@ agents that speak ACP and take MCP servers.
   Format, Arrange, Slide, Tools) with Search the menus, slides to reorder, copy and skip, 15 layouts, text boxes with
   rich text, bullets and numbering, 20 shapes, pictures (cropped, with brightness, contrast, saturation, blur, black
   and white and see-through), lines and arrows, tables (merged cells, cell fills) and charts (column, bar, line, area,
-  pie, doughnut), about 1,900 icons and emoji, equations in LaTeX, YouTube and Vimeo videos; groups, find and replace
-  across slides and speaker notes, zoom, the format painter, a grid, rulers and guides, snapping guides and equal
+  pie, doughnut), about 1,900 icons and emoji, equations in LaTeX (drawn without the internet wherever the deck shows),
+  YouTube and Vimeo videos with their stills and videos from this device (up to 200 MB), connectors that stay joined to
+  shapes as they move (straight or elbowed), comments on a slide or a part of it with replies that agents answer and
+  resolve; groups (a part in one placed where it is on the slide), find and replace across slides, speaker notes,
+  charts and equations, zoom, the format painter, a grid, rulers and guides, snapping guides and equal
   gaps, alignment, stacking, undo, copy and paste; animations in order (on a click, with or after the one before, a
   paragraph at a time) and transitions, Morph among them (what two slides share glides into place); slide numbers
   and a footer; themes of colours and fonts; speaker notes; a slideshow (keys, swipes, black and white screens,
   every slide at once, a laser pointer, a pen and live captions) and a presenter's view with notes, the next slide,
   a timer and an audience window that follows it. They export as PowerPoint (every part still editable, native
-  charts, groups, icons, equations, notes, transitions with Morph, and animations), PDF, pictures of the slides
-  (PNG) or a web page that presents itself, and open as a slideshow at their own address or a published link.
+  charts, groups, icons, equations, notes, transitions with Morph, animations, connectors still joined, videos that
+  play and comments; looking in PowerPoint as here: the deck's fonts inside the file, compressed as PowerPoint keeps
+  its own, words that wrap and fit the same, each layout one of PowerPoint's for New Slide and Reset Slide, the footer
+  in its Header & Footer boxes, charts with their data for Edit Data), PDF, pictures of the slides
+  (PNG) or a web page that presents itself, and open as a slideshow at their own address or a published link. PowerPoint files (.pptx) open as decks to edit,
+  their layouts, text, pictures, tables, charts, groups, connectors, videos, notes and comments brought in.
 - **Documents, spreadsheets and LaTeX**: kept in the Library beside slides, each with versions, a picture in the list,
   its own address, menus with Search the menus, find and replace, a list of its keyboard shortcuts, and an agent that
-  changes it on request. Documents (save_doc, written in Markdown, or opened from a Word, Markdown, text or HTML file)
-  are edited as in Word or Google Docs on a page of their paper: paragraph styles, fonts, sizes, colours and
+  changes it on request, whose work you watch as it writes (slides too: the agent's caret where its words arrive, the
+  page read-only meanwhile, your unsaved changes never overwritten), in steps (a section, some slides, some cells) as
+  well as whole, its saves in one turn kept as one version. Documents (save_doc, written in Markdown, or opened from a Word, Markdown, text or HTML file)
+  are edited as in Word or Google Docs on real pages of their paper (what does not fit goes on to the next page, a long
+  table's header row again, each page with its own header, footer and number): paragraph styles, fonts, sizes, colours and
   highlights, links, alignment, line and paragraph spacing, bullets, numbers and checklists, callouts, tables (column
   widths dragged, merged and coloured cells), pictures with captions, equations in LaTeX, a table of contents that
   keeps up, headers and footers with page numbers, lines and page breaks, a "/" menu and Markdown shortcuts as you
   type, blocks dragged by their handles, the format painter, special characters and emoji, comments with replies
-  that agents read, answer and resolve, paste from Word and Google Docs cleaned, an outline, zoom, a word count and
-  printing; they export as Word (styles, lists, tables, pictures, comments, equations, the table of contents and
-  headers and footers as Word's own), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
+  that agents read, answer and resolve (a Word file's keep their authors), Suggesting as Word's track changes and
+  Google Docs' suggestions (accepted or rejected one by one or all at once, kept as Word's tracked changes both ways,
+  and made by agents too), a comparison with any earlier version, paste from Word and Google Docs cleaned, an outline, zoom, a word count and
+  printing; they export as Word (styles, lists, tables, pictures, comments, tracked changes, equations, the table of
+  contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
+  document's fonts inside the file), PDF on their paper, Markdown or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
   stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about two hundred of
   Excel's functions worked out as you type (lookups, criteria, dates, text, loans, and FILTER, SORT, UNIQUE and
   SEQUENCE that spill) with each function's arguments shown, references that move as cells are copied, filled,
   inserted and deleted, the fill handle with its series, number formats with Excel's own codes, borders, merged
   cells, filters, sorting by several columns, conditional formatting (rules, colour scales, data bars), dropdowns
-  with coloured chips, checkboxes, star ratings and a calendar for dates, notes, charts (seven kinds), Paste special,
+  with coloured chips, checkboxes, star ratings and a calendar for dates, notes and comment threads that agents answer, charts (seven kinds) that sit on their cells and move with them,
+  of one range or of several (Ctrl+click), Paste special,
   removing duplicates, splitting text into columns, summaries as a pivot table makes them, a row opened as a card,
-  a Kanban board, several sheets, copy and paste with Excel and Google Sheets, and the sum, average and count of what
+  a Kanban board kept with its sheet (what it groups by, its cards' fields, its lanes' order), several sheets, copy and paste with Excel and Google Sheets, and the sum, average and count of what
   is picked; they export as Excel (formulas, formats, filters, conditional formatting, dropdowns and checkboxes,
-  merged cells, notes and charts kept), CSV or PDF. LaTeX documents (save_latex, from nine templates, or opened from
-  a .tex file or a project's .zip) keep their source files and pictures, typeset on this computer (pdfLaTeX, XeLaTeX
+  long lists of options among them, merged cells, notes, threaded comments and charts on their cells kept, with
+  the editor's column widths, row heights and print layout), CSV or PDF. LaTeX documents (save_latex, from nine templates, a conference
+  paper as IEEE, ACM or Springer LNCS ask among them, or opened from a .tex file or a project's .zip) keep their source files and pictures, typeset on this computer (pdfLaTeX, XeLaTeX
   or LuaLaTeX, with BibTeX) as you type, beside the pages: a Visual mode that shows the source as a document while
   you type, formulas drawn as you write them, completion of commands, environments, packages, citations, labels and
   pictures, a symbols panel, tables made in a grid, references found by DOI, arXiv id or title, folding, spelling,
   quick checks before TeX runs, errors and warnings at their lines, the log, an outline, snippets, a word count,
-  comments agents answer, versions compared, dark pages, the pages presented full screen, and a jump between a place
+  comments agents answer (on .tex files opened from Files too), Track changes as in Overleaf (an agent's
+  edits too, each accepted or rejected), versions compared, dark pages, the pages presented full screen, and a jump between a place
   on a page and its line. TeX runs in a folder of its own, with no shell escape and, where bubblewrap is installed,
   in its sandbox. They export as the PDF, the main .tex file or the whole project as a .zip. Jupyter notebooks
   (save_notebook, from an .ipynb an agent wrote and ran, or opened from one) show in the notebook page's own view,
@@ -555,6 +589,9 @@ programs shows each program's version and what is out, with Check now, Update no
   brings the chapters and bibliography it reads and typesets among its folder's pictures (read only to TeX),
   writing only the files that changed; a Word or Excel file says first what the editor doesn't keep (headers and
   footers, comments, charts…), offers to save a copy instead, and its first save keeps the old file in the trash.
+  A PDF's Fill & sign: its form's fields to type in, tick and pick over its pages, text, ticks, crosses, dates and
+  signatures (saved ones, or drawn there) put anywhere with a click and dragged into place, saved as a copy beside it
+  or over it.
   Jupyter notebooks open and run, with Ask beside them as for other files; New → New notebook starts one (an empty
   .ipynb opens as a new notebook too), saved outputs show as Jupyter shows them, a progress bar at its last state,
   and Jupyter kernels registered from a virtual environment are offered as environments to run in. Videos play in the app's own player (seek with a
@@ -630,7 +667,9 @@ programs shows each program's version and what is out, with Check now, Update no
   permissions, which carry over when the app updates (every version is signed with the same certificate); on Linux it says what is in the way (a Wayland desktop, a library missing). Each session asks on a
   card before its agent starts; one session at a time. While an agent works, a glow in the app's water colours lines
   every display's edges, with a note at the bottom ("An agent is using your Mac · Press Esc to stop"); clicks go
-  through it, and the agent's screenshots never show it (it is hidden for the moment a screenshot is taken). Esc stops the agent (⌘⇧Esc too on a Mac), as do Stop in the menu bar or tray,
+  through it, and the agent's screenshots never show it (it is hidden for the moment a screenshot is taken). A ring
+  with an Agent tag circles the pointer the agent moves, which glides to each place instead of jumping, with a ripple
+  on each click and the words or keys it types beside it, hidden from its screenshots too. Esc stops the agent (⌘⇧Esc too on a Mac), as do Stop in the menu bar or tray,
   in the session and in Settings; the agent pressing Escape itself does not. Each step shows in the conversation with
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour

@@ -4,6 +4,13 @@ Copyright 2026 Hydor Devs
 Hydor was created by Chris Samarinas (https://algoprog.com).
 https://github.com/algoprog/hydor · https://hydor.app
 
+The handwriting styles for typed signatures (web/src/features/signatures/fonts/) are the
+fonts Dancing Script, Mr Dafoe, Mr De Haviland and Mynerve, unchanged but for WOFF
+compression, under the SIL Open Font License 1.1; each keeps that licence beside it.
+
+The font text is written in when PDF forms are filled (server/documents/pdf/fonts/) is Liberation Sans,
+unchanged, under the SIL Open Font License 1.1, which it keeps beside it.
+
 Some of the bundled skills (in skills/) are adapted from Magnus Hedemark's
 agent-skills collection, under the MIT License; each keeps that licence in
 its own LICENSE.txt.

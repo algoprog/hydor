@@ -90,6 +90,8 @@ export const BLOCKS: Block[] = [
   },
   { id: 'foldout', kind: 'layout', label: 'Fold-out', html: question('A question', 'The answer, shown when it is opened.') },
   { id: 'toc', kind: 'layout', label: 'Table of contents', html: '<nav class="n-toc"></nav>' },
+  // (a name of its own in the page, and its first columns, are given as it goes in: writing.ts)
+  { id: 'database', kind: 'layout', label: 'Database', html: '<div class="n-db" data-db="new"></div>' },
   { id: 'field', kind: 'layout', label: 'Field', html: '<label class="n-field">Your name<input type="text" placeholder="Type here"></label>' },
 
   {
@@ -166,6 +168,86 @@ export const BLOCKS: Block[] = [
     html: `<footer style="display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between;align-items:center;padding:24px 0;margin-top:32px;border-top:1px solid ${LINE};color:${MUTED};font-size:14px"><span>© ${new Date().getFullYear()} Your name</span><nav style="display:flex;gap:16px"><a href="#">About</a><a href="#">Contact</a></nav></footer>`,
   },
 ];
+
+/** A database's words (shared/page-db.ts), in English: the app gives them in its language, in Edit (as db.…) and in Use. */
+const DB_WORDS: Record<string, string> = {
+  untitled: 'Untitled database',
+  table: 'Table',
+  // (not "Board": the dictionaries have that word as a leaderboard)
+  board: 'Board view',
+  sort: 'Sort',
+  filter: 'Filter',
+  newRow: 'New',
+  oneRow: '1 row',
+  nRows: '{n} rows',
+  nOfRows: '{n} of {m} rows',
+  kText: 'Text',
+  kNumber: 'Number',
+  kSelect: 'Select',
+  kMulti: 'Multi-select',
+  kDate: 'Date',
+  kCheck: 'Checkbox',
+  kLink: 'Link',
+  colName: 'Column name',
+  kind: 'Kind',
+  options: 'Options',
+  addOption: 'Add an option',
+  newOption: 'New option',
+  sortAsc: 'Sort ascending',
+  sortDesc: 'Sort descending',
+  noSort: 'No sort',
+  filterBy: 'Filter by it',
+  moveLeft: 'Move left',
+  moveRight: 'Move right',
+  delCol: 'Delete the column',
+  addCol: 'Add a column',
+  newCol: 'Column',
+  delRow: 'Delete the row',
+  addFilter: 'Add a filter',
+  remove: 'Remove',
+  clear: 'Clear',
+  groupBy: 'Group by',
+  noValue: 'No value',
+  needSelect: 'A board groups its cards by a select column’s options.',
+  addSelect: 'Add a select column',
+  status: 'Status',
+  untitledRow: 'Untitled',
+  open: 'Open the link',
+  full: 'This database is full: some of the change could not be kept.',
+  failed: 'The change could not be kept',
+  unread: 'Its rows could not be read',
+  inUse: 'Its rows can be changed in Use.',
+  opContains: 'contains',
+  opNotContains: 'doesn’t contain',
+  opIs: 'is',
+  opIsNot: 'is not',
+  opHas: 'has',
+  opHasNot: 'doesn’t have',
+  opEmpty: 'is empty',
+  opFilled: 'is not empty',
+  opBefore: 'is before',
+  opAfter: 'is after',
+  opChecked: 'is ticked',
+  opUnchecked: 'is not ticked',
+  cDefault: 'No colour',
+  cGrey: 'Grey',
+  cBrown: 'Brown',
+  cOrange: 'Orange',
+  cYellow: 'Yellow',
+  cGreen: 'Green',
+  cBlue: 'Blue',
+  cPurple: 'Purple',
+  cPink: 'Pink',
+  cRed: 'Red',
+  // a new database's first columns and options
+  colName0: 'Name',
+  todo: 'To do',
+  doing: 'Doing',
+  done: 'Done',
+};
+
+/** A database's words in the app's language, for a page in Use (the kit draws its databases). */
+export const dbLabels = (): Record<string, string> => Object.fromEntries(Object.entries(DB_WORDS).map(([k, v]) => [k, tr(v)]));
 
 /** The words of the editor's bars and its names for parts, in the app's language. */
 export function editorLabels(): Record<string, string> {
@@ -278,9 +360,19 @@ export function editorLabels(): Record<string, string> {
     phQuote: 'Quote',
     phToggle: 'Toggle',
     tocEmpty: 'The headings of the page show here',
+    comment: 'Comment',
+    commentTip: 'Comment (Ctrl+Alt+M)',
+    comments: 'Comments',
+    sDatabase: 'Database',
+    linkPage: 'Link to a page',
+    noPages: 'No page by that name',
+    noPagesYet: 'No other pages yet',
+    language: 'Language',
+    langAuto: 'Auto',
+    langPlain: 'Plain text',
     btnWords: 'A button',
     cardTitle: 'A card',
     cardWords: 'A few words about it.',
   };
-  return Object.fromEntries(Object.entries(words).map(([k, v]) => [k, tr(v)]));
+  return { ...Object.fromEntries(Object.entries(words).map(([k, v]) => [k, tr(v)])), ...Object.fromEntries(Object.entries(DB_WORDS).map(([k, v]) => [`db.${k}`, tr(v)])) };
 }

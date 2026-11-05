@@ -15,7 +15,7 @@ import type { DB } from '../db.ts';
 import { pageMimeFor } from '../files.ts';
 import { inside, signWithKey } from '../links.ts';
 import { injectHead, kitHead, storageShim } from './kit.ts';
-import { cleanTitle, pageHtml, pageInfo, pageSource } from './store.ts';
+import { cleanTitle, dbSeed, pageHtml, pageInfo, pageSource } from './store.ts';
 
 /** A folder to publish holds at most this much. */
 const MAX_FILES = 5000;
@@ -347,7 +347,10 @@ export async function serveSite(db: DB, req: FastifyRequest, reply: FastifyReply
     const page = site.page_id ? await pageHtml(db, site.page_id) : null;
     if (!page) return text(reply, 404, 'The page this site showed was deleted.');
     reply.header('Cache-Control', 'no-cache');
-    return reply.type('text/html; charset=utf-8').send(injectHead(page.html, kitHead({ n: '', theme: 'auto', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value } })));
+    // (its databases show what they hold, as they are: a published copy keeps no change)
+    return reply
+      .type('text/html; charset=utf-8')
+      .send(injectHead(page.html, kitHead({ n: '', theme: 'auto', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: dbSeed(db, site.page_id!) }, page.html)));
   }
   // Never a dot file or folder (.env, .git), never a way out.
   const segs = rest.split('/');

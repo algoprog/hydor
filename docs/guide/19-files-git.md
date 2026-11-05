@@ -266,7 +266,7 @@ These files open in the editors the [Library](/guide/library#documents) has for 
 
 - **Word documents** (.docx) open in the document editor, as in Word or Google Docs, on a sheet of their paper.
 - **Excel files** (.xlsx), **CSV** and **TSV** files open in the spreadsheet editor, with their sheets and working formulas (and an Excel file's filters, conditional formatting, dropdowns and checkboxes, merged cells, notes and charts).
-- **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, each in a tab, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document that reads it, on the chapter's own tab. Comments and **Compare versions** are for LaTeX documents kept in the Library: a file keeps only its text.
+- **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, each in a tab, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document that reads it, on the chapter's own tab. Comments work as in the [Library](/guide/library#latex-documents): a file keeps only its text, so the app keeps its comments beside it, by the file's path, saved with **Save**; they go along when you rename or move the file (or its folder) here, and an agent [asked about the file](#ask-an-agent-about-the-file) reads them, answers and resolves them, its answers showing as they come. **Compare versions** is for LaTeX documents kept in the Library.
 
 Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Ask** ([ask an agent](#ask-an-agent-about-the-file)), **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
 
@@ -274,7 +274,7 @@ What saving keeps of the file:
 
 - **CSV and TSV**: the rows and cells you didn't change keep their text exactly as it was, and the file its separator, quotes and line ends. A CSV file holds one sheet's values: when you added formulas, sheets or formatting, the first save asks first, and formulas are saved as the values they give.
 - **LaTeX**: only the files you changed are written, each with its own line ends. A file you add in the editor goes into the folder; one you delete goes to the [Trash](#delete-and-put-back).
-- **Word and Excel** files are written again from what the editor holds: a Word file's comments, equations, table of contents, header and footer come along, and an Excel file's filters, conditional formatting, dropdowns and checkboxes, merged cells, notes and charts. Where a file has what the editor doesn't keep (a Word file's footnotes, tracked changes, charts, or a header with a picture or a table; an Excel file's pictures, pivot tables or formatted tables), a bar above says so: "Saving replaces the file without what this editor does not keep", and which. The first save asks before replacing the file, and **Save as a copy**, in that bar, writes your changes to a new file beside it instead ("report (edited).docx"). The first time you save a Word or Excel file, the file as it was goes to the [Trash](#delete-and-put-back), where **Put back** brings it back beside the new one.
+- **Word and Excel** files are written again from what the editor holds: a Word file's comments, tracked changes, equations, table of contents, header and footer come along, and an Excel file's filters, conditional formatting, dropdowns and checkboxes, merged cells, notes, comments and charts. Where a file has what the editor doesn't keep (a Word file's footnotes, charts, or a header with a picture or a table; an Excel file's pictures, shapes, pivot tables, formatted tables, hyperlinks, named ranges, macros or grouped rows), a bar above says so: "Saving replaces the file without what this editor does not keep", and which. The first save asks before replacing the file, and **Save as a copy**, in that bar, writes your changes to a new file beside it instead ("report (edited).docx"). The first time you save a Word or Excel file, the file as it was goes to the [Trash](#delete-and-put-back), where **Put back** brings it back beside the new one.
 - A file too long for the editor shows its start, to read only: **Edit as text** or **Show as a preview** shows all of it.
 
 When an agent or a terminal changes the file while it is open, the editor takes the new version if you changed nothing, or asks, as the text editor does: **Reload (discard mine)** or **Overwrite with mine**.
@@ -286,7 +286,7 @@ PowerPoint files, older Office files (.doc, .xls, .ppt), OpenDocument files, RTF
 The file viewer shows files as they look:
 
 - **Images** (PNG, JPEG, GIF, WebP, SVG, ICO, BMP, AVIF): shown whole, on a checkerboard where they are see-through.
-- **PDFs**: in your browser's own PDF viewer.
+- **PDFs**: in your browser's own PDF viewer, with **Fill & sign** at the top to fill them in and sign them (see [Fill in and sign a PDF](#fill-in-and-sign-a-pdf)).
 - **Video** (MP4, WebM, MOV and M4V; MKV and OGV where your browser plays them): in the app's own player (see [Watch a video](#watch-a-video) below). **Audio** (MP3, WAV, OGG) plays in place.
 - **Office documents**: PowerPoint (.pptx, .ppt), older Word and Excel files (.doc, .xls and the like), OpenDocument (.odt, .ods, .odp), RTF and EPUB; and Word (.docx) and Excel (.xlsx) files from **More** (⋯) → **Show as a preview** in their editors. A switch at the top picks the view:
   - **Pages**: the document as LibreOffice lays it out, page by page ("Laying out the pages…" the first time). This view is there only when LibreOffice is installed on this computer, and not for EPUB books.
@@ -309,6 +309,32 @@ A video opens in the app's own player, which fills the viewer:
 - The controls fade while it plays and come back when you move the pointer. The player remembers your volume and speed for the next video.
 - **On a phone**: tap the picture to show or hide the controls, and double-tap its left or right side to go back or forward 10 seconds. On an iPhone, full screen uses the phone's own video player.
 - A video your browser can't play (MKV and AVI files often use codecs browsers don't) says "This video can’t play here", with **Download** to watch it in a video app.
+
+## Fill in and sign a PDF
+
+Open a PDF and press **Fill & sign** at the top (on a phone, the pen beside its name). Its pages show as paper, with its form's fields over them in light blue:
+
+- **Fields**: type in a text box, tick a checkbox, pick a radio button, a dropdown's choice or a list's choices. A field the form locks (read-only, or locked by a digital signature already in the file) can't be changed.
+- **A click on a page** puts what the toolbar holds there: **Text** (a box to type in, the usual), **Tick**, **Cross** or **Date** (today's date, which you can change). Click blank after blank: each click starts the next one. This is how you fill in a form that is only printed lines and boxes, or a scanned one.
+- **Signature** puts one of your saved signatures on the page with one tap, or one you draw, type or upload there (tick **Keep it for later** to save it; see [Signatures](/guide/library#signatures)). A form's own signature field says **Sign here**: tap it, and the signature goes into its box.
+- **Move and size**: drag a tick, a cross or a signature to move it, and its blue corner to size it. A text box moves by the handle at its left, and **A−** and **A+** over it make its words smaller or larger. The bin over each, or Delete, takes it away.
+- **Zoom**: pinch on a phone or tablet; on a computer, Ctrl with the mouse wheel, or Ctrl+= and Ctrl+−. **Fit width** (or Ctrl+0) goes back.
+
+**Save** writes a copy beside the file, "name (filled).pdf", and opens it. The arrow beside it has **Save a copy beside it** and **Replace the file**, whose old version goes to the [Trash](#delete-and-put-back). **Close** leaves without saving, asking first when you changed something.
+
+The fields keep your values as a form's own fields, so any PDF viewer shows them and they can still be changed there, in fonts that hold your words (Greek and Chinese too). What you placed is drawn onto the pages. The file's own bytes stay as they were, with the changes after them, so:
+
+- a **digitally signed** PDF stays valid when you only fill in its fields. Text, ticks or a signature placed on its pages show in other viewers as a change made after signing;
+- a PDF **protected** by its owner (it opens without a password but limits changes) is filled in only as far as it allows. One that needs a password to open can't be filled in here.
+
+What it can't do:
+
+- **XFA forms** (made with Adobe LiveCycle Designer, often by governments): their fields fill in only in Adobe Acrobat or Reader. You can still type and sign on their pages.
+- **Scanned forms** have no fields and no words to find: your text and ticks go where you click.
+- A drawn signature is a picture of your signature, not a digital signature that proves who signed.
+- Nothing here takes words out of a PDF for good. White boxes, which agents can put over words, hide them from the eye only: the words stay in the file.
+
+Agents fill in, write on and change PDFs too, with their own tools: see [Documents, images, videos and voice](/guide/documents-voice#pdfs).
 
 ## Find a file by name
 
@@ -666,6 +692,8 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 
 - "In the file I have open, add a comment over each function saying what it does."
 - "Copy the PDFs in ~/Downloads from this week into my Taxes 2026 project."
+- "Fill in ~/Downloads/rental-application.pdf with my details, and ask me for anything you don't know."
+- "Merge the PDFs in ~/Documents/Scans into one file, the cover first, and turn the sideways pages upright."
 - "Which files in ~/code/shop mention the checkout, and what does each do with it?"
 - "Add a column to ~/Documents/people.csv with each person's share of the total."
 - "Make a notebook in ~/code/ml that trains a small image classifier, run it, and set up an environment I can run it in."

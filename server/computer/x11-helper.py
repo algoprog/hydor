@@ -1,6 +1,6 @@
 # Computer use on Linux with X11 (server/computer/linux.ts runs it): uses the mouse and keyboard through the X server's
-# XTest extension, with nothing but Python's own ctypes and the X libraries every X11 desktop has (libX11, libXtst;
-# libXrandr for the displays). It stays running and reads one request per line on stdin, {"id":1,"ops":[...]}, and
+# XTest extension (the pointer gliding to where it acts, so the eye can follow), with nothing but Python's own ctypes and
+# the X libraries every X11 desktop has (libX11, libXtst; libXrandr for the displays). It stays running and reads one request per line on stdin, {"id":1,"ops":[...]}, and
 # answers each on stdout, {"id":1,"ok":true,"out":{...}}; first it says {"ready":true,...} with what it found.
 # The steps are those of plan.ts (Op), in the X server's pixels; keys come as keysyms, found on the keyboard as it is
 # laid out. A character no key types (another script, an emoji) borrows a spare key for a moment, as xdotool does.
@@ -242,6 +242,25 @@ def move_to(x, y):
     time.sleep(0.05)
 
 
+def ease(t):
+    """Slow at both ends, as a hand moves."""
+    return 4 * t * t * t if t < 0.5 else 1 - pow(-2 * t + 2, 3) / 2
+
+
+def glide(o):
+    """The pointer to (x, y) in small steps over o["ms"], so the eye can follow it, instead of a jump."""
+    x, y, ms = float(o["x"]), float(o["y"]), max(0, int(o.get("ms") or 0))
+    x0, y0, _ = query_pointer()
+    if ms <= 0 or abs(x - x0) + abs(y - y0) < 3:
+        motion(x, y)
+        return
+    n = max(4, int(round(ms / 16.0)))
+    for i in range(1, n + 1):
+        e = ease(i / float(n))
+        motion(x0 + (x - x0) * e, y0 + (y - y0) * e)
+        time.sleep(ms / 1000.0 / n)
+
+
 def button(b, down):
     XT.XTestFakeButtonEvent(dpy, b, 1 if down else 0, 0)
     flush()
@@ -474,7 +493,9 @@ def run(ops):
     out = {"done": 0, "positions": []}
     for o in ops:
         op = o.get("op")
-        if op == "move":
+        if op == "glide":
+            glide(o)
+        elif op == "move":
             move_to(o["x"], o["y"])
         elif op == "click":
             click(o)

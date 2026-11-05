@@ -1,7 +1,9 @@
 // A session's browser as the pages know it: its state from the server's news, the latest frame of its
-// live view, and the user's input on its way to the page while they drive.
+// live view and what the agent's pointer does in it, and the user's input on its way to the page while
+// they drive.
 import { create } from 'zustand';
 import type { BrowserEvent, BrowserInput, BrowserView, ChromeDownload, SessionBrowserOptions } from '@shared/browser';
+import type { AgentPointer } from '@shared/pointer';
 import { api, enc, post } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { toastError } from '../../lib/store';
@@ -26,6 +28,19 @@ export function onFrame(key: string, fn: FrameFn): () => void {
   };
 }
 
+/** What the agent's pointer does, as it happens, by key (outside React too: each view animates it itself). */
+type PointerFn = (p: AgentPointer) => void;
+const pointerFns = new Map<string, Set<PointerFn>>();
+
+export function onPointer(key: string, fn: PointerFn): () => void {
+  let set = pointerFns.get(key);
+  if (!set) pointerFns.set(key, (set = new Set()));
+  set.add(fn);
+  return () => {
+    set.delete(fn);
+  };
+}
+
 let listening = false;
 /** Hears the server's browser news, once for the whole app. */
 export function listenBrowser() {
@@ -43,6 +58,8 @@ export function listenBrowser() {
       const f = { data: d.data, w: d.w, h: d.h, tab: d.tab };
       frames.set(key, f);
       for (const fn of frameFns.get(key) ?? []) fn(f);
+    } else if (d.type === 'pointer') {
+      for (const fn of pointerFns.get(key) ?? []) fn(d.pointer);
     }
   });
 }

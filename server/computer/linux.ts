@@ -41,8 +41,8 @@ async function problem(): Promise<string | null> {
   }
 }
 
-async function drive(ops: Op[], signal?: AbortSignal): Promise<DriverOut> {
-  return (await helper.call({ ops }, { signal, timeoutMs: driverTimeout(ops) })) as unknown as DriverOut;
+async function drive(ops: Op[], signal?: AbortSignal, started?: () => void): Promise<DriverOut> {
+  return (await helper.call({ ops }, { signal, timeoutMs: driverTimeout(ops), sent: started })) as unknown as DriverOut;
 }
 
 type Place = { x: number; y: number; w: number; h: number };

@@ -3,7 +3,7 @@
 // service), and installs the new versions the server downloads (updates.ts). Elsewhere `desktop` is null.
 //
 // The channel both ways: the server tells the app what to show (a new version ready, an agent using the computer, with
-// the glow around the screen) and what to do (install), asks it what only it can find out or do (macOS's permissions
+// the glow around the screen and its pointer over the real one) and what to do (install), asks it what only it can find out or do (macOS's permissions
 // for computer use, and asking for them; hiding the glow for a moment while it looks at the screen; letting go of Esc
 // while the agent itself presses it; on Linux, a picture of the screen), and hears what you chose in its menus
 // (Restart to Update, Stop, Esc) and, on Windows, that it should stop (quit: Windows has no signal a program can catch
@@ -11,6 +11,7 @@
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import type { Show } from './computer/plan.ts';
 
 export type DesktopPlatform = 'mac' | 'windows' | 'linux';
 /**
@@ -97,7 +98,13 @@ export type ToDesktop =
    * false: a Linux desktop without a compositor), its note says `using` and `esc`, Esc stops it (and ⌘⇧Esc on a Mac),
    * and the menu bar or tray says so, with Stop.
    */
-  | { type: 'computer'; active: boolean; title?: string; using?: string; esc?: string; glow?: boolean }
+  | { type: 'computer'; active: boolean; title?: string; using?: string; esc?: string; glow?: boolean; agent?: string }
+  /**
+   * The agent's pointer, drawn over the real one in the glow's windows while the driver acts: a timeline (ms from now)
+   * of where it goes and what it does there (a ring and halo with the `agent` tag, a ripple on a click, the keys or
+   * words beside it), in the driver's places (points on a Mac, pixels elsewhere). Hidden with the glow for screenshots.
+   */
+  | { type: 'pointer'; steps: Show[] }
   /** The glow back after a screenshot. */
   | { type: 'glow'; show: true }
   /** Esc stops the agent again, after it pressed Esc itself. */

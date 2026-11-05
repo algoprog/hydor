@@ -1,9 +1,10 @@
 // The "/" menu: typed at the start of a line or after a space, "/" opens a short list under the caret of what to put
-// there (headings, lists, a checklist, a quote, code, a callout, a table, a picture, an equation, a line across, a page
-// break, a table of contents, today's date), narrowed as more is typed. The arrow keys and Enter pick, Esc or a space
-// closes it; what was typed from the "/" goes when something is picked. The editor keeps where the "/" is and the keys.
+// there (headings, lists, a checklist, a quote, code, a callout, a table, a picture, a signature, an equation, a line across, a page
+// break, a table of contents, today's date), narrowed as more is typed. It never scrolls: a long list is two columns,
+// filled from the top, as the page editor's is. The arrow keys (← and → across the columns) and Enter pick, Esc or a
+// space closes it; what was typed from the "/" goes when something is picked. The editor keeps where the "/" is and the keys.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { CalendarDays, Code2, Heading1, Heading2, Heading3, Image as ImageIcon, Lightbulb, List, ListChecks, ListOrdered, Minus, Quote, SeparatorHorizontal, Sigma, Table2, TableOfContents } from 'lucide-react';
+import { CalendarDays, Code2, Heading1, Heading2, Heading3, Image as ImageIcon, Lightbulb, List, ListChecks, ListOrdered, Minus, Quote, SeparatorHorizontal, Sigma, Signature, Table2, TableOfContents } from 'lucide-react';
 import { cx } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import type { DocEngine } from './engine';
@@ -17,7 +18,7 @@ export interface SlashItem {
 }
 
 /** What the "/" menu offers. */
-export function slashItems(e: DocEngine, more: { picture: () => void; equation: () => void; today: () => void }): SlashItem[] {
+export function slashItems(e: DocEngine, more: { picture: () => void; signature: () => void; equation: () => void; today: () => void }): SlashItem[] {
   return [
     { label: 'Heading 1', icon: <Heading1 size={16} />, also: 'h1 title big', run: () => e.style('h1') },
     { label: 'Heading 2', icon: <Heading2 size={16} />, also: 'h2', run: () => e.style('h2') },
@@ -30,6 +31,7 @@ export function slashItems(e: DocEngine, more: { picture: () => void; equation: 
     { label: 'Callout', icon: <Lightbulb size={16} />, also: 'note tip box emoji', run: () => e.style('callout') },
     { label: 'Table', icon: <Table2 size={16} />, also: 'grid', run: () => e.insertTable(3, 3) },
     { label: 'Picture', icon: <ImageIcon size={16} />, also: 'image photo', run: more.picture },
+    { label: 'Signature', icon: <Signature size={16} />, also: 'sign initials autograph', run: more.signature },
     { label: 'Equation', icon: <Sigma size={16} />, also: 'maths math formula latex', run: more.equation },
     { label: 'A line across', icon: <Minus size={16} />, also: 'divider rule hr', run: () => e.insertAtom('hr') },
     { label: 'A page break', icon: <SeparatorHorizontal size={16} />, also: 'new page', run: () => e.insertAtom('pagebreak') },
@@ -59,7 +61,31 @@ export function slashAt(before: string): { from: number; query: string } | null 
   return m ? { from: before.length - m[1].length - 1, query: m[1] } : null;
 }
 
-export function SlashMenu({ items, index, at, bound, onPick, onHover }: { items: SlashItem[]; index: number; at: { x: number; top: number; bottom: number }; bound: number; onPick: (k: number) => void; onHover: (k: number) => void }) {
+/** How the list is laid out for so many items in so much room: two columns (filled from the top) when it is long and there is room, a phone's too. */
+export function slashLayout(n: number, room: number): { rows: number; width: number } {
+  const two = n >= 8 && room >= 340;
+  return { rows: two ? Math.ceil(n / 2) : n, width: two ? Math.min(400, room) : 240 };
+}
+
+export function SlashMenu({
+  items,
+  index,
+  at,
+  bound,
+  rows,
+  width,
+  onPick,
+  onHover,
+}: {
+  items: SlashItem[];
+  index: number;
+  at: { x: number; top: number; bottom: number };
+  bound: number;
+  rows: number;
+  width: number;
+  onPick: (k: number) => void;
+  onHover: (k: number) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [up, setUp] = useState(false);
   // Under the caret, or above it where there is no room below.
@@ -69,17 +95,14 @@ export function SlashMenu({ items, index, at, bound, onPick, onHover }: { items:
     const r = el.getBoundingClientRect();
     setUp(r.bottom > bound - 8 && at.top - r.height > 60);
   }, [items.length, at.top, bound]);
-  useLayoutEffect(() => {
-    ref.current?.querySelector(`[data-k="${index}"]`)?.scrollIntoView({ block: 'nearest' });
-  }, [index]);
   return (
     <div
       ref={ref}
       data-keeps-editing
       role="listbox"
       onMouseDown={(e) => e.preventDefault()}
-      className="absolute z-30 max-h-[300px] w-[240px] overflow-y-auto rounded-xl border border-line bg-elevated p-1 shadow-lg"
-      style={{ left: at.x, top: up ? undefined : at.bottom + 6, bottom: up ? `calc(100% - ${at.top - 6}px)` : undefined }}
+      className="absolute z-30 grid grid-flow-col gap-x-0.5 rounded-xl border border-line bg-elevated p-1 shadow-lg"
+      style={{ left: at.x, width, gridTemplateRows: `repeat(${rows}, auto)`, top: up ? undefined : at.bottom + 6, bottom: up ? `calc(100% - ${at.top - 6}px)` : undefined }}
     >
       {items.map((it, k) => (
         <button
@@ -90,7 +113,7 @@ export function SlashMenu({ items, index, at, bound, onPick, onHover }: { items:
           aria-selected={k === index}
           onMouseEnter={() => onHover(k)}
           onClick={() => onPick(k)}
-          className={cx('flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-fg', k === index ? 'bg-bg-2' : 'hover:bg-bg-2')}
+          className={cx('flex h-8 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-fg pointer-coarse:h-10', k === index ? 'bg-bg-2' : 'hover:bg-bg-2')}
         >
           <span className="flex w-4 shrink-0 items-center justify-center text-fg-3">{it.icon}</span>
           <span className="min-w-0 flex-1 truncate">{it.label}</span>

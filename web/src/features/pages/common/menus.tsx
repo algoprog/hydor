@@ -257,6 +257,8 @@ function useRowFits(on: boolean, menus: MenuDef[]) {
   const root = useRef<HTMLDivElement>(null);
   const row = useRef<HTMLDivElement>(null);
   const [ok, setOk] = useState(true);
+  // Measured again when the names change, not each time an editor draws (its menus are made anew each time).
+  const names = menus.map((m) => m.label).join('\n');
   useLayoutEffect(() => {
     if (!on) return;
     const a = root.current;
@@ -268,7 +270,7 @@ function useRowFits(on: boolean, menus: MenuDef[]) {
     ro.observe(a);
     ro.observe(b);
     return () => ro.disconnect();
-  }, [on, menus]);
+  }, [on, names]);
   return { root, row, ok };
 }
 
@@ -321,7 +323,8 @@ export function MenuBar({
   const asOne: MenuDef[] = useMemo(() => [{ label: 'Menus', items: menus.map((m) => ({ label: m.label, items: m.items })) }], [menus]);
 
   return (
-    <div ref={fits.root} className={cx('relative flex min-w-0 items-center gap-0.5', compact === 'auto' && 'flex-1', className)} onMouseDown={keepFocus}>
+    // Folded, it is never narrower than its two buttons: squeezed further, they would slide under the buttons beside it.
+    <div ref={fits.root} className={cx('relative flex items-center gap-0.5', !folded && 'min-w-0', compact === 'auto' && 'flex-1', className)} onMouseDown={keepFocus}>
       {compact === 'auto' && (
         // The row as it would be, unseen, to tell whether it fits (in the app's language: its words are translated too).
         <div ref={fits.row} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 flex items-center gap-0.5 whitespace-nowrap">

@@ -6,16 +6,21 @@
 // and from Excel and Google Sheets; formulas pasted here move along, and Paste special pastes values, looks or formulas
 // alone, or turned on its side. Besides: find and replace; filters on a header row; conditional formatting; rules for
 // what cells take, with checkboxes, lists' coloured chips, stars and a calendar for dates; borders; merged cells; the
-// fill handle; hidden rows and columns; number formats with Excel's codes; charts over the grid; the data tools;
-// notes; a row expanded into a card; zoom. Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo
-// step through them.
+// fill handle; hidden rows and columns; number formats with Excel's codes; charts on the grid's cells (of the cells
+// picked, or of several ranges picked with Ctrl+click); the data tools; notes; a row expanded into a card; zoom.
+// Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them. While an agent writes a
+// new version (live.ts), it shows as it comes, read-only, the cell its words arrive in boxed and kept in view.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye } from 'lucide-react';
+import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, MessageSquarePlus, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye } from 'lucide-react';
+import { newCommentId } from '@shared/comments';
 import {
   cleanBorder,
+  colIndex,
   colName,
   COL_W,
   computeBook,
+  cornerAt,
+  cornerXY,
   dateSerial,
   DEFAULT_DP,
   formatValue,
@@ -24,6 +29,7 @@ import {
   generalNumber,
   inputText,
   isDateFmt,
+  keyOf,
   MAX_H,
   MAX_W,
   MIN_W,
@@ -39,6 +45,7 @@ import {
   renameSheet,
   ROW_H,
   SHEET_LIMITS,
+  sheetSizes,
   shiftFormula,
   uniqueSheetName,
   type BorderKind,
@@ -50,7 +57,9 @@ import {
   type NumFmt,
   type Rect,
   type Sheet,
+  type SheetBoard,
   type SheetChart,
+  type SheetComment,
   type Validation,
   type Workbook,
 } from '@shared/sheets';
@@ -62,16 +71,18 @@ import { CharPicker } from '../common/CharPicker';
 import { FindBar, useFind } from '../common/FindBar';
 import { isMod } from '../common/keys';
 import { MenuBar } from '../common/menus';
+import { useOwnScroll } from '../live';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { Board } from './Board';
 import { ChartLayer, ChartPanel } from './Charts';
+import { CommentsPanel } from './CommentsPanel';
 import { CondPanel } from './CondPanel';
 import { DupDialog, FormatDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
 import { fillDownTo, fillSeries } from './fill';
 import { FilterMenu } from './FilterMenu';
 import { FormulaBar, formulaHelp } from './FormulaBar';
-import { fontPx, Grid, textWidth, type Edit, type GridHandle, type GridView, type RefBox, type Smart } from './Grid';
+import { fontPx, Grid, textWidth, type Edit, type GridGeo, type GridHandle, type GridView, type RefBox, type Smart } from './Grid';
 import { sheetMenus, type MenuCtx } from './menus';
 import {
   applyPatch,
@@ -80,6 +91,7 @@ import {
   cellsPatch,
   clearChanges,
   colW,
+  commentsMoved,
   copyOf,
   dataEdge,
   deletePatch,
@@ -206,11 +218,22 @@ function codeDecimals(code: string, d: 1 | -1): string {
 
 const clone = (b: Workbook): Workbook => structuredClone(b);
 
-type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | null;
+type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | { kind: 'comments'; draft?: boolean } | null;
 type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | null;
 type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
-export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef }: ModelEditorProps<Workbook>) {
+/** Where an agent's words are arriving: its cell, boxed in the app's busy colour with a small flag (as a collaborator's in Google Sheets). */
+function AgentCell({ geo, r, c }: { geo: GridGeo; r: number; c: number }) {
+  if (r + 1 >= geo.rowOff.length || c + 1 >= geo.colOff.length) return null;
+  const box = { left: geo.colOff[c] - 1, top: geo.rowOff[r] - 1, width: geo.colOff[c + 1] - geo.colOff[c] + 2, height: geo.rowOff[r + 1] - geo.rowOff[r] + 2 };
+  return (
+    <div aria-hidden className="pointer-events-none absolute z-[2] outline-2 outline-busy [outline-style:solid]" style={box}>
+      <span className="absolute bottom-full left-0 mb-px rounded-[3px] bg-busy px-1 text-[10px] leading-[14px] font-semibold whitespace-nowrap text-bg">Agent</span>
+    </div>
+  );
+}
+
+export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live: agent }: ModelEditorProps<Workbook>) {
   const root = useRef<HTMLDivElement>(null);
   const grid = useRef<GridHandle>(null);
   const barRef = useRef<HTMLTextAreaElement>(null);
@@ -225,6 +248,13 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const [sel, setSelState] = useState<Sel>(cellSel(0, 0));
   const selRef = useRef(sel);
   selRef.current = sel;
+  // More ranges picked with Ctrl+click besides the selection (a chart of several ranges; looks and Delete go on all).
+  const [more, setMoreState] = useState<Rect[]>([]);
+  const moreRef = useRef(more);
+  const setMore = (m: Rect[]) => {
+    moreRef.current = m;
+    setMoreState(m);
+  };
   const sels = useRef(new Map<string, Sel>());
   const [edit, setEditState] = useState<Edit | null>(null);
   const editRef = useRef<Edit | null>(null);
@@ -246,8 +276,10 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const filterRef = useRef<HTMLDivElement>(null);
   const [chartSel, setChartSel] = useState<string | null>(null);
   const [rowCard, setRowCard] = useState<number | null>(null);
-  // The Kanban board: the table it shows (by a cell of its header row) and the column it groups by.
-  const [board, setBoard] = useState<{ r: number; c: number; by: number } | null>(null);
+  // The Kanban board: whether it is shown, and (until settings of its own are kept with the sheet) the table it shows,
+  // by its header row's first cell, and the column it groups by.
+  const [boardOn, setBoardOn] = useState(false);
+  const [boardLocal, setBoardLocal] = useState<{ r: number; c: number; by: number } | null>(null);
   const [line, setLine] = useState<{ kind: BorderKind; color?: string }>({ kind: 'thin' });
   const [header, setHeader] = useState(true);
   const [noteDraft, setNoteDraft] = useState('');
@@ -279,9 +311,13 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   dirtyRef.current = dirty;
   useEffect(() => onDirty?.(dirty), [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Another spreadsheet, or a new version of it (the agent's) while nothing was changed here: start from it.
-  useEffect(() => {
-    if (!doc || dirtyRef.current) return;
+  // Another spreadsheet, or a new version of it (the agent's) while nothing was changed here: start from it (before it
+  // is drawn, so the one it replaces never shows again for a moment). A cell being typed in keeps it waiting until it is
+  // done: then it is a change here, left as it is, or there is none and it comes in.
+  const taken = useRef<string | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!doc || doc.key === taken.current || dirtyRef.current || edit) return;
+    taken.current = doc.key;
     bookRef.current = clone(doc.model);
     savedRef.current = clone(doc.model);
     calcRef.current = computeBook(bookRef.current);
@@ -290,13 +326,33 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     setEdit(null);
     setRev((r) => r + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc?.key]);
+  }, [doc?.key, !!edit, dirty]);
 
-  const book = bookRef.current;
-  const calc = calcRef.current;
+  // An agent's version being written shows in place of the workbook (read-only, the cell being written in view, its
+  // formulas worked out as it comes), unless there are changes here not saved: those are left as they are. A cell being
+  // typed in holds it back until it is done.
+  const liveBook = agent && !dirty && !edit ? agent.model : null;
+  const liveOn = !!liveBook;
+  const readOnly = !!readOnlyProp || liveOn;
+  const liveCalc = useMemo(() => (liveBook ? computeBook(liveBook) : null), [liveBook]);
+  const book = liveBook ?? bookRef.current;
+  const calc = liveCalc ?? calcRef.current;
+  // What draws the cells again: each change here, or each draw of the agent's version.
+  const shownRev = liveOn ? -agent!.n : rev;
   const sheetIx = book ? Math.min(si, book.sheets.length - 1) : 0;
   const sheet: Sheet | undefined = book?.sheets[sheetIx];
-  const size = useMemo(() => (calc ? gridSize(calc, sheetIx) : { rows: 1000, cols: 26 }), [calc, sheetIx, rev]);
+  const size = useMemo(() => (calc ? gridSize(calc, sheetIx, sheet) : { rows: 1000, cols: 26 }), [calc, sheetIx, rev, sheet]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The sheet and the cell being written stay in view, unless a sheet was picked or the cells scrolled here lately.
+  const pickedAt = useRef(0);
+  const ownScroll = useOwnScroll(root);
+  const mark = liveOn && agent?.mark?.kind === 'sheet' ? agent.mark : null;
+  const markAt = mark ? parseRef(mark.cell) : null;
+  useEffect(() => {
+    if (!mark || !liveBook || performance.now() - pickedAt.current < 4000) return;
+    const i = liveBook.sheets.findIndex((x) => x.id === mark.sheet);
+    if (i >= 0 && i !== sheetIx) setSi(i);
+    else if (markAt && !ownScroll()) grid.current?.reveal(markAt.r, markAt.c);
+  }, [mark?.sheet, mark?.cell, agent?.n]);
   const x = rectOf(sel);
 
   // What the sheet's rules make of it, worked out once per change.
@@ -449,8 +505,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const right = s.fc >= s.ac;
     return { r: m ? m.r1 : s.r, c: m ? m.c1 : s.c, ar: down ? g.r1 : g.r2, fr: down ? g.r2 : g.r1, ac: right ? g.c1 : g.c2, fc: right ? g.c2 : g.c1 };
   };
-  /** A new selection (what is being typed goes in first); `reveal` scrolls to it. */
-  const setSel = (s: Sel, reveal = false, keepEdit = false) => {
+  /** A new selection (what is being typed goes in first); `reveal` scrolls to it; `keepMore`: the other ranges picked stay. */
+  const setSel = (s: Sel, reveal = false, keepEdit = false, keepMore = false) => {
+    if (!keepMore && moreRef.current.length) setMore([]);
     if (editRef.current && !keepEdit) {
       commitEdit(null);
       // Words its rule refused stay out of the cell.
@@ -466,8 +523,18 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const whole = (b.r1 === 0 && b.r2 >= size.rows - 1) || (b.c1 === 0 && b.c2 >= size.cols - 1);
     if (reveal) requestAnimationFrame(() => (whole ? grid.current?.reveal(next.r, next.c) : grid.current?.reveal(next.fr, next.fc)));
   };
+  /** Ctrl+click: the selection joins the ranges picked, and a new one begins at the cell. */
+  const addRange = (r: number, c: number) => {
+    const all = [...moreRef.current, rectOf(selRef.current)].slice(-20);
+    setSel(cellSel(r, c), false, false, true);
+    setMore(all);
+  };
+  /** Every range picked: those with Ctrl+click, then the selection. */
+  const picked = (): Rect[] => [...moreRef.current, rectOf(selRef.current)];
   const pickSheet = (i: number) => {
     if (!book || i === sheetIx) return;
+    pickedAt.current = performance.now();
+    if (moreRef.current.length) setMore([]);
     if (editRef.current) commitEdit(null);
     if (editRef.current) setEdit(null);
     if (sheet) sels.current.set(sheet.id, selRef.current);
@@ -575,11 +642,17 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const opts = rule.type === 'list' && calc ? listOptions(calc, sheetIx, rule).map((o) => o.v) : [];
     if (opts.length) return `${tr('This cell takes one of')}: ${opts.slice(0, 8).join(', ')}${opts.length > 8 ? '…' : ''}`;
     if (rule.type === 'checkbox') return tr('This cell takes TRUE or FALSE.');
-    if (rule.type === 'rating') return `${tr('This cell takes a whole number of stars from 0 to')} ${rule.max ?? 5}.`;
-    const what = rule.type === 'date' ? 'date' : rule.type === 'length' ? 'length' : 'number';
+    const max = rule.max ?? 5;
+    if (rule.type === 'rating') return tr(`This cell takes a whole number of stars from 0 to ${max}.`);
     if (!w || rule.type === 'formula') return tr('This value is not allowed in this cell.');
-    const op = w.op === 'between' ? `between ${w.a} and ${w.b}` : w.op === 'notBetween' ? `not between ${w.a} and ${w.b}` : `${{ eq: '=', neq: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤' }[w.op as 'eq'] ?? ''} ${w.a ?? ''}`;
-    return `${tr(what === 'date' ? 'This cell takes a date' : what === 'length' ? 'This cell takes words whose length is' : 'This cell takes a number')} ${op.trim()}.`;
+    // Each a whole sentence, so it translates whole (its words may go in another order).
+    const [a, b] = [w.a ?? '', w.b ?? ''];
+    const sign = { eq: '=', neq: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤' }[w.op as 'eq'] ?? '=';
+    if (rule.type === 'date')
+      return tr(w.op === 'between' ? `This cell takes a date between ${a} and ${b}.` : w.op === 'notBetween' ? `This cell takes a date not between ${a} and ${b}.` : `This cell takes a date ${sign} ${a}.`);
+    if (rule.type === 'length')
+      return tr(w.op === 'between' ? `This cell takes words whose length is between ${a} and ${b}.` : w.op === 'notBetween' ? `This cell takes words whose length is not between ${a} and ${b}.` : `This cell takes words whose length is ${sign} ${a}.`);
+    return tr(w.op === 'between' ? `This cell takes a number between ${a} and ${b}.` : w.op === 'notBetween' ? `This cell takes a number not between ${a} and ${b}.` : `This cell takes a number ${sign} ${a}.`);
   };
 
   /** The options a list cell offers for what is typed in it. */
@@ -693,7 +766,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const active: Cell | undefined = sheet?.cells[refName(sel.r, sel.c)];
   const restyle = (f: (s: CellStyle | undefined) => CellStyle | undefined, extra?: (changes: Record<string, Cell | null>) => Patch | null) => {
     if (!book || !sheet || !calc) return;
-    const changes = styleChanges(sheet, calc, sheetIx, rectOf(selRef.current), f);
+    const changes: Record<string, Cell | null> = {};
+    for (const x2 of picked()) Object.assign(changes, styleChanges(sheet, calc, sheetIx, x2, f));
     change(together([cellsPatch(book, sheetIx, changes), extra?.(changes) ?? null]));
     grid.current?.focus();
   };
@@ -856,7 +930,10 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const body = (single(sel) || wholeCols || wholeRows) && hasHeader(sheet, calc, sheetIx, block) ? { ...block, r1: block.r1 + 1 } : block;
     if (body.r2 <= body.r1) return void toast(tr('There is nothing to sort here: pick a column of a table, or the rows to sort.'));
     const col = Math.max(body.c1, Math.min(body.c2, sel.c));
-    change(cellsPatch(book, sheetIx, sortChanges(sheet, calc, sheetIx, body, col, asc)));
+    // The rows' comments go with them.
+    const moved = new Map<number, number>();
+    const changes = sortChanges(sheet, calc, sheetIx, body, col, asc, moved);
+    change(together([cellsPatch(book, sheetIx, changes), commentsMoved(sheet, body, moved)]));
     grid.current?.focus();
   };
   const clear = (all = false) => {
@@ -866,7 +943,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       restyle(() => undefined);
       return;
     }
-    change(cellsPatch(book, sheetIx, clearChanges(sheet, calc, sheetIx, rectOf(selRef.current))));
+    const changes: Record<string, Cell | null> = {};
+    for (const x2 of picked()) Object.assign(changes, clearChanges(sheet, calc, sheetIx, x2));
+    change(cellsPatch(book, sheetIx, changes));
   };
   const fill = (down: boolean) => {
     if (!book || !sheet) return;
@@ -920,8 +999,29 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const got = pasteChanges(sheet, target, own ? { clip: own } : { text });
     const patches: (Patch | null)[] = [];
     if (own?.cut) {
-      // Cells cut leave where they were (all but those pasted over).
+      // Cells cut leave where they were (all but those pasted over), their comments going with them.
       const from = b.sheets.find((s) => s.id === own.sheet);
+      const dr = got.x.r1 - own.x.r1;
+      const dc = got.x.c1 - own.x.c1;
+      const inCut = (cm: SheetComment) => {
+        const p = parseRef(cm.cell)!;
+        return p.r >= own.x.r1 && p.r <= own.x.r2 && p.c >= own.x.c1 && p.c <= own.x.c2;
+      };
+      const going = from?.comments?.filter(inCut) ?? [];
+      if (from && going.length) {
+        const moved = going.map((cm) => {
+          const p = parseRef(cm.cell)!;
+          return { ...cm, cell: refName(p.r + dr, p.c + dc) };
+        });
+        const keep = (list: SheetComment[] | undefined, out: Set<string>) => (list ?? []).filter((cm) => !out.has(cm.cell));
+        const target = new Set(moved.map((m) => m.cell));
+        if (from.id === sheet.id) patches.push(metaPatch(from, { comments: [...keep(from.comments?.filter((cm) => !inCut(cm)), target), ...moved].sort((x, y) => keyOf(x.cell) - keyOf(y.cell)) }));
+        else {
+          const rest = from.comments!.filter((cm) => !inCut(cm));
+          patches.push(metaPatch(from, { comments: rest.length ? rest : undefined }));
+          patches.push(metaPatch(sheet, { comments: [...keep(sheet.comments, target), ...moved].sort((x, y) => keyOf(x.cell) - keyOf(y.cell)) }));
+        }
+      }
       if (from) {
         const empty: Record<string, Cell | null> = {};
         for (let r = own.x.r1; r <= own.x.r2; r++)
@@ -1092,7 +1192,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     const fx = view.filter.x;
     const body = { ...fx, r1: fx.r1 + 1, r2: Math.min(fx.r2, calc.extent(sheetIx).rows - 1) };
     if (body.r2 <= body.r1) return;
-    change(cellsPatch(book, sheetIx, sortChanges(sheet, calc, sheetIx, body, c, asc)));
+    const moved = new Map<number, number>();
+    const changes = sortChanges(sheet, calc, sheetIx, body, c, asc, moved);
+    change(together([cellsPatch(book, sheetIx, changes), commentsMoved(sheet, body, moved)]));
   };
 
   // ---- rules for what cells take, and the cells they draw ------------------------------------------------------------------------
@@ -1188,7 +1290,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const lineText = cleanBorder(`${line.kind}${line.color ? ` ${line.color}` : ''}`);
   const borders = (where: BorderWhere) => {
     if (!book || !sheet) return;
-    change(cellsPatch(book, sheetIx, borderChanges(sheet, rectOf(selRef.current), where, where === 'none' ? undefined : lineText)));
+    const changes: Record<string, Cell | null> = {};
+    for (const x2 of picked()) Object.assign(changes, borderChanges(sheet, x2, where, where === 'none' ? undefined : lineText));
+    change(cellsPatch(book, sheetIx, changes));
     grid.current?.focus();
   };
   const merged = !!view.merges.list.length && view.merges.list.some((m) => m.r1 <= x.r2 && m.r2 >= x.r1 && m.c1 <= x.c2 && m.c2 >= x.c1);
@@ -1216,17 +1320,19 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   const insertChart = () => {
     if (!sheet || !calc) return;
     if ((sheet.charts?.length ?? 0) >= SHEET_LIMITS.charts) return void toast(tr('A sheet holds at most 20 charts.'));
-    const block = blockOf();
-    const e = calc.extent(sheetIx);
+    // The ranges picked with Ctrl+click (the labels from one, the values from the others), or the cells picked, or the table around them.
+    const parts = moreRef.current.length ? picked() : [blockOf()];
+    const block = parts.reduce((a, b) => ({ r1: Math.min(a.r1, b.r1), c1: Math.min(a.c1, b.c1), r2: Math.max(a.r2, b.r2), c2: Math.max(a.c2, b.c2) }));
+    const e = calc.shownExtent(sheetIx);
     if (!e.rows) return void toast(tr('Put some numbers in the sheet first, then pick them for the chart.'));
-    // Beside the sheet's data (a column's width clear of it), level with the cells it draws.
-    const at = Math.max(block.c2 + 1, e.cols);
-    let px = 20;
-    for (let c = 0; c < at; c++) px += view.hidC.has(c) ? 0 : colW(sheet, c);
-    let py = 0;
-    for (let r = 0; r < block.r1; r++) py += view.hidR.has(r) ? 0 : rowH(sheet, r);
-    const chart: SheetChart = { id: newId(), kind: 'column', range: rangeName(block), x: px, y: py, w: 480, h: 300 };
+    // Beside the sheet's data, a little way into the column after it, level with the cells it draws: on those cells.
+    const at = Math.min(SHEET_LIMITS.cols - 1, Math.max(block.c2 + 1, e.cols));
+    const g = sheetSizes(sheet, view.hidR);
+    const from = { cell: refName(block.r1, at), dx: 20 };
+    const p0 = cornerXY(from, g);
+    const chart: SheetChart = { id: newId(), kind: 'column', range: parts.map(rangeName).join(','), from, to: cornerAt(p0.x + 480, p0.y + 300, g.colW, g.rowH) };
     setCharts([...(sheet.charts ?? []), chart]);
+    if (moreRef.current.length) setMore([]);
     setChartSel(chart.id);
     setPanel({ kind: 'chart', id: chart.id });
     requestAnimationFrame(() => grid.current?.reveal(block.r1, Math.min(size.cols - 1, at + 3)));
@@ -1267,6 +1373,30 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     grid.current?.focus();
   };
 
+  // ---- comments -----------------------------------------------------------------------------------------------------------------
+  /** The comments panel, its thread of the cell picked raised; `draft`: a new comment on that cell, when it has none. */
+  const openComments = (draft = false) => {
+    if (editRef.current) commitEdit(null);
+    setPanel({ kind: 'comments', draft });
+  };
+  const setComments = (list: SheetComment[]) => sheet && change(metaPatch(sheet, { comments: list.length ? list : undefined }));
+  /** One thread changed (null: deleted). */
+  const editThread = (id: string, f: (c: SheetComment) => SheetComment | null) => sheet && setComments((sheet.comments ?? []).flatMap((c) => (c.id === id ? (f(c) ?? []) : [c])));
+  /** A new comment on the cell picked (a reply, where it has a thread already). */
+  const addComment = (text: string) => {
+    if (!sheet) return;
+    const cell = refName(selRef.current.r, selRef.current.c);
+    const had = sheet.comments?.find((c) => c.cell === cell);
+    const now = Date.now();
+    if (had) editThread(had.id, (c) => ({ ...c, replies: [...(c.replies ?? []), { id: newCommentId(), by: 'user', text, at: now }] }));
+    else setComments([...(sheet.comments ?? []), { id: newCommentId(), cell, by: 'user' as const, text, at: now }].sort((a, b) => keyOf(a.cell) - keyOf(b.cell)));
+    setPanel({ kind: 'comments' });
+  };
+  const goCell = (cell: string) => {
+    const p = parseRef(cell);
+    if (p) setSel(cellSel(p.r, p.c), true);
+  };
+
   // ---- the data tools ---------------------------------------------------------------------------------------------------------------
   /** The columns of a block, by their header's words (or their letters). */
   const colChoices = (b: Rect, head: boolean): ColChoice[] =>
@@ -1288,7 +1418,9 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     if (!book || !sheet || !calc || !toolBlock) return;
     const body = header ? { ...toolBlock, r1: toolBlock.r1 + 1 } : toolBlock;
     if (body.r2 <= body.r1) return;
-    change(cellsPatch(book, sheetIx, sortByKeys(sheet, calc, sheetIx, body, keys)));
+    const moved = new Map<number, number>();
+    const changes = sortByKeys(sheet, calc, sheetIx, body, keys, moved);
+    change(together([cellsPatch(book, sheetIx, changes), commentsMoved(sheet, body, moved)]));
   };
   const removeDups = (cols: number[]) => {
     if (!book || !sheet || !calc || !toolBlock) return;
@@ -1400,6 +1532,22 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   };
 
   // ---- the Kanban board ------------------------------------------------------------------------------------------------------------
+  // Its settings kept with the sheet (what it groups by, its cards' fields, its lanes' order), else those it was opened with.
+  const keptBoard = (() => {
+    const k = sheet?.board;
+    const at = k ? parseRef(k.at) : null;
+    return k && at ? { r: at.r, c: at.c, by: colIndex(k.by), fields: k.fields?.map(colIndex), lanes: k.lanes, open: !!k.open } : null;
+  })();
+  const board = boardOn ? (boardLocal ?? keptBoard) : null;
+  /** A change to the board's settings, kept with the sheet (and undone with Undo). */
+  const setBoardModel = (set: Partial<SheetBoard>) => {
+    if (!sheet || !board) return;
+    const base: SheetBoard = sheet.board && !boardLocal ? sheet.board : { at: refName(board.r, board.c), by: colName(board.by) };
+    const next: SheetBoard = { ...base, ...set };
+    for (const k of Object.keys(set) as (keyof SheetBoard)[]) if (set[k] === undefined) delete next[k];
+    change(metaPatch(sheet, { board: next }));
+    setBoardLocal(null);
+  };
   /** A table: the filter's range when the cell is in it, else the data around the cell. */
   const tableAt = (r: number, c: number): Rect => {
     const fx = view.filter?.x;
@@ -1417,14 +1565,33 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     return out;
   };
   const toggleBoard = () => {
-    if (board) return setBoard(null);
+    if (board) return setBoardOn(false);
     if (!sheet || !calc) return;
+    if (editRef.current) commitEdit(null);
+    // The board kept with the sheet, while its table still has rows and its column a dropdown.
+    if (keptBoard) {
+      const b = tableAt(keptBoard.r, keptBoard.c);
+      if (b.r2 > b.r1 && dropdownCols(b).some((x) => x.c === keptBoard.by)) {
+        setBoardLocal(null);
+        return setBoardOn(true);
+      }
+    }
     const b = tableAt(sel.r, sel.c);
     const choices = dropdownCols(b);
     if (!choices.length || b.r2 <= b.r1) return void toast(tr('Give the table a dropdown column first (Insert → Dropdown): the board groups its rows by it.'));
-    if (editRef.current) commitEdit(null);
-    setBoard({ r: b.r1, c: b.c1, by: (choices.find((x) => x.c === sel.c) ?? choices[0]).c });
+    setBoardLocal({ r: b.r1, c: b.c1, by: (choices.find((x) => x.c === sel.c) ?? choices[0]).c });
+    setBoardOn(true);
   };
+  // A sheet opens on its board when it says so: when the workbook opens and a sheet is picked (not again on each
+  // version saved, which would close a board shown meanwhile).
+  const boardFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sheet || boardFor.current === sheet.id) return;
+    boardFor.current = sheet.id;
+    setBoardLocal(null);
+    setBoardOn(!!sheet.board?.open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet?.id]);
   const boardBlock = board && sheet && calc ? tableAt(board.r, board.c) : null;
   /** A new row under the board's table, in a lane: its group's value set, then opened as a card. */
   const boardAdd = (value: string) => {
@@ -1465,6 +1632,18 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       e.preventDefault();
       return cancelEdit();
     }
+    const lower = e.key.toLowerCase();
+    if (mod && (lower === 'b' || lower === 'i' || lower === 'u')) {
+      // The cell being typed in turns bold (italic, underlined) as in Sheets; the typing goes on where it was.
+      e.preventDefault();
+      e.stopPropagation();
+      const el = document.activeElement as HTMLTextAreaElement | null;
+      const key = lower as 'b' | 'i' | 'u';
+      setStyle({ [key]: !active?.s?.[key] || undefined });
+      requestAnimationFrame(() => el?.focus({ preventScroll: true }));
+      return;
+    }
+    if (mod && (e.key === '`' || e.code === 'Backquote')) return void (e.preventDefault(), e.stopPropagation());
     if (e.key === 'F4') {
       // The reference under the caret cycles through its $ signs.
       e.preventDefault();
@@ -1533,8 +1712,11 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     if (mod && lower === 's') return void (e.preventDefault(), save());
     if (mod && lower === 'f') return void (e.preventDefault(), find.show());
     if (mod && lower === 'h') return void (e.preventDefault(), find.show(!readOnly));
+    // Undo and Redo: Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y, as the menu says (the app's own Ctrl+Z, for a pin, is not for here).
+    if (mod && (lower === 'z' || lower === 'y')) return void (e.preventDefault(), e.stopPropagation(), lower === 'y' || e.shiftKey ? redo() : undo());
     if (mod && (k === '/' || e.code === 'Slash')) return void (e.preventDefault(), setDialog('shortcuts'));
-    if (mod && (k === '`' || e.code === 'Backquote')) return void (e.preventDefault(), setFormulas((f) => !f));
+    // Ctrl+` shows the formulas here, not the app's terminal panel.
+    if (mod && (k === '`' || e.code === 'Backquote')) return void (e.preventDefault(), e.stopPropagation(), setFormulas((f) => !f));
     if (mod && lower === 'a') return void (e.preventDefault(), setSel({ r: s.r, c: s.c, ar: 0, ac: 0, fr: size.rows - 1, fc: size.cols - 1 }));
     // Ctrl+Space: the whole column; Shift+Space: the whole row; Space on rows picked whole: expand the row.
     // Ctrl even on a Mac, as Sheets has it (⌘Space is the Mac's own search).
@@ -1546,8 +1728,11 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     }
     if (k === ' ' && !e.altKey && wholeRows && !readOnly) return void (e.preventDefault(), setRowCard(s.r));
     if (k === ' ' && !e.altKey && !readOnly && toggleChecks()) return void e.preventDefault();
-    if (mod && !readOnly && (lower === 'b' || lower === 'i' || lower === 'u')) {
+    if (mod && (lower === 'b' || lower === 'i' || lower === 'u')) {
+      // Bold here, not the app's sidebar (Ctrl+B there).
       e.preventDefault();
+      e.stopPropagation();
+      if (readOnly) return;
       const key = lower as 'b' | 'i' | 'u';
       return setStyle({ [key]: !active?.s?.[key] || undefined });
     }
@@ -1591,6 +1776,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
       return;
     }
     if (k === 'F2' && e.shiftKey && !readOnly) return void (e.preventDefault(), editNote());
+    // Ctrl+Alt+M (⌘⌥M): a comment on the cell, or its thread.
+    if (mod && e.altKey && (lower === 'm' || e.code === 'KeyM')) return void (e.preventDefault(), openComments(!readOnly));
     const arrows: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     if (arrows[k]) {
       e.preventDefault();
@@ -1649,16 +1836,17 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
 
   const onKey = (e: React.KeyboardEvent<HTMLElement>) => (editRef.current ? editKey(e) : navKey(e));
 
-  // Ctrl+S anywhere in the editor (a toolbar button or a menu may hold the focus); Ctrl+F and Ctrl+H too.
+  // Ctrl+S anywhere in the editor (a toolbar button, a menu or a panel's field may hold the focus; the grid and the
+  // formula bar save by themselves): a field gives up what was typed in it first, as leaving it would.
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const a = document.activeElement;
-      if (a && a !== document.body && !root.current?.contains(a)) return;
-      const inField = !!a && a !== document.body && !!(a as HTMLElement).closest('textarea,input');
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !inField) {
-        e.preventDefault();
-        void saveNow.current();
-      }
+      // The editor's own panels on a phone sit outside it, over the page (Panel.tsx marks them).
+      if (a && a !== document.body && !root.current?.contains(a) && !(a as HTMLElement).closest('[data-sheet-panel]')) return;
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's' || e.defaultPrevented) return;
+      e.preventDefault();
+      if (a && a !== document.body && (a as HTMLElement).closest('textarea,input,select')) (a as HTMLElement).blur();
+      setTimeout(() => void saveNow.current(), 0);
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
@@ -1724,7 +1912,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
   }, [sel, sheetIx, rev, leadFor, sheet]);
 
   // ---- what the selection adds up to ---------------------------------------------------------------------------------------
-  const stats = useMemo(() => (sheet && calc && !single(sel) ? statsOf(sheet, calc, sheetIx, x) : null), [rev, sel, sheetIx]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stats = useMemo(() => (sheet && calc && (!single(sel) || more.length) ? statsOf(sheet, calc, sheetIx, [...more, x]) : null), [rev, sel, sheetIx, more]); // eslint-disable-line react-hooks/exhaustive-deps
   const statFmt = (v: number) => {
     const f = active?.s?.fmt;
     return formatValue(v, f === 'currency' || f === 'percent' || f === 'number' ? active!.s : { fmt: 'number', dp: Number.isInteger(v) ? 0 : 2 });
@@ -1841,6 +2029,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     rating: insertRating,
     date: openDate,
     noteEdit: editNote,
+    comment: () => openComments(!readOnly),
+    comments: () => openComments(false),
     func: (name) => typeIn(`=${name}(`),
     chars: openChars,
     addSheet: () => addSheet(),
@@ -1863,6 +2053,8 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
     expand: () => setRowCard(sel.r),
     board: !!board,
     toggleBoard,
+    boardOpens: board ? !!keptBoard?.open && !boardLocal : undefined,
+    boardOpen: () => board && setBoardModel({ open: keptBoard?.open && !boardLocal ? undefined : true }),
   };
   const menus = sheetMenus(menuCtx);
 
@@ -1891,6 +2083,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         ['Ctrl+;', 'Today’s date'],
         ['Ctrl+Shift+;', 'The time now'],
         ['Shift+F2', 'A note on the cell'],
+        ['Ctrl+Alt+M', 'A comment on the cell'],
       ],
     },
     {
@@ -1945,25 +2138,28 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         {tail}
       </div>
       {band}
-      <Toolbar
-        style={active?.s}
-        readOnly={readOnly}
-        canUndo={hist.current.past.length > 0 || !!edit}
-        canRedo={hist.current.future.length > 0}
-        narrow={narrow}
-        merged={merged}
-        filtered={!!sheet.filter}
-        line={line}
-        onLine={setLine}
-        onUndo={undo}
-        onRedo={redo}
-        onStyle={setStyle}
-        onFormat={setFormat}
-        onDecimals={stepDecimals}
-        onBorders={borders}
-        onMerge={(h2) => void merge(h2)}
-        onFilter={toggleFilter}
-      />
+      {/* While an agent's version shows, the toolbar stays where it is, out of use. */}
+      <div inert={liveOn} className={cx('shrink-0', liveOn && 'opacity-45')}>
+        <Toolbar
+          style={active?.s}
+          readOnly={!!readOnlyProp}
+          canUndo={hist.current.past.length > 0 || !!edit}
+          canRedo={hist.current.future.length > 0}
+          narrow={narrow}
+          merged={merged}
+          filtered={!!sheet.filter}
+          line={line}
+          onLine={setLine}
+          onUndo={undo}
+          onRedo={redo}
+          onStyle={setStyle}
+          onFormat={setFormat}
+          onDecimals={stepDecimals}
+          onBorders={borders}
+          onMerge={(h2) => void merge(h2)}
+          onFilter={toggleFilter}
+        />
+      </div>
       {!board && (
         <FormulaBar
           name={rectLabel(x, size.rows, size.cols) === 'the whole sheet' ? `${refName(0, 0)}:${refName(size.rows - 1, size.cols - 1)}` : rectLabel(x, size.rows, size.cols)}
@@ -1980,6 +2176,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
           onSuggest={suggest}
           barRef={barRef}
           ghost={spillFormula}
+          cellAnchor={edit?.where === 'cell' ? () => grid.current?.input()?.getBoundingClientRect() ?? null : null}
         />
       )}
       <div className="relative flex min-h-0 flex-1">
@@ -1988,18 +2185,22 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             sheet={sheet}
             si={sheetIx}
             calc={calc}
-            rev={rev}
+            rev={shownRev}
             rules={view.rules}
             block={boardBlock}
             hidden={view.hidR}
             by={board.by}
             choices={dropdownCols(boardBlock)}
+            fields={boardLocal ? undefined : keptBoard?.fields}
+            lanes={boardLocal ? undefined : keptBoard?.lanes}
             readOnly={readOnly}
-            onBy={(c) => setBoard({ ...board, by: c })}
+            onBy={(c) => (readOnly ? setBoardLocal({ r: board.r, c: board.c, by: c }) : setBoardModel({ by: colName(c), lanes: undefined }))}
+            onFields={(cols) => setBoardModel({ fields: cols.map(colName) })}
+            onLanes={(order) => setBoardModel({ lanes: order })}
             onMove={(r, v) => setCellValue(r, board.by, v)}
             onOpen={(r) => setRowCard(r)}
             onAdd={boardAdd}
-            onClose={() => setBoard(null)}
+            onClose={() => setBoardOn(false)}
           />
         ) : (
           <Grid
@@ -2007,7 +2208,7 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             sheet={sheet}
             si={sheetIx}
             calc={calc}
-            rev={rev}
+            rev={shownRev}
             rows={size.rows}
             cols={size.cols}
             sel={sel}
@@ -2018,27 +2219,36 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             view={view}
             zoom={zoom}
             formulas={formulas}
+            more={more}
             overlay={
-              sheet.charts?.length ? (
-                <ChartLayer
-                  book={book}
-                  calc={calc}
-                  si={sheetIx}
-                  charts={sheet.charts}
-                  rev={rev}
-                  zoom={zoom}
-                  picked={chartSel}
-                  readOnly={readOnly}
-                  onPick={(id) => {
-                    setChartSel(id);
-                    grid.current?.focus();
-                  }}
-                  onChange={(c) => updateChart(c)}
-                  onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
-                />
-              ) : undefined
+              sheet.charts?.length || (markAt && mark?.sheet === sheet.id)
+                ? (geo) => (
+                    <>
+                      {markAt && mark?.sheet === sheet.id && <AgentCell geo={geo} r={markAt.r} c={markAt.c} />}
+                      {!!sheet.charts?.length && (
+                        <ChartLayer
+                          book={book}
+                          calc={calc}
+                          si={sheetIx}
+                          charts={sheet.charts}
+                          rev={shownRev}
+                          geo={geo}
+                          picked={chartSel}
+                          readOnly={readOnly}
+                          onPick={(id) => {
+                            setChartSel(id);
+                            grid.current?.focus();
+                          }}
+                          onChange={(c) => updateChart(c)}
+                          onOpen={(id) => !readOnly && setPanel({ kind: 'chart', id })}
+                        />
+                      )}
+                    </>
+                  )
+                : undefined
             }
-            onSel={(s) => setSel(s, true)}
+            onSel={(s, keepMore) => setSel(s, true, false, keepMore)}
+            onAddRange={addRange}
             onEdit={(mode, text) => startEdit(mode, text)}
             onText={(t, pos) => setText(t, pos)}
             onCaret={onCaret}
@@ -2056,6 +2266,10 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
             onFillDown={fillDown}
             onUnhide={unhide}
             onExpand={(r) => setRowCard(r)}
+            onComment={(r, c) => {
+              setSel(cellSel(r, c));
+              openComments(false);
+            }}
           />
         )}
         {find.open && (
@@ -2089,7 +2303,30 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
         )}
         {panel?.kind === 'cf' && <CondPanel rules={sheet.conditional ?? []} picked={selRange()} narrow={narrow} onChange={setConditional} onClose={() => setPanel(null)} />}
         {panel?.kind === 'dv' && <ValidPanel rules={sheet.validation ?? []} picked={selRange()} start={panel.start} narrow={narrow} onChange={setRules} onClose={() => setPanel(null)} />}
-        {panelChart && <ChartPanel key={panelChart.id} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
+        {panel?.kind === 'comments' && (
+          <CommentsPanel
+            comments={sheet.comments ?? []}
+            cell={refName(sel.r, sel.c)}
+            draft={!!panel.draft}
+            narrow={narrow}
+            readOnly={readOnly}
+            onGo={goCell}
+            onAdd={addComment}
+            onReply={(id, t) => editThread(id, (c) => ({ ...c, replies: [...(c.replies ?? []), { id: newCommentId(), by: 'user', text: t, at: Date.now() }] }))}
+            onResolve={(id, on) =>
+              editThread(id, (c) => {
+                const next = { ...c, resolved: on || undefined };
+                if (!on) delete next.resolved;
+                return next;
+              })
+            }
+            onEdit={(id, t) => editThread(id, (c) => ({ ...c, text: t }))}
+            onDelete={(id) => editThread(id, () => null)}
+            onDraft={(on) => setPanel({ kind: 'comments', draft: on })}
+            onClose={() => setPanel(null)}
+          />
+        )}
+        {panelChart && <ChartPanel key={panelChart.id} book={book} chart={panelChart} narrow={narrow} onChange={(c) => updateChart(c, `chart:${c.id}`)} onDelete={() => deleteChart(panelChart.id)} onClose={() => setPanel(null)} />}
       </div>
       <SheetTabs
         names={book.sheets.map((s) => s.name)}
@@ -2232,6 +2469,11 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
                     {activeNote ? 'Edit note' : 'Insert note'}
                   </MenuItem>
                 )}
+                {ctx.on === 'cell' && (
+                  <MenuItem icon={<MessageSquarePlus size={14} />} hint="Ctrl+Alt+M" onClick={() => (setCtx(null), openComments(!readOnly))}>
+                    Comment
+                  </MenuItem>
+                )}
                 {ctx.on !== 'col' && (
                   <MenuItem icon={<Maximize2 size={14} />} onClick={() => (setCtx(null), setRowCard(sel.r))}>
                     Expand row
@@ -2301,6 +2543,12 @@ export function SheetEditor({ doc, layout, readOnly, onSave, lead, tail, band, s
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) saveNote(pick.r, pick.c, noteDraft);
                 if (e.key === 'Escape') setPick(null);
+                // Ctrl+S keeps the note and saves the spreadsheet.
+                if (e.key.toLowerCase() === 's' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  saveNote(pick.r, pick.c, noteDraft);
+                  setTimeout(() => void saveNow.current(), 0);
+                }
               }}
               rows={4}
               maxLength={SHEET_LIMITS.note}

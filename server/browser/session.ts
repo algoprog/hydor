@@ -1,10 +1,12 @@
 // The browsers: one Chromium per profile (a fresh one shared by sessions, each in a browser context of
 // its own, or a named profile that keeps logins), and each session's browser in it: its tabs, who
-// drives (the agent, or the user who took over), what waits for the user, and its live view.
+// drives (the agent, or the user who took over), what waits for the user, and its live view, with
+// the agent's pointer in it.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { BrowserAsk, BrowserDialog, BrowserInput, BrowserNote, BrowserView, ChromeInfo } from '../../shared/browser.ts';
+import type { AgentPointer, PointerAct, Way } from '../../shared/pointer.ts';
 import { config } from '../config.ts';
 import type { Deps } from '../features/types.ts';
 import { addNote, notesOf, updateNote } from '../notes.ts';
@@ -17,6 +19,8 @@ import { shownUrl } from './outline.ts';
 import { sleep, Tab, type ElRef, type TabOwner } from './tab.ts';
 
 const DESKTOP = { w: 1280, h: 800 };
+/** How long the agent's pointer takes to glide to where it acts, while someone watches (the action waits for it). */
+export const GLIDE_MS = 300;
 /** The session's browser a tab belongs to. */
 const ownerOf = (t: Tab) => t.owner as SessionBrowser;
 /** A browser nobody used or watched for this long closes. */
@@ -461,6 +465,8 @@ export class SessionBrowser implements TabOwner {
   lastUse = Date.now();
   /** Someone watches the live view until then. */
   watchUntil = 0;
+  /** Where the agent's pointer rests, as fractions of the page (null until it first points). */
+  pointer: { x: number; y: number } | null = null;
   private cast: { w: number; h: number } | null = null;
   /** The agent was turned away while the user drove: it hears when they hand back. */
   turnedAway = false;
@@ -587,6 +593,7 @@ export class SessionBrowser implements TabOwner {
       dialog: this.active?.dialog ?? this.tabs.find((t) => t.dialog)?.dialog ?? undefined,
       viewport: { w: this.active?.viewport.w ?? DESKTOP.w, h: this.active?.viewport.h ?? DESKTOP.h, mobile: this.active?.viewport.mobile || undefined },
       downloads: this.downloads,
+      ...(this.pointer ? { pointer: this.pointer } : {}),
     };
   }
 
@@ -626,6 +633,35 @@ export class SessionBrowser implements TabOwner {
   }
   private lastFrame: { tab: string; data: string; w: number; h: number } | null = null;
   private refresh: NodeJS.Timeout | null = null;
+
+  /** Someone watches the live view now (the small picture on the folded panel counts). */
+  get watched(): boolean {
+    return !!this.cast && Date.now() < this.watchUntil;
+  }
+
+  /**
+   * The agent's pointer, for the live view: it goes to a place on the page (CSS pixels; a key is pressed where it
+   * rests) and acts there. While someone watches, it glides from where it was and this waits as long, so the eye has
+   * followed it before the click lands; nobody watching, nothing waits. Returns what was shown, in fractions.
+   */
+  async pointAt(t: Tab, p: { x?: number; y?: number; act: PointerAct; box?: { x: number; y: number; w: number; h: number }; dir?: Way; keys?: string }): Promise<AgentPointer> {
+    const from = this.pointer ?? { x: 0.5, y: 0.5 };
+    const f = p.x === undefined || p.y === undefined ? null : await t.frameSize();
+    const frac = (v: number, of: number) => Math.round(Math.min(1, Math.max(0, v / Math.max(1, of))) * 10_000) / 10_000;
+    const x = f ? frac(p.x!, f.w) : from.x;
+    const y = f ? frac(p.y!, f.h) : from.y;
+    const far = Math.hypot(x - from.x, y - from.y) > 0.004;
+    const shown: AgentPointer = { x, y, act: p.act };
+    if (far && this.watched) shown.glide = GLIDE_MS;
+    if (p.box && f) shown.box = { x: frac(p.box.x, f.w), y: frac(p.box.y, f.h), w: frac(p.box.w, f.w), h: frac(p.box.h, f.h) };
+    if (p.dir) shown.dir = p.dir;
+    if (p.keys) shown.keys = p.keys.slice(0, 60);
+    this.pointer = { x, y };
+    d().toSubscribers(this.key, { t: 'feature', id: 'browser', key: this.key, data: { type: 'pointer', tab: t.targetId, pointer: shown } });
+    this.changed();
+    if (shown.glide) await sleep(shown.glide);
+    return shown;
+  }
 
   /** A full-resolution picture of the page as a frame: after a restart, or once a zoom or scroll settles. */
   private freshFrame(t: Tab) {
@@ -701,17 +737,9 @@ export class SessionBrowser implements TabOwner {
     const t = this.active;
     if (!t) return;
     this.lastUse = Date.now();
-    // Input is in the page's CSS pixels: a zoomed-out page (a phone layout without a viewport tag) shows more of them.
-    let w = t.viewport.w;
-    let h = t.viewport.h;
-    try {
-      const m = await t.s.send('Page.getLayoutMetrics', {}, 5000);
-      const v = m.cssVisualViewport ?? m.visualViewport;
-      if (v?.clientWidth && v?.clientHeight) {
-        w = v.clientWidth;
-        h = v.clientHeight;
-      }
-    } catch {}
+    // Input is in the page's CSS pixels, across the whole frame: its scrollbars too (measured without them, a click
+    // landed up to their width to the left), and a zoomed-out page (a phone layout without a viewport tag) shows more.
+    const { w, h } = await t.frameSize();
     const k = w / Math.max(1, t.viewport.w);
     let typed = false;
     for (const e of events.slice(0, 200)) {

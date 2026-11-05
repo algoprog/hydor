@@ -1,5 +1,5 @@
 // The slides editor's menus, as Google Slides and PowerPoint have them: Edit, View (zoom, the grid, the rulers and
-// guides), Insert (every kind of part, the footer), Format (the words' look, the format painter, a picture's crop),
+// guides), Insert (every kind of part, a comment, the footer), Format (the words' look, the format painter, a picture's crop),
 // Arrange (groups, the stacking order, lining up, turning), Slide, and Tools. Each action with its keys; what does not
 // apply to what is picked is greyed. Search the menus (Alt+/) finds any of them.
 import {
@@ -20,6 +20,7 @@ import {
   Bold,
   Clipboard,
   Copy,
+  CornerDownRight,
   Crop,
   Eye,
   Grid3x3,
@@ -34,6 +35,7 @@ import {
   List,
   ListOrdered,
   Lock,
+  MessageSquarePlus,
   MonitorPlay,
   MoveRight,
   Paintbrush,
@@ -51,6 +53,7 @@ import {
   Sigma,
   Smile,
   Sparkles,
+  Spline,
   Star,
   Strikethrough,
   Table2,
@@ -112,13 +115,19 @@ export interface MenuArgs {
   picture(): void;
   pictureUrl(): void;
   line(arrow: boolean): void;
+  /** A connector: straight or elbowed, between the two parts picked or free. */
+  connector(elbow: boolean): void;
   table(): void;
   chart(): void;
   icon(): void;
   emoji(): void;
   equation(): void;
   video(): void;
+  /** A video from this device. */
+  videoFile(): void;
   footer(): void;
+  /** A comment on what is picked, or on the slide. */
+  comment(): void;
   crop(): void;
   resetPicture(): void;
   editTex(): void;
@@ -228,6 +237,9 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           items: [
             { label: 'Straight line', run: () => a.line(false) },
             { label: 'Arrow', run: () => a.line(true) },
+            '-',
+            { label: 'Straight connector', icon: <Spline size={14} />, also: 'connector join link shapes flowchart', run: () => a.connector(false) },
+            { label: 'Elbow connector', icon: <CornerDownRight size={14} />, also: 'connector elbow bent join link shapes flowchart', run: () => a.connector(true) },
           ],
         },
         { label: 'Table', icon: <Table2 size={14} />, disabled: ro, run: a.table },
@@ -236,8 +248,17 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Icon', icon: <Star size={14} />, also: 'icon symbol pictogram lucide', disabled: ro, run: a.icon },
         { label: 'Emoji', icon: <Smile size={14} />, also: 'emoji smiley', disabled: ro, run: a.emoji },
         { label: 'Equation', icon: <Sigma size={14} />, also: 'equation maths formula latex', disabled: ro, run: a.equation },
-        { label: 'Video', icon: <Video size={14} />, also: 'video youtube vimeo', disabled: ro, run: a.video },
+        {
+          label: 'Video',
+          icon: <Video size={14} />,
+          disabled: ro,
+          items: [
+            { label: 'From YouTube or Vimeo', also: 'video youtube vimeo online address link', run: a.video },
+            { label: 'From this device', also: 'video file upload mp4 mov webm film clip', run: a.videoFile },
+          ],
+        },
         '-',
+        { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'comment note review feedback', disabled: ro, run: a.comment },
         { label: 'Slide numbers and footer', also: 'footer page number date', disabled: ro, run: a.footer },
       ],
     },

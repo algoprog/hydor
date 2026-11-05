@@ -1,9 +1,11 @@
 // Computer steps in the conversation: what the agent did on the computer in a line, with a small picture of the screen
-// after it (its answer starts "Computer step N"); the picture opens large, the line opens the full answer.
-import { memo, useState } from 'react';
+// after it (its answer starts "Computer step N"), marked where the step clicked, dragged or scrolled; the picture opens
+// large, the line opens the full answer.
+import { memo, useEffect, useRef, useState } from 'react';
 import { ChevronRight, Monitor, MousePointerClick, XCircle } from 'lucide-react';
 import type { ToolItem } from '@shared/types';
-import { openLightbox } from '../../components/Lightbox';
+import { markLightbox, openLightbox } from '../../components/Lightbox';
+import { StepMarks, useStepMarks } from '../../components/StepMarks';
 import { cx } from '../../components/ui';
 import { enc } from '../../lib/api';
 import { mu } from '../../lib/machine';
@@ -73,7 +75,17 @@ export const ComputerStep = memo(function ComputerStep({ item, sessionKey }: { i
   const pic = n && !noPic ? mu(`/api/computer/sessions/${enc(sessionKey)}/steps/${n}`) : null;
   const failed = t.status === 'error' || (!n && !running && !!t.output);
   const Icon = tool === 'computer_screenshot' ? Monitor : MousePointerClick;
-  const enlarge = () => pic && openLightbox([{ src: pic, name: summary(tool, (t.input ?? {}) as Args, false, t.output) }]);
+  const big = useRef<HTMLImageElement>(null);
+  const [wanted, setWanted] = useState(false);
+  // Read once the picture opens (here, or large).
+  const marks = useStepMarks(n && !noPic && tool === 'computer_act' ? `/api/computer/sessions/${enc(sessionKey)}/steps/${n}.json` : null, open || wanted);
+  const enlarge = () => {
+    setWanted(true);
+    if (pic) openLightbox([{ src: pic, name: summary(tool, (t.input ?? {}) as Args, false, t.output), marks }]);
+  };
+  useEffect(() => {
+    if (pic && marks.length) markLightbox(pic, marks);
+  }, [pic, marks]);
   return (
     <div className="tl-item">
       <div className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 transition-colors hover:bg-bg-2', open && 'bg-bg-2')}>
@@ -93,8 +105,9 @@ export const ComputerStep = memo(function ComputerStep({ item, sessionKey }: { i
         <div>
           {pic && (
             <div className="pt-1.5 pl-7">
-              <button onClick={enlarge} className="cursor-zoom-in">
-                <img src={pic} alt="The screen after this step" className="max-h-[260px] max-w-full rounded-lg border border-line" />
+              <button onClick={enlarge} className="relative inline-block max-w-full cursor-zoom-in align-top">
+                <img ref={big} src={pic} alt="The screen after this step" className="max-h-[260px] max-w-full rounded-lg border border-line" />
+                <StepMarks img={big} marks={marks} />
               </button>
             </div>
           )}

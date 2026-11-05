@@ -1,8 +1,10 @@
 // Script tests for the page editor (a page's Edit mode, editor.ts with writing.ts): writing as in Notion in a real
 // browser (Enter makes the next block, Backspace joins, Tab nests, Markdown as you type, "/" for blocks, Turn into,
 // colours, to-dos that tick, toggles, a table of contents, an icon and a cover, pictures dropped or pasted in, blocks
-// dragged into a column, several blocks picked, undo by the block), that nothing of the editor's own reaches the page it
-// gives back, the kit's styles for the blocks, and that a page made of them survives its exports (a web page, a PDF and
+// dragged into a column, several blocks picked or picked with a drag, undo by the block, nested items that keep their
+// place, code coloured as it is written with a language to pick, Save from the first letter), that nothing of the
+// editor's own reaches the page it gives back, the kit's styles for the blocks, the code's colours, a page in Use (links,
+// a table of contents left empty, coloured code), and that a page made of them survives its exports (a web page, a PDF and
 // a Word document when a browser is here). The browser parts run when this computer has a Chromium (Settings → Browser,
 // or Playwright's); ONLY=word runs those whose page has that word. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/page-editor-test.ts
@@ -15,9 +17,12 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { canCapture, closeCapture, withTab, type Tab } from '../capture/index.ts';
 import { KIT_CSS } from '../../shared/page-kit.ts';
+import { CODE_COLOURS_SRC, codeColours, hasCode } from '../../shared/code-colours.ts';
+import { dbBlocks, PAGE_DB_SRC, pageDatabases, pageDbScript } from '../../shared/page-db.ts';
 import { extractText } from '../documents/extract.ts';
 import { EDITOR_SRC } from './editor.ts';
 import { pages } from './index.ts';
+import { BRIDGE_SRC, injectHead, kitHead } from './kit.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -49,11 +54,53 @@ try {
 }
 ok(compiles, 'the editor’s script (with the writing) is one function the page can run');
 
+// ---- code blocks' colours (shared/code-colours.ts) -----------------------------------------------------------------------
+{
+  const C = codeColours();
+  const kinds = (code: string, lang: string) =>
+    C.tokens(code, lang)
+      .filter(([c]) => c)
+      .map(([c, t]) => `${c}:${t}`)
+      .join(' ');
+  same(kinds('def add(a, b):\n    return a + 1  # sum', 'python'), 'k:def f:add k:return n:1 c:# sum', 'Python’s keywords, names, numbers and comments are told apart');
+  same(kinds('<a href="x">Hi &amp; bye</a>', 'html'), 'g:a a:href s:"x" v:&amp; g:a', 'HTML’s tags, attributes and their values');
+  same(kinds('.card:hover { color: #fff; }', 'css'), 't:.card k::hover a:color n:#fff', 'CSS’s selectors, properties and values');
+  same(kinds('{"a": [1, true]}', 'json'), 'a:"a" n:1 v:true', 'JSON’s keys and values');
+  same(kinds("SELECT name FROM users WHERE id = 3 -- one", 'sql'), 'k:SELECT k:FROM k:WHERE n:3 c:-- one', 'SQL’s words in any case');
+  same([C.detect('import os\ndef f():\n    print(None)'), C.detect('const x = () => 1;\nconsole.log(x)'), C.detect('{"a": 1}'), C.detect('SELECT * FROM t WHERE a = 1'), C.detect('hello there')].join(','), 'python,js,json,sql,', 'a block’s language is told from its code (none, from plain words)');
+  same([C.langId('py'), C.langId('TypeScript'), C.langId('sh'), C.langId('klingon')].join(','), 'python,ts,bash,', 'a language is known by its usual names');
+  ok(!/<\/script/i.test(CODE_COLOURS_SRC) && !/<!--/.test(CODE_COLOURS_SRC), 'the colours’ script can go in a <script> as it is');
+  ok(KIT_CSS.includes('pre.n-code .n-ck,'), 'the kit colours the code’s words');
+  // Plain blocks agents write (<pre><code>): coloured only when the code surely is a language (it may be a command's output).
+  same([C.detect('const xs = [1].map((x) => x);\nconsole.log(xs)', true), C.detect('x => y', true), C.detect('total 12\ndrwxr-xr-x 2 alex', true), C.detect('x => y')].join(','), 'js,,,js', 'a plain block’s language is told only when the code shows it plainly');
+  same([hasCode('<pre class="n-code">x</pre>'), hasCode('<pre>\n <code class="language-py">x</code></pre>'), hasCode('<p><code>x</code></p>')].join(','), 'true,true,false', 'a page with plain code blocks gets the colours’ script, one with inline code alone does not');
+  ok(KIT_CSS.includes(',pre>code>.n-ck{'), 'the kit colours a plain block’s words, inside its <code>');
+}
+
+// ---- databases (shared/page-db.ts): what one is, checked; an agent's changes ----------------------------------------------
+{
+  const D = pageDatabases();
+  const s = D.normalize({ cols: [{ name: 'Task' }, { name: 'Status', kind: 'select', options: ['To do', { name: 'Done', color: 'green' }] }, { name: 'Tags', kind: 'multi-select' }, { name: 'Due', kind: 'date' }, { name: 'Cost', kind: 'number' }, { name: 'Paid', kind: 'checkbox' }, { name: 'Web', kind: 'url' }], rows: [{ Task: 'Book', Status: 'Done', Tags: 'a, b', Due: '2026-11-10T09:00', Cost: '12,5', Paid: 'yes', Web: 'https://x.test' }, { Task: '<b>x</b>', Status: 'Doing' }] });
+  same(s.cols.map((c) => c.kind).join(','), 'text,select,multi,date,number,check,link', 'a database’s columns take their kinds (by their usual names too)');
+  same(s.rows.map((r) => s.cols.map((c) => D.text(c, r.cells[c.id])).join('|')).join(' / '), 'Book|Done|a, b|2026-11-10|12.5|✓|https://x.test / <b>x</b>|Doing|||||', 'its rows’ values as their columns keep them (a new option for a new name; words stay words)');
+  same(s.cols[1].options?.find((o) => o.name === 'Done')?.color, 'green', 'an option keeps the colour it was given');
+  const s2 = D.change(s, { add: [{ Task: 'Visa', Status: 'To do' }], update: [{ id: s.rows[1].id, Status: 'Done', Cost: 3 }], remove: [s.rows[0].id] });
+  same(s2.rows.map((r) => `${D.text(s2.cols[0], r.cells[s2.cols[0].id])}:${D.text(s2.cols[1], r.cells[s2.cols[1].id])}`).join(','), '<b>x</b>:Done,Visa:To do', 'an agent adds, changes and removes rows by their columns’ names');
+  const s3 = D.change(s2, { cols: s2.cols.map((c) => (c.name === 'Status' ? { ...c, kind: 'text' } : c)) });
+  const s4 = D.change(s3, { cols: s3.cols.map((c) => (c.name === 'Status' ? { ...c, kind: 'select' } : c)) });
+  same(s4.rows.map((r) => D.text(s4.cols[1], r.cells[s4.cols[1].id])).join(','), 'Done,To do', 'a column of another kind keeps its values where they fit (a select’s options back from its words)');
+  same(JSON.stringify(D.normalize({ ...s4, rows: [{ id: 'r1', cells: { [s4.cols[1].id]: 'onotanoption' } }] }).rows[0].cells), '{}', 'a kept value that names no option is no value (nothing makes options of it)');
+  same(JSON.stringify(dbBlocks('<div class="n-db" data-db="tasks" data-title="A &amp; B" data-schema=\'{"cols":["X"]}\'></div><div class="n-db" data-db="bad name"></div>')), '[{"name":"tasks","title":"A & B","schema":{"cols":["X"]}}]', 'the server reads a page’s databases from its HTML');
+  ok(!/<\/script/i.test(PAGE_DB_SRC) && !/<!--/.test(PAGE_DB_SRC), 'the databases’ script can go in a <script> as it is');
+}
+
 // ---- the editor in a browser --------------------------------------------------------------------------------------
 const LABELS = { phText: 'Type ‘/’ for commands' };
 const pageOf = (body: string, cls = 'n-page') =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Test page</title><style id="n-kit" data-n-own>${KIT_CSS}</style>` +
   `<script data-n-own>window.__msgs=[];addEventListener('message',function(e){var d=e.data;if(d&&typeof d.type==='string'&&d.type.indexOf('wa-ed')===0)window.__msgs.push(d)});</script>` +
+  // (the app's side of the page's data, for the databases: kept here)
+  `<script data-n-own>window.__store={};addEventListener('message',function(e){var d=e.data;if(!d||d.type!=='wa-ed-store')return;var v=null;if(d.op==='get')v=window.__store[d.key]===undefined?null:JSON.parse(window.__store[d.key]);else window.__store[d.key]=JSON.stringify(d.value);window.postMessage({type:'wa-ed',n:'test',cmd:'store',arg:{id:d.id,value:v}},'*')});</script>` +
   `<script data-n-own>(${EDITOR_SRC})(${JSON.stringify({ n: 'test', theme: 'light', doctype: '<!doctype html>', labels: LABELS })})</script>` +
   `<style>body{max-width:640px;margin:0 auto;padding:40px 60px;font:16px/1.5 sans-serif}</style></head><body class="${cls}">${body}</body></html>`;
 
@@ -382,7 +429,7 @@ if (canCapture()) {
     async (d) => {
       await d.write('#b', 'start');
       await d.cmd('turn', 'p');
-      same((await shape(d)).split('|').slice(0, 3).join('|'), 'ul>li:A|p:B|ul>li:C', 'a nested item turned into text keeps the items after it');
+      same((await shape(d)).split('|').slice(0, 3).join('|'), 'ul>li:A|ul>li>ul>li:B|ul>li>ul>li:C', 'a nested item turned into text keeps its place, and the items after it theirs');
       await d.write('#pa');
       await d.press('Enter');
       same(await d.js<boolean>('return !!document.getElementById("anchor")'), true, 'Enter leaves an empty anchor of the page’s where it was');
@@ -601,6 +648,350 @@ if (canCapture()) {
     await d.cmd('fill', { id: askV.id, href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', play: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', thumb: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', title: 'A song' });
     ok((await d.js<string>('const v = document.querySelector("a.n-video"); return v ? v.getAttribute("data-video") : ""')) === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'a video goes in as its still, linked to it');
   });
+
+  // ---- code blocks: coloured as they show and as they are written, a language to pick, plain code in the page kept --------
+  await drive('<p id="a">Before</p><pre class="n-code" id="c">const x = 1; // one\nfunction f(a) { return "s"; }</pre><p id="z">After</p>', async (d) => {
+    same(
+      await d.js<string>('return [...document.querySelectorAll("#c span")].map(s => s.className + ":" + s.textContent).join(" ")'),
+      'n-ck:const n-cn:1 n-cc:// one n-ck:function n-cf:f n-ck:return n-cs:"s"',
+      'a code block shows its code coloured, the language told from the code',
+    );
+    await d.click('#c');
+    same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.tag, 'pre', 'a click on a coloured word picks the code block, not the word');
+    same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.langAuto, 'js', 'the Part tab is told the language its code looks like');
+    await d.cmd('codeLang', 'python');
+    same(await d.js<string>('return document.querySelector("#c").getAttribute("data-lang")'), 'python', 'a language picked is kept with the block');
+    same(await d.js<string>('return [...document.querySelectorAll("#c .n-ck")].map(s => s.textContent).join(",")'), 'return', 'and its code is coloured as that language');
+    await d.write('#c');
+    await d.press('Enter');
+    await d.type('def g(): pass');
+    await sleep(80);
+    same(await d.js<string>('return [...document.querySelectorAll("#c .n-ck")].map(s => s.textContent).join(",")'), 'return,def,pass', 'code typed is coloured as it is written');
+    await d.type('!');
+    ok((await d.js<string>('return document.querySelector("#c").textContent')).endsWith('def g(): pass!'), 'with the caret where it was');
+    await d.press('Escape');
+    const out = await d.html();
+    ok(out.includes('<pre class="n-code" id="c" data-lang="python">const x = 1; // one\nfunction f(a) { return "s"; }\ndef g(): pass!</pre>'), 'the page given back keeps its code as plain text, and its language');
+    await d.cmd('codeLang', '');
+    same(await d.js<string>('return document.querySelector("#c").hasAttribute("data-lang")'), false, 'Auto takes the language off');
+  });
+
+  // ---- plain code blocks agents write (<pre><code>): coloured in Edit inside their <code>, kept as they were written ----------
+  await drive(
+    '<pre id="p1"><code class="language-python">def f(a):\n    return a  # one</code></pre><pre id="p2"><code>total 12\nnotes</code></pre><pre id="p3"><code class="lang-js">let <b>x</b> = 1;</code></pre><pre id="p4" data-lang="sql"><code>SELECT 1</code></pre>',
+    async (d) => {
+      const kinds = (sel: string) => d.js<string>(`return [...document.querySelectorAll(${JSON.stringify(sel)})].map(s => s.className + ":" + s.textContent).join(" ")`);
+      same(await kinds('#p1 > code > span'), 'n-ck:def n-cf:f n-ck:return n-cc:# one', 'a plain code block shows its code coloured as its class says, inside its <code>');
+      same([await kinds('#p2 span'), await kinds('#p3 code > span'), await kinds('#p4 code > span')].join('|'), '||n-ck:SELECT n-cn:1', 'one that is surely no language stays plain, one with markup of its own is left as it is, its block’s data-lang counts');
+      await d.click('#p1 .n-cf');
+      same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.tag, 'code', 'a click on a coloured word picks the block’s code, not the word');
+      await d.write('#p1 code');
+      same(await d.js<number>('return document.querySelectorAll("#p1 span").length'), 0, 'written in, its code is plain text');
+      await d.type('!');
+      await d.press('Escape');
+      same(await kinds('#p1 > code > .n-ck'), 'n-ck:def n-ck:return', 'and coloured again once it is left');
+      const out = await d.html();
+      ok(out.includes('<pre id="p1"><code class="language-python">def f(a):\n    return a  # one!</code></pre>') && out.includes('<pre id="p3"><code class="lang-js">let <b>x</b> = 1;</code></pre>') && !/n-c[a-z]"/.test(out), 'the page given back has its plain code blocks as they were written, no colours');
+    },
+  );
+
+  // ---- comments: Comment on a block, marks beside the blocks, their places kept as blocks change -----------------------------
+  await drive('<h2 id="h">Prices</h2><p id="p">Ten euros a day.</p><p id="q">Paid at the door.</p>', async (d) => {
+    await d.cmd('caps', { comment: true });
+    await d.cmd('comments', [
+      { id: 'c1', on: { path: [1, 0], tag: 'h2', words: 'Prices' }, n: 2 },
+      { id: 'c2', on: { path: [1, 9], tag: 'p', words: 'Paid at the door.' }, n: 1 },
+      { id: 'c3', on: { words: 'nowhere at all' }, n: 1 },
+    ]);
+    await d.write('#p');
+    for (let i = 0; i < 5; i++) await d.press('ArrowLeft', { shift: true });
+    await d.press('m', { ctrl: true, alt: true });
+    const asked = (await d.msgs('wa-ed-comment')).at(-1);
+    ok(asked?.on?.tag === 'p' && asked?.on?.words === 'Ten euros a day.' && asked?.quote === 'day.', 'Ctrl+Alt+M asks the app for a comment on the block written in, and on the words picked there');
+    await d.click('#h');
+    await d.press('Escape');
+    await d.click('#h');
+    await d.cmd('comment');
+    same((await d.msgs('wa-ed-comment')).at(-1)?.quote, 'Prices', 'Comment on a block picked: its words');
+    await d.cmd('anchors', { id: 7 });
+    same(
+      JSON.stringify((await d.msgs('wa-ed-anchors')).at(-1)?.list?.map((x: { id: string; on: { tag: string } }) => `${x.id}:${x.on.tag}`)),
+      JSON.stringify(['c1:h2', 'c2:p']),
+      'each comment is found on its block: where it was, or by its words where the page changed (none for words no block has)',
+    );
+    await d.write('#q');
+    await d.cmd('turn', 'h3');
+    await d.press('Escape');
+    await d.cmd('anchors', { id: 8 });
+    const moved = (await d.msgs('wa-ed-anchors')).at(-1)?.list?.find((x: { id: string }) => x.id === 'c2');
+    same(moved?.on?.tag, 'h3', 'a commented block turned into another kind keeps its comment, which the app keeps once saved');
+    const out = await d.html();
+    same(/c1|c2|cmshow|n-cm/.test(out), false, 'nothing of the comments is in the page given back');
+  });
+
+  // ---- a database in Edit: "/database", its cells written in where they are, kept with the page's data through the app ---------
+  await drive('<h1 id="t">Trips</h1><p id="a">Plans</p>', async (d) => {
+    await d.write('#a');
+    await d.press('Enter');
+    await d.type('/database');
+    await d.press('Enter');
+    await sleep(400);
+    const db = await d.js<string>('const x = document.querySelector(".n-db"); return x ? x.getAttribute("data-db") + "|" + x.shadowRoot.querySelectorAll("tbody tr").length + "|" + [...x.shadowRoot.querySelectorAll("th")].map(t => t.textContent).join(",") : "none"');
+    ok(/^db-\w+\|3\|Name,Status,Date,$/.test(db), `"/database" puts in a database: a name of its own, three empty rows, a name, a status and a date (${db})`);
+    same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.name, 'Database', 'and picks it');
+    const at = await d.js<{ x: number; y: number }>('const i = document.querySelector(".n-db").shadowRoot.querySelector("tbody input.cell"); const b = i.getBoundingClientRect(); return { x: b.left + 20, y: b.top + b.height / 2 };');
+    await d.clickAt(at.x, at.y);
+    await d.type('Lisbox');
+    await d.press('Backspace');
+    await d.type('n');
+    await sleep(500);
+    same(await d.js<string>('return document.querySelector(".n-db").shadowRoot.querySelector("tbody input.cell").value'), 'Lisbon', 'its cells are written in where they are (Backspace too), the block staying');
+    ok(/^n-db:db-\w+=\{.*"Lisbon"/.test(await d.js<string>('const k = Object.keys(window.__store)[0]; return k ? k + "=" + window.__store[k] : ""')), 'and what it holds is kept with the page’s data, through the app');
+    const out = await d.html();
+    ok(/<div class="n-db" data-db="db-\w+" data-schema="[^"]*"><\/div>/.test(out) && !/Lisbon|<table/.test(out), 'the page given back has the block alone, nothing it draws or holds');
+    // A copy (Ctrl+D, a paste) is a database of its own: two blocks of one name would overwrite each other's rows.
+    // (picked as its handle picks it, the caret no longer in its cell: there, Ctrl+D is the cell's)
+    await d.click('#t');
+    await d.cmd('select', await d.js<number[]>('const x = document.querySelector(".n-db"); return [[...document.documentElement.children].indexOf(document.body), [...document.body.children].indexOf(x)];'));
+    await d.press('d', { ctrl: true });
+    await sleep(400);
+    const both = await d.js<string>('return [...document.querySelectorAll(".n-db")].map(x => x.getAttribute("data-db") + ":" + (x.shadowRoot ? x.shadowRoot.querySelector("tbody input.cell").value : "")).join(",")');
+    const [first, copy] = both.split(',').map((x) => x.split(':'));
+    ok(!!copy && first[0] !== copy[0] && copy[1] === 'Lisbon', `Duplicate makes a database of its own, a name of its own, with the rows the first holds (${both})`);
+    const cellAt = await d.js<{ x: number; y: number }>('const i = document.querySelectorAll(".n-db")[1].shadowRoot.querySelector("tbody input.cell"); const b = i.getBoundingClientRect(); return { x: b.left + 20, y: b.top + b.height / 2 };');
+    await d.clickAt(cellAt.x, cellAt.y);
+    const saves = (await d.msgs('wa-ed-save')).length;
+    await d.press('s', { ctrl: true });
+    same((await d.msgs('wa-ed-save')).length, saves + 1, 'Ctrl+S in a database’s cell saves the page (its other keys are its own)');
+  });
+
+  // ---- links to other pages: "@" or "/" → Link to a page, a chip with the page's icon -----------------------------------------
+  await drive('<p id="a">See</p><p id="b">Also</p>', async (d) => {
+    await d.cmd('pages', [
+      { id: 'abc1234567', title: 'Trip notes', kind: 'page', icon: '🧭' },
+      { id: 'def1234567', title: 'Budget', kind: 'sheet', icon: '' },
+      { id: 'bad"<x', title: 'Not a page' },
+    ]);
+    await d.write('#a');
+    await d.type(' @tri');
+    await d.press('Enter');
+    await d.type('now');
+    const a = await d.js<string>('return document.querySelector("#a").innerHTML');
+    ok(/See @?<a class="n-pagelink" href="\/pages\/abc1234567" data-page="abc1234567"[^>]*><span class="n-pagelink-icon" aria-hidden="true">🧭<\/span>Trip notes<\/a>(&nbsp;| )now/.test(a), `"@" and a page's name put a link to it in, with its icon, the caret after it (${a})`);
+    same(a.includes('@'), false, 'the "@…" typed goes');
+    same(await d.js<string>('return document.querySelector("#a a").getAttribute("contenteditable")'), 'false', 'while words are written, the link is one piece');
+    await d.write('#b');
+    await d.type(' /link');
+    await d.press('Enter');
+    await d.type('bud');
+    await d.press('Enter');
+    same(await d.js<string>('const l = document.querySelector("#b a.n-pagelink"); return l ? l.getAttribute("data-page") + " " + l.querySelector(".n-pagelink-icon").getAttribute("data-kind") : "none"'), 'def1234567 sheet', '"/" → Link to a page does the same; a page with no icon shows its kind’s');
+    await d.press('Escape');
+    const out = await d.html();
+    ok(out.includes('<a class="n-pagelink" href="/pages/abc1234567" data-page="abc1234567"><span class="n-pagelink-icon" aria-hidden="true">🧭</span>Trip notes</a>'), 'the page given back has the link as the kit draws it, and nothing of the editor’s');
+    await d.cmd('pages', [{ id: 'abc1234567', title: 'Trip notes, Lisbon', kind: 'page', icon: '🗺️' }]);
+    same(await d.js<string>('return document.querySelector("#a a.n-pagelink").textContent'), '🗺️Trip notes, Lisbon', 'a link takes its page’s new title and icon');
+  });
+
+  // ---- picking blocks with a drag: from beside a block's words, from the left margin, item by item, from the + ---------------
+  await drive('<h1 id="t">Pick</h1><p id="a">Short</p><p id="b">Also short</p><ul><li id="i1">One<ul><li id="i2">Two</li></ul></li><li id="i3">Three</li></ul><p id="z">Last</p>', async (d) => {
+    const s = d.tab.s;
+    const box = (sel: string) => d.js<{ l: number; r: number; t: number; b: number; m: number }>(`const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, m: b.top + Math.min(b.height, 24) / 2 };`);
+    const drag = async (x0: number, y0: number, x1: number, y1: number) => {
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0, y: y0 });
+      await sleep(60);
+      await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y: y0, button: 'left', clickCount: 1 });
+      for (let i = 1; i <= 8; i++) await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0 + ((x1 - x0) * i) / 8, y: y0 + ((y1 - y0) * i) / 8, buttons: 1 });
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x1, y: y1, button: 'left', clickCount: 1 });
+      await sleep(100);
+    };
+    const picked = async () => (await d.msgs('wa-ed-sel')).at(-1)?.sel?.multi ?? 0;
+    const [a, b, t, i2, i3, z] = await Promise.all(['#a', '#b', '#t', '#i2', '#i3', '#z'].map(box));
+    await drag(a.r - 30, a.m, a.r - 30, b.m);
+    same(await picked(), 2, 'a drag from beside a block’s words down to the next block picks both');
+    await d.cmd('deselect');
+    await drag(t.l - 56, t.m, t.l - 56, i2.m);
+    same(await picked(), 4, 'a drag down the left margin picks the blocks beside it (a list’s item with the items under it)');
+    await d.cmd('deselect');
+    await drag(i2.r - 40, i2.m, i2.r - 40, i3.m);
+    same(await picked(), 2, 'a drag across a list picks its items one by one, nested ones too');
+    same(await d.js<string>('return document.querySelector("#i2").textContent'), 'Two', 'and changes nothing');
+    await d.cmd('deselect');
+    await drag(a.l + 4, a.m, a.l + 4, a.m + 3);
+    same(await picked(), 0, 'a press on a block’s words that hardly moves is still a click');
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: z.l + 10, y: z.m });
+    await sleep(80);
+    const plus = { x: z.l - 36, y: z.m };
+    await drag(plus.x, plus.y, plus.x, b.m);
+    ok((await picked()) >= 4 && (await shape(d)).endsWith('p:Last'), 'a drag from the + beside a block picks blocks too, and adds none');
+    await d.press('Delete');
+    same(await shape(d), 'h1:Pick|p:Short', 'the blocks picked go together with Delete');
+  });
+
+  // ---- nested items keep their place: turned into text, a heading, a quote or a to-do, they stay under their parent ---------
+  await drive(
+    '<ul><li id="c">Clothes<ul><li id="s">Socks</li><li id="sh">Shirts<ul><li>Linen</li><li>Cotton</li></ul></li><li id="j">A jacket</li></ul></li><li>Papers</li></ul><p id="end">End</p>',
+    async (d) => {
+      const held = () => d.js<string>('return [...document.querySelectorAll("li.n-block")].map(li => li.firstElementChild.tagName + ":" + li.firstElementChild.textContent).join(",")');
+      await d.write('#sh', 'start');
+      await d.cmd('turn', 'p');
+      same(
+        await shape(d),
+        'ul>li:Clothes|ul>li>ul>li:Socks|ul>li>ul>li:Shirts|ul>li>ul>li>ul>li:Linen|ul>li>ul>li>ul>li:Cotton|ul>li>ul>li:A jacket|ul>li:Papers|p:End',
+        'an item under another turned into text stays where it was, with the items under it',
+      );
+      same(await held(), 'P:Shirts', 'its item holds the paragraph (li.n-block, no marker of its own)');
+      await d.type('!');
+      same(await held(), 'P:!Shirts', 'and writing goes on in it');
+      await d.press('End');
+      await d.press('Enter');
+      await d.type('Ties');
+      same(await held(), 'P:!Shirts,P:Ties', 'Enter at its end makes the next block at the same level');
+      same(await d.js<string>('const li = document.querySelectorAll("li.n-block")[1]; return [...li.querySelectorAll("li")].map(x => x.textContent).join(",")'), 'Linen,Cotton', 'which the items under it go with');
+      await d.cmd('turn', 'h3');
+      same(await held(), 'P:!Shirts,H3:Ties', 'a held block turned into a heading stays held');
+      await d.cmd('turn', 'bullet');
+      same(await held(), 'P:!Shirts', 'and into a bulleted list it is an item there again');
+      ok((await shape(d)).includes('ul>li>ul>li:Ties|ul>li>ul>li>ul>li:Linen'), 'with the items under it');
+      await d.write('#j', 'start');
+      await d.cmd('turn', 'quote');
+      same(await held(), 'P:!Shirts,BLOCKQUOTE:A jacket', 'an item turned into a quote stays in place too');
+      await d.press('Home');
+      await d.press('Backspace');
+      same(await held(), 'P:!Shirts,P:A jacket', 'Backspace at a held quote’s start makes it text, as anywhere');
+      await d.press('Backspace');
+      ok((await shape(d)).includes('ul>li:Clothes') && (await shape(d)).includes('|p:A jacket|ul>li:Papers'), `then takes it up a level: out of the list, where it was, from the list’s top (${await shape(d)})`);
+      await d.press('Tab');
+      same(await held(), 'P:!Shirts,P:A jacket', 'Tab puts a block under the list item before it');
+      await d.press('Tab', { shift: true });
+      ok((await shape(d)).includes('|p:A jacket|ul>li:Papers'), 'and Shift+Tab takes it back out');
+      await d.write('#s', 'start');
+      await d.cmd('turn', 'todo');
+      same(await d.js<string>('const li = document.querySelector("#c ul.n-todo > li"); return li ? li.textContent : "none"'), 'Socks', 'an item under another turned into a to-do stays under it too');
+      const out = await d.html();
+      ok(/<li id="sh" class="n-block"><p>!Shirts<\/p><\/li>/.test(out), 'the page given back keeps held blocks as the kit draws them');
+    },
+  );
+
+  // ---- what the second round found: an empty table of contents, Save from the first letter, code from an empty block -------
+  await drive('<h1 id="t">Plan</h1><nav class="n-toc"></nav><h2>Days</h2><p id="a">Words</p>', async (d) => {
+    same(await d.js<number>('return document.querySelectorAll("nav.n-toc a").length'), 2, 'a table of contents an agent left empty is filled as the editor starts');
+    same((await d.msgs('wa-ed-state')).some((m) => m.dirty), false, 'and that is no change of the user’s');
+    await d.write('#a');
+    await d.type(' more');
+    same((await d.msgs('wa-ed-state')).at(-1)?.dirty, true, 'the first letter typed shows the page changed, before its block is left');
+    for (let i = 0; i < 5; i++) await d.press('Backspace');
+    await d.press('Escape');
+    same((await d.msgs('wa-ed-state')).at(-1)?.dirty, false, 'words typed and taken back leave it unchanged');
+    await d.write('#a');
+    await d.press('Enter');
+    await d.type('/code');
+    await d.press('Enter');
+    await d.type('x = 1');
+    await d.press('Enter');
+    await d.type('y');
+    await d.press('Escape');
+    same(JSON.stringify(await d.js<string>('return document.querySelector("pre").textContent')), JSON.stringify('x = 1\ny'), 'a code block made from an empty paragraph holds its code and no stray line');
+  });
+
+  // ---- a page in Use (the kit's bridge): links, and a table of contents left empty -------------------------------------------------
+  {
+    const body =
+      '<a id="out" href="https://example.com/x">Out</a> <a id="pg" class="n-pagelink" data-page="abc123" href="/pages/abc123">A page</a> <a id="in" href="#days">In</a> <a id="own" href="https://example.com/y" onclick="event.preventDefault()">Own</a><nav class="n-toc"></nav><h2>Days</h2><h3>Monday</h3><pre class="n-code" data-lang="js">let a = 1;</pre><pre id="plain"><code class="language-python">x = None</code></pre>';
+    const html = injectHead(`<!doctype html><html><head><title>Use</title></head><body>${body}</body></html>`, kitHead({ n: 't', theme: 'light', max: { key: 200, value: 1000 } }));
+    await withTab({ html, width: 700, height: 500, settleMs: 150 }, async (tab) => {
+      const js = <T>(code: string) => tab.evaluate<T>(`(() => { ${code} })()`);
+      await js('window.__opened = []; window.open = function (u) { window.__opened.push(String(u)); return null; }; return 1;');
+      const click = async (sel: string) => {
+        const r = await js<{ x: number; y: number }>(`const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.left + 4, y: b.top + b.height / 2 };`);
+        for (const type of ['mousePressed', 'mouseReleased'] as const) await tab.s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+        await sleep(80);
+      };
+      const at = await js<string>('return location.href');
+      await click('#out');
+      await click('#pg');
+      await click('#own');
+      await click('#in');
+      const opened = await js<string[]>('return window.__opened');
+      same(opened[0], 'https://example.com/x', 'a link to another site opens in a tab of its own');
+      ok(/\/pages\/abc123$/.test(opened[1] ?? ''), `a link to a page of the Library opens that page (in a tab, where no app is around it) (${opened[1]})`);
+      same(opened.length, 2, 'a link the page’s own script took care of is left to it');
+      same(await js<string>('return location.href.split("#")[0]'), at.split('#')[0], 'and the page stays where it is');
+      same(await js<string>('return [...document.querySelectorAll("nav.n-toc a")].map(a => a.getAttribute("href") + " " + a.className).join(",")'), '#days n-toc-1,#monday n-toc-2', 'a table of contents left empty shows the page’s headings');
+      same(await js<string>('return [...document.querySelectorAll("pre.n-code span")].map(s => s.className + ":" + s.textContent).join(" ")'), 'n-ck:let n-cn:1', 'a code block shows its code coloured, as in Edit');
+      same(await js<string>('return [...document.querySelectorAll("#plain > code > span")].map(s => s.className + ":" + s.textContent + ":" + (getComputedStyle(s).color !== getComputedStyle(s.parentElement).color)).join(" ")'), 'n-cv:None:true', 'and a plain block an agent wrote, inside its <code>, in the kit’s colours');
+    });
+  }
+
+  // ---- a database in Use: rows added, sorted, a board whose cards move between lanes, kept by the page's storage -----------
+  {
+    const schema = JSON.stringify({ cols: [{ name: 'Task' }, { name: 'Status', kind: 'select', options: ['To do', 'Done'] }, { name: 'Cost', kind: 'number' }], rows: [{ Task: 'Book', Status: 'To do', Cost: 3 }, { Task: 'Pack', Status: 'Done', Cost: 1 }] }).replace(/"/g, '&quot;');
+    const head = `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${JSON.stringify({ n: 't', theme: 'light', max: { key: 200, value: 600000 } })})</script><script>(${PAGE_DB_SRC})().run(null, null, { readOnly: false })</script>`;
+    const html = injectHead(`<!doctype html><html><head></head><body class="n-page"><div class="n-db" data-db="tasks" data-title="Tasks" data-schema="${schema}"></div></body></html>`, head);
+    await withTab({ html, width: 900, height: 700, settleMs: 300 }, async (tab) => {
+      const js = <T>(code: string) => tab.evaluate<T>(`(async () => { const R = document.querySelector(".n-db").shadowRoot; ${code} })()`);
+      const click = async (code: string) => {
+        const r = await js<{ x: number; y: number } | null>(`const el = (${code}); if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.left + Math.min(20, b.width / 2), y: b.top + b.height / 2 };`);
+        if (!r) throw new Error(`nothing to click: ${code}`);
+        for (const type of ['mousePressed', 'mouseReleased'] as const) await tab.s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+        await sleep(120);
+      };
+      const cells = () => js<string>('return [...R.querySelectorAll("tbody tr")].map(tr => [...tr.querySelectorAll("td")].slice(0, 3).map(td => (td.querySelector("input") ? td.querySelector("input").value : td.textContent)).join(":")).join(",")');
+      same(await cells(), 'Book:To do:3,Pack:Done:1', 'a database shows its rows, as its block starts it');
+      await click('[...R.querySelectorAll(".foot .b")].find(b => /New/.test(b.textContent))');
+      for (const ch of 'Visa') await tab.s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ch, text: ch });
+      await sleep(500);
+      same(await cells(), 'Book:To do:3,Pack:Done:1,Visa::', 'New adds a row, its first cell ready to type');
+      ok(/"Visa"/.test(JSON.stringify(await tab.evaluate('hydor.storage.get("n-db:tasks")'))), 'what it holds is kept by the page’s storage');
+      await click('[...R.querySelectorAll("th .b")].find(b => /Cost/.test(b.textContent))');
+      await click('[...R.querySelectorAll(".pop .row")].find(b => /ascending/.test(b.textContent))');
+      same(await cells(), 'Pack:Done:1,Book:To do:3,Visa::', 'a column’s menu sorts the rows by it (the empty last)');
+      await click('[...R.querySelectorAll(".tabs .b")].find(b => /Board/.test(b.textContent))');
+      same(await js<string>('return [...R.querySelectorAll(".lane")].map(l => l.querySelector(".lh").textContent + "=" + [...l.querySelectorAll(".card .ct")].map(c => c.textContent).join("+")).join(" | ")'), 'To do1=Book | Done1=Pack | No value1=Visa', 'its board has a lane for each option, with its cards');
+      const from = await js<{ x: number; y: number }>('const b = [...R.querySelectorAll(".card")].find(c => c.textContent.startsWith("Book")).getBoundingClientRect(); return { x: b.left + 20, y: b.top + 10 };');
+      const to = await js<{ x: number; y: number }>('const b = R.querySelectorAll(".lane")[1].getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.bottom - 10 };');
+      await tab.s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: from.x, y: from.y, button: 'left', clickCount: 1 });
+      for (let i = 1; i <= 8; i++) await tab.s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x + ((to.x - from.x) * i) / 8, y: from.y + ((to.y - from.y) * i) / 8, buttons: 1 });
+      await tab.s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', clickCount: 1 });
+      await sleep(500);
+      same(await js<string>('return [...R.querySelectorAll(".lane")].map(l => [...l.querySelectorAll(".card .ct")].map(c => c.textContent).join("+")).join(" | ")'), ' | Pack+Book | Visa', 'a card dragged to another lane takes its option');
+    });
+  }
+
+  // ---- a database only to read (a page saved as a file, a PDF, a published copy): its rows as words, sorted for whoever reads -
+  {
+    const schema = JSON.stringify({ cols: ['Task'] }).replace(/"/g, '&quot;');
+    const stored = JSON.stringify({ cols: [{ name: 'Task' }, { name: 'When', kind: 'date' }, { name: 'Tags', kind: 'multi', options: ['red', 'blue'] }, { name: 'Site', kind: 'link' }, { name: 'Done', kind: 'check' }], rows: [{ Task: 'Visa', When: '2026-12-01', Tags: ['red', 'blue'], Site: 'https://example.com/a', Done: true }, { Task: 'Book' }] });
+    const html = injectHead(`<!doctype html><html><head></head><body class="n-page"><div class="n-db" data-db="trip" data-schema="${schema}"></div></body></html>`, `<style id="n-kit">${KIT_CSS}</style>${pageDbScript(null, { 'n-db:trip': stored })}`);
+    await withTab({ html, width: 900, height: 700, settleMs: 300 }, async (tab) => {
+      const js = <T>(code: string) => tab.evaluate<T>(`(async () => { const R = document.querySelector(".n-db").shadowRoot; ${code} })()`);
+      const click = async (code: string) => {
+        const r = await js<{ x: number; y: number }>(`const b = (${code}).getBoundingClientRect(); return { x: b.left + Math.min(20, b.width / 2), y: b.top + b.height / 2 };`);
+        for (const type of ['mousePressed', 'mouseReleased'] as const) await tab.s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+        await sleep(120);
+      };
+      const rows = () => js<string>('return [...R.querySelectorAll("tbody tr")].map(tr => [...tr.querySelectorAll("td")].map(td => td.textContent + (td.querySelector("input:checked") ? "✓" : "")).join(":")).join(",")');
+      const first = await rows();
+      ok(/^Visa:[^:]*2026[^:]*:redblue:https:\/\/example\.com\/a:✓,Book::::$/.test(first) && !first.includes('2026-12-01'), `a database shows the rows its page keeps, as words (a date as this device writes one) (${first})`);
+      same(await js<string>('return [R.querySelectorAll("input:not([type=checkbox]), .foot .b, th.end").length, R.querySelector("td a")?.href].join("|")'), '0|https://example.com/a', 'only to read: no fields, no New, its links open');
+      await click('R.querySelector("input[type=checkbox]")');
+      ok(await js<boolean>('return R.querySelector("input[type=checkbox]").checked'), 'and its boxes stay as they are');
+      await click('R.querySelector(".tools .b")');
+      await click('[...R.querySelectorAll(".pop .row")].find(b => b.textContent === "Task")');
+      ok((await rows()).startsWith('Book'), 'whoever reads it can still sort it (for them alone)');
+      const note = await tab.evaluate<string>(`(async () => {
+        const el = document.createElement('div');
+        el.setAttribute('data-db', 'other');
+        el.setAttribute('data-schema', '{"cols":["Name"],"rows":[{"Name":"Kept"}]}');
+        document.body.append(el);
+        (${PAGE_DB_SRC})().mount(el, { store: { get: () => Promise.reject(new Error('No answer')), set: () => Promise.resolve() }, edit: true });
+        await new Promise((r) => setTimeout(r, 50));
+        const R = el.shadowRoot;
+        return [R.querySelector('.note')?.textContent, R.querySelectorAll('input:not([type=checkbox])').length, R.querySelector('tbody td')?.textContent].join('|');
+      })()`);
+      same(note, 'Its rows can be changed in Use.|0|Kept', 'in the editor, a database whose rows the app does not give stays as its block says, to read, saying where they change');
+    });
+  }
   closeCapture();
 } else console.log('(no Chromium here: the editor’s browser tests were skipped)');
 
@@ -634,6 +1025,59 @@ if (canCapture()) {
   const r = (await tools.save_page.run({ title: 'Plan', html }, ctx)) as string;
   const id = /\(page ([a-f0-9]{10})/.exec(r)?.[1] ?? '';
   ok(id, 'a page of Notion-like blocks is saved as it is');
+  const listed = (JSON.parse((await req('GET', '/api/pages')).body).pages as { id: string; icon?: string }[]).find((p) => p.id === id);
+  same(listed?.icon, '🧭', 'the Library knows a page’s icon (its .n-icon), for links to it from other pages');
+
+  // ---- comments on its blocks: kept outside the page, changed by a list of changes, answered by agents -------------------
+  {
+    const ops = (body: unknown) => req('POST', `/api/pages/${id}/comments`, body).then((r) => ({ status: r.statusCode, ...JSON.parse(r.body) }));
+    const r1 = await ops({ ops: [{ text: 'Bigger, please', on: { path: [1, 2], tag: 'h1', words: 'Plan' }, quote: 'Plan' }, { text: 'Is this the date?', on: { path: [1, 4], tag: 'details', words: 'Packing list' } }] });
+    same(r1.comments?.length, 2, 'comments go on a page’s blocks');
+    ok(r1.added?.length === 2 && r1.comments[0].by === 'user' && r1.comments[0].on.tag === 'h1', 'each the user’s, on its block (where it is, its tag and words)');
+    const before = (await req('GET', `/api/pages/${id}/export?format=html`)).body;
+    ok(!before.includes('Bigger, please'), 'and they are not in the page');
+    same(JSON.parse((await req('GET', `/api/pages/${id}`)).body).page.version, 1, 'nor a new version of it');
+    const c1 = r1.added[0];
+    const c2 = r1.added[1];
+    await ops({ ops: [{ id: c2, reply: 'It is.' }, { id: c2, resolve: true }] });
+    const got = JSON.parse((await req('GET', `/api/pages/${id}/comments`)).body).comments;
+    ok(got.find((c: { id: string }) => c.id === c2)?.resolved && got.find((c: { id: string }) => c.id === c2)?.replies?.[0]?.text === 'It is.', 'they are answered and resolved');
+    const bad = await ops({ ops: [{ text: '<script>x</script>', on: { path: ['x'], tag: 'H1 bad', words: 7 } }] });
+    ok(bad.status === 200 && !bad.comments.at(-1).on, 'an anchor that is not one is left out');
+    await ops({ ops: [{ id: bad.added[0], delete: true }] });
+    const read = (await tools.get_page.run({ id }, ctx)) as string;
+    ok(read.includes(`- ${c1} · open · on the <h1> “Plan”`) && read.includes('Bigger, please') && read.includes('save_page with this id and comments'), 'an agent reads them in get_page, and how to answer');
+    const answered = (await tools.save_page.run({ id, title: 'Plan', comments: [{ id: c1, reply: 'Made it bigger.', resolve: true }, { text: 'Check the dates', on: 'Packing list' }] }, ctx)) as string;
+    ok(/answered its comments; the page itself is as it was/.test(answered), `save_page answers them without the page (${answered})`);
+    const after = JSON.parse((await req('GET', `/api/pages/${id}/comments`)).body).comments;
+    ok(after.find((c: { id: string }) => c.id === c1)?.replies?.[0]?.by === 'agent' && after.find((c: { id: string }) => c.id === c1)?.resolved, 'as the agent');
+    ok(after.some((c: { by: string; on?: { words?: string } }) => c.by === 'agent' && c.on?.words === 'Packing list'), 'and adds its own, on the words of its block');
+    same(JSON.parse((await req('GET', `/api/pages/${id}`)).body).page.version, 1, 'the page itself stays as it was');
+    let refused = '';
+    try {
+      await tools.save_page.run({ title: 'New' }, ctx);
+    } catch (e) {
+      refused = (e as Error).message;
+    }
+    ok(/html/.test(refused), 'a new page still needs its html');
+  }
+
+  // ---- a database: an agent makes one, fills it with save_page's databases, reads it in get_page; its exports show it ------
+  {
+    const dbHtml = `<!doctype html><html><body class="n-page"><h1>Trip</h1><div class="n-db" data-db="tasks" data-title="Tasks" data-schema='{"cols":[{"name":"Task"},{"name":"Status","kind":"select","options":["To do","Done"]}],"rows":[{"Task":"Book","Status":"To do"}]}'></div></body></html>`;
+    const made = (await tools.save_page.run({ title: 'Trip', html: dbHtml, databases: { tasks: { add: [{ Task: 'Pack', Status: 'Done' }] } } }, ctx)) as string;
+    const pid = /\(page ([a-f0-9]{10})/.exec(made)?.[1] ?? '';
+    ok(/Database tasks: 2 rows/.test(made), `save_page fills a page’s database as it makes the page (${made})`);
+    const kept = JSON.parse((await req('GET', `/api/pages/${pid}/data`)).body).entries.find((x: { key: string }) => x.key === 'n-db:tasks')?.value;
+    same(kept?.rows?.length, 2, 'what it holds is kept as the page’s data (n-db:tasks)');
+    const changed = (await tools.save_page.run({ id: pid, title: 'Trip', databases: { tasks: { update: [{ id: kept.rows[0].id, Status: 'Done' }], add: [{ Task: 'Visa' }] }, nowhere: { add: [{}] } } }, ctx)) as string;
+    ok(/changed its databases/.test(changed) && /Database tasks: 3 rows/.test(changed) && /no database "nowhere"/.test(changed), `and changes its rows without the page (${changed})`);
+    const read = (await tools.get_page.run({ id: pid }, ctx)) as string;
+    ok(/- tasks “Tasks” · 3 rows/.test(read) && /Task="Book", Status="Done"/.test(read) && /Task="Visa"/.test(read) && !/Stored data:\n\{\n "n-db/.test(read), 'get_page shows its columns and rows (and not twice, as stored data)');
+    same(JSON.parse((await req('GET', `/api/pages/${pid}`)).body).page.version, 1, 'its rows are the page’s data: no new version');
+    const web = (await req('GET', `/api/pages/${pid}/export?format=html`)).body;
+    ok(web.includes('().run(null, {"n-db:tasks"') && web.includes('Visa'), 'a page saved as a file carries its databases’ rows, to show them');
+  }
   const web = await req('GET', `/api/pages/${id}/export?format=html`);
   ok(web.statusCode === 200 && web.body.includes('id="n-kit"') && web.body.includes('.n-todo{') && web.body.includes('<input type="checkbox" checked>'), 'as a web page it keeps its blocks, with the kit’s look for them');
   if (canCapture()) {

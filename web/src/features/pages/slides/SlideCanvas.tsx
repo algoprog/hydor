@@ -2,15 +2,18 @@
 // around: click a part to pick it (Shift adds to the pick, a drag across empty space picks what it touches), drag it
 // to move it (it snaps to the slide's middle and edges, to other parts, to the guides and the grid, with lines that
 // show where, and to gaps as wide as those between other parts, marked; Alt does not snap, Shift keeps it straight),
-// its handles to size or turn it, a line's ends to move them. A group is picked, moved, sized and turned as one;
+// its handles to size or turn it, a line's ends to move them (near a part, an end sticks to the middle of one of its
+// sides: a connector, which follows its parts as they are dragged). A group is picked, moved, sized and turned as one;
 // double-click it to pick a part inside, Esc or a click outside to leave it. Double-click words to change them in
 // place, a table's cell to type in it (Shift-click another to pick the cells between), a picture to crop it (drag the
 // frame's edges and corners over the whole picture, drag the picture under it; Enter keeps it, Esc does not). The
-// rulers give guides: drag one out of a ruler, drag it back to take it away. The slide itself is drawn by the runtime
-// as it shows anywhere; this draws what is picked over it, and moves parts while they are dragged without drawing the
-// slide again.
+// rulers give guides: drag one out of a ruler, drag it back to take it away; zoomed in, they stay at the view's edges.
+// The slide itself is drawn by the runtime as it shows anywhere; this draws what is picked over it, and moves parts
+// while they are dragged without drawing the slide again. The marks of the slide's comments sit over it, at their
+// parts' corners (the editor's alone), and, while an agent writes the slide, a box round the part its words arrive in.
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { scaleEls, type Crop, type Deck, type El, type GroupEl, type ImageEl, type Para, type TableEl, type TextProps } from '@shared/slides';
+import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Slide, type Stick, type TableEl, type TextProps } from '@shared/slides';
+import { MessageSquare } from 'lucide-react';
 import { cx } from '../../../components/ui';
 import { boxOf, heightOf, mergeAt, setEls, W } from './ops';
 import { PICS, RT } from './rt';
@@ -28,11 +31,15 @@ export interface CanvasHandle {
   endCrop(keep: boolean): void;
 }
 
-/** A match of Find to mark: in a part's paragraph, or a table's cell, [s, e) of its text. */
+/** A match of Find to mark: in a part's paragraph, a table's cell or a chart's words ([s, e) of their text), or an equation's LaTeX (the equation). */
 export interface FindMark {
   id: string;
   para?: number;
   cell?: [number, number];
+  /** A chart's words the match is in (its title, a label, a series' name). */
+  chart?: string;
+  /** In an equation's LaTeX: the equation is marked whole. */
+  tex?: boolean;
   s: number;
   e: number;
   current: boolean;
@@ -45,6 +52,17 @@ export interface CellSel {
   c0: number;
   r1: number;
   c1: number;
+}
+
+/** The mark of a slide's open comments: at a part's top-right corner, or where a comment on the slide is (the slide's pixels). */
+export interface CommentPin {
+  key: string;
+  x: number;
+  y: number;
+  /** The comments it marks. */
+  ids: string[];
+  /** One of them is the one picked in the Comments tab. */
+  active: boolean;
 }
 
 export interface GridOpts {
@@ -75,7 +93,7 @@ type Drag =
   | { kind: 'move'; ids: string[]; start: P; dx: number; dy: number; moved: boolean }
   | { kind: 'resize'; id: string; hx: number; hy: number; start: P; box: Box; rot: number; next: Box }
   | { kind: 'rotate'; id: string; cx: number; cy: number; rot: number }
-  | { kind: 'end'; id: string; which: 'start' | 'end'; next: { x: number; y: number; w: number; h: number } }
+  | { kind: 'end'; id: string; which: 'start' | 'end'; next: { x: number; y: number; w: number; h: number }; stick?: Stick; near?: string }
   | { kind: 'marquee'; start: P; at: P; add: string[] }
   | { kind: 'guide'; axis: 'x' | 'y'; index: number | null; at: number; off: boolean }
   | { kind: 'crop'; hx: number; hy: number; start: P; box: Box; full: Box };
@@ -237,6 +255,8 @@ export const SlideCanvas = forwardRef<
     change: (next: Deck | ((d: Deck) => Deck), key?: string) => void;
     fonts: number;
     readOnly?: boolean;
+    /** An agent writing this slide (live.ts): the part its words are arriving in ('' for the slide as a whole), boxed in its colour. */
+    agent?: string | null;
     /** Right-click (or a long press) on a part or the slide. */
     onMenu?: (at: { x: number; y: number }, id: string | null) => void;
     /** An empty picture was double-clicked: put one in its place. */
@@ -266,6 +286,9 @@ export const SlideCanvas = forwardRef<
     marks?: FindMark[];
     cellSel?: CellSel | null;
     onCellSel?: (s: CellSel | null) => void;
+    /** The slide's comments' marks (the editor's alone: never drawn in the slideshow), and a click on one. */
+    pins?: CommentPin[];
+    onPin?: (ids: string[]) => void;
     children?: ReactNode;
   }
 >(function SlideCanvas(
@@ -279,6 +302,7 @@ export const SlideCanvas = forwardRef<
     change,
     fonts,
     readOnly,
+    agent,
     onMenu,
     onReplaceImage,
     onChartData,
@@ -297,6 +321,8 @@ export const SlideCanvas = forwardRef<
     marks,
     cellSel,
     onCellSel,
+    pins,
+    onPin,
     children,
   },
   handle,
@@ -321,6 +347,9 @@ export const SlideCanvas = forwardRef<
   editingRef.current = editing;
   const anchor = useRef<{ p: P; cx: number; cy: number } | null>(null);
   const touches = useRef(new Map<number, P>());
+  const rulerX = useRef<SVGSVGElement>(null);
+  const rulerY = useRef<SVGSVGElement>(null);
+  const corner = useRef<HTMLDivElement>(null);
   const pinch = useRef<{ dist: number; k: number; mid: P } | null>(null);
 
   useLayoutEffect(() => {
@@ -393,10 +422,26 @@ export const SlideCanvas = forwardRef<
     const out: typeof hl = [];
     for (const m of marks) {
       const part = nodeOf(m.id);
+      const put = (b: DOMRect) => out.push({ x: b.left - st.left, y: b.top - st.top, w: b.width, h: b.height, current: m.current });
+      // An equation: what KaTeX drew of it (its LaTeX is not on the slide).
+      if (m.tex) {
+        const drawn = part?.querySelector('.ns-mi') ?? part;
+        if (drawn) put(drawn.getBoundingClientRect());
+        continue;
+      }
+      // A chart's words, where it draws them (a series' name is in the legend; without one, the chart is marked).
+      if (m.chart !== undefined) {
+        const t = Array.from(part?.querySelectorAll('text') ?? []).find((x) => x.textContent === m.chart);
+        const rr = t ? textRange(t, m.s, m.e) : null;
+        const rects = rr ? Array.from(rr.getClientRects()) : [];
+        if (rects.length) rects.forEach(put);
+        else if (t ?? part) put((t ?? part)!.getBoundingClientRect());
+        continue;
+      }
       const root = m.cell ? part?.querySelector(`td[data-r="${m.cell[0]}"][data-c="${m.cell[1]}"]`) : part?.querySelectorAll(':scope > .ns-txt > .ns-p')[m.para ?? 0];
       const r = root ? textRange(root, m.s, m.e) : null;
       if (!r) continue;
-      for (const b of Array.from(r.getClientRects())) out.push({ x: b.left - st.left, y: b.top - st.top, w: b.width, h: b.height, current: m.current });
+      for (const b of Array.from(r.getClientRects())) put(b);
     }
     setHl(out);
   }, [marks, slide, k, size.w, size.h, fonts]);
@@ -613,8 +658,8 @@ export const SlideCanvas = forwardRef<
         e.preventDefault();
         paraOp((paras, picked) => paras.map((p, i) => (picked.includes(i) ? { ...p, lvl: Math.max(0, Math.min(4, (p.lvl ?? 0) + (e.shiftKey ? -1 : 1))) } : p)));
       }
-      // Ctrl+F and Ctrl+H find, from inside words too.
-      if (!((e.ctrlKey || e.metaKey) && /^[fhFH/]$/.test(e.key))) e.stopPropagation();
+      // Ctrl+F and Ctrl+H find, from inside words too, and Ctrl+Alt+M comments on them.
+      if (!((e.ctrlKey || e.metaKey) && (/^[fhFH/]$/.test(e.key) || (e.altKey && e.code === 'KeyM')))) e.stopPropagation();
     };
     // Pasted words come in plain: a deck's runs keep its own look.
     const onPaste = (e: ClipboardEvent) => {
@@ -768,6 +813,20 @@ export const SlideCanvas = forwardRef<
         ]);
     }
     return best;
+  };
+
+  /** The connectors stuck to parts being dragged, drawn where they will go (`moved`: those parts as the drag has them now). */
+  const follow = (moved: El[]) => {
+    if (!slide || scoped.length || !moved.length) return;
+    const by = new Map(moved.map((e) => [e.id, e]));
+    const now = { ...slide, els: slide.els.map((e) => by.get(e.id) ?? e) };
+    const after = reconnect(now);
+    if (after === now) return;
+    after.els.forEach((l, i) => {
+      if (l === now.els[i] || l.type !== 'line' || by.has(l.id)) return;
+      const n = nodeOf(l.id);
+      if (n) n.replaceWith(RT.part(deck, slide, l, { edit: true, ...PICS }));
+    });
   };
 
   const begin = (e: React.PointerEvent, d: Drag) => {
@@ -956,6 +1015,7 @@ export const SlideCanvas = forwardRef<
         const n = nodeOf(id);
         if (n) n.style.translate = `${dx}px ${dy}px`;
       }
+      follow(levelEls.filter((x) => d.ids.includes(x.id)).map((x) => ({ ...x, x: x.x + dx, y: x.y + dy })));
       return setDrag({ ...d, dx, dy, moved: true });
     }
     if (d.kind === 'rotate') {
@@ -966,6 +1026,8 @@ export const SlideCanvas = forwardRef<
       a = a % 360;
       const n = nodeOf(d.id);
       if (n) n.style.rotate = `${a}deg`;
+      const turned = levelEls.find((x) => x.id === d.id);
+      if (turned) follow([{ ...turned, rot: a }]);
       return setDrag({ ...d, rot: a });
     }
     if (d.kind === 'resize') {
@@ -1026,12 +1088,13 @@ export const SlideCanvas = forwardRef<
       setGuides({ x: gxs, y: gys });
       // The part drawn again at its new size (its words wrap anew; a group's parts sized with it).
       const n = nodeOf(d.id);
+      const shown = (el.type === 'group' ? { ...el, ...next, els: scaleEls(el.els, next.w / el.w, next.h / el.h) } : { ...el, ...next }) as El;
       if (n) {
-        const shown = el.type === 'group' ? { ...el, ...next, els: scaleEls(el.els, next.w / el.w, next.h / el.h) } : { ...el, ...next };
-        const fresh = RT.part(deck, slide, shown as El, { edit: true, ...PICS });
+        const fresh = RT.part(deck, slide, shown, { edit: true, ...PICS });
         n.replaceWith(fresh);
         RT.fit(fresh);
       }
+      follow([shown]);
       return setDrag({ ...d, next });
     }
     if (d.kind === 'end') {
@@ -1041,7 +1104,34 @@ export const SlideCanvas = forwardRef<
       const ay = d.which === 'start' ? el.y + el.h : el.y;
       let bx = p.x;
       let by = p.y;
-      if (e.shiftKey) {
+      // Near a part (on the slide itself), its sides' middles show, and the end sticks to the nearest within reach (Alt: none).
+      let stick: Stick | undefined;
+      let near: string | undefined;
+      if (!scoped.length && !e.altKey) {
+        const reach = 14 / k;
+        let best = Infinity;
+        for (const part of levelEls) {
+          if (part.id === el.id || part.type === 'line') continue;
+          const b = turnedBox(part);
+          const room = 36 / k;
+          if (p.x < b.x - room || p.x > b.x + b.w + room || p.y < b.y - room || p.y > b.y + b.h + room) continue;
+          near ??= part.id;
+          for (const at of SIDES) {
+            const q = sidePoint(part, at);
+            const dist = Math.hypot(q.x - p.x, q.y - p.y);
+            if (dist <= reach && dist < best) {
+              best = dist;
+              stick = { el: part.id, at };
+              near = part.id;
+              bx = q.x;
+              by = q.y;
+            }
+          }
+        }
+      }
+      if (stick) {
+        // Stuck: no other snapping.
+      } else if (e.shiftKey) {
         const ang = Math.round(Math.atan2(by - ay, bx - ax) / (Math.PI / 4)) * (Math.PI / 4);
         const len = Math.hypot(bx - ax, by - ay);
         bx = ax + Math.cos(ang) * len;
@@ -1051,13 +1141,18 @@ export const SlideCanvas = forwardRef<
         bx += snapBoth([bx], xs, gridX, tol).d;
         by += snapBoth([by], ys, gridY, tol).d;
       }
-      const next = d.which === 'start' ? { x: Math.round(bx), y: Math.round(by), w: Math.round(ax - bx), h: Math.round(ay - by) } : { x: el.x, y: el.y, w: Math.round(bx - el.x), h: Math.round(by - el.y) };
+      const r = (v: number) => (stick ? Math.round(v * 100) / 100 : Math.round(v));
+      const next = d.which === 'start' ? { x: r(bx), y: r(by), w: r(ax - bx), h: r(ay - by) } : { x: el.x, y: el.y, w: r(bx - el.x), h: r(by - el.y) };
+      // Drawn as it will be: the end stuck (or free), so an elbow turns as it will.
+      const shown: LineEl = { ...el, ...next };
+      if (d.which === 'start') shown.from = stick;
+      else shown.to = stick;
       const n = nodeOf(d.id);
       if (n) {
-        const fresh = RT.part(deck, slide, { ...el, ...next }, { edit: true, ...PICS });
+        const fresh = RT.part(deck, slide, shown, { edit: true, ...PICS });
         n.replaceWith(fresh);
       }
-      return setDrag({ ...d, next });
+      return setDrag({ ...d, next, stick, near });
     }
   };
 
@@ -1109,7 +1204,16 @@ export const SlideCanvas = forwardRef<
         if (n) n.style.translate = '';
       }
       if (!d.moved || (Math.abs(d.dx) < 0.5 && Math.abs(d.dy) < 0.5)) return;
-      change(setEls(deck, index, d.ids, (e) => ({ ...e, x: Math.round(e.x + d.dx), y: Math.round(e.y + d.dy) })));
+      // A connector moved lets go of the parts that stay where they are (moved with them, it stays stuck).
+      const moving = new Set(everyEl(levelEls.filter((x) => d.ids.includes(x.id))).map((x) => x.id));
+      change(
+        setEls(deck, index, d.ids, (e) => {
+          const at = { ...e, x: Math.round(e.x + d.dx), y: Math.round(e.y + d.dy) };
+          if (at.type !== 'line' || (!at.from && !at.to)) return at;
+          const { from, to, ...rest } = at;
+          return { ...rest, ...(from && moving.has(from.el) ? { from } : {}), ...(to && moving.has(to.el) ? { to } : {}) };
+        }),
+      );
       return;
     }
     if (d.kind === 'rotate') {
@@ -1122,7 +1226,15 @@ export const SlideCanvas = forwardRef<
       change(setEls(deck, index, [d.id], (e) => (e.type === 'group' ? { ...e, ...n, els: scaleEls(e.els, n.w / e.w, n.h / e.h) } : { ...e, ...n })));
       return;
     }
-    if (d.kind === 'end') change(setEls(deck, index, [d.id], (e) => ({ ...e, ...d.next })));
+    if (d.kind === 'end')
+      change(
+        setEls(deck, index, [d.id], (e) => {
+          if (e.type !== 'line') return e;
+          const { from, to, ...rest } = e;
+          const ends = d.which === 'start' ? { ...(d.stick ? { from: d.stick } : {}), ...(to ? { to } : {}) } : { ...(from ? { from } : {}), ...(d.stick ? { to: d.stick } : {}) };
+          return { ...rest, ...d.next, ...ends };
+        }),
+      );
   };
 
   const editCell = (el: TableEl, td: HTMLElement) => {
@@ -1223,9 +1335,11 @@ export const SlideCanvas = forwardRef<
 
   const outline = (e: El, strong: boolean) => {
     if (e.type === 'line') {
+      // Along its path: an elbow connector's right angles too.
+      const pts = e.route === 'elbow' ? elbowPoints(e.x, e.y, e.x + e.w, e.y + e.h, e.from?.at, e.to?.at) : [[e.x, e.y], [e.x + e.w, e.y + e.h]];
       return (
         <svg key={e.id} className="pointer-events-none absolute top-0 left-0 overflow-visible" width={1} height={1}>
-          <line x1={S(e.x)} y1={S(e.y)} x2={S(e.x + e.w)} y2={S(e.y + e.h)} stroke="var(--accent)" strokeWidth={strong ? 2 : 1} strokeDasharray={strong ? undefined : '4 3'} />
+          <polyline points={pts.map((q) => `${S(q[0])},${S(q[1])}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={strong ? 2 : 1} strokeDasharray={strong ? undefined : '4 3'} />
         </svg>
       );
     }
@@ -1320,6 +1434,26 @@ export const SlideCanvas = forwardRef<
     );
   };
 
+  /**
+   * The rulers stay at the edges of the view while a zoomed slide is scrolled: the top one at its top (lined up with the
+   * slide across), the left one at its left, a corner where they meet. Placed as the view scrolls, without drawing again.
+   */
+  const pinRulers = () => {
+    const el = wrap.current;
+    if (!el) return;
+    const top = Math.max(stage.top - RULER - 4, el.scrollTop);
+    const left = Math.max(stage.left - RULER - 4, el.scrollLeft);
+    if (rulerX.current) rulerX.current.style.top = `${top}px`;
+    if (rulerY.current) rulerY.current.style.left = `${left}px`;
+    if (corner.current) {
+      corner.current.style.top = `${top}px`;
+      corner.current.style.left = `${left}px`;
+      // Only when they meet at the view's corner, over the slide.
+      corner.current.style.display = top > stage.top - RULER - 4 && left > stage.left - RULER - 4 ? 'block' : 'none';
+    }
+  };
+  useLayoutEffect(pinRulers);
+
   /** A ruler's ticks: every so many pixels of the slide, numbered every hundred or so. */
   const ruler = (axis: 'x' | 'y') => {
     const len = axis === 'x' ? W : H;
@@ -1345,7 +1479,8 @@ export const SlideCanvas = forwardRef<
     }
     return (
       <svg
-        className={cx('absolute bg-bg-2 stroke-fg-3/60 select-none', axis === 'x' ? 'cursor-s-resize' : 'cursor-e-resize')}
+        ref={axis === 'x' ? rulerX : rulerY}
+        className={cx('absolute z-[6] bg-bg-2 stroke-fg-3/60 select-none', axis === 'x' ? 'cursor-s-resize' : 'cursor-e-resize')}
         style={axis === 'x' ? { left: stage.left, top: stage.top - RULER - 4, width: stage.w, height: RULER } : { left: stage.left - RULER - 4, top: stage.top, width: RULER, height: stage.h }}
         onPointerDown={(ev) => {
           // A guide out of the ruler: across from the top one, down from the left one.
@@ -1365,6 +1500,16 @@ export const SlideCanvas = forwardRef<
   // Snap lines go across the slide (in a turned group, well past its box).
   const span = straight ? { x0: -origin.x, x1: W - origin.x, y0: -origin.y, y1: H - origin.y } : { x0: -2000, x1: 3300, y0: -2000, y1: 3000 };
   const shownGuides = rulers ? { x: deck.guides?.x ?? [], y: deck.guides?.y ?? [] } : { x: [], y: [] };
+  // Where an agent's words are arriving: the part (the group it is in, for a part of a group), or the whole slide.
+  const agentBox = (sl: Slide | undefined, id: string) => {
+    const e = id && sl ? sl.els.find((x) => x.id === id || (x.type === 'group' && everyEl(x.els).some((y) => y.id === id))) : undefined;
+    const box = e && e.type !== 'line' ? { left: S(e.x) - 3, top: S(e.y) - 3, width: S(e.w) + 6, height: S(e.h) + 6, rotate: e.rot ? `${e.rot}deg` : undefined } : { left: 0, top: 0, width: stage.w, height: stage.h };
+    return (
+      <div aria-hidden className="pointer-events-none absolute z-[6] rounded-[3px] outline-2 outline-busy [outline-style:solid]" style={box}>
+        <span className="absolute bottom-full left-0 mb-0.5 rounded-[3px] bg-busy px-1 text-[10px] leading-[14px] font-semibold whitespace-nowrap text-bg">Agent</span>
+      </div>
+    );
+  };
   return (
     <div
       ref={wrap}
@@ -1372,6 +1517,7 @@ export const SlideCanvas = forwardRef<
       data-slide-canvas
       data-k={k}
       className={cx('relative h-full w-full touch-none bg-bg-2 outline-none select-none', zoomed ? 'overflow-auto' : 'overflow-hidden', painting && 'cursor-copy')}
+      onScroll={pinRulers}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
@@ -1389,6 +1535,7 @@ export const SlideCanvas = forwardRef<
       <div className="relative" style={{ width: sheet.w, height: sheet.h }}>
         {showRulers && ruler('x')}
         {showRulers && ruler('y')}
+        {showRulers && <div ref={corner} className="absolute z-[7] hidden bg-bg-2" style={{ width: RULER, height: RULER }} />}
         <div ref={stageRef} className="absolute shadow-[0_0_0_1px_var(--line-2),0_10px_30px_rgba(0,0,0,.18)]" style={{ left: stage.left, top: stage.top, width: stage.w, height: stage.h }}>
           <div ref={content} className="absolute top-0 left-0 origin-top-left" style={{ width: W, height: H, transform: `scale(${k})` }} />
           {grid.show && (
@@ -1443,6 +1590,7 @@ export const SlideCanvas = forwardRef<
               })()}
             </Nest>
           )}
+          {agent !== undefined && agent !== null && agentBox(slide, agent)}
           <div className="pointer-events-none absolute inset-0">
             <Nest frames={frames} k={k}>
               {!crop && picked.map((e) => outline(e, picked.length === 1))}
@@ -1469,6 +1617,25 @@ export const SlideCanvas = forwardRef<
                   </div>
                 );
               })}
+              {/* While a line's end is dragged near a part: the middles of its sides, the one it would stick to filled. */}
+              {drag?.kind === 'end' &&
+                drag.near &&
+                (() => {
+                  const part = levelEls.find((x) => x.id === drag.near);
+                  return part
+                    ? SIDES.map((at) => {
+                        const q = sidePoint(part, at);
+                        const on = drag.stick?.el === part.id && drag.stick.at === at;
+                        return (
+                          <div
+                            key={`cx${at}`}
+                            className={cx('pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-accent shadow-sm', on ? 'scale-125 bg-accent' : 'bg-white')}
+                            style={{ left: S(q.x), top: S(q.y) }}
+                          />
+                        );
+                      })
+                    : null;
+                })()}
               {m && (
                 <div
                   className="pointer-events-none absolute border border-accent bg-accent/10"
@@ -1478,6 +1645,30 @@ export const SlideCanvas = forwardRef<
             </Nest>
           </div>
           {cropView()}
+          {pins?.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              title="Comments"
+              aria-label="Comments"
+              onPointerDown={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin?.(p.ids);
+              }}
+              className={cx(
+                'absolute z-[5] flex h-6 min-w-6 -translate-y-full items-center justify-center gap-0.5 rounded-full px-1.5 text-[11px] font-semibold shadow-md tabular-nums pointer-coarse:h-8 pointer-coarse:min-w-8',
+                // Near the slide's right edge it opens to the left of its point, staying on the slide.
+                p.x > W - 64 ? '-translate-x-full rounded-br-[4px]' : 'rounded-bl-[4px]',
+                p.active ? 'bg-accent text-accent-fg ring-2 ring-accent/40' : 'border border-line bg-elevated text-fg-2 hover:text-fg',
+              )}
+              style={{ left: p.x > W - 64 ? S(p.x) + 2 : S(p.x) - 2, top: S(p.y) + 2 }}
+            >
+              <MessageSquare size={12} />
+              {p.ids.length > 1 && p.ids.length}
+            </button>
+          ))}
         </div>
         {cell && (
           <textarea

@@ -15,6 +15,8 @@ import {
   Eye,
   Keyboard,
   ListFilter,
+  MessageSquarePlus,
+  MessagesSquare,
   Omega,
   Paintbrush,
   Redo2,
@@ -95,6 +97,9 @@ export interface MenuCtx {
   rating(): void;
   date(): void;
   noteEdit(): void;
+  /** A comment on the active cell (its thread, where it has one), and the panel of all the sheet's comments. */
+  comment(): void;
+  comments(): void;
   func(name: string): void;
   chars(): void;
   addSheet(): void;
@@ -118,6 +123,9 @@ export interface MenuCtx {
   /** The rows as a Kanban board, grouped by a dropdown column. */
   board: boolean;
   toggleBoard(): void;
+  /** While the board shows: whether the sheet opens on it, and the switch for that (kept with the sheet). */
+  boardOpens?: boolean;
+  boardOpen(): void;
 }
 
 const FUNCS = ['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'SUMIF', 'COUNTIF', 'VLOOKUP', 'XLOOKUP', 'ROUND', 'CONCAT', 'TODAY'];
@@ -125,8 +133,6 @@ const FUNCS = ['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'SUMIF', 'COUNTIF'
 export function sheetMenus(m: MenuCtx): MenuDef[] {
   const s = m.style;
   const ro = !!m.readOnly;
-  const rows = m.nRows === 1 ? 'row' : `${m.nRows} rows`;
-  const cols = m.nCols === 1 ? 'column' : `${m.nCols} columns`;
   const pasteSpecial: MenuEntry = !ro && {
     label: 'Paste special',
     icon: <ClipboardPaste size={14} />,
@@ -177,7 +183,9 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
         items: ZOOMS.map((z) => ({ label: `${z}%`, checked: Math.round(m.zoom * 100) === z, run: () => m.setZoom(z / 100) })),
       },
       { label: 'Show formulas', icon: <Sigma size={14} />, keys: 'Ctrl+`', checked: m.formulas, run: () => m.setFormulas(!m.formulas) },
+      { label: 'Comments', icon: <MessagesSquare size={14} />, also: 'discussion threads resolve', run: m.comments },
       { label: 'Kanban board', icon: <SquareKanban size={14} />, also: 'cards lanes group by status', checked: m.board, run: m.toggleBoard },
+      m.board && !ro && { label: 'Open the sheet on its board', also: 'kanban view start', checked: !!m.boardOpens, run: m.boardOpen },
       '-',
       m.hiddenRows && { label: 'Show all hidden rows', icon: <Eye size={14} />, run: () => m.showAll('row') },
       m.hiddenCols && { label: 'Show all hidden columns', icon: <Eye size={14} />, run: () => m.showAll('col') },
@@ -196,7 +204,8 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       !ro && { label: 'Dropdown', icon: <SquareChevronDown size={14} />, also: 'list options select chips', run: m.dropdown },
       !ro && { label: 'Rating', icon: <Star size={14} />, also: 'stars', run: m.rating },
       !ro && { label: 'Date', icon: <Calendar size={14} />, also: 'calendar picker', run: m.date },
-      !ro && { label: m.note ? 'Edit note' : 'Note', icon: <StickyNote size={14} />, keys: 'Shift+F2', also: 'comment', run: m.noteEdit },
+      !ro && { label: m.note ? 'Edit note' : 'Note', icon: <StickyNote size={14} />, keys: 'Shift+F2', also: 'memo', run: m.noteEdit },
+      !ro && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'discussion thread reply', run: m.comment },
       !ro && { label: 'Function', icon: <Sigma size={14} />, also: 'formula', items: FUNCS.map((f) => ({ label: f, run: () => m.func(f) })) },
       !ro && { label: 'Special character', icon: <Omega size={14} />, also: 'emoji symbol', run: m.chars },
       !ro && { label: 'Sheet', also: 'add a sheet tab', run: m.addSheet },
@@ -286,13 +295,13 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
             label: 'Rows and columns',
             also: 'hide show',
             items: [
-              { label: `Hide ${rows}`, run: () => m.hide('row') },
-              { label: `Hide ${cols}`, run: () => m.hide('col') },
+              { label: m.nRows === 1 ? 'Hide row' : `Hide ${m.nRows} rows`, run: () => m.hide('row') },
+              { label: m.nCols === 1 ? 'Hide column' : `Hide ${m.nCols} columns`, run: () => m.hide('col') },
               { label: 'Show all hidden rows', disabled: !m.hiddenRows, run: () => m.showAll('row') },
               { label: 'Show all hidden columns', disabled: !m.hiddenCols, run: () => m.showAll('col') },
               '-',
-              { label: `Delete ${rows}`, icon: <Trash2 size={14} />, run: () => m.remove('row') },
-              { label: `Delete ${cols}`, icon: <Trash2 size={14} />, run: () => m.remove('col') },
+              { label: m.nRows === 1 ? 'Delete row' : `Delete ${m.nRows} rows`, icon: <Trash2 size={14} />, run: () => m.remove('row') },
+              { label: m.nCols === 1 ? 'Delete column' : `Delete ${m.nCols} columns`, icon: <Trash2 size={14} />, run: () => m.remove('col') },
             ],
           },
           { label: 'Conditional formatting', icon: <Paintbrush size={14} />, also: 'colour scale data bars highlight rules', run: m.conditional },

@@ -40,13 +40,16 @@ RUN if [ "$OFFICE" = true ]; then apt-get update \
       fonts-liberation2 fonts-dejavu-core fonts-crosextra-carlito fonts-crosextra-caladea \
  && rm -rf /var/lib/apt/lists/*; fi
 
-# TeX Live (about 500 MB more) typesets the LaTeX documents in Pages and shows their pages: build with
-# --build-arg LATEX=true to add it. Without it, LaTeX documents are still kept and edited, not typeset.
+# TeX Live (about 560 MB more) typesets the LaTeX documents in Pages and shows their pages: build with
+# --build-arg LATEX=true to add it, with the publishers' classes the IEEE and Springer LNCS paper templates use
+# (texlive-publishers). LATEX=full adds TeX Live's extra fonts too (about 1.7 GB more), which the ACM paper's and the
+# CV's templates need. Without it, LaTeX documents are still kept and edited, not typeset.
 # pdfLaTeX and XeLaTeX only: LuaLaTeX runs only in bubblewrap's sandbox, which Docker does not allow.
 ARG LATEX=false
-RUN if [ "$LATEX" = true ]; then apt-get update \
+RUN if [ "$LATEX" = true ] || [ "$LATEX" = full ]; then apt-get update \
  && apt-get install -y --no-install-recommends texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
-      texlive-xetex latexmk lmodern \
+      texlive-xetex texlive-publishers latexmk lmodern \
+ && if [ "$LATEX" = full ]; then apt-get install -y --no-install-recommends texlive-fonts-extra; fi \
  && rm -rf /var/lib/apt/lists/*; fi
 
 # ffmpeg (about 150 MB more) takes a video's frames in the Library, which its title and description are written

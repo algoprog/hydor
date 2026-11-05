@@ -2,7 +2,7 @@
 // that holds gives a cell its look, a colour scale or data bars show with it), each with its range and a preview; add
 // one for the cells picked, change one (where it applies; a condition and the look it gives, a colour scale of two or
 // three colours at the lowest, middle and highest values, or data bars), move it up or down, or delete it.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Bold, Italic, Plus, Strikethrough, Trash2, Underline } from 'lucide-react';
 import { cleanRanges, type Cond, type CondRule, type CondStyle, type ScalePoint } from '@shared/sheets';
 import { Button, cx, IconButton, Segmented } from '../../../components/ui';
@@ -10,6 +10,7 @@ import { COND_CHOICES, CondFields } from './FilterMenu';
 import { Row, SidePanel, smallInput } from './Panel';
 import { ColorTool } from './Toolbar';
 import { Tool } from '../slides/controls';
+import { tr } from '../../../i18n/runtime';
 
 /** Conditions that look at a range's values together, besides those of one cell. */
 const RANGE_CHOICES: typeof COND_CHOICES = [
@@ -39,15 +40,22 @@ const SCALES: [string, string, string | null][] = [
   ['#ffffff', '#6d9eeb', null],
 ];
 
-/** What a rule says, in a few words, for its line in the list. */
-function summary(rule: CondRule): string {
+/** What a rule says, in a few words, for its line in the list: its words whole, so they translate whole, the values as written. */
+function summary(rule: CondRule): ReactNode {
   if (rule.scale) return 'Colour scale';
   if (rule.bar) return 'Data bars';
   const w = rule.when;
   const c = ALL_CHOICES.find((x) => x.op === w?.op);
   if (!w || !c) return '';
   if (w.op === 'top' || w.op === 'bottom') return `${c.label}: ${w.a ?? 10}${w.b === '%' ? '%' : ''}`;
-  return c.n === 0 ? c.label : c.n === 2 ? `${c.label} ${w.a} and ${w.b}` : `${c.label} ${w.a ?? ''}`;
+  if (c.n === 2) return tr(w.op === 'notBetween' ? `Is not between ${w.a} and ${w.b}` : `Is between ${w.a} and ${w.b}`);
+  return c.n === 0 ? (
+    c.label
+  ) : (
+    <>
+      {c.label} <span translate="no">{w.a ?? ''}</span>
+    </>
+  );
 }
 
 function Preview({ rule }: { rule: CondRule }) {
@@ -103,12 +111,15 @@ export function CondPanel({ rules, picked, narrow, onChange, onClose }: { rules:
     setDraft({ ...draft, style: next });
   };
   const point = (p: ScalePoint | undefined, place: 'min' | 'mid' | 'max', set: (p: ScalePoint | undefined) => void) => {
-    const label = place === 'min' ? 'Lowest' : place === 'mid' ? 'Middle' : 'Highest';
+    // Midpoint, not Middle: Middle is also an alignment, and translates as one.
+    const label = place === 'min' ? 'Lowest' : place === 'mid' ? 'Midpoint' : 'Highest';
+    // Each name whole, so it translates whole.
+    const names = { min: ['Lowest colour', 'Lowest point', 'The lowest point’s number'], mid: ['Middle colour', 'Middle point', 'The middle point’s number'], max: ['Highest colour', 'Highest point', 'The highest point’s number'] }[place];
     const at2 = p?.at ?? (place === 'mid' ? 'pctile' : place);
     return (
       <div className="flex items-center gap-1.5">
         <ColorTool
-          label={`${label} colour`}
+          label={names[0]}
           icon={<span className="h-3.5 w-3.5 rounded-full border border-line-2" style={{ background: p?.color ?? 'transparent' }} />}
           value={p?.color}
           none="None"
@@ -116,7 +127,7 @@ export function CondPanel({ rules, picked, narrow, onChange, onClose }: { rules:
         />
         <span className="w-[62px] shrink-0 text-[12.5px] text-fg-2">{label}</span>
         {p && (
-          <select value={at2} aria-label={`${label} point`} onChange={(e) => set({ ...p, at: e.target.value as ScalePoint['at'], v: p.v ?? 50 })} className={cx(smallInput, 'w-[128px] shrink-0')}>
+          <select value={at2} aria-label={names[1]} onChange={(e) => set({ ...p, at: e.target.value as ScalePoint['at'], v: p.v ?? 50 })} className={cx(smallInput, 'shrink-0')} style={{ width: 128 }}>
             {place !== 'max' && place !== 'mid' && <option value="min">Lowest value</option>}
             {place === 'max' && <option value="max">Highest value</option>}
             <option value="num">Number</option>
@@ -124,7 +135,7 @@ export function CondPanel({ rules, picked, narrow, onChange, onClose }: { rules:
             <option value="pctile">Percentile</option>
           </select>
         )}
-        {p && at2 !== 'min' && at2 !== 'max' && <input value={p.v ?? 50} onChange={(e) => set({ ...p, v: Number(e.target.value) || 0 })} aria-label={`${label} value`} className={cx(smallInput, 'w-0 min-w-0 flex-1')} />}
+        {p && at2 !== 'min' && at2 !== 'max' && <input value={p.v ?? 50} onChange={(e) => set({ ...p, v: Number(e.target.value) || 0 })} aria-label={names[2]} className={cx(smallInput, 'w-0 min-w-0 flex-1')} />}
       </div>
     );
   };

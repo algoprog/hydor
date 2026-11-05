@@ -1,10 +1,13 @@
 // Saved pages: the Pages library in SQLite. Each save is a new version (the oldest go past a count and
-// a size); each page keeps its own small storage (window.hydor.storage) and has a link of its own,
+// a size; an agent's saves of a page in a row, in one turn, are kept as one version: the last one, which says how many
+// saves it holds); each page keeps its own small storage (window.hydor.storage), comments on its blocks (outside its HTML)
+// and its icon (for links to it from other pages), and has a link of its own,
 // signed with the app's key, that opens it on any device without the app's sign-in. A page of another kind
 // (slides, a document, a spreadsheet: kinds.ts) keeps its model's text in place of HTML, and its own page is made
 // from it when it shows; its pictures are kept apart (assets.ts).
 import crypto from 'node:crypto';
 import { STORAGE_LIMITS, VERSION_LIMITS, type PageDataEntry, type PageInfo, type PageVersion } from '../../shared/pages.ts';
+import { applyCommentOps, cleanPageComments, type PageComment } from '../../shared/page-comments.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { signWithKey } from '../links.ts';
@@ -46,6 +49,11 @@ export function initPages(db: DB) {
       primary key (page_id, key)
     );
   `);
+  // An agent's version: the turn it was saved in (its session's, and which of its user's messages it answered), and how
+  // many of its saves in a row it holds (folded into one).
+  const vcols = (db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).map((c) => c.name);
+  if (!vcols.includes('turn')) db.exec('alter table page_versions add column turn text');
+  if (!vcols.includes('steps')) db.exec('alter table page_versions add column steps integer');
   // Its picture in Pages: which version and data it shows (thumbs.ts).
   const cols = (db.prepare('pragma table_info(pages)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('thumb')) db.exec('alter table pages add column thumb text');
@@ -57,10 +65,28 @@ export function initPages(db: DB) {
   if (!cols.includes('space')) db.exec('alter table pages add column space text');
   // Who made a version, when it was someone the project is shared with (server/spaces/share.ts): their name.
   if (!(db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).some((c) => c.name === 'who')) db.exec('alter table page_versions add column who text');
+  // A page's icon (the emoji the page editor puts at its top), for links to it in other pages: kept as each version is
+  // saved, and read once from the pages saved before ('' for none).
+  // Comments on its blocks (shared/page-comments.ts): kept with the page, outside its HTML, not by version.
+  if (!cols.includes('comments')) db.exec('alter table pages add column comments text');
+  if (!cols.includes('icon')) {
+    db.exec('alter table pages add column icon text');
+    const set = db.prepare('update pages set icon = ? where id = ?');
+    const rows = db.prepare('select p.id, v.html from pages p join page_versions v on v.page_id = p.id and v.version = p.version where p.kind is null').all() as { id: string; html: string }[];
+    db.transaction(() => {
+      for (const r of rows) set.run(iconOf(r.html), r.id);
+    })();
+  }
   initAssets(db);
 }
 
 const newId = () => crypto.randomBytes(5).toString('hex');
+
+/** A page's icon: the emoji in its .n-icon (the page editor's), or ''. */
+export function iconOf(html: string): string {
+  const m = /<div[^>]*\bclass="[^"]*\bn-icon\b[^"]*"[^>]*>\s*([^<]{1,16}?)\s*<\/div>/.exec(html.slice(0, 200_000));
+  return m && !/[&<>"]/.test(m[1]) ? m[1] : '';
+}
 const nonce = () => crypto.randomBytes(9).toString('base64url');
 
 export function cleanTitle(t: unknown, fallback = 'Page'): string {
@@ -91,6 +117,7 @@ interface Row {
   kind: string | null;
   app: string | null;
   space: string | null;
+  icon: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -120,6 +147,7 @@ const toInfo = (r: Row): PageInfo => ({
   ...(kindOf(r.kind) ? { kind: r.kind as PageKind } : {}),
   ...(r.app ? { app: r.app } : {}),
   ...(r.space ? { space: r.space } : {}),
+  ...(r.icon ? { icon: r.icon } : {}),
 });
 
 /** The library's pages: a template's screens stay with their template. */
@@ -145,8 +173,16 @@ export function mustPage(db: DB, id: string): PageInfo {
 
 export function versionsOf(db: DB, id: string): PageVersion[] {
   return (
-    db.prepare('select version, title, bytes, created_at, by, who from page_versions where page_id = ? order by version desc').all(id) as { version: number; title: string; bytes: number; created_at: number; by: PageVersion['by']; who: string | null }[]
-  ).map((v) => ({ version: v.version, title: v.title, bytes: v.bytes, createdAt: v.created_at, by: v.by, ...(v.who ? { who: v.who } : {}) }));
+    db.prepare('select version, title, bytes, created_at, by, steps, who from page_versions where page_id = ? order by version desc').all(id) as {
+      version: number;
+      title: string;
+      bytes: number;
+      created_at: number;
+      by: PageVersion['by'];
+      steps: number | null;
+      who: string | null;
+    }[]
+  ).map((v) => ({ version: v.version, title: v.title, bytes: v.bytes, createdAt: v.created_at, by: v.by, ...(v.steps && v.steps > 1 ? { steps: v.steps } : {}), ...(v.who ? { who: v.who } : {}) }));
 }
 
 /** A version as it is kept: a page's HTML, or another kind's text (the current version when `version` is left out). */
@@ -212,7 +248,7 @@ const safeJson = (s: string) => {
 
 const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', notebook: 'Notebook' };
 
-export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null }): PageInfo {
+export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: PageKind; model?: unknown; by: PageVersion['by']; sessionKey?: string; sourceItem?: string; app?: string; space?: string | null; turn?: string }): PageInfo {
   const kind = p.kind ?? 'page';
   const { text: html, sources } = contentOf(db, kind, p);
   const title = cleanTitle(p.title, DEFAULT_TITLE[kind] ?? 'Page');
@@ -233,25 +269,62 @@ export function createPage(db: DB, p: { title: unknown; html?: unknown; kind?: P
       p.app ?? null,
       p.app ? null : (p.space ?? null),
     );
-    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by) values (?, 1, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by);
+    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn) values (?, 1, ?, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by, p.turn ?? null);
+    if (kind === 'page') db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
     noteRefs(db, id, 1, sources);
   })();
   return pageInfo(db, id)!;
 }
 
-/** A new version of a page: it becomes the current one, and its title the page's. `who`: someone the project is shared with made it. */
-export function addVersion(db: DB, id: string, p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; who?: string }): PageInfo {
+/** How long apart an agent's saves in a row may be to be kept as one version. */
+export const FOLD_MS = 5 * 60_000;
+
+/**
+ * A new version of a page: it becomes the current one, and its title the page's. An agent's save in a turn (`turn`: its
+ * session's, answering one message of its user) takes the place of the version before it when that was saved in the
+ * same turn less than FOLD_MS ago: saves in a row are one version (the last), its number still the next one, so an
+ * editor holding the one before hears that a newer one is there. A version the user made, kept or brought back is never
+ * folded into. `onFold` hears which version went. `who`: someone the project is shared with made it (their name).
+ */
+export function addVersion(
+  db: DB,
+  id: string,
+  p: { title?: unknown; html?: unknown; model?: unknown; by: PageVersion['by']; turn?: string; onFold?: (version: number) => void; who?: string },
+): PageInfo {
   const cur = mustPage(db, id);
   const { text: html, sources } = contentOf(db, cur.kind ?? 'page', p);
   const title = p.title === undefined || p.title === null || !String(p.title).trim() ? cur.title : cleanTitle(p.title);
   const now = Date.now();
+  let folded: number | null = null;
   db.transaction(() => {
+    const last = db.prepare('select version, by, turn, created_at, steps from page_versions where page_id = ? order by version desc limit 1').get(id) as
+      | { version: number; by: PageVersion['by']; turn: string | null; created_at: number; steps: number | null }
+      | undefined;
+    const fold = !!last && p.by === 'agent' && !!p.turn && last.by === 'agent' && last.turn === p.turn && last.version === cur.version && now - last.created_at <= FOLD_MS;
     const next = ((db.prepare('select max(version) as v from page_versions where page_id = ?').get(id) as { v: number | null }).v ?? 0) + 1;
-    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, who) values (?, ?, ?, ?, ?, ?, ?, ?)').run(id, next, title, html, Buffer.byteLength(html), now, p.by, p.who ?? null);
+    db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn, steps, who) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+      id,
+      next,
+      title,
+      html,
+      Buffer.byteLength(html),
+      now,
+      p.by,
+      p.turn ?? null,
+      fold ? (last!.steps ?? 1) + 1 : null,
+      p.who ?? null,
+    );
     db.prepare('update pages set title = ?, version = ?, updated_at = ? where id = ?').run(title, next, now, id);
+    if (!cur.kind) db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
     noteRefs(db, id, next, sources);
+    if (fold) {
+      db.prepare('delete from page_versions where page_id = ? and version = ?').run(id, last!.version);
+      dropRefs(db, id, [last!.version]);
+      folded = last!.version;
+    }
     prune(db, id);
   })();
+  if (folded !== null) p.onFold?.(folded);
   return pageInfo(db, id)!;
 }
 
@@ -321,6 +394,30 @@ export function resetPageLink(db: DB, id: string): string {
   mustPage(db, id);
   db.prepare('update pages set link_nonce = ? where id = ?').run(nonce(), id);
   return pageToken(db, id);
+}
+
+// ---- comments on its blocks ------------------------------------------------------------------------------
+
+/** A page's comments (a page of HTML's: other kinds keep theirs in their model). */
+export function pageComments(db: DB, id: string): PageComment[] {
+  const r = db.prepare('select comments from pages where id = ?').get(id) as { comments: string | null } | undefined;
+  if (!r?.comments) return [];
+  try {
+    return cleanPageComments(JSON.parse(r.comments));
+  } catch {
+    return [];
+  }
+}
+
+/** Changes a page's comments (as `by` makes them): the list after them, what could not be done, and the new ones' ids. */
+export function changeComments(db: DB, id: string, ops: unknown, by: 'user' | 'agent'): { list: PageComment[]; notes: string[]; added: string[] } {
+  const p = mustPage(db, id);
+  if (p.kind) throw new HttpError(400, `This page is a ${mustKind(p.kind).noun}: its comments are in it.`);
+  return db.transaction(() => {
+    const out = applyCommentOps(pageComments(db, id), ops, by);
+    db.prepare('update pages set comments = ? where id = ?').run(out.list.length ? JSON.stringify(out.list) : null, id);
+    return out;
+  })();
 }
 
 // ---- storage ------------------------------------------------------------------------------------------
@@ -407,9 +504,14 @@ export function storageMap(db: DB, id: string): Record<string, string> {
   return Object.fromEntries(rows(db, id).map((r) => [r.key, r.value]));
 }
 
-/** Everything a page keeps, for an agent to read (cut to `max` characters). */
+/** What a page's databases hold (shared/page-db.ts), as JSON text by key: shown by a published copy or a page saved as a file. */
+export function dbSeed(db: DB, id: string): Record<string, string> {
+  return Object.fromEntries(rows(db, id).flatMap((r) => (r.key.startsWith('n-db:') ? [[r.key, r.value]] : [])));
+}
+
+/** Everything a page keeps, for an agent to read (cut to `max` characters); its databases are shown apart (dbsForAgent). */
 export function storageText(db: DB, id: string, max = 16_000): string {
-  const list = rows(db, id);
+  const list = rows(db, id).filter((r) => !r.key.startsWith('n-db:'));
   if (!list.length) return '';
   const out = JSON.stringify(Object.fromEntries(list.map((r) => [r.key, JSON.parse(r.value)])), null, 1);
   return out.length > max ? `${out.slice(0, max)}\n… (${list.length} keys; cut here)` : out;

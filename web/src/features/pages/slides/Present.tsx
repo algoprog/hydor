@@ -3,7 +3,7 @@
 // laser pointer, P a pen, E erases its lines, C live captions; Escape ends it). The presenter's view: the slide, the
 // next one, the speaker notes and a timer, with a second window for the audience (on another screen or a projector)
 // that follows it, and that it follows in turn; the presenter's laser, pen and captions show in it too.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Minus, MonitorUp, Pause, Play, Plus, RotateCcw, X } from 'lucide-react';
 import type { Deck } from '@shared/slides';
@@ -79,6 +79,16 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
   const [, tick] = useState(0);
   const [notesSize, setNotesSize] = useState(() => Number(localStorage.getItem('wa.slides.notesSize')) || 22);
   const [audience, setAudience] = useState<Window | null>(null);
+  // The next slide as wide as its place beside the slideshow (up to a point, so the notes keep their room).
+  const nextBox = useRef<HTMLDivElement>(null);
+  const [nextW, setNextW] = useState(320);
+  useLayoutEffect(() => {
+    const el = nextBox.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setNextW(Math.max(160, Math.min(640, Math.floor(el.clientWidth)))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const bc = useMemo(() => new BroadcastChannel(channelOf(pageId)), [pageId]);
   const close = useRef(onClose);
   close.current = onClose;
@@ -179,11 +189,11 @@ export function Presenter({ deck, from, pageId, onClose }: { deck: Deck; from: n
       <div className="flex min-h-0 flex-1 gap-3 p-3 max-md:flex-col">
         <div ref={host} className="relative min-h-0 flex-[1.6] overflow-hidden rounded-xl bg-black" />
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <div className="shrink-0">
+          <div ref={nextBox} className="shrink-0">
             <div className="mb-1 text-[12px] font-medium tracking-wide text-white/50 uppercase">{next ? 'Next' : at.step < at.steps ? 'Next: more on this slide' : 'Next'}</div>
             {next ? (
-              <div className="overflow-hidden rounded-lg ring-1 ring-white/15">
-                <SlideThumb deck={deck} index={next.i} slide={next.s} theme={deck.theme} width={320} fonts={fonts} />
+              <div className="w-fit overflow-hidden rounded-lg ring-1 ring-white/15">
+                <SlideThumb deck={deck} index={next.i} slide={next.s} theme={deck.theme} width={nextW} fonts={fonts} />
               </div>
             ) : (
               <div className="grid h-[120px] place-items-center rounded-lg bg-white/5 text-[13px] text-white/50">{at.step < at.steps ? 'Its next animation' : 'The end of the slideshow'}</div>

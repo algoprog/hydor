@@ -1,8 +1,12 @@
 // Pages as an agent writes them. Claude Code reports a tool call's input while the model writes it
 // (input_json_delta, passed on by the session manager as 'toolstream'); for show_html, save_page and an
 // HTML file written whole (Write), this reads the page's HTML out of that partial JSON as it grows and
-// sends each new piece to the pages showing the session, which draw the page as it comes. Agents that
-// hand over whole calls only (Codex, ACP) show the page once the call is there.
+// sends each new piece to the pages showing the session, which draw the page as it comes. For a document, a
+// deck, a spreadsheet or a LaTeX document being saved (save_doc, save_slides, save_sheet, save_latex) it sends the
+// call's input itself as it grows, to the session's pages and to an editor that has that page open (subscribed to
+// page:<id>), which read it (shared/partial-json.ts) and show the version being written (shared/page-drafts.ts); once
+// the call has run, the draft says which version it saved, or that it saved nothing, and the page shows that. Agents
+// that hand over whole calls only (Codex, ACP) show the page once the call is there.
 import type { PageDraft, PagesEvent } from '../../shared/pages.ts';
 import type { Deps } from '../features/types.ts';
 
@@ -10,16 +14,19 @@ import type { Deps } from '../features/types.ts';
 export interface ToolStream {
   id: string;
   name: string;
-  at: 'start' | 'delta' | 'end';
+  /** result: the call's answer came back (after its tool ran, or without it: refused, or its input not taken). */
+  at: 'start' | 'delta' | 'end' | 'result';
   delta?: string;
   /** At the end: the whole input. */
   input?: Record<string, unknown>;
 }
 
-const PAGE_TOOL = /^mcp__(?:hydor|naget-agent|agent-console)__(show_html|save_page)$/;
+const PAGE_TOOL = /^mcp__(?:hydor|naget-agent|agent-console)__(show_html|save_page|save_doc|save_slides|save_sheet|save_latex)$/;
 const HTML_FILE = /\.html?$/i;
 
 type Kind = PageDraft['tool'];
+/** Saves of another kind than a page of HTML: their drafts are the call's input as it comes. */
+const MODEL = new Set<Kind>(['save_doc', 'save_slides', 'save_sheet', 'save_latex']);
 
 /** Which calls draw a page as they come, and the fields that say what it is. */
 function kindOf(name: string): Kind | null {
@@ -152,6 +159,7 @@ export class JsonFields {
 
 interface Draft extends PageDraft {
   key: string;
+  seq: number;
   json: JsonFields;
   /** How much of `text` the pages have. */
   sent: number;
@@ -170,22 +178,42 @@ const FIELDS: Record<Kind, Set<string>> = {
   show_html: new Set(['title', 'html']),
   save_page: new Set(['id', 'title', 'html']),
   file: new Set(['file_path', 'content']),
+  save_doc: new Set(['id', 'title']),
+  save_slides: new Set(['id', 'title']),
+  save_sheet: new Set(['id', 'title']),
+  save_latex: new Set(['id', 'title']),
 };
 
 /** A file draft shows once its path says it is an HTML file. */
 const showable = (d: Draft) => d.tool !== 'file' || (!!d.path && HTML_FILE.test(d.path));
 
-const info = (d: Draft): Omit<PageDraft, 'text'> => ({ id: d.id, tool: d.tool, title: d.title, path: d.path, pageId: d.pageId, done: d.done, startedAt: d.startedAt });
+const info = (d: Draft): Omit<PageDraft, 'text'> => ({
+  id: d.id,
+  tool: d.tool,
+  title: d.title,
+  path: d.path,
+  pageId: d.pageId,
+  done: d.done,
+  startedAt: d.startedAt,
+  key: d.key,
+  seq: d.seq,
+  ...(d.saved ? { saved: d.saved } : {}),
+  ...(d.failed ? { failed: true } : {}),
+});
 
 function send(deps: Deps, d: Draft) {
   if (d.timer) clearTimeout(d.timer);
   d.timer = null;
   if (!showable(d)) return;
   const from = d.started ? d.sent : 0;
+  d.seq++;
   const data: PagesEvent = { what: 'draft', draft: info(d), from, text: d.text.slice(from) };
   d.started = true;
   d.sent = d.text.length;
-  deps.toSubscribers(d.key, { t: 'feature', id: 'pages', key: d.key, data });
+  const e = { t: 'feature', id: 'pages', key: d.key, data } as const;
+  deps.toSubscribers(d.key, e);
+  // An editor with the page open hears of a save of it too, from whichever session it comes.
+  if (MODEL.has(d.tool) && d.pageId) deps.toSubscribers(`page:${d.pageId}`, e);
 }
 
 function later(deps: Deps, d: Draft) {
@@ -194,7 +222,11 @@ function later(deps: Deps, d: Draft) {
 
 function read(d: Draft) {
   const f = d.json.fields;
-  if (d.tool === 'file') {
+  if (MODEL.has(d.tool)) {
+    d.title = f.get('title') ?? d.title;
+    const id = f.get('id');
+    if (id && /^[a-f0-9]{10}$/.test(id)) d.pageId = id;
+  } else if (d.tool === 'file') {
     d.path = f.get('file_path') ?? d.path;
     d.text = f.get('content') ?? '';
   } else {
@@ -218,11 +250,28 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
   let m = drafts.get(key);
   if (e.at === 'start') {
     if (!m) drafts.set(key, (m = new Map()));
-    m.set(e.id, { id: e.id, key, tool: kind, text: '', done: false, startedAt: Date.now(), json: new JsonFields(FIELDS[kind]), sent: 0, started: false, timer: null });
+    m.set(e.id, { id: e.id, key, tool: kind, text: '', done: false, startedAt: Date.now(), seq: 0, json: new JsonFields(FIELDS[kind]), sent: 0, started: false, timer: null });
     return;
   }
   const d = m?.get(e.id);
+  if (e.at === 'result') {
+    // Answered without saving (a save that ran has settled its draft by now): the page stays as it was.
+    if (!d || !MODEL.has(d.tool) || d.saved || d.failed) return;
+    if (!d.done) setTimeout(() => forget(key, d.id), KEEP_MS).unref();
+    d.done = true;
+    d.failed = true;
+    send(deps, d);
+    return;
+  }
   if (!d || d.done) return;
+  if (e.at === 'delta' && MODEL.has(d.tool)) {
+    if (!e.delta) return;
+    // The input itself, as it comes: the pages read it (its id and title are read here too).
+    d.text += e.delta;
+    if (d.json.feed(e.delta).size) read(d);
+    later(deps, d);
+    return;
+  }
   if (e.at === 'delta') {
     if (!e.delta || !d.json.feed(e.delta).size) return;
     const before = d.text.length;
@@ -238,7 +287,13 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
   const input = e.input ?? {};
   const str = (k: string) => (typeof input[k] === 'string' ? (input[k] as string) : undefined);
   const streamed = d.text.slice(0, d.sent);
-  if (d.tool === 'file') {
+  if (MODEL.has(d.tool)) {
+    d.title = str('title') ?? d.title;
+    const id = str('id')?.trim();
+    if (id && /^[a-f0-9]{10}$/.test(id)) d.pageId = id;
+    // What came in pieces is the input already; a driver that told nothing before the end gives it whole here.
+    if (!d.text) d.text = JSON.stringify(input);
+  } else if (d.tool === 'file') {
     d.path = str('file_path') ?? d.path;
     if (str('content') !== undefined) d.text = str('content')!;
   } else {
@@ -253,19 +308,50 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
   setTimeout(() => forget(key, d.id), KEEP_MS).unref();
 }
 
-/** The turn ended or the agent stopped: drafts still open stop where they are. */
+/** The turn ended or the agent stopped: drafts still open stop where they are; a save that never ran saved nothing. */
 export function endDrafts(deps: Deps, key: string) {
   const m = drafts.get(key);
   if (!m) return;
   for (const d of m.values()) {
-    if (d.done) continue;
+    const unsaved = MODEL.has(d.tool) && !d.saved && !d.failed;
+    if (d.done && !unsaved) continue;
+    if (!d.done) setTimeout(() => forget(key, d.id), KEEP_MS).unref();
     d.done = true;
+    if (unsaved) d.failed = true;
     send(deps, d);
-    setTimeout(() => forget(key, d.id), KEEP_MS).unref();
   }
 }
 
+/**
+ * A save of another kind has run (`tool`, given the page it changes, or none for a new one): its draft, the oldest of
+ * the session's written whole and not settled yet, says the version it saved, or that it saved nothing.
+ */
+export function settleDraft(deps: Deps, key: string, tool: string, pageId: string | null, out: { saved: { pageId: string; version: number } } | { failed: true }) {
+  const m = drafts.get(key);
+  if (!m) return;
+  const d = [...m.values()].find((x) => x.tool === tool && x.done && !x.saved && !x.failed && (x.pageId ?? null) === pageId);
+  if (!d) return;
+  if ('saved' in out) {
+    d.saved = out.saved;
+    d.pageId = out.saved.pageId;
+  } else d.failed = true;
+  send(deps, d);
+}
+
+/**
+ * A draft whole, as far as it was sent: the next piece sent goes on at its end (what came in since goes with that
+ * piece, not here, or the two would not meet and the page would ask for it whole again, piece after piece).
+ */
+const whole = (d: Draft): PageDraft => ({ ...info(d), text: d.started ? d.text.slice(0, d.sent) : '' });
+
 /** A session's drafts as they are now, whole (a page that opens mid-way, or missed a piece). */
 export function draftsOf(key: string): PageDraft[] {
-  return [...(drafts.get(key)?.values() ?? [])].filter(showable).map((d) => ({ ...info(d), text: d.text }));
+  return [...(drafts.get(key)?.values() ?? [])].filter(showable).map(whole);
+}
+
+/** The saves of a page being written now (from any session), whole: an editor that opens it mid-way. */
+export function draftsOfPage(pageId: string): PageDraft[] {
+  const out: PageDraft[] = [];
+  for (const m of drafts.values()) for (const d of m.values()) if (MODEL.has(d.tool) && d.pageId === pageId) out.push(whole(d));
+  return out;
 }

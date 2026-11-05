@@ -1,8 +1,10 @@
-// Small pictures of the page after each browser step, for the step's row in the conversation. A
-// step's answer starts with "Browser step N", which the row uses to find its picture.
+// Small pictures of the page after each browser step, for the step's row in the conversation, with where the
+// step acted on it (N.json beside N.jpg: the agent's clicks, the fields it typed into). A step's answer starts with
+// "Browser step N", which the row uses to find its picture.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { cleanMarks, type StepMark } from '../../shared/pointer.ts';
 import { BROWSER_DIR } from './chrome.ts';
 
 const DIR = path.join(BROWSER_DIR, 'steps');
@@ -30,18 +32,29 @@ export function nextStep(key: string): number {
   return n;
 }
 
-export function saveStep(key: string, n: number, jpeg: string) {
+export function saveStep(key: string, n: number, jpeg: string, marks: StepMark[] = []) {
   const dir = dirOf(key);
   try {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     fs.writeFileSync(path.join(dir, `${n}.jpg`), Buffer.from(jpeg, 'base64'), { mode: 0o600 });
-    if (n % 50 === 0) for (const old of numbers(dir).filter((x) => x <= n - KEEP)) fs.rmSync(path.join(dir, `${old}.jpg`), { force: true });
+    if (marks.length) fs.writeFileSync(path.join(dir, `${n}.json`), JSON.stringify({ marks }), { mode: 0o600 });
+    if (n % 50 === 0) for (const old of numbers(dir).filter((x) => x <= n - KEEP)) for (const ext of ['jpg', 'json']) fs.rmSync(path.join(dir, `${old}.${ext}`), { force: true });
   } catch {}
 }
 
-export function stepFile(key: string, n: number): string | null {
+/** Where a step acted, from its file (none when it has none, or it cannot be read). */
+export function readMarks(file: string | null): StepMark[] {
+  try {
+    return file ? cleanMarks(JSON.parse(fs.readFileSync(file, 'utf8'))) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** A step's picture (jpg), or where it acted on it (json). */
+export function stepFile(key: string, n: number, ext: 'jpg' | 'json' = 'jpg'): string | null {
   if (!Number.isInteger(n) || n <= 0) return null;
-  const f = path.join(dirOf(key), `${n}.jpg`);
+  const f = path.join(dirOf(key), `${n}.${ext}`);
   return fs.existsSync(f) ? f : null;
 }
 

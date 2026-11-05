@@ -2,8 +2,9 @@
 // the words it is on (the one picked right beside them, the others moved up or down to make room); on a narrow screen
 // or a phone, a panel that lists them all, each with the words it was on. A new comment is written in its place in
 // the column (or at the top of the panel). Each has replies, Resolve and Reopen, Edit and Delete; resolved ones show
-// only when asked. A button asks the agent to answer the open comments.
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+// only when asked. A button asks the agent to answer the open comments. Suggested changes (Suggestions.tsx) show among
+// them, each level with what it changes.
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MessageSquare, Sparkles, X } from 'lucide-react';
 import type { Comment } from '@shared/comments';
 import { Button, IconButton, Switch } from '../../../components/ui';
@@ -19,6 +20,13 @@ export interface CommentActions {
   readOnly?: boolean;
 }
 
+/** A card that shows among the comments (a suggested change): its id, where what it is about is down the page, and itself. */
+export interface Extra {
+  id: string;
+  top?: number;
+  node: ReactNode;
+}
+
 /** The new comment being written: where its words are (in the host's coordinates), and what they say. */
 export interface Draft {
   y: number;
@@ -29,6 +37,7 @@ export interface Draft {
 export function CommentsColumn({
   comments,
   tops,
+  extra = [],
   draft,
   onDraft,
   onCancelDraft,
@@ -38,6 +47,8 @@ export function CommentsColumn({
   width,
 }: {
   comments: Comment[];
+  /** Cards that show among the comments, each level with what it is about. */
+  extra?: Extra[];
   /** Where each comment's words start, down the page (none: its words are gone; it goes after the others). */
   tops: Map<string, number>;
   draft: Draft | null;
@@ -51,10 +62,11 @@ export function CommentsColumn({
   const refs = useRef(new Map<string, HTMLDivElement>());
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const items = useMemo(() => {
-    const list: { id: string; top: number; c: Comment | null }[] = comments.map((c, k) => ({ id: c.id, top: tops.get(c.id) ?? 1e9 + k, c }));
+    const list: { id: string; top: number; c: Comment | null; node?: ReactNode }[] = comments.map((c, k) => ({ id: c.id, top: tops.get(c.id) ?? 1e9 + k, c }));
+    extra.forEach((x, k) => list.push({ id: x.id, top: x.top ?? 2e9 + k, c: null, node: x.node }));
     if (draft) list.push({ id: '~draft', top: draft.y, c: null });
     return list.sort((x, y) => x.top - y.top);
-  }, [comments, tops, draft]);
+  }, [comments, tops, draft, extra]);
   // Measured after each render; placed again when a height changed.
   useLayoutEffect(() => {
     const next = new Map<string, number>();
@@ -111,7 +123,9 @@ export function CommentsColumn({
           className="absolute right-0 left-0"
           style={{ top: pos.get(it.id) ?? askH }}
         >
-          {it.c ? (
+          {it.node ? (
+            it.node
+          ) : it.c ? (
             <CommentThread
               comment={it.c}
               active={a.active === it.id}
@@ -137,6 +151,7 @@ export function CommentsColumn({
 export function CommentsPanel({
   comments,
   all,
+  extra = [],
   showResolved,
   setShowResolved,
   draft,
@@ -148,6 +163,8 @@ export function CommentsPanel({
 }: {
   comments: Comment[];
   all: Comment[];
+  /** Cards listed before the comments (suggested changes, in the order they come in the document). */
+  extra?: Extra[];
   showResolved: boolean;
   setShowResolved: (on: boolean) => void;
   draft: Draft | null;
@@ -163,7 +180,10 @@ export function CommentsPanel({
     <div className="flex h-full min-h-0 flex-col" data-keeps-editing>
       <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
         <MessageSquare size={15} className="text-fg-3" />
-        <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-fg">{`${open} open comment${open === 1 ? '' : 's'}`}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-2 truncate text-[13px] font-medium text-fg">
+          {(open > 0 || !extra.length) && <span>{`${open} open comment${open === 1 ? '' : 's'}`}</span>}
+          {extra.length > 0 && <span className={open > 0 ? 'text-fg-3' : undefined}>{`${extra.length} suggestion${extra.length === 1 ? '' : 's'}`}</span>}
+        </div>
         <IconButton label="Close" size="sm" onClick={onClose}>
           <X size={15} />
         </IconButton>
@@ -182,6 +202,9 @@ export function CommentsPanel({
             Ask the agent to answer the comments
           </Button>
         )}
+        {extra.map((x) => (
+          <div key={x.id}>{x.node}</div>
+        ))}
         {comments.map((c) => (
           <div key={c.id}>
             <CommentThread
@@ -196,7 +219,7 @@ export function CommentsPanel({
             />
           </div>
         ))}
-        {!comments.length && !draft && <p className="px-1 py-6 text-center text-[12.5px] leading-relaxed text-fg-3">Pick some words, then Comment (Ctrl+Alt+M), to leave a comment on them.</p>}
+        {!comments.length && !extra.length && !draft && <p className="px-1 py-6 text-center text-[12.5px] leading-relaxed text-fg-3">Pick some words, then Comment (Ctrl+Alt+M), to leave a comment on them.</p>}
       </div>
       {resolved > 0 && (
         <label className="flex shrink-0 cursor-pointer items-center gap-2 border-t border-line px-3 py-2 text-[12.5px] text-fg-2">

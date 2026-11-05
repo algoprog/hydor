@@ -90,7 +90,9 @@ export interface FileOpened {
   /**
    * A LaTeX file's project: its folder, its main file there (the file itself, or the document that reads it), the
    * model's name of the file opened ("main.tex" for the main file), the times of the project's files by their path in
-   * the folder (sent back when it is saved), and whether it is typeset among the folder's files.
+   * the folder (sent back when it is saved), and whether it is typeset among the folder's files. Its comments, which
+   * the app keeps by each file's path, are in the model; saving sends back those it opened with (`comments`), so
+   * what an agent did meanwhile is merged in.
    */
   tex?: { folder: string; main: string; open: string; files: Record<string, number>; inFolder: boolean };
 }
@@ -105,6 +107,8 @@ export interface FileSaved {
   backup?: string;
   /** A LaTeX project's files' times now. */
   files?: Record<string, number>;
+  /** A LaTeX project's comments as the app keeps them now (with what an agent did meanwhile), as the model has them. */
+  comments?: unknown[];
   /** What the file could not keep of this save: "sheets" (a CSV holds one), "formulas" (saved as their values), "formatting". */
   dropped: string[];
 }

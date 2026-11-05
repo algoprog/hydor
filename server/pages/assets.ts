@@ -2,7 +2,8 @@
 // ("naget-asset:<sha>" in a deck), however many versions and decks show it, so a deck's text stays small, every
 // version of it costs only its words, and an agent reading a deck gets no picture data. What the versions of a
 // deck show is noted; a picture nothing shows any more goes a day after (one just added waits for the deck that
-// will show it). A deck's own page (and its exports) gets its pictures put inside it.
+// will show it). A deck's own page (and its exports) gets its pictures put inside it. A deck's videos are noted and
+// swept with its pictures, their files kept apart (videos.ts).
 //
 // Pictures come in as the editor's uploads, as data: addresses, as files of an agent's session, or from the web
 // (public addresses only, bounded in time and size).
@@ -10,11 +11,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ASSET } from '../../shared/slides.ts';
+import { ASSET, VIDEO } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { fetchPage } from '../web/fetch.ts';
+import { initVideos, sweepVideos } from './videos.ts';
 
 /** The largest picture kept. */
 export const MAX_ASSET = 12 * 1024 * 1024;
@@ -36,6 +38,7 @@ export function initAssets(db: DB) {
     );
     create index if not exists page_asset_refs_sha on page_asset_refs(sha);
   `);
+  initVideos(db);
 }
 
 const MIMES: Record<string, string> = { png: 'image/png', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
@@ -72,10 +75,13 @@ export function assetDataUrl(db: DB, sha: string): string | null {
   return a ? `data:${a.mime};base64,${a.data.toString('base64')}` : null;
 }
 
-/** The pictures a version of a deck shows: noted, so they stay while it is kept. */
+/** The pictures (and videos, videos.ts) a version of a deck shows: noted, so they stay while it is kept. */
 export function noteRefs(db: DB, pageId: string, version: number, sources: string[]) {
   const put = db.prepare('insert or ignore into page_asset_refs (page_id, version, sha) values (?, ?, ?)');
-  for (const s of sources) if (s.startsWith(ASSET)) put.run(pageId, version, s.slice(ASSET.length));
+  for (const s of sources) {
+    if (s.startsWith(ASSET)) put.run(pageId, version, s.slice(ASSET.length));
+    else if (s.startsWith(VIDEO)) put.run(pageId, version, s.slice(VIDEO.length));
+  }
 }
 
 /** Versions went (or a whole page): what they showed is no longer noted, and pictures nothing shows go after a day. */
@@ -89,6 +95,7 @@ export function dropRefs(db: DB, pageId: string, versions?: number[]) {
 
 export function sweepAssets(db: DB) {
   db.prepare('delete from page_assets where created_at < ? and not exists (select 1 from page_asset_refs r where r.sha = page_assets.sha)').run(Date.now() - 86_400_000);
+  sweepVideos(db);
 }
 
 /** A path an agent gave: from its session's folder, from home (~), or absolute. */

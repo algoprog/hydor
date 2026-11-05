@@ -1,6 +1,7 @@
 // The Library's shared parts: a page's picture (or its first letter until the picture is ready), and the dialogs
 // to rename a page, publish one (or a folder), and make a new page, deck, document, spreadsheet or LaTeX document
-// (from a starting point, a file, or by asking an agent), in a space or in none; and a published site's row.
+// (from a starting point, a file, or by asking an agent), in a space or in none, or upload files of yours into the
+// Library (each made what it is: uploads.ts); and a published site's row.
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppWindow, FileText, Globe, GlobeLock, NotebookText, Presentation, Sheet, Sigma, Sparkles, Upload } from 'lucide-react';
 import type { PageInfo, SiteInfo, SiteVisibility } from '@shared/pages';
@@ -20,6 +21,7 @@ import { useSpaces } from '../spaces/state';
 import { SiteLink, VISIBILITY } from './cards';
 import { usePagesStore } from './state';
 import { STARTERS } from './templates';
+import { pickFiles } from './uploads';
 import { SlideThumb } from './slides/Thumb';
 import { TexTemplatePicker } from './latex/TemplatePicker';
 
@@ -175,7 +177,7 @@ const ASK_FOR: Record<NewKind, string> = {
   tex: 'Write me a LaTeX document and keep it in my Library: ',
   notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ',
 };
-const OPENS: Partial<Record<NewKind, string>> = { doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip', notebook: '.ipynb' };
+const OPENS: Partial<Record<NewKind, string>> = { slides: '.pptx,.ppsx,.potx,.pptm', doc: '.docx,.docm,.dotx,.md,.markdown,.txt,.html,.htm', sheet: '.xlsx,.ods,.csv,.tsv', tex: '.tex,.ltx,.zip', notebook: '.ipynb' };
 const KIND_TILES: { value: NewKind; label: string; icon: ReactNode }[] = [
   { value: 'page', label: 'A page', icon: <AppWindow size={16} /> },
   { value: 'slides', label: 'Slides', icon: <Presentation size={16} /> },
@@ -239,7 +241,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
       setBusy(false);
     }
   };
-  /** A Word document, a spreadsheet or a CSV opened as a page of its kind. */
+  /** A PowerPoint deck, a Word document, a spreadsheet or a CSV opened as a page of its kind. */
   const openFile = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -273,6 +275,10 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
       width={600}
       footer={
         <>
+          {/* Files of yours instead, as many as you pick, each made what it is, in the project picked below. */}
+          <Button variant="ghost" icon={<Upload size={14} />} onClick={() => pickFiles(where, onClose)} title="Add files of yours: documents, spreadsheets, slides, pictures, videos and sounds" className="mr-auto">
+            Upload files
+          </Button>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
@@ -351,15 +357,20 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }
                 );
               })}
             </div>
-            <Segmented<Ratio>
-              size="sm"
-              value={ratio}
-              onChange={setRatio}
-              options={[
-                { value: '16:9', label: 'Wide (16:9)' },
-                { value: '4:3', label: 'Standard (4:3)' },
-              ]}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Segmented<Ratio>
+                size="sm"
+                value={ratio}
+                onChange={setRatio}
+                options={[
+                  { value: '16:9', label: 'Wide (16:9)' },
+                  { value: '4:3', label: 'Standard (4:3)' },
+                ]}
+              />
+              <Button size="sm" variant="secondary" icon={<Upload size={14} />} disabled={busy} onClick={openFile}>
+                Open a PowerPoint file
+              </Button>
+            </div>
           </>
         )}
         {kind === 'tex' && (

@@ -9,7 +9,7 @@
 // Web Animations API on the parts (or their paragraphs); a slide's build is its click groups, each started by a
 // click (the first may start by itself), the effects within one timed "with" or "after" the one before. Morph moves
 // the parts two slides share from where they were to where they are. Equations are drawn by KaTeX where it is (the
-// app gives its own; a deck's page loads it), else shown as their LaTeX. While presenting, a laser pointer, a pen
+// app gives its own; a deck's page has each drawn by the server's), else shown as their LaTeX. While presenting, a laser pointer, a pen
 // and live captions (the browser's speech recognition, where it has one) are on the keys L, P and C.
 import type { Anim, Deck, El, IconNode, Para, Run, Slide, TextProps, Theme } from './slides.ts';
 
@@ -32,6 +32,8 @@ export interface DrawOpts {
   asset?: (sha: string) => string;
   /** Where a picture on the web is fetched from (the app's own pages may not load the web's). */
   web?: (url: string) => string;
+  /** Where a video the app keeps is ("naget-video:<sha>" → its address). */
+  video?: (sha: string) => string;
   /** The editor's hints in the user's language ("Click to add a title"). */
   hint?: (s: string) => string;
   /** The slide as its build leaves it after `step` clicks (Infinity: all of it, as printed). */
@@ -101,6 +103,8 @@ export interface SlidesRuntime {
   morphPairs(a: Slide, b: Slide): [El, El][];
   /** A deck's page: draws the deck from its JSON in #n-deck, as a viewer, every slide to print, or its first slide still (its picture). */
   boot(cfg: { mode: 'viewer' | 'print' | 'still' }): void;
+  /** The equations the server drew into the page (#n-math: each formula's KaTeX, by its LaTeX), as what draws them; none without. */
+  maths(): KatexLike | undefined;
 }
 
 /** Names of fonts with their CSS families, which the runtime is given (it cannot import). */
@@ -199,6 +203,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     '.ns-tex{font:400 28px/1.3 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;opacity:.8}',
     '.ns-video{position:absolute;inset:0;overflow:hidden;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center}',
     '.ns-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}',
+    '.ns-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;outline:none}',
     '.ns-play{width:96px;height:96px;border-radius:50%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 24px rgba(0,0,0,.35);pointer-events:none}',
     '.ns-play svg{width:44px;height:44px;margin-left:6px;fill:#fff}',
     '.ns-from{position:absolute;left:14px;bottom:10px;font:600 18px/1 system-ui,sans-serif;color:#fff;opacity:.85;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}',
@@ -227,7 +232,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     '.ns-gridon .ns-grid{display:grid}.ns-viewer.ns-gridon .ns-stage{display:none}',
     '.ns-thumb{position:relative;overflow:hidden;border-radius:8px;cursor:pointer;box-shadow:0 0 0 1px rgba(127,127,127,.35);background:#000}',
     '.ns-thumb.ns-cur{box-shadow:0 0 0 3px var(--n-accent,#2f6fec)}',
-    '.ns-thumb span{position:absolute;left:6px;bottom:4px;font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8)}',
+    // The thumbnail's own number, not the spans of the slide drawn in it (its words, its equations).
+    '.ns-thumb>span{position:absolute;left:6px;bottom:4px;font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8)}',
     '.ns-end{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:rgba(255,255,255,.75);font-size:15px;z-index:3}',
     // The presenter's tools: the laser, the pen's lines, the captions, and their buttons.
     '.ns-ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}',
@@ -243,6 +249,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     '.ns-pen.ns-on{box-shadow:0 0 0 2px #fff}',
     // Printing: a page per slide.
     '.ns-print{display:none}',
+    // A page made only to be printed (a PDF, the slides' pictures) shows its slides on the screen too.
+    '.ns-print.ns-onscreen{display:block}',
     '@media print{.ns-printing>*:not(.ns-print){display:none!important}.ns-print{display:block!important}.ns-pg{break-after:page;page-break-after:always;overflow:hidden;position:relative}.ns-pg:last-child{break-after:auto;page-break-after:auto}}',
     '@media (prefers-reduced-motion:reduce){.ns-full .ns-bar{transition:none}}',
   ].join('\n');
@@ -633,22 +641,52 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     const by = ay + y2;
     const ink = color(l.color, t, color('fg', t, '#000'));
     const root = svg('svg', { class: 'ns-shape', viewBox: `0 0 ${box.w} ${box.h}` });
-    const ang = Math.atan2(by - ay, bx - ax);
+    // Its path: straight, or an elbow connector's right angles (as shared/slides.ts elbowPoints makes them).
+    let pts = [
+      [ax, ay],
+      [bx, by],
+    ];
+    if (l.route === 'elbow') {
+      const across = (at: unknown) => at === 'l' || at === 'r';
+      const h1 = l.from ? across(l.from.at) : l.to ? across(l.to.at) : true;
+      const h2 = l.to ? across(l.to.at) : h1;
+      const mx = (ax + bx) / 2;
+      const my = (ay + by) / 2;
+      pts =
+        h1 && h2
+          ? [[ax, ay], [mx, ay], [mx, by], [bx, by]]
+          : !h1 && !h2
+            ? [[ax, ay], [ax, my], [bx, my], [bx, by]]
+            : h1
+              ? [[ax, ay], [bx, ay], [bx, by]]
+              : [[ax, ay], [ax, by], [bx, by]];
+      // A bend where the path does not turn (ends level with each other) is no bend.
+      pts = pts.filter((q, i) => i === 0 || q[0] !== pts[i - 1][0] || q[1] !== pts[i - 1][1]);
+      if (pts.length < 2) pts = [
+        [ax, ay],
+        [bx, by],
+      ];
+    }
+    const last = pts.length - 1;
+    // The arrows point along the first and the last stretch.
+    const angS = Math.atan2(pts[1][1] - ay, pts[1][0] - ax);
+    const angE = Math.atan2(by - pts[last - 1][1], bx - pts[last - 1][0]);
     const head = sw * 3.2 + 4;
     const cut = (cap: string | undefined) => (cap === 'arrow' ? head * 0.8 : 0);
-    const sx = ax + Math.cos(ang) * cut(l.start);
-    const sy = ay + Math.sin(ang) * cut(l.start);
-    const ex = bx - Math.cos(ang) * cut(l.end);
-    const ey = by - Math.sin(ang) * cut(l.end);
-    root.appendChild(svg('line', { x1: sx, y1: sy, x2: ex, y2: ey, stroke: ink, 'stroke-width': sw, 'stroke-linecap': l.dash === 'dot' ? 'round' : 'butt', ...(l.dash === 'dash' ? { 'stroke-dasharray': `${sw * 3} ${sw * 2}` } : l.dash === 'dot' ? { 'stroke-dasharray': `0.1 ${sw * 2}` } : {}) }));
+    const drawn = pts.map((q) => [...q]);
+    drawn[0] = [ax + Math.cos(angS) * cut(l.start), ay + Math.sin(angS) * cut(l.start)];
+    drawn[last] = [bx - Math.cos(angE) * cut(l.end), by - Math.sin(angE) * cut(l.end)];
+    const stroke = { stroke: ink, 'stroke-width': sw, 'stroke-linecap': l.dash === 'dot' ? 'round' : 'butt', ...(l.dash === 'dash' ? { 'stroke-dasharray': `${sw * 3} ${sw * 2}` } : l.dash === 'dot' ? { 'stroke-dasharray': `0.1 ${sw * 2}` } : {}) };
+    if (drawn.length === 2) root.appendChild(svg('line', { x1: drawn[0][0], y1: drawn[0][1], x2: drawn[1][0], y2: drawn[1][1], ...stroke }));
+    else root.appendChild(svg('polyline', { points: drawn.map((q) => q.join(',')).join(' '), fill: 'none', 'stroke-linejoin': 'miter', ...stroke }));
     const cap = (kind: string | undefined, x: number, y: number, a: number) => {
       if (kind === 'arrow') {
         const p = (d: number, s: number) => `${x + Math.cos(a) * d - Math.sin(a) * s},${y + Math.sin(a) * d + Math.cos(a) * s}`;
         root.appendChild(svg('path', { d: `M${p(0, 0)}L${p(-head, head * 0.55)}L${p(-head, -head * 0.55)}Z`, fill: ink }));
       } else if (kind === 'dot') root.appendChild(svg('circle', { cx: x, cy: y, r: sw * 1.6 + 1, fill: ink }));
     };
-    cap(l.end, bx, by, ang);
-    cap(l.start, ax, ay, ang + Math.PI);
+    cap(l.end, bx, by, angE);
+    cap(l.start, ax, ay, angS + Math.PI);
     return { root, box };
   };
 
@@ -689,9 +727,36 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     inner.classList.add('ns-tex');
   };
   const PLAYER = /^https:\/\/(www\.youtube-nocookie\.com\/embed\/[\w-]{6,20}|player\.vimeo\.com\/video\/\d{4,12})$/;
+  /** Where a video the app keeps plays from: the app's address of it, its signed one (a page without the app's sign-in), or itself inside a page; '' for none. */
+  const keptUrl = (s: unknown, o: DrawOpts): string => {
+    if (typeof s !== 'string') return '';
+    const k = /^naget-video:([a-f0-9]{16,64})$/.exec(s);
+    if (k) return o.video ? o.video(k[1]) : '';
+    if (/^\/pg\/video\/[a-f0-9]{16,64}\/[A-Za-z0-9_-]{16,64}$/.test(s)) return s;
+    if (/^data:video\/(mp4|webm|quicktime);base64,[A-Za-z0-9+/=]+$/.test(s)) return s;
+    return '';
+  };
+  /** A video the app keeps, playing in its box from its start, with the browser's own controls. */
+  const playKept = (box: HTMLElement, v: Extract<El, { type: 'video' }>, url: string) => {
+    if (!url || box.querySelector('video')) return;
+    const f = el('video');
+    f.src = url;
+    f.controls = true;
+    f.autoplay = true;
+    f.playsInline = true;
+    f.preload = 'auto';
+    if (v.muted) f.muted = true;
+    if (v.loop) f.loop = true;
+    const start = n(v.start, 0);
+    if (start > 0) f.addEventListener('loadedmetadata', () => (f.currentTime = start), { once: true });
+    box.textContent = '';
+    box.appendChild(f);
+    void f.play?.()?.catch(() => {});
+  };
   /** A video's player, playing from its start. */
-  const playVideo = (box: HTMLElement, v: Extract<El, { type: 'video' }>) => {
-    if (!PLAYER.test(v.src) || box.querySelector('iframe')) return;
+  const playVideo = (box: HTMLElement, v: Extract<El, { type: 'video' }>, o: DrawOpts = {}) => {
+    if (!PLAYER.test(v.src)) return playKept(box, v, keptUrl(v.src, o));
+    if (box.querySelector('iframe')) return;
     const yt = v.src.includes('youtube');
     const q = new URLSearchParams({
       autoplay: '1',
@@ -898,6 +963,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       d.appendChild(box);
     } else if (e.type === 'video') {
       const box = el('div', 'ns-video');
+      const online = PLAYER.test(e.src);
       const still = e.poster ? src(e.poster, o) : /youtube-nocookie\.com\/embed\/([\w-]{6,20})$/.test(e.src) ? src(`https://i.ytimg.com/vi/${e.src.split('/').pop()}/hqdefault.jpg`, o) : '';
       if (still) box.style.backgroundImage = `url("${still}")`;
       if (e.radius) box.style.borderRadius = px(n(e.radius, 0));
@@ -905,15 +971,19 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       const ic = svg('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
       ic.appendChild(svg('path', { d: 'M7 4.5v15l13-7.5z' }));
       play.appendChild(ic);
-      const from = el('span', 'ns-from');
-      from.textContent = e.src.includes('vimeo') ? 'Vimeo' : 'YouTube';
-      box.append(play, from);
-      if (o.play && PLAYER.test(e.src)) {
+      box.append(play);
+      // Where an online video comes from; one the app keeps is the deck's own.
+      if (online) {
+        const from = el('span', 'ns-from');
+        from.textContent = e.src.includes('vimeo') ? 'Vimeo' : 'YouTube';
+        box.append(from);
+      }
+      if (o.play && (online || keptUrl(e.src, o))) {
         box.dataset.video = '1';
         if (e.autoplay) box.dataset.autoplay = '1';
         box.addEventListener('click', (ev) => {
           ev.stopPropagation();
-          playVideo(box, e);
+          playVideo(box, e, o);
         });
       }
       d.appendChild(box);
@@ -1409,7 +1479,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       ...(o.words ?? {}),
     };
     // What every slide is drawn with here: videos play when clicked.
-    const pass: DrawOpts = { asset: o.asset, web: o.web, hint: o.hint, katex: o.katex, locale: o.locale, play: true };
+    const pass: DrawOpts = { asset: o.asset, web: o.web, video: o.video, hint: o.hint, katex: o.katex, locale: o.locale, play: true };
     const order = deck.slides.map((s, i) => ({ s, i })).filter((x) => o.withHidden || !x.s.hidden);
     const list = order.length ? order : deck.slides.map((s, i) => ({ s, i }));
     const root = el('div', `ns-show ${o.mode === 'full' ? 'ns-full' : 'ns-viewer'}`);
@@ -1595,9 +1665,10 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       const walk = (els: El[]) => {
         for (const e of els ?? []) {
           if (e.type === 'group') walk(e.els);
-          else if (e.type === 'video' && e.autoplay && win.origin !== 'null') {
+          // An online player cannot run in a page of its own origin (a deck's page): there, only the app's own videos start.
+          else if (e.type === 'video' && e.autoplay && (win.origin !== 'null' || !PLAYER.test(e.src))) {
             const box = root.querySelector<HTMLElement>(`.ns-el[data-id="${CSS.escape(e.id)}"] > .ns-video`);
-            if (box) playVideo(box, e);
+            if (box) playVideo(box, e, pass);
           }
         }
       };
@@ -1780,7 +1851,7 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
           const th = el('div', 'ns-thumb');
           th.dataset.i = String(x.i);
           th.style.aspectRatio = `${W} / ${SH}`;
-          const sl = slide(deck, x.i, { asset: o.asset, web: o.web, katex: o.katex, locale: o.locale });
+          const sl = slide(deck, x.i, { asset: o.asset, web: o.web, video: o.video, katex: o.katex, locale: o.locale });
           sl.style.transformOrigin = '0 0';
           sl.style.position = 'absolute';
           th.appendChild(sl);
@@ -2031,6 +2102,8 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
       const k = e.key;
+      // Space on a video that was clicked plays or pauses it (its own controls'), and the slideshow stays.
+      if (tag === 'VIDEO' && k === ' ') return;
       let hit = true;
       if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown' || k === ' ' || k === 'n' || k === 'N') {
         if (typed) {
@@ -2135,6 +2208,25 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
   };
 
   // ---- a deck's own page --------------------------------------------------------------------------------------------
+  /**
+   * The page's equations as the server drew them with its own KaTeX: what the server made of each formula (never the
+   * deck's own words) goes in as it is. A formula it did not draw shows as its LaTeX.
+   */
+  const maths = (): KatexLike | undefined => {
+    let drawn: Record<string, unknown> = {};
+    try {
+      drawn = JSON.parse(doc.getElementById('n-math')?.textContent ?? '{}') ?? {};
+    } catch {}
+    if (!drawn || typeof drawn !== 'object' || !Object.keys(drawn).length) return undefined;
+    return {
+      render(tex, into) {
+        const html = Object.prototype.hasOwnProperty.call(drawn, tex) ? drawn[tex] : undefined;
+        if (typeof html !== 'string') throw new Error('Not drawn');
+        into.innerHTML = html;
+      },
+    };
+  };
+
   const boot = (cfg: { mode: 'viewer' | 'print' | 'still' }) => {
     const data = doc.getElementById('n-deck');
     let deck: Deck;
@@ -2146,9 +2238,11 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     }
     style();
     const body = doc.body;
+    // Its equations, drawn by the server (an older page loaded KaTeX itself, which the runtime finds on the window).
+    const katex = maths();
     if (cfg.mode === 'still') {
       const first = Math.max(0, deck.slides.findIndex((x) => !x.hidden));
-      const one = slide(deck, first);
+      const one = slide(deck, first, { katex });
       body.style.margin = '0';
       body.appendChild(one);
       fit(one);
@@ -2159,7 +2253,11 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
       return;
     }
     if (cfg.mode === 'print') {
-      print(body, deck);
+      print(body, deck, { katex });
+      // Shown, not only in print: laid out, its words fitted, and its fonts and pictures loaded before it prints (hidden until
+      // then, a PDF would have none of the equations, nor the stills of videos from the web).
+      body.querySelector('.ns-print')?.classList.add('ns-onscreen');
+      fit(body);
       doc.fonts?.ready.then(() => {
         fitCache.clear();
         fit(body);
@@ -2169,13 +2267,13 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     const wrap = el('div', 'ns-wrap');
     body.appendChild(wrap);
     if ((win as unknown as { hydor?: { fill?: boolean } }).hydor?.fill ?? win.parent === win) body.classList.add('ns-filled');
-    const s = show(wrap, deck, { mode: 'viewer', keys: true });
+    const s = show(wrap, deck, { mode: 'viewer', keys: true, katex });
     // Printing from the page: every slide, a page each.
     let printed = false;
     win.addEventListener('beforeprint', () => {
       if (printed) return;
       printed = true;
-      print(body, deck);
+      print(body, deck, { katex });
     });
     // In full screen the slideshow takes the whole screen, its controls on hover.
     doc.addEventListener('fullscreenchange', () => {
@@ -2197,5 +2295,5 @@ export function slidesRuntime(win: Window, fonts: FontTable): SlidesRuntime {
     });
   };
 
-  return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot };
+  return { css, style, slide, part, words, fit, read, show, print, steps, morphPairs, boot, maths };
 }

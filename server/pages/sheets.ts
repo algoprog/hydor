@@ -14,6 +14,8 @@ import {
   bookOutline,
   bookText,
   borderOf,
+  chartBox,
+  chartParts,
   CELL_FONTS,
   codeColor,
   cellsFromRows,
@@ -29,6 +31,7 @@ import {
   FONT_PT,
   formatValue,
   formulaFromFile,
+  keyOf,
   formulaProblem,
   isError,
   replaceNames,
@@ -43,6 +46,7 @@ import {
   refName,
   ROW_H,
   SHEET_LIMITS,
+  sheetSizes,
   shiftFormula,
   spills,
   textOn,
@@ -51,19 +55,27 @@ import {
   type Calc,
   type Cell,
   type CellStyle,
+  type CondRule,
   type Rect,
   type Scalar,
   type Sheet,
+  type SheetChart,
+  type SheetComment,
+  type Validation,
   type Workbook,
 } from '../../shared/sheets.ts';
+import { authorForAgent, newCommentId } from '../../shared/comments.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { all, att, kid, kids, parseXml, patt, scan, textOf, type El } from '../documents/xml.ts';
 import { resolvePart, Zip } from '../documents/zip.ts';
-import { chartData, chartSvg } from '../../shared/sheet-chart.ts';
+import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
 import { CondFormats, hiddenCols, hiddenRows, isTicked, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { coreXml, esc as xesc, relsXml, XML_HEAD, zipParts } from './ooxml.ts';
-import { chartXml, condXml, drawingXml, Dxfs, filterXml, mergesXml, notesXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readValidation, validationXml } from './sheet-parts.ts';
+import { chartXml, commentsXml, condXml, drawingXml, Dxfs, filterXml, isListColor, isListsSheet, listFromSheet, listsSheet, mergesXml, namedAuthors, personsXml, readCharts, readConditional, readDxfs, readFilter, readNotes, readPersons, readThreaded, readValidation, validationXml } from './sheet-parts.ts';
+import { joinRects, odfFormula, odfText, odsCondStyles, odsConditional, odsNote, odsValidations } from './sheet-ods.ts';
+import { officeFont } from './word-fonts.ts';
+import { SHEET_EDITS_HELP } from '../../shared/sheet-edits.ts';
 
 export { isBookText } from '../../shared/sheets.ts';
 
@@ -124,12 +136,18 @@ const sheetNamed = (b: Workbook, name: unknown) => (typeof name === 'string' && 
  * file of the session to fill it from (file: "data.csv": CSV, TSV, XLSX or ODS; sheet: which of the file's), and
  * the workbook may come whole from one (file at the top). What was left out is said in `notes`, for the agent.
  */
-export async function agentBook(input: unknown, cwd: string): Promise<{ book: Workbook; text: string; notes: string[] }> {
+export async function agentBook(input: unknown, cwd: string, prev?: Workbook): Promise<{ book: Workbook; text: string; notes: string[] }> {
   const notes: string[] = [];
   let v: unknown = input;
+  // Comments are the user's and agents' threads: they come from the version this changes (and from files), never as an
+  // agent sends them back; an agent answers, resolves or adds them with `comments`, a list of changes.
+  let ops: unknown;
   if (isObj(v)) {
     v = { ...v };
     const top = v as Obj;
+    ops = top.comments;
+    delete top.comments;
+    if (Array.isArray(top.sheets)) top.sheets = (top.sheets as unknown[]).map((x) => (isObj(x) && 'comments' in x ? Object.fromEntries(Object.entries(x).filter(([k]) => k !== 'comments')) : x));
     if (typeof top.file === 'string' && top.file.trim()) {
       const got = await loadFile(top.file, cwd);
       notes.push(...got.notes.map((n) => `${got.name}: ${n}`));
@@ -166,11 +184,79 @@ export async function agentBook(input: unknown, cwd: string): Promise<{ book: Wo
   } catch (e) {
     throw new Error(`${(e as Error).message} See save_sheet's description for the workbook's shape.`);
   }
-  const text = bookText(book);
-  if (Buffer.byteLength(text) > MAX_BOOK) throw new Error(`The spreadsheet is over ${MAX_BOOK / 1024 / 1024} MB as it is kept; make it smaller (fewer cells, or shorter words).`);
+  for (const sh of book.sheets) {
+    const was = prev?.sheets.find((x) => x.id === sh.id) ?? prev?.sheets.find((x) => x.name.toLowerCase() === sh.name.toLowerCase());
+    if (was?.comments?.length) sh.comments = was.comments;
+  }
+  commentOps(book, ops, notes);
   const bad = formulaIssues(book);
   if (bad.length) notes.push(`These formulas cannot be read and show #ERROR!: ${bad.join('; ')}.`);
+  // A chart whose range it cannot draw from is kept, and says why in its place: the agent hears it too.
+  for (const sh of book.sheets)
+    for (const ch of sh.charts ?? []) {
+      const why = chartProblem(book, ch);
+      if (why) notes.push(`The chart${ch.title ? ` “${ch.title}”` : ''} on “${sh.name}” cannot draw from ${ch.range}: ${why}`);
+    }
+  const text = bookText(book);
+  if (Buffer.byteLength(text) > MAX_BOOK) throw new Error(`The spreadsheet is over ${MAX_BOOK / 1024 / 1024} MB as it is kept; make it smaller (fewer cells, or shorter words).`);
   return { book, text, notes };
+}
+
+/**
+ * An agent's changes to comments (save_sheet's comments): {id, reply} answers one, {id, resolve: true} or {id, reopen:
+ * true} resolves or reopens it, {id, delete: true} takes it out, {cell, text} (sheet: which, the first unless said)
+ * adds one of the agent's on a cell, a reply where the cell has one already. What it could not do is said in `notes`.
+ */
+function commentOps(book: Workbook, ops: unknown, notes: string[]) {
+  if (ops === undefined || ops === null) return;
+  if (!Array.isArray(ops)) return void notes.push('comments must be a list of changes, such as [{"id": "c1", "reply": "…"}]: they were left as they were.');
+  const now = Date.now();
+  const find = (id: string) => {
+    for (const sh of book.sheets) for (const c of sh.comments ?? []) if (c.id === id) return { sh, c };
+    return null;
+  };
+  const clean = (x: unknown) => (typeof x === 'string' ? x.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, 4000) : '');
+  for (const raw of ops.slice(0, 500)) {
+    const op = isObj(raw) ? raw : {};
+    const id = typeof op.id === 'string' ? op.id.trim() : '';
+    const reply = (c: SheetComment, t: string) => (c.replies = [...(c.replies ?? []), { id: `${c.id}r${(c.replies?.length ?? 0) + 1}${now.toString(36).slice(-3)}`, by: 'agent' as const, text: t, at: now }].slice(-50));
+    const got = id ? find(id) : null;
+    if (got) {
+      const { sh, c } = got;
+      if (op.delete === true) {
+        sh.comments = sh.comments!.filter((x) => x !== c);
+        if (!sh.comments.length) delete sh.comments;
+        continue;
+      }
+      if (clean(op.reply)) reply(c, clean(op.reply));
+      if (op.resolve === true || op.resolved === true) c.resolved = true;
+      if (op.reopen === true || op.resolved === false) delete c.resolved;
+      if (!clean(op.reply) && op.resolve === undefined && op.resolved === undefined && op.reopen === undefined && clean(op.text)) notes.push(`Comment ${id} is there already: answer it with "reply", not "text".`);
+      continue;
+    }
+    if (id && (op.delete === true || clean(op.reply) || op.resolve !== undefined || op.reopen !== undefined)) {
+      notes.push(`There is no comment ${id} to change: get_page lists them.`);
+      continue;
+    }
+    const words = clean(op.text);
+    const p = typeof op.cell === 'string' ? parseRef(op.cell.replace(/\$/g, '').trim().toUpperCase()) : null;
+    const sh = typeof op.sheet === 'string' ? book.sheets.find((x) => x.name.toLowerCase() === String(op.sheet).trim().toLowerCase()) : book.sheets[0];
+    if (!words) continue;
+    if (!p || !sh || p.r >= SHEET_LIMITS.rows || p.c >= SHEET_LIMITS.cols) {
+      notes.push(`A comment needs a cell (and a sheet that is there): "${words.slice(0, 40)}" was not added.`);
+      continue;
+    }
+    const cell = refName(p.r, p.c);
+    const had = sh.comments?.find((c) => c.cell === cell);
+    if (had) {
+      reply(had, words);
+      delete had.resolved;
+      notes.push(`${sh.name}!${cell} has a comment already (${had.id}): yours was added to it as a reply.`);
+      continue;
+    }
+    const nid = /^[A-Za-z0-9_-]{1,40}$/.test(id) && !find(id) ? id : newCommentId();
+    sh.comments = [...(sh.comments ?? []), { id: nid, by: 'agent' as const, text: words, at: now, cell }].sort((a, b) => keyOf(a.cell) - keyOf(b.cell));
+  }
 }
 
 /** Formulas that cannot be read, with where they are (the first few). */
@@ -232,10 +318,36 @@ export function bookForAgent(text: string): string {
     'Outline:',
     bookOutline(book, calc),
     ...(results.length ? ['', `What its formulas give${size > 20_000 ? ' (the first ones)' : ''}: ${results.join('; ')}`] : []),
+    ...commentsForAgent(book),
+    ...(() => {
+      // Charts that cannot draw from their ranges, and why (each is kept, saying so in its place).
+      const why = book.sheets.flatMap((sh) => (sh.charts ?? []).flatMap((ch) => (chartProblem(book, ch) ? [`“${sh.name}” ${ch.range}: ${chartProblem(book, ch)}`] : [])));
+      return why.length ? ['', `Charts that cannot draw: ${why.join('; ')}`] : [];
+    })(),
     '',
-    'The workbook as it is kept: each sheet with its id, name, cells by name (v: a value, f: a formula without "=", s: its style, note: its note), cols and rows (widths and heights in px, hidden, by index from 0), freeze, merges, filter, conditional (formatting), validation (what cells take: lists, checkboxes, ratings…) and charts. To change it, send the whole workbook back with save_sheet and this id, each sheet with its id and the parts you keep; cells you leave out are emptied.',
+    'The workbook as it is kept: each sheet with its id, name, cells by name (v: a value, f: a formula without "=", s: its style, note: its note), cols and rows (widths and heights in px, hidden, by index from 0), freeze, merges, filter, conditional (formatting), validation (what cells take: lists, checkboxes, ratings…), charts (each with from and to: the cells its corners are on, and dx and dy, px into them) and board (its Kanban board: the table’s first cell, the column it groups by and those its cards show, by letter, its lanes’ order, whether the sheet opens on it). To change it, send the whole workbook back with save_sheet and this id, each sheet with its id and the parts you keep (cells you leave out are emptied), or only the cells that change with update (the rest stays).',
     body + cut,
   ].join('\n');
+}
+
+const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ');
+
+/** The comments' threads, by sheet and cell, and how to answer them. */
+function commentsForAgent(book: Workbook): string[] {
+  const list = book.sheets.flatMap((sh) => (sh.comments ?? []).map((c) => ({ sh, c })));
+  if (!list.length) return [];
+  const open = list.filter((x) => !x.c.resolved).length;
+  const who = (x: Parameters<typeof authorForAgent>[0]) => authorForAgent(x);
+  return [
+    '',
+    `Comments (${open} open, ${list.length - open} resolved), each on a cell:`,
+    ...list.flatMap(({ sh, c }) => [
+      `- ${c.id} · ${c.resolved ? 'resolved' : 'open'} · ${quoteSheet(sh.name)}!${c.cell} · ${who(c)}, ${when(c.at)} UTC: ${c.text.replace(/\n/g, ' / ')}`,
+      ...(c.replies ?? []).map((r) => `    ↳ ${who(r)}, ${when(r.at)} UTC: ${r.text.replace(/\n/g, ' / ')}`),
+    ]),
+    '',
+    'To answer them, save_sheet with this id and comments: [{"id": "<id>", "reply": "what you did or say"}], adding "resolve": true once a comment is dealt with (or "reopen": true). Make the change a comment asks for in the cells too. Add a comment of your own with {"sheet": "<its name>", "cell": "B3", "text": "…"}. The comments in the sheets you send back are left as they are.',
+  ];
 }
 
 const SHEET_HELP = [
@@ -243,10 +355,12 @@ const SHEET_HELP = [
   'The workbook: { title, sheets: [{ name, rows: [[…], …] }] }. rows fill the sheet from A1 (or from start: "B2"), an array per row; a value is a number, words, true or false, null for an empty cell, or a formula: "=SUM(B2:B9)". Words are read as a person types them: "12%" is a percent, "$1,200" an amount, "2026-01-31" a date, "007" stays words; start with \' to keep words as they are. Cells by name, instead or as well: cells: { "B2": 12, "C2": "=B2*2", "D2": { "v": "Paid", "s": { "b": true } } } (as an object, v is taken as it is and f holds a formula, without "=").',
   "Formulas work as in Excel: + - * / ^ & = <> < > <= >=, 50%, references (A1, $A$1, A1:B5, A:A, Sheet2!A1, 'My sheet'!A1:B2) and functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, COUNTIF(S), SUMIF(S), AVERAGEIF(S), MAXIFS, MINIFS, SUMPRODUCT, PRODUCT, MEDIAN, STDEV, LARGE, SMALL, RANK, ROUND, ROUNDUP, ROUNDDOWN, INT, ABS, SQRT, POWER, MOD, IF, IFS, IFERROR, IFNA, AND, OR, NOT, SWITCH, CHOOSE, VLOOKUP, HLOOKUP, XLOOKUP, INDEX, MATCH, XMATCH, OFFSET, INDIRECT, CONCAT, TEXTJOIN, LEFT, RIGHT, MID, LEN, UPPER, LOWER, PROPER, TRIM, SUBSTITUTE, FIND, SEARCH, TEXT, VALUE, TODAY, NOW, DATE, YEAR, MONTH, DAY, WEEKDAY, EOMONTH, EDATE, DATEDIF, NETWORKDAYS, WORKDAY, PMT, FV, PV, NPER, RATE, NPV, IRR and more. Dates are Excel’s day numbers. FILTER, SORT, SORTBY, UNIQUE and SEQUENCE spill their results into the cells below and beside them, which must be empty (else #SPILL!).",
   'How it looks: header: true makes the first row bold and keeps it in view as the sheet scrolls; formats per column: { "B": "currency", "C:D": "percent", "E": "date", "F": { "fmt": "number", "dp": 1 }, "G": "dd/mm/yyyy" } (general, number, percent, currency with cur: "€", accounting, scientific, date, time, datetime, duration, text, or an Excel code: "#,##0.0;[Red]-#,##0.0", "d mmm yyyy", "h:mm AM/PM"; dp: decimals); widths: { "A": 180 } in px (100 otherwise); heights: { "1": 32 } by row number; freeze: { rows: 1, cols: 1 }; styles over ranges: { "A10:D10": { "b": true, "fill": "#fff3cd", "border": "thin" }, "A1:D10": { "outline": "medium" } } (outline: a border round the range). A style: b, i, u, s (struck through), color and fill (#hex), align (left, center, right), valign (top, middle, bottom), wrap, fmt, dp, cur, size (pt), font (Arial, Calibri, Cambria, Courier New, Georgia, Times New Roman, Trebuchet MS, Verdana), rot (degrees, -90 to 90), border on all four sides or bt, br, bb, bl for one ("thin", "medium", "thick", "dashed", "dotted" or "double", a colour after it: "thin #999999").',
-  'More a sheet may have: merges: ["A1:D1"] (cells merged into one; its first cell holds what it shows); hidden: { rows: [5, "8:9"], cols: ["C"] }; notes: { "B2": "Checked by Sam" } (or note on a cell object); filter: { range: "A1:D40", cols: { "C": { when: { op: "gt", a: "100" } }, "D": { hide: ["Done"] } } } (buttons on the header row; the rows it hides are hidden, not removed, and formulas still count them); conditional: [{ range: "C2:C40", when: { op: "gt", a: "100" }, style: { fill: "#fce8e6", color: "#c5221f", b: true } }, { range: "D2:D40", scale: ["#f8696b", "#ffeb84", "#63be7b"] }, { range: "E2:E40", bar: "#638ec6" }] (a condition’s op: empty, notEmpty, contains, notContains, starts, ends, is, eq, neq, gt, gte, lt, lte, between and notBetween with a and b, dateIs, before and after with a date or today, tomorrow, yesterday, week, month, year, formula with a: "=$C2>100" written for the range’s first cell; for conditional formatting also dup, unique, top and bottom with a: how many (b: "%" for a share), above and below the average; rules in order, the first that holds gives its look); validation: [{ range: "D2:D40", list: ["Open", { "v": "Done", "color": "#d9ead3" }] }, { range: "E2:E40", checkbox: true }, { range: "F2:F40", rating: 5 }, { range: "G2:G40", type: "number", when: { op: "between", a: "0", b: "100" }, reject: true }, { range: "H2:H40", source: "Lists!A1:A9" }] (lists show coloured chips and a dropdown, checkboxes hold TRUE or FALSE, ratings 0 to 5 stars; type also date, length and formula; reject refuses other input, else it is kept with a warning); charts: [{ kind: "line", range: "A1:C13", title: "Sales", at: "E2", w: 480, h: 300 }] (kind: column, bar, line, area, pie, doughnut or scatter; series down the columns, or by: "rows"; the first column as labels and the first row as names when they hold words, or labels and names: true or false; legend: bottom, right, top or none; xTitle, yTitle, colors, stacked; at a cell, or x and y in px from A1’s corner).',
+  'More a sheet may have: merges: ["A1:D1"] (cells merged into one; its first cell holds what it shows); hidden: { rows: [5, "8:9"], cols: ["C"] }; notes: { "B2": "Checked by Sam" } (or note on a cell object); filter: { range: "A1:D40", cols: { "C": { when: { op: "gt", a: "100" } }, "D": { hide: ["Done"] } } } (buttons on the header row; the rows it hides are hidden, not removed, and formulas still count them); conditional: [{ range: "C2:C40", when: { op: "gt", a: "100" }, style: { fill: "#fce8e6", color: "#c5221f", b: true } }, { range: "D2:D40", scale: ["#f8696b", "#ffeb84", "#63be7b"] }, { range: "E2:E40", bar: "#638ec6" }] (a condition’s op: empty, notEmpty, contains, notContains, starts, ends, is, eq, neq, gt, gte, lt, lte, between and notBetween with a and b, dateIs, before and after with a date or today, tomorrow, yesterday, week, month, year, formula with a: "=$C2>100" written for the range’s first cell; for conditional formatting also dup, unique, top and bottom with a: how many (b: "%" for a share), above and below the average; rules in order, the first that holds gives its look); validation: [{ range: "D2:D40", list: ["Open", { "v": "Done", "color": "#d9ead3" }] }, { range: "E2:E40", checkbox: true }, { range: "F2:F40", rating: 5 }, { range: "G2:G40", type: "number", when: { op: "between", a: "0", b: "100" }, reject: true }, { range: "H2:H40", source: "Lists!A1:A9" }] (lists show coloured chips and a dropdown, checkboxes hold TRUE or FALSE, ratings 0 to 5 stars; type also date, length and formula; reject refuses other input, else it is kept with a warning); charts: [{ kind: "line", range: "A1:C13", title: "Sales", at: "E2:J16" }] (kind: column, bar, line, area, pie, doughnut or scatter; range: the cells it draws, or several ranges split by commas read as if side by side, each as long as the others: "A1:A13,D1:D13" takes the labels from A and the values from D; series down the columns, or by: "rows"; the first column as labels and the first row as names when they hold words, or labels and names: true or false; legend: bottom, right, top or none; xTitle, yTitle, colors, stacked; where it sits: at: "E2:J16", the cells it covers, or at: "E2" with w and h in px; it is kept as from and to, the cells its corners are on, so it moves and stretches with them as rows and columns go in or out; a range it cannot draw from is kept and says why); board: { by: "Status", fields: ["Owner", "Hours"], lanes: ["Open", "Doing", "Done"], open: true } (the table’s rows as a Kanban board, as the user sees them in View → Kanban board: by, the column it groups by, a dropdown column; fields, the columns its cards show under their first cell; lanes, the options’ order; open: the sheet opens on it; columns by their header’s words or their letters; at: the table’s first cell, A1 unless said).',
+  'Comments: the user’s and agents’ threads on cells (beside notes), which get_page lists with their ids. Answer them with comments at the top: [{ "id": "c1", "reply": "Done: the totals are formulas now", "resolve": true }] (reply, resolve or reopen, delete), and add one of your own with { "sheet": "Budget", "cell": "B3", "text": "Is this the right rate?" }; comments inside the sheets you send are left as they were.',
   'A sheet may come from a file of this session instead: file: "data.csv" (CSV, TSV, .xlsx or .ods; from the session’s folder, ~ or absolute; sheet: which of an Excel file’s sheets), with rows, cells and formats given too going on top. file beside title (no sheets) makes the whole workbook from an .xlsx or .ods file.',
   'At most 50 sheets, 200,000 cells, 20,000 rows and 500 columns a sheet. Good sheets have a header row, one kind of value per column, and totals as formulas (=SUM(B2:B20)) rather than typed numbers, so they stay right when the user changes one.',
-  'To change a spreadsheet, get_page with its id gives it whole (each sheet with its id and cells, and what its formulas give); send the whole workbook back with the same id: a new version, the older ones restorable. Keep what the user changed.',
+  'To change a spreadsheet, get_page with its id gives it whole (each sheet with its id and cells, and what its formulas give); send the whole workbook back with the same id, or only the cells that change with update: a new version, the older ones restorable. Keep what the user changed.',
+  SHEET_EDITS_HELP,
 ].join(' ');
 
 export const SAVE_SHEET_DESCRIPTION = SHEET_HELP;
@@ -256,8 +370,14 @@ export const SAVE_SHEET_SCHEMA = {
   properties: {
     id: { type: 'string', description: 'A saved spreadsheet’s id, to save a new version of it.' },
     title: { type: 'string', description: 'Its name in the Library: "2027 budget".' },
-    sheets: { type: 'array', items: { type: 'object' }, description: 'The sheets, in order: { name, rows, cells, header, formats, widths, heights, freeze, styles, merges, hidden, notes, filter, conditional, validation, charts, file }.' },
+    sheets: { type: 'array', items: { type: 'object' }, description: 'The sheets, in order: { name, rows, cells, header, formats, widths, heights, freeze, styles, merges, hidden, notes, filter, conditional, validation, charts, board, file }.' },
     file: { type: 'string', description: 'Instead of sheets: an .xlsx, .ods or .csv file of this session to make the whole workbook from.' },
+    update: {
+      type: 'array',
+      items: { type: 'object' },
+      description: 'With id, instead of sheets: changes on top of the sheets they name, each {"sheet": its name or id (the first when left out), "cells": {"B7": 1250}, or "rows" from "start", and any other field of a sheet}; a value null empties a cell.',
+    },
+    comments: { type: 'array', items: { type: 'object' }, description: 'Changes to its comments: { id, reply, resolve, reopen, delete } for one get_page lists, { sheet, cell, text } for a new one of yours.' },
   },
   required: ['title'],
 };
@@ -290,8 +410,14 @@ const NS_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const CT = 'application/vnd.openxmlformats-officedocument.spreadsheetml';
 
-/** A column's px as Excel's width (characters of its default font's digits, Calibri 11: 7 px each, 5 px of margin). */
-const xlWidth = (px: number) => Math.round((Math.max(0, px - 5) / 7) * 256) / 256;
+/**
+ * A column's px as Excel's width: characters of its default font's widest digit (7 px for Arial 10 and Calibri 11), the
+ * cell's padding included, as ECMA-376 (18.3.1.13) has Excel turn it back into pixels: trunc((256w + trunc(128/7)) / 256 × 7).
+ */
+const MDW = 7;
+const xlWidth = (px: number) => Math.ceil((Math.max(0, px) * 256) / MDW - Math.trunc(128 / MDW)) / 256;
+/** An Excel width as the px it shows. */
+const pxOfWidth = (w: number) => Math.trunc(((256 * w + Math.trunc(128 / MDW)) / 256) * MDW);
 /** A row's px as points. */
 const xlHeight = (px: number) => Math.round(px * 0.75 * 100) / 100;
 const argb = (hex: string) => `FF${hex.slice(1).toUpperCase()}`;
@@ -328,13 +454,20 @@ function numFmtFor(s: CellStyle | undefined, v: Scalar): { id: number } | { code
   return id !== undefined ? { id } : { code };
 }
 
+/**
+ * The cells' font in Excel: the editor shows them in the app's own (Inter) at 10pt, and Excel can carry no fonts, so
+ * they are in the Office font closest to it at that size; and words sit in the middle of their rows, as in the editor.
+ */
+const XL_FONT = officeFont('Inter');
+const XL_SIZE = FONT_PT;
+
 /** The styles a file's cells use: fonts, fills, number formats and their combinations (cellXfs), each written once. */
 class XlStyles {
-  fonts = ['<font><sz val="11"/><name val="Calibri"/><family val="2"/></font>'];
+  fonts = [`<font><sz val="${XL_SIZE}"/><name val="${XL_FONT}"/><family val="2"/></font>`];
   fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
   borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>'];
   codes: string[] = [];
-  xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'];
+  xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>'];
   /** Conditional formatting's looks. */
   dxfs = new Dxfs();
   private ix = new Map<string, number>();
@@ -357,7 +490,7 @@ class XlStyles {
     if (s && (s.b || s.i || s.u || s.s || s.color || s.size || s.font)) {
       font = this.once(
         this.fonts,
-        `<font>${s.b ? '<b/>' : ''}${s.i ? '<i/>' : ''}${s.s ? '<strike/>' : ''}${s.u ? '<u/>' : ''}<sz val="${s.size ?? 11}"/>${s.color ? `<color rgb="${argb(s.color)}"/>` : ''}<name val="${xesc(s.font ?? 'Calibri')}"/>${s.font ? '' : '<family val="2"/>'}</font>`,
+        `<font>${s.b ? '<b/>' : ''}${s.i ? '<i/>' : ''}${s.s ? '<strike/>' : ''}${s.u ? '<u/>' : ''}<sz val="${s.size ?? XL_SIZE}"/>${s.color ? `<color rgb="${argb(s.color)}"/>` : ''}<name val="${xesc(s.font ?? XL_FONT)}"/>${s.font ? '' : '<family val="2"/>'}</font>`,
       );
     }
     const fill = s?.fill ? this.once(this.fills, `<fill><patternFill patternType="solid"><fgColor rgb="${argb(s.fill)}"/><bgColor indexed="64"/></patternFill></fill>`) : 0;
@@ -370,12 +503,12 @@ class XlStyles {
     const border = s && (s.bt || s.br || s.bb || s.bl) ? this.once(this.borders, `<border>${side('left', s.bl)}${side('right', s.br)}${side('top', s.bt)}${side('bottom', s.bb)}<diagonal/></border>`) : 0;
     // Excel turns words 1–90 degrees anticlockwise, and 91–180 for 1–90 clockwise.
     const rot = s?.rot ? (s.rot > 0 ? s.rot : 90 - s.rot) : 0;
-    const al =
-      s && (s.align || s.valign || s.wrap || rot)
-        ? `<alignment${s.align ? ` horizontal="${s.align}"` : ''}${s.valign ? ` vertical="${s.valign === 'middle' ? 'center' : s.valign}"` : ''}${rot ? ` textRotation="${rot}"` : ''}${s.wrap ? ' wrapText="1"' : ''}/>`
-        : '';
+    // Up and down as the editor puts words: in the middle of the row, wrapped ones from the top (the default style
+    // has the middle, so a cell without its own alignment needs none).
+    const vertical = s?.valign === 'top' || (s?.wrap && !s.valign) ? 'top' : s?.valign === 'bottom' ? 'bottom' : 'center';
+    const al = s && (s.align || (s.valign && s.valign !== 'middle') || s.wrap || rot) ? `<alignment${s.align ? ` horizontal="${s.align}"` : ''} vertical="${vertical}"${rot ? ` textRotation="${rot}"` : ''}${s.wrap ? ' wrapText="1"' : ''}/>` : '';
     if (!numFmtId && !font && !fill && !al && !border) return 0;
-    const xml = `<xf numFmtId="${numFmtId}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0"${numFmtId ? ' applyNumberFormat="1"' : ''}${font ? ' applyFont="1"' : ''}${fill ? ' applyFill="1"' : ''}${border ? ' applyBorder="1"' : ''}${al ? ` applyAlignment="1">${al}</xf>` : '/>'}`;
+    const xml = `<xf numFmtId="${numFmtId}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0"${numFmtId ? ' applyNumberFormat="1"' : ''}${font ? ' applyFont="1"' : ''}${fill ? ' applyFill="1"' : ''}${border ? ' applyBorder="1"' : ''} applyAlignment="1">${al || '<alignment vertical="center"/>'}</xf>`;
     return this.once(this.xfs, xml);
   }
 
@@ -386,7 +519,7 @@ class XlStyles {
       `<fonts count="${this.fonts.length}">${this.fonts.join('')}</fonts>` +
       `<fills count="${this.fills.length}">${this.fills.join('')}</fills>` +
       `<borders count="${this.borders.length}">${this.borders.join('')}</borders>` +
-      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"><alignment vertical="center"/></xf></cellStyleXfs>' +
       `<cellXfs count="${this.xfs.length}">${this.xfs.join('')}</cellXfs>` +
       '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
       `${this.dxfs.xml()}<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`
@@ -409,19 +542,23 @@ class XlStrings {
     return i;
   }
   xml(): string {
-    const si = this.list.map((s) => `<si><t${/^\s|\s$|\n/.test(s) ? ' xml:space="preserve"' : ''}>${xesc(s)}</t></si>`).join('');
+    // Words that start or end with a space say so, as Excel's own files do (only there: ECMA-376's schema has no xml:space on them).
+    const si = this.list.map((s) => `<si><t${/^\s|\s$/.test(s) ? ' xml:space="preserve"' : ''}>${xesc(s)}</t></si>`).join('');
     return `${XML_HEAD}<sst xmlns="${NS_MAIN}" count="${this.count}" uniqueCount="${this.list.length}">${si}</sst>`;
   }
 }
 
-/** A sheet's part: its frozen panes, columns' widths, rows' heights and cells, each formula with what it gives. */
 /** The relationships a sheet's part points at: its charts' drawing and its notes' VML drawing. */
 interface SheetLinks {
   drawing?: string;
   legacy?: string;
 }
 
-function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings, names: Set<string>, links: SheetLinks = {}): string {
+/**
+ * A sheet's part: its frozen panes, columns' widths, rows' heights and cells, each formula with what it gives, and its
+ * rules (`lists`: where the lists kept on the hidden sheet of lists are; `ofLists`: this is that sheet, never the one picked).
+ */
+function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings, names: Set<string>, links: SheetLinks = {}, lists?: Map<Validation, string>, ofLists = false): string {
   const e = calc.shownExtent(si);
   // Rows hidden by hand, or by the filter (Excel writes those hidden too, and its filter says why).
   const hidden = hiddenRows(sh, si, calc);
@@ -513,18 +650,29 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
     .filter(([, w, hid]) => w || hid)
     .sort((a, b) => a[0] - b[0]);
   const cols = widths.length ? `<cols>${widths.map(([c, w, hid]) => `<col min="${c + 1}" max="${c + 1}" width="${xlWidth(w ?? COL_W)}"${hid ? ' hidden="1"' : ''}${w ? ' customWidth="1"' : ''}/>`).join('')}</cols>` : '';
-  const wide = Array.from({ length: e.cols }, (_, c) => (sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W))).reduce((a, b) => a + b, 0) > 900;
+  // Printed as the app prints it: across the page when its columns are wider than an upright one holds, made smaller
+  // to fit the page's width when they are wider than that too, 12 mm margins, its name at the top.
+  const across = Array.from({ length: e.cols }, (_, c) => (sh.cols?.[c]?.hidden ? 0 : (sh.cols?.[c]?.w ?? COL_W))).reduce((a, b) => a + b, 0);
+  const wide = across > 700;
+  const fit = across > 1030;
+  const mm12 = '0.4724';
   return (
     `${XML_HEAD}<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_R}">` +
+    (fit ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '') +
     `<dimension ref="${e.rows ? `A1:${refName(e.rows - 1, Math.max(0, e.cols - 1))}` : 'A1'}"/>` +
-    `<sheetViews><sheetView workbookViewId="0"${si === 0 ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
-    `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="15"/>${cols}` +
+    `<sheetViews><sheetView workbookViewId="0"${si === 0 && !ofLists ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
+    // Rows as tall as the editor's (24 px) unless they say.
+    `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="${xlHeight(ROW_H)}" customHeight="1"/>${cols}` +
     `<sheetData>${body}</sheetData>` +
     filterXml(sh, si, calc) +
     mergesXml(sh) +
     condXml(sh, st.dxfs, names) +
-    validationXml(sh, names) +
-    `<pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>${wide ? '<pageSetup orientation="landscape"/>' : ''}` +
+    validationXml(sh, names, lists) +
+    // The cells' lines, as the app prints round its table's cells (not across the empty ones charts stand over).
+    (sh.charts?.length ? '' : '<printOptions gridLines="1"/>') +
+    `<pageMargins left="${mm12}" right="${mm12}" top="${mm12}" bottom="${mm12}" header="0.2" footer="0.2"/>` +
+    `<pageSetup orientation="${wide ? 'landscape' : 'portrait'}"${fit ? ' fitToWidth="1" fitToHeight="0"' : ''}/>` +
+    `<headerFooter><oddHeader>${xesc(`&L&"-,Bold"&12&A`)}</oddHeader></headerFooter>` +
     (links.drawing ? `<drawing r:id="${links.drawing}"/>` : '') +
     (links.legacy ? `<legacyDrawing r:id="${links.legacy}"/>` : '') +
     '</worksheet>'
@@ -534,6 +682,9 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
 /** The workbook as an Excel file (.xlsx) that opens in Excel, LibreOffice and Google Sheets: formulas kept, with what they give; filters, merged cells, conditional formatting, rules for cells, notes and charts too. */
 export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBook(book)): Buffer {
   const names = new Set(book.sheets.map((s) => s.name.toLowerCase()));
+  // Lists a rule cannot hold in its own words, and lists whose chips have colours: on a hidden sheet the rules point at.
+  const lists = listsSheet(book);
+  if (lists.sheet) names.add(lists.sheet.name.toLowerCase());
   const st = new XlStyles();
   const ss = new XlStrings();
   // Each sheet's other parts: its charts' drawing (with a chart part each) and its notes (comments and their VML).
@@ -542,25 +693,28 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
   let drawings = 0;
   let charts = 0;
   let notes = 0;
+  let threads = 0;
   const sheets = book.sheets.map((sh, si) => {
     const links: SheetLinks = {};
     const rels: [string, string, string][] = [];
-    if (sh.charts?.length) {
+    // Charts that cannot draw from their ranges are left out (the workbook keeps them, saying why).
+    const drawn = (sh.charts ?? []).filter((ch) => !chartProblem(book, ch));
+    if (drawn.length) {
       const d = ++drawings;
       const chartRels: [string, string, string][] = [];
-      sh.charts.forEach((ch, i) => {
+      drawn.forEach((ch, i) => {
         const n = ++charts;
         extra.push({ name: `xl/charts/chart${n}.xml`, data: chartXml(book, ch, chartData(book, calc, si, ch, true), names) });
         overrides.push(`<Override PartName="/xl/charts/chart${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`);
         chartRels.push([`rId${i + 1}`, 'chart', `../charts/chart${n}.xml`]);
       });
-      extra.push({ name: `xl/drawings/drawing${d}.xml`, data: drawingXml(sh, (i) => `rId${i + 1}`) });
+      extra.push({ name: `xl/drawings/drawing${d}.xml`, data: drawingXml(sh, drawn, (i) => `rId${i + 1}`) });
       extra.push({ name: `xl/drawings/_rels/drawing${d}.xml.rels`, data: relsXml(chartRels) });
       overrides.push(`<Override PartName="/xl/drawings/drawing${d}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
       links.drawing = `rId${rels.length + 1}`;
       rels.push([links.drawing, 'drawing', `../drawings/drawing${d}.xml`]);
     }
-    const nx = notesXml(sh, si + 1);
+    const nx = commentsXml(sh, si + 1);
     if (nx) {
       const k = ++notes;
       extra.push({ name: `xl/comments${k}.xml`, data: nx.comments });
@@ -569,10 +723,20 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
       rels.push([`rId${rels.length + 1}`, 'comments', `../comments${k}.xml`]);
       links.legacy = `rId${rels.length + 1}`;
       rels.push([links.legacy, 'vmlDrawing', `../drawings/vmlDrawing${k}.vml`]);
+      // Comments' threads, as Excel's own threaded comments.
+      if (nx.threaded) {
+        threads++;
+        extra.push({ name: `xl/threadedComments/threadedComment${k}.xml`, data: nx.threaded });
+        overrides.push(`<Override PartName="/xl/threadedComments/threadedComment${k}.xml" ContentType="application/vnd.ms-excel.threadedcomments+xml"/>`);
+        rels.push([`rId${rels.length + 1}`, 'http://schemas.microsoft.com/office/2017/10/relationships/threadedComment', `../threadedComments/threadedComment${k}.xml`]);
+      }
     }
     if (rels.length) extra.push({ name: `xl/worksheets/_rels/sheet${si + 1}.xml.rels`, data: relsXml(rels) });
-    return sheetXml(sh, si, calc, st, ss, names, links);
+    return sheetXml(sh, si, calc, st, ss, names, links, lists.ref);
   });
+  // The sheet of lists goes after the others, hidden.
+  if (lists.sheet) sheets.push(sheetXml(lists.sheet, 0, computeBook({ v: 1, sheets: [lists.sheet] }), st, ss, names, {}, undefined, true));
+  const titles = [...book.sheets.map((s) => s.name), ...(lists.sheet ? [lists.sheet.name] : [])];
   const n = sheets.length;
   const types =
     `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
@@ -582,27 +746,38 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="${CT}.worksheet+xml"/>`).join('') +
     `<Override PartName="/xl/styles.xml" ContentType="${CT}.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="${CT}.sharedStrings+xml"/>` +
     overrides.join('') +
+    (threads ? '<Override PartName="/xl/persons/person.xml" ContentType="application/vnd.ms-excel.person+xml"/>' : '') +
     '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +
     '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>';
   const app =
     `${XML_HEAD}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">` +
     `<Application>Hydor</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop>` +
     `<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${n}</vt:i4></vt:variant></vt:vector></HeadingPairs>` +
-    `<TitlesOfParts><vt:vector size="${n}" baseType="lpstr">${book.sheets.map((s) => `<vt:lpstr>${xesc(s.name)}</vt:lpstr>`).join('')}</vt:vector></TitlesOfParts>` +
+    `<TitlesOfParts><vt:vector size="${n}" baseType="lpstr">${titles.map((t) => `<vt:lpstr>${xesc(t)}</vt:lpstr>`).join('')}</vt:vector></TitlesOfParts>` +
     '<LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0300</AppVersion></Properties>';
-  // Excel keeps each filter's range in a hidden name of its sheet's.
+  // Excel keeps each filter's range in a hidden name of its sheet's, and the rows each printed page repeats (the app's
+  // print repeats a sheet's frozen rows, or a first row of words over the rest) in another.
   const filterNames = book.sheets
     .map((sh, i) => {
       const x = sh.filter ? parseRange(sh.filter.range) : null;
-      return x ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${xesc(`${quoteSheet(sh.name)}!$${colName(x.c1)}$${x.r1 + 1}:$${colName(x.c2)}$${x.r2 + 1}`)}</definedName>` : '';
+      const heads = headerRows(sh, i, calc);
+      return (
+        (x ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${xesc(`${quoteSheet(sh.name)}!$${colName(x.c1)}$${x.r1 + 1}:$${colName(x.c2)}$${x.r2 + 1}`)}</definedName>` : '') +
+        (heads ? `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${xesc(`${quoteSheet(sh.name)}!$1:$${heads}`)}</definedName>` : '')
+      );
     })
     .join('');
   const workbook =
     `${XML_HEAD}<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_R}"><workbookPr/><bookViews><workbookView activeTab="0"/></bookViews>` +
-    `<sheets>${book.sheets.map((s, i) => `<sheet name="${xesc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>` +
+    `<sheets>${titles.map((t, i) => `<sheet name="${xesc(t)}" sheetId="${i + 1}"${i >= book.sheets.length ? ' state="hidden"' : ''} r:id="rId${i + 1}"/>`).join('')}</sheets>` +
     (filterNames ? `<definedNames>${filterNames}</definedNames>` : '') +
     '<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>';
-  const wbRels = relsXml([...sheets.map((_, i) => [`rId${i + 1}`, 'worksheet', `worksheets/sheet${i + 1}.xml`] as [string, string, string]), [`rId${n + 1}`, 'styles', 'styles.xml'], [`rId${n + 2}`, 'sharedStrings', 'sharedStrings.xml']]);
+  const wbRels = relsXml([
+    ...sheets.map((_, i) => [`rId${i + 1}`, 'worksheet', `worksheets/sheet${i + 1}.xml`] as [string, string, string]),
+    [`rId${n + 1}`, 'styles', 'styles.xml'],
+    [`rId${n + 2}`, 'sharedStrings', 'sharedStrings.xml'],
+    ...(threads ? [[`rId${n + 3}`, 'http://schemas.microsoft.com/office/2017/10/relationships/person', 'persons/person.xml'] as [string, string, string]] : []),
+  ]);
   const rootRels = relsXml([
     ['rId1', 'officeDocument', 'xl/workbook.xml'],
     ['rId2', 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties', 'docProps/core.xml'],
@@ -617,6 +792,7 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     { name: 'xl/_rels/workbook.xml.rels', data: wbRels },
     ...sheets.map((x, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: x })),
     ...extra,
+    ...(threads ? [{ name: 'xl/persons/person.xml', data: personsXml(namedAuthors(book)) }] : []),
     { name: 'xl/styles.xml', data: st.xml() },
     { name: 'xl/sharedStrings.xml', data: ss.xml() },
   ]);
@@ -641,9 +817,10 @@ export function decodeText(buf: Buffer): string {
 
 /**
  * A workbook from a file: CSV or TSV, Excel (.xlsx) or OpenDocument (.ods); and what was left out of it, in plain words.
- * For a file opened to be saved again (Files): `loses`, what of an Excel file the workbook cannot hold ("charts" for
- * pictures and charts it cannot draw, "formulas", "pivots", "tables", "links"), and `cut`, whether some of its cells
- * or sheets did not come in at all.
+ * For a file opened to be saved again (Files): `loses`, what of an Excel file the workbook cannot hold ("pictures",
+ * "shapes", "charts" it cannot draw, "formulas" it cannot work out, "pivots", "tables", "links" to other files,
+ * "hyperlinks", "names", "macros", "groups" of rows and columns, "sparklines", "icons" (icon sets), "protection", "print"
+ * settings, "rich" text formatted in parts of a cell), and `cut`, whether some of its cells or sheets did not come in at all.
  */
 export function importBook(buf: Buffer, name: string): { book: Workbook; notes: string[]; loses?: string[]; cut?: boolean } {
   const ext = path.extname(name).slice(1).toLowerCase();
@@ -693,9 +870,9 @@ function relsOf(z: Zip, part: string): Map<string, Rel> {
 
 /** Excel's built-in number formats this reads (the others are General). */
 const BUILTIN = new Map<number, string>([
-  [1, '0'], [2, '0.00'], [3, '#,##0'], [4, '#,##0.00'], [5, '$#,##0'], [6, '$#,##0'], [7, '$#,##0.00'], [8, '$#,##0.00'], [9, '0%'], [10, '0.00%'],
+  [1, '0'], [2, '0.00'], [3, '#,##0'], [4, '#,##0.00'], [5, '$#,##0'], [6, '$#,##0'], [7, '$#,##0.00'], [8, '$#,##0.00'], [9, '0%'], [10, '0.00%'], [11, '0.00E+00'], [12, '# ?/?'], [13, '# ??/??'],
   [14, 'yyyy-mm-dd'], [15, 'd-mmm-yy'], [16, 'd-mmm'], [17, 'mmm-yy'], [18, 'h:mm AM/PM'], [19, 'h:mm:ss AM/PM'], [20, 'h:mm'], [21, 'h:mm:ss'], [22, 'yyyy-mm-dd h:mm'],
-  [37, '#,##0'], [38, '#,##0'], [39, '#,##0.00'], [40, '#,##0.00'], [45, 'mm:ss'], [46, '[h]:mm:ss'], [47, 'mm:ss.0'], [49, '@'],
+  [37, '#,##0'], [38, '#,##0'], [39, '#,##0.00'], [40, '#,##0.00'], [45, 'mm:ss'], [46, '[h]:mm:ss'], [47, 'mm:ss.0'], [48, '##0.0E+0'], [49, '@'],
 ]);
 
 /** Excel's 64 colours by index, for files that name colours that way. */
@@ -820,10 +997,13 @@ function stylesOf(xml: string | null, theme: string[]): { s?: CellStyle; date: b
     const h = att(al, 'horizontal');
     if (h === 'left' || h === 'right' || h === 'center') raw.align = h;
     else if (h === 'centerContinuous') raw.align = 'center';
+    // The editor puts words in the middle of their rows, and wrapped ones at the top: those need no place of their own.
     const v = att(al, 'vertical');
-    if (v === 'top') raw.valign = 'top';
-    else if (v === 'center') raw.valign = 'middle';
-    if (on(att(al, 'wrapText'))) raw.wrap = true;
+    const wrap = on(att(al, 'wrapText'));
+    if (v === 'top' && !wrap) raw.valign = 'top';
+    else if (v === 'bottom') raw.valign = 'bottom';
+    else if (v === 'center' && wrap) raw.valign = 'middle';
+    if (wrap) raw.wrap = true;
     const rot = Number(att(al, 'textRotation') ?? 0);
     if (rot > 0 && rot <= 90) raw.rot = rot;
     else if (rot > 90 && rot <= 180) raw.rot = 90 - rot;
@@ -841,28 +1021,45 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   const of = (type: string) => [...rels.values()].find((r) => r.type.endsWith(`/${type}`))?.target;
   const date1904 = on(att(kid(wb, 'workbookPr'), 'date1904'));
   const sst = z.text(of('sharedStrings') ?? 'xl/sharedStrings.xml');
+  // Words formatted in parts (a run of bold in a cell) come in as the cell's words alone.
+  let rich = false;
   const shared = sst
     ? kids(parseXml(sst).root, 'si').map((si) => {
         let s = '';
-        for (const x of si.c) if (typeof x !== 'string') s += x.n === 't' ? textOf(x) : x.n === 'r' ? textOf(kid(x, 't')) : '';
+        for (const x of si.c) {
+          if (typeof x === 'string') continue;
+          if (x.n === 'r' && kid(x, 'rPr')) rich = true;
+          s += x.n === 't' ? textOf(x) : x.n === 'r' ? textOf(kid(x, 't')) : '';
+        }
         return s;
       })
     : [];
   const theme = themeColors(z.text(of('theme') ?? 'xl/theme/theme1.xml'));
+  // The people who wrote its threaded comments, by id.
+  const persons = readPersons(z.text(of('person') ?? 'xl/persons/person.xml'));
   const stylesXml = z.text(of('styles') ?? 'xl/styles.xml');
   const styles = stylesOf(stylesXml, theme);
   const dxfs = readDxfs(stylesXml, (el) => colorOf(el, theme));
   // Names the workbook defines for cells or ranges (TaxRate: Sheet1!$B$1): formulas get the reference in their place.
   const names = new Map<string, string>();
+  // What a workbook here does not hold, for a file to be saved again: their keys (importBook says which).
+  const loses = new Set<string>();
   for (const d of all(kid(wb, 'definedNames'), 'definedName')) {
     const name = att(d, 'name') ?? '';
     const ref = textOf(d).trim();
     if (!name.startsWith('_xlnm.') && /^(?:'[^']+'|[A-Za-z_][\w.]*)!\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?$/.test(ref)) names.set(name.toLowerCase(), ref);
+    // Names go (formulas that use them get what they stand for), and so do print areas and titles (but the first rows
+    // repeated on each page, as the app prints a sheet's header rows anyway, as its own files say).
+    if (!name.startsWith('_xlnm.') && att(d, 'hidden') !== '1') loses.add('names');
+    if (name === '_xlnm.Print_Area' || (name === '_xlnm.Print_Titles' && !/^(?:'(?:[^']|'')+'|[^!',]+)!\$1:\$[1-5]$/.test(ref))) loses.add('print');
   }
+  if (rich) loses.add('rich');
+  if (kid(wb, 'workbookProtection')) loses.add('protection');
+  if (z.names().some((n) => /vbaProject\.bin$/i.test(n))) loses.add('macros');
   const sheets: Obj[] = [];
+  // The hidden sheets of lists this app writes (sheet-parts.ts listsSheet): read for their lists, not kept as sheets.
+  const listSheets: { name: string; cells: Record<string, Cell> }[] = [];
   const state = { cells: 0, drawn: false, bad: false, cutRows: false, cutCells: false };
-  // What a workbook here does not hold, for a file to be saved again: their keys (importBook says which).
-  const loses = new Set<string>();
   let cutSheets = false;
   const listed = all(kid(wb, 'sheets'), 'sheet');
   for (const s of listed) {
@@ -879,13 +1076,30 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     const parts = [...partRels.values()];
     if (parts.some((r) => /\/pivotTable$/.test(r.type))) loses.add('pivots');
     if (parts.some((r) => /\/table$/.test(r.type))) loses.add('tables');
+    // What a sheet has that a workbook here does not keep.
+    if (/<(?:\w+:)?hyperlinks?[\s>]/.test(xml)) loses.add('hyperlinks');
+    if (/<(?:\w+:)?(?:row|col)\b[^>]*\boutlineLevel="[1-9]/.test(xml)) loses.add('groups');
+    if (/<(?:\w+:)?sparklineGroups?[\s>]/.test(xml)) loses.add('sparklines');
+    if (/<(?:\w+:)?cfRule\b[^>]*\btype="iconSet"/.test(xml) || /<x14:iconSet\b/.test(xml)) loses.add('icons');
+    if (/<(?:\w+:)?sheetProtection\b/.test(xml)) loses.add('protection');
+    // A header or footer (but the sheet's name at the top, as the app prints it and its own files say).
+    if (/<(?:\w+:)?(?:odd|even|first)(?:Header|Footer)>\s*[^<\s]/.test(xml.replace(/<(?:\w+:)?oddHeader>&amp;L&amp;(?:"|&quot;)-,Bold(?:"|&quot;)&amp;12&amp;A<\/(?:\w+:)?oddHeader>/, ''))) loses.add('print');
     const sheet = readWorksheet(xml, name, shared, styles, date1904, state, names);
     const base = sheet.base as { cells: Record<string, Cell>; cols: Record<number, { w?: number; hidden?: boolean }>; rows: Record<number, { h?: number; hidden?: boolean }> } & Obj;
+    if (isListsSheet(name) && /^(hidden|veryHidden)$/.test(att(s, 'state') ?? '')) {
+      listSheets.push({ name, cells: base.cells });
+      continue;
+    }
     base.conditional = readConditional(xml, dxfs, names, (el) => colorOf(el, theme));
     base.validation = readValidation(xml, names);
-    // Notes: the comments part's words on their cells.
+    // Comments' threads (threaded comments), and notes: the comments part's words on their cells (a threaded comment's
+    // plain copy there is its thread's, not a note).
+    const threadedRel = parts.find((r) => /\/threadedComment$/.test(r.type));
+    const threads = readThreaded(threadedRel ? z.text(threadedRel.target) : null, persons);
     const comments = parts.find((r) => /\/comments$/.test(r.type));
-    for (const [ref, note] of readNotes(comments ? z.text(comments.target) : null)) base.cells[ref] = { ...(base.cells[ref] ?? {}), note };
+    const got = readNotes(comments ? z.text(comments.target) : null, new Set(threads.map((c) => c.cell)));
+    for (const [ref, note] of got.notes) base.cells[ref] = { ...(base.cells[ref] ?? {}), note };
+    base.comments = [...threads, ...got.threads];
     // Charts from the drawing; pictures in it are what is left out.
     const drawingRel = parts.find((r) => /\/drawing$/.test(r.type));
     const drawing = drawingRel ? z.text(drawingRel.target) : null;
@@ -893,8 +1107,14 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
       const dRels = relsOf(z, drawingRel!.target);
       const colW = (c: number) => (base.cols[c]?.hidden ? 0 : (base.cols[c]?.w ?? COL_W));
       const rowH = (r: number) => (base.rows[r]?.hidden ? 0 : (base.rows[r]?.h ?? ROW_H));
-      base.charts = readCharts(drawing, (rid) => (dRels.get(rid) ? z.text(dRels.get(rid)!.target) : null), name, colW, rowH);
-      if (/<(?:\w+:)?pic[\s>]/.test(drawing) || (base.charts as unknown[]).length < (drawing.match(/<(?:\w+:)?graphicFrame[\s>]/g)?.length ?? 0)) state.drawn = true;
+      base.charts = readCharts(drawing, (rid) => (dRels.get(rid) ? z.text(dRels.get(rid)!.target) : null), name, colW, rowH).map((ch) => wholeRange(ch, base.cells));
+      const left = [
+        /<(?:\w+:)?pic[\s>]/.test(drawing) && 'pictures',
+        /<(?:\w+:)?sp[\s>]/.test(drawing) && 'shapes',
+        (base.charts as unknown[]).length < (drawing.match(/<(?:\w+:)?graphicFrame[\s>]/g)?.length ?? 0) && 'charts',
+      ].filter((k): k is string => !!k);
+      for (const k of left) loses.add(k);
+      if (left.length) state.drawn = true;
     }
     sheets.push(sheet);
     if (sheets.length >= SHEET_LIMITS.sheets) {
@@ -903,15 +1123,79 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     }
   }
   if (!sheets.length) throw new Error('This Excel file has no sheets of cells in it.');
-  if (state.drawn) notes.push('Pictures (and charts this cannot draw) were left out.');
+  // Lists on that hidden sheet are lists of options again, with their chips' colours; the conditional formatting this
+  // app writes to show those colours in Excel is theirs, not a rule of the sheet's.
+  if (listSheets.length)
+    for (const sh of sheets) {
+      const base = sh.base as Obj;
+      base.validation = (base.validation as Validation[]).map((v) => {
+        const options = v.type === 'list' && v.source ? listFromSheet(v.source, listSheets) : null;
+        if (!options) return v;
+        const { source: _s, ...rest } = v;
+        return { ...rest, options };
+      });
+      if (Array.isArray(base.conditional)) base.conditional = (base.conditional as CondRule[]).filter((r) => !isListColor(r, base.validation as Validation[]));
+    }
+  if (state.drawn) notes.push('Pictures, shapes and charts this cannot draw were left out.');
   if (state.bad) notes.push('Some formulas could not be read here (links to other files, tables by name…): their last values were kept instead.');
   if (state.cutRows) notes.push(`Cells past row ${SHEET_LIMITS.rows.toLocaleString('en')} or column ${colName(SHEET_LIMITS.cols - 1)} were left out.`);
   if (state.cutCells) notes.push(`Only the first ${SHEET_LIMITS.cells.toLocaleString('en')} cells were taken in.`);
   if (cutSheets) notes.push(`Only the first ${SHEET_LIMITS.sheets} sheets were taken in.`);
-  if (state.drawn) loses.add('charts');
   if (state.bad) loses.add('formulas');
   if (z.names().some((n) => n.startsWith('xl/externalLinks/'))) loses.add('links');
-  return { book: normalizeBook({ sheets }, { notes }), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
+  return { book: plainCharts(normalizeBook({ sheets }, { notes })), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
+}
+
+/**
+ * A workbook's charts without what the app would take for them anyway (whether the first column is labels and the
+ * first row names, where the legend goes): a chart written here comes back as it was kept, and one made in Excel
+ * keeps only what makes it draw as it did there.
+ */
+function plainCharts(book: Workbook): Workbook {
+  if (!book.sheets.some((s) => s.charts?.length)) return book;
+  const calc = computeBook(book);
+  book.sheets.forEach((sh, si) => {
+    if (!sh.charts) return;
+    sh.charts = sh.charts.map((ch) => {
+      let out = ch;
+      for (const k of ['labels', 'names'] as const) {
+        if (out[k] === undefined) continue;
+        const { [k]: _drop, ...rest } = out;
+        if (JSON.stringify(chartData(book, calc, si, rest)) === JSON.stringify(chartData(book, calc, si, out))) out = rest;
+      }
+      const pie = out.kind === 'pie' || out.kind === 'doughnut';
+      const series = chartData(book, calc, si, out)?.series.length ?? 0;
+      if (out.legend !== undefined && out.legend === (pie || series > 1 ? 'bottom' : 'none')) {
+        const { legend: _l, ...rest } = out;
+        out = rest;
+      }
+      return out;
+    });
+  });
+  return book;
+}
+
+/**
+ * A chart read from its series as a range in parts, as one range when the columns (rows) between its parts hold no
+ * numbers to draw (words, or nothing): the block of cells it was made from, which draws the same.
+ */
+function wholeRange(ch: SheetChart, cells: Record<string, Cell>): SheetChart {
+  const parts = chartParts(ch.range);
+  if (!parts || parts.length < 2 || parts.some((p) => p.sheet !== undefined)) return ch;
+  const rows = ch.by === 'rows';
+  const u: Rect = { r1: Math.min(...parts.map((p) => p.x.r1)), c1: Math.min(...parts.map((p) => p.x.c1)), r2: Math.max(...parts.map((p) => p.x.r2)), c2: Math.max(...parts.map((p) => p.x.c2)) };
+  // The parts' lines, one after another and in order, with only gaps of words between them.
+  const own = new Set(parts.flatMap((p) => Array.from({ length: (rows ? p.x.r2 - p.x.r1 : p.x.c2 - p.x.c1) + 1 }, (_, k) => (rows ? p.x.r1 : p.x.c1) + k)));
+  const order = parts.map((p) => (rows ? p.x.r1 : p.x.c1));
+  if (order.some((v, i) => i && v < order[i - 1]) || parts.some((p) => (rows ? p.x.c1 !== u.c1 || p.x.c2 !== u.c2 : p.x.r1 !== u.r1 || p.x.r2 !== u.r2))) return ch;
+  for (let i = rows ? u.r1 : u.c1; i <= (rows ? u.r2 : u.c2); i++) {
+    if (own.has(i)) continue;
+    for (let j = (rows ? u.c1 : u.r1) + 1; j <= (rows ? u.c2 : u.r2); j++) {
+      const cell = cells[rows ? refName(i, j) : refName(j, i)];
+      if (cell && (cell.f !== undefined || typeof cell.v === 'number')) return ch;
+    }
+  }
+  return { ...ch, range: rangeName(u) };
 }
 
 /** One worksheet's XML, read as it streams by (a big sheet is never held as a tree). */
@@ -1014,7 +1298,7 @@ function readWorksheet(xml: string, name: string, shared: string[], styles: { s?
         case 'col': {
           const min = Number(a.min);
           const max = Math.min(Number(a.max), SHEET_LIMITS.cols);
-          if (on(a.customWidth) && a.width && max - min < 50) for (let k = min - 1; k < max; k++) cols[k] = { w: Math.round(Number(a.width) * 7 + 5) };
+          if (on(a.customWidth) && a.width && max - min < 50) for (let k = min - 1; k < max; k++) cols[k] = { w: pxOfWidth(Number(a.width)) };
           if (on(a.hidden) && max - min < 500) for (let k = min - 1; k < max; k++) cols[k] = { ...cols[k], hidden: true };
           break;
         }
@@ -1053,43 +1337,6 @@ function readWorksheet(xml: string, name: string, shared: string[], styles: { s?
   if (filter?.cols && fx) for (let r = fx.r1 + 1; r <= fx.r2; r++) if (rows[r]?.hidden) rows[r] = { ...rows[r], hidden: undefined };
   return { name, base: { cells, cols, rows, merges, ...(filter ? { filter } : {}) }, ...(freeze ? { freeze } : {}) };
 }
-
-/** An OpenDocument cell's words: its paragraphs, spaces (text:s) and tabs kept. */
-function odfText(el: El): string {
-  let s = '';
-  for (const x of el.c) {
-    if (typeof x === 'string') s += x;
-    else if (x.n === 's') s += ' '.repeat(Math.min(1000, Number(att(x, 'c') ?? 1) || 1));
-    else if (x.n === 'tab') s += '\t';
-    else if (x.n === 'line-break') s += '\n';
-    else if (x.n !== 'annotation') s += odfText(x);
-  }
-  return s;
-}
-
-/** An OpenDocument formula as Excel writes one: "of:=SUM([.A1:.B2];[$Data.C3])" is "SUM(A1:B2,Data!C3)". */
-function odfFormula(f: string): string {
-  const body = f.replace(/^[a-z]+:/i, '').replace(/^=/, '');
-  return body
-    .split(/("(?:[^"]|"")*")/)
-    .map((part, i) => {
-      if (i % 2) return part;
-      return part
-        .replace(/\[([^\]]+)\]/g, (_m, ref: string) => {
-          let sheet = '';
-          const cells = ref.split(':').map((p) => {
-            const dot = p.lastIndexOf('.');
-            const sh = p.slice(0, dot).replace(/^\$/, '');
-            if (sh) sheet = sh.replace(/^'(.*)'$/, '$1').replace(/''/g, "'");
-            return p.slice(dot + 1);
-          });
-          return `${sheet ? `${quoteName(sheet)}!` : ''}${cells.join(':')}`;
-        })
-        .replace(/;/g, ',');
-    })
-    .join('');
-}
-const quoteName = (n: string) => (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(n) && !/^[A-Za-z]{1,3}\d+$/.test(n) ? n : `'${n.replace(/'/g, "''")}'`);
 
 const ODS_CUR: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', INR: '₹', CHF: 'CHF' };
 
@@ -1147,14 +1394,20 @@ function odsStyles(content: El, styles: El | null): Map<string, CellStyle> {
   return out;
 }
 
-/** An OpenDocument spreadsheet's sheets: values, formulas (with their last values where they cannot be read here), formats. */
+/**
+ * An OpenDocument spreadsheet's sheets: values, formulas (with their last values where they cannot be read here),
+ * formats; merged cells, data validation, conditional formatting and notes (sheet-ods.ts).
+ */
 function readOds(z: Zip, notes: string[]): { book: Workbook; notes: string[] } {
   const xml = z.text('content.xml');
   if (!xml) throw new Error('This OpenDocument file has no content in it.');
   const { root, cut } = parseXml(xml, 3_000_000);
   if (cut) notes.push('The file is too big to read whole: only its first part was taken in.');
   const stylesXml = z.text('styles.xml');
-  const looks = odsStyles(root, stylesXml ? parseXml(stylesXml).root : null);
+  const stylesRoot = stylesXml ? parseXml(stylesXml).root : null;
+  const looks = odsStyles(root, stylesRoot);
+  const condLooks = odsCondStyles(stylesRoot, root);
+  const rules = odsValidations(root);
   const sheets: Obj[] = [];
   let count = 0;
   let bad = false;
@@ -1174,10 +1427,31 @@ function readOds(z: Zip, notes: string[]): { book: Workbook; notes: string[] } {
       }
       return out;
     };
+    const merges: string[] = [];
+    const ruled = new Map<string, Rect[]>();
+    const noted = new Map<string, string>();
     let r = 0;
     for (const row of rowsOf(t)) {
       const rep = Math.max(1, Number(att(row, 'number-rows-repeated') ?? 1) || 1);
       const list = kids(row).filter((x) => x.n === 'table-cell' || x.n === 'covered-table-cell');
+      // Merges, rules and notes, empty cells' too (a rule on a whole column covers rows written as one, repeated).
+      let c0 = 0;
+      for (const x of list) {
+        const crep = Math.max(1, Number(att(x, 'number-columns-repeated') ?? 1) || 1);
+        if (r < SHEET_LIMITS.rows && c0 < SHEET_LIMITS.cols) {
+          const name = att(x, 'content-validation-name');
+          if (name && rules.has(name)) {
+            const at = { r1: r, c1: c0, r2: Math.min(r + rep, SHEET_LIMITS.rows) - 1, c2: Math.min(c0 + crep, SHEET_LIMITS.cols) - 1 };
+            (ruled.get(name) ?? ruled.set(name, []).get(name)!).push(at);
+          }
+          const across = Number(att(x, 'number-columns-spanned') ?? 1) || 1;
+          const down = Number(att(x, 'number-rows-spanned') ?? 1) || 1;
+          if (x.n === 'table-cell' && (across > 1 || down > 1) && merges.length < SHEET_LIMITS.merges) merges.push(rangeName({ r1: r, c1: c0, r2: r + down - 1, c2: c0 + across - 1 }));
+          const note = odsNote(x);
+          if (note) noted.set(refName(r, c0), note);
+        }
+        c0 += crep;
+      }
       const filled = list.some((x) => att(x, 'value-type') || att(x, 'formula') || kids(x, 'p').length);
       if (!filled) {
         r += rep;
@@ -1235,7 +1509,9 @@ function readOds(z: Zip, notes: string[]): { book: Workbook; notes: string[] } {
       }
       if (rep > 100) r += rep - 100;
     }
-    sheets.push({ name: att(t, 'name') ?? `Sheet ${sheets.length + 1}`, base: { cells } });
+    for (const [ref, note] of noted) cells[ref] = { ...(cells[ref] ?? {}), note };
+    const validation = [...ruled].map(([name, at]) => ({ ...rules.get(name)!, range: joinRects(at).slice(0, 20).map(rangeName).join(',') }));
+    sheets.push({ name: att(t, 'name') ?? `Sheet ${sheets.length + 1}`, base: { cells, merges, validation, conditional: odsConditional(t, condLooks) } });
   }
   if (!sheets.length) throw new Error('This OpenDocument file has no sheets in it.');
   if (bad) notes.push('Some formulas could not be read here: their last values were kept instead.');
@@ -1561,14 +1837,23 @@ function tableHtml(sh: Sheet, si: number, calc: Calc, o: TableOpts, cls: CssClas
   return out.join('');
 }
 
-/** A sheet's charts as the page shows them: over the table where the editor shows them (`over`), or one after another. */
+/**
+ * A sheet's charts as the page shows them: over the table where the editor shows them (`over`: between their corners'
+ * cells, as the table draws them, rows and columns it leaves out folded away), or one after another at their size.
+ */
 function chartsHtml(book: Workbook, sh: Sheet, si: number, calc: Calc, over: { numW: number; head: number; k: number } | null): string {
+  const shown = sheetSizes(sh, hiddenRows(sh, si, calc));
+  const whole = sheetSizes(sh, undefined, true);
   return (sh.charts ?? [])
     .map((ch) => {
-      const svg = chartSvg(ch, chartData(book, calc, si, ch), ch.w, ch.h);
-      if (!over) return `<div class="nb-chart" style="width:${ch.w}px">${svg}</div>`;
+      const box = chartBox(ch, over ? shown : whole);
+      if (over && (box.w < 1 || box.h < 1)) return '';
+      const w = Math.max(160, Math.round(box.w));
+      const h = Math.max(120, Math.round(box.h));
+      const svg = chartSvg(ch, chartData(book, calc, si, ch), w, h, undefined, { problem: chartProblem(book, ch) });
+      if (!over) return `<div class="nb-chart" style="width:${w}px">${svg}</div>`;
       const k = over.k;
-      return `<div class="nb-chart" style="left:${Math.round(over.numW + ch.x * k)}px;top:${Math.round(over.head + ch.y * k)}px;width:${Math.round(ch.w * k)}px;height:${Math.round(ch.h * k)}px">${k === 1 ? svg : svg.replace(/ width="\d+" height="\d+"/, ' width="100%" height="100%"')}</div>`;
+      return `<div class="nb-chart" style="left:${Math.round(over.numW + box.x * k)}px;top:${Math.round(over.head + box.y * k)}px;width:${Math.round(box.w * k)}px;height:${Math.round(box.h * k)}px">${svg.replace(/ width="\d+" height="\d+"/, ' width="100%" height="100%"')}</div>`;
     })
     .join('');
 }

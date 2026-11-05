@@ -27,6 +27,7 @@ const RULES: Rule[] = [
   // Never an agent's.
   ['*', /^\/api\/auth\//, 'refuse', 'The password and signing in are the user’s alone (Settings → App → Password).'],
   ['*', /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)(\/|$)/, 'refuse', YOUR_TOOLS],
+  ['*', /^\/api\/pdf\//, 'refuse', 'Use your PDF tools for that: pdf_look and pdf_form to see a PDF and its form, pdf_fill, pdf_write and pdf_pages to change it.'],
   ['*', /^\/api\/browser\/sessions\//, 'refuse', 'Use the browser tools (browser_open, browser_act, browser_read) for that.'],
   ['*', /^\/api\/computer\/sessions\//, 'refuse', 'Use the computer tools (computer_screenshot, computer_act) for that.'],
   ['POST', /^\/api\/computer\/permissions\//, 'refuse', 'macOS asks the user for these permissions itself: tell them to press Allow in Settings → Capabilities → Computer use.'],
@@ -35,6 +36,9 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(access-tokens|mcp\/tokens)$/, 'refuse', 'Tokens are made by the user in Settings, so their value never passes through an agent. Tell them where: Settings → App → Machines (access from other machines) or Connect other agents.'],
   ['POST', /^\/api\/apps\/[^/]+\/keys$/, 'refuse', 'An app’s API keys are made by the user, on its Share tab.'],
   ['POST|PATCH', /^\/api\/connections\/secrets/, 'refuse', 'A key’s value never passes through an agent: ask for it with request_secret, and the user enters it in a card.'],
+  // A signature is the user's own: agents list them by name, and place one with place_signature, which the user allows on a card.
+  ['*', /^\/api\/signatures\/./, 'refuse', 'A signature is the user’s own: you never see its picture, and only the user changes or deletes one (Settings → App → Signatures). Ask them to draw one with ask_signature, and place one by name with place_signature (they allow each placement on a card).'],
+  ['W', /^\/api\/signatures$/, 'refuse', 'Only the user draws their signature: ask for one with ask_signature, which shows them a card to draw it on.'],
   ['POST', /^\/api\/apps\/[^/]+\/secrets$/, 'refuse', 'A key’s value never passes through an agent: the user gives the keys an app needs on its page, its install card, or its card in a session (use_app shows it).'],
   ['*', /^\/api\/accounts\/[^/]+\/(login|logout)/, 'refuse', 'Signing in and out of an agent’s account is the user’s to do, in Settings → Agents → Accounts.'],
   ['W', /^\/api\/budget\//, 'refuse', 'Spending caps are the user’s to set: the session’s menu → Spending cap, or Options on the start page.'],

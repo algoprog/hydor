@@ -88,11 +88,12 @@ function Batch({ b }: { b: UploadBatch }) {
   );
 }
 
+/** Files' uploads, in the stack of trays at the bottom right (the Library's UploadTrays places it). */
 export function UploadsPanel() {
   const batches = useUploads((s) => s.batches);
   if (!batches.length) return null;
   return (
-    <div className="anim-pop fixed right-3 bottom-[calc(76px+var(--safe-bottom))] z-40 w-[min(92vw,360px)] overflow-hidden rounded-xl border border-line-2 bg-panel shadow-pop md:bottom-4">
+    <div className="anim-pop overflow-hidden rounded-xl border border-line-2 bg-panel shadow-pop">
       <div className="border-b border-line px-3 py-1.5 text-[11px] font-medium tracking-wide text-fg-3 uppercase">Uploads</div>
       <div className="max-h-[50vh] overflow-y-auto">
         {batches.map((b) => (

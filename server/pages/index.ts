@@ -15,18 +15,24 @@
 //   GET/POST /api/pages, GET/PATCH/DELETE /api/pages/:id, GET /api/pages/kept?key=, GET /api/pages/drafts?key=
 //   POST /api/pages/:id/versions, GET /api/pages/:id/versions/:v, POST …/restore, POST /api/pages/:id/copy
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
-//   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/docs/print, POST /api/pages/assets, GET /api/pages/assets/:sha
+//   GET/POST /api/pages/:id/comments (comments on a page's blocks: shared/page-comments.ts)
+//   POST /api/pages/file-edit, GET /api/pages/:id/export?format=, POST /api/pages/docs/print, POST /api/pages/assets, GET /api/pages/assets/:sha,
+//   POST /api/pages/video-still, POST /api/pages/videos, GET /api/pages/videos/:sha
 //   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
 //   GET/POST /api/pages/:id/notebook (where a notebook of the Library runs: notebooks.ts)
+//   POST /api/library/uploads, PUT/DELETE /api/library/uploads/:id, POST /api/library/move (files dropped on the Library: uploads.ts)
 //   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
 //   GET/POST /api/sites, DELETE /api/sites/:id, GET/POST /api/sites/requests/:id
 // Routes whose token is the permission (no sign-in, never the app's cookies at work):
-//   GET /pg/:token (the page's own address), /pg/:token/html, /pg/:token/manifest.webmanifest, POST /pg/:token/storage
+//   GET /pg/:token (the page's own address), /pg/:token/html, /pg/:token/manifest.webmanifest, POST /pg/:token/storage,
+//   GET /pg/video/:sha/:sig (a deck's video, its signed address the permission)
 //   GET /site/:token/* (published sites, sandboxed)
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { isAbsPath } from '../platform.ts';
 import os from 'node:os';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import type { FastifyRequest } from 'fastify';
 import type { PagesEvent, PublishRequest } from '../../shared/pages.ts';
 import { HttpError } from '../auth.ts';
@@ -38,22 +44,33 @@ import { confidentialKey, confidentialRun } from '../confidential/index.ts';
 import { sessionSpace, spaceChoice } from '../spaces/choice.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { carryComments } from '../spaces/share.ts';
-import { draftsOf, endDrafts, feedDraft, type ToolStream } from './drafts.ts';
+import { draftsOf, draftsOfPage, endDrafts, feedDraft, settleDraft, type ToolStream } from './drafts.ts';
 import { agentNotebook, dropWorkFolder, SAVE_NOTEBOOK_DESCRIPTION, SAVE_NOTEBOOK_SCHEMA, workFile, writeWorkFile } from './notebooks.ts';
 import { dropEdits, initEdits, noteEdit, noteFileEdit, takeEdits } from './edits.ts';
 import { getAsset, MAX_ASSET, putAsset, sweepAssets, takeIn } from './assets.ts';
+import { videoStillOf } from './video-still.ts';
+import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts';
+import { videoSrc } from '../../shared/slides.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
 import { fontFile, fontsCss } from './fonts.ts';
-import { agentDoc, docPage, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { agentDoc, docPage, readDoc, SAVE_DOC_DESCRIPTION, SAVE_DOC_SCHEMA } from './docs.ts';
+import { applyDocEdits } from '../../shared/doc-edits.ts';
+import { applyDeckEdits, changesSlides } from '../../shared/deck-edits.ts';
+import { applyBookEdits } from '../../shared/sheet-edits.ts';
+import { applyTexEdits } from '../../shared/tex-edits.ts';
+import { TEX_MAIN } from '../../shared/latex.ts';
 import { normalizeDoc } from '../../shared/docs.ts';
+import { commentsForAgent } from '../../shared/page-comments.ts';
+import { dbBlocks, dbKey, dbsForAgent, pageDatabases } from '../../shared/page-db.ts';
 import { agentTex, compileSummary, compileTex, readTex, SAVE_LATEX_DESCRIPTION, SAVE_LATEX_SCHEMA, texRoutes } from './latex.ts';
 import { arxivRoutes, dropPaperFolder } from './latex-arxiv.ts';
 import { checkRoutes, LATEX_CHECK } from './latex-check.ts';
-import { agentBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
-import { agentDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
-import { openFile, saveFile } from './filemodel.ts';
+import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
+import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
+import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
 import { kindForFile, kindOf, mustKind, type PageKind } from './kinds.ts';
 import { shellManifest, shellPage } from './shell.ts';
+import { uploadRoutes } from './uploads.ts';
 import { createRequest, decideRequest, getRequest, initSites, listSites, publish, serveSite, unpublish, unpublishPage } from './sites.ts';
 import {
   addVersion,
@@ -73,6 +90,9 @@ import {
   pageSource,
   pageToken,
   putValues,
+  pageComments,
+  changeComments,
+  storageMap,
   renamePage,
   resetPageLink,
   setPageSpace,
@@ -100,7 +120,7 @@ const LOOK =
   'Its look: unless the user asks for another (their brand, colours of their own, a style), make the page look like part of this app, in its theme: <body class="n-page">, and every colour from the page kit’s variables, which take the app’s current theme, light or dark as the app is, and the user’s own colours: var(--n-bg) the page, --n-card cards, --n-fg text, --n-muted quieter text, --n-line borders, --n-soft quiet fills, --n-accent (with --n-accent-fg on it, --n-accent-soft for tints), --n-ok, --n-warn, --n-err, --n-info, and --n-c1 to --n-c6 for the series of a chart or a diagram (a chart library takes them from getComputedStyle(document.body)); corners var(--n-radius); the app’s font comes with n-page (var(--n-mono) for code). Write no colours of your own and no prefers-color-scheme rules: the kit switches light and dark with the app.';
 const CLASSES =
   'Ready-made classes, all optional: .n-options > .n-option (rows: .n-letter, h3, p), .n-grid > .n-card (an img or .n-media, then .n-body), table.n-compare (.n-yes, .n-no, .n-best; wrap wide ones in .n-scroll), .n-proscons > .n-pros + .n-cons (h4, ul), .n-btn (.n-primary), .n-field (a label around an input), .n-row, .n-tag, .n-muted. A picked choice gets .n-selected. ' +
-  'Blocks as the user’s page editor writes them (Notion’s): ul.n-todo > li > input[type=checkbox] (checked when done) + span (its words); details.n-toggle > summary + blocks; .n-callout > span.n-callout-icon (an emoji) + div.n-callout-text; .n-cols > div per column; nav.n-toc (the editor fills it with links to the headings); pre.n-code; table.n-tbl; .n-cover (a div with a gradient background-image, or an img) then .n-icon (an emoji) before the first heading; a.n-video[data-video="https://www.youtube-nocookie.com/embed/ID"] > img (a video’s still, linked to the video); .n-math[data-tex] (KaTeX’s HTML, with <link id="n-katex"> to KaTeX’s CSS on jsDelivr); colours of words .n-tc-grey|brown|orange|yellow|green|blue|purple|pink|red, and behind them .n-hl-… (on a block or a span/mark).';
+  'Blocks as the user’s page editor writes them (Notion’s): ul.n-todo > li > input[type=checkbox] (checked when done) + span (its words); a block kept under a list’s item, where an item would be: li.n-block > the block (a p, a heading, a quote…; no marker) + the item’s own nested lists; details.n-toggle > summary + blocks; .n-callout > span.n-callout-icon (an emoji) + div.n-callout-text; .n-cols > div per column; nav.n-toc (the editor fills it with links to the headings); a database (Notion’s: a table, or a board of cards by a select column, whose rows the user adds and changes): <div class="n-db" data-db="tasks" data-title="Tasks" data-schema=\'{"cols":[{"name":"Task","kind":"text"},{"name":"Status","kind":"select","options":["To do","Doing","Done"]},{"name":"Due","kind":"date"}],"rows":[{"Task":"Book flights","Status":"To do"}],"view":"table"}\'></div> (kinds text, number, select, multi, date, check, link; "view": "board" with "group": a select column; data-schema gives its start: its rows then live in the page’s data, changed with save_page’s databases); pre.n-code[data-lang="python"] (code as plain text, coloured as it shows: data-lang is one of plain, bash, c, cpp, csharp, css, diff, go, html, java, js, json, kotlin, lua, markdown, php, python, ruby, rust, sql, swift, ts, yaml; left out, the page tells it from the code; plain <pre><code class="language-python"> is coloured too, by its class); table.n-tbl; .n-cover (a div with a gradient background-image, or an img) then .n-icon (an emoji) before the first heading; a.n-video[data-video="https://www.youtube-nocookie.com/embed/ID"] > img (a video’s still, linked to the video); a link to another of the user’s pages (get_page lists their ids): <a class="n-pagelink" href="/pages/ID" data-page="ID"><span class="n-pagelink-icon">its emoji, or nothing</span>its title</a>, which opens that page in the app; .n-math[data-tex] (KaTeX’s HTML, with <link id="n-katex"> to KaTeX’s CSS on jsDelivr); colours of words .n-tc-grey|brown|orange|yellow|green|blue|purple|pink|red, and behind them .n-hl-… (on a block or a span/mark).';
 
 const SHOW_HTML: RunTool = {
   name: 'show_html',
@@ -141,26 +161,87 @@ const SAVE_PAGE: RunTool = {
     'await hydor.storage.get(key) (the value, or null), set(key, value) (any JSON), remove(key), keys(); about 2 MB per page. localStorage keeps nothing.',
     'Leave out id to make a new page; give the id of a saved page (get_page lists them) to replace it with a new version:',
     'older versions stay restorable, and its stored data stays.',
+    'The user can leave comments on a page’s blocks in its editor; get_page shows them, and comments answers, resolves or adds them (with id; leave html out to only answer them).',
+    'A database block’s rows are the page’s own data: get_page shows them, and databases adds, changes or removes them (with id; leave html out to only change them).',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'A saved page’s id, to save a new version of it.' },
       title: { type: 'string', description: 'The page’s name in the Library and on a home screen: "Workout log".' },
-      html: { type: 'string', description: 'The whole page, <!doctype html> included.' },
+      html: { type: 'string', description: 'The whole page, <!doctype html> included. With id and comments or databases, leave it out to only answer the comments or change the rows.' },
+      databases: {
+        type: 'object',
+        description:
+          'Changes to the page’s database blocks, by their names (data-db): {"tasks": {"add": [{"Task": "Book flights", "Status": "To do"}], "update": [{"id": "r1", "Status": "Done"}], "remove": ["r2"]}}; also "rows" (all of them anew), "cols" (the columns: [{"name", "kind": text|number|select|multi|date|check|link, "options": [names]}]) and "title". Values by column name: get_page shows each database’s columns, rows and their ids.',
+      },
+      comments: {
+        type: 'array',
+        description:
+          'Changes to the comments on the page’s blocks (get_page lists them with their ids): {"id": "c1", "reply": "what you did"}, adding "resolve": true once one is dealt with ("reopen": true opens it again); a comment of your own: {"text": "…", "on": "words of the block it is about"}.',
+        items: { type: 'object' },
+      },
       project: { type: 'string', description: 'The project (by its name) to keep it in; left out, this session’s project.' },
     },
-    required: ['title', 'html'],
+    required: ['title'],
   },
   async run(a, ctx) {
     const db = ctx.deps.db;
     const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
     const other = id ? kindOf(mustPage(db, id).kind) : null;
     if (other) throw new Error(`Page ${id} is a ${other.noun}: change it with ${other.tool}.`);
+    const answering = a.comments !== undefined && a.comments !== null;
+    const rows = a.databases && typeof a.databases === 'object' && !Array.isArray(a.databases) ? (a.databases as Record<string, unknown>) : null;
+    if ((a.html === undefined || a.html === null || a.html === '') && !(id && (answering || rows)))
+      throw new Error('html: give the whole page (only answering comments or changing a database’s rows, with id, leaves it out).');
+    // Its databases' rows (the page's own data, shared/page-db.ts): changed as asked, kept as the page stores them.
+    const fill = async (pid: string) => {
+      if (!rows) return '';
+      const html = (await pageHtml(db, pid))?.html ?? '';
+      const blocks = dbBlocks(html);
+      const stored = storageMap(db, pid);
+      const D = pageDatabases();
+      const notes: string[] = [];
+      const puts: [string, string][] = [];
+      for (const [name, ch] of Object.entries(rows).slice(0, 20)) {
+        const b = blocks.find((x) => x.name === name);
+        if (!b) {
+          notes.push(`The page has no database "${name}": put <div class="n-db" data-db="${name}"></div> in its html first.`);
+          continue;
+        }
+        let cur: unknown = b.schema;
+        try {
+          if (stored[dbKey(name)]) cur = JSON.parse(stored[dbKey(name)]);
+        } catch {}
+        const next = D.change(D.normalize(cur, b.title), ch);
+        puts.push([dbKey(name), JSON.stringify(next)]);
+        notes.push(`Database ${name}: ${next.rows.length} row${next.rows.length === 1 ? '' : 's'}.`);
+      }
+      try {
+        if (puts.length) putValues(db, pid, puts);
+      } catch (e) {
+        return ` Its databases were left as they were: ${(e as Error).message}.`;
+      }
+      if (puts.length) tell(ctx.deps, { what: 'pages' });
+      return notes.length ? ` ${notes.join(' ')}` : '';
+    };
+    // Its comments: answered, resolved or added (shared/page-comments.ts), after the new version if there is one.
+    const comment = (pid: string) => {
+      if (!answering) return '';
+      const r = changeComments(db, pid, a.comments, 'agent');
+      tell(ctx.deps, { what: 'comments', id: pid });
+      const open = r.list.filter((c) => !c.resolved).length;
+      return [` Its comments: ${open} open, ${r.list.length - open} resolved.`, ...r.notes].join(' ');
+    };
+    if (a.html === undefined || a.html === null || a.html === '') {
+      const page = mustPage(db, id!);
+      const done = [answering && 'answered its comments', rows && 'changed its databases'].filter(Boolean).join(' and ');
+      return `Saved "${page.title}" (page ${page.id}): ${done}; the page itself is as it was.${await fill(page.id)}${comment(page.id)}`;
+    }
     const p = id ? addVersion(db, id, { title: a.title, html: a.html, by: 'agent' }) : createPage(db, { title: a.title, html: a.html, by: 'agent', ...madeBy(ctx, a.project) });
     tell(ctx.deps, { what: 'pages' });
     refreshThumbs(ctx.deps, [p.id]);
-    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.`;
+    return `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can open it at its own address and add it to a phone’s home screen.${await fill(p.id)}${comment(p.id)}`;
   },
 };
 
@@ -171,10 +252,17 @@ const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
   description:
-    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML and the data it stores (to change it with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it.',
-  inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'A saved page’s id.' } } },
+    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents and Jupyter notebooks (Pages). With no id: each one’s id, title, kind, version and last change. With an id: a page’s current HTML, the data it stores and the comments on its blocks (to change it, or answer them, with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project or a notebook’s cells and outputs as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex or save_notebook), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'A saved page’s id.' },
+      path: { type: 'string', description: 'Instead of id: a .tex file of this computer, for the comments kept on its project.' },
+    },
+  },
   async run(a, ctx) {
     const db = ctx.deps.db;
+    if (typeof a.path === 'string' && a.path.trim() && !(typeof a.id === 'string' && a.id.trim())) return texFileForAgent(db, fromSession(ctx.cwd, a.path.trim()));
     const id = typeof a.id === 'string' ? a.id.trim() : '';
     if (!id) {
       const list = listPages(db).filter((p) => !outOfReach(ctx, p));
@@ -197,9 +285,13 @@ const GET_PAGE: RunTool = {
     const by = p.who ? ` It was last changed by ${p.who}, someone the user shared the project with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ' It was last changed by the user in the page editor: keep their changes.' : '';
     // Agents' tool output is cut further on anyway: say so here rather than lose the end unnoticed.
     const cut = html.length > 100_000 ? `${html.slice(0, 100_000)}\n… (cut: the page is ${Math.round(html.length / 1024)} KB; write the whole page anew to change it)` : html;
-    return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}HTML:\n${cut}`;
+    const notes = commentsForAgent(pageComments(db, id));
+    const dbs = dbsForAgent(html, storageMap(db, id));
+    return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${by}\n\n${data ? `Stored data:\n${data}\n\n` : 'It stores no data yet.\n\n'}${dbs ? `${dbs}\n\n` : ''}${notes ? `${notes}\n\n` : ''}HTML:\n${cut}`;
   },
 };
+
+const isObjIn = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** The page an agent's save_slides, save_doc… names to change (it must be of that kind), or null to make a new one. */
 function changing(db: Deps['db'], a: Record<string, unknown>, kind: PageKind): string | null {
@@ -228,14 +320,53 @@ const withProject = (schema: { properties: Record<string, unknown> } & Record<st
   properties: { ...schema.properties, project: { type: 'string', description: 'The project (by its name) to keep it in; left out, this session’s project.' } },
 });
 
-/** Keeps what an agent (or an app's step) made: a new version of the page it named, or a new page of its own. */
+/**
+ * Each session's turn now: made anew with each message of its user, or with the first save of a turn that began
+ * without one (a command, or one its agent began itself), and forgotten when the turn ends. Its agent's saves of a page
+ * in one turn are kept as one version (store.ts addVersion).
+ */
+const turns = new Map<string, string>();
+const newTurn = (key: string) => {
+  const t = `${key}#${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`;
+  turns.set(key, t);
+  return t;
+};
+
+/**
+ * Keeps what an agent (or an app's step) made: a new version of the page it named, or a new page of its own (in the
+ * project it names, else its session's). Its saves of a page in a row, in one turn, are kept as one version (store.ts
+ * addVersion), so working in steps does not fill the Versions list.
+ */
 function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknown, model: unknown, project?: unknown) {
   const db = ctx.deps.db;
-  const p = id ? addVersion(db, id, { title, model, by: 'agent' }) : createPage(db, { title, kind, model, by: 'agent', ...madeBy(ctx, project) });
+  const turn = turns.get(ctx.key) ?? newTurn(ctx.key);
+  let folded: number | undefined;
+  const p = id
+    ? addVersion(db, id, { title, model, by: 'agent', turn, onFold: (v) => (folded = v) })
+    : createPage(db, { title, kind, model, by: 'agent', ...madeBy(ctx, project), turn });
   tell(ctx.deps, { what: 'pages' });
   refreshThumbs(ctx.deps, [p.id]);
-  return p;
+  // The draft the user watched while the call came in gives way to this version.
+  settleDraft(ctx.deps, ctx.key, mustKind(kind).tool, id, { saved: { pageId: p.id, version: p.version } });
+  return { ...p, folded };
 }
+
+/** For the agent, when its save took the place of its own save before it (keepModel). */
+const foldNote = (p: { folded?: number }) => (p.folded ? [`It took the place of version ${p.folded}, your save of it a moment ago: saves in a row are kept as one version.`] : []);
+
+/** A save whose call the user watched come in (drafts.ts): when it fails, its draft goes and the page shows as it was. */
+const watched = (tool: RunTool): RunTool => ({
+  ...tool,
+  async run(a, ctx) {
+    try {
+      return await tool.run(a, ctx);
+    } catch (e) {
+      const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : null;
+      settleDraft(ctx.deps, ctx.key, tool.name, id, { failed: true });
+      throw e;
+    }
+  },
+});
 
 const SAVE_SLIDES: RunTool = {
   name: 'save_slides',
@@ -243,11 +374,22 @@ const SAVE_SLIDES: RunTool = {
   inputSchema: withProject(SAVE_SLIDES_SCHEMA),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'slides');
-    const { deck, notes } = await agentDeck(ctx.deps.db, { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides }, ctx.cwd);
+    const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
+    let input: Record<string, unknown> = { ratio: a.ratio, theme: a.theme, slides: a.slides, footer: a.footer, guides: a.guides, comments: a.comments };
+    // Some slides changed, added or taken out: the deck they make, its look as it was unless said.
+    if (changesSlides(a)) {
+      if (!id || !prev) throw new Error('change, add and remove change a saved deck: give its id (get_page lists them), or send the whole deck as slides.');
+      if (a.slides !== undefined) throw new Error('Give slides (the whole deck) or change, add and remove (some of its slides), not both.');
+      const was = readDeck(prev);
+      input = { ratio: a.ratio ?? was.ratio, theme: a.theme ?? was.theme, footer: a.footer ?? was.footer, guides: a.guides ?? was.guides, comments: a.comments, slides: applyDeckEdits(was, a).slides };
+    }
+    // The version it changes: the parts it sends back as they were keep their look.
+    const { deck, notes } = await agentDeck(ctx.deps.db, input, ctx.cwd, prev);
     const p = keepModel(ctx, id, 'slides', a.title, deck, a.project);
     const n = deck.slides.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} slide${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it, present it and export it to PowerPoint or PDF.`,
+      ...foldNote(p),
       ...notes,
     ].join(' ');
   },
@@ -259,12 +401,21 @@ const SAVE_DOC: RunTool = {
   inputSchema: withProject(SAVE_DOC_SCHEMA),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'doc');
-    const { id: _id, title: _title, project: _project, ...rest } = a;
+    const { id: _id, title: _title, project: _project, edits, ...rest } = a;
+    const prev = id ? pageSource(ctx.deps.db, id)?.text : undefined;
+    // Small changes: made on its Markdown as get_page gives it, then saved as the whole document sent back would be.
+    if (edits !== undefined && edits !== null) {
+      if (!id || !prev) throw new Error('edits change a saved document: give its id (get_page lists them), or send the whole document as markdown.');
+      if (typeof rest.markdown === 'string' || Array.isArray(rest.blocks)) throw new Error('Give edits (small changes) or the whole document (markdown or blocks), not both.');
+      if (!Array.isArray(edits) || !edits.length) throw new Error('edits is a list of changes, such as [{"find": "…", "replace": "…"}]: see save_doc’s description.');
+      rest.markdown = applyDocEdits(readDoc(prev), edits)!.markdown;
+    }
     // The version it changes: what the agent leaves out (paper, font) stays, and unchanged blocks keep their ids.
-    const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, id ? pageSource(ctx.deps.db, id)?.text : undefined);
+    const { doc, notes } = await agentDoc(ctx.deps.db, rest, ctx.cwd, prev);
     const p = keepModel(ctx, id, 'doc', a.title, doc, a.project);
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Word or Google Docs and export it as a Word document, a PDF or Markdown.`,
+      ...foldNote(p),
       ...notes,
     ].join(' ');
   },
@@ -276,12 +427,22 @@ const SAVE_SHEET: RunTool = {
   inputSchema: withProject(SAVE_SHEET_SCHEMA),
   async run(a, ctx) {
     const id = changing(ctx.deps.db, a, 'sheet');
-    const { id: _id, title: _title, project: _project, ...rest } = a;
-    const { book, notes } = await agentBook(rest, ctx.cwd);
+    const { id: _id, title: _title, project: _project, update, ...rest } = a;
+    const prev = id ? readBook(pageSource(ctx.deps.db, id)!.text) : undefined;
+    // Some cells changed: on top of the sheets they name, the others as they are.
+    if (update !== undefined && update !== null) {
+      if (!prev) throw new Error('update changes a saved spreadsheet: give its id (get_page lists them), or send the whole workbook as sheets.');
+      if (rest.sheets !== undefined || rest.file !== undefined) throw new Error('Give update (some cells) or sheets (the whole workbook), not both.');
+      if (!Array.isArray(update) || !update.length) throw new Error('update is a list of changes, such as [{"sheet": "Budget", "cells": {"B7": 1250}}]: see save_sheet’s description.');
+      rest.sheets = applyBookEdits(prev, update).sheets;
+    }
+    // The version it changes: its comments' threads stay as they are, changed only by the comments asked for.
+    const { book, notes } = await agentBook(rest, ctx.cwd, prev);
     const p = keepModel(ctx, id, 'sheet', a.title, book, a.project);
     const n = book.sheets.length;
     return [
       `Saved "${p.title}" (page ${p.id}, version ${p.version}), ${n} sheet${n === 1 ? '' : 's'}. It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit it as in Excel or Google Sheets and export it as an Excel file, a CSV or a PDF.`,
+      ...foldNote(p),
       ...notes,
     ].join(' ');
   },
@@ -293,16 +454,39 @@ const SAVE_LATEX: RunTool = {
   inputSchema: withProject(SAVE_LATEX_SCHEMA),
   async run(a, ctx) {
     const db = ctx.deps.db;
+    // A file of this computer's: its comments only (the app keeps them); the file the agent changes itself.
+    if (typeof a.path === 'string' && a.path.trim() && !(typeof a.id === 'string' && a.id.trim())) {
+      const r = await agentFileComments(db, fromSession(ctx.cwd, a.path.trim()), a.comments);
+      tell(ctx.deps, { what: 'file-comments', paths: r.paths });
+      // No page is saved: nothing to watch come in.
+      settleDraft(ctx.deps, ctx.key, 'save_latex', null, { failed: true });
+      return r.text;
+    }
     const id = changing(db, a, 'tex');
-    const { id: _id, project: _project, ...rest } = a;
+    const { id: _id, project: _project, edits, ...rest } = a;
+    const prev = id ? readTex(pageSource(db, id)!.text) : undefined;
+    // Small changes in its files: made on them as get_page gives them, the files they change then sent as written.
+    if (edits !== undefined && edits !== null) {
+      if (!prev) throw new Error('edits change a saved LaTeX document: give its id (get_page lists them), or send its files with source and files.');
+      if (typeof rest.source === 'string' || typeof rest.main === 'string' || typeof rest.tex === 'string') throw new Error('Give edits (small changes) or source (the whole of main.tex), not both.');
+      if (!Array.isArray(edits) || !edits.length) throw new Error('edits is a list of changes, such as [{"find": "…", "replace": "…"}]: see save_latex’s description.');
+      const files = new Map<string, string>([[TEX_MAIN, prev.main], ...prev.files.map((f) => [f.name, f.text] as [string, string])]);
+      const out = applyTexEdits(files, edits).files;
+      rest.source = out.get(TEX_MAIN);
+      const changed = Object.fromEntries([...out].filter(([n, t]) => n !== TEX_MAIN && files.get(n) !== t));
+      // Beside the files it sends itself, in either form (by name, or a list).
+      if (Object.keys(changed).length)
+        rest.files = Array.isArray(rest.files) ? [...rest.files, ...Object.entries(changed).map(([name, text]) => ({ name, text }))] : { ...(isObjIn(rest.files) ? rest.files : {}), ...changed };
+    }
     // The version it changes: the files and pictures the agent leaves out stay. (The title goes in a template's text.)
-    const { doc, notes } = await agentTex(db, rest, ctx.cwd, id ? readTex(pageSource(db, id)!.text) : undefined);
+    const { doc, notes } = await agentTex(db, rest, ctx.cwd, prev);
     // Typeset first: the agent hears of errors to fix, and the picture in the list comes from this run.
     const r = await compileTex(db, doc);
     const p = keepModel(ctx, id, 'tex', a.title, doc, a.project);
     return [
       [
         `Saved "${p.title}" (page ${p.id}, version ${p.version}). It shows in the conversation and in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user can edit the source beside its typeset pages and export it as a PDF, its .tex source or the project as a .zip.`,
+        ...foldNote(p),
         ...notes,
       ].join(' '),
       compileSummary(r),
@@ -350,7 +534,7 @@ const EXPORT_PAGE: RunTool = {
     const file = fs.existsSync(dest) && fs.statSync(dest).isDirectory() ? path.join(dest, f.name) : dest;
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, f.data);
-    return `Wrote ${file} (${Math.max(1, Math.round(f.data.length / 1024))} KB). Hand it to the user with present_files.`;
+    return `Wrote ${file} (${Math.max(1, Math.round(f.data.length / 1024))} KB).${f.note ? ` ${f.note}` : ''} Hand it to the user with present_files.`;
   },
 };
 
@@ -414,16 +598,16 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
   if (!p) return null;
   const k = kindOf(p.kind);
   const how: Record<string, string> = {
-    slides: 'Read it with get_page (each slide and part has its id; slides are numbered from 1 in the order they show), change what they ask, and save it with save_slides and that id. "This slide" or "slide 3" means the one they name; "every slide" means all of them.',
-    doc: 'Read it with get_page, change what they ask (a section is a heading and what follows it, up to the next heading of its level), and save the whole document with save_doc and that id.',
-    sheet: 'Read it with get_page, change what they ask (cells and ranges as A1 or B2:D9, on the sheet they name), and save the whole workbook with save_sheet and that id; keep formulas as formulas.',
-    tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (what you leave out stays); it is typeset again, and you hear of any errors: fix them.',
+    slides: 'Read it with get_page (each slide and part has its id; slides are numbered from 1 in the order they show), change what they ask, and save it with save_slides and that id: only the slides that change (change, add, remove) when the rest stays as it is. "This slide" or "slide 3" means the one they name; "every slide" means all of them.',
+    doc: 'Read it with get_page, change what they ask (a section is a heading and what follows it, up to the next heading of its level), and save it with save_doc and that id: edits for a few changes (a section, words found and replaced), else the whole document.',
+    sheet: 'Read it with get_page, change what they ask (cells and ranges as A1 or B2:D9, on the sheet they name), and save it with save_sheet and that id: update for the cells that change, else the whole workbook; keep formulas as formulas.',
+    tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (edits for small changes in a file; what you leave out stays); it is typeset again, and you hear of any errors: fix them.',
     notebook: 'Read it with get_page (its cells in order, numbered from 1, each with its id and what its last run showed), change what they ask ("cell 3" is the third, as the notebook shows them), and save the whole notebook with save_notebook and that id, keeping the cells, ids and outputs you do not change. To run code and keep real outputs, export it (export_page, ipynb) into your folder, run it there, and save it back with save_notebook and path. To answer a question about it, read it and answer.',
   };
   return [
     `The user is asking from their ${k?.noun ?? 'page'} "${p.title}" (saved page ${p.id}), open in front of them in the Library: their messages are about changing it.`,
     k ? how[p.kind!] : 'Read it with get_page and save the whole changed page with save_page and that id. When they name a part, change that part, and the rest only as needed.',
-    'What they look at updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',
+    'What they look at shows your changes as you write them, and updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',
   ].join(' ');
 }
 
@@ -457,6 +641,8 @@ function routes(d: Deps) {
   texRoutes(app, db);
   checkRoutes(app, db);
   arxivRoutes(app, db);
+  // Files dropped on the Library or picked with Upload files, and files the desktop app moves in by their path.
+  uploadRoutes(d);
   const P = (req: FastifyRequest) => req.params as Record<string, string>;
   const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
   const key = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 300) : undefined);
@@ -474,7 +660,11 @@ function routes(d: Deps) {
   });
   app.get('/api/pages/kept', async (req) => ({ items: keptIn(db, String((req.query as { key?: string }).key ?? '')) }));
   /** The pages an agent of this session is writing now, whole so far. */
-  app.get('/api/pages/drafts', async (req) => ({ drafts: draftsOf(String((req.query as { key?: string }).key ?? '')) }));
+  app.get('/api/pages/drafts', async (req) => {
+    const q = req.query as { key?: string; page?: string };
+    // A page's: the saves of it being written now, from any session (its editor, opened mid-way).
+    return { drafts: q.page ? draftsOfPage(String(q.page)) : draftsOf(String(q.key ?? '')) };
+  });
   /**
    * Keep: a page from the conversation (and what it stored meanwhile) goes into Pages; with `edited`, the
    * user's changed version goes on top of it (and the agent hears of it). Without `item`, a page the user
@@ -524,20 +714,24 @@ function routes(d: Deps) {
     const from = typeof b.path === 'string' && b.path.trim() ? resolvePath(b.path) : null;
     const name = from ? path.basename(from) : typeof b.name === 'string' ? b.name.slice(0, 300) : '';
     const kind = kindForFile(name);
+    // PowerPoint's old binary files are another format altogether.
+    if (/\.(ppt|pps|pot)$/i.test(name)) throw new HttpError(415, 'PowerPoint 97–2003 files (.ppt) cannot be opened here: save it as a .pptx in PowerPoint (or LibreOffice) and open that.');
     if (!kind || (!from && typeof b.data !== 'string')) {
-      throw new HttpError(400, 'Send a file’s path, or its name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
+      throw new HttpError(400, 'Send a file’s path, or its name and its data (base64): a .docx, .md, .txt or .html document, an .xlsx, .ods, .csv or .tsv spreadsheet, a PowerPoint deck (.pptx), a .tex file or a LaTeX project’s .zip, or a Jupyter notebook (.ipynb).');
     }
     let data: Buffer;
     if (from) {
       const st = await fs.promises.stat(from).catch(() => null);
       if (!st?.isFile()) throw new HttpError(404, `Not found: ${from}`);
-      if (st.size > 30 * 1024 * 1024) throw new HttpError(413, 'It is over 30 MB, too large to keep in the Library');
+      // A PowerPoint file may be larger than other files: its videos come along (as large as the slides editor takes).
+      const max = kind === 'slides' ? 200 : 30;
+      if (st.size > max * 1024 * 1024) throw new HttpError(413, `It is over ${max} MB, too large to keep in the Library`);
       data = await fs.promises.readFile(from);
     } else data = Buffer.from(String(b.data), 'base64');
     const k = mustKind(kind);
     let got: Awaited<ReturnType<NonNullable<typeof k.fromFile>>>;
     try {
-      got = await k.fromFile!(data, name);
+      got = await k.fromFile!(data, name, db);
     } catch (e) {
       throw new HttpError(422, `That file could not be read: ${(e as Error).message}`);
     }
@@ -626,6 +820,7 @@ function routes(d: Deps) {
   });
   /** A file of this computer in one of the editors (Files opens Word, Excel, CSV and LaTeX files so), and saved back to it. */
   app.get('/api/pages/file', async (req) => openFile(db, String((req.query as { path?: string }).path ?? '')));
+  app.get('/api/pages/file/comments', async (req) => openFileComments(db, String((req.query as { path?: string }).path ?? '')));
   app.put('/api/pages/file', { bodyLimit: 40 * 1024 * 1024 }, async (req) => saveFile(db, B(req)));
   /** The user changed an HTML file in the page editor beside a conversation: its agent hears of it with their next message. */
   app.post('/api/pages/file-edit', { bodyLimit: 12 * 1024 * 1024 }, async (req) => {
@@ -649,6 +844,16 @@ function routes(d: Deps) {
     tell(d, { what: 'pages' });
     return { ok: true };
   });
+  /** Comments on a page's blocks, as its editor shows them; changes to them as a list (see PageCommentOp), made by the user. */
+  app.get('/api/pages/:id/comments', async (req) => {
+    mustPage(db, P(req).id);
+    return { comments: pageComments(db, P(req).id) };
+  });
+  app.post('/api/pages/:id/comments', async (req) => {
+    const r = changeComments(db, P(req).id, B(req).ops, 'user');
+    tell(d, { what: 'comments', id: P(req).id });
+    return { comments: r.list, added: r.added };
+  });
   /** Its picture in Pages (404 until it is taken; the pages hear { what: 'thumb' } when it is). */
   app.get('/api/pages/:id/thumb', async (req, reply) => {
     const f = thumbFile(db, P(req).id);
@@ -666,6 +871,8 @@ function routes(d: Deps) {
     const format = String(q.format ?? '') as ExportFormat;
     if (!EXPORT_TYPES[format]) throw new HttpError(400, `format is one of ${Object.keys(EXPORT_TYPES).join(', ')}`);
     const f = await exportPage(db, P(req).id, { format, version: q.v ? Number(q.v) : undefined, paper: q.paper === 'letter' ? 'letter' : 'a4', slide: q.slide ? Number(q.slide) : undefined });
+    // What there is to say of it (a PowerPoint file's fonts inside it, and which compressed), beside it.
+    if (f.note) reply.header('X-Export-Note', f.note.replace(/[^\x20-\x7e]/g, '?'));
     return reply
       .header('Cache-Control', 'no-store')
       .header('Content-Disposition', `attachment; filename="${f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(f.name)}`)
@@ -701,6 +908,21 @@ function routes(d: Deps) {
     }
     throw new HttpError(400, 'Send data (a data: address) or url');
   });
+  /** A YouTube or Vimeo video's still, fetched here and kept as a picture (for a video put on a slide or a page): its source. */
+  app.post('/api/pages/video-still', async (req) => {
+    const url = B(req).url;
+    if (typeof url !== 'string' || !videoSrc(url)) throw new HttpError(400, 'url is the address of a video on YouTube or Vimeo');
+    const src = await videoStillOf(db, url);
+    if (!src) throw new HttpError(422, 'That video’s still could not be had: it may be private, or its site could not be reached');
+    return { src };
+  });
+  /** A video for a deck from this device, in pieces sent in order (the bytes themselves): the last one gives its source. */
+  app.post('/api/pages/videos', async (req) => {
+    const body = req.body as Readable | undefined;
+    if (!body || typeof body.pipe !== 'function') throw new HttpError(400, 'Send the video’s bytes (application/octet-stream), a piece at a time');
+    return takeVideoPiece(db, body, req.query as Record<string, string>);
+  });
+  app.get('/api/pages/videos/:sha', async (req, reply) => sendVideo(req, reply, getVideo(db, P(req).sha)));
   app.get('/api/pages/assets/:sha', async (req, reply) => {
     const a = getAsset(db, P(req).sha);
     if (!a) return reply.code(404).send({ error: 'No such picture' });
@@ -797,6 +1019,13 @@ function routes(d: Deps) {
     if (!p) return reply.code(404).send({ error: 'Not found' });
     return reply.header('Cache-Control', 'no-cache').type('application/manifest+json').send(JSON.stringify(shellManifest(P(req).token, p.title)));
   });
+  // A deck's video from a device, for what opens without the app's sign-in (a deck's own page, published copies, the
+  // conversation's frame): the address, signed by this server, is the permission.
+  app.get('/pg/video/:sha/:sig', async (req, reply) => {
+    const { sha, sig } = P(req);
+    reply.header('X-Robots-Tag', 'noindex, nofollow');
+    return videoAddressOk(sha, sig) ? sendVideo(req, reply, getVideo(db, sha)) : reply.code(404).send({ error: 'No such video' });
+  });
   app.post('/pg/:token/storage', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
     if (!sameOrigin(req)) return reply.code(403).send({ error: 'Cross-origin request refused' });
     const p = byToken(req);
@@ -815,19 +1044,24 @@ function routes(d: Deps) {
 export const pages: Feature = {
   id: 'pages',
   routes,
-  tools: () => [SHOW_HTML, SAVE_PAGE, SAVE_SLIDES, SAVE_DOC, SAVE_SHEET, SAVE_LATEX, SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK],
+  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK],
   spawn: (s, d) => {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
     return { instructions: ask ? [INSTRUCTIONS, ask] : [INSTRUCTIONS] };
   },
-  // The pages the user changed in the editor, with their next message.
-  beforeMessage: (key, d) => takeEdits(d.db, key),
+  // The pages the user changed in the editor, with their next message (which starts a new turn of saves).
+  beforeMessage: (key, d) => {
+    newTurn(key);
+    return takeEdits(d.db, key);
+  },
   start(d) {
     setCaptureDb(d.db);
     d.sessions.on('toolstream', (key: string, e: ToolStream) => feedDraft(d, key, e));
-    // A turn that ended (or an agent that stopped) leaves no page being written.
+    // A turn that ended (or an agent that stopped) leaves no page being written, and its saves are done with.
     d.sessions.on('live', (key: string, live: { status?: string } | null) => {
-      if (!live || !['working', 'waiting', 'starting'].includes(live.status ?? '')) endDrafts(d, key);
+      if (live && ['working', 'waiting', 'starting'].includes(live.status ?? '')) return;
+      endDrafts(d, key);
+      turns.delete(key);
     });
     enableThumbs();
     setTimeout(() => refreshThumbs(d), 30_000).unref();

@@ -108,6 +108,7 @@ export function Picked({
   const save = () => {
     if (img && edit) engine.image(img.id, { [edit]: text.replace(/\s+/g, ' ').trim() || undefined });
     setEdit(null);
+    engine.refocusSoon();
   };
   return (
     <>
@@ -164,7 +165,7 @@ export function Picked({
           </Tool>
         </div>
       )}
-      <Popover anchor={edit === 'alt' ? altRef : capRef} open={!!edit} onClose={() => setEdit(null)} width={300} title={edit === 'alt' ? 'Description' : 'Caption'}>
+      <Popover anchor={edit === 'alt' ? altRef : capRef} open={!!edit} onClose={() => (setEdit(null), engine.refocusSoon())} width={300} title={edit === 'alt' ? 'Description' : 'Caption'}>
         <form
           className="space-y-2 p-2"
           onSubmit={(e) => {

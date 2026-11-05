@@ -1,13 +1,15 @@
 // What computer use does, worked out before anything touches the computer: the agent's actions checked and turned
-// into the small steps each system's driver takes (driver.ts on a Mac, windows.ts, linux.ts), points on the screen
-// from the screenshot's pixels, keys by each system's own codes (macOS's key codes, Windows' virtual-key codes, X11's
-// keysyms), what each action did in words, and the sizes of pictures. Nothing here runs a program, so the tests run it
-// on any computer.
+// into the small steps each system's driver takes (driver.ts on a Mac, windows.ts, linux.ts), the pointer gliding to
+// where each acts instead of jumping, points on the screen from the screenshot's pixels, keys by each system's own codes
+// (macOS's key codes, Windows' virtual-key codes, X11's keysyms), what the overlay over the screen shows of the agent's
+// pointer and when, where each action was on the picture after it, what each did in words, and the sizes of pictures.
+// Nothing here runs a program, so the tests run it on any computer.
 //
 // Coordinates: the agent sees the main display scaled down to MAX_SIDE pixels on its longer side, and names pixels of
 // that picture. macOS posts events in points (a Retina display has two pixels to a point, and a scaled resolution
 // other ratios); Windows and X11 in the screen's own pixels. A pixel of the picture maps to the screen by the
 // display's size there over the picture's size in pixels.
+import type { PointerAct, StepMark } from '../../shared/pointer.ts';
 
 /** The longer side of a screenshot, in pixels: what models read well (the screen is scaled down to it, never up). */
 export const MAX_SIDE = 1280;
@@ -478,6 +480,8 @@ export function pressesEscape(a: Action, km: Keymap): boolean {
 
 /** The driver's small steps (driver.ts), in points. */
 export type Op =
+  /** The pointer to (x, y) in small steps over `ms` (each driver eases it in and out), so the eye can follow it. */
+  | { op: 'glide'; x: number; y: number; ms: number }
   | { op: 'move'; x: number; y: number }
   | { op: 'click'; x?: number; y?: number; button: 0 | 1 | 2; count: number; mods: number[]; flags: number }
   | { op: 'drag'; x1: number; y1: number; x2: number; y2: number }
@@ -495,62 +499,174 @@ export type Op =
 const BUTTON: Record<Button, 0 | 1 | 2> = { left: 0, right: 1, middle: 2 };
 /** A pause between actions, for the app to take the last one in (a click that focuses a field before typing). */
 const BETWEEN = 120;
+/** How long the pointer glides to where an action is ("a quarter of a second"), instead of jumping there. */
+export const GLIDE_MS = 240;
 
-/** The actions as the driver's steps. Coordinates need the geometry of the screenshot they came from. */
-export function opsFor(actions: Action[], g: Geometry | undefined): Op[] {
+/** One action as the driver's steps: a glide to where it acts first, when it acts somewhere. */
+function opsOf(a: Action, g: Geometry | undefined): Op[] {
   const pt = (p: Point) => {
     if (!g) throw new Error(NEEDS_SCREENSHOT);
     return toScreen(p, g);
   };
-  const out: Op[] = [];
+  const glide = (p: Point): Op => ({ op: 'glide', ...pt(p), ms: GLIDE_MS });
+  switch (a.do) {
+    case 'click':
+      return [...(a.at ? [glide(a.at)] : []), { op: 'click', ...(a.at ? pt(a.at) : {}), button: BUTTON[a.button], count: a.count, mods: a.mods, flags: a.flags }];
+    case 'move':
+      return [glide(a.at), { op: 'move', ...pt(a.at) }];
+    case 'drag': {
+      const f = pt(a.from);
+      const t = pt(a.to);
+      return [glide(a.from), { op: 'drag', x1: f.x, y1: f.y, x2: t.x, y2: t.y }];
+    }
+    case 'down':
+    case 'up':
+      return [...(a.at ? [glide(a.at)] : []), { op: a.do, ...(a.at ? pt(a.at) : {}) }];
+    case 'scroll': {
+      // Wheel deltas: up and left are positive (the content moves down, or right).
+      const d = a.direction;
+      return [...(a.at ? [glide(a.at)] : []), { op: 'scroll', ...(a.at ? pt(a.at) : {}), dy: d === 'up' ? NOTCH : d === 'down' ? -NOTCH : 0, dx: d === 'left' ? NOTCH : d === 'right' ? -NOTCH : 0, n: a.amount }];
+    }
+    case 'type':
+      return [{ op: 'type', text: a.text }];
+    case 'key':
+      return a.strokes.flatMap((s, k): Op[] => [...(k > 0 ? [{ op: 'sleep', ms: 40 } as Op] : []), s.code === undefined ? { op: 'type', text: s.char ?? '' } : { op: 'key', code: s.code, mods: s.mods, flags: s.flags }]);
+    case 'hold':
+      return [{ op: 'hold', code: a.stroke.code, mods: a.stroke.mods, flags: a.stroke.flags, ms: Math.round(a.seconds * 1000) }];
+    case 'wait':
+      return [{ op: 'sleep', ms: Math.round(a.seconds * 1000) }];
+    case 'cursor':
+      return [{ op: 'pos' }];
+    case 'open':
+      throw new Error('open_app is not one of the driver’s steps');
+  }
+}
+
+/** The actions as the driver's steps. Coordinates need the geometry of the screenshot they came from. */
+export function opsFor(actions: Action[], g: Geometry | undefined): Op[] {
+  return actions.flatMap((a, i) => [...(i > 0 ? [{ op: 'sleep', ms: BETWEEN } as Op] : []), ...opsOf(a, g)]);
+}
+
+/** About how long the drivers take for a step (their own pauses; typing a character takes a few milliseconds). */
+function opMs(o: Op): number {
+  const at = (p: { x?: number }) => (p.x !== undefined ? 50 : 0);
+  switch (o.op) {
+    case 'glide':
+    case 'sleep':
+      return o.ms;
+    case 'move':
+      return 50;
+    case 'click':
+      return at(o) + o.mods.length * 20 + o.count * 20 + (o.count - 1) * 60;
+    case 'drag':
+      return 50 + 80 + 12 * 16 + 50;
+    case 'down':
+      return at(o);
+    case 'up':
+      return o.x !== undefined ? 30 : 0;
+    case 'scroll':
+      return at(o) + o.n * 30;
+    case 'type':
+      return o.text.length * 8;
+    case 'key':
+      return o.mods.length * 20 + 20;
+    case 'hold':
+      return o.mods.length * 20 + o.ms;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * What the overlay over the screen shows of the agent's pointer (desktop/glow.cjs draws it over the real one): when,
+ * in ms after the driver starts, it goes where, and what it does there. Places are the driver's (points on a Mac,
+ * pixels elsewhere); none means where the pointer is.
+ */
+export interface Show {
+  at: number;
+  act: PointerAct;
+  x?: number;
+  y?: number;
+  /** How long it takes to get there (a glide, or a drag's way). */
+  ms?: number;
+  dir?: Direction;
+  /** type: what it typed (cut short); key: the keys it pressed, as it named them. */
+  text?: string;
+  keys?: string;
+}
+
+/** The kind of click, as the overlay and the marks name it. */
+const clickAct = (a: Extract<Action, { do: 'click' }>): PointerAct => (a.button === 'right' ? 'right' : a.button === 'middle' ? 'middle' : a.count === 2 ? 'double' : a.count === 3 ? 'triple' : 'click');
+
+/** The overlay's timeline for actions the driver takes in one go, timed by the drivers' own pauses. */
+export function showFor(actions: Action[], g: Geometry | undefined): Show[] {
+  const out: Show[] = [];
+  let t = 0;
   actions.forEach((a, i) => {
-    if (i > 0) out.push({ op: 'sleep', ms: BETWEEN });
+    if (i > 0) t += BETWEEN;
+    const ops = opsOf(a, g);
+    let at = t;
+    // A glide first: the pointer goes there, and the action follows once it has.
+    const first = ops[0];
+    if (first?.op === 'glide') {
+      out.push({ at, act: 'move', x: first.x, y: first.y, ms: first.ms });
+      at += first.ms;
+    }
+    const step = ops.find((o) => o.op !== 'glide');
+    const place = step && 'x' in step && step.x !== undefined ? { x: step.x, y: step.y } : {};
     switch (a.do) {
       case 'click':
-        out.push({ op: 'click', ...(a.at ? pt(a.at) : {}), button: BUTTON[a.button], count: a.count, mods: a.mods, flags: a.flags });
+        out.push({ at: at + (a.at ? 50 : 0) + a.mods.length * 10, act: clickAct(a), ...place });
         break;
-      case 'move':
-        out.push({ op: 'move', ...pt(a.at) });
+      case 'drag':
+        if (step?.op === 'drag') out.push({ at: at + 50 + 80, act: 'drag', x: step.x2, y: step.y2, ms: 12 * 16 });
         break;
-      case 'drag': {
-        const f = pt(a.from);
-        const t = pt(a.to);
-        out.push({ op: 'drag', x1: f.x, y1: f.y, x2: t.x, y2: t.y });
-        break;
-      }
       case 'down':
       case 'up':
-        out.push({ op: a.do, ...(a.at ? pt(a.at) : {}) });
+        out.push({ at: at + (a.at ? 30 : 0), act: a.do, ...place });
         break;
-      case 'scroll': {
-        // Wheel deltas: up and left are positive (the content moves down, or right).
-        const d = a.direction;
-        out.push({ op: 'scroll', ...(a.at ? pt(a.at) : {}), dy: d === 'up' ? NOTCH : d === 'down' ? -NOTCH : 0, dx: d === 'left' ? NOTCH : d === 'right' ? -NOTCH : 0, n: a.amount });
+      case 'scroll':
+        out.push({ at: at + (a.at ? 50 : 0), act: 'scroll', dir: a.direction, ...place });
         break;
-      }
       case 'type':
-        out.push({ op: 'type', text: a.text });
+        out.push({ at, act: 'type', text: a.text.length > 80 ? `${a.text.slice(0, 79)}…` : a.text });
         break;
       case 'key':
-        a.strokes.forEach((s, k) => {
-          if (k > 0) out.push({ op: 'sleep', ms: 40 });
-          out.push(s.code === undefined ? { op: 'type', text: s.char ?? '' } : { op: 'key', code: s.code, mods: s.mods, flags: s.flags });
-        });
-        break;
       case 'hold':
-        out.push({ op: 'hold', code: a.stroke.code, mods: a.stroke.mods, flags: a.stroke.flags, ms: Math.round(a.seconds * 1000) });
+        out.push({ at, act: 'key', keys: a.keys.slice(0, 60) });
         break;
-      case 'wait':
-        out.push({ op: 'sleep', ms: Math.round(a.seconds * 1000) });
-        break;
-      case 'cursor':
-        out.push({ op: 'pos' });
-        break;
-      case 'open':
-        throw new Error('open_app is not one of the driver’s steps');
     }
+    t += ops.reduce((s, o) => s + opMs(o), 0);
   });
   return out;
+}
+
+/**
+ * Where actions acted, as marks on the picture of the screen taken after them: their pixels of the screenshot before
+ * (`g`) as points on the screen, then as fractions of the display the picture after (`after`) shows.
+ */
+export function marksFor(actions: Action[], g: Geometry | undefined, after: Geometry): StepMark[] {
+  if (!g) return [];
+  const on = (p: Point) => {
+    const s = toScreen(p, g);
+    const x = (s.x - after.x) / after.w;
+    const y = (s.y - after.y) / after.h;
+    return x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x: Math.round(x * 10_000) / 10_000, y: Math.round(y * 10_000) / 10_000 } : null;
+  };
+  const out: StepMark[] = [];
+  for (const a of actions) {
+    const p = 'at' in a && a.at ? on(a.at) : null;
+    if (a.do === 'click' && p) out.push({ ...p, act: clickAct(a) });
+    else if (a.do === 'move' && p) out.push({ ...p, act: 'move' });
+    else if ((a.do === 'down' || a.do === 'up') && p) out.push({ ...p, act: a.do });
+    else if (a.do === 'scroll' && p) out.push({ ...p, act: 'scroll', dir: a.direction });
+    else if (a.do === 'drag') {
+      const f = on(a.from);
+      const to = on(a.to);
+      if (f && to) out.push({ ...to, act: 'drag', from: f });
+    }
+  }
+  return out.slice(0, 20);
 }
 
 /** How long the driver may take for these steps before it is stopped. */
@@ -558,7 +674,7 @@ export function driverTimeout(ops: Op[]): number {
   let ms = 15_000;
   for (const o of ops) {
     if (o.op === 'type') ms += o.text.length * 30;
-    else if (o.op === 'sleep' || o.op === 'hold') ms += o.ms;
+    else if (o.op === 'sleep' || o.op === 'hold' || o.op === 'glide') ms += o.ms;
     else if (o.op === 'scroll') ms += o.n * 40;
   }
   return ms;

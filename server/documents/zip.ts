@@ -10,6 +10,10 @@ interface Entry {
   csize: number;
   usize: number;
   offset: number;
+  /** Its CRC-32 and DOS time and date, as the central directory has them (to copy it into another zip as it is). */
+  crc: number;
+  dosTime: number;
+  dosDate: number;
 }
 
 /** Most a single entry may inflate to. */
@@ -65,7 +69,7 @@ export class Zip {
         x += 4 + size;
       }
       if (!name.endsWith('/')) {
-        const e = { name, method, flags, csize, usize, offset };
+        const e = { name, method, flags, csize, usize, offset, crc: buf.readUInt32LE(p + 16), dosTime: buf.readUInt16LE(p + 12), dosDate: buf.readUInt16LE(p + 14) };
         this.entries.set(name, e);
         this.folded.set(name.toLowerCase(), name);
       }
@@ -125,6 +129,21 @@ export class Zip {
     } else return null;
     this.used += out.length;
     return out;
+  }
+
+  /**
+   * An entry as it is packed (its compressed bytes, method, CRC, sizes and time), to copy into another zip unchanged
+   * (a signed copy of a Word file: every part but those changed stays byte for byte); null when there is none, or it is
+   * encrypted.
+   */
+  packed(name: string): { name: string; method: number; crc: number; csize: number; usize: number; dosTime: number; dosDate: number; data: Buffer } | null {
+    const real = this.find(name);
+    const e = real ? this.entries.get(real) : undefined;
+    const b = this.buf;
+    if (!e || e.flags & 1 || e.offset + 30 > b.length || b.readUInt32LE(e.offset) !== 0x04034b50) return null;
+    const start = e.offset + 30 + b.readUInt16LE(e.offset + 26) + b.readUInt16LE(e.offset + 28);
+    if (start + e.csize > b.length) return null;
+    return { name: e.name, method: e.method, crc: e.crc, csize: e.csize, usize: e.usize, dosTime: e.dosTime, dosDate: e.dosDate, data: b.subarray(start, start + e.csize) };
   }
 
   text(name: string, max = MAX_ENTRY): string | null {

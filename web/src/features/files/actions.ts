@@ -87,11 +87,11 @@ export async function addToSpace(items: Item[], space: Pick<Space, 'id' | 'name'
 
 /** The start page, with them in its message box: the new session gets them with its first message. */
 /**
- * The files the Library keeps a copy of, in its editor of their kind: Jupyter notebooks, Word and Markdown documents,
- * spreadsheets (Excel, OpenDocument, CSV, TSV) and LaTeX files. An HTML file stays a file (it opens as a page beside
- * a conversation); a .zip is not taken for a LaTeX project.
+ * The files the Library keeps a copy of, in its editor of their kind: Jupyter notebooks, PowerPoint decks, Word and
+ * Markdown documents, spreadsheets (Excel, OpenDocument, CSV, TSV) and LaTeX files. An HTML file stays a file (it opens
+ * as a page beside a conversation); a .zip is not taken for a LaTeX project.
  */
-export const LIBRARY_FILE = /\.(ipynb|docx|docm|dotx|md|markdown|txt|xlsx|ods|csv|tsv|tex|ltx)$/i;
+export const LIBRARY_FILE = /\.(ipynb|pptx|ppsx|potx|pptm|docx|docm|dotx|md|markdown|txt|xlsx|ods|csv|tsv|tex|ltx)$/i;
 
 /** Keeps a copy of a file in the Library, in the project picked (null: none; left out: the session's), and offers to open it. */
 export async function saveToLibrary(item: Item, sessionKey?: string, space?: string | null) {

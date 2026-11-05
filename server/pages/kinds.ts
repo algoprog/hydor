@@ -4,16 +4,20 @@
 // of it, which files it exports as, and which files it can be made from.
 import type { DB } from '../db.ts';
 import { HttpError } from '../auth.ts';
-import { ASSET, docMarkdown, docSources, mapDocSources, newDoc } from '../../shared/docs.ts';
+import { ASSET, asAccepted, docMarkdown, docSources, mapDocSources, newDoc } from '../../shared/docs.ts';
 import { newTex, texSources } from '../../shared/latex.ts';
 import { newBook } from '../../shared/sheets.ts';
-import { deckSources, newDeck } from '../../shared/slides.ts';
+import { deckSources, deckVideos, newDeck } from '../../shared/slides.ts';
 import { assetDataUrl } from './assets.ts';
 import { docForAgent, docFromFile, docPage, docxOfDoc, keepDoc, MAX_DOC, readDoc } from './docs.ts';
 import { importTex, keepTex, MAX_TEX, readTex, TEX_OPENS, texForAgent, texPage, texPdf, texSource, texZip } from './latex.ts';
 import { pptxFile, type Picture } from './pptx.ts';
+import { deckFontFiles } from './pptx-fonts.ts';
+import { deckFromPptx } from './pptx-import.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, keepBook, MAX_BOOK, readBook, xlsxOfBook } from './sheets.ts';
 import { deckForAgent, deckPage, keepDeck, MAX_DECK, readDeck } from './slides.ts';
+import { videoFileFor } from './videos.ts';
+import type { EmbeddedFont } from './word-fonts.ts';
 import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFromFile, notebookPage, notebookScript, readNotebook } from './notebooks.ts';
 
 export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook';
@@ -32,6 +36,10 @@ export interface ExportHelp {
   scales?: Map<string, number>;
   /** Parts made into pictures in a browser (a deck's icons and equations). */
   renders?: Map<string, Picture>;
+  /** A document's fonts for its Word file, the faces it uses (word-fonts.ts). */
+  wordFonts?: Map<string, EmbeddedFont>;
+  /** Something to say of the file made (which fonts went inside a PowerPoint file, and how). */
+  note?: (text: string) => void;
 }
 
 export interface KindDef {
@@ -57,8 +65,8 @@ export interface KindDef {
   still: (text: string) => { width: number; height: number };
   /** A new one, empty but for its title (what New makes). */
   fresh: (title: string) => unknown;
-  /** Made from a file someone opens (a .docx, a .csv…): the model, given to `keep`, and what could not come along. */
-  fromFile?: (buf: Buffer, name: string) => FromFile | Promise<FromFile>;
+  /** Made from a file someone opens (a .docx, a .csv…): the model, given to `keep`, and what could not come along (`db` keeps what goes beside the model, a deck's videos). */
+  fromFile?: (buf: Buffer, name: string, db?: DB) => FromFile | Promise<FromFile>;
   /** The file names it is made from. */
   opens?: RegExp;
 }
@@ -71,16 +79,32 @@ KINDS.set('slides', {
   max: MAX_DECK,
   keep: (db, input) => {
     const { deck, text } = keepDeck(db, input);
-    return { text, sources: deckSources(deck) };
+    // Its kept videos stay while a version shows them, as its pictures do.
+    return { text, sources: [...deckSources(deck), ...deckVideos(deck)] };
   },
   read: readDeck,
   page: (db, text, title, mode) => deckPage(db, readDeck(text), title, mode),
   forAgent: deckForAgent,
   // With YouTube's own stills of videos, for the PowerPoint file.
   sources: (text) => deckSources(readDeck(text), true),
-  files: { pptx: (_db, text, title, help) => pptxFile(readDeck(text), { title, picture: help.picture, scales: help.scales, renders: help.renders }) },
+  files: {
+    // Its videos from a device go into the PowerPoint file, and into the web page (a file on its own) where small enough.
+    pptx: async (db, text, title, help) => {
+      // Each video read once, however many slides show it.
+      const read = new Map<string, ReturnType<typeof videoFileFor>>();
+      const video = (src: string) => (read.has(src) ? read.get(src)! : (read.set(src, videoFileFor(db, src)), read.get(src)!));
+      const deck = readDeck(text);
+      // The faces of the app's fonts it shows go inside it (no Office computer has them; none offline).
+      const fonts = await deckFontFiles(deck);
+      return pptxFile(deck, { title, picture: help.picture, scales: help.scales, renders: help.renders, video, fonts, note: help.note });
+    },
+    html: (db, text, title) => deckPage(db, readDeck(text), title, 'viewer', { videosInside: true }),
+  },
   still: (text) => ({ width: 1280, height: /"ratio":"4:3"/.test(text.slice(0, 200)) ? 960 : 720 }),
   fresh: (title) => newDeck(title),
+  // A PowerPoint file, its slides as the deck's (pptx-import.ts).
+  fromFile: (buf, _name, db) => deckFromPptx(buf, db),
+  opens: /\.(pptx|ppsx|potx|pptm)$/i,
 });
 
 KINDS.set('doc', {
@@ -96,9 +120,9 @@ KINDS.set('doc', {
   forAgent: docForAgent,
   sources: (text) => docSources(readDoc(text)),
   files: {
-    docx: (db, text, title, help) => docxOfDoc(db, readDoc(text), title, help.picture),
-    // A file on its own: its pictures go inside it.
-    md: (db, text) => docMarkdown(mapDocSources(readDoc(text), (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? src) : src)), { tocLinks: true }),
+    docx: (db, text, title, help) => docxOfDoc(db, readDoc(text), title, help.picture, help.wordFonts),
+    // A file on its own: its pictures go inside it; Markdown has no way to show suggested changes, so they are made.
+    md: (db, text) => docMarkdown(mapDocSources(asAccepted(readDoc(text)), (src) => (src.startsWith(ASSET) ? (assetDataUrl(db, src.slice(ASSET.length)) ?? src) : src)), { tocLinks: true }),
   },
   still: () => ({ width: 1280, height: 800 }),
   fresh: (title) => newDoc(title),

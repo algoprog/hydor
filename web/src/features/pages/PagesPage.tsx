@@ -46,6 +46,7 @@ import { Studio, type StudioDoc } from './studio/Studio';
 import { tr } from '../../i18n/runtime';
 import { closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
 import { loadModelVersion, type AskScope } from './kinds';
+import { useLiveDraft, usePageDraft } from './live';
 import { EDITORS } from './editors';
 import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
@@ -61,7 +62,8 @@ export function PagesRoute() {
   }, [loc, search]);
   if (show) return <AudienceView id={show} />;
   const id = /^\/pages\/([a-f0-9]{10})$/.exec(loc)?.[1];
-  return id ? <PageView id={id} /> : <Library />;
+  // One view a page (key): what one page's view still does as it is left (saving it) never lands on the next one.
+  return id ? <PageView key={id} id={id} /> : <Library />;
 }
 
 // ---- a page's own place ---------------------------------------------------------------------------
@@ -241,6 +243,27 @@ function PageView({ id }: { id: string }) {
   const shareRef = useRef<HTMLButtonElement>(null);
   const exportRef = useRef<HTMLButtonElement>(null);
   const saveFirst = useRef<(() => Promise<boolean>) | null>(null);
+  // Leaving the page for another place in the app (another page, a session, Settings) saves what its editor holds
+  // and has not saved yet, as Save does (the version before stays among its versions): nothing else would keep it.
+  // Closing or reloading the tab asks first.
+  const unsaved = useRef(false);
+  const [dirty, setDirty] = useState(false);
+  const leaving = useRef(false);
+  useEffect(
+    () => () => {
+      leaving.current = true;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      void saveFirst.current?.().catch(toastError);
+    },
+    [],
+  );
+  useEffect(() => {
+    const before = (e: BeforeUnloadEvent) => {
+      if (unsaved.current) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', before);
+    return () => window.removeEventListener('beforeunload', before);
+  }, []);
   const ask = usePageAsk();
   const load = () =>
     api<Loaded>(`/api/pages/${enc(id)}`)
@@ -272,6 +295,12 @@ function PageView({ id }: { id: string }) {
   const startPresent = new URLSearchParams(search).get('present') === '1';
   const kind = data?.page.kind;
   const slides = kind === 'slides';
+  // An agent saving a new version of it, from any session: shown as it comes (live.ts), unless an older version is on view.
+  const draft = usePageDraft(kind ? id : undefined, { watch: !!kind });
+  const live = useLiveDraft(kind === 'notebook' ? null : kind, data?.model, data?.page.version, old ? null : draft);
+  // Said under the title while it is written, and while its version is being kept (a LaTeX document is typeset first).
+  const writing = !old && !!kind && kind !== 'notebook' && ((!!draft && !draft.done && !draft.failed) || !!live);
+  const keeping = writing && !!draft?.done;
 
   const viewVersion = async (v: number) => {
     setMenu(null);
@@ -341,11 +370,12 @@ function PageView({ id }: { id: string }) {
       await post(`/api/pages/${enc(id)}/versions`, { ...body, base: data.page.version });
     } catch (e) {
       if ((e as { status?: number }).status !== 409) throw e;
-      if (!(await confirm({ title: 'A newer version is there', body: 'It was saved again while you changed it (by an agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
+      // Left already: nobody to ask, and the newer version stays among the versions anyway.
+      if (!leaving.current && !(await confirm({ title: 'A newer version is there', body: 'It was saved again while you changed it (by an agent, say). Save yours on top? The other stays among its versions.', confirm: 'Save on top' })))
         return false;
       await post(`/api/pages/${enc(id)}/versions`, { ...body, base: data.page.version, force: true });
     }
-    toast(data.page.sessionKey ? 'Saved. The agent that made it sees your changes with your next message to it.' : 'Saved', 'ok');
+    toast(leaving.current ? `Saved your changes to “${data.page.title}”` : data.page.sessionKey ? 'Saved. The agent that made it sees your changes with your next message to it.' : 'Saved', 'ok');
     void load();
     return true;
   };
@@ -383,9 +413,12 @@ function PageView({ id }: { id: string }) {
           {title}
         </h1>
         {page && (
-          <div className="truncate text-[11.5px] text-fg-3">
-            {old ? `Version ${old.version} of ${page.version}` : `Version ${page.version} · ${ago(page.updatedAt)}`}
-            {page.storageBytes ? ` · keeps ${bytes(page.storageBytes)}` : ''}
+          <div className="flex min-w-0 items-center gap-1.5 truncate text-[11.5px] text-fg-3">
+            {writing && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
+            <span className="min-w-0 truncate">
+              {old ? `Version ${old.version} of ${page.version}` : keeping ? `Version ${page.version} · An agent is saving a new version` : writing ? `Version ${page.version} · An agent is writing a new version` : `Version ${page.version} · ${ago(page.updatedAt)}`}
+              {page.storageBytes ? ` · keeps ${bytes(page.storageBytes)}` : ''}
+            </span>
           </div>
         )}
       </button>
@@ -425,7 +458,13 @@ function PageView({ id }: { id: string }) {
       </IconButton>
     </>
   );
-  const band: ReactNode = old && (
+  // Changes not saved here are left as they are while an agent writes a new version: said once, under the bar.
+  const band: ReactNode = writing && dirty && !old ? (
+    <div className="flex shrink-0 items-center gap-2 border-b border-line bg-accent-soft px-3 py-2 text-[12.5px] text-fg-2 sm:px-5">
+      <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />
+      <span className="min-w-0 flex-1">An agent is writing a new version. Your changes stay as they are here until you save them.</span>
+    </div>
+  ) : old && (
     <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line bg-accent-soft px-3 py-2 text-[12.5px] sm:px-5">
       <span className="min-w-0 flex-1 text-fg-2">An older version, as it was {ago(data?.versions.find((v) => v.version === old.version)?.createdAt)}. What it changes here is not kept.</span>
       <Button size="sm" variant="primary" onClick={restore} className="h-7">
@@ -453,7 +492,12 @@ function PageView({ id }: { id: string }) {
         onAsk={(text) => askThis(text)}
         onScopes={setScopes}
         saveNowRef={saveFirst}
+        onDirty={(d) => {
+          unsaved.current = d;
+          setDirty(d);
+        }}
         startPresent={startPresent}
+        live={live}
       />
     ) : (
       <Empty icon={<AppWindow size={22} />} title="This app cannot open it">
@@ -474,6 +518,7 @@ function PageView({ id }: { id: string }) {
       savedNote={page?.sessionKey ? 'the agent that made it sees your changes' : undefined}
       onAsk={(text) => askThis(text)}
       saveNowRef={saveFirst}
+      pageId={old ? undefined : id}
     />
   );
   const allScopes = page ? scopesOf(page, scopes, part) : [];
@@ -502,7 +547,8 @@ function PageView({ id }: { id: string }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] text-fg">{v.version === data.page.version ? 'The latest' : v.title}</span>
                     <span className="block truncate text-[11.5px] text-fg-3">
-                      {ago(v.createdAt)} · {v.who ? <span translate="no">{v.who}</span> : (BY[v.by] ?? v.by)} · {bytes(v.bytes)}
+                      {ago(v.createdAt)} · {v.who ? <span translate="no">{v.who}</span> : (BY[v.by] ?? v.by)}
+                      {v.steps ? ` · ${v.steps} saves` : ''} · {bytes(v.bytes)}
                     </span>
                   </span>
                 </button>

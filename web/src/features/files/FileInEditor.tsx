@@ -3,14 +3,17 @@
 // its folder. Save writes the file again in its own format (server/pages/filemodel.ts). What the editor cannot keep of
 // a file (a Word file's headers and footers, say) is said above it before anything changes, and asked about the first
 // time it is saved over; a Word or Excel file's first save puts the file as it was in the Trash. Changes made to the
-// file meanwhile (an agent, a terminal) come in while nothing is changed here, and are asked about otherwise. Its text,
-// or its preview, is in the ⋯ menu, as the file showed before.
+// file meanwhile (an agent, a terminal) come in while nothing is changed here, and are asked about otherwise. A LaTeX
+// file's comments, which the app keeps beside it, come in as an agent answers them, and are kept when it is saved.
+// Its text, or its preview, is in the ⋯ menu, as the file showed before.
 import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileCode2, FolderOpen, MessageSquarePlus, RotateCcw, SquareTerminal, TriangleAlert } from 'lucide-react';
 import { editorKindOf, type FileOpened, type FileSaved } from '@shared/documents';
+import type { PagesEvent } from '@shared/pages';
 import { TEX_MAIN } from '@shared/latex';
 import type { Workbook } from '@shared/sheets';
 import { api, ApiError, put } from '../../lib/api';
+import { useFeatureEvent } from '../../lib/featureEvents';
 import { basename, dirname, isWinPath, tildify } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { filePath, go, useFilePeek } from '../../lib/nav';
@@ -38,17 +41,24 @@ const DOC_LOST: Record<string, string> = {
   layout: 'landscape pages',
 };
 
-/** And of an Excel file, the spreadsheet editor. */
+/** And of an Excel file, the spreadsheet editor (merged cells, filters, conditional formatting, data validation, notes, comments and the charts it draws it keeps). */
 const SHEET_LOST: Record<string, string> = {
-  charts: 'charts and pictures',
-  merged: 'merged cells',
+  pictures: 'pictures',
+  shapes: 'shapes and text boxes',
+  charts: 'charts it cannot draw',
   formulas: 'formulas it cannot work out',
-  conditional: 'conditional formatting',
-  validation: 'data validation',
-  comments: 'cell comments',
   pivots: 'pivot tables',
   tables: 'formatted tables',
   links: 'links to other files',
+  hyperlinks: 'hyperlinks',
+  names: 'named ranges',
+  macros: 'macros',
+  groups: 'grouped rows and columns',
+  sparklines: 'sparklines',
+  icons: 'icon sets',
+  protection: 'sheet protection',
+  print: 'print settings',
+  rich: 'words formatted in parts of a cell',
 };
 
 /** What a CSV or TSV file cannot hold of a workbook: more sheets, formulas (their values go in), formatting. */
@@ -118,6 +128,10 @@ export function FileInEditor({
   if (saveFirst) saveFirst.current = async () => (dirtyRef.current ? ((await saveNow.current?.()) ?? false) : true);
   // The times the file (a LaTeX project's files) had when read or last saved here: a newer one was changed elsewhere.
   const times = useRef<{ mtime: number; files?: Record<string, number> }>({ mtime: 0 });
+  // A LaTeX project's comments as the app kept them when last read or saved here (what a save is merged against), and
+  // those that came in since from elsewhere, for the editor to take in.
+  const comments = useRef<unknown[]>([]);
+  const [incoming, setIncoming] = useState<{ list: unknown[]; n: number } | undefined>(undefined);
   const saving = useRef(false);
   // Asked or done once each time it opens: the old file to the Trash, what it loses, what a CSV keeps.
   const once = useRef({ backup: false, losses: false, delimited: false });
@@ -134,6 +148,8 @@ export function FileInEditor({
     try {
       const f = await api<FileOpened>(`/api/pages/file?path=${encodeURIComponent(path)}`);
       times.current = { mtime: f.mtime, files: f.tex?.files };
+      comments.current = (f.model as { comments?: unknown[] }).comments ?? [];
+      setIncoming(undefined);
       setOpened(f);
       setRound((n) => n + 1);
       setDirty(false);
@@ -175,6 +191,23 @@ export function FileInEditor({
     }, watchMs);
     return () => clearInterval(t);
   }, [opened, path, load, watchMs]);
+
+  // An agent answered, resolved or added comments of the project's files: they come in (the editor merges them with its own).
+  useFeatureEvent('pages', ({ data }) => {
+    const e = data as PagesEvent | undefined;
+    const tex = opened?.tex;
+    if (e?.what !== 'file-comments' || !tex) return;
+    const slash = (p: string) => p.replace(/\\/g, '/');
+    const mine = new Set(Object.keys(times.current.files ?? { [tex.main]: 0 }).map((rel) => slash(`${tex.folder}/${rel}`)));
+    if (!e.paths.some((p) => mine.has(slash(p)))) return;
+    api<{ comments: unknown[] }>(`/api/pages/file/comments?path=${encodeURIComponent(path)}`).then(
+      (r) => {
+        comments.current = r.comments;
+        setIncoming((i) => ({ list: r.comments, n: (i?.n ?? 0) + 1 }));
+      },
+      () => {},
+    );
+  });
 
   useEffect(() => {
     const before = (e: BeforeUnloadEvent) => {
@@ -235,7 +268,7 @@ export function FileInEditor({
         force: how.force,
         copy: how.copy,
         backup: office && !how.copy && !once.current.backup,
-        tex: opened.tex && { ...opened.tex, files: times.current.files },
+        tex: opened.tex && { ...opened.tex, files: times.current.files, comments: comments.current },
       });
       // Another file to show: a copy, or the document a chapter renamed here belonged to.
       const show = (p: string) => (embedded ? useFilePeek.setState({ file: { path: p } }) : go(filePath(p)));
@@ -246,6 +279,13 @@ export function FileInEditor({
         return true;
       }
       times.current = { mtime: r.mtime, files: r.files ?? times.current.files };
+      if (r.comments) {
+        // Kept merged with what an agent did meanwhile: the editor takes that in once it has the save in hand.
+        const merged = r.comments;
+        const differs = JSON.stringify(merged) !== JSON.stringify((model as { comments?: unknown[] }).comments ?? []);
+        comments.current = merged;
+        if (differs) setTimeout(() => setIncoming((i) => ({ list: merged, n: (i?.n ?? 0) + 1 })));
+      }
       setChanged(false);
       if (r.backup) once.current.backup = true;
       toast(r.backup ? `Saved ${basename(path)}. The file as it was is in the Trash, should you want it back.` : `Saved ${basename(path)}`, 'ok');
@@ -433,7 +473,7 @@ export function FileInEditor({
           band={band}
           onDirty={setDirty}
           saveNowRef={saveNow}
-          file={opened.tex && { folder: opened.tex.inFolder ? opened.tex.folder : undefined, main: opened.tex.main, open: opened.tex.open }}
+          file={opened.tex && { folder: opened.tex.inFolder ? opened.tex.folder : undefined, main: opened.tex.main, open: opened.tex.open, comments: incoming }}
         />
       ) : (
         <div className="flex h-full items-center justify-center text-fg-3">

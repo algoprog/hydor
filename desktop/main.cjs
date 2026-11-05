@@ -24,8 +24,9 @@
 // keyboard through programs the server starts. On a Mac, macOS counts them as this app's doing, so the permissions
 // (Accessibility, Screen Recording) are this app's: the server asks here what macOS allows and to ask you for the rest
 // ({ type: 'ask' }, answered with { type: 'reply' }). While an agent acts ({ type: 'computer' }), a glow lines the
-// screen's edges with a note that Esc stops it (glow.cjs), the menu bar or tray says so, with Stop, and Esc (⌘⇧Esc too
-// on a Mac) stops it ({ type: 'computer-stop' } to the server). The glow is hidden while the agent looks at the screen,
+// screen's edges with a note that Esc stops it (glow.cjs), the agent's pointer shows over the real one ({ type:
+// 'pointer' }), the menu bar or tray says so, with Stop, and Esc (⌘⇧Esc too on a Mac) stops it ({ type:
+// 'computer-stop' } to the server). The glow is hidden while the agent looks at the screen,
 // and Esc let go while the agent itself presses it; on Linux the app takes the agent's screenshots.
 'use strict';
 const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, nativeImage, nativeTheme, session, shell, systemPreferences } = require('electron');
@@ -465,6 +466,8 @@ function onMessage(m) {
     onUpdate(m);
   } else if (m.type === 'computer') {
     onComputer(m);
+  } else if (m.type === 'pointer') {
+    if (computerActive) glow.pointer(m);
   } else if (m.type === 'glow') {
     glow.unveil();
   } else if (m.type === 'esc') {
@@ -554,7 +557,7 @@ function onComputer(m) {
   const was = !!computerActive;
   computerActive = m.active ? { title: typeof m.title === 'string' ? m.title : '', using: typeof m.using === 'string' && m.using ? m.using : SYSTEM_USING } : null;
   if (computerActive) {
-    glow.setGlow(m.glow !== false, { using: computerActive.using, esc: typeof m.esc === 'string' ? m.esc : '' });
+    glow.setGlow(m.glow !== false, { using: computerActive.using, esc: typeof m.esc === 'string' ? m.esc : '', agent: typeof m.agent === 'string' ? m.agent : '' });
     holdStops();
   } else if (was) {
     glow.setGlow(false);
@@ -872,7 +875,8 @@ function openWindow(at) {
       // Windows and Linux: the menu shows when you press Alt.
       autoHideMenuBar: !MAC,
       ...(MAC || WIN ? {} : { icon: resource('icon-256.png') }),
-      webPreferences: { contextIsolation: true, sandbox: true, spellcheck: true, backgroundThrottling: false },
+      // preload.cjs gives the app's own page a dropped file's path, so the Library moves it in rather than copying it.
+      webPreferences: { contextIsolation: true, sandbox: true, spellcheck: true, backgroundThrottling: false, preload: path.join(__dirname, 'preload.cjs') },
     });
     win.webContents.setUserAgent(`${win.webContents.getUserAgent()} Hydor${MAC ? 'Mac' : WIN ? 'Windows' : 'Linux'}/${app.getVersion()}`);
     win.once('ready-to-show', () => win && win.show());

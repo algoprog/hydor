@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { ClipboardList, ExternalLink, MessageCircleQuestion, ShieldAlert } from 'lucide-react';
 import { formDefaults } from '@shared/forms';
 import type { Agent, ApprovalRequest } from '@shared/types';
@@ -38,8 +38,21 @@ function FileDetail({ detail }: { detail: string }) {
   );
 }
 
+// A card about a signature (a pad to draw one an agent asked for, or where it would place one): the signatures feature's, loaded when one shows.
+const SignatureApproval = lazy(() => import('../signatures/Cards').then((m) => ({ default: m.SignatureApproval })));
+
 /** `base`: the machine the session is on, when it is not the one the page shows (the inbox lists them all). */
-export function ApprovalCard({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; sessionKey: string; agent: Agent; id?: string; base?: string; onDone?: () => void }) {
+export function ApprovalCard(props: { a: ApprovalRequest; sessionKey: string; agent: Agent; id?: string; base?: string; onDone?: () => void }) {
+  if (props.a.signature)
+    return (
+      <Suspense fallback={null}>
+        <SignatureApproval a={props.a} sessionKey={props.sessionKey} id={props.id} base={props.base} onDone={props.onDone} />
+      </Suspense>
+    );
+  return <Card {...props} />;
+}
+
+function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; sessionKey: string; agent: Agent; id?: string; base?: string; onDone?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [denyOpen, setDenyOpen] = useState(false);
   const [msg, setMsg] = useState('');
