@@ -641,9 +641,10 @@ export function decodeText(buf: Buffer): string {
 
 /**
  * A workbook from a file: CSV or TSV, Excel (.xlsx) or OpenDocument (.ods); and what was left out of it, in plain words.
- * For a file opened to be saved again (Files): `loses`, what of an Excel file the workbook cannot hold ("charts" for
- * pictures and charts it cannot draw, "formulas", "pivots", "tables", "links"), and `cut`, whether some of its cells
- * or sheets did not come in at all.
+ * For a file opened to be saved again (Files): `loses`, what of an Excel file the workbook cannot hold ("pictures",
+ * "shapes", "charts" it cannot draw, "formulas" it cannot work out, "pivots", "tables", "links" to other files,
+ * "hyperlinks", "names", "macros", "groups" of rows and columns, "sparklines", "icons" (icon sets), "protection", "print"
+ * settings, "rich" text formatted in parts of a cell), and `cut`, whether some of its cells or sheets did not come in at all.
  */
 export function importBook(buf: Buffer, name: string): { book: Workbook; notes: string[]; loses?: string[]; cut?: boolean } {
   const ext = path.extname(name).slice(1).toLowerCase();
@@ -841,10 +842,16 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   const of = (type: string) => [...rels.values()].find((r) => r.type.endsWith(`/${type}`))?.target;
   const date1904 = on(att(kid(wb, 'workbookPr'), 'date1904'));
   const sst = z.text(of('sharedStrings') ?? 'xl/sharedStrings.xml');
+  // Words formatted in parts (a run of bold in a cell) come in as the cell's words alone.
+  let rich = false;
   const shared = sst
     ? kids(parseXml(sst).root, 'si').map((si) => {
         let s = '';
-        for (const x of si.c) if (typeof x !== 'string') s += x.n === 't' ? textOf(x) : x.n === 'r' ? textOf(kid(x, 't')) : '';
+        for (const x of si.c) {
+          if (typeof x === 'string') continue;
+          if (x.n === 'r' && kid(x, 'rPr')) rich = true;
+          s += x.n === 't' ? textOf(x) : x.n === 'r' ? textOf(kid(x, 't')) : '';
+        }
         return s;
       })
     : [];
@@ -854,15 +861,21 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
   const dxfs = readDxfs(stylesXml, (el) => colorOf(el, theme));
   // Names the workbook defines for cells or ranges (TaxRate: Sheet1!$B$1): formulas get the reference in their place.
   const names = new Map<string, string>();
+  // What a workbook here does not hold, for a file to be saved again: their keys (importBook says which).
+  const loses = new Set<string>();
   for (const d of all(kid(wb, 'definedNames'), 'definedName')) {
     const name = att(d, 'name') ?? '';
     const ref = textOf(d).trim();
     if (!name.startsWith('_xlnm.') && /^(?:'[^']+'|[A-Za-z_][\w.]*)!\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?$/.test(ref)) names.set(name.toLowerCase(), ref);
+    // Names go (formulas that use them get what they stand for), and so do print areas and titles.
+    if (!name.startsWith('_xlnm.') && att(d, 'hidden') !== '1') loses.add('names');
+    if (name === '_xlnm.Print_Area' || name === '_xlnm.Print_Titles') loses.add('print');
   }
+  if (rich) loses.add('rich');
+  if (kid(wb, 'workbookProtection')) loses.add('protection');
+  if (z.names().some((n) => /vbaProject\.bin$/i.test(n))) loses.add('macros');
   const sheets: Obj[] = [];
   const state = { cells: 0, drawn: false, bad: false, cutRows: false, cutCells: false };
-  // What a workbook here does not hold, for a file to be saved again: their keys (importBook says which).
-  const loses = new Set<string>();
   let cutSheets = false;
   const listed = all(kid(wb, 'sheets'), 'sheet');
   for (const s of listed) {
@@ -879,6 +892,13 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     const parts = [...partRels.values()];
     if (parts.some((r) => /\/pivotTable$/.test(r.type))) loses.add('pivots');
     if (parts.some((r) => /\/table$/.test(r.type))) loses.add('tables');
+    // What a sheet has that a workbook here does not keep.
+    if (/<(?:\w+:)?hyperlinks?[\s>]/.test(xml)) loses.add('hyperlinks');
+    if (/<(?:\w+:)?(?:row|col)\b[^>]*\boutlineLevel="[1-9]/.test(xml)) loses.add('groups');
+    if (/<(?:\w+:)?sparklineGroups?[\s>]/.test(xml)) loses.add('sparklines');
+    if (/<(?:\w+:)?cfRule\b[^>]*\btype="iconSet"/.test(xml) || /<x14:iconSet\b/.test(xml)) loses.add('icons');
+    if (/<(?:\w+:)?sheetProtection\b/.test(xml)) loses.add('protection');
+    if (/<(?:\w+:)?(?:odd|even|first)(?:Header|Footer)>\s*[^<\s]/.test(xml)) loses.add('print');
     const sheet = readWorksheet(xml, name, shared, styles, date1904, state, names);
     const base = sheet.base as { cells: Record<string, Cell>; cols: Record<number, { w?: number; hidden?: boolean }>; rows: Record<number, { h?: number; hidden?: boolean }> } & Obj;
     base.conditional = readConditional(xml, dxfs, names, (el) => colorOf(el, theme));
@@ -894,7 +914,13 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
       const colW = (c: number) => (base.cols[c]?.hidden ? 0 : (base.cols[c]?.w ?? COL_W));
       const rowH = (r: number) => (base.rows[r]?.hidden ? 0 : (base.rows[r]?.h ?? ROW_H));
       base.charts = readCharts(drawing, (rid) => (dRels.get(rid) ? z.text(dRels.get(rid)!.target) : null), name, colW, rowH);
-      if (/<(?:\w+:)?pic[\s>]/.test(drawing) || (base.charts as unknown[]).length < (drawing.match(/<(?:\w+:)?graphicFrame[\s>]/g)?.length ?? 0)) state.drawn = true;
+      const left = [
+        /<(?:\w+:)?pic[\s>]/.test(drawing) && 'pictures',
+        /<(?:\w+:)?sp[\s>]/.test(drawing) && 'shapes',
+        (base.charts as unknown[]).length < (drawing.match(/<(?:\w+:)?graphicFrame[\s>]/g)?.length ?? 0) && 'charts',
+      ].filter((k): k is string => !!k);
+      for (const k of left) loses.add(k);
+      if (left.length) state.drawn = true;
     }
     sheets.push(sheet);
     if (sheets.length >= SHEET_LIMITS.sheets) {
@@ -903,12 +929,11 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     }
   }
   if (!sheets.length) throw new Error('This Excel file has no sheets of cells in it.');
-  if (state.drawn) notes.push('Pictures (and charts this cannot draw) were left out.');
+  if (state.drawn) notes.push('Pictures, shapes and charts this cannot draw were left out.');
   if (state.bad) notes.push('Some formulas could not be read here (links to other files, tables by name…): their last values were kept instead.');
   if (state.cutRows) notes.push(`Cells past row ${SHEET_LIMITS.rows.toLocaleString('en')} or column ${colName(SHEET_LIMITS.cols - 1)} were left out.`);
   if (state.cutCells) notes.push(`Only the first ${SHEET_LIMITS.cells.toLocaleString('en')} cells were taken in.`);
   if (cutSheets) notes.push(`Only the first ${SHEET_LIMITS.sheets} sheets were taken in.`);
-  if (state.drawn) loses.add('charts');
   if (state.bad) loses.add('formulas');
   if (z.names().some((n) => n.startsWith('xl/externalLinks/'))) loses.add('links');
   return { book: normalizeBook({ sheets }, { notes }), notes, loses: [...loses], cut: state.cutRows || state.cutCells || cutSheets };
