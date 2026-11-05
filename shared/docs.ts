@@ -234,6 +234,8 @@ export const INK = '#1f2328';
 /** The highlight ==words== get. */
 export const HL = '#fef08a';
 export const MONO = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+/** The font code is in (MONO's first). */
+export const MONO_FONT = 'JetBrains Mono';
 
 /** Colours for words, and for highlights, as the editor offers them. */
 export const TEXT_COLORS = ['#1f2328', '#5f6368', '#c5221f', '#e8710a', '#b06000', '#188038', '#137333', '#1a73e8', '#174ea6', '#9334e6', '#a142f4', '#d01884'];
@@ -1203,15 +1205,19 @@ export const wordCount = (s: string) => (s.match(WORD) ?? []).length;
 
 export const docWords = (d: Doc) => d.blocks.reduce((n, b) => n + wordCount(blockText(b)), 0);
 
-/** The fonts a document uses: its own and its words'. */
+/** The fonts a document uses: its own, its words', and its code's (JetBrains Mono, loaded so code looks the same on every computer and in its files). */
 export function docFonts(d: Doc): string[] {
   const names = new Set<string>([d.font]);
   const add = (runs: Run[]) => {
-    for (const r of runs) if (r.font) names.add(r.font);
+    for (const r of runs) {
+      if (r.font) names.add(r.font);
+      if (r.code) names.add(MONO_FONT);
+    }
   };
   for (const b of d.blocks) {
     if (b.type === 'p' || b.type === 'li') add(b.runs);
     else if (b.type === 'table') for (const r of b.rows) for (const c of r) add(c.runs);
+    if (b.type === 'p' && b.style === 'code') names.add(MONO_FONT);
   }
   return [...names];
 }
