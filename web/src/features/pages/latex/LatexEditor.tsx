@@ -95,6 +95,7 @@ import { docWords, makeSnippet, SAMPLE_BIB, withBibliography, withPackages, type
 import { rememberSymbol, SymbolsPanel } from './SymbolsPanel';
 import { symInsert, type Sym } from './symbols';
 import { TableEditor } from './TableEditor';
+import { ToolRow, type RowTool } from './ToolRow';
 import { MAX_VISUAL } from './visual';
 import { WordCountDialog } from './WordCount';
 
@@ -1076,7 +1077,6 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       </Button>
     </div>
   );
-  const sep = <span className="mx-1 h-5 w-px shrink-0 bg-line" />;
   const code = codes.current.get(file);
 
   const showInPdf = async () => {
@@ -1267,6 +1267,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
         '-',
         { label: 'Show the log', icon: <ScrollText size={14} />, disabled: !result?.log, run: () => setLogOpen(true) },
         { label: 'Open the PDF', icon: <ExternalLink size={14} />, disabled: !result?.pdf, run: openPdf },
+        !!onAsk && { label: 'Ask the agent', icon: <Sparkles size={14} />, also: 'lines section question help', run: askHere },
         !!onAsk && !readOnly && !!result?.errors.length && { label: 'Ask the agent to fix them', icon: <Sparkles size={14} />, also: 'errors', run: askFix },
         '-',
         { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, also: 'keys', run: () => setDialog('keys') },
@@ -1274,16 +1275,35 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
     },
   ];
 
-  const toolbar = (
-    <div className="flex h-11 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-line bg-panel px-2 [&::-webkit-scrollbar]:hidden">
-      {!wide && (
-        <>
-          {compileButtons}
-          {engineChip}
-          {sep}
-        </>
-      )}
-      <div className="shrink-0">
+  // The toolbar: what fits the row, the most used first (the rest folds away, all of it in the menus too). Where the
+  // source and the pages do not fit side by side, the row starts with the switch between them and Recompile; over
+  // the pages it holds only those.
+  const askLabel = cursor.picked && file !== PICTURES ? 'Ask the agent about these lines' : 'Ask the agent';
+  const overPages = !wide && pane === 'preview';
+  const tools: RowTool[] = ([
+    !wide && {
+      id: 'pane',
+      rank: 0,
+      group: 'pane',
+      node: (
+        <Segmented
+          size="sm"
+          value={pane}
+          onChange={setPane}
+          options={[
+            { value: 'source', label: 'LaTeX source' },
+            { value: 'preview', label: 'Preview' },
+          ]}
+        />
+      ),
+    },
+    !wide && { id: 'compile', rank: 1, group: 'compile', node: compileButtons },
+    !wide && { id: 'engine', rank: 12, group: 'compile', node: engineChip },
+    !overPages && {
+      id: 'mode',
+      rank: 8,
+      group: 'mode',
+      node: (
         <Segmented
           size="sm"
           value={mode}
@@ -1293,59 +1313,132 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
             { value: 'visual', label: 'Visual' },
           ]}
         />
-      </div>
-      {!readOnly && (
-        <>
-          {sep}
+      ),
+    },
+    !overPages &&
+      !readOnly && {
+        id: 'bold',
+        rank: 2,
+        group: 'insert',
+        node: (
           <IconButton label="Bold (Ctrl+B)" size="sm" onClick={() => void insert('bold')}>
             <Bold size={15} />
           </IconButton>
+        ),
+      },
+    !overPages &&
+      !readOnly && {
+        id: 'italic',
+        rank: 3,
+        group: 'insert',
+        node: (
           <IconButton label="Italic (Ctrl+I)" size="sm" onClick={() => void insert('italic')}>
             <Italic size={15} />
           </IconButton>
+        ),
+      },
+    !overPages &&
+      !readOnly && {
+        id: 'symbols',
+        rank: 5,
+        group: 'insert',
+        node: (
           <IconButton ref={anchors.symbols} label="Symbols" size="sm" active={menu === 'symbols'} onClick={() => setMenu(menu === 'symbols' ? null : 'symbols')}>
             <Omega size={15} />
           </IconButton>
+        ),
+      },
+    !overPages &&
+      !readOnly && {
+        id: 'equation',
+        rank: 4,
+        group: 'insert',
+        node: (
           <IconButton label="Equation" size="sm" onClick={() => void insert('equation')}>
             <Sigma size={15} />
           </IconButton>
+        ),
+      },
+    !overPages &&
+      !readOnly && {
+        id: 'figure',
+        rank: 6,
+        group: 'insert',
+        node: (
           <IconButton label="Figure with a picture" size="sm" onClick={() => void insert('figure')}>
             <ImagePlus size={15} />
           </IconButton>
-        </>
-      )}
-      {sep}
-      <IconButton
-        ref={anchors.outline}
-        label="Outline"
-        size="sm"
-        active={wide ? outlineOpen : menu === 'outline'}
-        onClick={() => (wide ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
-      >
-        <ListTree size={15} />
-      </IconButton>
-      {canComment && (
-        <IconButton label="Comments" size="sm" active={commentsOpen} onClick={() => setCommentsOpen((x) => !x)} className="relative">
-          <MessageSquare size={15} />
-          {openCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-accent px-1 text-[9.5px] leading-3.5 font-semibold text-accent-fg tabular-nums">{openCount}</span>}
+        ),
+      },
+    !overPages && {
+      id: 'outline',
+      rank: 11,
+      group: 'view',
+      node: (
+        <IconButton
+          ref={anchors.outline}
+          label="Outline"
+          size="sm"
+          active={wide ? outlineOpen : menu === 'outline'}
+          onClick={() => (wide ? setOutlineOpen((o) => !o) : setMenu(menu === 'outline' ? null : 'outline'))}
+        >
+          <ListTree size={15} />
         </IconButton>
-      )}
-      <IconButton label="Find and replace (Ctrl+F)" size="sm" disabled={!code} active={find.open} onClick={() => (find.open ? find.close() : find.show())}>
-        <Search size={15} />
-      </IconButton>
-      {setup?.sync !== false && (
-        <IconButton label="Show this line in the PDF" size="sm" disabled={!result?.pdf || file === PICTURES} onClick={() => void showInPdf()}>
-          <LocateFixed size={15} />
+      ),
+    },
+    !overPages &&
+      canComment && {
+        id: 'comments',
+        rank: 10,
+        group: 'view',
+        node: (
+          <IconButton label="Comments" size="sm" active={commentsOpen} onClick={() => setCommentsOpen((x) => !x)} className="relative">
+            <MessageSquare size={15} />
+            {openCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-accent px-1 text-[9.5px] leading-3.5 font-semibold text-accent-fg tabular-nums">{openCount}</span>}
+          </IconButton>
+        ),
+      },
+    !overPages && {
+      id: 'find',
+      rank: 9,
+      group: 'view',
+      node: (
+        <IconButton label="Find and replace (Ctrl+F)" size="sm" disabled={!code} active={find.open} onClick={() => (find.open ? find.close() : find.show())}>
+          <Search size={15} />
         </IconButton>
-      )}
-      {onAsk && (
-        <>
-          {sep}
+      ),
+    },
+    !overPages &&
+      setup?.sync !== false && {
+        id: 'showpdf',
+        rank: 13,
+        group: 'view',
+        node: (
+          <IconButton label="Show this line in the PDF" size="sm" disabled={!result?.pdf || file === PICTURES} onClick={() => void showInPdf()}>
+            <LocateFixed size={15} />
+          </IconButton>
+        ),
+      },
+    !overPages &&
+      !!onAsk && {
+        id: 'ask',
+        rank: 7,
+        group: 'ask',
+        node: (
           <Button size="sm" variant="ghost" icon={<Sparkles size={14} className="text-accent" />} onClick={askHere} className="shrink-0">
-            {cursor.picked && file !== PICTURES ? 'Ask the agent about these lines' : 'Ask the agent'}
+            {askLabel}
           </Button>
-        </>
-      )}
+        ),
+        small: (
+          <IconButton label={askLabel} size="sm" onClick={askHere}>
+            <Sparkles size={15} className="text-accent" />
+          </IconButton>
+        ),
+      },
+  ] as (RowTool | false)[]).filter((t): t is RowTool => !!t);
+  const toolbar = (
+    <div className="flex h-11 shrink-0 items-center border-b border-line bg-panel px-2">
+      <ToolRow tools={tools} className="flex-1" />
     </div>
   );
 
@@ -1528,20 +1621,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly, onSave, lead, tail,
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
-          {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
-          <MenuBar menus={menus} compact={roomy ? 'auto' : true} />
+          {/* The menus beside the title, where the header has room for them; one button where it hasn't, which the
+              title gives way to (the switch between the source and the pages is in the toolbar then). */}
+          <MenuBar menus={menus} compact={roomy ? 'auto' : true} className={roomy ? undefined : 'shrink-0'} />
         </div>
-        {!wide && (
-          <Segmented
-            size="sm"
-            value={pane}
-            onChange={setPane}
-            options={[
-              { value: 'source', label: 'LaTeX source' },
-              { value: 'preview', label: 'Preview' },
-            ]}
-          />
-        )}
         {wide && engineChip}
         {wide && compileButtons}
         {tail}
