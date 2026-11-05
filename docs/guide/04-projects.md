@@ -35,6 +35,8 @@ Each project shows as a card:
 
 Click a card to open the project's own page, or type the project's name in the search box (Ctrl+K) to go straight there. With no projects yet, the page says what a project is for in three short parts, with **Make a project**.
 
+Drop files from your computer on a project's card to add them to the project ("Drop to add to Thesis" shows while they are over it): documents, spreadsheets, slides, LaTeX and notebooks become pages of the Library, pictures, videos and sounds are kept there, and any other file goes in the project's folder (see [Add files of yours](/guide/library#add-files-of-yours)).
+
 Under the projects, **Folders you work in** lists folders your sessions used lately that could become projects (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
 
 ## Make a project
@@ -98,13 +100,13 @@ Below them are six tabs: **Overview**, **Library**, **Files**, **Knowledge**, **
 The project at a glance, in cards:
 
 - **Sessions**: the sessions started in the project, the one at work most recently first, each with its agent's icon, its title, what it is doing while it runs (**Working**, **Needs you**, **Ready**; not on a phone) and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the project's folder, with its guidelines, documents and skills, and has **New session**.
-- **In the Library**: what the project holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there.
+- **In the Library**: what the project holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there. Files dropped on it are added to the project.
 - **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Starts as** (its assistant) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the project are listed under its folder).
 - **The projects it brings together**, for a group: each of its projects, with how many sessions it has. Click one to open it.
 
 ### Library
 
-Everything the project holds in the Library: the pages, slides, documents, spreadsheets and LaTeX documents agents saved in its sessions, and what you kept there or moved there (see [Sort it by project](/guide/library#sort-it-by-project)). Each card opens it, and its **More** (⋯) has what it has in the Library. **Open in the Library** shows the project's things there, with the Library's search and kinds. With nothing yet, the tab says so, with **New page** and **New slides**, made in the project.
+Everything the project holds in the Library: the pages, slides, documents, spreadsheets and LaTeX documents agents saved in its sessions, and what you kept there or moved there (see [Sort it by project](/guide/library#sort-it-by-project)). Each card opens it, and its **More** (⋯) has what it has in the Library. **Open in the Library** shows the project's things there, with the Library's search and kinds. With nothing yet, the tab says so, with **New page** and **New slides**, made in the project. Drop files on it to add them to the project, each made what it is (see [Add files of yours](/guide/library#add-files-of-yours)).
 
 ### Files
 
@@ -115,7 +117,7 @@ The project's folder, and the other folders it works with, as the [Files page](/
 - ✕ on a folder's chip leaves it out of the project; the folder itself stays as it is. The message has **Undo**.
 - **Open in Files** opens the folder on the Files page.
 
-To add files from elsewhere, use **Add to a project** on the Files page, in a file's window or on an agent's file cards: a file is copied into the project's folder, a folder joins those it works with (see [Add files to a project](/guide/files-git#add-files-to-a-project)).
+To add files from elsewhere, use **Add to a project** on the Files page, in a file's window or on an agent's file cards: a file is copied into the project's folder, a folder joins those it works with (see [Add files to a project](/guide/files-git#add-files-to-a-project)). Or drop files from your computer on the project's card or its Library: what the Library keeps (documents, spreadsheets, pictures…) goes there, and any other file comes into this folder (see [Add files of yours](/guide/library#add-files-of-yours)).
 
 ### Knowledge
 

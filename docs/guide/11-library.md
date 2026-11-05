@@ -212,7 +212,7 @@ Above the cards:
 - The button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
 - When a place holds more than one kind, **All**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX**, **Pictures** and **Videos** show one kind at a time. [Show the pictures](/library?kind=image).
 
-With nothing kept yet, the Library says "Your Library is empty", with **New page** and **New slides**.
+With nothing kept yet, the Library says "Your Library is empty", that files dropped there are added, and has **New page** and **New slides**.
 
 ## Sort it by project
 
@@ -221,6 +221,7 @@ Everything in the Library belongs to one project, or to none (see [Projects and 
 - What an agent saves (a page, slides, a document, a spreadsheet, a LaTeX document) goes in its session's project, when the session is in one.
 - What you keep yourself (**Keep** on a page, **Save to Library** under a picture, a video or a sound) asks where it goes when you have projects, with the session's own project first; with no projects, it is kept at once.
 - **New**, at the top right of the Library, makes it in the project you are looking at; pick another under **In a project** (see [Make a page](#make-a-page)).
+- Files you drop on the Library go in the project you drop them on in its list of places, or in the one you are looking at (see [Add files of yours](#add-files-of-yours)).
 - To move something, open its **More** (⋯) → **Move to a project**, on its card or on its own page, and pick a project or **No project**. "Moved to Thesis" confirms it. Moving it changes nothing else: its versions, its data and its addresses stay.
 
 A project's own page shows what it holds in the Library too, on its **Overview** and **Library** tabs (see [A project's own page](/guide/projects#a-projects-own-page)). Deleting a project keeps what it held in the Library, in no project.
@@ -228,6 +229,8 @@ A project's own page shows what it holds in the Library too, on its **Overview**
 ## Images and videos in the Library
 
 Pictures, videos and sounds agents make for you stay in the session's folder (see [Ask for a picture, or have one changed](/guide/documents-voice#ask-for-a-picture-or-have-one-changed), [Ask for a video](/guide/documents-voice#ask-for-a-video) and [Ask for music, a voice or a sound](/guide/documents-voice#ask-for-music-a-voice-or-a-sound)). To keep one, click **Save to Library** under it in the conversation (with projects, pick the one it goes in): a copy goes into your Library, where it stays after the session's folder is cleaned up, and a model writes its title and description (see [Titles and descriptions](#titles-and-descriptions)). The button then reads **In your Library** and opens it there.
+
+Pictures, videos and sounds of yours go in the same way: drop them on the Library, or use **Upload files** (see [Add files of yours](#add-files-of-yours)).
 
 They show among the Library's other things; **Pictures**, **Videos** and **Audio** above the cards show each kind alone ([Show the videos](/library?kind=video), [the audio](/library?kind=audio)). Each is a card with a still of it and its title (while it is being written, "Writing its title…"); a video's card shows its length on the still, and a sound's card shows its shape, with a round button to play it right there and its length beside it. Click a card to open it (see [Open an image, a video or a sound](#open-an-image-a-video-or-a-sound)). Its **More** (⋯) has **Start a session with it**, **Move to a project**, **Download**, **Write its title and description again** and **Delete**, which takes it out of your Library (the file it was saved from, if it is still there, stays).
 
@@ -268,6 +271,36 @@ Below, the picture (click it for full size), or the video or the sound, to play 
 A document, a spreadsheet or a LaTeX document starts empty but for its name (a LaTeX document with a short article to build on), or from a file of yours: **Open a Word or text file** (.docx, .md, .txt or .html), **Open an Excel or CSV file** (.xlsx, .ods, .csv or .tsv) or **Open a .tex or .zip file** (one LaTeX file, or a whole project in a .zip). A notebook starts with its name as a heading and an empty code cell, or from **Open a notebook (.ipynb)**. The file becomes a page of its kind; the file itself stays as it was. To change the file itself, open it in Files: it opens in the same editor and saves back to the file (see [Edit Word, Excel, CSV and LaTeX files](/guide/files-git#edit-word-excel-csv-and-latex-files)).
 
 Or describe what you want under **Or describe it, and an agent makes it** ("a packing list for a week of hiking", "a monthly budget for two") and click **Ask**: the start page opens with your words, for an agent to make it and keep it in your Library (with a project picked under **In a project**, the start page has that project picked too, so it lands there).
+
+**Upload files**, at the bottom left, adds files of yours instead, as many as you pick, each made what it is, in the project under **In a project** (see [Add files of yours](#add-files-of-yours)).
+
+## Add files of yours
+
+Drop files from your computer anywhere on the Library to add them: as many as you like, or whole folders (the files in them). While they are over it, the place they will go is outlined and a line says it: "Drop to add to Thesis", or "Drop to add to the Library, not in a project".
+
+- Dropped on a project in the list of places beside the cards (its chip, on a phone), they go in that project; on **Everything**, **Not in a project** or **Published**, in none.
+- Dropped on the cards, they go in the place you have open: the project you are looking at, or none on **Everything** and **Not in a project**.
+- You can also drop them on a project's card on the [Projects page](/projects), or on what a project holds in the Library on its own page (its **Overview** and **Library** tabs): they go in that project.
+- Without a mouse, on a phone or a tablet: **Upload files** opens your device's file chooser, to pick several at once. It is in **New**, at the bottom left (the files go in the project picked under **In a project**), and beside a project's name when its place is open (on a phone, the upload button beside **Find by name**), for that project.
+
+Each file becomes what it is:
+
+- A Word file (.docx), Markdown, text or a web page (.html) becomes a document, an Excel, OpenDocument or CSV file a spreadsheet, a PowerPoint file (.pptx) slides, a .tex file or a LaTeX project's .zip a LaTeX document, and a Jupyter notebook (.ipynb) a notebook, as **New** makes them from a file (see [Make a page](#make-a-page)): up to 30 MB.
+- A picture, a video or a sound is kept in the Library with a title and a description written for it (see [Titles and descriptions](#titles-and-descriptions)): up to 1 GB. One the Library has already, the same file under any name, is not kept twice: it says "Already in your Library".
+- Any other file (a PDF, a .zip that is no LaTeX project, a file too large to become a document), dropped on a project, goes in the project's folder, where its **Files** tab and the Files page show it; the folders it was in come along when you dropped a folder, and a name taken there already gets "copy" after it. Outside a project, the Library can't keep it, and says what it keeps.
+
+A small tray at the bottom right shows each file as it goes: how much of it has gone, then what it became and in which project, or why it could not be added, in plain words. Click a file there to open what it became: a document, a picture, or the file in its project's folder, in Files. **Cancel** stops the files not added yet, and ✕ beside one stops that one. A few files go at a time, the others wait their turn, and a large one goes in pieces, so a slow or broken connection doesn't lose it. The tray stays while you open what came in, on any page; ✕ closes it once they are all in.
+
+### In the desktop apps, a drop moves the file
+
+In the desktop apps (Mac, Windows and Linux), a file dragged in from Finder, Explorer or your file manager moves into the Library, as moving it between folders does, rather than being copied; the line says "Drop to move them into Thesis".
+
+- A picture, a video or a sound moves into the Library's own folder, and another file dropped on a project into the project's folder.
+- A Word, Excel, PowerPoint, LaTeX or notebook file the Library made a page of is no longer needed where it was: it goes to the app's Trash, where **Put back** brings it back (see [Delete and put back](/guide/files-git#delete-and-put-back)). When the page could not keep all of it (a Word file's footnotes, an Excel file's charts, a LaTeX file that reads others of its folder, a Markdown file that shows pictures of its folder), the file stays where it was, and the tray says what the page lacks.
+- A file in a project's folder, in the app's own folders or in the system's stays where it is, and a copy is added instead. A picture or a video the Library has already stays where it is too, and nothing is added.
+- A folder you dropped goes once all its files have moved out of it.
+
+The tray says of each file where it went, and where its original is. In a browser, and in the desktop app on another machine's pages (see [Use other machines from one app](/guide/devices#use-other-machines-from-one-app)), files are uploaded and the originals stay where they were.
 
 ## Open a page
 
@@ -692,3 +725,4 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Rename the boat video in my Library to 'Lake test', and write its description again."
 - "Make a birthday card with the tram picture from my Library."
 - "Which sounds did I keep in my Library? List their titles and lengths."
+- "Move the photos in ~/Downloads/Lisbon into my Library, in the Trip project."
