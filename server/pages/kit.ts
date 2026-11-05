@@ -883,9 +883,9 @@ if (/<\/style/i.test(KIT_CSS)) throw new Error('The page kit must not close its 
 
 const cfgJson = (cfg: BridgeCfg) => JSON.stringify(cfg).replace(/</g, '\\u003c');
 
-/** The kit's <style> and <script>, for a page (with the colours of its code blocks). */
-export function kitHead(cfg: BridgeCfg): string {
-  return `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${cfgJson(cfg)})</script>${codeColoursScript()}`;
+/** The kit's <style> and <script>, for a page (with the colours of its code blocks, when `html`, the page, has any). */
+export function kitHead(cfg: BridgeCfg, html?: string): string {
+  return `<style id="n-kit">${KIT_CSS}</style><script>(${BRIDGE_SRC})(${cfgJson(cfg)})</script>${html === undefined || /\bn-code\b/.test(html) ? codeColoursScript() : ''}`;
 }
 
 /** Only the stand-ins for localStorage and sessionStorage, for the pages of a published folder. */
